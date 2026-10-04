@@ -526,6 +526,68 @@ class AdmissionRuntime:
                 )
             return active.shared_pressure_lease
 
+    def require_effect_authority(
+        self,
+        operation_id: str,
+        *,
+        now_wall: float | None = None,
+    ) -> AdmissionLease:
+        """Require live authority immediately before an external effect.
+
+        Terminal accounting is intentionally not gated by this method: callers
+        must still be able to reconcile actual usage after a slow or ambiguous
+        effect. Effectful boundaries should call this immediately before
+        dispatch so an expired durable pressure lease cannot authorize new work.
+        """
+
+        operation = str(operation_id).strip()
+        if not operation:
+            raise AdmissionRuntimeError("operation_id is required")
+        wall = _wall_time(now_wall, field="now_wall")
+
+        with self._lock:
+            active = self._active.get(operation)
+            if active is None:
+                raise AdmissionRuntimeError(
+                    "operation has no active admission lease"
+                )
+            shared = active.shared_pressure_lease
+            ledger = self.shared_pressure_ledger
+            if ledger is None:
+                if shared is not None:
+                    raise AdmissionRuntimeConflict(
+                        "active shared pressure lease has no configured ledger"
+                    )
+                return active.lease
+            if shared is None:
+                raise AdmissionRuntimeError(
+                    "effect authority requires shared pressure lease"
+                )
+            finder = getattr(ledger, "lease_for_operation", None)
+            if not callable(finder):
+                raise AdmissionRuntimeError(
+                    "shared pressure ledger does not support live authority lookup"
+                )
+            try:
+                persisted = finder(
+                    self.shared_pressure_scope,
+                    operation,
+                    now=wall,
+                )
+            except SharedPressureError as exc:
+                raise AdmissionRuntimeError(
+                    "effect_authority_unavailable"
+                ) from exc
+            if persisted is None:
+                raise AdmissionRuntimeConflict(
+                    "effect authority expired"
+                )
+            if persisted != shared:
+                raise AdmissionRuntimeConflict(
+                    "effect authority does not match active lease"
+                )
+            return active.lease
+
     def reattach(
         self,
         request: AdmissionRequest,
