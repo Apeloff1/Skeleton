@@ -107,8 +107,10 @@ function patchImageSizeDoS() {
   }
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
-  // Current locked version. If this changes, force a review so a future package
-  // layout cannot silently bypass the compensating control.
+  // Metro 0.83.x depends on the synchronous 1.x API. image-size 2.x is not
+  // API-compatible with that call path, so keep the exact legacy version and
+  // apply the reviewed forward-progress patches below. Any version drift still
+  // requires explicit review.
   if (version !== '1.2.1') {
     throw new Error(`[patch-node-modules] image-size ${version} requires security patch review`);
   }
