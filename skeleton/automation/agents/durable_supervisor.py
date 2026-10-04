@@ -309,7 +309,9 @@ class DurableAgentSupervisor:
 
     @property
     def runtime(self) -> SwarmRuntime:
-        return self._runtime
+        """Return a detached runtime image, never the mutable authority object."""
+
+        return self._clone_runtime()
 
     @property
     def resource_scope(self) -> str:
