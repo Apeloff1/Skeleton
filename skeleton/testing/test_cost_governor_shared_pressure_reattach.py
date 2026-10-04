@@ -12,6 +12,7 @@ from skeleton.ai.runtime.observability.cost_governor import (
     CostGovernorError,
 )
 from skeleton.contracts.canonical import EvidenceRef
+from skeleton.intelligence.admission_runtime import AdmissionRuntimeConflict
 from skeleton.intelligence.admission import (
     AdmissionRequest,
     ResourceBudget,
@@ -407,6 +408,88 @@ def test_tampered_shared_pressure_owner_is_rejected(
     assert restarted.runtime.quota_ledger.snapshot("tenant-a")[
         "active_reservations"
     ] == 1
+
+
+def test_effect_authority_expiry_fences_new_effects_but_not_accounting(
+    tmp_path,
+) -> None:
+    quota_path = tmp_path / "quota.sqlite3"
+    pressure_path = tmp_path / "pressure.sqlite3"
+    pressure = _configure_pressure(pressure_path)
+    request = _request(
+        "op-effect-expiry",
+        max_wall_seconds=5.0,
+    )
+    governor = _governor(quota_path, pressure)
+    governor.reserve(request, now_wall=10.0)
+
+    live = governor.runtime.require_effect_authority(
+        request.operation_id,
+        now_wall=14.999,
+    )
+    assert live.operation_id == request.operation_id
+
+    with pytest.raises(
+        AdmissionRuntimeConflict,
+        match="effect authority expired",
+    ):
+        governor.runtime.require_effect_authority(
+            request.operation_id,
+            now_wall=15.0,
+        )
+
+    # Expiry fences future effects, but terminal accounting must remain
+    # available so known usage cannot become an unrecoverable reservation.
+    completed = governor.complete(
+        request.operation_id,
+        UsageEstimate(
+            input_tokens=120,
+            output_tokens=25,
+            cost_usd=0.7,
+            wall_seconds=5.0,
+            provider_attempts=1,
+        ),
+        evidence_refs=_evidence("effect-expiry-accounting"),
+        now_wall=16.0,
+    )
+    assert completed.state == "completed"
+    snapshot = governor.runtime.quota_ledger.snapshot("tenant-a")
+    assert snapshot["active_reservations"] == 0
+    assert snapshot["completions"] == 1
+
+
+def test_effect_authority_rejects_replacement_lease_split_brain(
+    tmp_path,
+) -> None:
+    quota_path = tmp_path / "quota.sqlite3"
+    pressure_path = tmp_path / "pressure.sqlite3"
+    pressure = _configure_pressure(pressure_path)
+    request = _request(
+        "op-effect-replaced",
+        max_wall_seconds=5.0,
+    )
+    governor = _governor(quota_path, pressure)
+    governor.reserve(request, now_wall=10.0)
+
+    replacement = pressure.acquire(
+        _SCOPE,
+        request.tenant_id,
+        request.operation_id,
+        "worker-b",
+        priority=request.priority,
+        lease_seconds=30.0,
+        now=16.0,
+    )
+    assert replacement.owner_id == "worker-b"
+
+    with pytest.raises(
+        AdmissionRuntimeConflict,
+        match="effect authority does not match active lease",
+    ):
+        governor.runtime.require_effect_authority(
+            request.operation_id,
+            now_wall=16.5,
+        )
 
 
 def test_expired_shared_pressure_lease_cannot_be_renewed(
