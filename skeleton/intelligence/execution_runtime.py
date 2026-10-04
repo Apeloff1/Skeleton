@@ -1203,8 +1203,7 @@ class CognitiveExecutionRuntime:
             ),
             deadline=deadline,
         )
-        cooperative_cancellation = True
-        provider_supports_cooperative_cancellation = bool(
+        cooperative_cancellation = bool(
             getattr(
                 self.provider,
                 "supports_cooperative_cancellation",
