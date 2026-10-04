@@ -1093,7 +1093,7 @@ async def ai_chat(
     user_prompt = "\n\n".join(sections)
     history = _provider_history(
         transcript,
-        exclude_message_id=user_message.message_id,
+        before_sequence=user_message.sequence,
     )
     operation_id, execution_id = _chat_turn_ids(
         thread.thread_id,
