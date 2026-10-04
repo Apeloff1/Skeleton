@@ -95,3 +95,47 @@ def test_vector_store_rejects_threshold_batch_dimension_drift(store_type) -> Non
 
     with pytest.raises(ValueError,match="embedding dimension drift"):
         store.query_threshold_many(["alpha"],minimum_score=0.0)
+
+
+@pytest.mark.parametrize("store_type",[CanonicalVectorStore,AIVectorStore])
+def test_zero_top_k_skips_query_embedding_work(store_type) -> None:
+    calls=[]
+    def embed(text:str)->list[float]:
+        calls.append(text)
+        return [1.0,0.0]
+    store=store_type(embedder=embed)
+    store.add(CanonicalChunk(text="alpha",chunk_id="a"))
+    before=list(calls)
+    assert store.query("unused",top_k=0)==[]
+    assert store.query_many(["unused-a","unused-b"],top_k=0)==[[],[]]
+    assert calls==before
+
+
+@pytest.mark.parametrize("store_type",[CanonicalVectorStore,AIVectorStore])
+def test_diverse_query_spends_context_budget_on_complementary_evidence(store_type) -> None:
+    vectors={
+        "query":[1.0,0.0,0.0],
+        "alpha":[0.9,0.435889894,0.0],
+        "alpha-copy":[0.9,0.435889894,0.0],
+        "beta":[0.85,0.0,0.526782688],
+    }
+    store=store_type(embedder=lambda text:list(vectors[text]))
+    for name in ("alpha","alpha-copy","beta"):
+        store.add(CanonicalChunk(text=name,chunk_id=name))
+    assert [row.chunk.chunk_id for row in store.query("query",top_k=2)]==[
+        "alpha","alpha-copy"
+    ]
+    diverse=store.query_diverse(
+        "query",top_k=2,candidate_multiplier=3,diversity=0.5
+    )
+    assert [row.chunk.chunk_id for row in diverse]==["alpha","beta"]
+
+
+@pytest.mark.parametrize("store_type",[CanonicalVectorStore,AIVectorStore])
+def test_diverse_query_validates_bounded_controls(store_type) -> None:
+    store=store_type(dims=8)
+    store.add(CanonicalChunk(text="alpha beta",chunk_id="a"))
+    with pytest.raises(ValueError,match="candidate_multiplier"):
+        store.query_diverse("alpha",candidate_multiplier=0)
+    with pytest.raises(ValueError,match="diversity"):
+        store.query_diverse("alpha",diversity=1.1)
