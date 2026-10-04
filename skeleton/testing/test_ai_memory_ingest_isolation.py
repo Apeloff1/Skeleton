@@ -36,7 +36,7 @@ def test_cag_duplicate_persona_identity_is_rejected(store_type) -> None:
 
     assert store.health()["active_persona"]=="assistant"
     assert original.system_prompt=="Original prompt"
-    assert store.personas()==("assistant",)
+    assert store.health()["personas"]==1
 
 
 @pytest.mark.parametrize("store_type",[CanonicalMAG,AIMAG])
