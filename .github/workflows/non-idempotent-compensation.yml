@@ -5,18 +5,28 @@ on:
     branches:
       - main
     paths:
-      - "skeleton/kernel/side_effect_compensation.py"
-      - "skeleton/ai/runtime/kernel/side_effect_compensation.py"
-      - "skeleton/testing/test_side_effect_compensation.py"
+      - "machine/non_idempotent_compensation_contract.json"
+      - "scripts/verify_non_idempotent_compensation_contract.py"
+      - "skeleton/skills/tool_saga.py"
+      - "skeleton/ai/runtime/skills/tool_saga.py"
+      - "skeleton/skills/tool_contract.py"
+      - "skeleton/storage/cas.py"
+      - "skeleton/testing/test_tool_saga.py"
+      - "skeleton/testing/test_distributed_transactions.py"
       - "machine/ai_hostile_gap_disposition.json"
       - ".github/workflows/non-idempotent-compensation.yml"
   push:
     branches:
       - main
     paths:
-      - "skeleton/kernel/side_effect_compensation.py"
-      - "skeleton/ai/runtime/kernel/side_effect_compensation.py"
-      - "skeleton/testing/test_side_effect_compensation.py"
+      - "machine/non_idempotent_compensation_contract.json"
+      - "scripts/verify_non_idempotent_compensation_contract.py"
+      - "skeleton/skills/tool_saga.py"
+      - "skeleton/ai/runtime/skills/tool_saga.py"
+      - "skeleton/skills/tool_contract.py"
+      - "skeleton/storage/cas.py"
+      - "skeleton/testing/test_tool_saga.py"
+      - "skeleton/testing/test_distributed_transactions.py"
       - "machine/ai_hostile_gap_disposition.json"
       - ".github/workflows/non-idempotent-compensation.yml"
   workflow_dispatch:
@@ -31,7 +41,7 @@ concurrency:
 jobs:
   non-idempotent-compensation:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 12
     env:
       PYTHONPATH: "."
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
@@ -48,11 +58,16 @@ jobs:
       - name: Compile compensation authority
         run: >-
           python -m compileall -q
-          skeleton/kernel/side_effect_compensation.py
-          skeleton/ai/runtime/kernel/side_effect_compensation.py
-          skeleton/testing/test_side_effect_compensation.py
-      - name: Run compensation regressions
-        run: python -m unittest -q skeleton.testing.test_side_effect_compensation
+          skeleton/skills/tool_saga.py
+          skeleton/ai/runtime/skills/tool_saga.py
+          scripts/verify_non_idempotent_compensation_contract.py
+      - name: Verify canonical G015 compensation contract
+        run: python scripts/verify_non_idempotent_compensation_contract.py --json
+      - name: Run durable saga regressions
+        run: >-
+          python -m unittest -q
+          skeleton.testing.test_tool_saga
+          skeleton.testing.test_distributed_transactions
       - name: Verify governed AI file-tree parity
         run: python scripts/check_ai_file_tree.py
       - name: Verify hostile-gap disposition
