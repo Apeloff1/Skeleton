@@ -906,11 +906,24 @@ class AsyncToolSagaRuntime:
                     )
 
                 if receipt.status is ToolExecutionStatus.FAILED:
-                    compensation_target = (
-                        index
-                        if step.compensation is not None
-                        else _previous_compensation(normalized, index - 1)
-                    )
+                    if receipt.error_code in {
+                        "reconciled_effect_absent",
+                        "reconciled_effect_compensated",
+                    }:
+                        # Independent reconciliation already proved there is no
+                        # uncompensated effect at this step. Compensating it
+                        # again can create a new side effect, so continue only
+                        # with prior successfully committed saga steps.
+                        compensation_target = _previous_compensation(
+                            normalized,
+                            index - 1,
+                        )
+                    else:
+                        compensation_target = (
+                            index
+                            if step.compensation is not None
+                            else _previous_compensation(normalized, index - 1)
+                        )
                 elif receipt.status is ToolExecutionStatus.DENIED:
                     compensation_target = _previous_compensation(
                         normalized,
