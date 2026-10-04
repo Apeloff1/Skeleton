@@ -8,7 +8,7 @@ from .catalog import CapabilityRecord, RepositoryCatalog, build_catalog
 from .context import context_for_intent
 from .contracts import SubsystemContract, derive_contracts
 from .coordination import CoordinationDecision, CoordinationPlan, build_coordination_plan, select_next_work
-from .execution_plan import ExecutionPlan, ExecutionState, PlanStep, advance_execution, build_execution_plan, replan_execution
+from .execution_plan import ExecutionObservation, ExecutionPlan, ExecutionState, PlanStep, advance_execution, build_execution_plan, replan_execution
 from .governance import GovernanceViolation, validate_governance
 from .growth import GrowthRecommendation, growth_recommendations
 from .health import HealthReport, repository_health
@@ -33,7 +33,7 @@ from .workspace import generate_workspace
 
 __all__ = [
     "AtlasZone", "CapabilityRecord", "ContextShard", "CoordinationDecision", "CoordinationPlan",
-    "ExecutionPlan", "ExecutionState", "FileRecord", "Finding", "GovernanceViolation",
+    "ExecutionObservation", "ExecutionPlan", "ExecutionState", "FileRecord", "Finding", "GovernanceViolation",
     "GrowthRecommendation", "HealthReport", "Hotspot", "ImpactReport", "ManifestDelta",
     "NavigationIndex", "OwnershipReport", "PathPlacement", "PlanStep", "PolicyDecision", "Relation",
     "ReorganizationProposal", "RepositoryAtlas", "RepositoryCatalog", "RepositoryModel",
