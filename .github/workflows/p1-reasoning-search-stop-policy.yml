@@ -11,6 +11,7 @@ on:
       - "skeleton/intelligence/__init__.py"
       - "skeleton/ai/runtime/intelligence/__init__.py"
       - "skeleton/intelligence/uncertainty.py"
+      - "skeleton/ai/runtime/intelligence/uncertainty.py"
       - "skeleton/intelligence/cognition.py"
       - "skeleton/testing/test_reasoning_strategy_registry.py"
       - ".github/workflows/p1-reasoning-search-stop-policy.yml"
@@ -25,6 +26,7 @@ on:
       - "skeleton/intelligence/__init__.py"
       - "skeleton/ai/runtime/intelligence/__init__.py"
       - "skeleton/intelligence/uncertainty.py"
+      - "skeleton/ai/runtime/intelligence/uncertainty.py"
       - "skeleton/intelligence/cognition.py"
       - "skeleton/testing/test_reasoning_strategy_registry.py"
       - ".github/workflows/p1-reasoning-search-stop-policy.yml"
@@ -187,6 +189,8 @@ jobs:
               digest(
                   [
                       "skeleton/intelligence/strategy_registry.py",
+                      "skeleton/intelligence/uncertainty.py",
+                      "skeleton/ai/runtime/intelligence/uncertainty.py",
                       ".github/workflows/p1-reasoning-search-stop-policy.yml",
                   ]
               ),
