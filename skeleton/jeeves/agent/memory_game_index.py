@@ -362,6 +362,7 @@ class MemoryGameIndex:
         self.policy = policy or MemoryGamePolicy()
         self._clock = clock
         self._cards: dict[str, IndexCard] = {}
+        self._namespace_to_cards: dict[str, set[str]] = defaultdict(set)
         self._source_to_cards: dict[tuple[str, str], set[str]] = defaultdict(set)
         self._token_to_cards: dict[tuple[str, str], set[str]] = defaultdict(set)
         self._relations: dict[str, CardRelation] = {}
@@ -389,9 +390,11 @@ class MemoryGameIndex:
             if prior is None and len(self._cards) >= self.policy.maximum_cards:
                 self._evict_one()
             if prior is not None:
+                self._namespace_to_cards[prior.namespace_key].discard(prior.card_id)
                 self._source_to_cards[(prior.namespace_key, prior.source_ref)].discard(prior.card_id)
                 self._remove_token_index(prior)
             self._cards[card.card_id] = card
+            self._namespace_to_cards[card.namespace_key].add(card.card_id)
             self._source_to_cards[(card.namespace_key, card.source_ref)].add(card.card_id)
             self._add_token_index(card)
             return card
@@ -637,7 +640,9 @@ class MemoryGameIndex:
                 source_cards = (self._cards[card_id] for card_id in candidate_ids if card_id in self._cards)
             else:
                 source_cards = (
-                    card for card in self._cards.values() if card.namespace_key == namespace_key
+                    self._cards[card_id]
+                    for card_id in self._namespace_to_cards.get(namespace_key, ())
+                    if card_id in self._cards
                 )
             direct = tuple(
                 heapq.nlargest(
@@ -872,6 +877,7 @@ class MemoryGameIndex:
             card = self._cards.pop(card_id, None)
             if card is None:
                 return False
+            self._namespace_to_cards[card.namespace_key].discard(card.card_id)
             self._source_to_cards[(card.namespace_key, card.source_ref)].discard(card.card_id)
             self._remove_token_index(card)
             relation_ids = tuple(self._relations_by_card.pop(card.card_id, set()))
@@ -899,10 +905,21 @@ class MemoryGameIndex:
 
     def cards(self, namespace_key: str | None = None) -> tuple[IndexCard, ...]:
         with self._lock:
-            values = self._cards.values()
-            if namespace_key is not None:
-                values = (card for card in values if card.namespace_key == namespace_key)
-            return tuple(sorted(values, key=lambda card: (card.updated_at, card.card_id), reverse=True))
+            if namespace_key is None:
+                values = self._cards.values()
+            else:
+                values = (
+                    self._cards[card_id]
+                    for card_id in self._namespace_to_cards.get(namespace_key, ())
+                    if card_id in self._cards
+                )
+            return tuple(
+                sorted(
+                    values,
+                    key=lambda card: (card.updated_at, card.card_id),
+                    reverse=True,
+                )
+            )
 
     def card(self, card_id: str) -> IndexCard | None:
         with self._lock:
@@ -924,7 +941,7 @@ class MemoryGameIndex:
         with self._lock:
             if namespace_key is None:
                 return len(self._cards)
-            return sum(1 for card in self._cards.values() if card.namespace_key == namespace_key)
+            return len(self._namespace_to_cards.get(namespace_key, ()))
 
     @property
     def fingerprint(self) -> str:
@@ -1205,6 +1222,7 @@ class MemoryGameIndex:
             ),
         )
         self._cards.pop(victim.card_id, None)
+        self._namespace_to_cards[victim.namespace_key].discard(victim.card_id)
         self._source_to_cards[(victim.namespace_key, victim.source_ref)].discard(victim.card_id)
         self._remove_token_index(victim)
         relation_ids = tuple(self._relations_by_card.pop(victim.card_id, set()))

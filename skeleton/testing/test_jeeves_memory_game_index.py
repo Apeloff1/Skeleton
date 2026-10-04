@@ -190,3 +190,30 @@ def test_interference_uses_inverted_index_instead_of_namespace_full_scan() -> No
     assert packet.direct_hits[0].card.card_id in {target.card_id, similar.card_id}
     assert evaluated <= 2
     assert evaluated < index.count("t/u/w")
+
+
+def test_novel_query_fallback_uses_namespace_index_not_global_card_scan() -> None:
+    _, clock = _clock()
+    index = MemoryGameIndex(clock=clock)
+    for namespace in ("tenant/a", "tenant/b"):
+        for number in range(25):
+            index.index_source(
+                namespace_key=namespace,
+                source_tier=SourceTier.CACHE,
+                source_ref=f"{namespace}:{number}",
+                source_fingerprint=f"{number + (100 if namespace.endswith('b') else 0):064x}",
+                cue=f"known_{namespace[-1]}_{number}",
+                preview="",
+                trust=1.0,
+            )
+
+    class _NoGlobalValues(dict):
+        def values(self):
+            raise AssertionError("novel-query fallback scanned global card values")
+
+    index._cards = _NoGlobalValues(index._cards)
+    packet = index.query("tenant/a", "completely_novel_token", limit=3, touch=False)
+
+    assert len(packet.direct_hits) == 3
+    assert all(hit.card.namespace_key == "tenant/a" for hit in packet.direct_hits)
+    assert index.count("tenant/a") == 25
