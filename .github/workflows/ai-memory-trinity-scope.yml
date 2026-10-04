@@ -21,7 +21,7 @@ permissions:
 
 concurrency:
   group: ai-memory-trinity-scope-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   scoped-memory:
