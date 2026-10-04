@@ -30,14 +30,28 @@ class PersonaContext:
         return len(text) // 4
 
     def add_knowledge(self, key: str, facts: List[str], importance: float = 1.0) -> None:
-        """Add facts to the knowledge graph with importance weighting."""
+        """Add validated, caller-independent facts to the knowledge graph."""
+        if not isinstance(key, str) or not key.strip():
+            raise ValueError("knowledge key must be non-empty")
+        if not isinstance(facts, list) or not facts:
+            raise ValueError("facts must be a non-empty list")
+        if any(not isinstance(fact, str) or not fact.strip() for fact in facts):
+            raise ValueError("facts must contain non-empty strings")
+        if (
+            isinstance(importance, bool)
+            or not isinstance(importance, (int, float))
+            or not 0.0 <= float(importance) <= 1.0
+        ):
+            raise ValueError("importance must be in [0, 1]")
+        key = key.strip()
+        stored_facts = list(facts)
         if key in self.knowledge_graph:
             previous = self.knowledge_graph[key]
             self.current_tokens -= sum(self.estimate_tokens(f) for f in previous)
             self.current_tokens = max(0, self.current_tokens)
-        self.knowledge_graph[key] = facts
-        self.importance_scores[key] = importance
-        self.current_tokens += sum(self.estimate_tokens(f) for f in facts)
+        self.knowledge_graph[key] = stored_facts
+        self.importance_scores[key] = float(importance)
+        self.current_tokens += sum(self.estimate_tokens(f) for f in stored_facts)
         self._evict_if_needed()
 
     def _evict_if_needed(self) -> None:
@@ -95,9 +109,20 @@ class CAGStore(MemoryStore):
         system_prompt: str,
         max_tokens: int = 4000,
     ) -> PersonaContext:
+        if not isinstance(persona_id, str) or not persona_id.strip():
+            raise ValueError("persona_id must be non-empty")
+        persona_id = persona_id.strip()
+        if persona_id in self._personas:
+            raise ValueError("persona_id is already registered")
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("persona name must be non-empty")
+        if not isinstance(system_prompt, str) or not system_prompt.strip():
+            raise ValueError("system_prompt must be non-empty")
+        if isinstance(max_tokens, bool) or not isinstance(max_tokens, int) or max_tokens < 1:
+            raise ValueError("max_tokens must be a positive integer")
         persona = PersonaContext(
             persona_id=persona_id,
-            name=name,
+            name=name.strip(),
             system_prompt=system_prompt,
             max_tokens=max_tokens,
         )
