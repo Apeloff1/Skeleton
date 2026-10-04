@@ -1,0 +1,21 @@
+name: Temporary preempt doomed Merge Readiness main 31d7ea2
+
+on:
+  push:
+    branches:
+      - "ops/preempt-doomed-mr-final-20261004"
+    paths:
+      - ".github/workflows/preempt-doomed-main-31d7ea2-tmp.yml"
+
+permissions: {}
+
+concurrency:
+  group: merge-readiness-31d7ea22706a83a4c46e9aa95e5700a68a69f902
+  cancel-in-progress: true
+
+jobs:
+  preempt:
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo preempted
