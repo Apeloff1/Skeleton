@@ -843,9 +843,10 @@ class DurableAgentSupervisor:
         usage: AgentResourceUsage | None = None,
         active_task_ids: Iterable[str] | None = None,
         reason: str | None = None,
+        require_live_authority: bool = False,
     ) -> AgentCheckpoint:
         now = self._now()
-        if now >= authority.expires_at and (state or previous.state) not in _TERMINAL_STATES:
+        if require_live_authority and now >= authority.expires_at:
             raise AgentRuntimeDenied("delegation authority is expired")
         checkpoint = _checkpoint(
             tenant_id=tenant_id,
@@ -882,6 +883,7 @@ class DurableAgentSupervisor:
             current,
             state=AgentLifecycleState.RUNNING,
             reason="started",
+            require_live_authority=True,
         )
 
     def suspend(self, tenant_id: str, agent_id: str) -> AgentCheckpoint:
@@ -983,6 +985,7 @@ class DurableAgentSupervisor:
             current,
             active_task_ids=(*current.active_task_ids, task),
             reason="task-acquired",
+            require_live_authority=True,
         )
 
     def release_task(
