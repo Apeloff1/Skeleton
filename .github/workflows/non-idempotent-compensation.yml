@@ -1,0 +1,59 @@
+name: Non Idempotent Compensation
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "skeleton/kernel/side_effect_compensation.py"
+      - "skeleton/ai/runtime/kernel/side_effect_compensation.py"
+      - "skeleton/testing/test_side_effect_compensation.py"
+      - "machine/ai_hostile_gap_disposition.json"
+      - ".github/workflows/non-idempotent-compensation.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/kernel/side_effect_compensation.py"
+      - "skeleton/ai/runtime/kernel/side_effect_compensation.py"
+      - "skeleton/testing/test_side_effect_compensation.py"
+      - "machine/ai_hostile_gap_disposition.json"
+      - ".github/workflows/non-idempotent-compensation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: non-idempotent-compensation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  non-idempotent-compensation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Compile compensation authority
+        run: >-
+          python -m compileall -q
+          skeleton/kernel/side_effect_compensation.py
+          skeleton/ai/runtime/kernel/side_effect_compensation.py
+          skeleton/testing/test_side_effect_compensation.py
+      - name: Run compensation regressions
+        run: python -m unittest -q skeleton.testing.test_side_effect_compensation
+      - name: Verify governed AI file-tree parity
+        run: python scripts/check_ai_file_tree.py
+      - name: Verify hostile-gap disposition
+        run: python scripts/verify_ai_hostile_gap_disposition.py
