@@ -24,8 +24,8 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.12'
-      - name: Install focused test dependency
-        run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+      - name: Install declared runtime and test slice
+        run: python -m pip install --disable-pip-version-check -e ".[dev]"
       - name: Compile effect plane
         run: python -m compileall -q skeleton/ai/runtime/effects scripts/run_ai_effect_qualification.py
       - name: Focused effect regressions
