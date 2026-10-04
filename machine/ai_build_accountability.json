@@ -1643,7 +1643,7 @@
       "id": "ACC-VOL-015",
       "type": "volume",
       "title": "VOL-015 Tool & Action System",
-      "status": "implemented",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
@@ -1701,7 +1701,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-10-04T01:48:00Z",
+      "last_event_at_utc": "2026-10-04T04:35:00Z",
       "history": [
         {
           "sequence": 1,
@@ -1761,6 +1761,37 @@
             "tests/test_governed_tool_journey.py",
             "tests/test_tool_runtime_independent_verifier.py"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "evidence_refreshed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "evidence-steward",
+          "at_utc": "2026-10-04T04:35:00Z",
+          "git_sha": "57ad4a7db7789e23e9adb0066da8d7df3b56a89b",
+          "statement": "Reconciled the landed connector-normalization and durable compensation/saga implementations. All explicit VOL-015 implementation gaps are closed; independent verification remains pending.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/57ad4a7db7789e23e9adb0066da8d7df3b56a89b",
+          "from_status": "implemented",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/c54893c64047ecb2b6ac72086eff51b814ca257a",
+            "https://github.com/Apeloff1/Skeleton/commit/57ad4a7db7789e23e9adb0066da8d7df3b56a89b",
+            "https://github.com/Apeloff1/Skeleton/pull/2653",
+            "https://github.com/Apeloff1/Skeleton/pull/2688",
+            "skeleton/tools/integrations/adapters",
+            "skeleton/ai/runtime/tools/integrations/adapters",
+            ".github/workflows/provider-adapters-offline.yml",
+            "skeleton/skills/tool_saga.py",
+            "skeleton/ai/runtime/skills/tool_saga.py",
+            "skeleton/testing/test_tool_saga.py",
+            "scripts/verify_tool_runtime_closure.py",
+            "tests/test_tool_runtime_independent_verifier.py",
+            ".github/workflows/tool-runtime-closure.yml",
+            ".github/workflows/p1-privileged-tool-transaction.yml",
+            "https://github.com/Apeloff1/Skeleton/commit/176ba68996218a6b846143810bb9f7c8694c31f2"
+          ]
         }
       ],
       "evidence": [
@@ -1789,7 +1820,21 @@
         "skeleton/testing/test_tool_receipt_store.py",
         "skeleton/testing/test_tool_runtime.py",
         "tests/test_governed_tool_journey.py",
-        "tests/test_tool_runtime_independent_verifier.py"
+        "tests/test_tool_runtime_independent_verifier.py",
+        "https://github.com/Apeloff1/Skeleton/commit/c54893c64047ecb2b6ac72086eff51b814ca257a",
+        "https://github.com/Apeloff1/Skeleton/commit/57ad4a7db7789e23e9adb0066da8d7df3b56a89b",
+        "https://github.com/Apeloff1/Skeleton/pull/2653",
+        "https://github.com/Apeloff1/Skeleton/pull/2688",
+        "skeleton/tools/integrations/adapters",
+        "skeleton/ai/runtime/tools/integrations/adapters",
+        ".github/workflows/provider-adapters-offline.yml",
+        "skeleton/skills/tool_saga.py",
+        "skeleton/ai/runtime/skills/tool_saga.py",
+        "skeleton/testing/test_tool_saga.py",
+        "scripts/verify_tool_runtime_closure.py",
+        ".github/workflows/tool-runtime-closure.yml",
+        "https://github.com/Apeloff1/Skeleton/commit/176ba68996218a6b846143810bb9f7c8694c31f2",
+        "git-head:57ad4a7db7789e23e9adb0066da8d7df3b56a89b"
       ],
       "baseline_status": "unverified"
     },
@@ -1797,7 +1842,7 @@
       "id": "ACC-VOL-016",
       "type": "volume",
       "title": "VOL-016 Agent Runtime",
-      "status": "implemented",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
@@ -1849,7 +1894,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-10-04T01:48:00Z",
+      "last_event_at_utc": "2026-10-04T04:35:00Z",
       "history": [
         {
           "sequence": 1,
@@ -1903,6 +1948,33 @@
             "skeleton/testing/test_swarm_fencing_concurrency.py",
             "tests/test_agent_coordination.py"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "evidence_refreshed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "evidence-steward",
+          "at_utc": "2026-10-04T04:35:00Z",
+          "git_sha": "57ad4a7db7789e23e9adb0066da8d7df3b56a89b",
+          "statement": "Reconciled the landed durable agent supervisor and resource-accounting implementation. All explicit VOL-016 implementation gaps are closed; independent verification remains pending.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/663cefe36111f05a69563619712f85464a043d06",
+          "from_status": "implemented",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/663cefe36111f05a69563619712f85464a043d06",
+            "https://github.com/Apeloff1/Skeleton/pull/2687",
+            "skeleton/automation/agents/agent_runtime.py",
+            "skeleton/ai/agents/core/agent_runtime.py",
+            "skeleton/agents/agent_runtime.py",
+            "skeleton/testing/test_agent_runtime_durable.py",
+            "scripts/verify_agent_runtime_closure.py",
+            "tests/test_agent_runtime_independent_verifier.py",
+            ".github/workflows/agent-runtime-closure.yml",
+            ".github/workflows/p1-agent-delegation-qualification.yml",
+            "https://github.com/Apeloff1/Skeleton/commit/176ba68996218a6b846143810bb9f7c8694c31f2"
+          ]
         }
       ],
       "evidence": [
@@ -1925,7 +1997,18 @@
         "skeleton/testing/test_swarm_exact_lease_atomicity.py",
         "skeleton/testing/test_swarm_fencing.py",
         "skeleton/testing/test_swarm_fencing_concurrency.py",
-        "tests/test_agent_coordination.py"
+        "tests/test_agent_coordination.py",
+        "https://github.com/Apeloff1/Skeleton/commit/663cefe36111f05a69563619712f85464a043d06",
+        "https://github.com/Apeloff1/Skeleton/pull/2687",
+        "skeleton/automation/agents/agent_runtime.py",
+        "skeleton/ai/agents/core/agent_runtime.py",
+        "skeleton/agents/agent_runtime.py",
+        "skeleton/testing/test_agent_runtime_durable.py",
+        "scripts/verify_agent_runtime_closure.py",
+        "tests/test_agent_runtime_independent_verifier.py",
+        ".github/workflows/agent-runtime-closure.yml",
+        "https://github.com/Apeloff1/Skeleton/commit/176ba68996218a6b846143810bb9f7c8694c31f2",
+        "git-head:57ad4a7db7789e23e9adb0066da8d7df3b56a89b"
       ],
       "baseline_status": "unverified"
     },
@@ -1933,7 +2016,7 @@
       "id": "ACC-VOL-017",
       "type": "volume",
       "title": "VOL-017 Multi-Agent Orchestration",
-      "status": "implemented",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
@@ -1985,7 +2068,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-10-04T01:48:00Z",
+      "last_event_at_utc": "2026-10-04T04:35:00Z",
       "history": [
         {
           "sequence": 1,
@@ -2039,6 +2122,32 @@
             "skeleton/testing/test_swarm_fencing_concurrency.py",
             "tests/test_agent_coordination.py"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "evidence_refreshed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "evidence-steward",
+          "at_utc": "2026-10-04T04:35:00Z",
+          "git_sha": "57ad4a7db7789e23e9adb0066da8d7df3b56a89b",
+          "statement": "Reconciled the landed conflict-domain registry, generation fencing, bounded fan-out, and evidence-qualified arbitration implementation. All explicit VOL-017 implementation gaps are closed; independent verification remains pending.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/4965ccf2857d40506673e860faccce6f15d9f241",
+          "from_status": "implemented",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/4965ccf2857d40506673e860faccce6f15d9f241",
+            "https://github.com/Apeloff1/Skeleton/pull/2680",
+            "skeleton/automation/swarm/multi_agent_orchestration.py",
+            "skeleton/ai/agents/swarm/multi_agent_orchestration.py",
+            "skeleton/swarm/multi_agent_orchestration.py",
+            "skeleton/testing/test_multi_agent_orchestration.py",
+            ".github/workflows/p1-multi-agent-orchestration.yml",
+            "skeleton/testing/test_swarm_fencing.py",
+            "skeleton/testing/test_swarm_fencing_concurrency.py",
+            "https://github.com/Apeloff1/Skeleton/commit/176ba68996218a6b846143810bb9f7c8694c31f2"
+          ]
         }
       ],
       "evidence": [
@@ -2061,7 +2170,16 @@
         "skeleton/testing/test_swarm_exact_lease_atomicity.py",
         "skeleton/testing/test_swarm_fencing.py",
         "skeleton/testing/test_swarm_fencing_concurrency.py",
-        "tests/test_agent_coordination.py"
+        "tests/test_agent_coordination.py",
+        "https://github.com/Apeloff1/Skeleton/commit/4965ccf2857d40506673e860faccce6f15d9f241",
+        "https://github.com/Apeloff1/Skeleton/pull/2680",
+        "skeleton/automation/swarm/multi_agent_orchestration.py",
+        "skeleton/ai/agents/swarm/multi_agent_orchestration.py",
+        "skeleton/swarm/multi_agent_orchestration.py",
+        "skeleton/testing/test_multi_agent_orchestration.py",
+        ".github/workflows/p1-multi-agent-orchestration.yml",
+        "https://github.com/Apeloff1/Skeleton/commit/176ba68996218a6b846143810bb9f7c8694c31f2",
+        "git-head:57ad4a7db7789e23e9adb0066da8d7df3b56a89b"
       ],
       "baseline_status": "unverified"
     },
