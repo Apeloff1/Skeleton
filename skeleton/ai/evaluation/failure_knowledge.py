@@ -12,11 +12,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 import hashlib
-import json
 import re
 from typing import Any, Iterable, Mapping
 
-from skeleton.contracts.canonical import EvidenceRef
+from skeleton.contracts.canonical import CanonicalContractError, EvidenceRef, canonical_json_bytes
 from skeleton.contracts.risk_evidence import RiskBindingEvaluation
 from skeleton.eval.regression_corpus import FailureClass, RegressionCorpus
 
@@ -84,14 +83,8 @@ def _positive_int(value: object, field: str) -> int:
 
 def _canonical_digest(value: object) -> str:
     try:
-        raw = json.dumps(
-            value,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-            allow_nan=False,
-        ).encode("utf-8")
-    except (TypeError, ValueError) as exc:
+        raw = canonical_json_bytes(value)
+    except CanonicalContractError as exc:
         raise FailureKnowledgeError(
             "failure-knowledge payload must be canonical JSON"
         ) from exc
