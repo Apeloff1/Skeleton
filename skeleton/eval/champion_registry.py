@@ -11,11 +11,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 import hashlib
-import json
 import re
 from typing import Any, Iterable
 
-from skeleton.contracts.canonical import EvidenceRef
+from skeleton.contracts.canonical import CanonicalContractError, EvidenceRef, canonical_json_bytes
 from skeleton.contracts.reproducibility import ReproducibilityBundle
 from skeleton.eval.benchmark_registry import (
     BenchmarkManifest,
@@ -80,14 +79,8 @@ def _positive_int(value: object, field: str) -> int:
 
 def _canonical_digest(value: object) -> str:
     try:
-        raw = json.dumps(
-            value,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-            allow_nan=False,
-        ).encode("utf-8")
-    except (TypeError, ValueError) as exc:
+        raw = canonical_json_bytes(value)
+    except CanonicalContractError as exc:
         raise ChampionRegistryError(
             "champion registry payload must be canonical JSON"
         ) from exc
