@@ -3851,7 +3851,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Represent roots, capabilities, contracts, ownership and construction status in validated manifests.",
         "Version manifest schemas and reject unknown/ambiguous references.",
@@ -3868,27 +3868,29 @@
         "ManifestReference"
       ],
       "implementation_paths": [
-        "machine",
-        "scripts",
-        "docs"
+        "machine/manifest_reference_policy.json",
+        "machine/architecture_rule_registry.json",
+        "docs/architecture/MANIFEST_REFERENCE_INTEGRITY.md",
+        "scripts/check_architecture_manifest_references.py"
       ],
       "tests": [
-        "scripts/check_architecture.py",
-        "planned:skeleton/testing/test_machine_manifest_parity.py"
+        "tests/test_architecture_manifest_references.py",
+        "tests/test_architecture_rule_registry.py"
       ],
       "evaluations": [
         "planned:manifest drift injection suite",
         "planned:stale-reference evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/d4334086eaf1c7cbbff46890b727fc954fde1677"
+      ],
       "risks": [
         "manifest drift",
         "dangling path/reference",
         "schema downgrade"
       ],
       "gaps": [
-        "unify manifest reference validation",
-        "bind generated docs to manifest digests"
+        "independent manifest-reference drift, schema-downgrade, and doc-digest verification remains pending"
       ],
       "accountability_id": "ACC-VOL-054",
       "completion_checkbox": false,
