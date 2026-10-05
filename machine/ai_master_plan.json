@@ -1650,7 +1650,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Build repository intelligence from files, symbols, imports, ownership, tests and change history.",
         "Track index freshness and provenance so stale code graphs are visible.",
@@ -1670,12 +1670,14 @@
       "implementation_paths": [
         "skeleton/repo_intelligence/repository_graph.py",
         "skeleton/repo_intelligence/change_planner.py",
-        "skeleton/repo_intelligence/git_index.py"
+        "skeleton/repo_intelligence/git_index.py",
+        "skeleton/repo_intelligence/source_extraction.py"
       ],
       "tests": [
         "skeleton/testing/test_repo_intelligence_git_index.py",
         "planned:skeleton/testing/test_repo_graph_freshness.py",
-        "skeleton/testing/test_vol021_repository_graph.py"
+        "skeleton/testing/test_vol021_repository_graph.py",
+        "skeleton/testing/test_vol021_source_extraction.py"
       ],
       "evaluations": [
         "planned:impact-prediction precision/recall eval",
@@ -1687,9 +1689,7 @@
         "false dependency confidence",
         "generated/vendor code pollution"
       ],
-      "gaps": [
-        "cross-language source extraction adapters still need to materialize import edges from repository contents"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-021",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
