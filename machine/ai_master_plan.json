@@ -1644,9 +1644,9 @@
       "implementation_paths": [
         "skeleton/multimodal/contracts.py",
         "skeleton/multimodal/__init__.py",
-        "backend/routes/media.py",
         "skeleton/multimodal/sanitize.py",
-        "skeleton/multimodal/ingest.py"
+        "skeleton/multimodal/ingest.py",
+        "backend/core/ai_provider.py"
       ],
       "tests": [
         "backend/tests/test_ai_provider_media.py",
@@ -1658,7 +1658,9 @@
         "planned:cross-modal retrieval eval",
         "planned:hidden-instruction multimodal adversarial suite"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/909ebf8b316c75cc345c46b9ca1d6d190faf28ee"
+      ],
       "risks": [
         "embedded prompt injection",
         "metadata privacy leakage",
