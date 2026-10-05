@@ -21,6 +21,9 @@ class HermeticBuild:
  source_digest:str; toolchain_digest:str; inputs:tuple[BuildInput,...]; policy:HermeticPolicy
  def __post_init__(self):
   object.__setattr__(self,"source_digest",_d(self.source_digest,"source_digest")); object.__setattr__(self,"toolchain_digest",_d(self.toolchain_digest,"toolchain_digest"))
+  if len({x.name for x in self.inputs})!=len(self.inputs) or any(not x.name or not x.source for x in self.inputs):raise ValueError("unique build input identity required")
+  for x in self.inputs:_d(x.digest,"input_digest")
+  if any(not x for x in self.policy.vendored_network_inputs) or len(set(self.policy.vendored_network_inputs))!=len(self.policy.vendored_network_inputs):raise ValueError("unique vendored input identity required")
   if self.policy.network_allowed and not self.policy.vendored_network_inputs: raise ValueError("qualified network build must declare vendored/cached inputs")
  @property
  def identity(self)->str: return sha256_json({"source":self.source_digest,"toolchain":self.toolchain_digest,"inputs":sorted((x.name,x.digest,x.source) for x in self.inputs),"network":self.policy.network_allowed,"vendored":sorted(self.policy.vendored_network_inputs)})
@@ -48,8 +51,11 @@ class BinaryAttestation:
  artifact_digest:str; build:BuildIdentity; signature:ArtifactSignature
  def __post_init__(self):
   object.__setattr__(self,"artifact_digest",_d(self.artifact_digest,"artifact_digest"))
+  for n in ("source_digest","environment_digest","toolchain_digest"):_d(getattr(self.build,n),n)
+  _d(self.signature.artifact_digest,"signature_artifact_digest");_t(self.signature.signer_id,"signer_id");_d(self.signature.signature_digest,"signature_digest")
   if self.signature.artifact_digest!=self.artifact_digest: raise ValueError("signature must bind attested artifact")
 def verify_attestation(a:BinaryAttestation,trusted_signers:tuple[str,...])->bool:
+ if len(set(trusted_signers))!=len(trusted_signers) or any(not x for x in trusted_signers):return False
  return a.signature.signer_id in trusted_signers and a.signature.artifact_digest==a.artifact_digest
 
 @dataclass(frozen=True,slots=True)
