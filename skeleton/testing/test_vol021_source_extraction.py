@@ -19,3 +19,12 @@ def test_source_budget_is_hard():
 def test_graph_is_deterministic_under_source_order():
  xs=(s("a.py","import b"),s("b.py",""))
  assert build_repository_graph(xs).digest==build_repository_graph(tuple(reversed(xs))).digest
+
+def test_source_identity_is_bound_to_content_and_safe_path():
+ with pytest.raises(RepositoryGraphError,match="digest mismatch"):SourceFile("a.py","x","0"*64)
+ with pytest.raises(RepositoryGraphError,match="invalid source path"):s("../a.py","x")
+ with pytest.raises(RepositoryGraphError,match="invalid source path"):s("/a.py","x")
+def test_source_metadata_is_bounded_and_deterministic():
+ x=SourceFile("a.py","",hashlib.sha256(b"").hexdigest(),"core",("z.py","a.py","z.py"))
+ assert x.tests==("a.py","z.py")
+ with pytest.raises(RepositoryGraphError,match="source tests"):SourceFile("a.py","",hashlib.sha256(b"").hexdigest(),tests=("",))
