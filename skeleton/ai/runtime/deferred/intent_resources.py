@@ -14,6 +14,7 @@ class ApprovalBurden: approvals:int; overrides:int; stale:int
 @dataclass(frozen=True,slots=True)
 class ApprovalReusePolicy: max_uses:int; require_same_version:bool=True
 def reusable(scope,requested_scope,requested_version,uses,policy):
+ if not all((scope.scope_id,scope.version,requested_scope,requested_version)) or policy.max_uses<1 or uses<0:return False
  return scope.scope_id==requested_scope and (not policy.require_same_version or scope.version==requested_version) and uses<policy.max_uses
 @dataclass(frozen=True,slots=True)
 class TrustSignal: confidence:float; uncertainty:float; degraded:bool; evidence:tuple[str,...]
@@ -21,7 +22,9 @@ class TrustSignal: confidence:float; uncertainty:float; degraded:bool; evidence:
 class CalibrationObservation: predicted:float; observed:float
 @dataclass(frozen=True,slots=True)
 class TrustPresentation: confidence:float; uncertainty:float; degraded:bool; evidence_count:int
-def present_trust(s):return TrustPresentation(s.confidence,s.uncertainty,s.degraded,len(s.evidence))
+def present_trust(s):
+ if not 0<=s.confidence<=1 or not 0<=s.uncertainty<=1 or any(not e for e in s.evidence):raise ValueError("invalid trust signal")
+ return TrustPresentation(s.confidence,s.uncertainty,s.degraded,len(s.evidence))
 @dataclass(frozen=True,slots=True)
 class IntentConstraint: key:str; value:str
 @dataclass(frozen=True,slots=True)
@@ -29,6 +32,8 @@ class UserIntent: intent_id:str; authoritative_instruction:str; inferred_intent:
 @dataclass(frozen=True,slots=True)
 class IntentRevision: revision_id:str; intent:UserIntent; supersedes:str|None
 def latest_intent(revisions):
+ if not revisions or any(not r.revision_id or not r.intent.intent_id or not r.intent.authoritative_instruction for r in revisions):raise ValueError("complete intent identity required")
+ if len({r.revision_id for r in revisions})!=len(revisions):raise ValueError("duplicate intent revision")
  superseded={r.supersedes for r in revisions if r.supersedes}
  live=[r for r in revisions if r.revision_id not in superseded]
  if len(live)!=1:raise ValueError("ambiguous intent lineage")
