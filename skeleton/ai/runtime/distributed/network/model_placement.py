@@ -15,12 +15,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 import hashlib
-import json
 import math
 import re
 from typing import Any, Iterable, Mapping, Sequence
 
-from skeleton.contracts.canonical import EvidenceRef
+from skeleton.contracts.canonical import (
+    CanonicalContractError,
+    EvidenceRef,
+    canonical_json_bytes,
+)
 from skeleton.distributed.network.remote_execution import (
     RemoteExecutionGrantDecision,
     RemoteExecutionRequest,
@@ -122,14 +125,8 @@ def _nonnegative(value: object, field: str) -> float:
 
 def _canonical_digest(value: object) -> str:
     try:
-        raw = json.dumps(
-            value,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-            allow_nan=False,
-        ).encode("utf-8")
-    except (TypeError, ValueError) as exc:
+        raw = canonical_json_bytes(value)
+    except CanonicalContractError as exc:
         raise ModelPlacementError(
             "model placement payload must be canonical JSON"
         ) from exc
@@ -751,7 +748,116 @@ class ModelPlacementDecision:
         )
 
 
-def qualify_model_placement(
+@dataclass(frozen=True, slots=True)
+class ModelPlacementSelection:
+    request_digest: str
+    selected_worker_id: str | None
+    selected_worker_generation: int | None
+    selected_worker_identity_digest: str | None
+    warm_authorization_digest: str | None
+    warm_observation_digest: str | None
+    candidate_worker_ids: tuple[str, ...]
+    rejected: tuple[tuple[str, tuple[str, ...]], ...]
+    topology_digest: str
+    capacity_digest: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "request_digest",
+            _sha256(self.request_digest, "request_digest"),
+        )
+        for field in (
+            "selected_worker_identity_digest",
+            "warm_authorization_digest",
+            "warm_observation_digest",
+        ):
+            value = getattr(self, field)
+            if value is not None:
+                object.__setattr__(self, field, _sha256(value, field))
+        if self.selected_worker_id is not None:
+            object.__setattr__(
+                self,
+                "selected_worker_id",
+                _token(
+                    self.selected_worker_id,
+                    "selected_worker_id",
+                    maximum=128,
+                ),
+            )
+        if self.selected_worker_generation is not None:
+            object.__setattr__(
+                self,
+                "selected_worker_generation",
+                _positive_int(
+                    self.selected_worker_generation,
+                    "selected_worker_generation",
+                ),
+            )
+        if (self.selected_worker_id is None) != (
+            self.selected_worker_generation is None
+        ):
+            raise ModelPlacementError(
+                "selection worker identity must be complete"
+            )
+        object.__setattr__(
+            self,
+            "candidate_worker_ids",
+            _tokens(self.candidate_worker_ids, "candidate_worker_ids"),
+        )
+        object.__setattr__(
+            self,
+            "rejected",
+            tuple(
+                sorted(
+                    (
+                        _token(
+                            worker_id,
+                            "rejected.worker_id",
+                            maximum=128,
+                        ),
+                        tuple(sorted(set(reasons))),
+                    )
+                    for worker_id, reasons in self.rejected
+                )
+            ),
+        )
+        for field in ("topology_digest", "capacity_digest"):
+            object.__setattr__(
+                self,
+                field,
+                _sha256(getattr(self, field), field),
+            )
+
+    @property
+    def selected(self) -> bool:
+        return self.selected_worker_id is not None
+
+    def payload(self) -> dict[str, Any]:
+        return {
+            "request_digest": self.request_digest,
+            "selected_worker_id": self.selected_worker_id,
+            "selected_worker_generation": self.selected_worker_generation,
+            "selected_worker_identity_digest": (
+                self.selected_worker_identity_digest
+            ),
+            "warm_authorization_digest": self.warm_authorization_digest,
+            "warm_observation_digest": self.warm_observation_digest,
+            "candidate_worker_ids": list(self.candidate_worker_ids),
+            "rejected": [
+                [worker_id, list(reasons)]
+                for worker_id, reasons in self.rejected
+            ],
+            "topology_digest": self.topology_digest,
+            "capacity_digest": self.capacity_digest,
+        }
+
+    @property
+    def selection_digest(self) -> str:
+        return _canonical_digest(self.payload())
+
+
+def select_model_placement(
     *,
     request: ModelPlacementRequest,
     registrations: Sequence[WorkerRegistration],
@@ -761,15 +867,14 @@ def qualify_model_placement(
     active_assignments: Mapping[str, int],
     warm_authorizations: Mapping[str, ModelWarmAuthorizationDecision],
     warm_observations: Mapping[str, ModelWarmObservation],
-    reservation: CapacityReservation,
     observed_at: float,
-) -> ModelPlacementDecision:
+) -> ModelPlacementSelection:
+    """Select one deterministic worker without claiming reservation authority."""
+
     if not isinstance(request, ModelPlacementRequest):
         raise TypeError("request must be ModelPlacementRequest")
     if not isinstance(capacities, WorkerCapacityCatalog):
         raise TypeError("capacities must be WorkerCapacityCatalog")
-    if not isinstance(reservation, CapacityReservation):
-        raise TypeError("reservation must be CapacityReservation")
     now = _nonnegative(observed_at, "observed_at")
 
     rejected: dict[str, list[str]] = {}
@@ -911,29 +1016,12 @@ def qualify_model_placement(
         if placement.selected is None
         else placement.selected.registration
     )
-    reasons: list[str] = []
-    if selected is None:
-        reasons.append("no-qualified-placement")
-
     selected_authorization = None
     selected_observation = None
-    reservation_digest = None
     if selected is not None:
         worker = selected.identity
         selected_authorization = warm_authorizations[worker.worker_id]
         selected_observation = warm_observations[worker.worker_id]
-        if reservation.worker != worker:
-            reasons.append("reservation-worker-mismatch")
-        if (
-            reservation.demand.inflight < request.demand_inflight
-            or reservation.demand.weight < request.demand_weight
-        ):
-            reasons.append("reservation-demand-insufficient")
-        if now < reservation.created_at:
-            reasons.append("reservation-not-yet-valid")
-        if now >= reservation.expires_at:
-            reasons.append("reservation-expired")
-        reservation_digest = _reservation_digest(reservation)
 
     topology_digest = _canonical_digest(
         {
@@ -956,10 +1044,7 @@ def qualify_model_placement(
         )
         for worker_id, worker_reasons in sorted(rejected.items())
     )
-    normalized = tuple(sorted(set(reasons)))
-    return ModelPlacementDecision(
-        accepted=not normalized,
-        reasons=normalized,
+    return ModelPlacementSelection(
         request_digest=request.request_digest,
         selected_worker_id=(
             None if selected is None else selected.identity.worker_id
@@ -982,13 +1067,84 @@ def qualify_model_placement(
             if selected_observation is None
             else selected_observation.observation_digest
         ),
-        reservation_digest=reservation_digest,
         candidate_worker_ids=tuple(
             candidate.worker_id for candidate in placement.candidates
         ),
         rejected=normalized_rejected,
         topology_digest=topology_digest,
         capacity_digest=capacity_digest,
+    )
+
+
+def qualify_model_placement(
+    *,
+    request: ModelPlacementRequest,
+    registrations: Sequence[WorkerRegistration],
+    liveness: Mapping[str, LivenessView],
+    capacities: WorkerCapacityCatalog,
+    active_weight: Mapping[str, int],
+    active_assignments: Mapping[str, int],
+    warm_authorizations: Mapping[str, ModelWarmAuthorizationDecision],
+    warm_observations: Mapping[str, ModelWarmObservation],
+    reservation: CapacityReservation,
+    observed_at: float,
+) -> ModelPlacementDecision:
+    if not isinstance(reservation, CapacityReservation):
+        raise TypeError("reservation must be CapacityReservation")
+    now = _nonnegative(observed_at, "observed_at")
+    selection = select_model_placement(
+        request=request,
+        registrations=registrations,
+        liveness=liveness,
+        capacities=capacities,
+        active_weight=active_weight,
+        active_assignments=active_assignments,
+        warm_authorizations=warm_authorizations,
+        warm_observations=warm_observations,
+        observed_at=now,
+    )
+
+    reasons: list[str] = []
+    if not selection.selected:
+        reasons.append("no-qualified-placement")
+
+    reservation_digest = None
+    if selection.selected:
+        if (
+            reservation.worker.worker_id
+            != selection.selected_worker_id
+            or reservation.worker.generation
+            != selection.selected_worker_generation
+        ):
+            reasons.append("reservation-worker-mismatch")
+        if (
+            reservation.demand.inflight < request.demand_inflight
+            or reservation.demand.weight < request.demand_weight
+        ):
+            reasons.append("reservation-demand-insufficient")
+        if now < reservation.created_at:
+            reasons.append("reservation-not-yet-valid")
+        if now >= reservation.expires_at:
+            reasons.append("reservation-expired")
+        reservation_digest = _reservation_digest(reservation)
+
+    normalized = tuple(sorted(set(reasons)))
+    return ModelPlacementDecision(
+        accepted=not normalized,
+        reasons=normalized,
+        request_digest=selection.request_digest,
+        selected_worker_id=selection.selected_worker_id,
+        selected_worker_generation=selection.selected_worker_generation,
+        selected_worker_identity_digest=(
+            selection.selected_worker_identity_digest
+        ),
+        warm_authorization_digest=selection.warm_authorization_digest,
+        warm_observation_digest=selection.warm_observation_digest,
+        reservation_digest=reservation_digest,
+        candidate_worker_ids=selection.candidate_worker_ids,
+        rejected=selection.rejected,
+        topology_digest=selection.topology_digest,
+        capacity_digest=selection.capacity_digest,
     )
 
 
@@ -999,9 +1155,11 @@ __all__ = [
     "ModelPlacementDecision",
     "ModelPlacementError",
     "ModelPlacementRequest",
+    "ModelPlacementSelection",
     "ModelWarmAuthorizationDecision",
     "ModelWarmObservation",
     "WarmReadiness",
     "qualify_model_placement",
+    "select_model_placement",
     "qualify_model_warmup",
 ]
