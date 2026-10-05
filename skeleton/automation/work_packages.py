@@ -24,12 +24,16 @@ class WorkPackageDependency:
   if self.package_id==self.depends_on:raise WorkPackageError("self dependency")
 @dataclass(frozen=True,slots=True)
 class WorkPackageEvidence:
- evidence_id:str;package_id:str;package_digest:str;role:EvidenceRole;actor_id:str;artifact_digest:str
+ evidence_id:str;package_id:str;package_digest:str;role:EvidenceRole;actor_id:str;artifact_digest:str;observed_at:datetime
  def __post_init__(self):
   for f in ("evidence_id","package_id","actor_id"):object.__setattr__(self,f,_id(getattr(self,f),f))
   if not isinstance(self.role,EvidenceRole):raise WorkPackageError("role must be EvidenceRole")
   for f in ("package_digest","artifact_digest"):
    if not isinstance(getattr(self,f),str) or not _SHA.fullmatch(getattr(self,f)):raise WorkPackageError(f"{f} must be sha256")
+  if not isinstance(self.observed_at,datetime) or self.observed_at.tzinfo is None:raise WorkPackageError("observed_at must be timezone-aware")
+  normalized=self.observed_at.astimezone(timezone.utc)
+  if normalized.microsecond:raise WorkPackageError("observed_at must use whole-second precision")
+  object.__setattr__(self,"observed_at",normalized)
 @dataclass(frozen=True,slots=True)
 class WorkPackage:
  package_id:str;volume_id:str;objective:str;non_goals:tuple[str,...];interfaces:tuple[str,...];state_owners:tuple[str,...];risks:tuple[str,...];tests:tuple[str,...];rollback:str;requirement_ids:tuple[str,...];aiq_task_ids:tuple[str,...]
@@ -98,4 +102,4 @@ class WorkPackageRegistry:
   state=self.state(pid)
   p=self.packages[pid]
   ev=tuple(sorted((e for e in self.evidence.values() if e.package_id==pid),key=lambda x:(x.role.value,x.evidence_id)))
-  return {"package_id":pid,"package_digest":p.digest,"state":state.value,"evidence_ids":tuple(e.evidence_id for e in ev),"artifact_digests":tuple(e.artifact_digest for e in ev)}
+  return {"package_id":pid,"package_digest":p.digest,"state":state.value,"evidence_ids":tuple(e.evidence_id for e in ev),"artifact_digests":tuple(e.artifact_digest for e in ev),"observed_at_utc":tuple(e.observed_at.isoformat() for e in ev)}
