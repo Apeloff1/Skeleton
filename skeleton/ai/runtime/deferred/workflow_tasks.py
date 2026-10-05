@@ -12,7 +12,8 @@ class WorkflowSource: source_id:str; version:DSLVersion; text:str; declared_auth
 class DSLDiagnostic: code:str; message:str; position:int|None
 def validate_source(s:WorkflowSource,allowed_authority:tuple[str,...])->tuple[DSLDiagnostic,...]:
  ds=[]
- if s.version.major!=1:ds.append(DSLDiagnostic("DSL_VERSION","unsupported DSL major",None))
+ if not s.source_id or not s.text:ds.append(DSLDiagnostic("DSL_IDENTITY","source identity/text required",None))
+ if s.version.major!=1 or s.version.minor<0:ds.append(DSLDiagnostic("DSL_VERSION","unsupported DSL major",None))
  extra=set(s.declared_authority)-set(allowed_authority)
  if extra:ds.append(DSLDiagnostic("DSL_AUTHORITY","undeclared privilege: "+",".join(sorted(extra)),None))
  if "\x00" in s.text:ds.append(DSLDiagnostic("DSL_SYNTAX","NUL is not valid source",s.text.index("\x00")))
@@ -29,13 +30,16 @@ class CompiledWorkflow: source_id:str; source_digest:str; version:DSLVersion; li
 class CompileResult: workflow:CompiledWorkflow|None; diagnostics:tuple[DSLDiagnostic,...]
 def compile_workflow(s:WorkflowSource,links:tuple[WorkflowLink,...],available_capabilities:tuple[str,...],edges:tuple[tuple[str,str],...])->CompileResult:
  ds=list(validate_source(s,s.declared_authority))
+ if len({x.node_id for x in links})!=len(links) or any(not x.node_id or not x.capability for x in links):ds.append(DSLDiagnostic("LINK_IDENTITY","unique link identity required",None))
  nodes={x.node_id for x in links}
  for x in links:
   if x.capability not in available_capabilities:ds.append(DSLDiagnostic("MISSING_CAPABILITY",x.capability,None))
   if x.compensation and x.compensation not in nodes:ds.append(DSLDiagnostic("INVALID_COMPENSATION",x.node_id,None))
  graph={n:[] for n in nodes}
+ if len(set(edges))!=len(edges):ds.append(DSLDiagnostic("DUPLICATE_EDGE","duplicate workflow edge",None))
  for a,b in edges:
-  if a in graph:graph[a].append(b)
+  if not a or not b or a==b or a not in graph or b not in graph:ds.append(DSLDiagnostic("INVALID_EDGE",f"{a}->{b}",None))
+  elif a in graph:graph[a].append(b)
  visiting=set();done=set()
  def visit(n):
   if n in visiting:return True
