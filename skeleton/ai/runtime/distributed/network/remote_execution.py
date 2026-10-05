@@ -21,12 +21,22 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 import hashlib
-import json
 import math
 import re
 from typing import Any, Iterable, Mapping
 
-from skeleton.contracts.canonical import EvidenceRef
+from skeleton.contracts.canonical import (
+    CanonicalContractError,
+    EvidenceRef,
+    canonical_json_bytes,
+)
+from skeleton.distributed.network.consistency_policy import (
+    ConsistencyMode,
+    DataConsistencyPolicy,
+    canonical_data_consistency_policy,
+    consistency_satisfies,
+)
+from skeleton.vault.data_governance import DataClass
 from skeleton.shells.leases import Lease
 from skeleton.shells.worker_heartbeat import LivenessView, WorkerLiveness
 from skeleton.shells.worker_identity import (
@@ -119,14 +129,8 @@ def _nonnegative(value: object, field: str) -> float:
 
 def _canonical_digest(value: object) -> str:
     try:
-        raw = json.dumps(
-            value,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-            allow_nan=False,
-        ).encode("utf-8")
-    except (TypeError, ValueError) as exc:
+        raw = canonical_json_bytes(value)
+    except CanonicalContractError as exc:
         raise RemoteExecutionError(
             "remote execution payload must be canonical JSON"
         ) from exc
@@ -218,6 +222,9 @@ class RemoteExecutionRequest:
     authority_digest: str
     payload_digest: str
     required_role: WorkerRole
+    data_class: DataClass | str | int = DataClass.INTERNAL
+    consistency_mode: ConsistencyMode | str = ConsistencyMode.READ_YOUR_WRITES
+    consistency_policy_digest: str | None = None
     required_features: tuple[str, ...] = ()
     required_labels: tuple[tuple[str, str], ...] = ()
     protocol_version: int = 1
@@ -257,6 +264,30 @@ class RemoteExecutionRequest:
             )
         except ValueError as exc:
             raise RemoteExecutionError("invalid required_role") from exc
+        try:
+            object.__setattr__(
+                self,
+                "data_class",
+                DataClass.parse(self.data_class),
+            )
+        except Exception as exc:
+            raise RemoteExecutionError("invalid data_class") from exc
+        try:
+            object.__setattr__(
+                self,
+                "consistency_mode",
+                ConsistencyMode(self.consistency_mode),
+            )
+        except ValueError as exc:
+            raise RemoteExecutionError("invalid consistency_mode") from exc
+        policy_digest = self.consistency_policy_digest
+        if policy_digest is None:
+            policy_digest = canonical_data_consistency_policy().policy_digest
+        object.__setattr__(
+            self,
+            "consistency_policy_digest",
+            _sha256(policy_digest, "consistency_policy_digest"),
+        )
         object.__setattr__(
             self,
             "required_features",
@@ -308,6 +339,9 @@ class RemoteExecutionRequest:
             "authority_digest": self.authority_digest,
             "payload_digest": self.payload_digest,
             "required_role": self.required_role.value,
+            "data_class": self.data_class.label,
+            "consistency_mode": self.consistency_mode.value,
+            "consistency_policy_digest": self.consistency_policy_digest,
             "required_features": list(self.required_features),
             "required_labels": [list(item) for item in self.required_labels],
             "protocol_version": self.protocol_version,
@@ -614,6 +648,7 @@ def qualify_remote_execution(
     lease: Lease,
     fence: RemoteExecutionFence,
     observed_at: float,
+    consistency_policy: DataConsistencyPolicy | None = None,
 ) -> RemoteExecutionGrantDecision:
     if not isinstance(request, RemoteExecutionRequest):
         raise TypeError("request must be RemoteExecutionRequest")
@@ -634,6 +669,30 @@ def qualify_remote_execution(
     identity_digest = worker_identity_digest(worker)
     current_lease_digest = lease_digest(lease)
     reasons: list[str] = []
+
+    selected_consistency_policy = (
+        canonical_data_consistency_policy()
+        if consistency_policy is None
+        else consistency_policy
+    )
+    if not isinstance(selected_consistency_policy, DataConsistencyPolicy):
+        raise TypeError("consistency_policy must be DataConsistencyPolicy")
+    if (
+        request.consistency_policy_digest
+        != selected_consistency_policy.policy_digest
+    ):
+        reasons.append("consistency-policy-digest-mismatch")
+    consistency_rule = selected_consistency_policy.rule_for(
+        request.data_class
+    )
+    if not consistency_rule.allow_remote_execution:
+        reasons.append("remote-execution-disallowed-for-data-class")
+    elif not consistency_satisfies(
+        policy=selected_consistency_policy,
+        data_class=request.data_class,
+        requested_mode=request.consistency_mode,
+    ):
+        reasons.append("consistency-mode-too-weak")
 
     if registration.identity != worker:
         reasons.append("worker-registration-identity-mismatch")
@@ -876,6 +935,7 @@ def qualify_remote_execution_commit(
     completion: WorkerMessage,
     protocol_cursor: ProtocolCursor,
     observed_at: float,
+    consistency_policy: DataConsistencyPolicy | None = None,
 ) -> RemoteExecutionCommitDecision:
     if not isinstance(grant, RemoteExecutionGrantDecision):
         raise TypeError("grant must be RemoteExecutionGrantDecision")
@@ -895,6 +955,7 @@ def qualify_remote_execution_commit(
         lease=lease,
         fence=current_fence,
         observed_at=observed_at,
+        consistency_policy=consistency_policy,
     )
     reasons: list[str] = []
     if not fresh.accepted:
@@ -972,6 +1033,8 @@ __all__ = [
     "REMOTE_EXECUTION_ACCOUNTABILITY_ID",
     "REMOTE_EXECUTION_SCHEMA_VERSION",
     "REMOTE_EXECUTION_TASK_ID",
+    "ConsistencyMode",
+    "DataConsistencyPolicy",
     "RemoteExecutionCommitDecision",
     "RemoteExecutionError",
     "RemoteExecutionFence",
