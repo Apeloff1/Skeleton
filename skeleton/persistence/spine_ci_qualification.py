@@ -259,6 +259,12 @@ class SpineCiQualification:
             "required_check_count": expected_count,
             "checks": normalized,
             "checks_digest": _digest(normalized),
+            "qualification_identity": _digest({
+                "repository": repository,
+                "head_sha": expected_head_sha,
+                "required_check_policy_digest": REQUIRED_CHECK_POLICY_DIGEST,
+                "checks_digest": _digest(normalized),
+            }),
             "check_names": actual_names,
             "attestation_digest": attestation,
             "catalog_complete": True,
