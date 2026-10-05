@@ -451,3 +451,20 @@ def test_maturity_availability_identifiers_and_guarantees_are_typed() -> None:
         descriptor("cap.lower")
     with pytest.raises(CapabilityError, match="canonical token"):
         descriptor("CAP.A", guarantees=("Has Space",))
+
+
+def test_evidence_count_is_bounded_before_registry_construction() -> None:
+    item = descriptor("CAP.A")
+    oversized = tuple(
+        evidence(item, evidence_id=f"EVID.{index:05d}")
+        for index in range(10_001)
+    )
+    with pytest.raises(CapabilityError, match="evidence count exceeds safety bound"):
+        CapabilityMap((item,), oversized)
+
+
+def test_non_iterable_registry_inputs_fail_with_stable_type_errors() -> None:
+    with pytest.raises(TypeError, match="descriptors must be iterable"):
+        CapabilityMap(None, ())  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="evidence must be iterable"):
+        CapabilityMap((), None)  # type: ignore[arg-type]
