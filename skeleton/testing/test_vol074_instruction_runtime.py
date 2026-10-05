@@ -131,7 +131,7 @@ def state(
         correction_success_rate=correction_success_rate,
         transfer_evidence=transfer_evidence,
         retention_evidence=retention_evidence,
-        last_observed_at=10.0 if evidence_count else None,
+        last_observed_at=0.0 if evidence_count else None,
         latest_success=latest_success if evidence_count else None,
         evidence_digest=digest(
             f"{objective_id}:{mastery}:{uncertainty}:{effective_evidence}"
