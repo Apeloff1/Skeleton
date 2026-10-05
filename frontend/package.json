@@ -20,7 +20,8 @@
     "test:conversation": "node --test scripts/test-conversation-projection.mjs",
     "test:skeleton-forge": "node --test scripts/skeleton-forge/*.test.cjs",
     "test:forge-operator": "node --test scripts/forge-operator/*.test.cjs",
-    "test:product-projection": "node --test scripts/test-product-projection.mjs"
+    "test:product-projection": "node --test scripts/test-product-projection.mjs",
+    "test:accessibility": "node --test scripts/test-accessibility-contract.mjs"
   },
   "engines": {
     "node": ">=24"
