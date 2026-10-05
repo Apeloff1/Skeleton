@@ -59,6 +59,8 @@ class WorkflowCompatibility: source_version:int; target_version:int; compatible:
 @dataclass(frozen=True,slots=True)
 class WorkflowBinding: run_id:str; workflow:WorkflowVersion
 def rebind(b:WorkflowBinding,target:WorkflowVersion,c:WorkflowCompatibility,*,explicit_migration:bool)->WorkflowBinding:
+ if not all((b.run_id,b.workflow.workflow_id,b.workflow.ir_digest,target.workflow_id,target.ir_digest)) or b.workflow.workflow_id!=target.workflow_id:raise ValueError("workflow identity mismatch")
+ if target.version<0 or b.workflow.version<0:raise ValueError("invalid workflow version")
  if not explicit_migration:return b
  if b.workflow.version!=c.source_version or target.version!=c.target_version or not c.compatible:raise ValueError("incompatible workflow migration")
  return WorkflowBinding(b.run_id,target)
@@ -70,6 +72,8 @@ class WorkflowMigration: migration_id:str; source_version:int; target_version:in
 @dataclass(frozen=True,slots=True)
 class WorkflowMigrationReceipt: migration_id:str; migrated:bool; pinned:bool; restarted:bool
 def migrate(m:WorkflowMigration,*,compatible:bool,terminate_and_restart:bool=False)->WorkflowMigrationReceipt:
+ if not m.migration_id or m.source_version<0 or m.target_version<0 or m.source_version==m.target_version:raise ValueError("valid migration identity required")
+ if len({x.source_key for x in m.mappings})!=len(m.mappings) or len({x.target_key for x in m.mappings})!=len(m.mappings) or any(not x.source_key or not x.target_key for x in m.mappings):raise ValueError("unique state mappings required")
  irreversible=any(x.irreversible for x in m.mappings)
  if irreversible and m.rollback_declared:raise ValueError("irreversible migration cannot claim rollback")
  if compatible:return WorkflowMigrationReceipt(m.migration_id,True,False,False)
@@ -81,6 +85,7 @@ class TaskProfile: task_type:TaskType; default_budget:int; default_tests:tuple[s
 @dataclass(frozen=True,slots=True)
 class TaskClassification: task_type:TaskType; confidence:float; profile:TaskProfile
 def classify(label:str,profiles:dict[TaskType,TaskProfile])->TaskClassification:
+ if set(profiles)!=set(TaskType) or any(p.default_budget<0 or any(not x for x in p.default_tests) or any(not x for x in p.authority) for p in profiles.values()):raise ValueError("complete task profiles required")
  try:t=TaskType(label.lower())
  except ValueError:t=TaskType.GENERIC
  return TaskClassification(t,1.0 if t is not TaskType.GENERIC else 0.0,profiles[t])
@@ -92,4 +97,5 @@ class ComplexityEstimate: score:float; uncertainty:float; calibration_id:str; fe
 @dataclass(frozen=True,slots=True)
 class EstimateRevision: previous:ComplexityEstimate; revised:ComplexityEstimate; runtime_evidence:str
 def revise(e:ComplexityEstimate,new_score:float,new_uncertainty:float,evidence:str)->EstimateRevision:
+ if not e.calibration_id or not evidence or new_score<0 or not 0<=new_uncertainty<=1 or len({x.name for x in e.features})!=len(e.features) or any(not x.name for x in e.features):raise ValueError("valid complexity evidence required")
  return EstimateRevision(e,ComplexityEstimate(new_score,new_uncertainty,e.calibration_id,e.features),evidence)
