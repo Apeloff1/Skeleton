@@ -18,6 +18,7 @@ from enum import Enum
 from hashlib import sha256
 import json
 import re
+from itertools import islice
 from typing import Iterable, Mapping
 
 RADAR_SCHEMA = "skeleton.contracts.technology_radar.v1"
@@ -108,7 +109,12 @@ def technology_evidence_set_digest(
 ) -> str:
     """Return deterministic identity for an exact technology evidence set."""
 
-    materialized = tuple(items)
+    try:
+        materialized = tuple(islice(iter(items), _MAX_EVIDENCE + 1))
+    except TypeError as exc:
+        raise TypeError("items must be iterable") from exc
+    if len(materialized) > _MAX_EVIDENCE:
+        raise RadarError("evidence set exceeds safety bound")
     if any(not isinstance(item, TechnologyEvidence) for item in materialized):
         raise TypeError("items must contain TechnologyEvidence")
     evidence_ids = [item.evidence_id for item in materialized]
@@ -466,14 +472,31 @@ class TechnologyRadar:
         evidence: Iterable[TechnologyEvidence] = (),
         architecture_decisions: Iterable[ArchitectureDecision] = (),
     ) -> None:
-        materialized_candidates = tuple(candidates)
-        materialized_evidence = tuple(evidence)
-        materialized_adrs = tuple(architecture_decisions)
+        try:
+            materialized_candidates = tuple(
+                islice(iter(candidates), _MAX_CANDIDATES + 1)
+            )
+        except TypeError as exc:
+            raise TypeError("candidates must be iterable") from exc
+        try:
+            materialized_evidence = tuple(
+                islice(iter(evidence), _MAX_EVIDENCE + 1)
+            )
+        except TypeError as exc:
+            raise TypeError("evidence must be iterable") from exc
+        try:
+            materialized_adrs = tuple(
+                islice(iter(architecture_decisions), _MAX_CANDIDATES + 1)
+            )
+        except TypeError as exc:
+            raise TypeError("architecture_decisions must be iterable") from exc
 
         if len(materialized_candidates) > _MAX_CANDIDATES:
             raise RadarError("candidate count exceeds safety bound")
         if len(materialized_evidence) > _MAX_EVIDENCE:
             raise RadarError("evidence count exceeds safety bound")
+        if len(materialized_adrs) > _MAX_CANDIDATES:
+            raise RadarError("architecture decision count exceeds safety bound")
         if any(
             not isinstance(item, TechnologyCandidate)
             for item in materialized_candidates
