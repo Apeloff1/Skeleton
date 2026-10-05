@@ -449,7 +449,7 @@ def test_tree_constructor_rejects_unreachable_nodes() -> None:
         stop_reason=None,
     )
 
-    with pytest.raises(ScenarioRuntimeError, match="unknown node"):
+    with pytest.raises(ScenarioRuntimeError, match="unreachable nodes"):
         replace(
             tree,
             nodes=tree.nodes + (orphan,),
@@ -503,3 +503,40 @@ def test_canonical_and_ai_scenario_runtime_are_byte_identical() -> None:
     canonical = ROOT / "skeleton/simulation/scenario_runtime.py"
     mirror = ROOT / "skeleton/ai/simulation/scenario_runtime.py"
     assert canonical.read_bytes() == mirror.read_bytes()
+
+
+def test_tree_constructor_rejects_cost_usage_underreporting() -> None:
+    def expand(state, node):
+        if node.depth:
+            return ()
+        return (transition("costly", 1, cost_units=4),)
+
+    tree = runtime().explore({"position": 0}, expand)
+    with pytest.raises(ScenarioRuntimeError, match="usage.cost_units"):
+        replace(
+            tree,
+            usage=ScenarioResourceUsage(
+                nodes=tree.usage.nodes,
+                actions=tree.usage.actions,
+                cost_units=0,
+                max_depth_reached=tree.usage.max_depth_reached,
+            ),
+        )
+
+
+def test_runtime_verify_rejects_child_cost_chain_tampering() -> None:
+    def expand(state, node):
+        if node.depth:
+            return ()
+        return (transition("costly", 1, cost_units=4),)
+
+    rt = runtime()
+    tree = rt.explore({"position": 0}, expand)
+    child = next(node for node in tree.nodes if node.parent_id is not None)
+    forged_child = replace(child, cumulative_cost_units=child.cumulative_cost_units + 1)
+    forged_nodes = tuple(
+        forged_child if node.node_id == child.node_id else node for node in tree.nodes
+    )
+    forged = replace(tree, nodes=forged_nodes)
+    with pytest.raises(ScenarioRuntimeError, match="cumulative cost"):
+        rt.verify(forged)
