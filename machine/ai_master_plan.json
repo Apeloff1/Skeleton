@@ -6170,10 +6170,18 @@
       "contracts": [
         "Runbook",
         "RunbookStep",
-        "RunbookValidation"
+        "RunbookValidation",
+        "RunbookRegistry",
+        "StepKind",
+        "ValidationStatus"
       ],
       "implementation_paths": [
-        "skeleton/observability/runbooks.py"
+        "skeleton/observability/runbooks.py",
+        "skeleton/observability/__init__.py",
+        "skeleton/ai/runtime/observability/runbooks.py",
+        "skeleton/ai/runtime/observability/__init__.py",
+        "scripts/validate_runbook.py",
+        "machine/ai_file_tree.json"
       ],
       "tests": [
         "skeleton/testing/test_vol091_runbooks.py"
