@@ -1543,3 +1543,35 @@ def test_learning_package_exports_remain_byte_identical() -> None:
     mirror = ROOT / "skeleton/ai/learning/__init__.py"
 
     assert canonical.read_bytes() == mirror.read_bytes()
+
+def test_latest_success_fails_closed_on_conflicting_newest_evidence_cohort() -> None:
+    failed = evidence(
+        "latest.a.failure",
+        attempt_id="attempt.latest.failure",
+        observed_at=10.0,
+        success=False,
+        score=0.0,
+    )
+    passed = evidence(
+        "latest.z.success",
+        attempt_id="attempt.latest.success",
+        observed_at=10.0,
+        success=True,
+        score=1.0,
+    )
+
+    estimator = LearnerStateEstimator()
+    first = estimator.infer(
+        "learner.test",
+        "objective.basics",
+        (failed, passed),
+    )
+    second = estimator.infer(
+        "learner.test",
+        "objective.basics",
+        (passed, failed),
+    )
+
+    assert first.latest_success is False
+    assert second.latest_success is False
+    assert first.digest == second.digest
