@@ -284,10 +284,10 @@
   ],
   "backlog": {
     "summary": {
-      "item_count": 1766,
-      "gap_count": 786,
+      "item_count": 1764,
+      "gap_count": 784,
       "risk_count": 980,
-      "open_count": 1766,
+      "open_count": 1764,
       "closed_count": 0
     },
     "items": [
@@ -2274,38 +2274,6 @@
         "state": "open",
         "closure_evidence_refs": [],
         "deduplication_key": "gap:materialize revocation propagation proof"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-087-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-087:gap:001",
-        "volume_ref": "VOL-087",
-        "statement": "define canonical locale policy",
-        "accountability_id": "ACC-VOL-087",
-        "requirement_refs": [
-          "REQ:VOL-087:001",
-          "REQ:VOL-087:002",
-          "REQ:VOL-087:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define canonical locale policy"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-087-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-087:gap:002",
-        "volume_ref": "VOL-087",
-        "statement": "materialize critical-string coverage",
-        "accountability_id": "ACC-VOL-087",
-        "requirement_refs": [
-          "REQ:VOL-087:001",
-          "REQ:VOL-087:002",
-          "REQ:VOL-087:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize critical-string coverage"
       },
       {
         "backlog_id": "BL-GAP-VOL-088-001",
