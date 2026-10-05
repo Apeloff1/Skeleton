@@ -8177,22 +8177,31 @@
       "id": "ACC-VOL-054",
       "type": "volume",
       "title": "VOL-054 Machine Architecture Manifests",
-      "status": "unverified",
+      "status": "implemented",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-10-05T18:00:05Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-10-05T18:00:05Z",
+        "git_sha": "d4334086eaf1c7cbbff46890b727fc954fde1677",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/pull/2316",
+          "https://github.com/Apeloff1/Skeleton/commit/d4334086eaf1c7cbbff46890b727fc954fde1677",
+          "machine/manifest_reference_policy.json",
+          "machine/architecture_rule_registry.json",
+          "docs/architecture/MANIFEST_REFERENCE_INTEGRITY.md",
+          "scripts/check_architecture_manifest_references.py",
+          "tests/test_architecture_manifest_references.py",
+          "tests/test_architecture_rule_registry.py"
+        ],
+        "statement": "Retroactively implementation-signed after review of the landed P2 architecture convergence, current manifest-reference policy, exact documentation bindings, and focused fail-closed regressions. Independent verification remains pending; this does not grant completion.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/d4334086eaf1c7cbbff46890b727fc954fde1677"
       },
       "verification_signoff": {
         "signed": false,
@@ -8208,9 +8217,61 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-10-05T18:00:05Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T18:00:05Z",
+          "git_sha": "d4334086eaf1c7cbbff46890b727fc954fde1677",
+          "statement": "Begin current-main evidence reconciliation for VOL-054.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/d4334086eaf1c7cbbff46890b727fc954fde1677",
+          "from_status": "unverified",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2316",
+            "https://github.com/Apeloff1/Skeleton/commit/d4334086eaf1c7cbbff46890b727fc954fde1677"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T18:00:05Z",
+          "git_sha": "d4334086eaf1c7cbbff46890b727fc954fde1677",
+          "statement": "Retroactively implementation-signed after review of the landed P2 architecture convergence, current manifest-reference policy, exact documentation bindings, and focused fail-closed regressions. Independent verification remains pending; this does not grant completion.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/d4334086eaf1c7cbbff46890b727fc954fde1677",
+          "from_status": "in_progress",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2316",
+            "https://github.com/Apeloff1/Skeleton/commit/d4334086eaf1c7cbbff46890b727fc954fde1677",
+            "machine/manifest_reference_policy.json",
+            "machine/architecture_rule_registry.json",
+            "docs/architecture/MANIFEST_REFERENCE_INTEGRITY.md",
+            "scripts/check_architecture_manifest_references.py",
+            "tests/test_architecture_manifest_references.py",
+            "tests/test_architecture_rule_registry.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/pull/2316",
+        "https://github.com/Apeloff1/Skeleton/commit/d4334086eaf1c7cbbff46890b727fc954fde1677",
+        "machine/manifest_reference_policy.json",
+        "machine/architecture_rule_registry.json",
+        "docs/architecture/MANIFEST_REFERENCE_INTEGRITY.md",
+        "scripts/check_architecture_manifest_references.py",
+        "tests/test_architecture_manifest_references.py",
+        "tests/test_architecture_rule_registry.py"
+      ],
       "baseline_status": "unverified"
     },
     {
