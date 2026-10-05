@@ -20,3 +20,14 @@ def test_tool_composition_cannot_union_authority():
  a=ToolBinding("a","1",frozenset({"read","write"}),"A","B","verified");b=ToolBinding("b","1",frozenset({"read"}),"B","C","verified")
  assert not compose_tools(ToolComposition((a,b),frozenset({"read","write"}))).admissible
  assert compose_tools(ToolComposition((a,b),frozenset({"read"}))).effective_authority==frozenset({"read"})
+
+
+def test_cognitive_reconciliation_depth_invariants():
+ import pytest
+ with pytest.raises(ValueError):analyze_plan("",("a",),(),())
+ r=PlanLintRule("r","1")
+ with pytest.raises(ValueError):analyze_plan("v",("a",),(),(r,r))
+ a=analyze_plan("v",("a","b"),(("a","b"),("b","a")),())
+ assert any(d.rule_id=="cycle" for d in a.diagnostics)
+ with pytest.raises(ValueError):simulate_plan(("x","x"))
+ s=simulate_plan(("x",));assert {f.scenario for f in s.findings}=={"failure","timeout","resource_exhaustion"}
