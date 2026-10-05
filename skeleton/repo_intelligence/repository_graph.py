@@ -16,16 +16,20 @@ class FileNode:
   if self.language not in set(_EXT.values()):raise RepositoryGraphError("unsupported language")
   if not isinstance(self.content_digest,str) or not re.fullmatch(r"[0-9a-f]{64}",self.content_digest):raise RepositoryGraphError("invalid digest")
   if self.owner is not None and (not isinstance(self.owner,str) or not self.owner):raise RepositoryGraphError("invalid owner")
-  if not isinstance(self.tests,tuple):raise RepositoryGraphError("tests must be tuple")
+  if not isinstance(self.tests,tuple) or any(not isinstance(x,str) or not x or x.startswith("/") or ".." in x.split("/") for x in self.tests):raise RepositoryGraphError("tests must be safe non-empty paths")
   object.__setattr__(self,"tests",tuple(sorted(set(self.tests))))
 @dataclass(frozen=True,slots=True)
 class DependencyEdge:
  source:str;target:str;kind:str
  def __post_init__(self):
+  for value in (self.source,self.target):
+   if not isinstance(value,str) or not value or value.startswith("/") or ".." in value.split("/"):raise RepositoryGraphError("invalid edge path")
   if self.kind not in {"import","test","ownership","generated"}:raise RepositoryGraphError("invalid edge kind")
   if self.source==self.target:raise RepositoryGraphError("self edge")
 class RepositoryGraph:
  def __init__(self,nodes:tuple[FileNode,...],edges:tuple[DependencyEdge,...]):
+  if not isinstance(nodes,tuple) or not isinstance(edges,tuple):raise RepositoryGraphError("nodes and edges must be tuples")
+  if any(not isinstance(n,FileNode) for n in nodes) or any(not isinstance(e,DependencyEdge) for e in edges):raise RepositoryGraphError("typed nodes and edges required")
   if len(nodes)>MAX_FILES or len(edges)>MAX_EDGES:raise RepositoryGraphError("graph budget exceeded")
   by={n.path:n for n in nodes}
   if len(by)!=len(nodes):raise RepositoryGraphError("duplicate path")
