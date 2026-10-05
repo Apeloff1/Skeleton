@@ -42,3 +42,13 @@ def test_impact_and_risk_inputs_fail_closed():
  with pytest.raises(ValueError): estimate_risk((), "cal")
  with pytest.raises(ValueError): estimate_risk((RiskFactor("blast",-1,.5),), "cal")
  with pytest.raises(ValueError): estimate_risk((RiskFactor("blast",1,1.01),), "cal")
+
+
+def test_change_plan_and_generated_output_identity_hardening():
+ assert not change_admissible(SafeChangePlan((),(ChangeGate("owner",True),),True))
+ assert not change_admissible(SafeChangePlan((ChangeStep("x",True,None),),(),True))
+ assert not change_admissible(SafeChangePlan((ChangeStep("",True,None),),(ChangeGate("owner",True),),True))
+ spec=GenerationSpec("v1","g1",(ExtensionPoint("custom","manual/custom.py"),))
+ a=generate_code(spec,"x");b=generate_code(spec,"y")
+ assert a.spec_digest==b.spec_digest
+ assert a.output_digest!=b.output_digest
