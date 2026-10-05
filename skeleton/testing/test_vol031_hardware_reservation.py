@@ -41,6 +41,7 @@ from skeleton.shells.worker_heartbeat import (
 )
 from skeleton.shells.worker_identity import (
     WorkerIdentity,
+    WorkerIdentityError,
     WorkerRegistry,
     WorkerRole,
 )
@@ -580,3 +581,22 @@ def test_vol031_canonical_and_ai_mirrors_are_byte_identical() -> None:
     )
     for source, mirror in pairs:
         assert source.read_bytes() == mirror.read_bytes()
+
+
+
+def test_worker_generation_race_becomes_fail_closed_receipt(monkeypatch) -> None:
+    fixture = _fixture()
+
+    def stale_reserve(*args, **kwargs):
+        raise WorkerIdentityError("worker generation is stale")
+
+    monkeypatch.setattr(
+        fixture["reservations"],
+        "reserve",
+        stale_reserve,
+    )
+    receipt, reservation = _schedule(fixture)
+
+    assert receipt.accepted is False
+    assert reservation is None
+    assert "reservation-conflict:WorkerIdentityError" in receipt.reasons
