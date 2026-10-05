@@ -49,7 +49,10 @@ class ReconciliationCase: case_id:str; conflict:KnowledgeConflict
 @dataclass(frozen=True,slots=True)
 class ReconciliationDecision: case_id:str; resolved_claim_id:str|None; rule:str|None; competing_evidence:tuple[str,...]
 def reconcile(case,resolved_claim_id=None,rule=None):
+ if not case.case_id or len(case.conflict.claim_ids)<2 or not case.conflict.evidence_ids:raise ValueError("complete conflict evidence required")
+ if len(set(case.conflict.claim_ids))!=len(case.conflict.claim_ids):raise ValueError("duplicate conflicting claim")
  if resolved_claim_id is not None and (resolved_claim_id not in case.conflict.claim_ids or not rule):raise ValueError("resolution requires justified rule")
+ if resolved_claim_id is None and rule is not None:raise ValueError("rule requires resolved claim")
  return ReconciliationDecision(case.case_id,resolved_claim_id,rule,case.conflict.evidence_ids)
 @dataclass(frozen=True,slots=True)
 class KnowledgeSnapshot:
