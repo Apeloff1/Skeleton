@@ -16,6 +16,21 @@ from .executor import (
     ExecutionReceipt,
     FailureReceipt,
 )
+from .deployment_profiles import (
+    AirGapProfile,
+    Connectivity,
+    DeferredOperation,
+    DeferredSyncLedger,
+    EdgeNode,
+    EdgeProfile,
+    EnterpriseProfile,
+    EnterpriseTopology,
+    OfflineProfile,
+    SyncReceipt,
+    SyncState,
+    TransferBundle,
+    admit_transfer,
+)
 from .contract_fuzzing import ContractFuzzer, FuzzBudget, FuzzFailure, FuzzReport
 from .simulation_mode import SimulationAuthority, SimulationEvidence, SimulationRequest, SimulationResult, SimulationRuntime
 from .journal import (
@@ -34,6 +49,18 @@ __all__ = [
     "FuzzFailure",
     "FuzzReport",
     "DEFERRED_165_SPECS",
+    "AirGapProfile",
+    "Connectivity",
+    "DeferredOperation",
+    "DeferredSyncLedger",
+    "EdgeNode",
+    "EdgeProfile",
+    "EnterpriseProfile",
+    "EnterpriseTopology",
+    "OfflineProfile",
+    "SyncReceipt",
+    "SyncState",
+    "TransferBundle",
     "DeferredEffectAuthority",
     "DeferredExecutionError",
     "DeferredExecutionJournal",
@@ -54,5 +81,6 @@ __all__ = [
     "SimulationRuntime",
     "SqliteDeferredExecutionJournal",
     "build_registry",
+    "admit_transfer",
     "volume_ids",
 ]
