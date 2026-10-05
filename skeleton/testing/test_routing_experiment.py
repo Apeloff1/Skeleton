@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace
-
 from skeleton.eval.champion_registry import CandidateArtifact, ChampionRegistry
 from skeleton.intelligence.routing_experiment import (
     RoutingPolicyArtifact,
