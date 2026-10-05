@@ -6843,7 +6843,11 @@
         "Criterion"
       ],
       "implementation_paths": [
-        "skeleton/eval/functional_acceptance.py"
+        "machine",
+        "docs/plan",
+        "skeleton/eval",
+        "skeleton/eval/functional_acceptance.py",
+        "skeleton/testing/test_functional_ai_acceptance.py"
       ],
       "tests": [
         "skeleton/testing/test_functional_ai_acceptance.py"
@@ -6862,9 +6866,7 @@
         "missing negative evidence",
         "stale signoff"
       ],
-      "gaps": [
-        "independent functional-AI acceptance evidence-integrity verification remains pending"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-104",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
