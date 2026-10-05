@@ -41,3 +41,18 @@ def test_capability_security_source_and_ai_mirror_are_byte_identical():
  from pathlib import Path
  root=Path(__file__).resolve().parents[2]
  assert (root/"skeleton/security/capability_security.py").read_bytes()==(root/"skeleton/ai/runtime/security/capability_security.py").read_bytes()
+
+
+
+@pytest.mark.parametrize(
+    "factory",
+    (
+        lambda: CapabilityGrant("worker-1", "", "repo:a", "read"),
+        lambda: CapabilityGrant("worker-1", " repo.read", "repo:a", "read"),
+        lambda: ToolRequest("git", "", "repo:a", "read", D),
+        lambda: ToolRequest(" git", "repo.read", "repo:a", "read", D),
+    ),
+)
+def test_blank_capability_inputs_fail_closed(factory):
+ with pytest.raises(SecurityContractError):
+  factory()
