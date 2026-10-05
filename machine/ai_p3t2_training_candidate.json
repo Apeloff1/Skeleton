@@ -1,0 +1,57 @@
+{
+  "schema_version": "skeleton.ai.p3t2.training_candidate.v1",
+  "task_id": "P3T2-TRAINING-01",
+  "lane_id": "P3T2-L2",
+  "status": "implementation_candidate",
+  "stacked_on_task_id": "P3T2-DATA-01",
+  "source_frontier": "machine/ai_masterplan_continuation_frontier.json",
+  "volume_refs": [
+    "VOL-143",
+    "VOL-144",
+    "VOL-145",
+    "VOL-146",
+    "VOL-147",
+    "VOL-148",
+    "VOL-149"
+  ],
+  "implementation_paths": [
+    "skeleton/training/__init__.py",
+    "skeleton/training/control.py",
+    "skeleton/ai/runtime/training/__init__.py",
+    "skeleton/ai/runtime/training/control.py"
+  ],
+  "executable_tests": [
+    "skeleton/testing/test_training_control.py"
+  ],
+  "exact_mirror_pairs": [
+    [
+      "skeleton/training/__init__.py",
+      "skeleton/ai/runtime/training/__init__.py"
+    ],
+    [
+      "skeleton/training/control.py",
+      "skeleton/ai/runtime/training/control.py"
+    ]
+  ],
+  "evidence_policy": {
+    "exact_head_ci_required": true,
+    "independent_closure_required": true,
+    "current_main_reconciliation_required": true,
+    "data_dependency_candidate_required": true,
+    "may_self_close": false
+  },
+  "promotion_state": {
+    "completion_checkbox": false,
+    "implementation_signed": false,
+    "verification_signed": false,
+    "may_self_close": false
+  },
+  "invariants": [
+    "Candidate ownership equals the exact P3T2-TRAINING-01 seven-volume set.",
+    "Canonical and AI-runtime training mirrors remain byte-identical.",
+    "Trainer actor cannot sign evaluation of its own checkpoint.",
+    "Resume refuses an open staged intent and refuses cursor rewind.",
+    "Lineage receipt promotion_authority is always false.",
+    "This packet does not write implementation_candidate into the continuation owner registry."
+  ]
+}
