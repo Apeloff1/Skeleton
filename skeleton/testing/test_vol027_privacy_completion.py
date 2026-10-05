@@ -20,3 +20,23 @@ def test_unknown_region_fails_closed():
  with pytest.raises(LifecycleError):policy_for_region("unknown")
 def test_registry_is_deterministic():
  assert registered_regions()==("EEA","GLOBAL","UK","US-CA")
+
+def test_manually_forged_complete_proof_is_rejected():
+ from skeleton.vault.deletion_proof import DeletionProof
+ with pytest.raises(LifecycleError,match="digest mismatch"):
+  DeletionProof("r",("mongo",),("mongo",),"0"*64)
+
+def test_deletion_proof_collections_must_be_canonical_and_bounded_to_required_set():
+ from skeleton.vault.deletion_proof import DeletionProof
+ import hashlib,json
+ digest=lambda req:hashlib.sha256(json.dumps({"record":"r","required":req},sort_keys=True,separators=(",",":")).encode()).hexdigest()
+ with pytest.raises(LifecycleError,match="sorted unique"):
+  DeletionProof("r",("mongo","mongo"),("mongo",),digest(("mongo","mongo")))
+ with pytest.raises(LifecycleError,match="subset"):
+  DeletionProof("r",("mongo",),("mongo","other"),digest(("mongo",)))
+
+def test_deletion_topology_inputs_are_strictly_typed():
+ with pytest.raises(LifecycleError,match="typed tuple"):
+  prove_deletion(record_id="r",canonical_store="mongo",derived_stores=[],deleted_stores=("mongo",))
+ with pytest.raises(LifecycleError,match="deleted_stores must be tuple"):
+  prove_deletion(record_id="r",canonical_store="mongo",derived_stores=(),deleted_stores=["mongo"])
