@@ -6,8 +6,11 @@ class PlanDiagnostic: rule_id:str; location:str; severity:str; remediation:str
 @dataclass(frozen=True)
 class PlanAnalysis: ir_version:str; diagnostics:tuple[PlanDiagnostic,...]
 def analyze(ir_version,steps,rules):
+ if not ir_version:raise ValueError("IR version required")
+ rules=tuple(rules)
+ if any(not r.rule_id or r.severity not in {"info","warning","error"} for r in rules):raise ValueError("valid lint rules required")
  rule_map={r.rule_id:r for r in rules}
- if len(rule_map)!=len(tuple(rules)):raise ValueError("duplicate lint rule")
+ if len(rule_map)!=len(rules):raise ValueError("duplicate lint rule")
  out=[];ids=set()
  for i,s in enumerate(steps):
   if not isinstance(s,dict) or not isinstance(s.get("id"),str) or not s["id"]:
