@@ -9,8 +9,10 @@ def generate_client(api_version,operations):
  methods=[]
  for op in operations:
   if op.get("api_version")!=api_version:raise ValueError("operation contract version drift")
-  if "auth_required" not in op:raise ValueError("auth semantics must be explicit")
+  if "auth_required" not in op or not isinstance(op["auth_required"],bool):raise ValueError("auth semantics must be explicit bool")
+  if not op.get("name") or op.get("method") not in {"GET","POST","PUT","PATCH","DELETE","HEAD","OPTIONS"} or not op.get("path","").startswith("/"):raise ValueError("invalid SDK operation")
   methods.append(SDKMethod(op["name"],op["method"],op["path"],op["auth_required"]))
+ if len({x.name for x in methods})!=len(methods):raise ValueError("duplicate SDK method")
  return ClientSDK(SDKVersion(api_version),tuple(sorted(methods,key=lambda x:x.name)))
 def check_compatibility(client,server_operations):
  expected={(x.name,x.http_method,x.path,x.auth_required) for x in client.methods}
