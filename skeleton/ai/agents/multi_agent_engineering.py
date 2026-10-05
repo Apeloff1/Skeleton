@@ -49,8 +49,11 @@ class HandoffVerification:
   _sha(self.handoff_digest,"handoff_digest");object.__setattr__(self,"verifier_id",_id(self.verifier_id,"verifier_id"));object.__setattr__(self,"producer_id",_id(self.producer_id,"producer_id"))
   if not isinstance(self.passed,bool):raise CoordinationError("passed must be bool")\n  if self.verifier_id==self.producer_id:raise CoordinationError("handoff verifier must be independent")
 class Coordinator:
- def __init__(self,task):\n  if not isinstance(task,MultiAgentTask):raise CoordinationError("task must be MultiAgentTask")\n  self.task=task;self.assignments={};self.failed=set();self.handoffs={}
+ def __init__(self,task):
+  if not isinstance(task,MultiAgentTask):raise CoordinationError("task must be MultiAgentTask")
+  self.task=task;self.assignments={};self.failed=set();self.handoffs={}
  def assign(self,a):
+  if not isinstance(a,AgentAssignment):raise CoordinationError("assignment must be AgentAssignment")
   if a.task_digest!=self.task.digest:raise CoordinationError("assignment/task mismatch")
   if not set(a.authority_ids)<=set(self.task.authority_ids):raise CoordinationError("delegated authority exceeds parent")
   if not set(a.scope_paths)<=set(self.task.scope_paths):raise CoordinationError("delegated scope exceeds parent")
@@ -60,13 +63,30 @@ class Coordinator:
    if prior.assignment_id!=a.assignment_id and set(prior.scope_paths)&set(a.scope_paths):raise CoordinationError("mutation conflict domain overlaps")
   self.assignments[a.assignment_id]=a
  def accept_handoff(self,p):
+  if not isinstance(p,HandoffPacket):raise CoordinationError("handoff must be HandoffPacket")
   a=self.assignments.get(p.assignment_id)
   if a is None:raise CoordinationError("handoff references unknown assignment")
   if p.producer_id!=a.agent_id:raise CoordinationError("handoff producer mismatch")
-  return p.digest
+  prior=self.handoffs.get(p.assignment_id)
+  if prior is not None and prior.digest!=p.digest:raise CoordinationError("handoff identity immutable for assignment")
+  self.handoffs[p.assignment_id]=p;return p.digest
  def fail(self,assignment_id):
   if assignment_id not in self.assignments:raise CoordinationError("unknown assignment")
   self.failed.add(assignment_id)
+ def recover(self,assignment_id,replacement):
+  if assignment_id not in self.failed:raise CoordinationError("assignment is not failed")
+  prior=self.assignments[assignment_id]
+  if not isinstance(replacement,AgentAssignment):raise CoordinationError("replacement must be AgentAssignment")
+  if replacement.assignment_id!=assignment_id or replacement.task_digest!=self.task.digest:raise CoordinationError("replacement identity mismatch")
+  if replacement.agent_id==prior.agent_id or replacement.lease_id==prior.lease_id:raise CoordinationError("recovery requires new agent and lease")
+  if replacement.authority_ids!=prior.authority_ids or replacement.scope_paths!=prior.scope_paths:raise CoordinationError("recovery cannot amplify or alter delegated domain")
+  self.assignments[assignment_id]=replacement;self.failed.remove(assignment_id);self.handoffs.pop(assignment_id,None)
  def can_commit(self,verifications):
-  verified={v.handoff_digest for v in verifications if v.passed}
-  return not self.failed and bool(self.assignments) and len(verified)==len(self.assignments)
+  if not isinstance(verifications,tuple) or any(not isinstance(v,HandoffVerification) for v in verifications):raise CoordinationError("verifications must be typed tuple")
+  if self.failed or not self.assignments or set(self.handoffs)!=set(self.assignments):return False
+  by_digest={v.handoff_digest:v for v in verifications if v.passed}
+  if len(by_digest)!=len(verifications):return False
+  for h in self.handoffs.values():
+   v=by_digest.get(h.digest)
+   if v is None or v.producer_id!=h.producer_id:return False
+  return len(by_digest)==len(self.assignments)
