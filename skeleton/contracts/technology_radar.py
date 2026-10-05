@@ -612,10 +612,10 @@ class TechnologyRadar:
         observed_cost = max(int(item) for item in costs)
         observed_risk = max(int(item) for item in risks)
 
-        if observed_cost > candidate.budget:
-            raise RadarError("experiment exceeds candidate budget")
         if observed_cost > candidate.exit.max_cost:
             raise RadarError("experiment exceeds exit cost threshold")
+        if observed_cost > candidate.budget:
+            raise RadarError("experiment exceeds candidate budget")
         if observed_risk > candidate.exit.max_risk:
             raise RadarError("experiment exceeds exit risk threshold")
 
