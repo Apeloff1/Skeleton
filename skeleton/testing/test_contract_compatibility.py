@@ -67,3 +67,19 @@ def test_schema_evolution_matrix_accepts_backward_optional_extension():
  result=SchemaEvolutionGuard("backward").check(old,new)
  assert result["compatible"] is True
  assert result["breaking_count"]==0
+
+
+def test_canonical_payload_rejects_non_string_keys_at_every_depth():
+ import pytest
+ from skeleton.contracts.canonical import CanonicalContractError,canonical_json_bytes
+ for payload in ({1:"x"},{"nested":{2:"x"}},{"items":[{3:"x"}]}):
+  with pytest.raises(CanonicalContractError,match="string keys"):
+   canonical_json_bytes(payload)
+
+def test_canonical_digest_distinguishes_bool_and_integer_payload_values():
+ from skeleton.contracts.canonical import CanonicalEnvelope,EvidenceRef,Identity
+ def envelope(value):
+  return CanonicalEnvelope(1,"compat.scalar",Identity("Apeloff1/Skeleton","a"*40),(EvidenceRef("repo","b"*64),),(),{"value":value})
+ assert envelope(True).canonical_bytes!=envelope(1).canonical_bytes
+ assert envelope(False).canonical_bytes!=envelope(0).canonical_bytes
+ assert envelope(True).digest!=envelope(1).digest
