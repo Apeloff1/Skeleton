@@ -1,12 +1,13 @@
 from __future__ import annotations
 import hashlib,pytest
-from datetime import datetime,timezone
+from datetime import datetime,timezone,timedelta
 from skeleton.automation.work_packages import *
 SHA=hashlib.sha256(b"x").hexdigest()
+NOW=datetime(2026,10,5,14,0,tzinfo=timezone.utc)
 def pkg(i="PKG.095"):return WorkPackage(i,"VOL.095","Build exact package",("Do not merge",),("API.X",),("OWNER.X",),("RISK.X",),("TEST.X",),"Rollback commit",("REQ.1",),("AIQ.1",))
-def ev(i,role,actor,p="PKG.095",package=None,digest=None):
+def ev(i,role,actor,p="PKG.095",package=None,digest=None,observed_at=NOW):
  target=package or pkg(p)
- return WorkPackageEvidence(i,p,digest or target.digest,role,actor,SHA)
+ return WorkPackageEvidence(i,p,digest or target.digest,role,actor,SHA,observed_at)
 def test_package_requires_all_structural_fields():
  with pytest.raises(WorkPackageError,match="tests"):WorkPackage("PKG.X","VOL.095","x",("n",),("i",),("o",),("r",),(),"rb",("q",),("a",))
 def test_state_is_derived_not_manually_set():
@@ -60,7 +61,7 @@ def test_actor_cannot_contradict_same_role_evidence():
  r=WorkPackageRegistry();p=pkg();r.add(p)
  r.attest(ev("EVID.I1",EvidenceRole.IMPLEMENTATION,"ACTOR.I",package=p))
  with pytest.raises(WorkPackageError,match="contradict evidence"):
-  r.attest(WorkPackageEvidence("EVID.I2",p.package_id,p.digest,EvidenceRole.IMPLEMENTATION,"ACTOR.I",hashlib.sha256(b"other").hexdigest()))
+  r.attest(WorkPackageEvidence("EVID.I2",p.package_id,p.digest,EvidenceRole.IMPLEMENTATION,"ACTOR.I",hashlib.sha256(b"other").hexdigest(),NOW))
 
 def test_stale_package_evidence_is_rejected():
  r=WorkPackageRegistry();p=pkg();r.add(p)
@@ -97,3 +98,12 @@ def test_evidence_rollup_is_deterministic_and_exact_version_bound():
  assert roll["state"]==PackageState.IMPLEMENTED.value
  assert roll["evidence_ids"]==("EVID.I",)
  assert roll["artifact_digests"]==(SHA,)
+ assert roll["observed_at_utc"]==(NOW.isoformat(),)
+
+def test_evidence_timestamp_normalizes_to_utc_and_rejects_fractional_seconds():
+ p=pkg()
+ offset=datetime(2026,10,5,16,0,tzinfo=timezone(timedelta(hours=2)))
+ e=WorkPackageEvidence("EVID.UTC",p.package_id,p.digest,EvidenceRole.IMPLEMENTATION,"ACTOR.I",SHA,offset)
+ assert e.observed_at==NOW
+ with pytest.raises(WorkPackageError,match="whole-second precision"):
+  WorkPackageEvidence("EVID.SUB",p.package_id,p.digest,EvidenceRole.IMPLEMENTATION,"ACTOR.I",SHA,NOW.replace(microsecond=1))
