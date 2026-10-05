@@ -1,0 +1,41 @@
+"""Outcome-bound education intelligence primitives."""
+
+from .learning import (
+    EDUCATION_SCHEMA,
+    EducationContractError,
+    EvidenceKind,
+    InstructionKind,
+    InstructionPlan,
+    InstructionPlanner,
+    InstructionStep,
+    LearnerEvidence,
+    LearnerState,
+    LearningObjective,
+    LearningObjectiveGraph,
+    LearningOutcomeEvaluation,
+    ObjectiveBelief,
+    OutcomeBinding,
+    OutcomeDecision,
+    OutcomeEvaluator,
+    OutcomeVerdict,
+)
+
+__all__ = [
+    "EDUCATION_SCHEMA",
+    "EducationContractError",
+    "EvidenceKind",
+    "InstructionKind",
+    "InstructionPlan",
+    "InstructionPlanner",
+    "InstructionStep",
+    "LearnerEvidence",
+    "LearnerState",
+    "LearningObjective",
+    "LearningObjectiveGraph",
+    "LearningOutcomeEvaluation",
+    "ObjectiveBelief",
+    "OutcomeBinding",
+    "OutcomeDecision",
+    "OutcomeEvaluator",
+    "OutcomeVerdict",
+]
