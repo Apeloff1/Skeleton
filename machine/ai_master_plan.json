@@ -4999,6 +4999,8 @@
         "SimulationEvidence",
         "SimulationAuthority",
         "SimulationBudget",
+        "SimulationRule",
+        "SimulationRuleSet",
         "ScenarioTransition",
         "ScenarioNode",
         "ScenarioEdge",
