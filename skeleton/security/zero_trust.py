@@ -110,6 +110,13 @@ def _denied(reason: str) -> TrustDecision:
     return TrustDecision(False, reason, None, None, None, None)
 
 
+def _resource_in_scope(resource: str, prefix: str) -> bool:
+    if resource == prefix:
+        return True
+    boundary = prefix if prefix.endswith("/") else prefix + "/"
+    return resource.startswith(boundary)
+
+
 def authorize(
     identity: WorkloadIdentity,
     grant: InternalGrant,
@@ -133,7 +140,7 @@ def authorize(
         return _denied("identity_mismatch")
     if now < grant.issued_tick or now >= grant.expires_tick:
         return _denied("grant_expired")
-    if action not in grant.actions or not resource.startswith(grant.resource_prefix):
+    if action not in grant.actions or not _resource_in_scope(resource, grant.resource_prefix):
         return _denied("least_privilege_denied")
     return TrustDecision(
         True,
