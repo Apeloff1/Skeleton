@@ -41,3 +41,15 @@ def test_signoff_binds_exact_long_horizon_evidence():
  with pytest.raises(AutonomyAcceptanceError,match="stale or rejected"):verify_acceptance(changed,s)
 def test_ineligible_worker_cannot_be_signed():
  with pytest.raises(AutonomyAcceptanceError,match="ineligible"):sign_acceptance(acc(control=control(ControlState.REVOKED)),"ACTOR.REVIEWER")
+
+def test_governed_mirror_exports_identical_contract():
+ from skeleton.ai.evaluation import autonomy_acceptance as governed
+ assert governed.CheckpointEvidence.__annotations__ == CheckpointEvidence.__annotations__
+ assert governed.FailureCampaign is not FailureCampaign
+ assert tuple(x.value for x in governed.FailureCampaign) == tuple(x.value for x in FailureCampaign)
+
+def test_checkpoint_digest_fields_reject_forgery():
+ with pytest.raises(AutonomyAcceptanceError,match="objective_digest must be sha256"):
+  CheckpointEvidence("CHECKPOINT.X","forged",S("auth"),S("state"),1,S("recovery"))
+ with pytest.raises(AutonomyAcceptanceError,match="authority_digest must be sha256"):
+  CheckpointEvidence("CHECKPOINT.X",S("objective"),"forged",S("state"),1,S("recovery"))
