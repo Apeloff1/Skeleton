@@ -8,12 +8,14 @@ class TaskDependency: before:str; after:str
 @dataclass(frozen=True,slots=True)
 class TaskDecomposition: parent_authority:frozenset[str]; parent_constraints:frozenset[str]; subtasks:tuple[Subtask,...]; dependencies:tuple[TaskDependency,...]
 def validate_decomposition(d,max_subtasks=64):
+ if max_subtasks<1 or not d.subtasks or any(not x.task_id or x.duration<0 for x in d.subtasks):return False
  ids={x.task_id for x in d.subtasks}
  if len(ids)!=len(d.subtasks) or len(ids)>max_subtasks or not any(x.integration for x in d.subtasks):return False
  if any(not x.authority<=d.parent_authority or not d.parent_constraints<=x.constraints for x in d.subtasks):return False
  g={i:[] for i in ids}
+ if len({(e.before,e.after) for e in d.dependencies})!=len(d.dependencies):return False
  for e in d.dependencies:
-  if e.before not in ids or e.after not in ids:return False
+  if not e.before or not e.after or e.before==e.after or e.before not in ids or e.after not in ids:return False
   g[e.before].append(e.after)
  seen=set();active=set()
  def cyc(n):
@@ -48,6 +50,9 @@ class Assignment: task_id:str; worker_id:str
 @dataclass(frozen=True,slots=True)
 class Schedule: policy:SchedulingPolicy; assignments:tuple[Assignment,...]
 def schedule_ready(d,completed,workers,leases,worker_authority):
+ if not validate_decomposition(d):raise ValueError("invalid decomposition")
+ if any(not w for w in workers) or len(set(workers))!=len(workers):raise ValueError("unique worker identity required")
+ if not completed<={x.task_id for x in d.subtasks}:raise ValueError("unknown completed task")
  ready=[]
  for t in d.subtasks:
   deps={e.before for e in d.dependencies if e.after==t.task_id}
