@@ -11117,7 +11117,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Chaos experiments require bounded blast radius and abort controls.",
         "Map experiments to hypotheses, SLOs and recovery evidence."
@@ -11134,15 +11134,20 @@
       ],
       "implementation_paths": [
         "skeleton/reliability",
-        "experiments"
+        "experiments",
+        "skeleton/ai/runtime/deferred/reliability_release.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_chaos_contracts.py"
+        "skeleton/testing/test_ai_chaos_recovery_controls.py"
       ],
       "evaluations": [
-        "planned:compound fault campaigns"
+        "skeleton/testing/test_ai_chaos_recovery_controls.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/a14bfd868d23105e3432aa5288cb78c9f1e58cd0",
+        "skeleton/ai/runtime/deferred/reliability_release.py",
+        "skeleton/testing/test_ai_chaos_recovery_controls.py"
+      ],
       "risks": [
         "chaos causes real outage",
         "unmeasured recovery"
@@ -11164,7 +11169,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Drills must exercise real procedures/artifacts in representative environments.",
         "Track RTO/RPO and unresolved manual dependencies."
@@ -11181,15 +11186,20 @@
       ],
       "implementation_paths": [
         "recovery",
-        "docs"
+        "docs",
+        "skeleton/ai/runtime/deferred/reliability_release.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_recovery_drills.py"
+        "skeleton/testing/test_ai_chaos_recovery_controls.py"
       ],
       "evaluations": [
-        "planned:quarterly full recovery scenario"
+        "skeleton/testing/test_ai_chaos_recovery_controls.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/a14bfd868d23105e3432aa5288cb78c9f1e58cd0",
+        "skeleton/ai/runtime/deferred/reliability_release.py",
+        "skeleton/testing/test_ai_chaos_recovery_controls.py"
+      ],
       "risks": [
         "paper runbook only",
         "unrehearsed dependency"
@@ -11211,7 +11221,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Map every release class to mandatory tests/evidence and allowed waivers.",
         "Fail closed on missing/cancelled required gate states."
@@ -11228,15 +11238,20 @@
       ],
       "implementation_paths": [
         "release",
-        "machine"
+        "machine",
+        "skeleton/ai/runtime/deferred/reliability_release.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_release_qualification_matrix.py"
+        "skeleton/testing/test_ai_release_qualification_policy.py"
       ],
       "evaluations": [
-        "planned:gate omission mutation test"
+        "skeleton/testing/test_ai_release_qualification_policy.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/95b0cd9326216705ab2d6d880d1c44601736b385",
+        "skeleton/ai/runtime/deferred/reliability_release.py",
+        "skeleton/testing/test_ai_release_qualification_policy.py"
+      ],
       "risks": [
         "wrong gate set",
         "cancelled treated green"
@@ -11258,7 +11273,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Define canary cohort, duration, success/failure thresholds and abort controls.",
         "Compare canary against control on SLO/quality/security/cost signals."
@@ -11275,15 +11290,20 @@
       ],
       "implementation_paths": [
         "deploy",
-        "skeleton/observability"
+        "skeleton/observability",
+        "skeleton/ai/runtime/deferred/reliability_release.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_canary_deployment.py"
+        "skeleton/testing/test_ai_deployment_safety.py"
       ],
       "evaluations": [
-        "planned:bad-canary rollback drill"
+        "skeleton/testing/test_ai_deployment_safety.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/a1bff2662d5afe64b85b30cbfa7fa6f8a670a283",
+        "skeleton/ai/runtime/deferred/reliability_release.py",
+        "skeleton/testing/test_ai_deployment_safety.py"
+      ],
       "risks": [
         "insufficient sample",
         "slow rollback"
@@ -11305,7 +11325,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Flags must have owner, default, scope, expiry and rollback semantics.",
         "Security/authority guarantees cannot be disabled by ordinary feature flags."
@@ -11322,15 +11342,20 @@
       ],
       "implementation_paths": [
         "config",
-        "machine"
+        "machine",
+        "skeleton/ai/runtime/deferred/reliability_release.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_feature_flags.py"
+        "skeleton/testing/test_ai_deployment_safety.py"
       ],
       "evaluations": [
-        "planned:stale-flag audit"
+        "skeleton/testing/test_ai_deployment_safety.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/a1bff2662d5afe64b85b30cbfa7fa6f8a670a283",
+        "skeleton/ai/runtime/deferred/reliability_release.py",
+        "skeleton/testing/test_ai_deployment_safety.py"
+      ],
       "risks": [
         "flag combinatorial explosion",
         "security bypass"
@@ -11352,7 +11377,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Rollback plans must account for forward-written durable data.",
         "Test rollback from partially completed deployments/migrations."
@@ -11369,15 +11394,20 @@
       ],
       "implementation_paths": [
         "release",
-        "recovery"
+        "recovery",
+        "skeleton/ai/runtime/deferred/reliability_release.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_rollback_architecture.py"
+        "skeleton/testing/test_ai_deployment_safety.py"
       ],
       "evaluations": [
-        "planned:migration rollback campaign"
+        "skeleton/testing/test_ai_deployment_safety.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/a1bff2662d5afe64b85b30cbfa7fa6f8a670a283",
+        "skeleton/ai/runtime/deferred/reliability_release.py",
+        "skeleton/testing/test_ai_deployment_safety.py"
+      ],
       "risks": [
         "old binary cannot read new data",
         "external effects unreverted"
@@ -12014,7 +12044,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Keep independent evidence visible before aggregation.",
         "Escalate unresolved high-impact disagreement instead of averaging it away."
@@ -12031,15 +12061,20 @@
       ],
       "implementation_paths": [
         "skeleton/ai/agents",
-        "skeleton/eval"
+        "skeleton/eval",
+        "skeleton/ai/agents/consensus.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_consensus_disagreement.py"
+        "skeleton/testing/test_consensus_disagreement.py"
       ],
       "evaluations": [
-        "planned:correlated-agent failure evaluation"
+        "skeleton/testing/test_consensus_disagreement.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/0fbac57d5bdd3394a23d1243c6ff72e35dd0a6a6",
+        "skeleton/ai/agents/consensus.py",
+        "skeleton/testing/test_consensus_disagreement.py"
+      ],
       "risks": [
         "false consensus",
         "majority amplifies shared error"
@@ -12197,7 +12232,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Preserve artifact version under review and review lineage.",
         "Block publication/promotion until required reviewers/gates resolve."
@@ -12213,16 +12248,20 @@
         "ReviewDecision"
       ],
       "implementation_paths": [
-        "planned:skeleton/artifacts",
-        "skeleton/ai"
+        "skeleton/ai",
+        "skeleton/ai/artifact_review.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_artifact_review_workflow.py"
+        "skeleton/testing/test_artifact_review_workflow.py"
       ],
       "evaluations": [
-        "planned:stale-review race evaluation"
+        "skeleton/testing/test_artifact_review_workflow.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/2c04246776357c1d4cf6a90e9b7d6b66f035a837",
+        "skeleton/ai/artifact_review.py",
+        "skeleton/testing/test_artifact_review_workflow.py"
+      ],
       "risks": [
         "review targets old version",
         "approval bypass"
