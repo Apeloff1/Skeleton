@@ -93,7 +93,8 @@
       "move_batch": "B3-owner-sensitive",
       "source_disposition": "retain_until_explicit_owner_and_import_cutover",
       "volume_refs": [
-        "VOL-007"
+        "VOL-007",
+        "VOL-239"
       ]
     },
     {
@@ -606,6 +607,7 @@
         "VOL-207",
         "VOL-208",
         "VOL-224",
+        "VOL-237",
         "VOL-256",
         "VOL-257",
         "VOL-258",
@@ -813,6 +815,8 @@
         "VOL-191",
         "VOL-204",
         "VOL-225",
+        "VOL-235",
+        "VOL-236",
         "VOL-325",
         "VOL-390",
         "VOL-403",
@@ -918,6 +922,9 @@
         "VOL-177",
         "VOL-205",
         "VOL-230",
+        "VOL-232",
+        "VOL-233",
+        "VOL-234",
         "VOL-256",
         "VOL-257",
         "VOL-318",
@@ -1071,7 +1078,8 @@
       "volume_refs": [
         "VOL-029",
         "VOL-102",
-        "VOL-188"
+        "VOL-188",
+        "VOL-240"
       ]
     },
     {
@@ -2209,7 +2217,8 @@
       "volume_refs": [
         "VOL-113",
         "VOL-124",
-        "VOL-229"
+        "VOL-229",
+        "VOL-231"
       ],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
@@ -5177,7 +5186,8 @@
       "source_disposition": "canonical_namespace_entrypoint_with_independently_governed_children",
       "volume_refs": [
         "VOL-001",
-        "VOL-213"
+        "VOL-213",
+        "VOL-238"
       ]
     },
     {
