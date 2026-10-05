@@ -14,6 +14,14 @@ from .lifecycle_safety import (
     MigrationReceipt, MigrationState, MigrationStep, ParityEvidence,
     RetirementDecision, can_remove_adapter, decide_retirement,
 )
+from .build_generation import (
+    ChangeGate, ChangeRisk, ChangeStep, ClientSDK, ExtensionPoint, GeneratedCode,
+    GenerationSpec, ImpactEvidence, ImpactQuery, ImpactSet, RebuildEvidence,
+    RebuildPlan, RebuildStep, RiskCalibration, RiskFactor, SDKMethod, SDKVersion,
+    SafeChangePlan, SystemArtifact, SystemCompilePlan, SystemSource,
+    change_admissible, compile_system, estimate_risk, generate_client,
+    generate_code, impact, rebuild_admissible, rebuild_verified,
+)
 from .contract_fuzzing import ContractFuzzer, FuzzBudget, FuzzFailure, FuzzReport
 from .simulation_mode import SimulationAuthority, SimulationEvidence, SimulationRequest, SimulationResult, SimulationRuntime
 from .journal import DeferredExecutionJournal, DeferredJournalConflict, DeferredJournalError, DeferredJournalRecord, SqliteDeferredExecutionJournal
