@@ -36,9 +36,9 @@ class QualificationEvidence:
   for f in ("replayer_id","researcher_id"):object.__setattr__(self,f,_id(getattr(self,f),f))
   for f in ("replay_digest","robustness_digest","security_digest","latency_digest","cost_digest","operations_digest"):_sha(getattr(self,f),f)
   if self.comparison.claim_digest!=self.claim_digest:raise QualificationError("baseline comparison targets wrong claim")
-  if self.replayer_id==self.researcher_id:raise QualificationError("benchmark replay must be independent")
+  if self.replayer_id==self.researcher_id:raise QualificationError("benchmark replay must be independent")\n  if not self.comparison.supported:raise QualificationError("baseline comparison is not statistically supported")
  @property
- def qualified(self):return self.comparison.supported
+ def qualified(self):return True
 
 @dataclass(frozen=True,slots=True)
 class QualificationReceipt:
