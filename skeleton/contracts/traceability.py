@@ -437,17 +437,36 @@ class TraceabilityMatrix:
 
         return self.traverse(start_id, direction=TraversalDirection.REVERSE)
 
+    def _lineage_neighbors(self, node_id: str, *, reverse: bool) -> tuple[str, ...]:
+        lineage = {EdgeKind.IMPLEMENTS, EdgeKind.VERIFIES, EdgeKind.EVIDENCES}
+        return tuple(sorted(
+            (edge.source_id if reverse else edge.target_id)
+            for edge in self.edges
+            if edge.kind in lineage
+            and (edge.target_id if reverse else edge.source_id) == node_id
+        ))
+
+    def _lineage(self, start_id: str, *, reverse: bool) -> tuple[str, ...]:
+        start_id = self.node(start_id).node_id
+        seen = {start_id}
+        todo = [start_id]
+        while todo:
+            current = todo.pop()
+            for neighbor in reversed(self._lineage_neighbors(current, reverse=reverse)):
+                if neighbor not in seen:
+                    seen.add(neighbor)
+                    todo.append(neighbor)
+        return tuple(sorted(seen))
+
     def requirements_for(self, node_id: str) -> tuple[str, ...]:
         return tuple(
-            item
-            for item in self.provenance(node_id)
+            item for item in self._lineage(node_id, reverse=False)
             if self.nodes[item].kind is NodeKind.REQUIREMENT
         )
 
     def evidence_for(self, node_id: str) -> tuple[str, ...]:
         return tuple(
-            item
-            for item in self.dependents(node_id)
+            item for item in self._lineage(node_id, reverse=True)
             if self.nodes[item].kind is NodeKind.EVIDENCE
         )
 
