@@ -14,6 +14,16 @@ from .lifecycle_safety import (
     MigrationReceipt, MigrationState, MigrationStep, ParityEvidence,
     RetirementDecision, can_remove_adapter, decide_retirement,
 )
+from .intent_resources import (
+    ApprovalBurden, ApprovalReusePolicy, ApprovalScope, ArtifactDependency,
+    ArtifactGraph, ArtifactNode, CalibrationObservation, DependencyKind,
+    HumanFactorFinding, HumanFactorRequirement, IntentConstraint, IntentRevision,
+    OperatorTask, ProjectFact, ProjectMemory, ProjectMemoryRevision, ResourceHandle,
+    ResourceName, ResourceNamespace, ResourceQuery, ResourceRef, ResolutionReceipt,
+    TrustPresentation, TrustSignal, UserIntent, Workspace, WorkspaceMember,
+    WorkspaceResource, artifact_cycle, latest_intent, member_authorized,
+    present_trust, read_project_memory, resolve, reusable,
+)
 from .contract_fuzzing import ContractFuzzer, FuzzBudget, FuzzFailure, FuzzReport
 from .simulation_mode import SimulationAuthority, SimulationEvidence, SimulationRequest, SimulationResult, SimulationRuntime
 from .journal import DeferredExecutionJournal, DeferredJournalConflict, DeferredJournalError, DeferredJournalRecord, SqliteDeferredExecutionJournal
