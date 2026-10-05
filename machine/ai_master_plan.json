@@ -22150,10 +22150,10 @@
       ],
       "implementation_paths": [
         "machine",
-        "planned:skeleton/artifacts"
+        "skeleton/ai/runtime/deferred/lifecycle_governance.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_license_intelligence.py"
+        "skeleton/testing/test_lifecycle_governance.py"
       ],
       "evaluations": [
         "planned:license conflict evaluation"
@@ -22197,10 +22197,11 @@
       ],
       "implementation_paths": [
         "skeleton/data",
-        "skeleton/security"
+        "skeleton/security",
+        "skeleton/ai/runtime/deferred/lifecycle_governance.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_data_usage_rights.py"
+        "skeleton/testing/test_lifecycle_governance.py"
       ],
       "evaluations": [
         "planned:derived-data rights evaluation"
@@ -22211,7 +22212,6 @@
         "unauthorized training"
       ],
       "gaps": [
-        "define rights schema",
         "bind lineage/training/exports"
       ],
       "accountability_id": "ACC-VOL-408",
@@ -22300,10 +22300,11 @@
       ],
       "implementation_paths": [
         "experiments",
-        "docs"
+        "docs",
+        "skeleton/ai/runtime/deferred/lifecycle_governance.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_research_ethics_review.py"
+        "skeleton/testing/test_lifecycle_governance.py"
       ],
       "evaluations": [
         "planned:sensitive-research scenario review"
@@ -22347,10 +22348,11 @@
       ],
       "implementation_paths": [
         "machine",
-        "skeleton/ai/providers"
+        "skeleton/ai/providers",
+        "skeleton/ai/runtime/deferred/lifecycle_governance.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_model_lifecycle_governance.py"
+        "skeleton/testing/test_lifecycle_governance.py"
       ],
       "evaluations": [
         "planned:invalid transition evaluation"
@@ -22361,7 +22363,6 @@
         "retired model reused"
       ],
       "gaps": [
-        "define lifecycle state machine",
         "bind model ops/MBOM"
       ],
       "accountability_id": "ACC-VOL-411",
@@ -22394,10 +22395,11 @@
       ],
       "implementation_paths": [
         "skeleton/ai/providers",
-        "machine"
+        "machine",
+        "skeleton/ai/runtime/deferred/lifecycle_governance.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_model_deprecation.py"
+        "skeleton/testing/test_lifecycle_governance.py"
       ],
       "evaluations": [
         "planned:consumer migration evaluation"
@@ -22441,10 +22443,11 @@
       ],
       "implementation_paths": [
         "skeleton/ai/providers",
-        "skeleton/eval"
+        "skeleton/eval",
+        "skeleton/ai/runtime/deferred/lifecycle_governance.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_provider_migration.py"
+        "skeleton/testing/test_lifecycle_governance.py"
       ],
       "evaluations": [
         "planned:provider parity benchmark"
@@ -22455,7 +22458,6 @@
         "data residency regression"
       ],
       "gaps": [
-        "define parity matrix",
         "bind shadow traffic"
       ],
       "accountability_id": "ACC-VOL-413",
@@ -22601,10 +22603,11 @@
       ],
       "implementation_paths": [
         "experiments",
-        "skeleton/security"
+        "skeleton/security",
+        "skeleton/ai/runtime/deferred/lifecycle_governance.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_experimental_feature_sandbox.py"
+        "skeleton/testing/test_lifecycle_governance.py"
       ],
       "evaluations": [
         "planned:kill-switch/isolation evaluation"
@@ -22615,7 +22618,6 @@
         "experiment becomes permanent"
       ],
       "gaps": [
-        "define sandbox lifecycle",
         "bind feature flags/technology radar"
       ],
       "accountability_id": "ACC-VOL-416",
@@ -22648,10 +22650,11 @@
       ],
       "implementation_paths": [
         "experiments",
-        "docs/plan"
+        "docs/plan",
+        "skeleton/ai/runtime/deferred/lifecycle_governance.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_research_branching_model.py"
+        "skeleton/testing/test_lifecycle_governance.py"
       ],
       "evaluations": [
         "planned:research-to-production promotion audit"
@@ -22695,10 +22698,11 @@
       ],
       "implementation_paths": [
         "machine",
-        "docs"
+        "docs",
+        "skeleton/ai/runtime/deferred/lifecycle_governance.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_technique_retirement.py"
+        "skeleton/testing/test_lifecycle_governance.py"
       ],
       "evaluations": [
         "planned:retired-tech reference audit"
