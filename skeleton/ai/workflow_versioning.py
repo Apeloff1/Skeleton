@@ -27,5 +27,6 @@ class WorkflowMigration:
  def __post_init__(self):
   if self.from_version==self.to_version or not self.evidence_id:raise ValueError("migration requires version change and evidence")
  def apply(self,binding:WorkflowBinding):
+  if self.to_version<=self.from_version:raise ValueError("workflow migration must move forward")
   if binding.operation_id!=self.operation_id or binding.pinned_version!=self.from_version:raise ValueError("migration does not bind operation/version")
   return WorkflowBinding(binding.operation_id,binding.workflow_id,self.to_version)
