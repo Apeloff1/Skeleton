@@ -3,20 +3,20 @@ from dataclasses import dataclass
 from enum import Enum
 @dataclass(frozen=True,slots=True)
 class FreshnessSLI: source_watermark:int; observed_watermark:int; maximum_lag:int
- @property
+    @property
  def healthy(self):return self.source_watermark-self.observed_watermark<=self.maximum_lag
 @dataclass(frozen=True,slots=True)
 class DataSLO: availability_target:float; correctness_target:float; freshness:FreshnessSLI
 @dataclass(frozen=True,slots=True)
 class DataServiceHealth: availability_ok:bool; correctness_ok:bool; freshness_ok:bool
- @property
+    @property
  def healthy(self):return self.availability_ok and self.correctness_ok and self.freshness_ok
 def data_health(slo,availability,correctness):return DataServiceHealth(availability>=slo.availability_target,correctness>=slo.correctness_target,slo.freshness.healthy)
 @dataclass(frozen=True,slots=True)
 class EmbeddingVersion: model:str; version:str; dimension:int; preprocessing:str
 @dataclass(frozen=True,slots=True)
 class EmbeddingRecord: record_id:str; embedding:EmbeddingVersion; vector:tuple[float,...]
- def __post_init__(self):
+    def __post_init__(self):
   if len(self.vector)!=self.embedding.dimension:raise ValueError("embedding dimension mismatch")
 @dataclass(frozen=True,slots=True)
 class EmbeddingMigration: source:EmbeddingVersion; target:EmbeddingVersion; validated:bool
