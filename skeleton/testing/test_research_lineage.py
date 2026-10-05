@@ -806,3 +806,32 @@ def test_canonical_and_ai_research_lineage_implementations_are_byte_identical() 
     ai_mirror = root / "skeleton" / "ai" / "research" / "source_lineage.py"
 
     assert canonical.read_bytes() == ai_mirror.read_bytes()
+
+def test_qualification_snapshot_binds_cross_source_reconciliation_and_authority():
+ registry=ResearchSourceRegistry()
+ _ingest(registry,"paper-a","baseline")
+ _ingest(registry,"paper-b","dependent",citations=(CitationSpec("paper-a",CitationRelation.SUPPORTS),))
+ registry.create_claim(claim_id="claim-b",statement="supported",source_ids=("paper-b",))
+ registry.record_replication(replication_id="rep-1",source_id="paper-b",target_source_id="paper-a",outcome=ReplicationOutcome.REPLICATED,method="independent",result="reproduced")
+ registry.register_historical_technique(technique_id="hist-1",problem="p",mechanism="m",failure_modes=("f",),modern_analogues=("a",),source_ids=("paper-b",))
+ q=registry.qualification_snapshot()
+ assert q["citation_graph_healthy"] is True
+ assert q["claim_results"]=={"claim-b":True}
+ assert q["replication_results"]=={"rep-1":True}
+ assert q["historical_results"]=={"hist-1":True}
+ assert q["authority_scope"]=="research-evidence-only"
+ assert len(q["qualification_digest"])==64
+ assert q==registry.qualification_snapshot()
+
+def test_qualification_snapshot_exposes_retraction_without_self_healing_evidence():
+ registry=ResearchSourceRegistry()
+ _ingest(registry,"paper-a","baseline")
+ _ingest(registry,"paper-b","dependent",citations=(CitationSpec("paper-a",CitationRelation.SUPPORTS),))
+ registry.create_claim(claim_id="claim-b",statement="supported",source_ids=("paper-b",))
+ before=registry.qualification_snapshot()
+ registry.transition_source_status("paper-a",status=SourceStatus.RETRACTED,correction_refs=("notice:r",))
+ after=registry.qualification_snapshot()
+ assert before["qualification_digest"]!=after["qualification_digest"]
+ assert after["citation_graph_healthy"] is False
+ assert after["claim_results"]["claim-b"] is False
+ assert after["authority_scope"]=="research-evidence-only"
