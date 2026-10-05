@@ -86,7 +86,7 @@ Completion requires implementation sign-off plus independent verification sign-o
 - [ ] `ACC-VOL-051` — VOL-051 Repository Architecture — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-052` — VOL-052 Internal Python Architecture — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-053` — VOL-053 Import Architecture — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-054` — VOL-054 Machine Architecture Manifests — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-054` — VOL-054 Machine Architecture Manifests — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-055` — VOL-055 Architecture Linter — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [x] `ACC-VOL-056` — VOL-056 Gap Ledger — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:P1 Evidence Identity Gate** — completed_at_utc: `2026-10-04T04:32:01Z`
 - [x] `ACC-VOL-057` — VOL-057 Risk Register — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:P1 Evidence Identity Gate** — completed_at_utc: `2026-10-04T04:32:01Z`
