@@ -1,0 +1,1 @@
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"}],"uuid":"89a34c82cee24d9ea6dcaa71cb965211","collectionName":"flashcard_decks","type":"collection"}

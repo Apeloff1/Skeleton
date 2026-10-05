@@ -1,0 +1,418 @@
+{
+  "families": [
+    {
+      "base": "https://api.x.ai/v1",
+      "env": "XAI_API_KEY",
+      "gate": "openai_compat",
+      "house": "xAI",
+      "id": "xai.grok",
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "models": [
+        "grok-4",
+        "grok-3",
+        "grok-2",
+        "grok-2-vision"
+      ]
+    },
+    {
+      "base": "https://api.moonshot.ai/v1",
+      "env": "KIMI_API_KEY",
+      "gate": "kimi",
+      "house": "Moonshot",
+      "id": "moonshot.kimi",
+      "modalities": [
+        "text"
+      ],
+      "models": [
+        "kimi-k2-0711-preview",
+        "moonshot-v1-8k",
+        "moonshot-v1-32k",
+        "moonshot-v1-128k"
+      ]
+    },
+    {
+      "base": "https://api.openai.com/v1",
+      "env": "OPENAI_API_KEY",
+      "gate": "openai_compat",
+      "house": "OpenAI",
+      "id": "openai.gpt",
+      "modalities": [
+        "text",
+        "image",
+        "audio"
+      ],
+      "models": [
+        "gpt-4o",
+        "gpt-4o-mini",
+        "gpt-4.1",
+        "o3",
+        "o4-mini",
+        "whisper-1",
+        "tts-1"
+      ]
+    },
+    {
+      "base": "https://api.anthropic.com",
+      "env": "ANTHROPIC_API_KEY",
+      "gate": "anthropic",
+      "house": "Anthropic",
+      "id": "anthropic.claude",
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "models": [
+        "claude-opus-4",
+        "claude-sonnet-4",
+        "claude-3-5-haiku"
+      ]
+    },
+    {
+      "base": "https://generativelanguage.googleapis.com",
+      "env": "GEMINI_API_KEY",
+      "gate": "gemini",
+      "house": "Google",
+      "id": "google.gemini",
+      "modalities": [
+        "text",
+        "image",
+        "audio",
+        "video"
+      ],
+      "models": [
+        "gemini-2.5-pro",
+        "gemini-2.5-flash",
+        "gemini-2.0-flash"
+      ]
+    },
+    {
+      "base": "https://huggingface.co",
+      "env": "HF_TOKEN",
+      "gate": "huggingface",
+      "house": "Meta",
+      "id": "meta.llama",
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "models": [
+        "llama-4-scout",
+        "llama-3.3-70b",
+        "llama-3.1-8b"
+      ]
+    },
+    {
+      "base": "https://api.mistral.ai/v1",
+      "env": "MISTRAL_API_KEY",
+      "gate": "openai_compat",
+      "house": "Mistral",
+      "id": "mistral.mixtral",
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "models": [
+        "mistral-large",
+        "mistral-small",
+        "pixtral-large",
+        "codestral"
+      ]
+    },
+    {
+      "base": "https://api.deepseek.com",
+      "env": "DEEPSEEK_API_KEY",
+      "gate": "openai_compat",
+      "house": "DeepSeek",
+      "id": "deepseek.v3",
+      "modalities": [
+        "text"
+      ],
+      "models": [
+        "deepseek-chat",
+        "deepseek-reasoner"
+      ]
+    },
+    {
+      "base": "https://huggingface.co",
+      "env": "HF_TOKEN",
+      "gate": "huggingface",
+      "house": "Alibaba",
+      "id": "alibaba.qwen",
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "models": [
+        "qwen2.5",
+        "qwen2.5-vl",
+        "qwen-max"
+      ]
+    },
+    {
+      "base": "https://api.cohere.com",
+      "env": "COHERE_API_KEY",
+      "gate": "cohere",
+      "house": "Cohere",
+      "id": "cohere.command",
+      "modalities": [
+        "text"
+      ],
+      "models": [
+        "command-r-plus",
+        "command-r",
+        "command-a"
+      ]
+    },
+    {
+      "base": "https://huggingface.co",
+      "env": "HF_TOKEN",
+      "gate": "huggingface",
+      "house": "HuggingFace",
+      "id": "huggingface.hub",
+      "modalities": [
+        "text",
+        "image",
+        "audio"
+      ],
+      "models": [
+        "sshleifer/tiny-gpt2",
+        "gpt2",
+        "openai/whisper-tiny",
+        "openai/clip-vit-base-patch32"
+      ]
+    },
+    {
+      "base": "local",
+      "env": "",
+      "gate": "local",
+      "house": "Skeleton",
+      "id": "house.skeleton",
+      "modalities": [
+        "text",
+        "image",
+        "audio",
+        "video"
+      ],
+      "models": [
+        "pfc",
+        "midbrain",
+        "left",
+        "right",
+        "neo",
+        "neo_rms"
+      ]
+    }
+  ],
+  "kind": "catalog",
+  "probe": [
+    {
+      "gate": "openai_compat",
+      "house": "xAI",
+      "id": "xai.grok",
+      "keyed": false,
+      "live": false,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "models": [
+        "grok-4",
+        "grok-3",
+        "grok-2",
+        "grok-2-vision"
+      ]
+    },
+    {
+      "gate": "kimi",
+      "house": "Moonshot",
+      "id": "moonshot.kimi",
+      "keyed": false,
+      "live": false,
+      "modalities": [
+        "text"
+      ],
+      "models": [
+        "kimi-k2-0711-preview",
+        "moonshot-v1-8k",
+        "moonshot-v1-32k",
+        "moonshot-v1-128k"
+      ]
+    },
+    {
+      "gate": "openai_compat",
+      "house": "OpenAI",
+      "id": "openai.gpt",
+      "keyed": false,
+      "live": false,
+      "modalities": [
+        "text",
+        "image",
+        "audio"
+      ],
+      "models": [
+        "gpt-4o",
+        "gpt-4o-mini",
+        "gpt-4.1",
+        "o3",
+        "o4-mini",
+        "whisper-1",
+        "tts-1"
+      ]
+    },
+    {
+      "gate": "anthropic",
+      "house": "Anthropic",
+      "id": "anthropic.claude",
+      "keyed": false,
+      "live": false,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "models": [
+        "claude-opus-4",
+        "claude-sonnet-4",
+        "claude-3-5-haiku"
+      ]
+    },
+    {
+      "gate": "gemini",
+      "house": "Google",
+      "id": "google.gemini",
+      "keyed": false,
+      "live": false,
+      "modalities": [
+        "text",
+        "image",
+        "audio",
+        "video"
+      ],
+      "models": [
+        "gemini-2.5-pro",
+        "gemini-2.5-flash",
+        "gemini-2.0-flash"
+      ]
+    },
+    {
+      "gate": "huggingface",
+      "house": "Meta",
+      "id": "meta.llama",
+      "keyed": false,
+      "live": false,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "models": [
+        "llama-4-scout",
+        "llama-3.3-70b",
+        "llama-3.1-8b"
+      ]
+    },
+    {
+      "gate": "openai_compat",
+      "house": "Mistral",
+      "id": "mistral.mixtral",
+      "keyed": false,
+      "live": false,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "models": [
+        "mistral-large",
+        "mistral-small",
+        "pixtral-large",
+        "codestral"
+      ]
+    },
+    {
+      "gate": "openai_compat",
+      "house": "DeepSeek",
+      "id": "deepseek.v3",
+      "keyed": false,
+      "live": false,
+      "modalities": [
+        "text"
+      ],
+      "models": [
+        "deepseek-chat",
+        "deepseek-reasoner"
+      ]
+    },
+    {
+      "gate": "huggingface",
+      "house": "Alibaba",
+      "id": "alibaba.qwen",
+      "keyed": false,
+      "live": false,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "models": [
+        "qwen2.5",
+        "qwen2.5-vl",
+        "qwen-max"
+      ]
+    },
+    {
+      "gate": "cohere",
+      "house": "Cohere",
+      "id": "cohere.command",
+      "keyed": false,
+      "live": false,
+      "modalities": [
+        "text"
+      ],
+      "models": [
+        "command-r-plus",
+        "command-r",
+        "command-a"
+      ]
+    },
+    {
+      "gate": "huggingface",
+      "house": "HuggingFace",
+      "id": "huggingface.hub",
+      "keyed": false,
+      "live": false,
+      "modalities": [
+        "text",
+        "image",
+        "audio"
+      ],
+      "models": [
+        "sshleifer/tiny-gpt2",
+        "gpt2",
+        "openai/whisper-tiny",
+        "openai/clip-vit-base-patch32"
+      ]
+    },
+    {
+      "gate": "local",
+      "house": "Skeleton",
+      "id": "house.skeleton",
+      "keyed": false,
+      "live": true,
+      "modalities": [
+        "text",
+        "image",
+        "audio",
+        "video"
+      ],
+      "models": [
+        "pfc",
+        "midbrain",
+        "left",
+        "right",
+        "neo",
+        "neo_rms"
+      ]
+    }
+  ],
+  "sha256": "fb5dc62002b3cb7f35f34faa16102e9624dce5e046cb33a55eb69d57b61b6243"
+}

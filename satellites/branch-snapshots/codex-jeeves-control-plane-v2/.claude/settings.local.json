@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node /app/frontend/scripts/init-git-for-eas.js)",
+      "Bash(rm -rf /app/frontend/.git && echo \"cleaned up test .git\")",
+      "Bash(rm -rf /app/frontend/.git && echo \"cleaned up\")"
+    ],
+    "additionalDirectories": [
+      "/app/frontend/.git"
+    ]
+  }
+}
