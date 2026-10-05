@@ -1,0 +1,53 @@
+name: VOL-074 Education Intelligence
+
+on:
+  pull_request:
+    paths:
+      - "skeleton/education/**"
+      - "machine/ai_education_contract.json"
+      - "machine/ai_master_plan.json"
+      - "scripts/check_vol074_education_intelligence.py"
+      - "tests/test_vol074_education_intelligence.py"
+      - ".github/workflows/vol074-education-intelligence.yml"
+  push:
+    branches: [main]
+    paths:
+      - "skeleton/education/**"
+      - "machine/ai_education_contract.json"
+      - "machine/ai_master_plan.json"
+      - "scripts/check_vol074_education_intelligence.py"
+      - "tests/test_vol074_education_intelligence.py"
+      - ".github/workflows/vol074-education-intelligence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vol074-education-intelligence-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Learner evidence and outcomes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+      - name: Install focused test runtime
+        run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+      - name: Compile bounded implementation
+        run: |
+          python -m py_compile skeleton/education/learning.py
+          python -m py_compile scripts/check_vol074_education_intelligence.py
+      - name: Verify education contracts
+        run: python scripts/check_vol074_education_intelligence.py
+      - name: Run adversarial VOL-074 regressions
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: python -m pytest -q --noconftest tests/test_vol074_education_intelligence.py
