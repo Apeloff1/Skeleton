@@ -64,3 +64,19 @@ def test_ownership_policy_enums_are_typed():
 
 def test_resource_evidence_boolean_claims_are_typed():
  with pytest.raises(MaintenanceError,match="reachable must be bool"):evidence(reachable=1)
+
+def test_execution_boundary_enforces_mutation_budget_and_receipt_binding():
+ t=task(action=MaintenanceAction.UPDATE,risk=MaintenanceRisk.MEDIUM,mutation_limit=2)
+ r=authorize(t,owner(),evidence())
+ enforce_mutation_budget(t,r,2)
+ with pytest.raises(MaintenanceError,match="exceeds task limit"):enforce_mutation_budget(t,r,3)
+ other=task(task_id="TASK.CLEAN.2",action=MaintenanceAction.UPDATE,risk=MaintenanceRisk.MEDIUM,mutation_limit=2)
+ with pytest.raises(MaintenanceError,match="exact task"):enforce_mutation_budget(other,r,1)
+
+def test_blocked_or_invalid_mutation_batch_cannot_execute():
+ t=task(action=MaintenanceAction.UPDATE,risk=MaintenanceRisk.MEDIUM)
+ blocked=authorize(t,owner())
+ with pytest.raises(MaintenanceError,match="cannot mutate"):enforce_mutation_budget(t,blocked,1)
+ allowed=authorize(t,owner(),evidence())
+ with pytest.raises(MaintenanceError,match="positive integer"):enforce_mutation_budget(t,allowed,0)
+ with pytest.raises(MaintenanceError,match="positive integer"):enforce_mutation_budget(t,allowed,True)
