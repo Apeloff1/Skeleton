@@ -14,6 +14,14 @@ from .lifecycle_safety import (
     MigrationReceipt, MigrationState, MigrationStep, ParityEvidence,
     RetirementDecision, can_remove_adapter, decide_retirement,
 )
+from .control_plane import (
+    Constraint, ConstraintResult, ConstraintSet, ConstraintStrength,
+    ControlPlaneCommand, ControlPlaneReceipt, ControlPlaneState, Decision,
+    DecisionContext, DecisionEdge, DecisionOption, DecisionOutcome,
+    DecisionRecord, NormalizedObjective, Objective, ObjectiveAmbiguity,
+    ObjectiveAssumption, ObjectiveCriterion, ObjectiveState, WorkflowEdge,
+    WorkflowIR, WorkflowNode, apply_command, decide, evaluate_constraints,
+)
 from .contract_fuzzing import ContractFuzzer, FuzzBudget, FuzzFailure, FuzzReport
 from .simulation_mode import SimulationAuthority, SimulationEvidence, SimulationRequest, SimulationResult, SimulationRuntime
 from .journal import DeferredExecutionJournal, DeferredJournalConflict, DeferredJournalError, DeferredJournalRecord, SqliteDeferredExecutionJournal
