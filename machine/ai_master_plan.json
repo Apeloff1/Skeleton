@@ -5044,7 +5044,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Separate observed learner evidence from inferred mastery/confidence.",
         "Plan explanations/practice against explicit learning objectives and prerequisite graphs.",
@@ -5057,21 +5057,32 @@
       ],
       "contracts": [
         "LearnerEvidence",
+        "LearnerSkillState",
+        "LearnerStateEstimator",
         "LearningObjective",
-        "InstructionPlan"
+        "LearningObjectiveGraph",
+        "InstructionStep",
+        "InstructionPlan",
+        "LearningOutcome",
+        "LearnerEvidenceLedger",
+        "LearningSnapshot"
       ],
       "implementation_paths": [
-        "skeleton/ai",
-        "planned:skeleton/education",
-        "skeleton/evaluation"
+        "skeleton/learning/instruction_runtime.py",
+        "skeleton/learning/__init__.py",
+        "skeleton/learning/school",
+        "skeleton/jeeves/assessment.py",
+        "skeleton/jeeves/curriculum.py",
+        "skeleton/jeeves/pedagogy.py",
+        "skeleton/ai/learning/instruction_runtime.py",
+        "skeleton/ai/learning/__init__.py",
+        "machine/ai_file_tree.json"
       ],
       "tests": [
-        "planned:skeleton/testing/test_learner_evidence.py",
-        "planned:skeleton/testing/test_instruction_plan.py"
+        "skeleton/testing/test_vol074_instruction_runtime.py"
       ],
       "evaluations": [
-        "planned:misconception correction evaluation",
-        "planned:personalization bias evaluation"
+        "skeleton/testing/test_vol074_instruction_runtime.py"
       ],
       "evidence": [],
       "risks": [
@@ -5079,10 +5090,7 @@
         "reinforced misconception",
         "engagement metric gaming"
       ],
-      "gaps": [
-        "define learner-state uncertainty model",
-        "bind pedagogy to outcome evaluations"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-074",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
@@ -5559,7 +5567,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Select formal-method targets by consequence and ambiguity rather than prestige.",
         "Bind each formal model to named implementation contracts and assumptions.",
@@ -5572,21 +5580,36 @@
       ],
       "contracts": [
         "FormalSpecification",
+        "FormalAssumption",
+        "ImplementationBinding",
+        "StateVariable",
+        "FormalState",
         "ProofObligation",
-        "Counterexample"
+        "ProofResult",
+        "Counterexample",
+        "FormalRunReport",
+        "FormalSpecificationRegistry",
+        "ModelSemantics",
+        "BoundedModelChecker"
       ],
       "implementation_paths": [
-        "formal",
-        "scripts",
-        "skeleton/testing"
+        "skeleton/contracts/formal_methods.py",
+        "skeleton/contracts/formal_targets.py",
+        "skeleton/contracts/__init__.py",
+        "skeleton/ai/runtime/contracts/formal_methods.py",
+        "skeleton/ai/runtime/contracts/formal_targets.py",
+        "skeleton/ai/runtime/contracts/__init__.py",
+        "skeleton/contracts/operation.py",
+        "skeleton/contracts/protocol.py",
+        "machine/ai_file_tree.json"
       ],
       "tests": [
-        "planned:skeleton/testing/test_formal_contract_registry.py",
-        "planned:formal model conformance tests"
+        "skeleton/testing/test_vol081_formal_methods.py"
       ],
       "evaluations": [
-        "planned:model/code conformance evaluation",
-        "planned:state-space/assumption review"
+        "skeleton/testing/test_vol081_formal_methods.py",
+        "P0.OPERATION.LIFECYCLE",
+        "P0.PROTOCOL.REPLAY"
       ],
       "evidence": [],
       "risks": [
@@ -5594,10 +5617,7 @@
         "state explosion",
         "proof overclaim"
       ],
-      "gaps": [
-        "select P0 formal targets",
-        "establish model-to-code traceability"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-081",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
