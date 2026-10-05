@@ -35,3 +35,18 @@ def test_self_diagnosis_is_unknown_without_external_evidence():
  assert SelfDiagnostic((e,),()).advisory_health is FindingState.UNKNOWN
 def test_fault_hypothesis_confidence_is_bounded():
  with pytest.raises(ValueError): FaultHypothesis("db","maybe",D,1.1)
+
+
+def test_recovery_diagnostic_depth_invariants_fail_closed():
+ import pytest
+ d="a"*64
+ with pytest.raises(ValueError):RecoveryArtifact("a","bad",d,True)
+ a=RecoveryArtifact("a",d,d,True)
+ with pytest.raises(ValueError):BootstrapRecovery("r",(a,a),0)
+ with pytest.raises(ValueError):validate_recovery(BootstrapRecovery("r",(a,),0),-1)
+ with pytest.raises(ValueError):CrashReport(CrashContext("c","id",(("k","1"),("k","2"))),CrashSignature("E",d),True,True)
+ m=SupportManifest(("p","p"),(("p",sha256_json({"content":"x"})),),"later")
+ with pytest.raises(ValueError):SupportBundle(m,(("p","x"),),SupportRedaction(()))
+ with pytest.raises(ValueError):DoctorFinding(DoctorCheck("","c"),FindingState.BROKEN,d,"fix")
+ with pytest.raises(ValueError):HealthEvidence("c",FindingState.HEALTHY,None,"bad")
+ with pytest.raises(ValueError):FaultHypothesis("c","why","bad",0.5)
