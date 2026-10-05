@@ -1,5 +1,5 @@
-import pytest
 from __future__ import annotations
+import pytest
 from dataclasses import replace
 from skeleton.persistence.foundation_recovery import *
 def scenario():
