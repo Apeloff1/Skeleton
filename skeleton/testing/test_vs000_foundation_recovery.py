@@ -1,3 +1,4 @@
+import pytest
 from __future__ import annotations
 from dataclasses import replace
 from skeleton.persistence.foundation_recovery import *
@@ -27,3 +28,29 @@ def test_unsupported_event_never_becomes_authoritative_projection():
  e=DurableEvent(1,"EVENT.1",{"op":"execute","key":"x"},None);s=VS000Scenario("SCENARIO.X",{},(e,))
  try:checkpoint(s,"CHECKPOINT.X");assert False
  except RecoveryError as exc:assert "unsupported" in str(exc)
+
+def test_event_payload_and_initial_state_are_snapshotted():
+ payload={"op":"set","key":"x","value":{"nested":1}};initial={"boot":{"ready":True}}
+ e=DurableEvent(1,"EVENT.X",payload,None);s=VS000Scenario("SCENARIO.X",initial,(e,))
+ before=e.digest;payload["value"]["nested"]=2;initial["boot"]["ready"]=False
+ assert e.digest==before
+ assert project(s.initial_state,s.events)=={"boot":{"ready":True},"x":{"nested":1}}
+
+def test_duplicate_event_identity_is_rejected():
+ e1=DurableEvent(1,"EVENT.X",{"op":"set","key":"x","value":1},None)
+ e2=DurableEvent(2,"EVENT.X",{"op":"set","key":"y","value":2},e1.digest)
+ with pytest.raises(RecoveryError,match="duplicate event identity"):VS000Scenario("SCENARIO.X",{},(e1,e2))
+
+def test_sequence_and_checkpoint_counts_reject_boolean_aliases():
+ with pytest.raises(RecoveryError,match="positive integer"):DurableEvent(True,"EVENT.X",{"op":"set","key":"x","value":1},None)
+ with pytest.raises(RecoveryError,match="through_sequence"):RecoveryCheckpoint("CHECKPOINT.X",False,"0"*64,"0"*64)
+
+def test_scenario_requires_typed_tuple_event_log():
+ with pytest.raises(RecoveryError,match="typed tuple"):VS000Scenario("SCENARIO.X",{},[])
+
+def test_recovery_evidence_binds_exact_scenario():
+ s=scenario();cp=checkpoint(s,"CHECKPOINT.1");ev=recover(s,cp)
+ assert ev.scenario_digest==scenario_digest(s)
+ changed=VS000Scenario(s.scenario_id,{"boot":False},s.events)
+ assert scenario_digest(changed)!=ev.scenario_digest
+ assert len(ev.digest)==64
