@@ -7,6 +7,14 @@ from .environment import (
     SimulationBoundaryError,
     SimulationEvidence,
 )
+from .authority import (
+    RolloutRequest,
+    SimulationAuthorityError,
+    SimulationAuthorityGuard,
+    SimulationPermit,
+    SimulationResourceBudget,
+)
+from .world import WorldRule, WorldRules
 from .scenario_runtime import (
     SCENARIO_SCHEMA,
     ScenarioEdge,
@@ -43,6 +51,13 @@ __all__ = [
     "EnvironmentTransition",
     "SimulationBoundaryError",
     "SimulationEvidence",
+    "RolloutRequest",
+    "SimulationAuthorityError",
+    "SimulationAuthorityGuard",
+    "SimulationPermit",
+    "SimulationResourceBudget",
+    "WorldRule",
+    "WorldRules",
     "SCENARIO_SCHEMA",
     "ScenarioEdge",
     "ScenarioNode",
