@@ -22,8 +22,8 @@ def validate_source(s:WorkflowSource,allowed_authority:tuple[str,...])->tuple[DS
 class WorkflowLink: node_id:str; capability:str; compensation:str|None
 @dataclass(frozen=True,slots=True)
 class CompiledWorkflow: source_id:str; source_digest:str; version:DSLVersion; links:tuple[WorkflowLink,...]
- @property
- def identity(self)->str:return sha256_json({"source":self.source_digest,"version":(self.version.major,self.version.minor),"links":[(x.node_id,x.capability,x.compensation) for x in self.links]})
+    @property
+    def identity(self)->str:return sha256_json({"source":self.source_digest,"version":(self.version.major,self.version.minor),"links":[(x.node_id,x.capability,x.compensation) for x in self.links]})
 @dataclass(frozen=True,slots=True)
 class CompileResult: workflow:CompiledWorkflow|None; diagnostics:tuple[DSLDiagnostic,...]
 def compile_workflow(s:WorkflowSource,links:tuple[WorkflowLink,...],available_capabilities:tuple[str,...],edges:tuple[tuple[str,str],...])->CompileResult:
