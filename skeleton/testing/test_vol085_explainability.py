@@ -721,25 +721,22 @@ def test_ledger_is_idempotent_for_identical_record() -> None:
     assert ledger.digest
 
 
-def test_ledger_rejects_identity_collision() -> None:
+def test_record_identity_rejects_content_substitution() -> None:
     record = build(
         (factor("input.user"),),
         chosen_policy=policy(
             require_uncertainty_for_model_output=False,
         ),
     )
-    forged = replace(
-        record,
-        outcome_summary="A different sanitized outcome.",
-    )
-    ledger = ExplanationLedger()
-    ledger.append(record)
 
     with pytest.raises(
         ExplanationError,
-        match="identity collision",
+        match="explanation_id does not bind record content",
     ):
-        ledger.append(forged)
+        replace(
+            record,
+            outcome_summary="A different sanitized outcome.",
+        )
 
 
 def test_full_ledger_still_allows_idempotent_replay() -> None:
@@ -903,3 +900,45 @@ def test_canonical_and_ai_explainability_runtime_are_byte_identical() -> None:
     mirror = ROOT / "skeleton/ai/runtime/observability/explainability.py"
 
     assert canonical.read_bytes() == mirror.read_bytes()
+
+
+def test_public_surface_omits_trace_id_but_audit_retains_it() -> None:
+    record = build(
+        (factor("input.user"),),
+        chosen_policy=policy(
+            require_uncertainty_for_model_output=False,
+        ),
+    )
+
+    public = record.to_public_dict()
+    audit = record.to_audit_dict()
+
+    assert "trace_id" not in public
+    assert audit["trace_id"] == operation().trace_id
+
+
+def test_private_uncertainty_taints_otherwise_safe_model_output() -> None:
+    observed = factor("input.user")
+    model = factor(
+        "model.rank",
+        kind=DecisionFactorKind.MODEL_OUTPUT,
+        relation=FactorRelation.DECISION_INPUT,
+        summary="Safe model-output summary.",
+    )
+    uncertainty = factor(
+        "uncertainty.rank",
+        kind=DecisionFactorKind.UNCERTAINTY,
+        relation=FactorRelation.UNCERTAINTY_DISCLOSURE,
+        summary="private calibration details",
+        sensitivity=FactorSensitivity.PRIVATE,
+        depends_on=("model.rank",),
+        uncertainty=0.2,
+    )
+
+    record = build((observed, model, uncertainty))
+
+    assert [item.factor_id for item in record.factors] == ["input.user"]
+    assert record.withheld_factor_count == 2
+    rendered = json_text(record.to_public_dict())
+    assert "Safe model-output summary." not in rendered
+    assert "private calibration details" not in rendered
