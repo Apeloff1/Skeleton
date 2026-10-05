@@ -287,3 +287,18 @@ def test_evidence_digest_binds_verifier_identity():
     substituted = evidence(ctrl, verifier_id="verify.other.v1")
 
     assert original.digest != substituted.digest
+
+def test_conflicting_equally_fresh_evidence_fails_closed_regardless_of_order():
+    ctrl = control()
+    reg = registry(ctrl=ctrl)
+    passed = evidence(ctrl, evidence_id="EV-PASS", artifact_digest="a"*64, result=EvidenceResult.PASS)
+    failed = evidence(ctrl, evidence_id="EV-FAIL", artifact_digest="b"*64, result=EvidenceResult.FAIL)
+
+    first = reg.assess((passed, failed), at=NOW)
+    second = reg.assess((failed, passed), at=NOW)
+
+    assert first.controls[0].status is ControlStatus.FAILED
+    assert second.controls[0].status is ControlStatus.FAILED
+    assert "cohort contains failure" in first.controls[0].reason
+    assert first.compliant is False
+    assert second.compliant is False
