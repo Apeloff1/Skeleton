@@ -35,10 +35,11 @@ class ReproductionEvidence:
   if self.reproducer_id==self.original_researcher_id:raise ResearchAcceptanceError("reproduction must be independent")
 @dataclass(frozen=True,slots=True)
 class ResearchAcceptance:
- acceptance_id:str;conclusion_digest:str;coverage:tuple[ClaimEvidenceCoverage,...];reproductions:tuple[ReproductionEvidence,...];high_impact:bool;reviewer_id:str;researcher_id:str
+ acceptance_id:str;conclusion_digest:str;coverage:tuple[ClaimEvidenceCoverage,...];reproductions:tuple[ReproductionEvidence,...];high_impact:bool;reviewer_id:str;researcher_id:str;lineage_qualification_digest:str|None=None
  def __post_init__(self):
   object.__setattr__(self,"acceptance_id",_id(self.acceptance_id,"acceptance_id"));_sha(self.conclusion_digest,"conclusion_digest")
   object.__setattr__(self,"reviewer_id",_id(self.reviewer_id,"reviewer_id"));object.__setattr__(self,"researcher_id",_id(self.researcher_id,"researcher_id"))
+  if self.lineage_qualification_digest is not None:_sha(self.lineage_qualification_digest,"lineage_qualification_digest")
   if self.high_impact and self.reviewer_id==self.researcher_id:raise ResearchAcceptanceError("high-impact conclusion requires independent review")
   if not isinstance(self.high_impact,bool):raise ResearchAcceptanceError("high_impact must be bool")
   if not isinstance(self.coverage,tuple) or not isinstance(self.reproductions,tuple):raise ResearchAcceptanceError("acceptance collections must be tuples")
@@ -51,7 +52,7 @@ class ResearchAcceptance:
   by_claim={r.claim_id for r in self.reproductions if r.reproduced}
   return all(c.claim_id in by_claim for c in self.coverage)
  @property
- def digest(self):return _dig({"id":self.acceptance_id,"conclusion":self.conclusion_digest,"coverage":[[c.claim_id,c.evidence_digests,c.contradiction_digests,c.uncertainty_recorded,c.negative_results_preserved] for c in self.coverage],"reproductions":[[r.reproduction_id,r.claim_id,r.method_digest,r.result_digest,r.reproducer_id,r.reproduced] for r in self.reproductions],"high_impact":self.high_impact,"reviewer":self.reviewer_id,"researcher":self.researcher_id})
+ def digest(self):return _dig({"id":self.acceptance_id,"conclusion":self.conclusion_digest,"coverage":[[c.claim_id,c.evidence_digests,c.contradiction_digests,c.uncertainty_recorded,c.negative_results_preserved] for c in self.coverage],"reproductions":[[r.reproduction_id,r.claim_id,r.method_digest,r.result_digest,r.reproducer_id,r.reproduced] for r in self.reproductions],"high_impact":self.high_impact,"reviewer":self.reviewer_id,"researcher":self.researcher_id,"lineage_qualification":self.lineage_qualification_digest})
 
 @dataclass(frozen=True,slots=True)
 class ResearchAcceptanceSignoff:
