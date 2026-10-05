@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "volume": "VOL-073",
+  "status": "implementation_contract",
+  "policy": {
+    "state_rule": "Every governed simulation state binds world identity, monotonic tick, canonical rule digest, explicit uncertainty, immutable deterministic values, and parent-state lineage.",
+    "authority_rule": "Simulation states, actions, evidence, and permits are simulation-only and cannot authorize real-world facts, postconditions, network writes, filesystem writes, process execution, or other external side effects.",
+    "resource_rule": "Rollouts fail closed before execution when depth, branching, total nodes, state bytes, action bytes, compute units, uncertainty, or declared capability scope exceed the active budget."
+  },
+  "authority": {
+    "canonical_state_contract": "skeleton/simulation/world.py",
+    "rollout_guard": "skeleton/simulation/authority.py",
+    "existing_rollout_engine": "skeleton/simulation/world_model.py",
+    "environment_adapter": "skeleton/simulation/environment.py",
+    "world_model_dependency": "skeleton.simulation.world.WorldState",
+    "real_side_effect_authority": false
+  },
+  "default_budget": {
+    "max_depth": 64,
+    "max_branching_factor": 8,
+    "max_total_nodes": 4096,
+    "max_state_bytes": 262144,
+    "max_action_bytes": 65536,
+    "max_compute_units": 1000000,
+    "max_uncertainty": 0.8
+  },
+  "allowed_simulation_capabilities": [
+    "simulate.branch",
+    "simulate.physics",
+    "simulate.read-state"
+  ],
+  "forbidden_real_capabilities": [
+    "filesystem.write",
+    "network.write",
+    "process.execute",
+    "real.postcondition",
+    "real.world-fact"
+  ],
+  "implementation": {
+    "state_contract": "skeleton/simulation/world.py",
+    "authority_guard": "skeleton/simulation/authority.py",
+    "tests": "tests/test_vol073_simulation_intelligence.py",
+    "verifier": "scripts/check_vol073_simulation_intelligence.py",
+    "workflow": ".github/workflows/vol073-simulation-intelligence.yml"
+  }
+}
