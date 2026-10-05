@@ -8,6 +8,8 @@ on:
       - "skeleton/eval/research_acceptance.py"
       - "skeleton/ai/evaluation/research_acceptance.py"
       - "skeleton/testing/test_research_system_acceptance.py"
+      - "skeleton/testing/test_vol001_independent_verifier.py"
+      - "scripts/verify_vol001_research_closure.py"
       - "machine/ai_master_plan.json"
       - ".github/workflows/ai-research-lineage.yml"
   push:
@@ -19,6 +21,8 @@ on:
       - "skeleton/eval/research_acceptance.py"
       - "skeleton/ai/evaluation/research_acceptance.py"
       - "skeleton/testing/test_research_system_acceptance.py"
+      - "skeleton/testing/test_vol001_independent_verifier.py"
+      - "scripts/verify_vol001_research_closure.py"
       - "machine/ai_master_plan.json"
       - ".github/workflows/ai-research-lineage.yml"
   workflow_dispatch:
@@ -46,4 +50,15 @@ jobs:
       - run: python -m pip install --disable-pip-version-check . "pytest>=8,<9"
       - run: python -m compileall -q skeleton/research skeleton/ai/research skeleton/eval/research_acceptance.py skeleton/ai/evaluation/research_acceptance.py
       - run: python scripts/check_ai_master_plan.py
-      - run: python -m pytest -q --noconftest skeleton/testing/test_research_lineage.py skeleton/testing/test_research_system_acceptance.py
+      - run: python -m pytest -q --noconftest skeleton/testing/test_research_lineage.py skeleton/testing/test_research_system_acceptance.py skeleton/testing/test_vol001_independent_verifier.py
+      - name: Emit exact-head independent verification receipt
+        env:
+          EVIDENCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: python scripts/verify_vol001_research_closure.py --evidence-out vol001-independent-verification.json
+      - name: Upload verification receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: vol001-independent-verification-${{ github.event.pull_request.head.sha || github.sha }}
+          path: vol001-independent-verification.json
+          if-no-files-found: error
+          retention-days: 14
