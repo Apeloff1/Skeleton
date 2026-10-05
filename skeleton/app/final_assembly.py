@@ -12,9 +12,10 @@ def _id(v,f):
  return v
 @dataclass(frozen=True,slots=True)
 class FinalAssemblyPlan:
- plan_id:str;head_digest:str;environment_digest:str;artifact_digest:str;gate_ids:tuple[str,...]
+ plan_id:str;authority_id:str;head_digest:str;environment_digest:str;artifact_digest:str;gate_ids:tuple[str,...]
  def __post_init__(self):
   object.__setattr__(self,"plan_id",_id(self.plan_id,"plan_id"))
+  object.__setattr__(self,"authority_id",_id(self.authority_id,"authority_id"))
   for f in ("head_digest","environment_digest","artifact_digest"):_sha(getattr(self,f),f)
   if not isinstance(self.gate_ids,tuple) or not self.gate_ids:raise FinalAssemblyError("gate_ids required")
   ids=tuple(_id(x,"gate_id") for x in self.gate_ids)
@@ -22,9 +23,10 @@ class FinalAssemblyPlan:
   object.__setattr__(self,"gate_ids",tuple(sorted(ids)))
 @dataclass(frozen=True,slots=True)
 class FinalAssemblyRun:
- plan_id:str;head_digest:str;environment_digest:str;artifact_digest:str;passed_gate_ids:tuple[str,...];evidence_digest:str
+ plan_id:str;authority_id:str;head_digest:str;environment_digest:str;artifact_digest:str;passed_gate_ids:tuple[str,...];evidence_digest:str
  def __post_init__(self):
   object.__setattr__(self,"plan_id",_id(self.plan_id,"plan_id"))
+  object.__setattr__(self,"authority_id",_id(self.authority_id,"authority_id"))
   for f in ("head_digest","environment_digest","artifact_digest","evidence_digest"):_sha(getattr(self,f),f)
   if not isinstance(self.passed_gate_ids,tuple):raise FinalAssemblyError("passed_gate_ids must be tuple")
   ids=tuple(_id(x,"gate_id") for x in self.passed_gate_ids)
@@ -45,9 +47,10 @@ class FinalAssemblyEvidence:
 def qualify(plan,evidence):
  if not isinstance(plan,FinalAssemblyPlan) or not isinstance(evidence,FinalAssemblyEvidence):raise FinalAssemblyError("typed plan and evidence required")
  run=evidence.run
- if run.plan_id!=plan.plan_id or run.head_digest!=plan.head_digest or run.environment_digest!=plan.environment_digest or run.artifact_digest!=plan.artifact_digest:raise FinalAssemblyError("assembly run does not match exact plan")
+ if run.plan_id!=plan.plan_id or run.authority_id!=plan.authority_id or run.head_digest!=plan.head_digest or run.environment_digest!=plan.environment_digest or run.artifact_digest!=plan.artifact_digest:raise FinalAssemblyError("assembly run does not match exact plan")
  if run.passed_gate_ids!=plan.gate_ids:raise FinalAssemblyError("all exact assembly gates must pass")
  if evidence.unresolved_risk_ids:raise FinalAssemblyError("unresolved release risks block qualification")
  if evidence.independent_verifier_id is None:raise FinalAssemblyError("independent verification required")
+ if evidence.independent_verifier_id==plan.authority_id:raise FinalAssemblyError("verifier must be independent from assembly authority")
  if evidence.verified_evidence_digest!=run.evidence_digest:raise FinalAssemblyError("verified evidence digest mismatch")
  return run.evidence_digest
