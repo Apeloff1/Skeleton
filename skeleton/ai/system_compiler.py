@@ -17,7 +17,7 @@ def _canonical(x):
  if isinstance(x,(list,tuple)):return [_canonical(v) for v in x]
  return x
 def compile_system(source,plan):
- if not source.contract_id or not source.contract_version or not plan.targets:raise ValueError("compiler source and targets required")
+ if not source.contract_id or not source.contract_version or not plan.targets or any(not isinstance(t,str) or not t for t in plan.targets):raise ValueError("compiler source and targets required")
  raw=json.dumps(_canonical({"id":source.contract_id,"version":source.contract_version,"payload":source.payload}),sort_keys=True,separators=(",",":"),allow_nan=False).encode()
  digest=hashlib.sha256(raw).hexdigest()
  return tuple(SystemArtifact(t,(f"derived:{t}:{digest}\n").encode(),digest) for t in sorted(set(plan.targets)))
