@@ -496,8 +496,8 @@ def test_canonical_ai_package_exports_capability_contract_by_identity() -> None:
 
 def test_snapshot_round_trip_preserves_authoritative_identity() -> None:
     root = descriptor("CAP.ROOT")
-    evidence = evidence(root)
-    snapshot = CapabilityMap((root,), (evidence,)).resolve_all()
+    live_evidence = evidence(root)
+    snapshot = CapabilityMap((root,), (live_evidence,)).resolve_all()
     replayed = CapabilitySnapshot.from_dict(snapshot.to_dict())
     assert replayed == snapshot
     assert replayed.digest == snapshot.digest
