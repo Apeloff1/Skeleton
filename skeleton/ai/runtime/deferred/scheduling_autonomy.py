@@ -65,8 +65,8 @@ class SimulationMetric: throughput:float; latency:float; fairness:float; resourc
 @dataclass(frozen=True,slots=True)
 class SchedulingSimulation:
  trace:WorkloadTrace; policy:SchedulingPolicy; metric:SimulationMetric
- @property
- def authoritative(self):return False
+    @property
+    def authoritative(self):return False
 @dataclass(frozen=True,slots=True)
 class ControlState: measured:float; target:float; resource_remaining:float
 @dataclass(frozen=True,slots=True)
