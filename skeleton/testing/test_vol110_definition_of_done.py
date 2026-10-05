@@ -16,9 +16,12 @@ from skeleton.contracts.definition_of_done import (
     DoDRequirement,
     EvidenceKind,
     RequirementStatus,
+    completion_evidence_from_promotion_receipt,
     default_definition_of_done,
 )
+from skeleton.contracts.canonical import EvidenceRef
 from skeleton.contracts.maturity_reconciliation import MaturityState
+from skeleton.contracts.promotion_evidence import PromotionEvidenceReceipt
 
 ROOT = Path(__file__).resolve().parents[2]
 NOW = datetime(2026, 10, 5, 14, 0, 0, tzinfo=timezone.utc)
@@ -776,3 +779,145 @@ def test_canonical_and_ai_dod_runtime_are_byte_identical() -> None:
     ).read_bytes() == (
         ROOT / "skeleton/ai/runtime/contracts/definition_of_done.py"
     ).read_bytes()
+
+
+def test_policy_cannot_disable_independent_completion_signoff() -> None:
+    req = DoDRequirement(
+        "dod.test",
+        EvidenceKind.TEST,
+        "Test evidence.",
+        MaturityState.IMPLEMENTED,
+        always_required=True,
+    )
+    with pytest.raises(DefinitionOfDoneError, match="independent signoff is mandatory"):
+        DefinitionOfDone(
+            "policy.unsafe",
+            1,
+            (req,),
+            independent_signoff_required=False,
+        )
+
+
+def test_hardened_high_risk_change_requires_risk_review() -> None:
+    policy = default_definition_of_done()
+    p = profile((ChangeImpact.AUTHORITY,))
+    ids = {
+        item.requirement_id
+        for item in active(policy, p, MaturityState.HARDENED)
+    }
+
+    assert "dod.risk_review" in ids
+
+
+def test_production_maturity_requires_promotion_evidence() -> None:
+    policy = default_definition_of_done()
+    p = profile((ChangeImpact.LOGIC,))
+    ids = {
+        item.requirement_id
+        for item in active(policy, p, MaturityState.PRODUCTION)
+    }
+
+    assert "dod.promotion" in ids
+
+
+def promotion_receipt() -> PromotionEvidenceReceipt:
+    return PromotionEvidenceReceipt(
+        repository="Apeloff1/Skeleton",
+        commit_sha="1" * 40,
+        task_id="VOL-110",
+        accountability_id="ACC-VOL-110",
+        configuration_digest="2" * 64,
+        environment_digest="3" * 64,
+        verifier_id="independent.verifier",
+        verifier_digest="4" * 64,
+        test_manifest_digest="5" * 64,
+        run_id="run.vol110",
+        run_attempt=1,
+        observed_at=NOW - timedelta(minutes=2),
+        evidence=(
+            EvidenceRef(
+                source="tests:test_vol110",
+                digest="6" * 64,
+                category="test",
+            ),
+        ),
+    )
+
+
+def test_promotion_receipt_helper_binds_exact_subject_and_receipt() -> None:
+    receipt = promotion_receipt()
+    item = completion_evidence_from_promotion_receipt(
+        evidence_id="ev.promotion",
+        requirement_id="dod.promotion",
+        producer_id="release.builder",
+        receipt=receipt,
+    )
+
+    assert item.evidence_kind is EvidenceKind.PROMOTION
+    assert item.subject_digest == receipt.subject_digest
+    assert item.artifact_digest == receipt.receipt_digest
+    assert item.verifier_id == receipt.verifier_id
+    assert item.observed_at == receipt.observed_at
+
+
+def test_production_promotion_receipt_can_participate_in_exact_completion() -> None:
+    policy = default_definition_of_done()
+    receipt = promotion_receipt()
+    p = ChangeImpactProfile(
+        subject_id="change.vol110.production",
+        subject_digest=receipt.subject_digest,
+        owner_id="team.owner",
+        builder_id="release.builder",
+        impacts=(ChangeImpact.LOGIC,),
+    )
+    requirements = active(policy, p, MaturityState.PRODUCTION)
+    items = []
+    for req in requirements:
+        if req.evidence_kind is EvidenceKind.PROMOTION:
+            items.append(
+                completion_evidence_from_promotion_receipt(
+                    evidence_id="ev.promotion",
+                    requirement_id=req.requirement_id,
+                    producer_id=p.builder_id,
+                    receipt=receipt,
+                )
+            )
+            continue
+        producer = p.owner_id if req.evidence_kind is EvidenceKind.OWNERSHIP else p.builder_id
+        verifier = "independent.verifier" if req.independent else "routine.verifier"
+        items.append(
+            CompletionEvidence(
+                evidence_id=f"ev.{req.requirement_id}",
+                requirement_id=req.requirement_id,
+                evidence_kind=req.evidence_kind,
+                subject_digest=p.subject_digest,
+                artifact_digest=ARTIFACT,
+                producer_id=producer,
+                verifier_id=verifier,
+                observed_at=NOW - timedelta(minutes=5),
+                passed=True,
+            )
+        )
+
+    materialized = tuple(items)
+    signoff = valid_signoff(
+        policy,
+        p,
+        MaturityState.PRODUCTION,
+        materialized,
+        signer_id="completion.reviewer",
+    )
+    result = evaluate(
+        policy,
+        p,
+        MaturityState.PRODUCTION,
+        materialized,
+        signoff,
+    )
+
+    assert result.eligible
+    assert any(
+        item.requirement_id == "dod.promotion"
+        and item.status is RequirementStatus.SATISFIED
+        for item in result.requirements
+    )
