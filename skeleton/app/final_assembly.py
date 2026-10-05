@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import re
 _SHA=re.compile(r"^[0-9a-f]{64}$");_ID=re.compile(r"^[A-Z][A-Z0-9_.:-]{2,127}$")
+_MAX_GATES=512;_MAX_RISKS=4096
 class FinalAssemblyError(ValueError):pass
 def _sha(v,f):
  if not isinstance(v,str) or not _SHA.fullmatch(v):raise FinalAssemblyError(f"{f} must be sha256")
@@ -18,6 +19,7 @@ class FinalAssemblyPlan:
   object.__setattr__(self,"authority_id",_id(self.authority_id,"authority_id"))
   for f in ("head_digest","environment_digest","artifact_digest"):_sha(getattr(self,f),f)
   if not isinstance(self.gate_ids,tuple) or not self.gate_ids:raise FinalAssemblyError("gate_ids required")
+  if len(self.gate_ids)>_MAX_GATES:raise FinalAssemblyError("gate count exceeds safety bound")
   ids=tuple(_id(x,"gate_id") for x in self.gate_ids)
   if len(set(ids))!=len(ids):raise FinalAssemblyError("duplicate assembly gate")
   object.__setattr__(self,"gate_ids",tuple(sorted(ids)))
@@ -29,6 +31,7 @@ class FinalAssemblyRun:
   object.__setattr__(self,"authority_id",_id(self.authority_id,"authority_id"))
   for f in ("head_digest","environment_digest","artifact_digest","evidence_digest"):_sha(getattr(self,f),f)
   if not isinstance(self.passed_gate_ids,tuple):raise FinalAssemblyError("passed_gate_ids must be tuple")
+  if len(self.passed_gate_ids)>_MAX_GATES:raise FinalAssemblyError("passed gate count exceeds safety bound")
   ids=tuple(_id(x,"gate_id") for x in self.passed_gate_ids)
   if len(set(ids))!=len(ids):raise FinalAssemblyError("duplicate passed gate")
   object.__setattr__(self,"passed_gate_ids",tuple(sorted(ids)))
@@ -38,6 +41,7 @@ class FinalAssemblyEvidence:
  def __post_init__(self):
   if not isinstance(self.run,FinalAssemblyRun):raise FinalAssemblyError("run must be FinalAssemblyRun")
   if not isinstance(self.unresolved_risk_ids,tuple):raise FinalAssemblyError("unresolved_risk_ids must be tuple")
+  if len(self.unresolved_risk_ids)>_MAX_RISKS:raise FinalAssemblyError("risk count exceeds safety bound")
   risks=tuple(_id(x,"risk_id") for x in self.unresolved_risk_ids)
   if len(set(risks))!=len(risks):raise FinalAssemblyError("duplicate unresolved risk")
   object.__setattr__(self,"unresolved_risk_ids",tuple(sorted(risks)))
