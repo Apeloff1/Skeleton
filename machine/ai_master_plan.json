@@ -11443,22 +11443,30 @@
       ],
       "implementation_paths": [
         "scripts",
-        "docker-compose.yml"
+        "docker-compose.yml",
+        "skeleton/ai/runtime/deferred/local_development.py",
+        "skeleton/developer/bootstrap.py",
+        "pyproject.toml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_local_development.py"
+        "skeleton/testing/test_vol195_local_development.py",
+        "skeleton/testing/test_local_bootstrap.py"
       ],
       "evaluations": [
         "planned:clean-machine local bootstrap"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/d04f366813e6cc372ccb6ed3dd62e71c5208d8bb",
+        "https://github.com/Apeloff1/Skeleton/commit/92188eba884054c85e0c1b700b0d838ae69be976",
+        "https://github.com/Apeloff1/Skeleton/commit/0a66b788f8884be10725c3c13635041ad8875524",
+        "https://github.com/Apeloff1/Skeleton/commit/1c1f9394a573df9e6168e8ac9efa27ccb3e5577f"
+      ],
       "risks": [
         "works-only-on-maintainer machine",
         "production secret reuse"
       ],
       "gaps": [
-        "define one-command bootstrap",
-        "bind versions to environment spec"
+        "check in canonical uv.lock and bind its digest as the authoritative local dependency graph"
       ],
       "accountability_id": "ACC-VOL-195",
       "completion_checkbox": false,
