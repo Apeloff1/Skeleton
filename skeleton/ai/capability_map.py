@@ -350,11 +350,19 @@ class CapabilityMap:
         descriptors: Iterable[CapabilityDescriptor],
         evidence: Iterable[CapabilityEvidence],
     ) -> None:
-        materialized_descriptors = tuple(descriptors)
-        materialized_evidence = tuple(evidence)
+        try:
+            materialized_descriptors = tuple(descriptors)
+        except TypeError as exc:
+            raise TypeError("descriptors must be iterable") from exc
+        try:
+            materialized_evidence = tuple(evidence)
+        except TypeError as exc:
+            raise TypeError("evidence must be iterable") from exc
 
         if len(materialized_descriptors) > _MAX_CAPABILITIES:
             raise CapabilityError("capability count exceeds safety bound")
+        if len(materialized_evidence) > _MAX_CAPABILITIES:
+            raise CapabilityError("evidence count exceeds safety bound")
         if any(
             not isinstance(item, CapabilityDescriptor)
             for item in materialized_descriptors
