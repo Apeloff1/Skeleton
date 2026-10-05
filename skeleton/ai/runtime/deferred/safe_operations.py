@@ -16,6 +16,7 @@ def _d(v:object,n:str)->str:
 class SafeRepairPlan:
  repair_id:str; affected_state_digest:str; mutation_digest:str; rollback_digest:str; target_invariant:str
  def __post_init__(self):
+  object.__setattr__(self,"repair_id",_t(self.repair_id,"repair_id"));object.__setattr__(self,"target_invariant",_t(self.target_invariant,"target_invariant"))
   for n in ("affected_state_digest","mutation_digest","rollback_digest"): object.__setattr__(self,n,_d(getattr(self,n),n))
 @dataclass(frozen=True,slots=True)
 class RepairCheckpoint: repair_id:str; pre_state_digest:str; mutation_applied:bool
@@ -23,12 +24,16 @@ class RepairCheckpoint: repair_id:str; pre_state_digest:str; mutation_applied:bo
 class RepairEvidence:
  repair_id:str; post_state_digest:str; invariant_restored:bool; verification_digest:str
 def admit_repair_completion(plan:SafeRepairPlan,checkpoint:RepairCheckpoint,evidence:RepairEvidence)->bool:
+ if not all((checkpoint.repair_id,evidence.repair_id,evidence.verification_digest)):return False
+ try:_d(checkpoint.pre_state_digest,"pre_state_digest");_d(evidence.post_state_digest,"post_state_digest");_d(evidence.verification_digest,"verification_digest")
+ except ValueError:return False
  return checkpoint.repair_id==plan.repair_id==evidence.repair_id and checkpoint.pre_state_digest==plan.affected_state_digest and checkpoint.mutation_applied and evidence.invariant_restored
 
 @dataclass(frozen=True,slots=True)
 class TwinObservation:
  component:str; observed_state_digest:str; observed_at:str; uncertainty:float; governed:bool
  def __post_init__(self):
+  _t(self.component,"component");_d(self.observed_state_digest,"observed_state_digest");_t(self.observed_at,"observed_at")
   if not 0<=self.uncertainty<=1: raise ValueError("uncertainty must be in [0,1]")
 @dataclass(frozen=True,slots=True)
 class DigitalTwin:
