@@ -61,6 +61,6 @@ class DistributedScheduler:
   state=OutcomeState.FAILED if failed else OutcomeState.SUCCEEDED
   if state is OutcomeState.SUCCEEDED and result_digest is None:raise DistributedError("successful reconciliation requires result")
   receipt=DistributedReceipt(task.digest,unknown.lease_id,unknown.fence_token,state,result_digest,provider_evidence_digest)
-  self._terminal[task.task_id]=receipt;return receipt
+  prior=self._terminal.get(task.task_id)\n  if prior is not None and prior!=receipt:raise DistributedError("terminal outcome immutable")\n  self._terminal[task.task_id]=receipt;self._active.pop(task.task_id,None);return receipt
  def may_reissue(self,task):
   return task.task_id not in self._terminal and task.task_id not in self._active
