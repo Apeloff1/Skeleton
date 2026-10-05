@@ -118,9 +118,8 @@ class MBOM:
         if self.components != canonical:
             raise MBOMError("components must be canonical order")
 
-    @property
-    def digest(self) -> str:
-        body = {
+    def _identity_body(self) -> dict[str, object]:
+        return {
             "model_id": self.model_id,
             "model": self.model_artifact_digest,
             "components": [
@@ -135,15 +134,64 @@ class MBOM:
                 self.lineage.post_training_evidence_digest,
             ),
         }
+
+    @property
+    def digest(self) -> str:
         return hashlib.sha256(
             json.dumps(
-                body,
+                self._identity_body(),
                 sort_keys=True,
                 separators=(",", ":"),
                 ensure_ascii=False,
                 allow_nan=False,
             ).encode()
         ).hexdigest()
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "schema": "skeleton.model_bom.v1",
+            **self._identity_body(),
+            "digest": self.digest,
+        }
+
+    @classmethod
+    def from_dict(cls, payload: object) -> "MBOM":
+        if not isinstance(payload, dict):
+            raise MBOMError("MBOM payload must be object")
+        expected = {"schema", "model_id", "model", "components", "lineage", "digest"}
+        if set(payload) != expected:
+            raise MBOMError("MBOM payload fields must be exact")
+        if payload["schema"] != "skeleton.model_bom.v1":
+            raise MBOMError("unsupported MBOM schema")
+        raw_components = payload["components"]
+        if not isinstance(raw_components, list) or not raw_components:
+            raise MBOMError("MBOM components must be non-empty list")
+        if len(raw_components) > _MAX_COMPONENTS:
+            raise MBOMError("component count exceeds safety bound")
+        components: list[ModelComponent] = []
+        for raw in raw_components:
+            if not isinstance(raw, (list, tuple)) or len(raw) != 3:
+                raise MBOMError("malformed MBOM component")
+            components.append(ModelComponent(raw[0], raw[1], raw[2]))
+        raw_lineage = payload["lineage"]
+        if not isinstance(raw_lineage, (list, tuple)) or len(raw_lineage) != 5:
+            raise MBOMError("malformed MBOM lineage")
+        instance = cls(
+            payload["model_id"],
+            payload["model"],
+            tuple(components),
+            ModelLineage(
+                raw_lineage[0],
+                raw_lineage[1],
+                raw_lineage[2],
+                raw_lineage[3],
+                raw_lineage[4],
+            ),
+        )
+        encoded_digest = _sha(payload["digest"], "digest")
+        if encoded_digest != instance.digest:
+            raise MBOMError("MBOM digest mismatch")
+        return instance
 
 
 __all__ = [
