@@ -53,3 +53,10 @@ def test_plan_analysis_and_simulation_require_deterministic_identity():
  with pytest.raises(ValueError): analyze_plan("ir",("a",),(),(PlanLintRule("r","v1"),PlanLintRule("r","v1")))
  with pytest.raises(ValueError): simulate_plan(())
  with pytest.raises(ValueError): simulate_plan(("a","a"))
+
+
+def test_plan_analysis_reports_dependency_cycles():
+ result=analyze_plan("ir-v1",("a","b","c"),(("a","b"),("b","c"),("c","a")),(PlanLintRule("base","v1"),))
+ assert any(d.rule_id=="cycle" and d.severity is Severity.ERROR for d in result.diagnostics)
+ acyclic=analyze_plan("ir-v1",("a","b"),(("a","b"),),(PlanLintRule("base","v1"),))
+ assert not any(d.rule_id=="cycle" for d in acyclic.diagnostics)
