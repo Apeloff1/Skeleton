@@ -575,10 +575,15 @@ class DefinitionOfDoneEvaluator:
                 )
                 continue
 
-            latest = max(
-                candidates,
-                key=lambda item: (item.observed_at, item.digest),
+            latest_time = max(item.observed_at for item in candidates)
+            latest_candidates = tuple(
+                item for item in candidates if item.observed_at == latest_time
             )
+            if len(latest_candidates) != 1:
+                raise DefinitionOfDoneError(
+                    "ambiguous latest completion evidence for requirement"
+                )
+            latest = latest_candidates[0]
             age = (now - latest.observed_at).total_seconds()
             if age > requirement.max_age_seconds:
                 status = RequirementStatus.STALE
