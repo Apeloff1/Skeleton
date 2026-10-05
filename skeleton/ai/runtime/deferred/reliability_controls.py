@@ -56,6 +56,7 @@ class RetryAttempt: budget_id:str; failure:FailureClass; idempotent:bool
 @dataclass(frozen=True,slots=True)
 class RetryDecision: allowed:bool; next_budget:RetryBudget; reason:str
 def retry(b:RetryBudget,a:RetryAttempt)->RetryDecision:
+ if not a.budget_id:return RetryDecision(False,b,"attempt identity required")
  if a.budget_id!=b.budget_id:return RetryDecision(False,b,"budget identity mismatch")
  if a.failure is not FailureClass.TRANSIENT:return RetryDecision(False,b,"failure not transient")
  if not a.idempotent:return RetryDecision(False,b,"operation not idempotent")
@@ -70,6 +71,8 @@ class ProbeResult: dependency_id:str; success:bool
 @dataclass(frozen=True,slots=True)
 class BreakerDecision: state:BreakerState; allow_primary:bool; fallback_allowed:bool
 def breaker(b:CircuitBreaker,probe:ProbeResult|None=None,*,fallback_policy_compatible:bool=False)->BreakerDecision:
+ if not b.dependency_id or not b.failure_domain or b.threshold<1 or b.failures<0:raise ValueError("invalid circuit breaker")
+ if probe is not None and not probe.dependency_id:raise ValueError("probe identity required")
  if probe is not None and probe.dependency_id!=b.dependency_id: raise ValueError("probe belongs to another dependency")
  if b.state is BreakerState.OPEN:
   if probe is None:return BreakerDecision(BreakerState.OPEN,False,fallback_policy_compatible)
