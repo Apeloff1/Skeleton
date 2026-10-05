@@ -12,3 +12,8 @@ def test_cycle_or_missing_dependency_rejected():
  with pytest.raises(ValueError):analyze_critical_path({"a":1},(("a","x"),))
 def test_real_blocker_state_is_surfaced():
  r=analyze_critical_path({"a":1},(),{"a":"lease unavailable"});assert r.blockers[0].reason=="lease unavailable"
+
+def test_nan_and_boolean_durations_rejected():
+ import pytest,math
+ with pytest.raises(ValueError):analyze_critical_path({"a":math.nan},())
+ with pytest.raises(ValueError):analyze_critical_path({"a":True},())
