@@ -1,0 +1,92 @@
+"""Human trust, intent, workspace and resource contracts VOL-326..334."""
+from dataclasses import dataclass
+from enum import Enum
+@dataclass(frozen=True,slots=True)
+class HumanFactorRequirement: requirement_id:str; consequence_visible:bool; authority_visible:bool; status_visible:bool
+@dataclass(frozen=True,slots=True)
+class OperatorTask: task_id:str; risk:str; workload:int
+@dataclass(frozen=True,slots=True)
+class HumanFactorFinding: task_id:str; requirement_id:str; passed:bool
+@dataclass(frozen=True,slots=True)
+class ApprovalScope: scope_id:str; version:str; expires_at:str; authority:frozenset[str]
+@dataclass(frozen=True,slots=True)
+class ApprovalBurden: approvals:int; overrides:int; stale:int
+@dataclass(frozen=True,slots=True)
+class ApprovalReusePolicy: max_uses:int; require_same_version:bool=True
+def reusable(scope,requested_scope,requested_version,uses,policy):
+ return scope.scope_id==requested_scope and (not policy.require_same_version or scope.version==requested_version) and uses<policy.max_uses
+@dataclass(frozen=True,slots=True)
+class TrustSignal: confidence:float; uncertainty:float; degraded:bool; evidence:tuple[str,...]
+@dataclass(frozen=True,slots=True)
+class CalibrationObservation: predicted:float; observed:float
+@dataclass(frozen=True,slots=True)
+class TrustPresentation: confidence:float; uncertainty:float; degraded:bool; evidence_count:int
+def present_trust(s):return TrustPresentation(s.confidence,s.uncertainty,s.degraded,len(s.evidence))
+@dataclass(frozen=True,slots=True)
+class IntentConstraint: key:str; value:str
+@dataclass(frozen=True,slots=True)
+class UserIntent: intent_id:str; authoritative_instruction:str; inferred_intent:str|None; constraints:tuple[IntentConstraint,...]
+@dataclass(frozen=True,slots=True)
+class IntentRevision: revision_id:str; intent:UserIntent; supersedes:str|None
+def latest_intent(revisions):
+ superseded={r.supersedes for r in revisions if r.supersedes}
+ live=[r for r in revisions if r.revision_id not in superseded]
+ if len(live)!=1:raise ValueError("ambiguous intent lineage")
+ return live[0]
+@dataclass(frozen=True,slots=True)
+class ProjectFact: fact_id:str; value:str; source:str; trust_class:str
+@dataclass(frozen=True,slots=True)
+class ProjectMemoryRevision: revision_id:str; fact:ProjectFact; supersedes:str|None
+@dataclass(frozen=True,slots=True)
+class ProjectMemory: tenant_id:str; project_id:str; trust_class:str; revisions:tuple[ProjectMemoryRevision,...]
+def read_project_memory(m,tenant,project,trust):
+ if (m.tenant_id,m.project_id,m.trust_class)!=(tenant,project,trust):return ()
+ return m.revisions
+@dataclass(frozen=True,slots=True)
+class WorkspaceMember: principal_id:str; permissions:frozenset[str]; active:bool=True
+@dataclass(frozen=True,slots=True)
+class WorkspaceResource: resource_ref:str
+@dataclass(frozen=True,slots=True)
+class Workspace: workspace_id:str; members:tuple[WorkspaceMember,...]; resources:tuple[WorkspaceResource,...]
+def member_authorized(w,principal,permission):
+ return any(m.principal_id==principal and m.active and permission in m.permissions for m in w.members)
+@dataclass(frozen=True,slots=True)
+class ResourceName:
+ tenant:str; project:str; name:str; version:str
+ def __post_init__(self):
+  if not all((self.tenant,self.project,self.name,self.version)):raise ValueError("resource scope required")
+  if any(x in self.name for x in ("..","/","\\","%2f","%2F")) or self.name!=self.name.strip():raise ValueError("ambiguous resource name")
+@dataclass(frozen=True,slots=True)
+class ResourceNamespace: tenant:str; project:str
+@dataclass(frozen=True,slots=True)
+class ResourceRef: name:ResourceName
+@dataclass(frozen=True,slots=True)
+class ResourceQuery: namespace:ResourceNamespace; name:str; version:str|None
+@dataclass(frozen=True,slots=True)
+class ResourceHandle: ref:ResourceRef; lifecycle:str
+@dataclass(frozen=True,slots=True)
+class ResolutionReceipt: query:ResourceQuery; resolved_version:str|None; authorized:bool; alias_used:bool
+def resolve(q,candidates,*,authorized):
+ if not authorized:return None,ResolutionReceipt(q,None,False,False)
+ matches=[x for x in candidates if x.name.tenant==q.namespace.tenant and x.name.project==q.namespace.project and x.name.name==q.name]
+ if q.version:matches=[x for x in matches if x.name.version==q.version]
+ if len(matches)!=1:return None,ResolutionReceipt(q,None,True,q.version is None)
+ return ResourceHandle(matches[0],"active"),ResolutionReceipt(q,matches[0].name.version,True,q.version is None)
+class DependencyKind(str,Enum): BUILD="build"; RUNTIME="runtime"; EVIDENCE="evidence"
+@dataclass(frozen=True,slots=True)
+class ArtifactNode: artifact_id:str; version:str
+@dataclass(frozen=True,slots=True)
+class ArtifactDependency: source:ArtifactNode; target:ArtifactNode; kind:DependencyKind
+@dataclass(frozen=True,slots=True)
+class ArtifactGraph: nodes:tuple[ArtifactNode,...]; edges:tuple[ArtifactDependency,...]
+def artifact_cycle(g):
+ adj={(n.artifact_id,n.version):[] for n in g.nodes}
+ for e in g.edges:adj[(e.source.artifact_id,e.source.version)].append((e.target.artifact_id,e.target.version))
+ active=set();done=set()
+ def visit(n):
+  if n in active:return True
+  if n in done:return False
+  active.add(n)
+  if any(visit(x) for x in adj.get(n,())):return True
+  active.remove(n);done.add(n);return False
+ return any(visit(n) for n in adj)
