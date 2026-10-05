@@ -27,6 +27,11 @@ objects already in the repository. Existing imports remain compatibility paths. 
 - `cognition/`, `learning/`, `evaluation/` — cognition, controlled learning, and evaluation support.
 - `research/historical/architecture_registry/` — base architecture metadata and numbered architecture rounds retained as non-authoritative research lineage.
 - `simulation/`, `forge/` — explicit masterplan domains for bounded world-model simulation and candidate forge workflows.
+- `modeling/`, `training/` — controlled model-development, lineage, training, recovery, evaluation-gate, curriculum, verifier-model, and post-training surfaces.
+- `runtime/multimodal/{artifacts,vision,document_vision,audio,speech,video}/` — governed multimodal ingestion and processing mirrors.
+- `integrations/{connectors,plugins}/` — bounded connector and plugin lifecycle surfaces; external authority remains policy-gated.
+- `runtime/supply_chain/` — model bill-of-materials and AI supply-chain provenance controls.
+- `build/documentation/` — deterministic generated-documentation and reference-validation build runtime.
 - `build/shift_supervisor/` — planning/scheduling/build-control code promoted from the transitional `core/` root.
 - `build/{automation,repo_intelligence}/` — repository-side AI build/control support.
 - `compat/` — legacy runtime surfaces staged for convergence into an existing canonical owner; these paths never create new production authority.
