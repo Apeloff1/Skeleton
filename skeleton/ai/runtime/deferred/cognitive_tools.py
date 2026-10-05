@@ -45,6 +45,17 @@ def analyze_plan(ir_version,nodes,edges,rules):
  for a,b in edges:
   if a not in ids or b not in ids:d.append(PlanDiagnostic("edge-endpoint","edges",Severity.ERROR,"declare both endpoints"))
  if len(ids)!=len(nodes):d.append(PlanDiagnostic("duplicate-node","nodes",Severity.ERROR,"use unique node ids"))
+ graph={n:[] for n in ids}
+ for a,b in edges:
+  if a in ids and b in ids:graph[a].append(b)
+ visiting=set();visited=set()
+ def visit(n):
+  if n in visiting:return True
+  if n in visited:return False
+  visiting.add(n)
+  if any(visit(x) for x in graph[n]):return True
+  visiting.remove(n);visited.add(n);return False
+ if any(visit(n) for n in sorted(ids) if n not in visited):d.append(PlanDiagnostic("cycle","edges",Severity.ERROR,"remove dependency cycle"))
  return PlanAnalysis(ir_version,tuple(sorted(d,key=lambda x:(x.location,x.rule_id))))
 @dataclass(frozen=True,slots=True)
 class SimulatedStep: step_id:str; scenario:str; outcome:str
