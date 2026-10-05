@@ -7,6 +7,9 @@ class SimulationFinding: step_id:str; severity:str; message:str
 class PlanSimulation:
  steps:tuple[SimulatedStep,...]; findings:tuple[SimulationFinding,...]; production_evidence:bool=field(default=False,init=False)
 def simulate(step_ids,scenarios):
+ step_ids=tuple(step_ids);scenarios=tuple(scenarios)
+ if not step_ids or len(step_ids)!=len(set(step_ids)) or any(not isinstance(x,str) or not x for x in step_ids):raise ValueError("unique simulation step identities required")
+ if not scenarios:raise ValueError("simulation scenarios required")
  allowed={"success","failure","timeout","resource"};steps=[];findings=[]
  for sid in step_ids:
   for scenario in scenarios:
