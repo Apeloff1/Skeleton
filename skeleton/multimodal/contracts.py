@@ -3,9 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from hashlib import sha256
-import json, re
+import re
 from types import MappingProxyType
 from typing import Mapping
+
+from skeleton.contracts.canonical import CanonicalContractError, canonical_json_bytes
 
 MAX_SEGMENTS=4096
 MAX_TEXT=1_000_000
@@ -20,7 +22,10 @@ def _token(v:str,n:str,m=512):
 def _hex(v:str,n:str):
     if not isinstance(v,str) or not _SHA.fullmatch(v): raise MediaError(f"invalid {n}")
     return v
-def _digest(v:object)->str: return sha256(json.dumps(v,sort_keys=True,separators=(",",":"),ensure_ascii=False,allow_nan=False).encode()).hexdigest()
+def _digest(v:object)->str:
+    try: raw=canonical_json_bytes(v)
+    except CanonicalContractError as exc: raise MediaError("media contract payload must be canonical JSON") from exc
+    return sha256(raw).hexdigest()
 
 @dataclass(frozen=True,slots=True)
 class MediaProvenance:

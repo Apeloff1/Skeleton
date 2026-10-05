@@ -2,7 +2,8 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
-import json,re
+import re
+from skeleton.contracts.canonical import canonical_json_bytes
 from .contracts import MediaError,MediaProvenance,Modality,ModalitySegment
 MAX_PAYLOAD_BYTES=16_000_000
 _PROMPT=re.compile(r"(?i)\b(ignore previous|system prompt|developer message|follow these instructions)\b")
@@ -20,6 +21,6 @@ def sanitize_payload(*,segment_id:str,modality:Modality,payload:bytes,source_id:
  embedded=bool(text and _PROMPT.search(text)); quarantined=active_content or embedded
  reason="active-content" if active_content else ("embedded-instruction" if embedded else None)
  source=_d(payload);safe=b"" if quarantined else payload;policy=f"multimodal-sanitize-{modality.value}-v1"
- transform=sha256(json.dumps({"policy":policy,"source":source,"result":_d(safe),"quarantined":quarantined,"reason":reason},sort_keys=True,separators=(",",":")).encode()).hexdigest()
+ transform=sha256(canonical_json_bytes({"policy":policy,"source":source,"result":_d(safe),"quarantined":quarantined,"reason":reason})).hexdigest()
  segment=ModalitySegment(segment_id,modality,_d(safe),MediaProvenance(source_id,source,transform),text=text,untrusted_metadata={"sanitization":"quarantined" if quarantined else "pass","policy_id":policy})
  return segment,SanitizationReceipt(source,_d(safe),policy,quarantined,reason,transform)

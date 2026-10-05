@@ -1,4 +1,8 @@
+import hashlib
+
 import pytest
+
+from skeleton.contracts.canonical import canonical_json_bytes
 from skeleton.multimodal import CrossModalReference,MediaArtifact,MediaError,MediaProvenance,Modality,ModalitySegment
 D="0"*64
 def seg(i,m=Modality.DOCUMENT,meta=None): return ModalitySegment(i,m,D,MediaProvenance("src",D),text="payload",untrusted_metadata=meta)
@@ -22,3 +26,18 @@ def test_cross_modal_identity_changes_digest():
     a=MediaArtifact("x",(seg("a"),seg("b",Modality.IMAGE)),(CrossModalReference("a","b","aligns",.5),))
     b=MediaArtifact("x",(seg("a"),seg("b",Modality.IMAGE)),(CrossModalReference("a","b","aligns",.6),))
     assert a.digest!=b.digest
+
+
+def test_provenance_identity_uses_shared_canonical_contract_bytes():
+    provenance=MediaProvenance("src","0"*64,"1"*64)
+    expected={"source_id":"src","source_digest":"0"*64,"transform_digest":"1"*64}
+    assert provenance.digest==hashlib.sha256(canonical_json_bytes(expected)).hexdigest()
+
+
+def test_multimodal_contract_source_and_ai_mirror_are_byte_identical():
+    from pathlib import Path
+
+    root=Path(__file__).resolve().parents[2]
+    source=root/"skeleton"/"multimodal"/"contracts.py"
+    mirror=root/"skeleton"/"ai"/"runtime"/"multimodal"/"contracts.py"
+    assert source.read_bytes()==mirror.read_bytes()
