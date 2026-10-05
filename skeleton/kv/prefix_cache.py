@@ -6,6 +6,7 @@ class PrefixArtifact: key:PrefixCacheKey; sensitive:bool
 @dataclass(frozen=True)
 class PrefixReuseDecision: reusable:bool; reason:str
 def can_reuse(a,key,authorized_scopes):
+ if any(not x for x in (key.instruction_digest,key.prompt_digest,key.model,key.tokenizer,key.version,key.scope)):return PrefixReuseDecision(False,"incomplete cache identity")
  if a.key!=key:return PrefixReuseDecision(False,"identity mismatch")
- if a.sensitive and key.scope not in authorized_scopes:return PrefixReuseDecision(False,"scope denied")
+ if key.scope not in authorized_scopes:return PrefixReuseDecision(False,"scope denied")
  return PrefixReuseDecision(True,"exact identity and scope")
