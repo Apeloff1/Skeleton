@@ -36,6 +36,9 @@ CAPABILITY_CONTRACTS = "skeleton/security/capability_contracts.py"
 CAPABILITY_TEST = "skeleton/testing/test_vol026_capability_security.py"
 THREAT_TEST = "skeleton/testing/test_vol026_threat_model.py"
 TOOL_AUTH_TEST = "skeleton/testing/test_vol026_tool_authorization.py"
+ROOTED_FS_TEST = "skeleton/testing/test_security_rooted_fs.py"
+OUTBOUND_HTTP_TEST = "skeleton/testing/test_security_outbound_http.py"
+SAST_SCRIPT = "scripts/check_repository_python_sast.py"
 WORKFLOW = ".github/workflows/vol026-security-closure.yml"
 
 REQUIRED_ASSETS = (
@@ -73,6 +76,9 @@ REQUIRED_PATHS = (
     CAPABILITY_TEST,
     THREAT_TEST,
     TOOL_AUTH_TEST,
+    ROOTED_FS_TEST,
+    OUTBOUND_HTTP_TEST,
+    SAST_SCRIPT,
     "machine/ai_master_plan.json",
 )
 WORKFLOW_REQUIRED_PATHS = (
@@ -85,6 +91,9 @@ WORKFLOW_REQUIRED_PATHS = (
     CAPABILITY_TEST,
     THREAT_TEST,
     TOOL_AUTH_TEST,
+    ROOTED_FS_TEST,
+    OUTBOUND_HTTP_TEST,
+    SAST_SCRIPT,
     "scripts/verify_vol026_security_closure.py",
     "tests/test_vol026_security_independent_verifier.py",
 )
