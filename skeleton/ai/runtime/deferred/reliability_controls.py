@@ -7,7 +7,7 @@ class PressureLevel(str,Enum): NORMAL="normal"; HIGH="high"; SATURATED="saturate
 @dataclass(frozen=True,slots=True)
 class BufferLimit:
  capacity:int; high_watermark:int
- def __post_init__(self):
+    def __post_init__(self):
   if self.capacity<=0 or not 0<self.high_watermark<=self.capacity: raise ValueError("invalid buffer limits")
 @dataclass(frozen=True,slots=True)
 class BackpressureSignal: depth:int; limit:BufferLimit; cancelled:bool=False
@@ -49,7 +49,7 @@ def queue_decision(b:QueueBudget,s:CongestionState,k:QueueKind)->QueueDecision:
 class FailureClass(str,Enum): TRANSIENT="transient"; PERMANENT="permanent"; POLICY="policy"; UNKNOWN="unknown"
 @dataclass(frozen=True,slots=True)
 class RetryBudget: budget_id:str; max_attempts:int; consumed:int=0
- def __post_init__(self):
+    def __post_init__(self):
   if not self.budget_id or self.max_attempts<0 or not 0<=self.consumed<=self.max_attempts: raise ValueError("invalid retry budget")
 @dataclass(frozen=True,slots=True)
 class RetryAttempt: budget_id:str; failure:FailureClass; idempotent:bool
