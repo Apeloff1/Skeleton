@@ -1029,6 +1029,8 @@ class FormalRunReport:
 
     @property
     def all_obligations_proved_within_model(self) -> bool:
+        if self.stop_reason is not ExplorationStop.COMPLETE:
+            return False
         return all(
             result.status is ProofStatus.PROVED_WITHIN_MODEL
             for result in self.results
