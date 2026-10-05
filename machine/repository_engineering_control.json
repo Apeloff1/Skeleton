@@ -284,10 +284,10 @@
   ],
   "backlog": {
     "summary": {
-      "item_count": 1754,
-      "gap_count": 774,
+      "item_count": 1752,
+      "gap_count": 772,
       "risk_count": 980,
-      "open_count": 1754,
+      "open_count": 1752,
       "closed_count": 0
     },
     "items": [
@@ -2274,38 +2274,6 @@
         "state": "open",
         "closure_evidence_refs": [],
         "deduplication_key": "gap:materialize revocation propagation proof"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-092-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-092:gap:001",
-        "volume_ref": "VOL-092",
-        "statement": "define maintenance ownership registry",
-        "accountability_id": "ACC-VOL-092",
-        "requirement_refs": [
-          "REQ:VOL-092:001",
-          "REQ:VOL-092:002",
-          "REQ:VOL-092:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define maintenance ownership registry"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-092-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-092:gap:002",
-        "volume_ref": "VOL-092",
-        "statement": "bind deletion to reachability/retention checks",
-        "accountability_id": "ACC-VOL-092",
-        "requirement_refs": [
-          "REQ:VOL-092:001",
-          "REQ:VOL-092:002",
-          "REQ:VOL-092:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind deletion to reachability/retention checks"
       },
       {
         "backlog_id": "BL-GAP-VOL-093-001",
