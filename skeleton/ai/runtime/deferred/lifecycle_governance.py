@@ -59,25 +59,27 @@ class ProviderParity: capability:bool; policy:bool; quality:bool; cost:bool; dat
 class ProviderMigration: source:str; target:str; parity:ProviderParity; shadow_passed:bool; rollback_ready:bool
 @dataclass(frozen=True,slots=True)
 class ProviderCutover: allowed:bool; reason:str
-def provider_cutover(m):return ProviderCutover(all((m.parity.capability,m.parity.policy,m.parity.quality,m.parity.cost,m.parity.data_boundary,m.shadow_passed,m.rollback_ready)),"parity/shadow/rollback")
+def provider_cutover(m):
+ if not m.source or not m.target or m.source==m.target:return ProviderCutover(False,"invalid provider identity")
+ return ProviderCutover(all((m.parity.capability,m.parity.policy,m.parity.quality,m.parity.cost,m.parity.data_boundary,m.shadow_passed,m.rollback_ready)),"parity/shadow/rollback")
 @dataclass(frozen=True,slots=True)
 class ExperimentKillSwitch: enabled:bool
 @dataclass(frozen=True,slots=True)
 class ExperimentalFeature: feature_id:str; isolated:bool; production_claim:bool=False
 @dataclass(frozen=True,slots=True)
 class ExperimentExposure: feature:ExperimentalFeature; synthetic_or_shadow:bool; kill_switch:ExperimentKillSwitch
-def experiment_allowed(e):return e.feature.isolated and e.synthetic_or_shadow and e.kill_switch.enabled and not e.feature.production_claim
+def experiment_allowed(e):return bool(e.feature.feature_id) and e.feature.isolated and e.synthetic_or_shadow and e.kill_switch.enabled and not e.feature.production_claim
 @dataclass(frozen=True,slots=True)
 class ResearchBranchPolicy: bounded_owners:frozenset[str]; production_gates_required:bool=True
 @dataclass(frozen=True,slots=True)
 class ResearchBranch: branch_id:str; parent:str; owner:str
 @dataclass(frozen=True,slots=True)
 class ResearchMergeCandidate: branch:ResearchBranch; lineage_preserved:bool; gates_passed:bool
-def research_merge(c,p):return c.branch.owner in p.bounded_owners and c.lineage_preserved and c.gates_passed and p.production_gates_required
+def research_merge(c,p):return bool(c.branch.branch_id) and bool(c.branch.parent) and bool(c.branch.owner) and c.branch.owner in p.bounded_owners and c.lineage_preserved and c.gates_passed and p.production_gates_required
 @dataclass(frozen=True,slots=True)
 class Technique: technique_id:str; version:str
 @dataclass(frozen=True,slots=True)
 class RetirementEvidence: reason:str; replacement:str; consumers:tuple[str,...]; archive_location:str
 @dataclass(frozen=True,slots=True)
 class TechniqueRetirement: technique:Technique; evidence:RetirementEvidence
-def retirement_complete(r):return all((r.evidence.reason,r.evidence.replacement,r.evidence.archive_location))
+def retirement_complete(r):return all((r.technique.technique_id,r.technique.version,r.evidence.reason,r.evidence.replacement,r.evidence.archive_location)) and all(bool(x) for x in r.evidence.consumers)
