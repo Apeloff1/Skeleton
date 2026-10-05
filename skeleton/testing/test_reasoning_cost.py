@@ -10,3 +10,7 @@ def test_nonfinite_and_duplicate_cost_rejected():
  with pytest.raises(ValueError):attribute("o",s,math.nan)
  a=attribute("o",s,1)
  with pytest.raises(ValueError):report((a,a))
+
+def test_incomplete_stage_identity_rejected():
+ import pytest
+ with pytest.raises(ValueError):attribute("o",ReasoningStage("s","","m","v"),1)
