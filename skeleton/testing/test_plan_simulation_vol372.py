@@ -7,3 +7,8 @@ def test_production_evidence_cannot_be_injected():
  import pytest
  with pytest.raises(TypeError):PlanSimulation((),(),True)
 def test_unknown_scenario_fails_closed():assert simulate(("a",),("novel",)).steps[0].outcome=="failed"
+
+def test_duplicate_steps_and_empty_scenarios_rejected():
+ import pytest
+ with pytest.raises(ValueError):simulate(("a","a"),("success",))
+ with pytest.raises(ValueError):simulate(("a",),())
