@@ -13,6 +13,7 @@ import { useTunnelStatus } from '../hooks/useTunnelStatus';
 import { useReduceMotion } from '../hooks/useReduceMotion';
 import { useFeatureFlag, FLAG } from '../feature-flags';
 import { setOfflineState } from '../../utils/safeFetch';
+import { accessibleStatusProps } from '../accessibility/runtime';
 
 type Variant = 'down' | 'offline' | 'degraded' | null;
 
@@ -68,8 +69,12 @@ export const StabilityBanner: React.FC<{ defaultEnabled?: boolean }> = ({ defaul
         { backgroundColor: message.bg, transform: [{ translateY }] },
         { pointerEvents: 'none' },
       ]}
+      {...accessibleStatusProps(
+        'Connectivity status: ' + message.text,
+        { assertive: variant === 'offline' || variant === 'down' },
+      )}
     >
-      <Text style={[styles.txt, { color: message.fg }]} numberOfLines={1}>
+      <Text style={[styles.txt, { color: message.fg }]} numberOfLines={1} allowFontScaling>
         {message.text}
       </Text>
     </Animated.View>
