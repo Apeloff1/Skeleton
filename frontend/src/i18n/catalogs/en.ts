@@ -1,4 +1,5 @@
-import { createCatalog, TranslationKey } from '../runtime';
+import { createCatalog } from '../runtime';
+import type { TranslationKey } from '../runtime';
 
 export const EN_MESSAGES: Readonly<Record<TranslationKey, string>> = Object.freeze({
   'app.name': 'Skeleton',
