@@ -393,6 +393,34 @@ def test_ownership_evidence_must_come_from_declared_owner() -> None:
     assert target.status is RequirementStatus.OWNER_MISMATCH
 
 
+def test_independent_requirement_rejects_owner_as_verifier() -> None:
+    policy = default_definition_of_done()
+    p = profile((ChangeImpact.SECURITY,))
+    req = next(
+        item for item in active(policy, p, MaturityState.VERIFIED)
+        if item.requirement_id == "dod.security_review"
+    )
+
+    result = evaluate_without_signoff(
+        policy,
+        p,
+        MaturityState.VERIFIED,
+        (
+            evidence(
+                req,
+                producer_id="security.reviewer",
+                verifier_id=p.owner_id,
+            ),
+        ),
+    )
+    target = next(
+        item for item in result.requirements
+        if item.requirement_id == req.requirement_id
+    )
+    assert target.status is RequirementStatus.INDEPENDENCE_VIOLATION
+    assert not result.eligible
+
+
 def test_independent_requirement_rejects_builder_as_verifier() -> None:
     policy = default_definition_of_done()
     p = profile((ChangeImpact.SECURITY,))
