@@ -6,6 +6,9 @@ class RebuildPlan: steps:tuple[RebuildStep,...]; max_steps:int=64
 @dataclass(frozen=True)
 class RebuildEvidence: artifact_id:str; expected_digest:str; actual_digest:str; verified:bool
 def execute_rebuild(plan,verified_inputs,producer):
+ if isinstance(plan.max_steps,bool) or not isinstance(plan.max_steps,int) or plan.max_steps<=0:raise ValueError("positive rebuild bound required")
+ ids=[s.artifact_id for s in plan.steps]
+ if len(ids)!=len(set(ids)):raise ValueError("duplicate rebuild artifact")
  if len(plan.steps)>plan.max_steps:raise ValueError("rebuild cascade exceeds bound")
  out=[]
  for s in plan.steps:
