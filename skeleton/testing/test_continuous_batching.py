@@ -326,3 +326,18 @@ def test_duplicate_item_ids_fail_closed() -> None:
             policy=_policy(),
             observed_at=NOW,
         )
+
+
+def test_batch_identity_changes_when_deadline_changes() -> None:
+    request = _placement_request()
+    placement = _placement(request)
+    first = _item("item-1", request, placement, deadline_at=125.0)
+    second = _item("item-1", request, placement, deadline_at=126.0)
+    assert first.item_digest != second.item_digest
+
+
+def test_batch_policy_identity_is_order_stable_and_content_bound() -> None:
+    first = _policy()
+    second = _policy(max_batch_runtime_s=21.0)
+    assert first.policy_digest == _policy().policy_digest
+    assert first.policy_digest != second.policy_digest
