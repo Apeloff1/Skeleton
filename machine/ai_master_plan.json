@@ -2002,7 +2002,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Classify data at ingestion and preserve classification through derived artifacts.",
         "Implement retention, deletion, export and residency semantics across source, projection, embedding, cache and backup.",
@@ -2022,12 +2022,15 @@
       "implementation_paths": [
         "skeleton/vault",
         "backend/routes/governance.py",
-        "machine/state_topology.json"
+        "machine/state_topology.json",
+        "skeleton/vault/deletion_proof.py",
+        "skeleton/vault/regional_privacy.py"
       ],
       "tests": [
         "skeleton/testing/test_data_governance.py",
         "skeleton/testing/test_data_lifecycle.py",
-        "skeleton/testing/test_lifecycle_adapters.py"
+        "skeleton/testing/test_lifecycle_adapters.py",
+        "skeleton/testing/test_vol027_privacy_completion.py"
       ],
       "evaluations": [
         "planned:deletion completeness drill",
@@ -2040,10 +2043,7 @@
         "cross-tenant leakage",
         "residency drift"
       ],
-      "gaps": [
-        "regional policy mapping remains incomplete",
-        "prove deletion through all future derived stores"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-027",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
