@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tree_version": "1.6.9",
+  "tree_version": "1.6.10",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "4bba10289d27060ff4f78ec487634c815cd114a0",
@@ -398,7 +398,7 @@
       "source": "skeleton/vault",
       "destination": "skeleton/ai/runtime/vault",
       "kind": "tree",
-      "source_git_object_sha": "c64aba5a0befc84a82606e95c1031ec0823cf30f",
+      "source_git_object_sha": "1ed25a02256e6c4a19c1b43ee7a09f416f09be12",
       "role": "data governance lifecycle and audit authority",
       "work_package_refs": [
         "WP-W00",
@@ -669,7 +669,7 @@
       "source": "skeleton/security",
       "destination": "skeleton/ai/runtime/security",
       "kind": "tree",
-      "source_git_object_sha": "e0aacacba8cbf3c61576df67405fa206fda2c1fb",
+      "source_git_object_sha": "10801de024d81f8d6670fcd2b5c63538f1c26eb1",
       "role": "AI runtime security and activation controls",
       "work_package_refs": [
         "WP-W00",
@@ -715,7 +715,7 @@
       "source": "skeleton/eval",
       "destination": "skeleton/ai/evaluation",
       "kind": "tree",
-      "source_git_object_sha": "afe29ecc0bbc248ef71070cc274959210b917631",
+      "source_git_object_sha": "38072c19a87b4ae7cc4e9dbc2933abbd4d8e2d1e",
       "role": "evaluation and evidence support",
       "work_package_refs": [
         "WP-W00",
@@ -5239,7 +5239,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "164_mapping_current_main_parity_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "164_mapping_exact_head_parity_and_source_identity_reconciled_pending_fresh_ci_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -5336,7 +5336,7 @@
       }
     }
   ],
-  "assignment_basis_git_sha": "03a5ff12967a0d597784112a1208c73718098d5b",
+  "assignment_basis_git_sha": "905183e5188a81e9f9a9ec4cb383b64fc166be78",
   "assignment_policy": {
     "version": "1.0.0",
     "source_identity": "Each pending assignment is bound to the source Git tree/blob object on assignment_basis_git_sha.",
@@ -5875,7 +5875,7 @@
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
     "note": "TREE-030 canonicalized School under skeleton/learning/school, retained skeleton/school as an explicitly classified compatibility boundary, preserved exact AI School parity, and left acquired.py as the only AIFT-LEARNING overlay.",
-    "current_mapping_count": 154,
+    "current_mapping_count": 164,
     "audit_scope_status": "validated_134_mapping_line_extended_to_154_requires_full_refresh",
     "pending_mapping_ids": [
       "AIFT-V2B-GAMEFORGE-AGENTS",
@@ -5999,6 +5999,18 @@
       "source_branch_head_sha": "284009aaf8db123a3c285022ef8d383015561367",
       "reconciled_base_main_sha": "055d83cc9fdb2318c29b59306e805d6ec36671df",
       "scope": "Wave 2B additions only; full 154-mapping object/parity audit and exact-head CI remain required before cutover."
+    },
+    "masterplan_completion_exact_head_repair": {
+      "basis_head_sha": "905183e5188a81e9f9a9ec4cb383b64fc166be78",
+      "mapping_count": 164,
+      "repaired_mapping_ids": [
+        "AIFT-VAULT",
+        "AIFT-SECURITY",
+        "AIFT-EVALUATION"
+      ],
+      "repaired_source_identity_count": 3,
+      "parity_drift_errors_after_file_repair": 0,
+      "policy": "All 164 governed mappings were re-audited with source exclusions, overlay children, compatibility facades, and the acquired-ingest semantic-normalization exception respected. This record refreshes source object identity only; fresh CI and independent verification remain required."
     }
   },
   "move_tag_contract": {
@@ -6187,6 +6199,15 @@
           "owner": "product/application assembly"
         }
       ]
+    },
+    "masterplan_completion_tree_parity": {
+      "base_main_sha": "6be4eeadaa81ea36c9e72b0dfc7c02f3bc6342c8",
+      "repair_head_sha": "905183e5188a81e9f9a9ec4cb383b64fc166be78",
+      "mirrored_files": 9,
+      "refreshed_source_identity_count": 3,
+      "mapping_count": 164,
+      "status": "parity_repaired_pending_fresh_ci_independent_verification",
+      "policy": "Staged mirror repair only. No source retirement, import inversion, completion checkbox, implementation signoff, or independent verification authority is granted."
     }
   }
 }
