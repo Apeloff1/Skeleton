@@ -44,3 +44,18 @@ def test_signoff_replay_rejects_evidence_substitution():
  ev[0]=AcceptanceEvidence(x.evidence_id,x.criterion,S("replacement"),True)
  changed=FunctionalAIAcceptance(b.acceptance_id,b.source_digest,b.config_digest,b.model_digest,b.environment_digest,tuple(ev),b.builder_id)
  with pytest.raises(AcceptanceError,match="stale or mismatched"):verify_signoff(changed,s)
+
+def test_signoff_replay_rejects_config_model_and_environment_drift():
+ b=bundle();s=sign(b,"ACTOR.REVIEWER")
+ variants=(
+  FunctionalAIAcceptance(b.acceptance_id,b.source_digest,S("changed-config"),b.model_digest,b.environment_digest,b.evidence,b.builder_id),
+  FunctionalAIAcceptance(b.acceptance_id,b.source_digest,b.config_digest,S("changed-model"),b.environment_digest,b.evidence,b.builder_id),
+  FunctionalAIAcceptance(b.acceptance_id,b.source_digest,b.config_digest,b.model_digest,S("changed-env"),b.evidence,b.builder_id),
+ )
+ for changed in variants:
+  with pytest.raises(AcceptanceError,match="stale or mismatched"):verify_signoff(changed,s)
+
+def test_governed_mirror_preserves_acceptance_surface():
+ from skeleton.ai.evaluation import functional_acceptance as governed
+ assert governed.FunctionalAIAcceptance.__annotations__ == FunctionalAIAcceptance.__annotations__
+ assert tuple(x.value for x in governed.Criterion) == tuple(x.value for x in Criterion)
