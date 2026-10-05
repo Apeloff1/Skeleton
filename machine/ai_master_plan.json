@@ -12975,7 +12975,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Cards reference immutable model/eval versions.",
         "Separate measured facts from qualitative claims."
@@ -12991,23 +12991,28 @@
         "ModelCardEvidence"
       ],
       "implementation_paths": [
-        "docs",
-        "machine"
+        "skeleton/supply_chain/model_bom.py",
+        "skeleton/ai/runtime/deferred/research_evaluation.py",
+        "skeleton/ai/runtime/deferred/component_provider_assurance.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_model_cards.py"
+        "skeleton/testing/test_model_cards.py"
       ],
       "evaluations": [
-        "planned:model-card evidence audit"
+        "skeleton/testing/test_model_cards.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/supply_chain/model_bom.py",
+        "skeleton/ai/runtime/deferred/research_evaluation.py",
+        "skeleton/ai/runtime/deferred/component_provider_assurance.py",
+        "skeleton/testing/test_model_cards.py"
+      ],
       "risks": [
         "stale marketing claim",
         "missing limitation"
       ],
       "gaps": [
-        "define card schema",
-        "generate from MBOM/evals"
+        "independent exact-head model-card MBOM/evaluation binding verification remains pending"
       ],
       "accountability_id": "ACC-VOL-221",
       "completion_checkbox": false,
@@ -13022,7 +13027,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Cards bind to immutable dataset version/fingerprint.",
         "Document excluded/unknown provenance and sensitive attributes."
@@ -13038,23 +13043,28 @@
         "DatasetCardEvidence"
       ],
       "implementation_paths": [
-        "docs",
-        "datasets"
+        "skeleton/artifacts",
+        "skeleton/ai/runtime/deferred/research_evaluation.py",
+        "skeleton/ai/runtime/deferred/component_provider_assurance.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_dataset_cards.py"
+        "skeleton/testing/test_dataset_cards.py"
       ],
       "evaluations": [
-        "planned:dataset-card completeness audit"
+        "skeleton/testing/test_dataset_cards.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/artifacts",
+        "skeleton/ai/runtime/deferred/research_evaluation.py",
+        "skeleton/ai/runtime/deferred/component_provider_assurance.py",
+        "skeleton/testing/test_dataset_cards.py"
+      ],
       "risks": [
         "unknown rights hidden",
         "card/version mismatch"
       ],
       "gaps": [
-        "define card schema",
-        "generate from dataset registry"
+        "independent exact-head dataset-card registry/lineage binding verification remains pending"
       ],
       "accountability_id": "ACC-VOL-222",
       "completion_checkbox": false,
@@ -13069,7 +13079,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Cards cannot grant authority; they document governed contracts.",
         "Bind to exact tool version/implementation owner."
@@ -13085,23 +13095,28 @@
         "ToolCardEvidence"
       ],
       "implementation_paths": [
-        "docs",
-        "skeleton/ai"
+        "skeleton/tools",
+        "skeleton/ai/runtime/deferred/research_evaluation.py",
+        "skeleton/ai/runtime/deferred/component_provider_assurance.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_tool_cards.py"
+        "skeleton/testing/test_tool_cards.py"
       ],
       "evaluations": [
-        "planned:tool-card contract parity"
+        "skeleton/testing/test_tool_cards.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/tools",
+        "skeleton/ai/runtime/deferred/research_evaluation.py",
+        "skeleton/ai/runtime/deferred/component_provider_assurance.py",
+        "skeleton/testing/test_tool_cards.py"
+      ],
       "risks": [
         "tool description prompt injection",
         "stale authority claim"
       ],
       "gaps": [
-        "generate from ToolDefinition",
-        "bind security review"
+        "independent exact-head tool-card ToolDefinition/security-review binding verification remains pending"
       ],
       "accountability_id": "ACC-VOL-223",
       "completion_checkbox": false,
@@ -13116,7 +13131,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Bind card to agent definition/version and evaluation evidence.",
         "Clearly distinguish default authority from optional delegated grants."
@@ -13132,23 +13147,28 @@
         "AgentCardEvidence"
       ],
       "implementation_paths": [
-        "docs",
-        "skeleton/ai/agents"
+        "skeleton/ai/agents",
+        "skeleton/ai/runtime/deferred/research_evaluation.py",
+        "skeleton/ai/runtime/deferred/component_provider_assurance.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_agent_cards.py"
+        "skeleton/testing/test_agent_cards.py"
       ],
       "evaluations": [
-        "planned:card/agent authority parity"
+        "skeleton/testing/test_agent_cards.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/ai/agents",
+        "skeleton/ai/runtime/deferred/research_evaluation.py",
+        "skeleton/ai/runtime/deferred/component_provider_assurance.py",
+        "skeleton/testing/test_agent_cards.py"
+      ],
       "risks": [
         "card overstates autonomy",
         "grant ambiguity"
       ],
       "gaps": [
-        "generate from agent registry",
-        "bind performance evidence"
+        "independent exact-head agent-card registry/performance-evidence binding verification remains pending"
       ],
       "accountability_id": "ACC-VOL-224",
       "completion_checkbox": false,
@@ -13163,7 +13183,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Show dimensions and raw blocker states, not only aggregate score.",
         "Bind observations to time/version/environment."
@@ -13180,22 +13200,27 @@
       ],
       "implementation_paths": [
         "skeleton/observability",
-        "machine"
+        "skeleton/ai/runtime/deferred/research_evaluation.py",
+        "skeleton/ai/runtime/deferred/component_provider_assurance.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_component_health_scorecard.py"
+        "skeleton/testing/test_component_health_scorecard.py"
       ],
       "evaluations": [
-        "planned:blocker masking test"
+        "skeleton/testing/test_component_health_scorecard.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/observability",
+        "skeleton/ai/runtime/deferred/research_evaluation.py",
+        "skeleton/ai/runtime/deferred/component_provider_assurance.py",
+        "skeleton/testing/test_component_health_scorecard.py"
+      ],
       "risks": [
         "green average hides critical failure",
         "stale health"
       ],
       "gaps": [
-        "define dimensions",
-        "bind dashboard to evidence sources"
+        "independent exact-head component-health noncompensable evidence/dashboard verification remains pending"
       ],
       "accountability_id": "ACC-VOL-225",
       "completion_checkbox": false,
@@ -13210,7 +13235,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Differentiate direct/transitive/build/runtime dependencies.",
         "Require risk disposition for unmaintained or vulnerable critical packages."
@@ -13226,23 +13251,28 @@
         "UpgradePlan"
       ],
       "implementation_paths": [
-        "scripts",
-        "machine"
+        "skeleton/supply_chain",
+        "skeleton/ai/runtime/deferred/operations_experience.py",
+        "skeleton/ai/runtime/deferred/component_provider_assurance.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_dependency_health.py"
+        "skeleton/testing/test_dependency_health.py"
       ],
       "evaluations": [
-        "planned:stale/vulnerable dependency audit"
+        "skeleton/testing/test_dependency_health.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/supply_chain",
+        "skeleton/ai/runtime/deferred/operations_experience.py",
+        "skeleton/ai/runtime/deferred/component_provider_assurance.py",
+        "skeleton/testing/test_dependency_health.py"
+      ],
       "risks": [
         "abandoned dependency",
         "upgrade breaks compatibility"
       ],
       "gaps": [
-        "connect SBOM to health",
-        "bind findings to backlog"
+        "independent exact-head SBOM dependency-health and backlog-binding verification remains pending"
       ],
       "accountability_id": "ACC-VOL-226",
       "completion_checkbox": false,
@@ -13257,7 +13287,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Record provider-specific dependency and criticality.",
         "Maintain tested fallback or explicit no-fallback disposition."
@@ -13273,23 +13303,28 @@
         "ProviderExitPlan"
       ],
       "implementation_paths": [
-        "machine",
-        "skeleton/ai/providers"
+        "skeleton/providers/contract.py",
+        "skeleton/ai/runtime/deferred/research_evaluation.py",
+        "skeleton/ai/runtime/deferred/component_provider_assurance.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_provider_risk.py"
+        "skeleton/testing/test_provider_risk.py"
       ],
       "evaluations": [
-        "planned:provider-loss scenario"
+        "skeleton/testing/test_provider_risk.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/providers/contract.py",
+        "skeleton/ai/runtime/deferred/research_evaluation.py",
+        "skeleton/ai/runtime/deferred/component_provider_assurance.py",
+        "skeleton/testing/test_provider_risk.py"
+      ],
       "risks": [
         "vendor lock-in",
         "fallback violates privacy"
       ],
       "gaps": [
-        "map provider dependencies",
-        "bind to failover"
+        "independent exact-head provider dependency/risk/failover-class verification remains pending"
       ],
       "accountability_id": "ACC-VOL-227",
       "completion_checkbox": false,
@@ -13304,7 +13339,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Failover requires compatible capability/data-boundary profile.",
         "Unknown external outcome must reconcile before retry to alternate provider."
@@ -13320,23 +13355,30 @@
         "ProviderOutcome"
       ],
       "implementation_paths": [
-        "skeleton/ai/providers",
-        "skeleton/reliability"
+        "skeleton/providers/contract.py",
+        "skeleton/reliability",
+        "skeleton/ai/runtime/deferred/research_evaluation.py",
+        "skeleton/ai/runtime/deferred/component_provider_assurance.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_provider_failover.py"
+        "skeleton/testing/test_provider_failover.py"
       ],
       "evaluations": [
-        "planned:provider outage/privacy fallback evaluation"
+        "skeleton/testing/test_provider_failover.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/providers/contract.py",
+        "skeleton/reliability",
+        "skeleton/ai/runtime/deferred/research_evaluation.py",
+        "skeleton/ai/runtime/deferred/component_provider_assurance.py",
+        "skeleton/testing/test_provider_failover.py"
+      ],
       "risks": [
         "double execution",
         "weaker privacy fallback"
       ],
       "gaps": [
-        "define compatibility classes",
-        "bind health to router"
+        "independent exact-head provider compatibility, health, region, and failover-selection verification remains pending"
       ],
       "accountability_id": "ACC-VOL-228",
       "completion_checkbox": false,
@@ -13351,7 +13393,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Never imply remote freshness or capabilities while offline.",
         "Queue/reconcile permitted deferred work with idempotency."
@@ -13367,23 +13409,28 @@
         "SyncReceipt"
       ],
       "implementation_paths": [
-        "skeleton/ai",
-        "desktop"
+        "skeleton/inventory",
+        "skeleton/ai/runtime/deferred/research_evaluation.py",
+        "skeleton/ai/runtime/deferred/component_provider_assurance.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_offline_mode.py"
+        "skeleton/testing/test_offline_mode.py"
       ],
       "evaluations": [
-        "planned:disconnect/reconnect evaluation"
+        "skeleton/testing/test_offline_mode.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/inventory",
+        "skeleton/ai/runtime/deferred/research_evaluation.py",
+        "skeleton/ai/runtime/deferred/component_provider_assurance.py",
+        "skeleton/testing/test_offline_mode.py"
+      ],
       "risks": [
         "stale data presented current",
         "sync conflict"
       ],
       "gaps": [
-        "define offline capability map",
-        "bind local model/storage"
+        "independent exact-head offline local-model/storage capability-map and zero-network verification remains pending"
       ],
       "accountability_id": "ACC-VOL-229",
       "completion_checkbox": false,
@@ -13398,7 +13445,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Disable external connectors/egress by construction.",
         "Provide signed import/export workflow for packages, updates and audit evidence."
@@ -13414,23 +13461,28 @@
         "TransferBundle"
       ],
       "implementation_paths": [
-        "deploy",
-        "skeleton/security"
+        "skeleton/security",
+        "skeleton/ai/runtime/deferred/research_evaluation.py",
+        "skeleton/ai/runtime/deferred/component_provider_assurance.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_air_gapped_profile.py"
+        "skeleton/testing/test_air_gapped_profile.py"
       ],
       "evaluations": [
-        "planned:network-denial acceptance"
+        "skeleton/testing/test_air_gapped_profile.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/security",
+        "skeleton/ai/runtime/deferred/research_evaluation.py",
+        "skeleton/ai/runtime/deferred/component_provider_assurance.py",
+        "skeleton/testing/test_air_gapped_profile.py"
+      ],
       "risks": [
         "hidden egress dependency",
         "unsigned media import"
       ],
       "gaps": [
-        "define package trust workflow",
-        "materialize air-gap install test"
+        "independent exact-head air-gap package trust, SBOM, signature, zero-network install verification remains pending"
       ],
       "accountability_id": "ACC-VOL-230",
       "completion_checkbox": false,
