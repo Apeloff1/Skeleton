@@ -1,7 +1,7 @@
 """Executable unified threat-model coverage contracts for VOL-026."""
 from dataclasses import dataclass
 from hashlib import sha256
-import json
+from skeleton.contracts.canonical import canonical_json_bytes
 from .contracts import SecurityContractError
 _REQUIRED=frozenset({"tool-authority","secrets","filesystem","network-egress","supply-chain"})
 @dataclass(frozen=True,slots=True)
@@ -24,7 +24,7 @@ class ThreatModel:
   object.__setattr__(self,"threats",tuple(sorted(self.threats,key=lambda t:t.threat_id)))
  @property
  def digest(self):
-  return sha256(json.dumps({"version":self.model_version,"threats":[{"id":t.threat_id,"asset":t.asset,"boundary":t.boundary,"mitigation":t.mitigation,"validation":t.validation} for t in self.threats]},sort_keys=True,separators=(",",":")).encode()).hexdigest()
+  return sha256(canonical_json_bytes({"version":self.model_version,"threats":[{"id":t.threat_id,"asset":t.asset,"boundary":t.boundary,"mitigation":t.mitigation,"validation":t.validation} for t in self.threats]})).hexdigest()
 def canonical_vol026_threat_model()->ThreatModel:
  return ThreatModel((
   Threat("T-AUTH-001","tool-authority","planner-to-tool","exact capability/resource/operation grant","skeleton/testing/test_vol026_capability_security.py"),
