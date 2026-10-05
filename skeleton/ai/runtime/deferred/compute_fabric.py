@@ -47,7 +47,7 @@ def allocate_research(q):
  if not q.jobs:return ResearchAllocation("",False,"empty")
  ordered=sorted(q.jobs,key=lambda x:(-int(x.priority),x.job_id))
  for j in ordered:
-  if j.quota<=0:continue
+  if not j.job_id or not j.provenance or j.quota<=0:continue
   if q.production_pressure and j.priority is not ResearchPriority.URGENT:continue
   return ResearchAllocation(j.job_id,True,"policy admitted")
  return ResearchAllocation("",False,"production/quota protected")
