@@ -42,7 +42,7 @@ class RunbookStep:
         object.__setattr__(self,"next_step_ids",ns)
         if self.kind is StepKind.OBSERVE and self.signal_ref is None: raise RunbookError("observe step requires signal_ref")
         if self.kind is StepKind.COMMAND and (self.command_ref is None or self.authority_ref is None): raise RunbookError("command step requires command_ref and authority_ref")
-        if self.kind is StepKind.ROLLBACK and self.command_ref is None: raise RunbookError("rollback step requires command_ref")
+        if self.kind is StepKind.ROLLBACK and (self.command_ref is None or self.authority_ref is None): raise RunbookError("rollback step requires command_ref and authority_ref")
         if self.kind in (StepKind.ESCALATE,StepKind.STOP) and self.next_step_ids: raise RunbookError("terminal step cannot have successors")
     @property
     def digest(self): return _digest({"step_id":self.step_id,"kind":self.kind.value,"instruction":self.instruction,"signal_ref":self.signal_ref,"command_ref":self.command_ref,"authority_ref":self.authority_ref,"rollback_step_id":self.rollback_step_id,"next_step_ids":self.next_step_ids})
@@ -68,7 +68,18 @@ class Runbook:
             if cur in reachable: continue
             reachable.add(cur); stack.extend(by[cur].next_step_ids)
         if reachable!=ids: raise RunbookError("runbook contains unreachable steps")
-        if not any(s.kind in (StepKind.STOP,StepKind.ESCALATE) for s in steps): raise RunbookError("runbook requires explicit stop or escalation")
+        terminals={s.step_id for s in steps if s.kind in (StepKind.STOP,StepKind.ESCALATE)}
+        if not terminals: raise RunbookError("runbook requires explicit stop or escalation")
+        reverse={step_id:set() for step_id in ids}
+        for step in steps:
+            for successor in step.next_step_ids: reverse[successor].add(step.step_id)
+        can_terminate=set(terminals); stack=list(terminals)
+        while stack:
+            cur=stack.pop()
+            for predecessor in reverse[cur]:
+                if predecessor not in can_terminate:
+                    can_terminate.add(predecessor); stack.append(predecessor)
+        if can_terminate!=ids: raise RunbookError("every reachable step must have a path to stop or escalation")
         object.__setattr__(self,"steps",steps)
     @property
     def digest(self): return _digest({"runbook_id":self.runbook_id,"version":self.version,"owner":self.owner,"degraded_mode":self.degraded_mode,"entry_step_id":self.entry_step_id,"steps":[s.digest for s in self.steps]})
