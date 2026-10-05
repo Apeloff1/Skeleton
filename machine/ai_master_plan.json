@@ -6986,7 +6986,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Require credible baselines, reproducibility, contamination analysis and statistical support.",
         "Characterize robustness, security, latency, cost and operational constraints.",
@@ -6998,22 +6998,25 @@
         "claim scoping"
       ],
       "contracts": [
+        "SOTAMetricRequirement",
         "SOTACandidateClaim",
-        "BaselineComparison",
-        "QualificationEvidence"
+        "SOTAReplayRecord",
+        "SOTAQualificationReceipt",
+        "SOTACandidateGate"
       ],
       "implementation_paths": [
-        "benchmarks",
-        "skeleton/eval",
-        "machine"
+        "skeleton/eval/sota_candidate.py",
+        "skeleton/eval/__init__.py",
+        "skeleton/eval/p3_acceptance.py",
+        "machine/sota_candidate_policy.json",
+        "scripts/check_vol107_sota_candidate.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_sota_candidate_claims.py",
-        "planned:qualification evidence tests"
+        "skeleton/testing/test_vol107_sota_candidate.py"
       ],
       "evaluations": [
-        "planned:independent benchmark replay",
-        "planned:robustness/cost characterization"
+        "skeleton/testing/test_vol107_sota_candidate.py",
+        "scripts/check_vol107_sota_candidate.py"
       ],
       "evidence": [],
       "risks": [
@@ -7021,10 +7024,7 @@
         "contamination",
         "baseline weakness"
       ],
-      "gaps": [
-        "define claim template and prohibited shortcuts",
-        "materialize independent replay path"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-107",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
