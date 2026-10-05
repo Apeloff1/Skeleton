@@ -1,12 +1,12 @@
 """Executable architecture fitness registry for VOL-116."""
 from dataclasses import dataclass
-import re
+import re\n_ID=re.compile(r"^[A-Z][A-Z0-9_.:-]{2,127}$")\ndef _id(v,f):\n if not isinstance(v,str) or not _ID.fullmatch(v):raise FitnessError(f"{f} must be stable identifier")\n return v
 class FitnessError(ValueError):pass
 @dataclass(frozen=True)
 class FitnessFunction:
  rule_id:str;decision_ref:str;pattern:str
  def __post_init__(self):
-  if not self.rule_id or not self.decision_ref:raise FitnessError("rule identity and decision required")
+  object.__setattr__(self,"rule_id",_id(self.rule_id,"rule_id"));object.__setattr__(self,"decision_ref",_id(self.decision_ref,"decision_ref"))\n  if not isinstance(self.pattern,str) or not self.pattern:raise FitnessError("rule pattern required")
   try:re.compile(self.pattern)
   except re.error as e:raise FitnessError("invalid rule") from e
 @dataclass(frozen=True)
