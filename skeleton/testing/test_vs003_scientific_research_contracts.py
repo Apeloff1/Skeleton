@@ -42,3 +42,14 @@ def test_reproduction_cannot_exceed_preregistered_trials_or_change_metrics():
  with pytest.raises(ResearchError,match="trial budget"):validate_reproduction(n,p,over)
  wrong=ReproductionRecord("REPRO.2",n.digest,p.digest,(("METRIC.2",1.0),),Outcome.SUPPORTS,1)
  with pytest.raises(ResearchError,match="preregistration"):validate_reproduction(n,p,wrong)
+
+def test_synthesis_uses_complete_claim_graph_and_preserves_conflict():
+ q=ResearchQuestion("QUESTION.1","does it work?","bounded claim",("small corpus",));g=EvidenceGraph()
+ a=node("EVID.1",Outcome.SUPPORTS);b=node("EVID.2",Outcome.CONTRADICTS);g.add(a);g.add(b)
+ c=synthesize(q,"CLAIM.1",g,"mixed result",("small corpus",))
+ assert c.evidence_digests==(a.digest,b.digest)
+ assert c.outcomes==(Outcome.SUPPORTS,Outcome.CONTRADICTS)
+ assert "conflicting_or_negative_evidence" in c.limitations
+def test_synthesis_rejects_claim_without_evidence():
+ q=ResearchQuestion("QUESTION.1","q","scope",("limit",))
+ with pytest.raises(ResearchError,match="unsupported claim"):synthesize(q,"CLAIM.1",EvidenceGraph(),"claim",("limit",))
