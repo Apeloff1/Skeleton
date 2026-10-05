@@ -49,7 +49,7 @@ class ReproductionRecord:
   if not vals: raise ResearchError("reproduction metrics required")
   if len({k for k,_ in vals})!=len(vals): raise ResearchError("duplicate reproduction metric")\n  for k,v in vals:\n   _id(k,"metric_id")\n   if not isinstance(v,(int,float)) or isinstance(v,bool) or not math.isfinite(v): raise ResearchError("metric value must be finite numeric")
   object.__setattr__(self,"metric_values",vals)
-  if not isinstance(self.trial_count,int) or isinstance(self.trial_count,bool) or self.trial_count<1: raise ResearchError("trial_count must be positive integer")
+  if not isinstance(self.trial_count,int) or isinstance(self.trial_count,bool) or self.trial_count<1: raise ResearchError("trial_count must be positive integer")\n @property\n def digest(self): return _digest({"reproduction_id":self.reproduction_id,"evidence_digest":self.evidence_digest,"experiment_digest":self.experiment_digest,"metric_values":self.metric_values,"outcome":self.outcome.value,"trial_count":self.trial_count})
 @dataclass(frozen=True,slots=True)
 class ResearchConclusion:
  conclusion_id:str; question_id:str; claim_id:str; evidence_digests:tuple[str,...]; outcomes:tuple[Outcome,...]; statement:str; limitations:tuple[str,...]
@@ -67,3 +67,9 @@ class EvidenceGraph:
   self.nodes[node.evidence_id]=node
  def for_claim(self,claim_id):
   _id(claim_id,"claim_id"); return tuple(sorted((n for n in self.nodes.values() if claim_id in n.claim_ids),key=lambda n:n.evidence_id))
+
+def validate_reproduction(evidence:EvidenceNode,plan:ExperimentPlan,record:ReproductionRecord)->None:
+ if not isinstance(evidence,EvidenceNode) or not isinstance(plan,ExperimentPlan) or not isinstance(record,ReproductionRecord): raise ResearchError("reproduction inputs must be typed")
+ if record.evidence_digest!=evidence.digest or record.experiment_digest!=plan.digest: raise ResearchError("reproduction is stale or bound to different evidence/experiment")
+ if record.trial_count>plan.max_trials: raise ResearchError("reproduction exceeds preregistered trial budget")
+ if tuple(k for k,_ in record.metric_values)!=plan.metric_ids: raise ResearchError("reproduction metrics differ from preregistration")
