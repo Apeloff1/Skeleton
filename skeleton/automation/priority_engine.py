@@ -2,7 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
-import hashlib,json,re
+import hashlib,json,re,math
 _ID=re.compile(r"^[A-Z][A-Z0-9_.:-]{2,127}$")
 class PriorityError(ValueError):pass
 class ConstraintKind(str,Enum): HARD_BLOCKER="hard_blocker"; SOFT_SIGNAL="soft_signal"
@@ -18,7 +18,7 @@ class PriorityInput:
   object.__setattr__(self,"factor_id",_id(self.factor_id,"factor_id"));object.__setattr__(self,"provenance_ref",_id(self.provenance_ref,"provenance_ref"))
   for f in ("value","weight"):
    v=getattr(self,f)
-   if not isinstance(v,(int,float)) or isinstance(v,bool):raise PriorityError(f"{f} must be numeric")
+   if not isinstance(v,(int,float)) or isinstance(v,bool) or not math.isfinite(v):raise PriorityError(f"{f} must be finite numeric")
   if not 0<=self.value<=1:raise PriorityError("value must be bounded 0..1")
   if not -10<=self.weight<=10:raise PriorityError("weight must be bounded -10..10")
  @property
@@ -29,6 +29,8 @@ class PriorityConstraint:
  constraint_id:str;kind:ConstraintKind;active:bool;provenance_ref:str;reason:str
  def __post_init__(self):
   object.__setattr__(self,"constraint_id",_id(self.constraint_id,"constraint_id"));object.__setattr__(self,"provenance_ref",_id(self.provenance_ref,"provenance_ref"))
+  if not isinstance(self.kind,ConstraintKind):raise PriorityError("kind must be ConstraintKind")
+  if not isinstance(self.active,bool):raise PriorityError("active must be bool")
   if not isinstance(self.reason,str) or not self.reason.strip():raise PriorityError("constraint reason required")
 
 @dataclass(frozen=True,slots=True)
@@ -39,13 +41,22 @@ class PriorityDecision:
 
 class PriorityEngine:
  def __init__(self,*,max_age_boost:float=5.0,age_step:float=.1,hysteresis:float=.25):
+  for name,value in (("max_age_boost",max_age_boost),("age_step",age_step),("hysteresis",hysteresis)):
+   if not isinstance(value,(int,float)) or isinstance(value,bool) or not math.isfinite(value):raise PriorityError(f"{name} must be finite numeric")
   if not 0<=max_age_boost<=10 or not 0<=age_step<=1 or not 0<=hysteresis<=5:raise PriorityError("engine bounds invalid")
   self.max_age_boost=max_age_boost;self.age_step=age_step;self.hysteresis=hysteresis
  def decide(self,item_id:str,inputs, constraints=(),*,age_epochs:int=0,previous_score:float|None=None)->PriorityDecision:
   _id(item_id,"item_id")
-  factors=tuple(sorted(inputs,key=lambda x:x.factor_id)); blockers=tuple(sorted(c.constraint_id for c in constraints if c.kind is ConstraintKind.HARD_BLOCKER and c.active))
+  if not isinstance(inputs,tuple) or any(not isinstance(x,PriorityInput) for x in inputs):raise PriorityError("inputs must be typed tuple")
+  if not isinstance(constraints,tuple) or any(not isinstance(x,PriorityConstraint) for x in constraints):raise PriorityError("constraints must be typed tuple")
+  if len(inputs)>256 or len(constraints)>256:raise PriorityError("priority input cardinality exceeds policy bound")
+  factors=tuple(sorted(inputs,key=lambda x:x.factor_id))
+  constraint_set=tuple(sorted(constraints,key=lambda x:x.constraint_id))
   if len({f.factor_id for f in factors})!=len(factors):raise PriorityError("duplicate priority factor")
-  if age_epochs<0:raise PriorityError("age_epochs cannot be negative")
+  if len({x.constraint_id for x in constraint_set})!=len(constraint_set):raise PriorityError("duplicate priority constraint")
+  blockers=tuple(x.constraint_id for x in constraint_set if x.kind is ConstraintKind.HARD_BLOCKER and x.active)
+  if not isinstance(age_epochs,int) or isinstance(age_epochs,bool) or age_epochs<0:raise PriorityError("age_epochs must be non-negative integer")
+  if previous_score is not None and (not isinstance(previous_score,(int,float)) or isinstance(previous_score,bool) or not math.isfinite(previous_score)):raise PriorityError("previous_score must be finite numeric")
   raw=sum(f.contribution for f in factors)
   age=min(self.max_age_boost,age_epochs*self.age_step)
   target=raw+age
