@@ -26,3 +26,8 @@ def test_tool_composition_checks_schema_and_trust_transitions():
  a=ToolBinding("a","1",frozenset({"read"}),"A","B","verified")
  b=ToolBinding("b","1",frozenset({"read"}),"X","C","verified")
  assert not compose_tools(ToolComposition((a,b),frozenset({"read"}))).admissible
+
+
+def test_simulation_evidence_is_explicitly_non_production():
+ simulation=simulate_plan(("step",))
+ assert simulation.production_evidence is False
