@@ -44,10 +44,11 @@ class WorkPackage:
    raw=getattr(self,f)
    if not isinstance(raw,tuple):raise WorkPackageError(f"{f} must be tuple")
    if len(raw)>256:raise WorkPackageError(f"{f} exceeds policy bound")
-   vals=tuple(sorted(set(raw)))
+   normalize=_id if f in ("requirement_ids","aiq_task_ids") else _txt
+   vals=tuple(normalize(v,f) for v in raw)
    if not vals:raise WorkPackageError(f"{f} cannot be empty")
-   for v in vals:_txt(v,f)
-   object.__setattr__(self,f,vals)
+   if len(vals)!=len(set(vals)):raise WorkPackageError(f"{f} contains duplicate values")
+   object.__setattr__(self,f,tuple(sorted(vals)))
  @property
  def digest(self):return _dig({"package_id":self.package_id,"volume_id":self.volume_id,"objective":self.objective,"non_goals":self.non_goals,"interfaces":self.interfaces,"state_owners":self.state_owners,"risks":self.risks,"tests":self.tests,"rollback":self.rollback,"requirement_ids":self.requirement_ids,"aiq_task_ids":self.aiq_task_ids})
 class WorkPackageRegistry:
@@ -62,7 +63,13 @@ class WorkPackageRegistry:
   if d.package_id not in self.packages or d.depends_on not in self.packages:raise WorkPackageError("unknown package dependency")
   prior=self.dependencies.get(d.dependency_id)
   if prior is not None and prior!=d:raise WorkPackageError("dependency identity immutable")
-  self.dependencies[d.dependency_id]=d;self._acyclic()
+  if any(x.dependency_id!=d.dependency_id and x.package_id==d.package_id and x.depends_on==d.depends_on for x in self.dependencies.values()):raise WorkPackageError("duplicate dependency edge")
+  self.dependencies[d.dependency_id]=d
+  try:self._acyclic()
+  except Exception:
+   if prior is None:self.dependencies.pop(d.dependency_id,None)
+   else:self.dependencies[d.dependency_id]=prior
+   raise
  def _acyclic(self):
   g={k:set() for k in self.packages}
   for d in self.dependencies.values():g[d.package_id].add(d.depends_on)
@@ -76,6 +83,7 @@ class WorkPackageRegistry:
   for n in g:visit(n)
  def attest(self,e):
   if not isinstance(e,WorkPackageEvidence):raise WorkPackageError("evidence must be WorkPackageEvidence")
+  if e.evidence_id not in self.evidence and len(self.evidence)>=4096:raise WorkPackageError("evidence registry exceeds policy bound")
   if e.package_id not in self.packages:raise WorkPackageError("evidence references unknown package")
   if e.package_digest!=self.packages[e.package_id].digest:raise WorkPackageError("evidence is stale or bound to another package version")
   same=[x for x in self.evidence.values() if x.package_id==e.package_id and x.package_digest==e.package_digest and x.role is e.role]
