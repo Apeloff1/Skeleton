@@ -27,3 +27,12 @@ def test_ambiguous_latest_resolution_fails_closed():
 def test_artifact_graph_is_version_specific_and_detects_cycles():
  a=ArtifactNode("a","1");b=ArtifactNode("b","1")
  assert artifact_cycle(ArtifactGraph((a,b),(ArtifactDependency(a,b,DependencyKind.BUILD),ArtifactDependency(b,a,DependencyKind.RUNTIME))))
+
+def test_depth_invariants_fail_closed():
+ import pytest
+ scope=ApprovalScope("s","v","later",frozenset({"read"}));assert not reusable(scope,"s","v",0,ApprovalReusePolicy(0))
+ with pytest.raises(ValueError):present_trust(TrustSignal(1.1,0.1,False,("e",)))
+ intent=UserIntent("i","do",None,());rev=IntentRevision("r",intent,None)
+ with pytest.raises(ValueError):latest_intent((rev,rev))
+ a=ArtifactNode("a","1");b=ArtifactNode("b","1")
+ with pytest.raises(ValueError):artifact_cycle(ArtifactGraph((a,),(ArtifactDependency(a,b,DependencyKind.RUNTIME),)))
