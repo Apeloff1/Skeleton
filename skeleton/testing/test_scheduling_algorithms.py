@@ -9,3 +9,7 @@ def test_deadline_policy_is_replaceable_and_measurable():
  tasks=(t("late",deadline=10,sequence=0),t("early",deadline=1,sequence=1))
  assert [x.task_id for x in schedule(tasks,(w("w"),),policy=SchedulingPolicy.FIFO).assignments]==["late","early"]
  assert [x.task_id for x in schedule(tasks,(w("w"),),policy=SchedulingPolicy.EARLIEST_DEADLINE).assignments]==["early","late"]
+
+def test_deferred_prerequisite_blocks_dependent():
+ tasks=({"id":"a","dependencies":(),"authority":"x","lease":False,"sequence":0},{"id":"b","dependencies":("a",),"authority":"x","lease":True,"sequence":1})
+ s=schedule(tasks,({"id":"w","authorities":("x",)},));assert not s.assignments and set(s.deferred)=={"a","b"}
