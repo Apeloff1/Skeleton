@@ -14,6 +14,13 @@ from .lifecycle_safety import (
     MigrationReceipt, MigrationState, MigrationStep, ParityEvidence,
     RetirementDecision, can_remove_adapter, decide_retirement,
 )
+from .workflow_tasks import (
+    CompileResult, CompiledWorkflow, ComplexityEstimate, ComplexityFeature,
+    DSLDiagnostic, DSLVersion, EstimateRevision, StateMapping, TaskClassification,
+    TaskProfile, TaskType, WorkflowBinding, WorkflowCompatibility, WorkflowLink,
+    WorkflowMigration, WorkflowMigrationReceipt, WorkflowSource, WorkflowVersion,
+    classify, compile_workflow, migrate, rebind, revise, validate_source,
+)
 from .contract_fuzzing import ContractFuzzer, FuzzBudget, FuzzFailure, FuzzReport
 from .simulation_mode import SimulationAuthority, SimulationEvidence, SimulationRequest, SimulationResult, SimulationRuntime
 from .journal import DeferredExecutionJournal, DeferredJournalConflict, DeferredJournalError, DeferredJournalRecord, SqliteDeferredExecutionJournal
