@@ -11,3 +11,9 @@ def test_source_and_supersession_lineage_preserved():
  assert [x.fact_id for x in m.visible("t","p","verified")]==["2"] and m.facts[1].source_id=="source"
 def test_missing_supersession_target_fails_closed():
  with pytest.raises(ValueError):ProjectMemory("t","p","verified").add(f("2",supersedes="missing"))
+
+def test_supersession_fork_rejected():
+ import pytest
+ m=ProjectMemory("t","p","trusted").add(ProjectFact("a","t","p","trusted","v","s"))
+ m=m.add(ProjectFact("b","t","p","trusted","v2","s","a"))
+ with pytest.raises(ValueError):m.add(ProjectFact("c","t","p","trusted","v3","s","a"))
