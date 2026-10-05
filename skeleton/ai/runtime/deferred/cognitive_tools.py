@@ -7,7 +7,7 @@ class StrategyVersion: name:str; version:str
 class StrategyEvidence: benchmark_id:str; eval_passed:bool; cost:float
 @dataclass(frozen=True,slots=True)
 class CognitiveStrategy: identity:StrategyVersion; evidence:tuple[StrategyEvidence,...]; production:bool=False
-def production_eligible(s):return bool(s.evidence) and all(e.eval_passed for e in s.evidence)
+def production_eligible(s):return bool(s.identity.name) and bool(s.identity.version) and bool(s.evidence) and all(bool(e.benchmark_id) and e.eval_passed and e.cost>=0 for e in s.evidence)
 @dataclass(frozen=True,slots=True)
 class StrategyConstraint: allowed:frozenset[StrategyVersion]; max_cost:float
 @dataclass(frozen=True,slots=True)
@@ -15,6 +15,7 @@ class StrategySelection: candidates:tuple[CognitiveStrategy,...]; constraint:Str
 @dataclass(frozen=True,slots=True)
 class StrategyDecision: selected:StrategyVersion|None; abstained:bool; reason:str
 def select_strategy(x):
+ if x.constraint.max_cost<0:raise ValueError("strategy cost bound must be nonnegative")
  ok=[s for s in x.candidates if s.identity in x.constraint.allowed and production_eligible(s) and sum(e.cost for e in s.evidence)<=x.constraint.max_cost]
  if not ok:return StrategyDecision(None,True,"no admissible strategy")
  s=min(ok,key=lambda z:(sum(e.cost for e in z.evidence),z.identity.name,z.identity.version));return StrategyDecision(s.identity,False,"admissible")
