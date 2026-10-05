@@ -27,9 +27,26 @@ class ReceiptIngestionError(RuntimeError):
     pass
 
 
+def _strict_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ReceiptIngestionError(f"duplicate JSON object key: {key}")
+        result[key] = value
+    return result
+
+
+def _reject_json_constant(value: str) -> None:
+    raise ReceiptIngestionError(f"non-finite JSON token rejected: {value}")
+
+
 def _load_object(path: Path, *, label: str) -> dict[str, Any]:
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload = json.loads(
+            path.read_text(encoding="utf-8"),
+            object_pairs_hook=_strict_object,
+            parse_constant=_reject_json_constant,
+        )
     except FileNotFoundError as exc:
         raise ReceiptIngestionError(f"{label} not found: {path}") from exc
     except json.JSONDecodeError as exc:
@@ -136,6 +153,8 @@ def apply_receipt(
     root: Path = ROOT,
     activate: bool = False,
 ) -> tuple[dict[str, Any], SelectionDecision]:
+    if not isinstance(activate, bool):
+        raise ReceiptIngestionError("activate must be boolean")
     updated = deepcopy(dict(policy))
     evidence = _evidence_from_mapping(receipt)
     candidate = _candidate(updated, evidence.candidate_id)
