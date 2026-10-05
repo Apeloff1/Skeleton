@@ -368,3 +368,24 @@ def test_requirement_projection_does_not_leak_across_dependency_edges() -> None:
     assert subject.requirements_for("EVID.A") == ("REQ.A",)
     assert subject.evidence_for("REQ.B") == ()
     assert "REQ.B" in subject.impact("EVID.A")
+
+
+def test_graph_materialization_stops_at_safety_bound() -> None:
+    consumed = 0
+
+    def nodes():
+        nonlocal consumed
+        while True:
+            consumed += 1
+            yield TraceNode(f"REQ.{consumed}", NodeKind.REQUIREMENT, f"plan:{consumed}")
+
+    with pytest.raises(TraceError, match="trace node count exceeds safety bound"):
+        TraceabilityMatrix(nodes(), ())
+    assert consumed == 10_001
+
+
+def test_non_iterable_graph_inputs_fail_with_stable_type_errors() -> None:
+    with pytest.raises(TypeError, match="nodes must be iterable"):
+        TraceabilityMatrix(None, ())  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="edges must be iterable"):
+        TraceabilityMatrix((), None)  # type: ignore[arg-type]
