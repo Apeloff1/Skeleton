@@ -9,6 +9,7 @@ class EffectAttempt: effect:SideEffect; precommitted:bool
 @dataclass(frozen=True,slots=True)
 class EffectReceipt: effect_id:str; state:EffectState; reconciliation_required:bool
 def effect_receipt(a,outcome):
+ if not all((a.effect.effect_id,a.effect.operation_id,a.effect.idempotency_key,a.effect.effect_class)):raise ValueError("complete side-effect identity required")
  if not a.precommitted:return EffectReceipt(a.effect.effect_id,EffectState.UNKNOWN,True)
  if outcome is True:return EffectReceipt(a.effect.effect_id,EffectState.CONFIRMED,False)
  if outcome is False:return EffectReceipt(a.effect.effect_id,EffectState.ATTEMPTED,False)
@@ -20,6 +21,8 @@ class Compensation: compensation_id:str; steps:tuple[CompensationStep,...]
 @dataclass(frozen=True,slots=True)
 class CompensationResult: compensation_id:str; succeeded:bool; reconciliation_required:bool
 def compensation_result(c,step_results):
+ if not c.compensation_id or not c.steps or any(not all((s.step_id,s.compensates_effect_id,s.idempotency_key)) for s in c.steps):raise ValueError("complete compensation identity required")
+ if len({s.step_id for s in c.steps})!=len(c.steps):raise ValueError("duplicate compensation step")
  ok=len(step_results)==len(c.steps) and all(step_results)
  return CompensationResult(c.compensation_id,ok,not ok)
 @dataclass(frozen=True,slots=True)
@@ -29,7 +32,9 @@ class SagaInstance: saga_id:str; instance_id:str; completed:int; durable_revisio
 @dataclass(frozen=True,slots=True)
 class SagaTransition: previous_revision:int; revision:int; completed:int
 def advance_saga(d,i):
- if d.saga_id!=i.saga_id or not(len(d.steps)==len(d.idempotency_keys)==len(d.timeouts)==len(d.compensations)):raise ValueError("invalid saga")
+ if not d.saga_id or not i.instance_id or d.saga_id!=i.saga_id or not d.steps or not(len(d.steps)==len(d.idempotency_keys)==len(d.timeouts)==len(d.compensations)):raise ValueError("invalid saga")
+ if any(not s for s in d.steps) or len(set(d.steps))!=len(d.steps) or any(not k for k in d.idempotency_keys) or len(set(d.idempotency_keys))!=len(d.idempotency_keys):raise ValueError("invalid saga identity")
+ if any(t<0 for t in d.timeouts) or i.completed<0 or i.durable_revision<0 or i.completed>len(d.steps):raise ValueError("invalid saga state")
  if i.completed>=len(d.steps):return i,SagaTransition(i.durable_revision,i.durable_revision,i.completed)
  n=SagaInstance(i.saga_id,i.instance_id,i.completed+1,i.durable_revision+1)
  return n,SagaTransition(i.durable_revision,n.durable_revision,n.completed)
