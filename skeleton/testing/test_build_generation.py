@@ -52,3 +52,10 @@ def test_change_plan_and_generated_output_identity_hardening():
  a=generate_code(spec,"x");b=generate_code(spec,"y")
  assert a.spec_digest==b.spec_digest
  assert a.output_digest!=b.output_digest
+
+
+def test_sdk_generation_rejects_duplicate_method_identity():
+ import pytest
+ version=SDKVersion("api-v7","g1")
+ methods=(SDKMethod("get","Req","Res"),SDKMethod("get","OtherReq","OtherRes"))
+ with pytest.raises(ValueError): generate_client(version,methods,"schema")
