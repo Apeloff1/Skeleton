@@ -178,3 +178,24 @@ def test_version_relationship_validation_detects_stale_missing_and_extra_values(
     assert by_id["version:generator"] is CheckStatus.FAIL
     assert by_id["version:required"] is CheckStatus.FAIL
     assert by_id["version:extra"] is CheckStatus.FAIL
+
+
+def test_source_set_is_nonempty_bounded_and_typed():
+    with pytest.raises(DocumentationError, match="non-empty"):
+        SourceDigestSet(())
+    with pytest.raises(DocumentationError, match="invalid source"):
+        SourceDigestSet(("not-a-source",))
+
+
+def test_document_requires_nonempty_typed_sections():
+    sources = source_set()
+    gen = generator()
+    with pytest.raises(DocumentationError, match="requires sections"):
+        GeneratedDocument("docs/generated/empty.md", gen, sources, ())
+    with pytest.raises(DocumentationError, match="section set"):
+        GeneratedDocument("docs/generated/bad.md", gen, sources, ("not-a-section",))
+
+
+def test_source_kind_must_be_typed_not_free_form():
+    with pytest.raises(DocumentationError, match="SourceKind"):
+        DocumentationSource("source.plan", "machine", "machine/plan.json", sha("x"))
