@@ -31,7 +31,8 @@ class FunctionalAIAcceptance:
   for f in ("source_digest","config_digest","model_digest","environment_digest"):_sha(getattr(self,f),f)
   if not isinstance(self.evidence,tuple) or any(not isinstance(x,AcceptanceEvidence) for x in self.evidence):raise AcceptanceError("evidence must be typed tuple")
   ev=tuple(sorted(self.evidence,key=lambda x:(x.criterion.value,x.evidence_id)))
-  if len({x.evidence_id for x in ev})!=len(ev):raise AcceptanceError("duplicate evidence identity")\n  if len({x.criterion for x in ev})!=len(ev):raise AcceptanceError("criterion must have exactly one evidence record")
+  if len({x.evidence_id for x in ev})!=len(ev):raise AcceptanceError("duplicate evidence identity")
+  if len({x.criterion for x in ev})!=len(ev):raise AcceptanceError("criterion must have exactly one evidence record")
   required=set(Criterion);present={x.criterion for x in ev}
   if present!=required:raise AcceptanceError("acceptance matrix incomplete")
   object.__setattr__(self,"evidence",ev)
