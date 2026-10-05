@@ -284,10 +284,10 @@
   ],
   "backlog": {
     "summary": {
-      "item_count": 1782,
-      "gap_count": 802,
+      "item_count": 1780,
+      "gap_count": 800,
       "risk_count": 980,
-      "open_count": 1782,
+      "open_count": 1780,
       "closed_count": 0
     },
     "items": [
@@ -2178,38 +2178,6 @@
         "state": "open",
         "closure_evidence_refs": [],
         "deduplication_key": "gap:bind data freshness/provenance into responses"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-073-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-073:gap:001",
-        "volume_ref": "VOL-073",
-        "statement": "define simulation state contract",
-        "accountability_id": "ACC-VOL-073",
-        "requirement_refs": [
-          "REQ:VOL-073:001",
-          "REQ:VOL-073:002",
-          "REQ:VOL-073:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define simulation state contract"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-073-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-073:gap:002",
-        "volume_ref": "VOL-073",
-        "statement": "materialize resource/authority guards",
-        "accountability_id": "ACC-VOL-073",
-        "requirement_refs": [
-          "REQ:VOL-073:001",
-          "REQ:VOL-073:002",
-          "REQ:VOL-073:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize resource/authority guards"
       },
       {
         "backlog_id": "BL-GAP-VOL-074-001",
