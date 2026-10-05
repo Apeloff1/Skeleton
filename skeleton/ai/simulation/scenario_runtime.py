@@ -1134,9 +1134,13 @@ class ScenarioRuntime:
             branches[edge.parent_id] = branches.get(edge.parent_id, 0) + 1
             parent = by_id[edge.parent_id]
             child = by_id[edge.child_id]
-            if child.cumulative_uncertainty + 1e-15 < parent.cumulative_uncertainty:
+            expected_uncertainty = _conservative_union(
+                parent.cumulative_uncertainty,
+                edge.local_uncertainty,
+            )
+            if abs(child.cumulative_uncertainty - expected_uncertainty) > 1e-12:
                 raise ScenarioRuntimeError(
-                    "tree uncertainty decreases along an edge"
+                    "tree cumulative uncertainty does not match edge uncertainty"
                 )
             if (
                 child.cumulative_cost_units
