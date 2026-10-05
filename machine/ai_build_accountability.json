@@ -14069,22 +14069,31 @@
       "id": "ACC-VOL-104",
       "type": "volume",
       "title": "VOL-104 Acceptance: Functional AI",
-      "status": "unverified",
+      "status": "implemented",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-10-05T16:57:30Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-10-05T16:57:30Z",
+        "git_sha": "3a74fad27e74047723d2fda750b73adb77649db3",
+        "evidence_refs": [
+          "docs/plan",
+          "git-head:3a74fad27e74047723d2fda750b73adb77649db3",
+          "https://github.com/Apeloff1/Skeleton/commit/0b6e84a423f2e8c92dc88869b531e25e9b6bacd7",
+          "https://github.com/Apeloff1/Skeleton/commit/3a74fad27e74047723d2fda750b73adb77649db3",
+          "machine",
+          "skeleton/eval",
+          "skeleton/eval/functional_acceptance.py",
+          "skeleton/testing/test_functional_ai_acceptance.py"
+        ],
+        "statement": "Implementation-signed after the functional-AI acceptance matrix, immutable digest binding, independent-review signoff contract, replay protection, and focused regression coverage landed on main. Independent verification and completion remain unsigned.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/3a74fad27e74047723d2fda750b73adb77649db3"
       },
       "verification_signoff": {
         "signed": false,
@@ -14100,9 +14109,60 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-10-05T16:57:30Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T16:57:30Z",
+          "git_sha": "3a74fad27e74047723d2fda750b73adb77649db3",
+          "statement": "Begin accountability reconciliation for the landed VOL-104 functional-AI acceptance implementation.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/3a74fad27e74047723d2fda750b73adb77649db3",
+          "from_status": "unverified",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/3a74fad27e74047723d2fda750b73adb77649db3"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T16:57:30Z",
+          "git_sha": "3a74fad27e74047723d2fda750b73adb77649db3",
+          "statement": "Implementation-signed after the functional-AI acceptance matrix, immutable digest binding, independent-review signoff contract, replay protection, and focused regression coverage landed on main. Independent verification and completion remain unsigned.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/3a74fad27e74047723d2fda750b73adb77649db3",
+          "from_status": "in_progress",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "docs/plan",
+            "git-head:3a74fad27e74047723d2fda750b73adb77649db3",
+            "https://github.com/Apeloff1/Skeleton/commit/0b6e84a423f2e8c92dc88869b531e25e9b6bacd7",
+            "https://github.com/Apeloff1/Skeleton/commit/3a74fad27e74047723d2fda750b73adb77649db3",
+            "machine",
+            "skeleton/eval",
+            "skeleton/eval/functional_acceptance.py",
+            "skeleton/testing/test_functional_ai_acceptance.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/plan",
+        "git-head:3a74fad27e74047723d2fda750b73adb77649db3",
+        "https://github.com/Apeloff1/Skeleton/commit/0b6e84a423f2e8c92dc88869b531e25e9b6bacd7",
+        "https://github.com/Apeloff1/Skeleton/commit/3a74fad27e74047723d2fda750b73adb77649db3",
+        "machine",
+        "skeleton/eval",
+        "skeleton/eval/functional_acceptance.py",
+        "skeleton/testing/test_functional_ai_acceptance.py"
+      ],
       "baseline_status": "unverified"
     },
     {
