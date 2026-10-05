@@ -521,3 +521,27 @@ def test_canonical_and_governed_observability_exports_are_byte_identical():
     ).read_bytes() == (
         ROOT / "skeleton/ai/runtime/observability/__init__.py"
     ).read_bytes()
+
+def test_newer_failed_drill_invalidates_older_pass():
+    registry = RunbookRegistry()
+    target = book()
+    registry.register(target)
+    registry.record_validation(validation(target, validation_id="VALIDATION.PASS", drill_id="DRILL.PASS", observed_at=NOW, status=ValidationStatus.PASSED))
+    registry.record_validation(validation(target, validation_id="VALIDATION.FAIL", drill_id="DRILL.FAIL", observed_at=datetime(2026, 10, 5, 14, 0, 0, tzinfo=timezone.utc), status=ValidationStatus.FAILED))
+    assert registry.validated(target.runbook_id, target.version) is False
+
+def test_newer_pass_can_revalidate_after_older_failure():
+    registry = RunbookRegistry()
+    target = book()
+    registry.register(target)
+    registry.record_validation(validation(target, validation_id="VALIDATION.FAIL", drill_id="DRILL.FAIL", observed_at=NOW, status=ValidationStatus.FAILED))
+    registry.record_validation(validation(target, validation_id="VALIDATION.PASS", drill_id="DRILL.PASS", observed_at=datetime(2026, 10, 5, 14, 0, 0, tzinfo=timezone.utc), status=ValidationStatus.PASSED))
+    assert registry.validated(target.runbook_id, target.version) is True
+
+def test_conflicting_latest_drills_fail_closed():
+    registry = RunbookRegistry()
+    target = book()
+    registry.register(target)
+    registry.record_validation(validation(target, validation_id="VALIDATION.PASS", drill_id="DRILL.PASS", observed_at=NOW, status=ValidationStatus.PASSED))
+    registry.record_validation(validation(target, validation_id="VALIDATION.FAIL", drill_id="DRILL.FAIL", observed_at=NOW, status=ValidationStatus.FAILED))
+    assert registry.validated(target.runbook_id, target.version) is False
