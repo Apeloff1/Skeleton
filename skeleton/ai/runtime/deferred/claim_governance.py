@@ -9,12 +9,20 @@ class SourceCluster: cluster_id:str; members:tuple[EvidenceIndependence,...]
 @dataclass(frozen=True,slots=True)
 class DiversityScore: independent_clusters:int; quality_floor:float; admissible:bool
 def diversity(evidence,quality_floor):
+ if not 0<=quality_floor<=1:raise ValueError("quality floor must be within [0,1]")
+ if any(not all((e.source_id,e.lineage,e.owner)) or not 0<=e.quality<=1 for e in evidence):raise ValueError("invalid evidence identity or quality")
+ if len({e.source_id for e in evidence})!=len(evidence):raise ValueError("duplicate evidence source")
  groups={(e.lineage,e.owner,tuple(sorted(e.citations))) for e in evidence}
  return DiversityScore(len(groups),quality_floor,bool(evidence) and all(e.quality>=quality_floor for e in evidence))
 @dataclass(frozen=True,slots=True)
 class ScopeDimension: name:str; value:str
 @dataclass(frozen=True,slots=True)
-class ClaimScope: dimensions:tuple[ScopeDimension,...]; valid_from:int; valid_to:int|None
+class ClaimScope:
+ dimensions:tuple[ScopeDimension,...]; valid_from:int; valid_to:int|None
+ def __post_init__(self):
+  if not self.dimensions or any(not d.name or not d.value for d in self.dimensions):raise ValueError("scope dimensions required")
+  if len({d.name for d in self.dimensions})!=len(self.dimensions):raise ValueError("duplicate scope dimension")
+  if self.valid_to is not None and self.valid_to<self.valid_from:raise ValueError("invalid scope interval")
 @dataclass(frozen=True,slots=True)
 class ScopeCompatibility: compatible:bool; qualification:str|None=None
 def scope_compatibility(a,b):
