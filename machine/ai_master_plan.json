@@ -366,7 +366,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Maintain one canonical architecture graph for roots, ownership zones, runtime DAGs and interfaces.",
         "Reject illegal dependencies and undeclared production components before dependency-heavy tests.",
@@ -396,7 +396,9 @@
         "planned:architecture mutation/fault suite",
         "planned:dependency-cycle regression evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/d4334086eaf1c7cbbff46890b727fc954fde1677"
+      ],
       "risks": [
         "documentation/runtime split brain",
         "transitional roots becoming accidental owners",
@@ -473,7 +475,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Bootstrap services in deterministic dependency order with explicit readiness and shutdown semantics.",
         "Propagate cancellation, deadline, budget and operation identity through all runtime layers.",
@@ -505,7 +507,9 @@
         "planned:crash-at-every-lifecycle-boundary suite",
         "planned:shutdown/cancellation latency evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/be408977891328b78522074c1fe693267b01ce5b"
+      ],
       "risks": [
         "orphan tasks",
         "readiness before dependencies are usable",
@@ -528,7 +532,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Declare authoritative, derived, cache and ephemeral state classes with one canonical owner each.",
         "Use transactional/outbox or explicit compensation semantics for cross-boundary durable changes.",
@@ -560,7 +564,9 @@
         "planned:partial-commit fault matrix",
         "planned:restore consistency evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/f9053d8c9a2dfddcff431a4ff37863a5d962eded"
+      ],
       "risks": [
         "split-brain ownership",
         "partial multi-store writes",
@@ -19650,7 +19656,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Every mutation records predecessor/version and source.",
         "Concurrent edits use explicit conflict semantics."
@@ -19683,7 +19689,8 @@
         "skeleton/contracts/memory_record.py",
         "skeleton/persistence/memory_repository.py",
         "skeleton/testing/test_memory_repository.py",
-        "skeleton/testing/test_mongo_memory_repository.py"
+        "skeleton/testing/test_mongo_memory_repository.py",
+        "https://github.com/Apeloff1/Skeleton/commit/39f4b48424133d3823c1d9dc17952135778852fc"
       ],
       "risks": [
         "lost update",
@@ -19706,7 +19713,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Reconciliation never silently merges different scopes/users/projects.",
         "Keep unresolved conflict sets when evidence is insufficient."
@@ -19737,7 +19744,8 @@
       "evidence": [
         "skeleton/memory/reconciliation.py",
         "skeleton/persistence/memory_repository.py",
-        "tests/test_memory_reconciliation.py"
+        "tests/test_memory_reconciliation.py",
+        "https://github.com/Apeloff1/Skeleton/commit/fb6b42094c41139d866ebbbdce402f51af7dd140"
       ],
       "risks": [
         "false merge",
