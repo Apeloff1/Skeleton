@@ -41,7 +41,7 @@ class ChangeGate: name:str; passed:bool; hard:bool=True
 class ChangeStep: step_id:str; reversible:bool; rollback:str|None
 @dataclass(frozen=True,slots=True)
 class SafeChangePlan: steps:tuple[ChangeStep,...]; gates:tuple[ChangeGate,...]; budget_ok:bool
-def change_admissible(p): return bool(p.steps) and bool(p.gates) and p.budget_ok and not any(g.hard and not g.passed for g in p.gates) and all(bool(s.step_id) and (s.reversible or bool(s.rollback)) for s in p.steps)
+def change_admissible(p): return bool(p.steps) and bool(p.gates) and len({s.step_id for s in p.steps})==len(p.steps) and len({g.name for g in p.gates})==len(p.gates) and all(g.name for g in p.gates) and p.budget_ok and not any(g.hard and not g.passed for g in p.gates) and all(bool(s.step_id) and (s.reversible or bool(s.rollback)) for s in p.steps)
 @dataclass(frozen=True,slots=True)
 class SystemSource: contract_version:str; content:str; authority:frozenset[str]
 @dataclass(frozen=True,slots=True)
@@ -52,6 +52,7 @@ class SystemArtifact:
  @property
  def authority(self): return frozenset()
 def compile_system(s,p):
+ if not s.contract_version or not s.content or not p.generator_version:raise ValueError("complete system generation identity required")
  sd=sha256_json({"contract_version":s.contract_version,"content":s.content})
  return SystemArtifact(sha256_json({"source":sd,"generator":p.generator_version}),sd,p.generator_version)
 @dataclass(frozen=True,slots=True)
@@ -61,6 +62,8 @@ class GenerationSpec: contract_version:str; generator_version:str; extension_poi
 @dataclass(frozen=True,slots=True)
 class GeneratedCode: content:str; generated_marker:str; spec_digest:str; output_digest:str
 def generate_code(spec,body):
+ if not spec.contract_version or not spec.generator_version or not body:raise ValueError("complete generation identity required")
+ if len({x.name for x in spec.extension_points})!=len(spec.extension_points) or any(not x.name or not x.manual_path for x in spec.extension_points):raise ValueError("invalid extension point identity")
  d=sha256_json({"contract":spec.contract_version,"generator":spec.generator_version,"extensions":[(x.name,x.manual_path) for x in spec.extension_points]})
  return GeneratedCode(body,"GENERATED - DO NOT EDIT",d,sha256_json({"spec":d,"content":body}))
 @dataclass(frozen=True,slots=True)
@@ -70,5 +73,6 @@ class SDKVersion: api_contract_version:str; generator_version:str
 @dataclass(frozen=True,slots=True)
 class ClientSDK: version:SDKVersion; methods:tuple[SDKMethod,...]; contract_digest:str
 def generate_client(version,methods,contract):
- if len({x.name for x in methods})!=len(methods): raise ValueError("duplicate sdk method")
+ if not version.api_contract_version or not version.generator_version or not contract or not methods:raise ValueError("complete client generation identity required")
+ if len({x.name for x in methods})!=len(methods) or any(not all((x.name,x.request_type,x.response_type)) for x in methods): raise ValueError("invalid sdk method")
  return ClientSDK(version,tuple(sorted(methods,key=lambda x:x.name)),sha256_json({"version":version.api_contract_version,"contract":contract}))
