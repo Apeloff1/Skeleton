@@ -18,3 +18,8 @@ def test_adapter_exception_becomes_conformance_failure():
  class A:
   def supports(self,c):raise RuntimeError()
  assert "adapter-error" in check_provider(ProviderAdapterSpec("p",("x",),"v1"),A()).failures
+
+def test_invalid_spec_does_not_call_adapter():
+ class A:
+  def supports(self,x):raise AssertionError("must not call")
+ assert not check_provider(ProviderAdapterSpec("p",("","x"),"v"),A()).passed
