@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 import hashlib,json,re
+from datetime import datetime,timezone
 _ID=re.compile(r"^[A-Z][A-Z0-9_.:-]{2,127}$")
 _SHA=re.compile(r"^[0-9a-f]{64}$")
 class WorkPackageError(ValueError):pass
