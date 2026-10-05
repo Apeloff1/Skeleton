@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 import hashlib,json,re
+from copy import deepcopy
 _ID=re.compile(r"^[A-Z][A-Z0-9_.:-]{2,127}$");_SHA=re.compile(r"^[0-9a-f]{64}$")
 class RecoveryError(ValueError):pass
 class RecoveryStatus(str,Enum): RECOVERED="recovered"; FAIL_CLOSED="fail_closed"
@@ -14,8 +15,10 @@ def _dig(v):return hashlib.sha256(json.dumps(v,sort_keys=True,separators=(",",":
 class DurableEvent:
  sequence:int;event_id:str;payload:dict;previous_digest:str|None
  def __post_init__(self):
-  if not isinstance(self.sequence,int) or self.sequence<1:raise RecoveryError("sequence must be positive")
+  if not isinstance(self.sequence,int) or isinstance(self.sequence,bool) or self.sequence<1:raise RecoveryError("sequence must be positive integer")
   object.__setattr__(self,"event_id",_id(self.event_id,"event_id"))
+  if not isinstance(self.payload,dict):raise RecoveryError("payload must be dict")
+  object.__setattr__(self,"payload",deepcopy(self.payload))
   if self.previous_digest is not None and not _SHA.fullmatch(self.previous_digest):raise RecoveryError("previous_digest must be sha256")
   json.dumps(self.payload,sort_keys=True,allow_nan=False)
  @property
@@ -25,7 +28,7 @@ class RecoveryCheckpoint:
  checkpoint_id:str;through_sequence:int;event_digest:str;projection_digest:str
  def __post_init__(self):
   object.__setattr__(self,"checkpoint_id",_id(self.checkpoint_id,"checkpoint_id"))
-  if self.through_sequence<0:raise RecoveryError("through_sequence invalid")
+  if not isinstance(self.through_sequence,int) or isinstance(self.through_sequence,bool) or self.through_sequence<0:raise RecoveryError("through_sequence invalid")
   for v in (self.event_digest,self.projection_digest):
    if not _SHA.fullmatch(v):raise RecoveryError("checkpoint digests must be sha256")
  @property
