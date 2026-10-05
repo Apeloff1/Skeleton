@@ -1598,7 +1598,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Use typed modality contracts for images, documents, audio, speech and video with provenance and classification.",
         "Preserve cross-modal alignment and source identity when extracting or transforming content.",
@@ -1619,12 +1619,14 @@
         "skeleton/multimodal/contracts.py",
         "skeleton/multimodal/__init__.py",
         "backend/routes/media.py",
-        "skeleton/multimodal/sanitize.py"
+        "skeleton/multimodal/sanitize.py",
+        "skeleton/multimodal/ingest.py"
       ],
       "tests": [
         "backend/tests/test_ai_provider_media.py",
         "skeleton/testing/test_vol020_multimodal_contracts.py",
-        "skeleton/testing/test_vol020_multimodal_sanitize.py"
+        "skeleton/testing/test_vol020_multimodal_sanitize.py",
+        "skeleton/testing/test_vol020_multimodal_ingest.py"
       ],
       "evaluations": [
         "planned:cross-modal retrieval eval",
@@ -1636,9 +1638,7 @@
         "metadata privacy leakage",
         "cross-modal misalignment"
       ],
-      "gaps": [
-        "document/audio/video ingestion adapters still need convergence onto the canonical MediaArtifact contract"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-020",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
