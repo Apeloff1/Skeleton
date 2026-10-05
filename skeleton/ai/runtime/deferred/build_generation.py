@@ -16,6 +16,7 @@ class ImpactEvidence: architecture:bool; traces:bool; ownership:bool; missing_ed
 @dataclass(frozen=True,slots=True)
 class ImpactSet: affected:tuple[str,...]; owners:tuple[str,...]; uncertainty:float; evidence:ImpactEvidence
 def impact(q,edges,owners,evidence):
+ if not q.changed_objects:raise ValueError("changed objects required")
  seen=set(q.changed_objects);front=list(seen)
  while front:
   x=front.pop()
