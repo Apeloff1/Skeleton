@@ -62,8 +62,21 @@ class BacklogDisposition:
   if self.kind is DispositionKind.DUPLICATE and not self.target_item_id:raise BacklogError("duplicate disposition requires target")
   if self.kind is not DispositionKind.DUPLICATE and self.target_item_id:raise BacklogError("only duplicate disposition may target another item")
 
+@dataclass(frozen=True,slots=True)
+class ClosureEvidence:
+ evidence_id:str;item_id:str;item_digest:str;observed_at:datetime;artifact_digest:str
+ def __post_init__(self):
+  object.__setattr__(self,"evidence_id",_id(self.evidence_id,"evidence_id"));object.__setattr__(self,"item_id",_id(self.item_id,"item_id"))
+  for f in ("item_digest","artifact_digest"):
+   v=getattr(self,f)
+   if not isinstance(v,str) or not re.fullmatch(r"[0-9a-f]{64}",v):raise BacklogError(f"{f} must be lowercase sha256")
+  if not isinstance(self.observed_at,datetime) or self.observed_at.tzinfo is None:raise BacklogError("observed_at must be timezone-aware")
+  normalized=self.observed_at.astimezone(timezone.utc)
+  if normalized.microsecond:raise BacklogError("observed_at must use whole-second precision")
+  object.__setattr__(self,"observed_at",normalized)
+
 class BacklogRegistry:
- def __init__(self):self._items={};self._deps={};self._dispositions={}
+ def __init__(self):self._items={};self._deps={};self._dispositions={};self._closures={}
  def add(self,item:BacklogItem):
   prior=self._items.get(item.item_id)
   if prior is not None and prior!=item:raise BacklogError("backlog identity is immutable")
