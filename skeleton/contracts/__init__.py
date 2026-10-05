@@ -389,3 +389,34 @@ __all__ = [
     "RetryClass",
     "UnknownOutcomePolicy",
 ]
+
+
+from .safety_hazards import (
+    DEFAULT_SAFETY_HAZARD_MANIFEST,
+    DEFAULT_SAFETY_HAZARD_MANIFEST_DIGEST,
+    DEFAULT_SAFETY_POLICY_ID,
+    DEFAULT_SAFETY_POLICY_VERSION,
+    MAX_SAFETY_HAZARDS,
+    SAFETY_HAZARD_SCHEMA_VERSION,
+    SafetyHazard,
+    SafetyHazardClass,
+    SafetyHazardError,
+    SafetyHazardManifest,
+    SafetyHazardSeverity,
+    make_safety_hazard_id,
+)
+
+__all__ += [
+    "DEFAULT_SAFETY_HAZARD_MANIFEST",
+    "DEFAULT_SAFETY_HAZARD_MANIFEST_DIGEST",
+    "DEFAULT_SAFETY_POLICY_ID",
+    "DEFAULT_SAFETY_POLICY_VERSION",
+    "MAX_SAFETY_HAZARDS",
+    "SAFETY_HAZARD_SCHEMA_VERSION",
+    "SafetyHazard",
+    "SafetyHazardClass",
+    "SafetyHazardError",
+    "SafetyHazardManifest",
+    "SafetyHazardSeverity",
+    "make_safety_hazard_id",
+]
