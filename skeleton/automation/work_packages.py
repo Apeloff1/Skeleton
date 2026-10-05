@@ -1,0 +1,80 @@
+"""Evidence-derived build work packages for VOL-095."""
+from __future__ import annotations
+from dataclasses import dataclass
+from enum import Enum
+import hashlib,json,re
+_ID=re.compile(r"^[A-Z][A-Z0-9_.:-]{2,127}$")
+_SHA=re.compile(r"^[0-9a-f]{64}$")
+class WorkPackageError(ValueError):pass
+class EvidenceRole(str,Enum): IMPLEMENTATION="implementation"; VERIFICATION="verification"; COMPLETION="completion"
+class PackageState(str,Enum): BLOCKED="blocked"; READY="ready"; IMPLEMENTED="implemented"; VERIFIED="verified"; COMPLETE="complete"
+def _id(v,f):
+ if not isinstance(v,str) or not _ID.fullmatch(v):raise WorkPackageError(f"{f} must be stable identifier")
+ return v
+def _txt(v,f):
+ if not isinstance(v,str) or not v.strip() or "\x00" in v:raise WorkPackageError(f"{f} required")
+ return v.strip()
+def _dig(v):return hashlib.sha256(json.dumps(v,sort_keys=True,separators=(",",":"),allow_nan=False).encode()).hexdigest()
+@dataclass(frozen=True,slots=True)
+class WorkPackageDependency:
+ dependency_id:str;package_id:str;depends_on:str
+ def __post_init__(self):
+  for f in ("dependency_id","package_id","depends_on"):object.__setattr__(self,f,_id(getattr(self,f),f))
+  if self.package_id==self.depends_on:raise WorkPackageError("self dependency")
+@dataclass(frozen=True,slots=True)
+class WorkPackageEvidence:
+ evidence_id:str;package_id:str;role:EvidenceRole;actor_id:str;artifact_digest:str
+ def __post_init__(self):
+  for f in ("evidence_id","package_id","actor_id"):object.__setattr__(self,f,_id(getattr(self,f),f))
+  if not isinstance(self.artifact_digest,str) or not _SHA.fullmatch(self.artifact_digest):raise WorkPackageError("artifact_digest must be sha256")
+@dataclass(frozen=True,slots=True)
+class WorkPackage:
+ package_id:str;volume_id:str;objective:str;non_goals:tuple[str,...];interfaces:tuple[str,...];state_owners:tuple[str,...];risks:tuple[str,...];tests:tuple[str,...];rollback:str;requirement_ids:tuple[str,...];aiq_task_ids:tuple[str,...]
+ def __post_init__(self):
+  for f in ("package_id","volume_id"):object.__setattr__(self,f,_id(getattr(self,f),f))
+  object.__setattr__(self,"objective",_txt(self.objective,"objective"));object.__setattr__(self,"rollback",_txt(self.rollback,"rollback"))
+  for f in ("non_goals","interfaces","state_owners","risks","tests","requirement_ids","aiq_task_ids"):
+   vals=tuple(sorted(set(getattr(self,f))))
+   if not vals:raise WorkPackageError(f"{f} cannot be empty")
+   for v in vals:_txt(v,f)
+   object.__setattr__(self,f,vals)
+ @property
+ def digest(self):return _dig({"package_id":self.package_id,"volume_id":self.volume_id,"objective":self.objective,"non_goals":self.non_goals,"interfaces":self.interfaces,"state_owners":self.state_owners,"risks":self.risks,"tests":self.tests,"rollback":self.rollback,"requirement_ids":self.requirement_ids,"aiq_task_ids":self.aiq_task_ids})
+class WorkPackageRegistry:
+ def __init__(self):self.packages={};self.dependencies={};self.evidence={}
+ def add(self,p):
+  prior=self.packages.get(p.package_id)
+  if prior is not None and prior!=p:raise WorkPackageError("package identity immutable")
+  self.packages[p.package_id]=p
+ def depend(self,d):
+  if d.package_id not in self.packages or d.depends_on not in self.packages:raise WorkPackageError("unknown package dependency")
+  self.dependencies[d.dependency_id]=d;self._acyclic()
+ def _acyclic(self):
+  g={k:set() for k in self.packages}
+  for d in self.dependencies.values():g[d.package_id].add(d.depends_on)
+  seen=set();stack=set()
+  def visit(n):
+   if n in stack:raise WorkPackageError("dependency cycle")
+   if n in seen:return
+   stack.add(n)
+   for x in g[n]:visit(x)
+   stack.remove(n);seen.add(n)
+  for n in g:visit(n)
+ def attest(self,e):
+  if e.package_id not in self.packages:raise WorkPackageError("evidence references unknown package")
+  prior=self.evidence.get(e.evidence_id)
+  if prior is not None and prior!=e:raise WorkPackageError("evidence identity immutable")
+  self.evidence[e.evidence_id]=e
+ def state(self,pid):
+  if pid not in self.packages:raise WorkPackageError("unknown package")
+  deps=[d.depends_on for d in self.dependencies.values() if d.package_id==pid]
+  if any(self.state(d) is not PackageState.COMPLETE for d in deps):return PackageState.BLOCKED
+  ev=[e for e in self.evidence.values() if e.package_id==pid];roles={e.role for e in ev}
+  if EvidenceRole.IMPLEMENTATION not in roles:return PackageState.READY
+  if EvidenceRole.VERIFICATION not in roles:return PackageState.IMPLEMENTED
+  impl={e.actor_id for e in ev if e.role is EvidenceRole.IMPLEMENTATION};verify={e.actor_id for e in ev if e.role is EvidenceRole.VERIFICATION}
+  if impl & verify:raise WorkPackageError("verification must be independent from implementation")
+  if EvidenceRole.COMPLETION not in roles:return PackageState.VERIFIED
+  complete={e.actor_id for e in ev if e.role is EvidenceRole.COMPLETION}
+  if complete & impl:raise WorkPackageError("completion signer cannot be implementation actor")
+  return PackageState.COMPLETE
