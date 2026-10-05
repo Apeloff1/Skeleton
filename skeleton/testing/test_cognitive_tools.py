@@ -60,3 +60,9 @@ def test_plan_analysis_reports_dependency_cycles():
  assert any(d.rule_id=="cycle" and d.severity is Severity.ERROR for d in result.diagnostics)
  acyclic=analyze_plan("ir-v1",("a","b"),(("a","b"),),(PlanLintRule("base","v1"),))
  assert not any(d.rule_id=="cycle" for d in acyclic.diagnostics)
+
+
+def test_simulation_surfaces_adverse_findings_without_production_authority():
+ result=simulate_plan(("step",))
+ assert {f.scenario for f in result.findings}=={"failure","timeout","resource_exhaustion"}
+ assert result.production_evidence is False
