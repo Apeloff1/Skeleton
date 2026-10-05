@@ -1,4 +1,8 @@
+import hashlib
+
 import pytest
+
+from skeleton.contracts.canonical import canonical_json_bytes
 from skeleton.security.contracts import SecretRef,SecurityContractError,SecurityIdentity
 from skeleton.security.capability_security import AuthorizationReceipt,CapabilityGrant,SecurityContext,ToolRequest,authorize_tool_request
 D="0"*64
@@ -24,3 +28,16 @@ def test_secret_reference_contains_reference_not_value():
  assert not hasattr(r,"value")
 def test_malformed_request_digest_rejected():
  with pytest.raises(SecurityContractError):ToolRequest("git","repo.read","repo:a","read","bad")
+
+
+
+def test_capability_grant_identity_uses_shared_canonical_bytes():
+ g=CapabilityGrant("worker-1","repo.read","repo:a","read")
+ expected=hashlib.sha256(canonical_json_bytes({"principal_id":"worker-1","capability":"repo.read","resource":"repo:a","operation":"read"})).hexdigest()
+ assert g.digest==expected
+
+
+def test_capability_security_source_and_ai_mirror_are_byte_identical():
+ from pathlib import Path
+ root=Path(__file__).resolve().parents[2]
+ assert (root/"skeleton/security/capability_security.py").read_bytes()==(root/"skeleton/ai/runtime/security/capability_security.py").read_bytes()
