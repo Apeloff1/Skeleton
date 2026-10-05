@@ -26,6 +26,13 @@ from .executor import (
     ExecutionReceipt,
     FailureReceipt,
 )
+from .model_instruction_ops import (
+    EvidenceState, InstructionAsset, InstructionBinding, InstructionVersion,
+    ModelDeployment, ModelHealth, ModelOpsDecision, ModelRollbackPlan,
+    ModelRollbackReceipt, ModelVersionFence, PromptBaseline, PromptRegression,
+    PromptTest, ResearchDashboard, ResearchFindingView, ResearchGap,
+    bind_instruction, decide_promotion, evaluate_prompt,
+)
 from .contract_fuzzing import ContractFuzzer, FuzzBudget, FuzzFailure, FuzzReport
 from .simulation_mode import SimulationAuthority, SimulationEvidence, SimulationRequest, SimulationResult, SimulationRuntime
 from .journal import (
@@ -49,6 +56,22 @@ __all__ = [
     "FuzzReport",
     "DEFERRED_165_SPECS",
     "DatasetCard",
+    "EvidenceState",
+    "InstructionAsset",
+    "InstructionBinding",
+    "InstructionVersion",
+    "ModelDeployment",
+    "ModelHealth",
+    "ModelOpsDecision",
+    "ModelRollbackPlan",
+    "ModelRollbackReceipt",
+    "ModelVersionFence",
+    "PromptBaseline",
+    "PromptRegression",
+    "PromptTest",
+    "ResearchDashboard",
+    "ResearchFindingView",
+    "ResearchGap",
     "DeferredEffectAuthority",
     "DeferredExecutionError",
     "DeferredExecutionJournal",
@@ -72,5 +95,8 @@ __all__ = [
     "SqliteDeferredExecutionJournal",
     "ToolCard",
     "build_registry",
+    "bind_instruction",
+    "decide_promotion",
+    "evaluate_prompt",
     "volume_ids",
 ]
