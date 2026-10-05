@@ -8,12 +8,13 @@ retained and surfaced until an explicit, evidence-backed resolution is recorded.
 from __future__ import annotations
 
 import hashlib
-import json
 import math
 from dataclasses import dataclass
 from enum import Enum
 from threading import RLock
 from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
+
+from skeleton.contracts.canonical import canonical_json_bytes
 
 STATE_VERSION = 1
 
@@ -48,7 +49,8 @@ def _confidence(value: Any) -> float:
 
 
 def _canonical(payload: Mapping[str, Any]) -> bytes:
-    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    """Use the repository-wide strict canonical JSON identity boundary."""
+    return canonical_json_bytes(payload)
 
 
 @dataclass(frozen=True, slots=True)
