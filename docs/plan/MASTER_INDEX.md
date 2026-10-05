@@ -32,6 +32,10 @@ Mandatory build accountability: [`BUILD_ACCOUNTABILITY_LEDGER.md`](BUILD_ACCOUNT
 
 Machine accountability ledger: [`machine/ai_build_accountability.json`](../../machine/ai_build_accountability.json)
 
+Fast masterplan parse index: [`machine/ai_masterplan_parse_index.json`](../../machine/ai_masterplan_parse_index.json)
+
+Parse-index freshness validator: [`scripts/check_ai_masterplan_parse_index.py`](../../scripts/check_ai_masterplan_parse_index.py)
+
 Master build sequence: [`MASTER_BUILD_SEQUENCE.md`](MASTER_BUILD_SEQUENCE.md)
 
 Machine build sequence: [`machine/ai_master_build_sequence.json`](../../machine/ai_master_build_sequence.json)
