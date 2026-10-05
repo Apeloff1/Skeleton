@@ -1,0 +1,188 @@
+name: VOL-026 Security Closure Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/security/capability_security.py"
+      - "skeleton/ai/runtime/security/capability_security.py"
+      - "skeleton/security/threat_model.py"
+      - "skeleton/ai/runtime/security/threat_model.py"
+      - "skeleton/security/tool_authorization.py"
+      - "skeleton/ai/runtime/security/tool_authorization.py"
+      - "skeleton/security/contracts.py"
+      - "skeleton/security/capability_contracts.py"
+      - "skeleton/testing/test_vol026_capability_security.py"
+      - "skeleton/testing/test_vol026_threat_model.py"
+      - "skeleton/testing/test_vol026_tool_authorization.py"
+      - "skeleton/testing/test_security_rooted_fs.py"
+      - "skeleton/testing/test_security_outbound_http.py"
+      - "scripts/check_repository_python_sast.py"
+      - "scripts/verify_vol026_security_closure.py"
+      - "tests/test_vol026_security_independent_verifier.py"
+      - "machine/ai_master_plan.json"
+      - ".github/workflows/vol026-security-closure.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/security/capability_security.py"
+      - "skeleton/ai/runtime/security/capability_security.py"
+      - "skeleton/security/threat_model.py"
+      - "skeleton/ai/runtime/security/threat_model.py"
+      - "skeleton/security/tool_authorization.py"
+      - "skeleton/ai/runtime/security/tool_authorization.py"
+      - "skeleton/security/contracts.py"
+      - "skeleton/security/capability_contracts.py"
+      - "skeleton/testing/test_vol026_capability_security.py"
+      - "skeleton/testing/test_vol026_threat_model.py"
+      - "skeleton/testing/test_vol026_tool_authorization.py"
+      - "skeleton/testing/test_security_rooted_fs.py"
+      - "skeleton/testing/test_security_outbound_http.py"
+      - "scripts/check_repository_python_sast.py"
+      - "scripts/verify_vol026_security_closure.py"
+      - "tests/test_vol026_security_independent_verifier.py"
+      - "machine/ai_master_plan.json"
+      - ".github/workflows/vol026-security-closure.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vol026-security-closure-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  independent-vol026-security:
+    name: Independent VOL-026 security verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused verifier runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+
+      - name: Compile VOL-026 security boundaries
+        run: >-
+          python -m compileall -q
+          skeleton/security/capability_security.py
+          skeleton/ai/runtime/security/capability_security.py
+          skeleton/security/threat_model.py
+          skeleton/ai/runtime/security/threat_model.py
+          skeleton/security/tool_authorization.py
+          skeleton/ai/runtime/security/tool_authorization.py
+          scripts/verify_vol026_security_closure.py
+
+      - name: Run VOL-026 focused security regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_vol026_capability_security.py
+          skeleton/testing/test_vol026_threat_model.py
+          skeleton/testing/test_vol026_tool_authorization.py
+          tests/test_vol026_security_independent_verifier.py
+
+      - name: Run referenced filesystem and egress regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_security_rooted_fs.py
+          skeleton/testing/test_security_outbound_http.py
+
+      - name: Run referenced repository SAST validation
+        run: python scripts/check_repository_python_sast.py
+
+      - name: Build independent exact-head security receipt
+        env:
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_vol026_security_closure.py
+          --evidence-out .vol026-security-independent.json
+          --print-evidence
+
+      - name: Assert independent exact-head security receipt
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".vol026-security-independent.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected:
+              raise SystemExit("VOL-026 receipt head mismatch")
+          if receipt.get("verifier") != "independent-vol026-security-v1":
+              raise SystemExit("unexpected VOL-026 verifier identity")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("independent VOL-026 security verification failed")
+
+          mirrors = receipt.get("mirror_digests") or {}
+          if len(mirrors) != 3:
+              raise SystemExit("VOL-026 mirror coverage is incomplete")
+          for pair in mirrors.values():
+              if pair.get("canonical") != pair.get("mirror"):
+                  raise SystemExit("VOL-026 security mirror digest mismatch")
+
+          behavior = receipt.get("behavior") or {}
+          capability = behavior.get("capability") or {}
+          tool_auth = behavior.get("tool_authorization") or {}
+          threat = behavior.get("threat_model") or {}
+          secrets = behavior.get("secrets") or {}
+
+          if capability.get("scope") != "tool-request-only":
+              raise SystemExit("capability scope widened")
+          if tool_auth.get("scope") != "single-tool-request":
+              raise SystemExit("tool authorization scope widened")
+          for surface in (capability, tool_auth):
+              if surface.get("mismatch_denied") is not True:
+                  raise SystemExit("exact-match mismatch did not fail closed")
+              if surface.get("duplicate_denied") is not True:
+                  raise SystemExit("ambiguous duplicate grant did not fail closed")
+              if surface.get("foreign_denied") is not True:
+                  raise SystemExit("foreign principal grant did not fail closed")
+
+          expected_assets = [
+              "filesystem",
+              "network-egress",
+              "secrets",
+              "supply-chain",
+              "tool-authority",
+          ]
+          if threat.get("assets") != expected_assets:
+              raise SystemExit("VOL-026 threat coverage mismatch")
+          if threat.get("digest") != threat.get("expected_digest"):
+              raise SystemExit("VOL-026 threat identity mismatch")
+          if secrets.get("security_secret_has_value") is not False:
+              raise SystemExit("security SecretRef exposed value material")
+          if secrets.get("capability_secret_has_value") is not False:
+              raise SystemExit("capability SecretRef exposed value material")
+
+          print(
+              "VOL-026 independent exact-head receipt:",
+              expected,
+              "boundaries=",
+              len(receipt.get("boundary_digests") or {}),
+          )
+          PY
