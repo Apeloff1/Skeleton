@@ -11,7 +11,7 @@ import json
 import re
 from typing import Any, Callable, Mapping
 from .contracts import canonical_json, sha256_json
-from .journal import DeferredExecutionJournal, DeferredJournalConflict
+from .executor import ExecutionReceipt, FailureReceipt\nfrom .journal import DeferredExecutionJournal, DeferredJournalConflict
 
 _HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 
@@ -125,8 +125,10 @@ class DeferredOutcomeReconciler:
             actual = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
             if actual != evidence.outcome_digest:
                 raise DeferredJournalConflict("provider success result digest mismatch")
+            receipt = ExecutionReceipt(**common, result_digest=actual)
             terminal = {
-                "receipt": {**common, "result_digest": actual, "status": "succeeded"},
+                "receipt": receipt.as_dict(),
+                "receipt_digest": receipt.digest,
                 "result": json.loads(encoded),
                 "reconciliation": {"provider_identity": evidence.provider_identity, "evidence_digest": evidence.evidence_digest},
             }
@@ -134,8 +136,10 @@ class DeferredOutcomeReconciler:
             if result is not None:
                 raise ValueError("failed reconciliation must not include result")
             error_type = _text(error_type, "error_type")
+            receipt = FailureReceipt(**common, error_type=error_type, error_digest=evidence.outcome_digest)
             terminal = {
-                "receipt": {**common, "error_type": error_type, "error_digest": evidence.outcome_digest, "status": "failed"},
+                "receipt": receipt.as_dict(),
+                "receipt_digest": receipt.digest,
                 "reconciliation": {"provider_identity": evidence.provider_identity, "evidence_digest": evidence.evidence_digest},
             }
 
