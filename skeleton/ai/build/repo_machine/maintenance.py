@@ -314,6 +314,8 @@ class RepositoryOwnership:
     ownership: OwnershipClass
     owner: str
     retention_reason: str
+    mutation_authority_refs: tuple[str, ...]
+    repository_path: str | None = None
     retention_until: datetime | None = None
     active_refs: tuple[str, ...] = ()
     preservation_refs: tuple[str, ...] = ()
@@ -335,6 +337,25 @@ class RepositoryOwnership:
             "retention_reason",
             _text(self.retention_reason, "retention_reason"),
         )
+        object.__setattr__(
+            self,
+            "mutation_authority_refs",
+            _ids(self.mutation_authority_refs, "mutation_authority_ref"),
+        )
+        if not self.mutation_authority_refs:
+            raise MaintenanceError(
+                "ownership requires at least one mutation authority"
+            )
+        if self.repository_path is not None:
+            object.__setattr__(
+                self,
+                "repository_path",
+                _path(self.repository_path),
+            )
+        if self.kind is ResourceKind.FILE and self.repository_path is None:
+            raise MaintenanceError(
+                "file ownership requires repository_path"
+            )
         object.__setattr__(
             self,
             "retention_until",
@@ -395,6 +416,8 @@ class RepositoryOwnership:
                 "ownership": self.ownership.value,
                 "owner": self.owner,
                 "retention_reason": self.retention_reason,
+                "mutation_authority_refs": self.mutation_authority_refs,
+                "repository_path": self.repository_path,
                 "retention_until": (
                     self.retention_until.isoformat()
                     if self.retention_until is not None
@@ -421,6 +444,7 @@ class ResourceEvidence:
     release_bound: bool
     evidence_bound: bool
     regeneration_receipt_digest: str | None = None
+    regeneration_source_refs: tuple[str, ...] = ()
     provenance_refs: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
@@ -472,6 +496,21 @@ class ResourceEvidence:
             )
         object.__setattr__(
             self,
+            "regeneration_source_refs",
+            _ids(
+                self.regeneration_source_refs,
+                "regeneration_source_ref",
+            ),
+        )
+        if (
+            self.regeneration_receipt_digest is None
+            and self.regeneration_source_refs
+        ):
+            raise MaintenanceError(
+                "regeneration source refs require regeneration receipt"
+            )
+        object.__setattr__(
+            self,
             "provenance_refs",
             _ids(self.provenance_refs, "provenance_ref"),
         )
@@ -497,6 +536,7 @@ class ResourceEvidence:
                 "regeneration_receipt_digest": (
                     self.regeneration_receipt_digest
                 ),
+                "regeneration_source_refs": self.regeneration_source_refs,
                 "provenance_refs": self.provenance_refs,
             }
         )
@@ -761,6 +801,11 @@ def authorize(
         raise MaintenanceError("resource evidence mismatch")
 
     reasons: list[str] = []
+    if (
+        task.action in (MaintenanceAction.UPDATE, MaintenanceAction.DELETE)
+        and task.authority_ref not in ownership.mutation_authority_refs
+    ):
+        reasons.append("mutation_authority_not_owned")
 
     if task.action is MaintenanceAction.INSPECT:
         return MaintenanceReceipt(
@@ -788,6 +833,14 @@ def authorize(
             reasons.append("resource_changed_since_observation")
 
     if task.action is MaintenanceAction.DELETE:
+        if (
+            ownership.repository_path is not None
+            and any(
+                _under(ownership.repository_path, prefix)
+                for prefix in _NON_WAIVABLE_PROTECTED_PATHS
+            )
+        ):
+            reasons.append("non_waivable_protected_path")
         if ownership.ownership in (
             OwnershipClass.ACTIVE,
             OwnershipClass.MIGRATION,
@@ -821,11 +874,16 @@ def authorize(
                 reasons.append("release_bound")
             if evidence.evidence_bound:
                 reasons.append("evidence_bound")
-            if (
-                ownership.ownership is OwnershipClass.GENERATED
-                and evidence.regeneration_receipt_digest is None
-            ):
-                reasons.append("generated_regeneration_unproven")
+            if ownership.ownership is OwnershipClass.GENERATED:
+                if evidence.regeneration_receipt_digest is None:
+                    reasons.append("generated_regeneration_unproven")
+                elif (
+                    evidence.regeneration_source_refs
+                    != ownership.generation_source_refs
+                ):
+                    reasons.append(
+                        "generated_regeneration_sources_mismatch"
+                    )
 
     decision = (
         MaintenanceVerdict.BLOCK
