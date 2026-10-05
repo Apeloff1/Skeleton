@@ -37,14 +37,16 @@ class EventPublisher: publisher_id:str; envelope_version:str
 class EventConsumer: consumer_id:str; envelope_version:str; replay:bool; idempotency:bool
 @dataclass(frozen=True,slots=True)
 class EventSDK: version:str; publishers:tuple[EventPublisher,...]; consumers:tuple[EventConsumer,...]
-def event_compatible(p,c):return p.envelope_version==c.envelope_version and c.idempotency
+def event_compatible(p,c):return all((p.publisher_id,p.envelope_version,c.consumer_id,c.envelope_version)) and p.envelope_version==c.envelope_version and c.idempotency and c.replay
 @dataclass(frozen=True,slots=True)
 class Scorer: name:str; version:str; inputs:tuple[str,...]; outputs:tuple[str,...]; dependencies:tuple[str,...]
 @dataclass(frozen=True,slots=True)
 class EvaluationResult: scorer:str; scorer_version:str; environment_id:str; model_id:str; config_digest:str; score:float
 @dataclass(frozen=True,slots=True)
 class EvaluationSDK: environment_id:str; model_id:str; config:dict
-def record_evaluation(sdk,scorer,score):return EvaluationResult(scorer.name,scorer.version,sdk.environment_id,sdk.model_id,sha256_json(sdk.config),score)
+def record_evaluation(sdk,scorer,score):
+ if not all((sdk.environment_id,sdk.model_id,scorer.name,scorer.version)) or not scorer.inputs or not scorer.outputs:raise ValueError("complete evaluation identity required")
+ return EvaluationResult(scorer.name,scorer.version,sdk.environment_id,sdk.model_id,sha256_json(sdk.config),score)
 @dataclass(frozen=True,slots=True)
 class BenchmarkManifest: plugin_version:str; dataset_id:str; dataset_version:str; required_resources:tuple[str,...]
 @dataclass(frozen=True,slots=True)
@@ -52,7 +54,9 @@ class BenchmarkPlugin: name:str; manifest:BenchmarkManifest
 @dataclass(frozen=True,slots=True)
 class BenchmarkExecution: plugin:str; plugin_version:str; dataset_id:str; dataset_version:str; admitted:bool
 def admit_benchmark(p,*,dataset_rights,security_allowed,resources_allowed):
- ok=dataset_rights and security_allowed and resources_allowed;m=p.manifest
+ m=p.manifest
+ if not all((p.name,m.plugin_version,m.dataset_id,m.dataset_version)) or any(not r for r in m.required_resources):raise ValueError("complete benchmark identity required")
+ ok=dataset_rights and security_allowed and resources_allowed
  return BenchmarkExecution(p.name,m.plugin_version,m.dataset_id,m.dataset_version,ok)
 @dataclass(frozen=True,slots=True)
 class DataField: name:str; meaning:str; nullable:bool; unit:str|None; freshness:str; classification:str
