@@ -38,7 +38,7 @@ class AcceptanceSignoff:
  acceptance_digest:str;reviewer_id:str;builder_id:str;approved:bool
  def __post_init__(self):
   _sha(self.acceptance_digest,"acceptance_digest");object.__setattr__(self,"reviewer_id",_id(self.reviewer_id,"reviewer_id"));object.__setattr__(self,"builder_id",_id(self.builder_id,"builder_id"))
-  if self.reviewer_id==self.builder_id:raise AcceptanceError("acceptance reviewer must be independent")
+  if not isinstance(self.approved,bool):raise AcceptanceError("approved must be bool")\n  if self.reviewer_id==self.builder_id:raise AcceptanceError("acceptance reviewer must be independent")
 def sign(bundle:FunctionalAIAcceptance,reviewer_id:str)->AcceptanceSignoff:
  if not bundle.eligible:raise AcceptanceError("failed criterion cannot be accepted")
  return AcceptanceSignoff(bundle.digest,reviewer_id,bundle.builder_id,True)
