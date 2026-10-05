@@ -41,15 +41,15 @@ class ChangeRecord:
  def __post_init__(self):
   for f in ("change_id","lease_id"):object.__setattr__(self,f,_id(getattr(self,f),f))
   for f in ("task_digest","before_digest","after_digest"):_sha(getattr(self,f),f)
-  if self.before_digest==self.after_digest:raise EngineeringError("change must alter repository state")
-  object.__setattr__(self,"paths",tuple(sorted(set(self.paths))))
+  if not isinstance(self.fence_token,int) or isinstance(self.fence_token,bool) or self.fence_token<1:raise EngineeringError("fence_token must be positive")\n  if self.before_digest==self.after_digest:raise EngineeringError("change must alter repository state")\n  if not isinstance(self.paths,tuple) or not self.paths:raise EngineeringError("paths must be non-empty tuple")
+  object.__setattr__(self,"paths",tuple(sorted(set(self.paths))))\n @property\n def digest(self):return _dig({"change_id":self.change_id,"task_digest":self.task_digest,"lease_id":self.lease_id,"fence_token":self.fence_token,"before_digest":self.before_digest,"after_digest":self.after_digest,"paths":self.paths})
 @dataclass(frozen=True,slots=True)
 class EngineeringEvidence:
  evidence_id:str;task_digest:str;change_digest:str;builder_id:str;verifier_id:str;decision:VerificationDecision;test_digest:str;rollback_verified:bool
  def __post_init__(self):
   for f in ("evidence_id","builder_id","verifier_id"):object.__setattr__(self,f,_id(getattr(self,f),f))
   for f in ("task_digest","change_digest","test_digest"):_sha(getattr(self,f),f)
-  if self.builder_id==self.verifier_id:raise EngineeringError("verifier must be independent from builder")
+  if not isinstance(self.decision,VerificationDecision):raise EngineeringError("decision must be VerificationDecision")\n  if not isinstance(self.rollback_verified,bool):raise EngineeringError("rollback_verified must be bool")\n  if self.builder_id==self.verifier_id:raise EngineeringError("verifier must be independent from builder")
   if self.decision is VerificationDecision.PASS and not self.rollback_verified:raise EngineeringError("passing evidence requires verified rollback")
 class MutationCustody:
  def __init__(self):self._latest={};self._active={}
