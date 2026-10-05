@@ -8768,7 +8768,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Require registered inputs and explicit resource/budget admission.",
         "Persist run state/checkpoints/evidence independently of worker lifetime."
@@ -8784,23 +8784,23 @@
         "TrainingAdmission"
       ],
       "implementation_paths": [
-        "training",
-        "machine"
+        "skeleton/training/control_plane.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_training_control_plane.py"
+        "skeleton/testing/test_training_control_plane.py"
       ],
       "evaluations": [
         "planned:training run replay"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/6e0533d9ec6f12c58035050ca4b4985eef178980"
+      ],
       "risks": [
         "untracked hyperparameter drift",
         "run orphaning"
       ],
       "gaps": [
-        "define training manifest",
-        "bind runs to dataset/model registries"
+        "independent training-control replay and registry-binding verification remains pending"
       ],
       "accountability_id": "ACC-VOL-143",
       "completion_checkbox": false,
@@ -8815,7 +8815,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Define data/model parallel topology and collective timeouts explicitly.",
         "Handle worker loss/stragglers without corrupting optimizer/model state."
@@ -8831,23 +8831,23 @@
         "CollectiveState"
       ],
       "implementation_paths": [
-        "training",
-        "skeleton/network"
+        "skeleton/training/distributed.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_distributed_training.py"
+        "skeleton/testing/test_distributed_training.py"
       ],
       "evaluations": [
         "planned:worker-loss/straggler evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/7ffc19a4597918a344415784ba6327b4d47eff35"
+      ],
       "risks": [
         "collective deadlock",
         "silent replica divergence"
       ],
       "gaps": [
-        "select topology abstractions",
-        "materialize failure drills"
+        "independent distributed-topology and failure-mode verification remains pending"
       ],
       "accountability_id": "ACC-VOL-144",
       "completion_checkbox": false,
@@ -8956,7 +8956,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Capture enough telemetry to diagnose divergence without leaking restricted data.",
         "Alert on non-finite values, stalls, throughput collapse and resource anomalies."
@@ -8972,23 +8972,23 @@
         "TrainingAlert"
       ],
       "implementation_paths": [
-        "training",
-        "skeleton/observability"
+        "skeleton/training/observability.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_training_observability.py"
+        "skeleton/testing/test_training_observability.py"
       ],
       "evaluations": [
         "planned:divergence/stall injection"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/73463dda21f269449db3cdf0fcd340fa682e784d"
+      ],
       "risks": [
         "silent NaN propagation",
         "telemetry overload"
       ],
       "gaps": [
-        "define training signal schema",
-        "bind alerts to runbooks"
+        "independent privacy-bounded training-observability verification remains pending"
       ],
       "accountability_id": "ACC-VOL-147",
       "completion_checkbox": false,
@@ -9003,7 +9003,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Evaluate candidates before registry promotion using fixed/versioned suites.",
         "Require explicit disposition for regressions and uncertainty."
@@ -9019,23 +9019,23 @@
         "ModelPromotion"
       ],
       "implementation_paths": [
-        "training",
-        "skeleton/eval"
+        "skeleton/training/eval_gates.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_training_eval_gates.py"
+        "skeleton/testing/test_training_eval_gates.py"
       ],
       "evaluations": [
         "planned:champion/challenger evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/59acbe8469b79a5e75a7020c6eeeab36ce583c17"
+      ],
       "risks": [
         "test-set overfitting",
         "regression waived silently"
       ],
       "gaps": [
-        "define gate bundles",
-        "bind to model registry"
+        "independent evidence-bound training-gate verification remains pending"
       ],
       "accountability_id": "ACC-VOL-148",
       "completion_checkbox": false,
@@ -9050,7 +9050,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Separate experimental post-training from production model authority.",
         "Record data, objective, algorithm and evaluation lineage for every candidate."
@@ -9066,23 +9066,23 @@
         "PostTrainingCandidate"
       ],
       "implementation_paths": [
-        "training/post",
-        "experiments"
+        "skeleton/training/post_training.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_post_training_lab.py"
+        "skeleton/testing/test_post_training_lab.py"
       ],
       "evaluations": [
         "planned:post-training ablation suite"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/4bba10289d27060ff4f78ec487634c815cd114a0"
+      ],
       "risks": [
         "reward hacking",
         "capability regression"
       ],
       "gaps": [
-        "define experiment families",
-        "bind promotion to eval gates"
+        "independent post-training isolation and promotion-boundary verification remains pending"
       ],
       "accountability_id": "ACC-VOL-149",
       "completion_checkbox": false,
@@ -9238,7 +9238,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Preserve source bytes/digests, metadata classification and transformation lineage.",
         "Apply resource limits and trust labels before decoding."
@@ -9254,23 +9254,25 @@
         "MediaMetadata"
       ],
       "implementation_paths": [
-        "skeleton/ai",
-        "planned:skeleton/artifacts"
+        "skeleton/artifacts/__init__.py",
+        "skeleton/artifacts/multimodal_ingestion.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_multimodal_ingestion.py"
+        "skeleton/testing/test_multimodal_ingestion.py"
       ],
       "evaluations": [
         "planned:media bomb/adversarial ingest suite"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/445e5f69770dfc21de4a70fc0fdc38ead0dfbb35",
+        "https://github.com/Apeloff1/Skeleton/commit/3c8d9c5c40c243349b183cb2a165b48772eb632e"
+      ],
       "risks": [
         "decoder resource bomb",
         "metadata leakage"
       ],
       "gaps": [
-        "define common media envelope",
-        "bind modality pipelines"
+        "independent adversarial multimodal-ingestion and resource-bound verification remains pending"
       ],
       "accountability_id": "ACC-VOL-153",
       "completion_checkbox": false,
@@ -9661,7 +9663,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Plugins must declare capabilities, permissions and compatibility before activation.",
         "Plugin lifecycle must support disable/remove without corrupting core state."
@@ -9677,23 +9679,23 @@
         "PluginLifecycle"
       ],
       "implementation_paths": [
-        "skeleton/ai",
-        "planned:skeleton/plugins"
+        "skeleton/plugins/lifecycle.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_plugin_ecosystem.py"
+        "skeleton/testing/test_plugin_ecosystem.py"
       ],
       "evaluations": [
         "planned:plugin compatibility matrix"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/2a4e496ef58559371fd458d187713e4ae017157f"
+      ],
       "risks": [
         "plugin privilege creep",
         "uninstall residue"
       ],
       "gaps": [
-        "define plugin manifest schema",
-        "bind plugin state to capability registry"
+        "independent plugin-lifecycle and capability-integration verification remains pending"
       ],
       "accountability_id": "ACC-VOL-162",
       "completion_checkbox": false,
