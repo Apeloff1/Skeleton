@@ -12337,7 +12337,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Assign distinct research roles and evidence ownership.",
         "Require handoffs preserve source/method/uncertainty lineage."
@@ -12353,11 +12353,12 @@
         "ResearchHandoff"
       ],
       "implementation_paths": [
-        "skeleton/ai/agents",
-        "experiments"
+        "skeleton/research/research_agent_team.py",
+        "skeleton/eval/research_evaluation_review.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_research_agent_team.py"
+        "skeleton/testing/test_research_agent_team.py",
+        "skeleton/testing/test_research_evaluation_review.py"
       ],
       "evaluations": [
         "planned:multi-agent research benchmark"
@@ -12368,8 +12369,7 @@
         "role overlap reduces independence"
       ],
       "gaps": [
-        "define role templates",
-        "bind to VS-003"
+        "independent exact-head research-team role and verifier-separation validation remains pending"
       ],
       "accountability_id": "ACC-VOL-210",
       "completion_checkbox": false,
@@ -12384,7 +12384,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Track publication/version/retraction/correction identity.",
         "Do not auto-promote novel claims into architecture without evaluation."
@@ -12400,11 +12400,12 @@
         "WatchQuery"
       ],
       "implementation_paths": [
-        "skeleton/ai",
-        "planned:skeleton/research"
+        "skeleton/research/literature_watch.py",
+        "skeleton/eval/research_evaluation_review.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_literature_watch.py"
+        "skeleton/testing/test_literature_watch.py",
+        "skeleton/testing/test_research_evaluation_review.py"
       ],
       "evaluations": [
         "planned:duplicate/retraction evaluation"
@@ -12415,8 +12416,7 @@
         "stale/retracted claim"
       ],
       "gaps": [
-        "define source adapters",
-        "bind triage to research backlog"
+        "independent exact-head literature-source adapter and backlog-triage validation remains pending"
       ],
       "accountability_id": "ACC-VOL-211",
       "completion_checkbox": false,
@@ -12431,7 +12431,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Represent citations, claims, replication and contradiction separately.",
         "Preserve temporal/source-version context."
@@ -12447,11 +12447,12 @@
         "ClaimCitation"
       ],
       "implementation_paths": [
-        "skeleton/ai",
-        "skeleton/retrieval"
+        "skeleton/research/citation_graph.py",
+        "skeleton/eval/research_evaluation_review.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_citation_graph.py"
+        "skeleton/testing/test_citation_graph.py",
+        "skeleton/testing/test_research_evaluation_review.py"
       ],
       "evaluations": [
         "planned:contradictory-citation evaluation"
@@ -12462,8 +12463,7 @@
         "wrong source version"
       ],
       "gaps": [
-        "build citation schema",
-        "bind to evidence graph"
+        "independent exact-head citation graph/evidence-link validation remains pending"
       ],
       "accountability_id": "ACC-VOL-212",
       "completion_checkbox": false,
@@ -12478,7 +12478,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Bind package to exact claim/result and artifact digests.",
         "Represent unavailable/restricted dependencies explicitly."
@@ -12494,11 +12494,12 @@
         "ReproductionResult"
       ],
       "implementation_paths": [
-        "experiments",
-        "planned:skeleton/artifacts"
+        "skeleton/artifacts/reproduction_package.py",
+        "skeleton/eval/research_evaluation_review.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_reproduction_packages.py"
+        "skeleton/testing/test_reproduction_packages.py",
+        "skeleton/testing/test_research_evaluation_review.py"
       ],
       "evaluations": [
         "planned:cold-environment reproduction"
@@ -12509,8 +12510,7 @@
         "package cannot reproduce claim"
       ],
       "gaps": [
-        "define bundle format",
-        "bind to experiment/reproducibility"
+        "independent exact-head reproduction-package portability validation remains pending"
       ],
       "accountability_id": "ACC-VOL-213",
       "completion_checkbox": false,
@@ -12525,7 +12525,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Reject comparisons with material uncontrolled differences unless explicitly qualified.",
         "Preserve raw run evidence behind summaries."
@@ -12541,11 +12541,12 @@
         "ComparisonResult"
       ],
       "implementation_paths": [
-        "experiments",
-        "skeleton/eval"
+        "skeleton/eval/experiment_comparison.py",
+        "skeleton/eval/research_evaluation_review.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_experiment_comparison.py"
+        "skeleton/testing/test_experiment_comparison.py",
+        "skeleton/testing/test_research_evaluation_review.py"
       ],
       "evaluations": [
         "planned:confounded-comparison evaluation"
@@ -12556,8 +12557,7 @@
         "selective run choice"
       ],
       "gaps": [
-        "define comparison eligibility",
-        "bind to statistical analysis"
+        "independent exact-head experiment-comparability validation remains pending"
       ],
       "accountability_id": "ACC-VOL-214",
       "completion_checkbox": false,
@@ -12572,7 +12572,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Declare population/sample/metric assumptions and missing-data handling.",
         "Report effect size and uncertainty, not only p-values."
@@ -12588,11 +12588,12 @@
         "UncertaintyEstimate"
       ],
       "implementation_paths": [
-        "skeleton/eval",
-        "experiments"
+        "skeleton/eval/statistical_analysis.py",
+        "skeleton/eval/research_evaluation_review.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_statistical_analysis.py"
+        "skeleton/testing/test_statistical_analysis.py",
+        "skeleton/testing/test_research_evaluation_review.py"
       ],
       "evaluations": [
         "planned:synthetic known-effect validation"
@@ -12603,8 +12604,7 @@
         "invalid independence assumptions"
       ],
       "gaps": [
-        "define approved methods",
-        "bind analyses to benchmark metadata"
+        "independent exact-head approved statistical-method validation remains pending"
       ],
       "accountability_id": "ACC-VOL-215",
       "completion_checkbox": false,
@@ -12619,7 +12619,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Freeze evaluation spec/environment before comparative runs.",
         "Capture outputs/scores/errors and model/inference identity."
@@ -12635,11 +12635,12 @@
         "ModelEvalResult"
       ],
       "implementation_paths": [
-        "skeleton/eval",
-        "benchmarks"
+        "skeleton/eval/model_eval_harness.py",
+        "skeleton/eval/research_evaluation_review.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_model_eval_harness.py"
+        "skeleton/testing/test_model_eval_harness.py",
+        "skeleton/testing/test_research_evaluation_review.py"
       ],
       "evaluations": [
         "planned:multi-model baseline evaluation"
@@ -12650,8 +12651,7 @@
         "contamination"
       ],
       "gaps": [
-        "unify eval runner",
-        "bind quality vector"
+        "independent exact-head model-evaluation coverage and quality-vector validation remains pending"
       ],
       "accountability_id": "ACC-VOL-216",
       "completion_checkbox": false,
@@ -12666,7 +12666,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Score end-to-end task outcome and policy adherence separately.",
         "Capture action traces/receipts for failure attribution."
@@ -12682,11 +12682,12 @@
         "AgentEvalResult"
       ],
       "implementation_paths": [
-        "skeleton/eval",
-        "skeleton/ai/agents"
+        "skeleton/eval/agent_eval_harness.py",
+        "skeleton/eval/research_evaluation_review.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_agent_eval_harness.py"
+        "skeleton/testing/test_agent_eval_harness.py",
+        "skeleton/testing/test_research_evaluation_review.py"
       ],
       "evaluations": [
         "planned:tool/recovery task suite"
@@ -12697,8 +12698,7 @@
         "trajectory hidden behind final answer"
       ],
       "gaps": [
-        "define scenario format",
-        "bind to performance evidence"
+        "independent exact-head agent-scenario and performance-evidence validation remains pending"
       ],
       "accountability_id": "ACC-VOL-217",
       "completion_checkbox": false,
@@ -12713,7 +12713,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Benchmarks must include restart/checkpoint and stale-world conditions.",
         "Measure cumulative error, intervention and resource use over horizon."
@@ -12729,11 +12729,12 @@
         "HorizonResult"
       ],
       "implementation_paths": [
-        "benchmarks",
-        "skeleton/ai/agents"
+        "skeleton/eval/long_horizon_benchmarks.py",
+        "skeleton/eval/research_evaluation_review.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_long_horizon_benchmarks.py"
+        "skeleton/testing/test_long_horizon_benchmarks.py",
+        "skeleton/testing/test_research_evaluation_review.py"
       ],
       "evaluations": [
         "planned:aging/zombie-work evaluation"
@@ -12744,8 +12745,7 @@
         "state drift"
       ],
       "gaps": [
-        "materialize bounded long-horizon suite",
-        "bind to autonomy acceptance"
+        "independent exact-head long-horizon boundedness and autonomy-acceptance validation remains pending"
       ],
       "accountability_id": "ACC-VOL-218",
       "completion_checkbox": false,
@@ -12760,7 +12760,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Fingerprint exact and near-duplicate content across datasets.",
         "Record contamination confidence and disposition per benchmark/model."
@@ -12776,11 +12776,12 @@
         "ContaminationReport"
       ],
       "implementation_paths": [
-        "skeleton/eval",
-        "datasets"
+        "skeleton/eval/contamination_auditor.py",
+        "skeleton/eval/research_evaluation_review.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_contamination_auditor.py"
+        "skeleton/testing/test_contamination_auditor.py",
+        "skeleton/testing/test_research_evaluation_review.py"
       ],
       "evaluations": [
         "planned:seeded-overlap detection"
@@ -12791,8 +12792,7 @@
         "hash-only misses paraphrases"
       ],
       "gaps": [
-        "define fingerprint methods",
-        "bind audit to SOTA claims"
+        "independent exact-head contamination and SOTA-claim gating validation remains pending"
       ],
       "accountability_id": "ACC-VOL-219",
       "completion_checkbox": false,
@@ -12807,7 +12807,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Protect rater privacy and separate identity from public results.",
         "Measure inter-rater reliability and adjudicate high-impact disagreement."
@@ -12823,11 +12823,12 @@
         "Adjudication"
       ],
       "implementation_paths": [
-        "skeleton/eval",
-        "frontend"
+        "skeleton/eval/human_evaluation.py",
+        "skeleton/eval/research_evaluation_review.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_human_evaluation.py"
+        "skeleton/testing/test_human_evaluation.py",
+        "skeleton/testing/test_research_evaluation_review.py"
       ],
       "evaluations": [
         "planned:rater consistency evaluation"
@@ -12838,8 +12839,7 @@
         "rubric drift"
       ],
       "gaps": [
-        "define rubric schema",
-        "bind human evidence to quality vector"
+        "independent exact-head human-reviewer independence and quality-vector validation remains pending"
       ],
       "accountability_id": "ACC-VOL-220",
       "completion_checkbox": false,
