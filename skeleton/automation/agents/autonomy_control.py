@@ -12,12 +12,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum, IntEnum
 import hashlib
-import json
 import math
 from typing import Any, Iterable
 
 from skeleton.automation.agents.delegation_qualification import AgentDelegationDecision
-from skeleton.contracts.canonical import EvidenceRef, evidence_ref_identity
+from skeleton.contracts.canonical import (
+    CanonicalContractError,
+    EvidenceRef,
+    canonical_json_bytes,
+    evidence_ref_identity,
+)
 
 
 AUTONOMY_CONTROL_SCHEMA_VERSION = 1
@@ -78,15 +82,8 @@ def _unit(value: object, field: str) -> float:
 
 def _canonical_digest(value: object) -> str:
     try:
-        encoded = json.dumps(
-            value,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-            allow_nan=False,
-            default=str,
-        ).encode("utf-8")
-    except (TypeError, ValueError) as exc:
+        encoded = canonical_json_bytes(value)
+    except CanonicalContractError as exc:
         raise AutonomyControlError("autonomy payload must be canonical JSON") from exc
     return hashlib.sha256(encoded).hexdigest()
 
