@@ -38,3 +38,9 @@ def test_signoff_replay_rejects_source_drift():
  b=bundle();s=sign(b,"ACTOR.REVIEWER");verify_signoff(b,s)
  changed=FunctionalAIAcceptance(b.acceptance_id,S("changed"),b.config_digest,b.model_digest,b.environment_digest,b.evidence,b.builder_id)
  with pytest.raises(AcceptanceError,match="stale or mismatched"):verify_signoff(changed,s)
+
+def test_signoff_replay_rejects_evidence_substitution():
+ b=bundle();s=sign(b,"ACTOR.REVIEWER");ev=list(b.evidence);x=ev[0]
+ ev[0]=AcceptanceEvidence(x.evidence_id,x.criterion,S("replacement"),True)
+ changed=FunctionalAIAcceptance(b.acceptance_id,b.source_digest,b.config_digest,b.model_digest,b.environment_digest,tuple(ev),b.builder_id)
+ with pytest.raises(AcceptanceError,match="stale or mismatched"):verify_signoff(changed,s)
