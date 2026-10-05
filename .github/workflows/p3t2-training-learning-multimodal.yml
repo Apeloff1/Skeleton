@@ -1,0 +1,166 @@
+name: P3 T2 Training Learning Multimodal Candidates
+
+on:
+  pull_request:
+    paths:
+      - "machine/ai_masterplan_continuation_frontier.json"
+      - "machine/ai_p3t2_training_candidate.json"
+      - "machine/ai_p3t2_learning_candidate.json"
+      - "machine/ai_p3t2_multimodal_candidate.json"
+      - "skeleton/training/**"
+      - "skeleton/ai/training/**"
+      - "skeleton/ai/runtime/training/**"
+      - "skeleton/ai/runtime/p3t2/**"
+      - "skeleton/artifacts/multimodal_ingestion.py"
+      - "skeleton/vision/pipeline.py"
+      - "skeleton/document_vision/fusion.py"
+      - "skeleton/audio/pipeline.py"
+      - "skeleton/speech/runtime.py"
+      - "skeleton/video/pipeline.py"
+      - "skeleton/ai/runtime/extensions/multimodal.py"
+      - "scripts/p3t2_candidate_common.py"
+      - "scripts/check_p3t2_*candidate*.py"
+      - "scripts/check_ai_masterplan_continuation.py"
+      - "tests/test_p3t2_*candidate*.py"
+      - "skeleton/testing/test_p3t2_evidence.py"
+      - "docs/plan/P3T2_TRAINING_LEARNING_MULTIMODAL_CANDIDATES.md"
+      - ".github/workflows/p3t2-training-learning-multimodal.yml"
+  push:
+    branches: [main]
+    paths:
+      - "machine/ai_masterplan_continuation_frontier.json"
+      - "machine/ai_p3t2_training_candidate.json"
+      - "machine/ai_p3t2_learning_candidate.json"
+      - "machine/ai_p3t2_multimodal_candidate.json"
+      - "skeleton/training/**"
+      - "skeleton/ai/training/**"
+      - "skeleton/ai/runtime/training/**"
+      - "skeleton/ai/runtime/p3t2/**"
+      - "skeleton/artifacts/multimodal_ingestion.py"
+      - "skeleton/vision/pipeline.py"
+      - "skeleton/document_vision/fusion.py"
+      - "skeleton/audio/pipeline.py"
+      - "skeleton/speech/runtime.py"
+      - "skeleton/video/pipeline.py"
+      - "skeleton/ai/runtime/extensions/multimodal.py"
+      - "scripts/p3t2_candidate_common.py"
+      - "scripts/check_p3t2_*candidate*.py"
+      - "scripts/check_ai_masterplan_continuation.py"
+      - "tests/test_p3t2_*candidate*.py"
+      - "skeleton/testing/test_p3t2_evidence.py"
+      - "docs/plan/P3T2_TRAINING_LEARNING_MULTIMODAL_CANDIDATES.md"
+      - ".github/workflows/p3t2-training-learning-multimodal.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p3t2-continuation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  continuation-candidates:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      OPENAI_API_KEY: ""
+      XAI_API_KEY: ""
+      ANTHROPIC_API_KEY: ""
+      GOOGLE_API_KEY: ""
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused validation runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pytest-asyncio>=0.24,<1"
+          "pydantic==2.13.5"
+          "pydantic-settings==2.15.0"
+          "fastapi==0.136.1"
+
+      - name: Compile candidate surfaces
+        run: >-
+          python -m compileall -q
+          skeleton/training
+          skeleton/ai/training
+          skeleton/ai/runtime/training
+          skeleton/ai/runtime/p3t2
+          skeleton/artifacts/multimodal_ingestion.py
+          skeleton/vision/pipeline.py
+          skeleton/document_vision/fusion.py
+          skeleton/audio/pipeline.py
+          skeleton/speech/runtime.py
+          skeleton/video/pipeline.py
+          skeleton/ai/runtime/extensions/multimodal.py
+          scripts/p3t2_candidate_common.py
+          scripts/check_p3t2_training_candidate.py
+          scripts/check_p3t2_learning_candidate.py
+          scripts/check_p3t2_multimodal_candidate.py
+          scripts/check_p3t2_continuation_candidates.py
+
+      - name: Validate masterplan continuation authority
+        run: |
+          python scripts/check_ai_master_plan.py
+          python scripts/check_ai_masterplan_continuation.py --json
+
+      - name: Validate exact-head candidate identities
+        run: |
+          HEAD_SHA="$(git rev-parse HEAD)"
+          python scripts/check_p3t2_training_candidate.py --head "$HEAD_SHA" --json
+          python scripts/check_p3t2_learning_candidate.py --head "$HEAD_SHA" --json
+          python scripts/check_p3t2_multimodal_candidate.py --head "$HEAD_SHA" --json
+          python scripts/check_p3t2_continuation_candidates.py --head "$HEAD_SHA" --json
+
+      - name: Execute candidate and evidence regressions
+        run: >-
+          python -m pytest -q
+          tests/test_p3t2_training_candidate.py
+          tests/test_p3t2_learning_candidate.py
+          tests/test_p3t2_multimodal_candidate.py
+          tests/test_p3t2_continuation_candidates.py
+          skeleton/testing/test_p3t2_evidence.py
+
+      - name: Execute exact per-volume regressions
+        run: >-
+          python -m pytest -q
+          skeleton/testing/test_training_control_plane.py
+          skeleton/testing/test_distributed_training.py
+          skeleton/testing/test_training_checkpointing.py
+          skeleton/testing/test_elastic_training_recovery.py
+          skeleton/testing/test_training_observability.py
+          skeleton/testing/test_training_eval_gates.py
+          skeleton/testing/test_post_training_lab.py
+          skeleton/testing/test_rl_environments.py
+          skeleton/testing/test_curriculum_engine.py
+          skeleton/testing/test_verifier_model_program.py
+          skeleton/testing/test_multimodal_ingestion.py
+          skeleton/testing/test_vision_pipeline.py
+          skeleton/testing/test_document_vision.py
+          skeleton/testing/test_audio_pipeline.py
+          skeleton/testing/test_live_speech_runtime.py
+          skeleton/testing/test_video_pipeline.py
+          skeleton/testing/test_p3_deferred_multimodal_tools.py
+
+      - name: Execute cross-plane acceptance
+        run: >-
+          python -m pytest -q
+          skeleton/testing/test_p3_training_control.py
+          skeleton/testing/test_p3_training_data.py
+          skeleton/testing/test_p3_local_training_evaluation.py
+          skeleton/testing/test_p3_post_training.py
+          skeleton/testing/test_p3_learning_programs.py
+          skeleton/testing/test_p3_multimodal_foundation.py
+          tests/test_p3_training_acceptance.py
