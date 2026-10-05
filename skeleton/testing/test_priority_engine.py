@@ -66,3 +66,21 @@ def test_decision_identity_changes_when_blocker_reason_or_age_changes():
  b=e.decide("ITEM.1",(),(PriorityConstraint("BLOCK.X",ConstraintKind.HARD_BLOCKER,True,"DEP.X","new reason"),),age_epochs=1)
  c=e.decide("ITEM.1",(),(PriorityConstraint("BLOCK.X",ConstraintKind.HARD_BLOCKER,True,"DEP.X","first reason"),),age_epochs=2)
  assert len({a.input_digest,b.input_digest,c.input_digest})==3
+
+def test_forged_priority_decision_rejects_nonfinite_or_invalid_digest():
+ good="0"*64
+ with pytest.raises(PriorityError,match="finite numeric"):
+  PriorityDecision("ITEM.X",False,float("nan"),0.0,(),(),0.0,good)
+ with pytest.raises(PriorityError,match="input_digest"):
+  PriorityDecision("ITEM.X",False,0.0,0.0,(),(),0.0,"bad")
+
+def test_forged_priority_decision_cannot_mismatch_blocker_state():
+ with pytest.raises(PriorityError,match="blocked must match"):
+  PriorityDecision("ITEM.X",False,1.0,1.0,(),("BLOCK.X",),0.0,"0"*64)
+ with pytest.raises(PriorityError,match="blocked must match"):
+  PriorityDecision("ITEM.X",True,1.0,1.0,(),(),0.0,"0"*64)
+
+def test_rank_requires_bounded_typed_decisions():
+ e=PriorityEngine();d=e.decide("ITEM.X",())
+ with pytest.raises(PriorityError,match="typed tuple"):e.rank([d])
+ with pytest.raises(PriorityError,match="typed tuple"):e.rank((object(),))
