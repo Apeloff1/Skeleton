@@ -2,7 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
-import hashlib,json,re
+import hashlib,json,re,math
 _ID=re.compile(r"^[A-Z][A-Z0-9_.:-]{2,127}$");_SHA=re.compile(r"^[0-9a-f]{64}$")
 class ImprovementError(ValueError):pass
 class PromotionStatus(str,Enum): PROMOTE="promote"; REJECT="reject"
@@ -31,9 +31,9 @@ class EvaluationBundle:
  candidate_digest:str;metric_values:tuple[tuple[str,float],...];safety_passed:bool;cost_passed:bool;robustness_passed:bool;evidence_digest:str
  def __post_init__(self):
   _sha(self.candidate_digest,"candidate_digest");_sha(self.evidence_digest,"evidence_digest")
-  vals=tuple(sorted(self.metric_values))
+  if not isinstance(self.metric_values,tuple) or len(self.metric_values)>256:raise ImprovementError("metric_values must be bounded tuple")\n  vals=tuple(sorted(self.metric_values))
   if not vals:raise ImprovementError("evaluation metrics required")
-  for k,v in vals:_id(k,"metric_id");json.dumps(v,allow_nan=False)
+  if len({k for k,_ in vals})!=len(vals):raise ImprovementError("duplicate evaluation metric")\n  for k,v in vals:\n   _id(k,"metric_id")\n   if not isinstance(v,(int,float)) or isinstance(v,bool) or not math.isfinite(v):raise ImprovementError("metric value must be finite numeric")
   object.__setattr__(self,"metric_values",vals)
 @dataclass(frozen=True,slots=True)
 class PromotionDecision:
