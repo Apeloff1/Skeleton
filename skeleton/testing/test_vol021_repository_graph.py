@@ -22,3 +22,9 @@ def test_unknown_change_is_rejected():
 def test_plan_cannot_escalate_authority():
  p=plan_change(graph(),("src/a.py",))
  with pytest.raises(RepositoryGraphError):ChangePlan(p.graph_digest,p.changed_paths,p.impacted_paths,p.required_tests,p.owners,"mutation")
+
+def test_change_plan_evidence_cannot_be_forged_or_noncanonical():
+ p=plan_change(graph(),("src/a.py",))
+ with pytest.raises(RepositoryGraphError,match="invalid graph digest"):ChangePlan("forged",p.changed_paths,p.impacted_paths,p.required_tests,p.owners)
+ with pytest.raises(RepositoryGraphError,match="changed paths must be impacted"):ChangePlan(p.graph_digest,("src/a.py",),("src/b.ts",),p.required_tests,p.owners)
+ with pytest.raises(RepositoryGraphError,match="must be canonical"):ChangePlan(p.graph_digest,("src/a.py","src/a.py"),p.impacted_paths,p.required_tests,p.owners)
