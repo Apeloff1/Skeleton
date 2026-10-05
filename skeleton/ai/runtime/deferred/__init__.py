@@ -26,6 +26,11 @@ from .executor import (
     ExecutionReceipt,
     FailureReceipt,
 )
+from .epistemic_integrity import (
+    CausalClaim, CausalGraph, CausalMethod, EvidenceDirection, Hypothesis,
+    HypothesisEngine, HypothesisEvidence, HypothesisStatus, InterventionResult,
+    KnowledgeRevision, TemporalClaim, TemporalKnowledge, ValidityInterval,
+)
 from .contract_fuzzing import ContractFuzzer, FuzzBudget, FuzzFailure, FuzzReport
 from .simulation_mode import SimulationAuthority, SimulationEvidence, SimulationRequest, SimulationResult, SimulationRuntime
 from .journal import (
@@ -49,6 +54,19 @@ __all__ = [
     "FuzzReport",
     "DEFERRED_165_SPECS",
     "DatasetCard",
+    "CausalClaim",
+    "CausalGraph",
+    "CausalMethod",
+    "EvidenceDirection",
+    "Hypothesis",
+    "HypothesisEngine",
+    "HypothesisEvidence",
+    "HypothesisStatus",
+    "InterventionResult",
+    "KnowledgeRevision",
+    "TemporalClaim",
+    "TemporalKnowledge",
+    "ValidityInterval",
     "DeferredEffectAuthority",
     "DeferredExecutionError",
     "DeferredExecutionJournal",
