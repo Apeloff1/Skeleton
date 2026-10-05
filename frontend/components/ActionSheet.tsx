@@ -38,6 +38,8 @@ import {
 import Animated, {
   useSharedValue, useAnimatedStyle, withTiming, withSpring,
 } from 'react-native-reanimated';
+import { useReduceMotion } from '../src/hooks/useReduceMotion';
+import { accessibleButtonProps } from '../src/accessibility/runtime';
 
 // ────────────────────────────────────────────────────────────────────
 // SHARED TYPES
@@ -136,6 +138,7 @@ const KIND_STYLE: Record<ActionKind, { fg: string; bg: string; weight: '700'|'80
 export function ActionSheetHost() {
   const [entry, setEntry] = useState<SheetEntry | null>(null);
   const [draft, setDraft] = useState('');
+  const reduceMotion = useReduceMotion();
 
   // Animation values
   const backdrop = useSharedValue(0);
@@ -147,6 +150,11 @@ export function ActionSheetHost() {
   }), []);
 
   useEffect(() => {
+    if (reduceMotion) {
+      backdrop.value = entry ? 1 : 0;
+      sheetY.value = entry ? 0 : 120;
+      return;
+    }
     if (entry) {
       backdrop.value = withTiming(1, { duration: 180 });
       sheetY.value   = withSpring(0, { damping: 18, stiffness: 200 });
@@ -154,7 +162,7 @@ export function ActionSheetHost() {
       backdrop.value = withTiming(0, { duration: 160 });
       sheetY.value   = withTiming(120, { duration: 160 });
     }
-  }, [entry, backdrop, sheetY]);
+  }, [entry, backdrop, sheetY, reduceMotion]);
 
   // ESC dismiss on web for accessibility parity
   useEffect(() => {
@@ -198,13 +206,30 @@ export function ActionSheetHost() {
   };
 
   return (
-    <Animated.View style={[styles.host, backdropStyle, { pointerEvents: 'box-none' as any }]}>
-      <Pressable style={styles.backdrop} onPress={handleDismiss} />
+    <Animated.View
+      style={[styles.host, backdropStyle, { pointerEvents: 'box-none' as any }]}
+      accessibilityViewIsModal
+      importantForAccessibility="yes"
+    >
+      <Pressable
+        style={styles.backdrop}
+        onPress={handleDismiss}
+        accessible={false}
+        importantForAccessibility="no"
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={[styles.kav, { pointerEvents: 'box-none' as any }]}
       >
-        <Animated.View style={[styles.sheet, sheetStyle]}>
+        <Animated.View
+          style={[styles.sheet, sheetStyle]}
+          accessibilityViewIsModal
+          accessibilityLabel={
+            entry.kind === 'action'
+              ? (entry.spec.title || 'Action options')
+              : entry.spec.title
+          }
+        >
           {/* Drag-handle */}
           <View style={styles.handle} />
 
@@ -229,6 +254,11 @@ export function ActionSheetHost() {
                       opt.kind === 'cancel' && styles.optCancel,
                     ]}
                     testID={`actionsheet-opt-${opt.kind || 'default'}-${i}`}
+                    {...accessibleButtonProps(opt.label, {
+                      hint: opt.kind === 'destructive'
+                        ? 'Activates a destructive action.'
+                        : undefined,
+                    })}
                   >
                     <Text style={[styles.optText, { color: k.fg, fontWeight: k.weight }]}>
                       {opt.label}
@@ -252,12 +282,15 @@ export function ActionSheetHost() {
                 style={[styles.input, entry.spec.multiline && styles.inputMulti]}
                 autoFocus
                 testID="promptsheet-input"
+                accessibilityLabel={entry.spec.title}
+                accessibilityHint={entry.spec.message}
               />
               <View style={styles.promptBtnRow}>
                 <Pressable
                   onPress={handleDismiss}
                   style={({ pressed }) => [styles.optBtn, styles.optCancel, { flex: 1, opacity: pressed ? 0.85 : 1 }]}
                   testID="promptsheet-cancel"
+                  {...accessibleButtonProps(entry.spec.cancelLabel || 'Cancel')}
                 >
                   <Text style={[styles.optText, { color: '#94a3b8', fontWeight: '700' }]}>
                     {entry.spec.cancelLabel || 'Cancel'}
@@ -267,6 +300,7 @@ export function ActionSheetHost() {
                   onPress={handleSubmitPrompt}
                   style={({ pressed }) => [styles.optBtn, { backgroundColor: '#a78bfa', flex: 1, opacity: pressed ? 0.85 : 1 }]}
                   testID="promptsheet-submit"
+                  {...accessibleButtonProps(entry.spec.submitLabel || 'Submit')}
                 >
                   <Text style={[styles.optText, { color: '#0a0f1f', fontWeight: '800' }]}>
                     {entry.spec.submitLabel || 'Submit'}
@@ -314,7 +348,7 @@ const styles = StyleSheet.create({
   title:   { color: '#f8fafc', fontSize: 17, fontWeight: '700', textAlign: 'center' },
   message: { color: '#94a3b8', fontSize: 13, lineHeight: 18, textAlign: 'center', marginTop: 6 },
 
-  optBtn:    { paddingVertical: 13, paddingHorizontal: 16, borderRadius: 12, alignItems: 'center', marginTop: 8 },
+  optBtn:    { paddingVertical: 13, paddingHorizontal: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center', minHeight: 48, marginTop: 8 },
   optCancel: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#1e293b' },
   optText:   { fontSize: 14, letterSpacing: 0.2 },
 
