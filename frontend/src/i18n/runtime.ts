@@ -15,6 +15,7 @@ export type TranslationKey =
   | 'recovery.boot_failed'
   | 'status.starting'
   | 'status.startup_check'
+  | 'status.startup_progress'
   | 'status.connectivity.offline'
   | 'status.connectivity.down'
   | 'status.connectivity.degraded'
