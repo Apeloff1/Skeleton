@@ -67,3 +67,17 @@ class MutationCustody:
   if any(not isinstance(p,str) or not p.strip() for p in paths):raise EngineeringError("mutation paths invalid")\n  if not set(paths)<=set(lease.scope_paths):raise EngineeringError("mutation escapes leased scope")
  def record(self,task:EngineeringTask,lease:MutationLease,change_id:str,before:str,after:str,paths)->ChangeRecord:
   self.assert_authorized(task,lease,paths);return ChangeRecord(change_id,task.digest,lease.lease_id,lease.fence_token,before,after,tuple(paths))
+
+@dataclass(frozen=True,slots=True)
+class EngineeringAcceptance:
+ task_digest:str;change_digest:str;evidence_digest:str
+ def __post_init__(self):
+  for f in ("task_digest","change_digest","evidence_digest"):_sha(getattr(self,f),f)
+def accept_change(task:EngineeringTask,change:ChangeRecord,evidence:EngineeringEvidence)->EngineeringAcceptance:
+ if not isinstance(task,EngineeringTask) or not isinstance(change,ChangeRecord) or not isinstance(evidence,EngineeringEvidence):raise EngineeringError("acceptance inputs must be typed")
+ if change.task_digest!=task.digest or evidence.task_digest!=task.digest:raise EngineeringError("acceptance task identity mismatch")
+ if evidence.change_digest!=change.digest:raise EngineeringError("evidence/change identity mismatch")
+ if evidence.decision is not VerificationDecision.PASS:raise EngineeringError("failed verification cannot accept change")
+ if not evidence.rollback_verified:raise EngineeringError("rollback must be verified")
+ ed=_dig({"evidence_id":evidence.evidence_id,"task_digest":evidence.task_digest,"change_digest":evidence.change_digest,"builder_id":evidence.builder_id,"verifier_id":evidence.verifier_id,"decision":evidence.decision.value,"test_digest":evidence.test_digest,"rollback_verified":evidence.rollback_verified})
+ return EngineeringAcceptance(task.digest,change.digest,ed)
