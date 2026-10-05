@@ -49,7 +49,7 @@ class HandoffVerification:
   _sha(self.handoff_digest,"handoff_digest");object.__setattr__(self,"verifier_id",_id(self.verifier_id,"verifier_id"));object.__setattr__(self,"producer_id",_id(self.producer_id,"producer_id"))
   if not isinstance(self.passed,bool):raise CoordinationError("passed must be bool")\n  if self.verifier_id==self.producer_id:raise CoordinationError("handoff verifier must be independent")
 class Coordinator:
- def __init__(self,task):self.task=task;self.assignments={};self.failed=set()
+ def __init__(self,task):\n  if not isinstance(task,MultiAgentTask):raise CoordinationError("task must be MultiAgentTask")\n  self.task=task;self.assignments={};self.failed=set();self.handoffs={}
  def assign(self,a):
   if a.task_digest!=self.task.digest:raise CoordinationError("assignment/task mismatch")
   if not set(a.authority_ids)<=set(self.task.authority_ids):raise CoordinationError("delegated authority exceeds parent")
