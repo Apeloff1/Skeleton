@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
+from skeleton.native.jvm_protocol import JvmCapability, capability_for
+
 _ACCELERATOR_NAMES = ("observability", "vector", "physics")
 
 
@@ -28,6 +30,9 @@ class JvmAcceleratorPreflight:
     source: str
     java_available: bool
     source_available: bool
+    capability_digest: str = ""
+    protocol_versions: tuple[int, ...] = ()
+    minimum_java_major: int = 0
 
     @property
     def ready(self) -> bool:
@@ -167,6 +172,10 @@ class JvmAcceleratorRegistry:
         with self._lock:
             return name in self._instances
 
+    def capability(self, name: str) -> JvmCapability:
+        self._validate_name(name)
+        return capability_for(name)
+
     def preflight(
         self,
         name: str | None = None,
@@ -178,6 +187,7 @@ class JvmAcceleratorRegistry:
             java_binary = str(getattr(config, "java_binary", ""))
             source = Path(getattr(config, "source"))
             java_path = _resolve_java(java_binary)
+            capability = self.capability(item)
             output[item] = JvmAcceleratorPreflight(
                 name=item,
                 java_binary=java_binary,
@@ -185,6 +195,9 @@ class JvmAcceleratorRegistry:
                 source=str(source),
                 java_available=java_path is not None,
                 source_available=source.is_file(),
+                capability_digest=capability.capability_digest,
+                protocol_versions=capability.protocol_versions,
+                minimum_java_major=capability.minimum_java_major,
             )
         return output
 
