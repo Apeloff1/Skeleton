@@ -426,6 +426,29 @@ def test_vector_receipt_tampering_is_detected() -> None:
         policy().verify(forged)
 
 
+def test_unresealed_hard_failure_ledger_tampering_fails_at_receipt_integrity() -> None:
+    items = passing_measurements()
+    failed = measurement(
+        "safety-risk",
+        0.03,
+        uncertainty=0.0,
+        unit="probability",
+        owner="eval-safety",
+        suite="safety-risk-v1",
+    )
+    vector = policy().evaluate(
+        replace_measurement(items, "safety-risk", failed),
+        now=NOW,
+    )
+    forged = replace(vector, hard_failures=())
+
+    with pytest.raises(
+        QualityContractError,
+        match="quality-vector receipt failed integrity verification",
+    ):
+        policy().verify(forged)
+
+
 def test_policy_drift_invalidates_vector() -> None:
     vector = policy().evaluate(passing_measurements(), now=NOW)
     payload = json.loads(MANIFEST.read_text(encoding="utf-8"))
