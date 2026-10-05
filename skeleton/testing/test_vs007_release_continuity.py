@@ -33,3 +33,18 @@ def test_acceptance_artifact_must_match_signed_target():
 def test_parallel_update_cannot_replace_staged_target():
  t=DesktopUpdateTransaction(rel(),receipt());t.stage(rel("RELEASE.V2",2))
  with pytest.raises(DesktopReleaseError,match="already in progress"):t.stage(rel("RELEASE.V3",3))
+
+def test_migration_receipt_moves_to_signed_target_artifact():
+ t=DesktopUpdateTransaction(rel(),receipt());target=rel("RELEASE.V2",2);t.stage(target);t.migrate(S("state-v2"))
+ assert t.receipt.artifact_digest==target.artifact_digest
+def test_rollback_restores_entire_preupdate_receipt():
+ original=receipt();t=DesktopUpdateTransaction(rel(),original);t.stage(rel("RELEASE.V2",2));t.migrate(S("partial"))
+ t.rollback(S("rollback-artifact"));assert t.receipt==original
+def test_rollback_after_commit_is_forbidden():
+ t=DesktopUpdateTransaction(rel(),receipt());target=rel("RELEASE.V2",2);t.stage(target);t.migrate(S("state-v2"))
+ good=DesktopAcceptanceRun("RUN.1",target.release_id,S("env"),S("vs001"),target.artifact_digest);t.commit(good)
+ with pytest.raises(DesktopReleaseError,match="rollback-eligible"):t.rollback(S("rollback"))
+def test_second_update_starts_from_committed_release():
+ t=DesktopUpdateTransaction(rel(),receipt());v2=rel("RELEASE.V2",2);t.stage(v2);t.migrate(S("state-v2"))
+ t.commit(DesktopAcceptanceRun("RUN.1",v2.release_id,S("env"),S("vs001"),v2.artifact_digest))
+ t.stage(rel("RELEASE.V3",3));assert t.preupdate_receipt.release_id=="RELEASE.V2"
