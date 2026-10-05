@@ -8,7 +8,9 @@ class SDKExport: name:str; contract_version:str; deprecated:bool=False
 class SDKCompatibility: source_version:str; target_version:str; compatible:bool
 @dataclass(frozen=True,slots=True)
 class InternalSDK: version:str; exports:tuple[SDKExport,...]
-def supported_export(sdk,name):return next((x for x in sdk.exports if x.name==name and not x.deprecated),None)
+def supported_export(sdk,name):
+ if not sdk.version or not name or len({x.name for x in sdk.exports})!=len(sdk.exports) or any(not x.name or not x.contract_version for x in sdk.exports):raise ValueError("invalid SDK export identity")
+ return next((x for x in sdk.exports if x.name==name and not x.deprecated),None)
 @dataclass(frozen=True,slots=True)
 class ProviderAdapterSpec: provider:str; version:str; capabilities:frozenset[str]
 @dataclass(frozen=True,slots=True)
@@ -25,6 +27,7 @@ class TransactionHandle: store_id:str; transaction_id:str
 @dataclass(frozen=True,slots=True)
 class StorageSDK: stores:tuple[StoreHandle,...]
 def select_store(sdk,state_class,consistency):
+ if len({s.store_id for s in sdk.stores})!=len(sdk.stores) or any(not s.store_id for s in sdk.stores):raise ValueError("unique storage identity required")
  xs=[s for s in sdk.stores if s.state_class is state_class and s.consistency is consistency]
  if len(xs)!=1:raise ValueError("storage requirement unresolved")
  return xs[0]
