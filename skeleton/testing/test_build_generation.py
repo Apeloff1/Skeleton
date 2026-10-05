@@ -21,3 +21,8 @@ def test_generated_code_is_marked_reproducible_and_extensions_external():
 def test_client_sdk_binds_exact_contract_version_and_digest():
  v=SDKVersion("api-v7","g1");s=generate_client(v,(SDKMethod("get","Req","Res"),),"schema")
  assert s.version.api_contract_version=="api-v7" and s.contract_digest
+
+
+def test_build_generation_slice_imports_cleanly():
+    import skeleton.ai.runtime.deferred.build_generation as module
+    assert module.RebuildPlan is not None
