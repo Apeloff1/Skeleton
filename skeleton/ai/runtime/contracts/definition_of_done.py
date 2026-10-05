@@ -21,6 +21,7 @@ import re
 from typing import Iterable
 
 from .maturity_reconciliation import MATURITY_ORDER, MaturityState
+from .promotion_evidence import PromotionEvidenceReceipt
 
 DOD_SCHEMA = "skeleton.contracts.definition_of_done.v1"
 _MAX_REQUIREMENTS = 256
@@ -59,6 +60,8 @@ class EvidenceKind(str, Enum):
     SECURITY_REVIEW = "security_review"
     MIGRATION = "migration"
     INDEPENDENT_VERIFICATION = "independent_verification"
+    RISK_REVIEW = "risk_review"
+    PROMOTION = "promotion"
 
 
 class RequirementStatus(str, Enum):
@@ -286,9 +289,9 @@ class DefinitionOfDone:
         if len(ids) != len(set(ids)):
             raise DefinitionOfDoneError("duplicate DoD requirement id")
         object.__setattr__(self, "requirements", normalized)
-        if not isinstance(self.independent_signoff_required, bool):
+        if self.independent_signoff_required is not True:
             raise DefinitionOfDoneError(
-                "independent_signoff_required must be boolean"
+                "independent signoff is mandatory for Definition of Done"
             )
         object.__setattr__(
             self,
@@ -668,6 +671,31 @@ class DefinitionOfDoneEvaluator:
         )
 
 
+def completion_evidence_from_promotion_receipt(
+    *,
+    evidence_id: str,
+    requirement_id: str,
+    producer_id: str,
+    receipt: PromotionEvidenceReceipt,
+    passed: bool = True,
+) -> CompletionEvidence:
+    """Bind production DoD evidence to an exact promotion receipt."""
+
+    if not isinstance(receipt, PromotionEvidenceReceipt):
+        raise TypeError("receipt must be PromotionEvidenceReceipt")
+    return CompletionEvidence(
+        evidence_id=evidence_id,
+        requirement_id=requirement_id,
+        evidence_kind=EvidenceKind.PROMOTION,
+        subject_digest=receipt.subject_digest,
+        artifact_digest=receipt.receipt_digest,
+        producer_id=producer_id,
+        verifier_id=receipt.verifier_id,
+        observed_at=receipt.observed_at,
+        passed=passed,
+    )
+
+
 def default_definition_of_done() -> DefinitionOfDone:
     """Repository default DoD policy for implemented-and-above maturity."""
 
@@ -786,6 +814,22 @@ def default_definition_of_done() -> DefinitionOfDone:
                 always_required=True,
                 independent=True,
             ),
+            DoDRequirement(
+                "dod.risk_review",
+                EvidenceKind.RISK_REVIEW,
+                "High-impact change has explicit risk disposition evidence.",
+                MaturityState.HARDENED,
+                triggers=high_risk + (ChangeImpact.RELEASE,),
+                independent=True,
+            ),
+            DoDRequirement(
+                "dod.promotion",
+                EvidenceKind.PROMOTION,
+                "Production maturity binds an exact independent promotion receipt.",
+                MaturityState.PRODUCTION,
+                always_required=True,
+                independent=True,
+            ),
         ),
     )
 
@@ -804,5 +848,6 @@ __all__ = [
     "DoDRequirementEvaluation",
     "EvidenceKind",
     "RequirementStatus",
+    "completion_evidence_from_promotion_receipt",
     "default_definition_of_done",
 ]
