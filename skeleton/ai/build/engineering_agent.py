@@ -19,9 +19,9 @@ class EngineeringTask:
  task_id:str;objective:str;repository_digest:str;scope_paths:tuple[str,...];test_refs:tuple[str,...];rollback_ref:str
  def __post_init__(self):
   object.__setattr__(self,"task_id",_id(self.task_id,"task_id"));_sha(self.repository_digest,"repository_digest")
-  if not self.objective.strip():raise EngineeringError("objective required")
+  if not isinstance(self.objective,str) or not self.objective.strip():raise EngineeringError("objective required")\n  object.__setattr__(self,"objective",self.objective.strip())
   for f in ("scope_paths","test_refs"):
-   vals=tuple(sorted(set(getattr(self,f))))
+   raw=getattr(self,f)\n   if not isinstance(raw,tuple):raise EngineeringError(f"{f} must be tuple")\n   if len(raw)>256:raise EngineeringError(f"{f} exceeds policy bound")\n   vals=tuple(sorted(set(raw)))
    if not vals or any(not isinstance(v,str) or not v.strip() for v in vals):raise EngineeringError(f"{f} required")
    object.__setattr__(self,f,vals)
   if not self.rollback_ref.strip():raise EngineeringError("rollback_ref required")
@@ -34,7 +34,7 @@ class MutationLease:
   for f in ("lease_id","holder_id"):object.__setattr__(self,f,_id(getattr(self,f),f))
   _sha(self.task_digest,"task_digest")
   if not isinstance(self.fence_token,int) or isinstance(self.fence_token,bool) or self.fence_token<1:raise EngineeringError("fence_token must be positive")
-  object.__setattr__(self,"scope_paths",tuple(sorted(set(self.scope_paths))))
+  if not isinstance(self.state,LeaseState):raise EngineeringError("state must be LeaseState")\n  if not isinstance(self.scope_paths,tuple) or not self.scope_paths:raise EngineeringError("scope_paths must be non-empty tuple")\n  object.__setattr__(self,"scope_paths",tuple(sorted(set(self.scope_paths))))
 @dataclass(frozen=True,slots=True)
 class ChangeRecord:
  change_id:str;task_digest:str;lease_id:str;fence_token:int;before_digest:str;after_digest:str;paths:tuple[str,...]
