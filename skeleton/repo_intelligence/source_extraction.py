@@ -1,6 +1,7 @@
 """Conservative cross-language dependency extraction for VOL-021."""
 from __future__ import annotations
 import ast,re
+from hashlib import sha256
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Mapping
@@ -10,6 +11,14 @@ _EXT={".py":"python",".js":"javascript",".ts":"typescript",".tsx":"typescript","
 @dataclass(frozen=True,slots=True)
 class SourceFile:
  path:str;content:str;content_digest:str;owner:str|None=None;tests:tuple[str,...]=()
+ def __post_init__(self):
+  if not isinstance(self.path,str) or not self.path or self.path.startswith("/") or ".." in self.path.split("/"):raise RepositoryGraphError("invalid source path")
+  if not isinstance(self.content,str):raise RepositoryGraphError("source content must be str")
+  if not isinstance(self.content_digest,str) or not re.fullmatch(r"[0-9a-f]{64}",self.content_digest):raise RepositoryGraphError("invalid source digest")
+  if sha256(self.content.encode()).hexdigest()!=self.content_digest:raise RepositoryGraphError("source digest mismatch")
+  if self.owner is not None and (not isinstance(self.owner,str) or not self.owner):raise RepositoryGraphError("invalid source owner")
+  if not isinstance(self.tests,tuple) or any(not isinstance(x,str) or not x for x in self.tests):raise RepositoryGraphError("source tests must be non-empty strings")
+  object.__setattr__(self,"tests",tuple(sorted(set(self.tests))))
 def _specs(src:SourceFile)->tuple[str,...]:
  if len(src.content.encode())>MAX_SOURCE_BYTES:raise RepositoryGraphError("source budget exceeded")
  ext=PurePosixPath(src.path).suffix;lang=_EXT.get(ext)
