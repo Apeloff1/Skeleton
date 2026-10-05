@@ -38,6 +38,9 @@ class PlanDiagnostic: rule_id:str; location:str; severity:Severity; remediation:
 @dataclass(frozen=True,slots=True)
 class PlanAnalysis: ir_version:str; diagnostics:tuple[PlanDiagnostic,...]
 def analyze_plan(ir_version,nodes,edges,rules):
+ if not ir_version or not nodes:raise ValueError("plan identity and nodes required")
+ if any(not r.rule_id or not r.version for r in rules):raise ValueError("lint rule identity required")
+ if len({(r.rule_id,r.version) for r in rules})!=len(rules):raise ValueError("duplicate lint rule")
  ids=set(nodes);d=[]
  for a,b in edges:
   if a not in ids or b not in ids:d.append(PlanDiagnostic("edge-endpoint","edges",Severity.ERROR,"declare both endpoints"))
@@ -52,6 +55,7 @@ class PlanSimulation: steps:tuple[SimulatedStep,...]; findings:tuple[SimulationF
     @property
     def production_evidence(self):return False
 def simulate_plan(step_ids):
+ if not step_ids or any(not s for s in step_ids) or len(set(step_ids))!=len(step_ids):raise ValueError("unique simulation steps required")
  scenarios=("success","failure","timeout","resource_exhaustion")
  return PlanSimulation(tuple(SimulatedStep(s,x,"simulated") for s in step_ids for x in scenarios),tuple())
 @dataclass(frozen=True,slots=True)
