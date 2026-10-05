@@ -116,3 +116,17 @@ jobs:
           python -m pytest -q
           skeleton/testing/test_native_abi.py
           skeleton/testing/test_native_fallback.py
+
+      - name: Profile VOL-032 native vector candidate
+        run: >-
+          python scripts/profile_p2_acceleration.py
+          --candidate ACCEL-NATIVE-VECTOR
+          --repeat 5
+          --evidence-id vol032-native-vector-exact-head
+          --output /tmp/vol032-native-vector.json
+
+      - name: Validate measured VOL-032 receipt ingestion without activation
+        run: >-
+          python scripts/record_p2_acceleration_profile.py
+          --receipt /tmp/vol032-native-vector.json
+          --output /tmp/vol032-policy-evaluated.json
