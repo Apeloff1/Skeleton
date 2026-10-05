@@ -1,4 +1,4 @@
-from __future__
+from __future__ import annotations
 import hashlib,pytest
 from skeleton.plugins.lifecycle import *
 S=lambda x:hashlib.sha256(x.encode()).hexdigest()
