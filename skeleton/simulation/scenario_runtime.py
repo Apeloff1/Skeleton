@@ -15,11 +15,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from hashlib import sha256
-import json
 import math
 import re
 from types import MappingProxyType
 from typing import Callable, Iterable, Mapping, Sequence
+
+from skeleton.contracts.canonical import CanonicalContractError, canonical_json_bytes
 
 SCENARIO_SCHEMA = "skeleton.simulation.scenario-runtime.v1"
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -170,7 +171,7 @@ def _finite(value: object, field: str) -> float:
 def _jsonable(value: object) -> object:
     if isinstance(value, Mapping):
         return {
-            str(key): _jsonable(child)
+            key: _jsonable(child)
             for key, child in value.items()
         }
     if isinstance(value, tuple):
@@ -203,14 +204,8 @@ def _freeze_json(value: object, field: str) -> object:
 
 def _canonical_json(value: object, field: str) -> bytes:
     try:
-        return json.dumps(
-            _jsonable(value),
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-            allow_nan=False,
-        ).encode("utf-8")
-    except (TypeError, ValueError) as exc:
+        return canonical_json_bytes(_jsonable(value))
+    except CanonicalContractError as exc:
         raise ScenarioRuntimeError(f"{field} must be deterministic JSON") from exc
 
 

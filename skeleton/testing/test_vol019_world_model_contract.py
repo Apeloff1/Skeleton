@@ -1,6 +1,20 @@
-import pytest
+import hashlib
 from dataclasses import replace
-from skeleton.simulation import Assumption, AssumptionSet, CounterfactualRolloutEngine, DeterministicEnvironmentAdapter, SimulationBoundaryError, UncertaintyPropagationPolicy, WorldModelError
+
+import pytest
+
+from skeleton.contracts.canonical import canonical_json_bytes
+from skeleton.simulation import (
+    SCENARIO_SCHEMA,
+    Assumption,
+    AssumptionSet,
+    CounterfactualRolloutEngine,
+    DeterministicEnvironmentAdapter,
+    SimulationBoundaryError,
+    SimulationRule,
+    UncertaintyPropagationPolicy,
+    WorldModelError,
+)
 
 def reducer(state,action,seed):
     n=int(state.get("n",0))+int(action["add"])
@@ -74,3 +88,52 @@ def test_reducer_outputs_fail_closed_without_type_coercion(reward,terminal,uncer
     with pytest.raises(SimulationBoundaryError,match=match):
         env.step({"x":1})
     assert env.state=={}
+
+
+def test_environment_evidence_digests_use_shared_canonical_contract_bytes():
+    env=DeterministicEnvironmentAdapter(simulation_id="digest",initial_state={"n":0},reducer=reducer,seed=7)
+    transition=env.step({"add":1})
+    assert transition.evidence.prior_state_digest==hashlib.sha256(canonical_json_bytes({"n":0})).hexdigest()
+    assert transition.evidence.action_digest==hashlib.sha256(canonical_json_bytes({"add":1})).hexdigest()
+    assert transition.evidence.next_state_digest==hashlib.sha256(canonical_json_bytes({"n":1})).hexdigest()
+
+
+def test_simulation_mapping_keys_fail_closed_without_json_key_coercion():
+    with pytest.raises(SimulationBoundaryError,match="deterministic JSON"):
+        DeterministicEnvironmentAdapter(simulation_id="strict-keys",initial_state={1:"bad"},reducer=reducer)
+
+
+def test_world_model_assumption_identity_uses_shared_canonical_contract_bytes():
+    assumption=Assumption("a","model approximation",0.1,"test")
+    expected={
+        "schema":"skeleton.world_model_simulation.v1",
+        "kind":"assumption",
+        "assumption_id":"a",
+        "statement":"model approximation",
+        "uncertainty":0.1,
+        "source_ref":"test",
+    }
+    assert assumption.digest==hashlib.sha256(canonical_json_bytes(expected)).hexdigest()
+
+
+def test_scenario_rule_identity_uses_shared_canonical_contract_bytes():
+    rule=SimulationRule("rule-1","bounded rule",{"limit":2},version=3)
+    expected={
+        "schema":SCENARIO_SCHEMA,
+        "kind":"rule",
+        "rule_id":"rule-1",
+        "description":"bounded rule",
+        "parameters":{"limit":2},
+        "version":3,
+    }
+    assert rule.digest==hashlib.sha256(canonical_json_bytes(expected)).hexdigest()
+
+
+def test_vol019_source_and_ai_simulation_mirrors_are_byte_identical():
+    from pathlib import Path
+
+    root=Path(__file__).resolve().parents[2]
+    for relative in ("environment.py","world_model.py","scenario_runtime.py"):
+        source=root/"skeleton"/"simulation"/relative
+        mirror=root/"skeleton"/"ai"/"simulation"/relative
+        assert source.read_bytes()==mirror.read_bytes()

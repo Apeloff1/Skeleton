@@ -10,10 +10,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
-import json
 import math
 from typing import Mapping, Protocol, Sequence, runtime_checkable
 
+from skeleton.contracts.canonical import CanonicalContractError, canonical_json_bytes
 from skeleton.simulation.environment import (
     EnvironmentTransition,
     SimulationBoundaryError,
@@ -64,14 +64,8 @@ def _finite(value: object, field: str) -> float:
 
 def _canonical_json(value: object, field: str) -> bytes:
     try:
-        return json.dumps(
-            value,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-            allow_nan=False,
-        ).encode("utf-8")
-    except (TypeError, ValueError) as exc:
+        return canonical_json_bytes(value)
+    except CanonicalContractError as exc:
         raise WorldModelError(f"{field} must be deterministic JSON") from exc
 
 
