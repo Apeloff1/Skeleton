@@ -15,7 +15,9 @@ IDENTITY = "b" * 64
 def verified(*, head_sha: str = HEAD, identity: str = IDENTITY) -> dict[str, object]:
     return {
         "kind": "spine_ci_qualification_verify",
+        "repository": "Apeloff1/Skeleton",
         "head_sha": head_sha,
+        "required_check_policy_digest": "e" * 64,
         "qualification_identity": identity,
         "verified": True,
         "ci_green": True,
@@ -79,3 +81,13 @@ def test_reuse_primitive_is_available_from_canonical_persistence_surface() -> No
     )
     assert "SpineCiReuseError" in persistence.__all__
     assert "can_reuse_verified_qualification" in persistence.__all__
+
+
+def test_reuse_rejects_cross_repository_or_policy_alias() -> None:
+    foreign = verified()
+    foreign["repository"] = "Other/Skeleton"
+    assert can_reuse_verified_qualification(verified(), foreign) is False
+
+    changed_policy = verified()
+    changed_policy["required_check_policy_digest"] = "f" * 64
+    assert can_reuse_verified_qualification(verified(), changed_policy) is False
