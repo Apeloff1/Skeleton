@@ -88,6 +88,25 @@ Skeleton/
 └── satellites/               transitional satellite/source material
 ```
 
+## Documentation layout
+
+Human documentation is organized by durable concern rather than accumulated at
+the `docs/` root:
+
+- `docs/architecture/` — architecture, ownership, repository topology, integration and frontier design;
+- `docs/security/` — security policy, incident response, adversarial analysis and release-security evidence;
+- `docs/jeeves/` — Jeeves workbench, assurance and model-specific design material;
+- `docs/operations/` — CI/owner controls, release operations and operator procedures;
+- `docs/consolidation/` — repository consolidation records and migration evidence;
+- `docs/plan/` — master plans, build packets and execution programs;
+- `docs/runbooks/` — procedural recovery/operations instructions;
+- `docs/qa/` — regression and end-to-end validation plans.
+
+Root-level documentation is reserved for cross-cutting entrypoints and temporary
+compatibility pointers. New domain-specific documents must land in the matching
+directory. TREE-042 canonicalized the first root-document batch with link stubs
+left behind for compatibility.
+
 ## Placement rules
 
 1. Put new canonical runtime code under an existing `skeleton/<domain>/`
