@@ -6003,7 +6003,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Represent jurisdiction, applicability, owner and review date for compliance requirements.",
         "Map applicable obligations to concrete data, security, retention, access and evidence controls.",
@@ -6017,20 +6017,24 @@
       "contracts": [
         "ComplianceRequirement",
         "ComplianceControl",
-        "ComplianceEvidence"
+        "ControlKind",
+        "EnforcementMode",
+        "ComplianceEvidence",
+        "ControlAssessment",
+        "ComplianceRegistry",
+        "ComplianceAssessment"
       ],
       "implementation_paths": [
-        "docs",
-        "machine",
-        "skeleton/security"
+        "skeleton/contracts/compliance.py",
+        "skeleton/contracts/__init__.py",
+        "skeleton/ai/runtime/contracts/compliance.py",
+        "skeleton/ai/runtime/contracts/__init__.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_compliance_registry.py",
-        "planned:skeleton/testing/test_compliance_control_mapping.py"
+        "skeleton/testing/test_vol088_compliance.py"
       ],
       "evaluations": [
-        "planned:control evidence audit",
-        "planned:jurisdiction/applicability review"
+        "skeleton/testing/test_vol088_compliance.py"
       ],
       "evidence": [],
       "risks": [
@@ -6038,10 +6042,7 @@
         "missing evidence",
         "stale applicability"
       ],
-      "gaps": [
-        "define compliance registry schema",
-        "bind controls to evidence owners"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-088",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
@@ -6055,7 +6056,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Identify machine-derived versus human-authored documentation sections explicitly.",
         "Validate links, referenced identifiers and version relationships automatically.",
@@ -6072,17 +6073,15 @@
         "DocumentationCheck"
       ],
       "implementation_paths": [
-        "docs",
-        "scripts",
-        "machine"
+        "skeleton/documentation/runtime.py",
+        "scripts/generate_documentation.py",
+        "docs/generated/README.md"
       ],
       "tests": [
-        "planned:skeleton/testing/test_documentation_engine.py",
-        "planned:documentation link/reference checks"
+        "skeleton/testing/test_vol089_090_documentation_engine.py"
       ],
       "evaluations": [
-        "planned:regeneration idempotency evaluation",
-        "planned:machine/human drift audit"
+        "skeleton/testing/test_vol089_090_documentation_engine.py"
       ],
       "evidence": [],
       "risks": [
@@ -6090,10 +6089,7 @@
         "generated overwrite",
         "broken references"
       ],
-      "gaps": [
-        "define generated-doc boundaries",
-        "materialize doc drift gate"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-089",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
@@ -6107,7 +6103,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Bind every generated artifact to source digests and generator version.",
         "Require deterministic ordering and stable formatting for reviewability.",
@@ -6124,17 +6120,15 @@
         "SourceDigestSet"
       ],
       "implementation_paths": [
-        "docs/generated",
-        "scripts",
-        "machine"
+        "skeleton/documentation/runtime.py",
+        "scripts/generate_documentation.py",
+        "docs/generated/README.md"
       ],
       "tests": [
-        "planned:skeleton/testing/test_generated_docs.py",
-        "planned:generated-output determinism tests"
+        "skeleton/testing/test_vol089_090_documentation_engine.py"
       ],
       "evaluations": [
-        "planned:clean-regeneration diff evaluation",
-        "planned:stale-source digest test"
+        "skeleton/testing/test_vol089_090_documentation_engine.py"
       ],
       "evidence": [],
       "risks": [
@@ -6142,10 +6136,7 @@
         "review noise",
         "manual derived edits"
       ],
-      "gaps": [
-        "define generated artifact manifest",
-        "add regeneration cleanliness gate"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-090",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
@@ -6159,7 +6150,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Write runbooks against named signals, commands, authority and rollback points.",
         "Test high-risk runbooks in drills and update them from incident evidence.",
@@ -6173,20 +6164,25 @@
       "contracts": [
         "Runbook",
         "RunbookStep",
-        "RunbookValidation"
+        "RunbookValidation",
+        "RunbookRegistry",
+        "StepKind",
+        "ValidationStatus"
       ],
       "implementation_paths": [
-        "docs",
-        "scripts",
-        "skeleton/observability"
+        "skeleton/observability/runbooks.py",
+        "skeleton/observability/__init__.py",
+        "skeleton/ai/runtime/observability/runbooks.py",
+        "skeleton/ai/runtime/observability/__init__.py",
+        "scripts/validate_runbook.py",
+        "machine/ai_file_tree.json"
       ],
       "tests": [
-        "planned:skeleton/testing/test_runbook_references.py",
-        "planned:runbook command validation tests"
+        "skeleton/testing/test_vol091_runbooks.py"
       ],
       "evaluations": [
-        "planned:operator recovery drill",
-        "planned:runbook dependency-loss evaluation"
+        "skeleton/testing/test_vol091_runbooks.py",
+        "scripts/validate_runbook.py"
       ],
       "evidence": [],
       "risks": [
@@ -6194,10 +6190,7 @@
         "missing escalation",
         "circular recovery dependency"
       ],
-      "gaps": [
-        "establish runbook registry",
-        "bind drills to runbook versions"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-091",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
@@ -7147,7 +7140,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Define required artifacts/evidence by maturity and change impact.",
         "Require tests, failure/recovery behavior, observability, rollback and ownership where applicable.",
@@ -7161,20 +7154,26 @@
       "contracts": [
         "DefinitionOfDone",
         "DoDRequirement",
-        "CompletionEvidence"
+        "ChangeImpactProfile",
+        "CompletionEvidence",
+        "CompletionSignoff",
+        "CompletionEvaluation",
+        "DefinitionOfDoneEvaluator"
       ],
       "implementation_paths": [
-        "machine",
-        "docs/plan",
-        "scripts"
+        "skeleton/contracts/definition_of_done.py",
+        "skeleton/contracts/__init__.py",
+        "skeleton/ai/runtime/contracts/definition_of_done.py",
+        "skeleton/ai/runtime/contracts/__init__.py",
+        "skeleton/automation/definition_of_done.py",
+        "machine/ai_file_tree.json"
       ],
       "tests": [
-        "planned:skeleton/testing/test_definition_of_done.py",
-        "planned:completion derivation tests"
+        "skeleton/testing/test_vol110_definition_of_done.py",
+        "skeleton/testing/test_definition_of_done.py"
       ],
       "evaluations": [
-        "planned:incomplete-evidence rejection suite",
-        "planned:promotion downgrade evaluation"
+        "skeleton/testing/test_vol110_definition_of_done.py"
       ],
       "evidence": [],
       "risks": [
@@ -7182,10 +7181,7 @@
         "evidence omission",
         "scope-dependent requirement lost"
       ],
-      "gaps": [
-        "unify maturity and DoD rules",
-        "bind change-impact triggers to DoD"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-110",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
