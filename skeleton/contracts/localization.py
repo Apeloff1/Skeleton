@@ -579,7 +579,7 @@ def serialize_timestamp(value: datetime) -> str:
     if value.tzinfo is None or value.utcoffset() is None:
         raise LocalizationError("persisted timestamp must be timezone-aware")
     utc = value.astimezone(timezone.utc)
-    return utc.isoformat(timespec="microseconds").replace("+00:00", "Z")
+    return utc.isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 def parse_timestamp(value: str) -> datetime:
