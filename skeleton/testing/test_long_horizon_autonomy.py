@@ -18,7 +18,7 @@ from skeleton.automation.agents.long_horizon import (
     ReauthorizationRequired,
     SqliteLongHorizonStore,
 )
-from skeleton.contracts.canonical import EvidenceRef
+from skeleton.contracts.canonical import EvidenceRef, canonical_json_bytes
 
 
 NOW = 1_800_000_000.0
@@ -426,6 +426,25 @@ def test_checkpoint_digest_tampering_is_detected(tmp_path) -> None:
 
     with pytest.raises(LongHorizonError, match="digest mismatch"):
         scheduler.store.load_checkpoint("op-1", checkpoint.sequence)
+
+
+def test_checkpoint_digest_uses_shared_canonical_contract_bytes(tmp_path) -> None:
+    scheduler = _scheduler(tmp_path)
+    scheduler.claim_due(now=NOW)
+    payload = {"phase": "verified", "cursor": 4, "nested": {"ok": True}}
+
+    checkpoint = scheduler.checkpoint("op-1", payload, now=NOW + 1.0)
+
+    expected = hashlib.sha256(canonical_json_bytes(payload)).hexdigest()
+    assert checkpoint.payload_digest == expected
+
+
+def test_checkpoint_rejects_non_string_mapping_keys(tmp_path) -> None:
+    scheduler = _scheduler(tmp_path)
+    scheduler.claim_due(now=NOW)
+
+    with pytest.raises(LongHorizonError, match="checkpoint payload must be canonical JSON"):
+        scheduler.checkpoint("op-1", {1: "not-canonical"}, now=NOW + 1.0)
 
 
 def test_cancel_is_idempotent_for_terminal_operation(tmp_path) -> None:

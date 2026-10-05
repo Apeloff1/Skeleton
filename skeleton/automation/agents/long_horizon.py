@@ -25,6 +25,7 @@ from skeleton.automation.agents.human_control import (
     HumanControlAction,
     HumanControlDecision,
 )
+from skeleton.contracts.canonical import CanonicalContractError, canonical_json_bytes
 
 
 SCHEMA = "skeleton.long_horizon_autonomy.v1"
@@ -129,14 +130,8 @@ def _non_negative_int(value: object, field: str) -> int:
 
 def _canonical_json(value: object, field: str) -> str:
     try:
-        return json.dumps(
-            value,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-            allow_nan=False,
-        )
-    except (TypeError, ValueError) as exc:
+        return canonical_json_bytes(value).decode("utf-8")
+    except CanonicalContractError as exc:
         raise LongHorizonError(f"{field} must be canonical JSON") from exc
 
 
