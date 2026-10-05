@@ -5,3 +5,7 @@ def test_population_mismatch_is_first_class():
  r=compare_scope(s("adult"),s("child"));assert not r.compatible and r.conflicts==("population",)
 def test_unqualified_comparison_fails():
  with pytest.raises(ValueError):require_compatible(s("adult"),s("child"))
+
+def test_missing_scope_dimension_requires_qualification():
+ a=ClaimScope((ScopeDimension("region","NO"),));b=ClaimScope((ScopeDimension("region","NO"),ScopeDimension("time","now")))
+ assert not compare_scope(a,b).compatible and "time" in compare_scope(a,b).conflicts
