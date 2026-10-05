@@ -1672,7 +1672,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Build repository intelligence from files, symbols, imports, ownership, tests and change history.",
         "Track index freshness and provenance so stale code graphs are visible.",
@@ -1690,26 +1690,30 @@
         "ImpactQuery"
       ],
       "implementation_paths": [
-        "skeleton/repo_intelligence",
-        "planned:machine/repository_graph.json"
+        "skeleton/repo_intelligence/repository_graph.py",
+        "skeleton/repo_intelligence/change_planner.py",
+        "skeleton/repo_intelligence/source_extraction.py"
       ],
       "tests": [
         "skeleton/testing/test_repo_intelligence_git_index.py",
-        "planned:skeleton/testing/test_repo_graph_freshness.py"
+        "skeleton/testing/test_vol021_repository_graph.py",
+        "skeleton/testing/test_vol021_source_extraction.py"
       ],
       "evaluations": [
         "planned:impact-prediction precision/recall eval",
         "planned:cross-language symbol resolution eval"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/pull/2928",
+        "https://github.com/Apeloff1/Skeleton/commit/d87bcda53705ae7a8b0ef9d0389d31b6191d26af"
+      ],
       "risks": [
         "stale index",
         "false dependency confidence",
         "generated/vendor code pollution"
       ],
       "gaps": [
-        "complete cross-language graph extraction",
-        "connect ownership/test mapping to change planner"
+        "independent cross-language repository-graph, ownership/test impact, and change-planner verification remains pending"
       ],
       "accountability_id": "ACC-VOL-021",
       "completion_checkbox": false,
