@@ -13497,7 +13497,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Adapt capability to measured edge resources without changing security guarantees.",
         "Handle intermittent connectivity and local persistence/reconciliation."
@@ -13513,23 +13513,28 @@
         "EdgeSync"
       ],
       "implementation_paths": [
-        "deploy",
-        "skeleton/runtime"
+        "skeleton/inventory",
+        "skeleton/ai/runtime/deferred/research_evaluation.py",
+        "skeleton/ai/runtime/deferred/deployment_operations_assurance.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_edge_deployment.py"
+        "skeleton/testing/test_edge_deployment.py"
       ],
       "evaluations": [
-        "planned:low-resource/intermittent network evaluation"
+        "skeleton/testing/test_edge_deployment.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/inventory",
+        "skeleton/ai/runtime/deferred/research_evaluation.py",
+        "skeleton/ai/runtime/deferred/deployment_operations_assurance.py",
+        "skeleton/testing/test_edge_deployment.py"
+      ],
       "risks": [
         "resource thrash",
         "stale edge state"
       ],
       "gaps": [
-        "define edge resource tiers",
-        "bind model/router constraints"
+        "independent exact-head edge resource-tier, model-size, context, storage, and router-class verification remains pending"
       ],
       "accountability_id": "ACC-VOL-231",
       "completion_checkbox": false,
@@ -13544,7 +13549,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Separate organization/tenant administration from model authority.",
         "Define supported topologies and operational responsibilities."
@@ -13560,23 +13565,28 @@
         "EnterpriseTopology"
       ],
       "implementation_paths": [
-        "deploy",
-        "skeleton/security"
+        "skeleton/security",
+        "skeleton/ai/runtime/deferred/research_evaluation.py",
+        "skeleton/ai/runtime/deferred/deployment_operations_assurance.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_enterprise_deployment.py"
+        "skeleton/testing/test_enterprise_deployment.py"
       ],
       "evaluations": [
-        "planned:HA/upgrade enterprise drill"
+        "skeleton/testing/test_enterprise_deployment.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/security",
+        "skeleton/ai/runtime/deferred/research_evaluation.py",
+        "skeleton/ai/runtime/deferred/deployment_operations_assurance.py",
+        "skeleton/testing/test_enterprise_deployment.py"
+      ],
       "risks": [
         "admin overprivilege",
         "unsupported topology drift"
       ],
       "gaps": [
-        "define reference topologies",
-        "bind enterprise acceptance"
+        "independent exact-head enterprise topology SSO/audit/backup/residency acceptance verification remains pending"
       ],
       "accountability_id": "ACC-VOL-232",
       "completion_checkbox": false,
@@ -13591,7 +13601,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Validate issuer/audience/signature and claim mapping fail closed.",
         "Avoid using mutable email/display names as sole durable identity."
@@ -13608,22 +13618,25 @@
       ],
       "implementation_paths": [
         "skeleton/security",
-        "backend"
+        "skeleton/ai/runtime/deferred/deployment_operations_assurance.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_identity_federation.py"
+        "skeleton/testing/test_identity_federation.py"
       ],
       "evaluations": [
-        "planned:issuer/claim confusion evaluation"
+        "skeleton/testing/test_identity_federation.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/security",
+        "skeleton/ai/runtime/deferred/deployment_operations_assurance.py",
+        "skeleton/testing/test_identity_federation.py"
+      ],
       "risks": [
         "account takeover via claim mapping",
         "stale group grant"
       ],
       "gaps": [
-        "define principal mapping",
-        "bind revocation/sessions"
+        "independent exact-head federated principal mapping and exact revocation/session verification remains pending"
       ],
       "accountability_id": "ACC-VOL-233",
       "completion_checkbox": false,
@@ -13638,7 +13651,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Admin actions require explicit identity/authorization and durable receipts.",
         "Separate operational admin from model-generated actions."
@@ -13654,23 +13667,26 @@
         "AdminReceipt"
       ],
       "implementation_paths": [
-        "backend",
-        "frontend"
+        "skeleton/ai/runtime/deferred/operations_experience.py",
+        "skeleton/ai/runtime/deferred/deployment_operations_assurance.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_administration_plane.py"
+        "skeleton/testing/test_administration_plane.py"
       ],
       "evaluations": [
-        "planned:privilege escalation evaluation"
+        "skeleton/testing/test_administration_plane.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/ai/runtime/deferred/operations_experience.py",
+        "skeleton/ai/runtime/deferred/deployment_operations_assurance.py",
+        "skeleton/testing/test_administration_plane.py"
+      ],
       "risks": [
         "admin CSRF/confused deputy",
         "unaudited change"
       ],
       "gaps": [
-        "define admin capability scopes",
-        "bind break-glass/approval"
+        "independent exact-head admin capability, two-person approval, and break-glass verification remains pending"
       ],
       "accountability_id": "ACC-VOL-234",
       "completion_checkbox": false,
@@ -13685,7 +13701,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "UI is a projection of append-only/canonical audit data.",
         "Support correlation/search without leaking other tenants/secrets."
@@ -13701,23 +13717,28 @@
         "AuditEntry"
       ],
       "implementation_paths": [
-        "frontend",
-        "skeleton/observability"
+        "skeleton/observability",
+        "skeleton/ai/runtime/deferred/operations_experience.py",
+        "skeleton/ai/runtime/deferred/deployment_operations_assurance.py"
       ],
       "tests": [
-        "planned:frontend audit UI tests"
+        "skeleton/testing/test_audit_ui.py"
       ],
       "evaluations": [
-        "planned:tenant/redaction audit evaluation"
+        "skeleton/testing/test_audit_ui.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/observability",
+        "skeleton/ai/runtime/deferred/operations_experience.py",
+        "skeleton/ai/runtime/deferred/deployment_operations_assurance.py",
+        "skeleton/testing/test_audit_ui.py"
+      ],
       "risks": [
         "audit omission",
         "sensitive log exposure"
       ],
       "gaps": [
-        "define audit API contract",
-        "bind to provenance/trace"
+        "independent exact-head audit sequence/provenance/trace API projection verification remains pending"
       ],
       "accountability_id": "ACC-VOL-235",
       "completion_checkbox": false,
@@ -13732,7 +13753,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Expose freshness/degraded telemetry state explicitly.",
         "Make hard blockers and active incidents prominent."
@@ -13748,23 +13769,28 @@
         "OpsAlert"
       ],
       "implementation_paths": [
-        "frontend",
-        "skeleton/observability"
+        "skeleton/observability",
+        "skeleton/ai/runtime/deferred/operations_experience.py",
+        "skeleton/ai/runtime/deferred/deployment_operations_assurance.py"
       ],
       "tests": [
-        "planned:frontend operations dashboard tests"
+        "skeleton/testing/test_operations_dashboard.py"
       ],
       "evaluations": [
-        "planned:telemetry-loss UX evaluation"
+        "skeleton/testing/test_operations_dashboard.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/observability",
+        "skeleton/ai/runtime/deferred/operations_experience.py",
+        "skeleton/ai/runtime/deferred/deployment_operations_assurance.py",
+        "skeleton/testing/test_operations_dashboard.py"
+      ],
       "risks": [
         "stale green dashboard",
         "alert overload"
       ],
       "gaps": [
-        "define dashboard data contract",
-        "bind runbooks"
+        "independent exact-head operations dashboard freshness and runbook-binding verification remains pending"
       ],
       "accountability_id": "ACC-VOL-236",
       "completion_checkbox": false,
@@ -13779,7 +13805,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Human controls act through governed APIs, not UI-local state.",
         "Surface orphan/stale lease and budget exhaustion conditions."
@@ -13795,23 +13821,28 @@
         "AgentOpsAlert"
       ],
       "implementation_paths": [
-        "frontend",
-        "skeleton/ai/agents"
+        "skeleton/ai/agents",
+        "skeleton/ai/runtime/deferred/operations_experience.py",
+        "skeleton/ai/runtime/deferred/deployment_operations_assurance.py"
       ],
       "tests": [
-        "planned:frontend agent operations tests"
+        "skeleton/testing/test_agent_operations_dashboard.py"
       ],
       "evaluations": [
-        "planned:orphan-agent control evaluation"
+        "skeleton/testing/test_agent_operations_dashboard.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/ai/agents",
+        "skeleton/ai/runtime/deferred/operations_experience.py",
+        "skeleton/ai/runtime/deferred/deployment_operations_assurance.py",
+        "skeleton/testing/test_agent_operations_dashboard.py"
+      ],
       "risks": [
         "UI authority bypass",
         "hidden zombie agent"
       ],
       "gaps": [
-        "define agent ops projection",
-        "bind human control receipts"
+        "independent exact-head agent operations projection and human-control receipt verification remains pending"
       ],
       "accountability_id": "ACC-VOL-237",
       "completion_checkbox": false,
@@ -13826,7 +13857,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Separate evidence state from generated narrative.",
         "Preserve source/version and experiment lineage in drill-down."
@@ -13842,23 +13873,26 @@
         "ResearchGap"
       ],
       "implementation_paths": [
-        "frontend",
-        "skeleton/ai"
+        "skeleton/ai/runtime/deferred/research_evaluation_assurance.py",
+        "skeleton/ai/runtime/deferred/deployment_operations_assurance.py"
       ],
       "tests": [
-        "planned:frontend research dashboard tests"
+        "skeleton/testing/test_research_dashboard.py"
       ],
       "evaluations": [
-        "planned:contradictory-evidence UX evaluation"
+        "skeleton/testing/test_research_dashboard.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/ai/runtime/deferred/research_evaluation_assurance.py",
+        "skeleton/ai/runtime/deferred/deployment_operations_assurance.py",
+        "skeleton/testing/test_research_dashboard.py"
+      ],
       "risks": [
         "confidence visualization misleads",
         "stale source"
       ],
       "gaps": [
-        "define research view model",
-        "bind citation/experiment graphs"
+        "independent exact-head research backlog/citation/experiment dashboard projection verification remains pending"
       ],
       "accountability_id": "ACC-VOL-238",
       "completion_checkbox": false,
@@ -13873,7 +13907,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Every deployed model maps to immutable artifact/config/eval evidence.",
         "Model changes follow staged promotion and rollback controls."
@@ -13890,22 +13924,27 @@
       ],
       "implementation_paths": [
         "skeleton/ai/providers",
-        "machine"
+        "skeleton/ai/runtime/deferred/operations_experience.py",
+        "skeleton/ai/runtime/deferred/deployment_operations_assurance.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_model_operations.py"
+        "skeleton/testing/test_model_operations.py"
       ],
       "evaluations": [
-        "planned:model failover/promotion drill"
+        "skeleton/testing/test_model_operations.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/ai/providers",
+        "skeleton/ai/runtime/deferred/operations_experience.py",
+        "skeleton/ai/runtime/deferred/deployment_operations_assurance.py",
+        "skeleton/testing/test_model_operations.py"
+      ],
       "risks": [
         "untracked model swap",
         "capacity mismatch"
       ],
       "gaps": [
-        "unify model ops registry",
-        "bind router/release gates"
+        "independent exact-head model operations registry and router/release-gate binding verification remains pending"
       ],
       "accountability_id": "ACC-VOL-239",
       "completion_checkbox": false,
@@ -13920,7 +13959,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Keep rollback-compatible prior artifacts/configs available.",
         "Handle in-flight sessions/caches/versioned outputs explicitly."
@@ -13936,23 +13975,28 @@
         "ModelRollbackReceipt"
       ],
       "implementation_paths": [
-        "skeleton/ai/providers",
-        "recovery"
+        "skeleton/reliability",
+        "skeleton/ai/runtime/deferred/operations_experience.py",
+        "skeleton/ai/runtime/deferred/deployment_operations_assurance.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_model_rollback.py"
+        "skeleton/testing/test_model_rollback.py"
       ],
       "evaluations": [
-        "planned:bad-model rollback evaluation"
+        "skeleton/testing/test_model_rollback.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/reliability",
+        "skeleton/ai/runtime/deferred/operations_experience.py",
+        "skeleton/ai/runtime/deferred/deployment_operations_assurance.py",
+        "skeleton/testing/test_model_rollback.py"
+      ],
       "risks": [
         "mixed model version state",
         "stale KV/cache semantics"
       ],
       "gaps": [
-        "define model version fencing",
-        "bind rollback to deployment registry"
+        "independent exact-head model version/artifact/deployment-registry rollback fencing verification remains pending"
       ],
       "accountability_id": "ACC-VOL-240",
       "completion_checkbox": false,
