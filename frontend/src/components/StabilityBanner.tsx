@@ -14,7 +14,8 @@ import { useReduceMotion } from '../hooks/useReduceMotion';
 import { useFeatureFlag, FLAG } from '../feature-flags';
 import { setOfflineState } from '../../utils/safeFetch';
 import { accessibleStatusProps } from '../accessibility/runtime';
-import { TranslationKey, useI18n } from '../i18n';
+import { useI18n } from '../i18n';
+import type { TranslationKey } from '../i18n';
 
 type Variant = 'down' | 'offline' | 'degraded' | null;
 
