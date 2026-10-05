@@ -7,7 +7,8 @@ from pathlib import Path
 
 from skeleton.documentation.runtime import (
     DocumentationSource, GeneratedDocument, GeneratedSection, GeneratorIdentity,
-    SourceDigestSet, SourceKind, generated_manifest,
+    SourceDigestSet, SourceKind, assert_clean_regeneration, generated_manifest,
+    render_generated_document,
 )
 
 
@@ -38,9 +39,13 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("spec", type=Path)
     parser.add_argument("--manifest", type=Path)
+    parser.add_argument("--template", type=Path)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--check-output", action="store_true")
     args = parser.parse_args()
     spec = json.loads(args.spec.read_text(encoding="utf-8"))
-    manifest = generated_manifest(build(spec))
+    document = build(spec)
+    manifest = generated_manifest(document)
     encoded = json.dumps(manifest, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
     if args.manifest:
         current = args.manifest.read_text(encoding="utf-8") if args.manifest.exists() else None
@@ -48,6 +53,20 @@ def main() -> int:
             raise SystemExit("generated manifest drift")
     else:
         print(encoded, end="")
+
+    if args.check_output and not args.output:
+        raise SystemExit("--check-output requires --output")
+    if args.output and not args.template:
+        raise SystemExit("--output requires --template")
+    if args.template:
+        template = args.template.read_text(encoding="utf-8")
+        generated = render_generated_document(template, document)
+        if args.output:
+            if args.check_output:
+                current = args.output.read_text(encoding="utf-8") if args.output.exists() else ""
+                assert_clean_regeneration(current, generated)
+            else:
+                args.output.write_text(generated, encoding="utf-8")
     return 0
 
 
