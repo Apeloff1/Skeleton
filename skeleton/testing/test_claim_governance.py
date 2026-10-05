@@ -23,3 +23,16 @@ def test_reconciliation_preserves_unresolved_conflict_and_evidence():
 def test_snapshot_binds_watermarks_model_schema_and_cannot_override_new_source():
  s=KnowledgeSnapshot("src1","idx1","m1","schema1");assert s.digest
  assert restore_allowed(s,"src1") and not restore_allowed(s,"src2")
+
+
+def test_claim_governance_invalid_inputs_fail_closed():
+ import pytest
+ with pytest.raises(ValueError): ExpirationPolicy(-1,1)
+ with pytest.raises(ValueError): claim_validity(10,9,ExpirationPolicy(5,1),False)
+ duplicate=ReconciliationCase("case",KnowledgeConflict(("a","a"),("e",)))
+ with pytest.raises(ValueError): reconcile(duplicate)
+ incomplete=ReconciliationCase("case",KnowledgeConflict(("a","b"),()))
+ with pytest.raises(ValueError): reconcile(incomplete)
+ valid=ReconciliationCase("case",KnowledgeConflict(("a","b"),("e",)))
+ with pytest.raises(ValueError): reconcile(valid,None,"prefer-current")
+ with pytest.raises(ValueError): KnowledgeSnapshot("source","","model","schema")
