@@ -1225,7 +1225,6 @@ class OutcomeEvaluator:
             )
 
         records: list[LearnerEvidence] = []
-        prior_by_attempt: dict[str, LearnerEvidence] = {}
         correction_attempts = 0
         correction_successes = 0
         corrected_after_failure = False
@@ -1251,20 +1250,15 @@ class OutcomeEvaluator:
                 )
             seen_ids.add(record.evidence_id)
             records.append(record)
-            prior_by_attempt[record.attempt_id] = record
 
         for record in records:
             if record.kind is LearnerEvidenceKind.CORRECTION:
                 correction_attempts += 1
                 correction_successes += int(record.success)
-                prior = prior_by_attempt.get(
-                    record.prior_attempt_id or ""
-                )
-                if (
-                    prior is not None
-                    and not prior.success
-                    and record.success
-                ):
+                if record.success:
+                    # The append-only ledger only admits correction records
+                    # whose prior_attempt_id resolves to an unsuccessful
+                    # attempt in the same learner/objective boundary.
                     corrected_after_failure = True
             elif (
                 record.kind is LearnerEvidenceKind.TRANSFER
@@ -1333,16 +1327,16 @@ class LearnerEvidenceLedger:
     def append(self, record: LearnerEvidence) -> LearnerEvidence:
         if not isinstance(record, LearnerEvidence):
             raise TypeError("record must be LearnerEvidence")
-        if len(self._records) >= self.max_records:
-            raise InstructionRuntimeError(
-                "learner evidence ledger capacity reached"
-            )
         if record.evidence_id in self._records:
             existing = self._records[record.evidence_id]
             if existing == record:
                 return existing
             raise InstructionRuntimeError(
                 "evidence identity collision"
+            )
+        if len(self._records) >= self.max_records:
+            raise InstructionRuntimeError(
+                "learner evidence ledger capacity reached"
             )
         if record.attempt_id in self._attempts:
             raise InstructionRuntimeError(
@@ -1473,6 +1467,27 @@ class LearningSnapshot:
         if self.plan.objective_graph_digest != self.graph_digest:
             raise InstructionRuntimeError(
                 "snapshot plan/graph identity mismatch"
+            )
+        expected_state_digest = _digest(
+            {
+                "schema": INSTRUCTION_SCHEMA,
+                "kind": "instruction-state-set",
+                "learner_id": self.learner_id,
+                "states": [
+                    {
+                        "objective_id": state.objective_id,
+                        "digest": state.digest,
+                    }
+                    for state in sorted(
+                        self.states,
+                        key=lambda item: item.objective_id,
+                    )
+                ],
+            }
+        )
+        if self.plan.state_digest != expected_state_digest:
+            raise InstructionRuntimeError(
+                "snapshot plan/state identity mismatch"
             )
 
     @property
@@ -1627,11 +1642,15 @@ class InstructionRuntime:
             )
         baseline = tuple(by_id[item] for item in baseline_ids)
         baseline_set = set(baseline_ids)
-        followup = tuple(
-            record
-            for record in all_records
-            if record.evidence_id not in baseline_set
+        expected_prefix = tuple(
+            record.evidence_id
+            for record in all_records[: len(baseline_ids)]
         )
+        if baseline_ids != expected_prefix:
+            raise InstructionRuntimeError(
+                "baseline_evidence_ids must be the chronological evidence prefix"
+            )
+        followup = tuple(all_records[len(baseline_ids):])
         before = self.estimator.infer(
             learner,
             objective,
