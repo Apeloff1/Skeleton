@@ -261,28 +261,28 @@ Completion requires implementation sign-off plus independent verification sign-o
 - [ ] `ACC-VOL-226` — VOL-226 Dependency Health — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-227` — VOL-227 Vendor / Provider Risk — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-228` — VOL-228 Provider Failover — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-229` — VOL-229 Offline Mode — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-230` — VOL-230 Air-Gapped Profile — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-231` — VOL-231 Edge Deployment — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-232` — VOL-232 Enterprise Deployment — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-233` — VOL-233 Identity Federation — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-234` — VOL-234 Administration Plane — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-235` — VOL-235 Audit UI — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-236` — VOL-236 Operations Dashboard — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-237` — VOL-237 Agent Operations Dashboard — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-238` — VOL-238 Research Dashboard — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-239` — VOL-239 Model Operations — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-240` — VOL-240 Model Rollback — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-241` — VOL-241 Prompt / Instruction Registry — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-242` — VOL-242 Prompt Regression Testing — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-229` — VOL-229 Offline Mode — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-230` — VOL-230 Air-Gapped Profile — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-231` — VOL-231 Edge Deployment — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-232` — VOL-232 Enterprise Deployment — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-233` — VOL-233 Identity Federation — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-234` — VOL-234 Administration Plane — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-235` — VOL-235 Audit UI — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-236` — VOL-236 Operations Dashboard — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-237` — VOL-237 Agent Operations Dashboard — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-238` — VOL-238 Research Dashboard — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-239` — VOL-239 Model Operations — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-240` — VOL-240 Model Rollback — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-241` — VOL-241 Prompt / Instruction Registry — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-242` — VOL-242 Prompt Regression Testing — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-243` — VOL-243 Routing Policy Registry — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-244` — VOL-244 Memory Policy Registry — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-245` — VOL-245 Retrieval Policy Registry — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-246` — VOL-246 Knowledge Refresh — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-247` — VOL-247 Temporal Knowledge — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-247` — VOL-247 Temporal Knowledge — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [x] `ACC-VOL-248` — VOL-248 Uncertainty Representation — status: `hardened` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:P1 Reasoning Search Stop Policy Gate** — completed_at_utc: `2026-10-04T04:16:01Z`
-- [ ] `ACC-VOL-249` — VOL-249 Hypothesis Engine — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-250` — VOL-250 Causal Knowledge — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-249` — VOL-249 Hypothesis Engine — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-250` — VOL-250 Causal Knowledge — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-251` — VOL-251 Search Strategy Engine — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-252` — VOL-252 Value of Information — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [x] `ACC-VOL-253` — VOL-253 Stopping Policies — status: `hardened` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:P1 Reasoning Search Stop Policy Gate** — completed_at_utc: `2026-10-04T00:48:31Z`
@@ -292,46 +292,46 @@ Completion requires implementation sign-off plus independent verification sign-o
 - [ ] `ACC-VOL-257` — VOL-257 Reversibility Classification — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-258` — VOL-258 Blast-Radius Model — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-259` — VOL-259 Changeset Budgeting — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-260` — VOL-260 Migration Engine — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-261` — VOL-261 Legacy Compatibility — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-262` — VOL-262 Deprecation Process — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-263` — VOL-263 Architecture Archaeology — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-264` — VOL-264 Repository Consolidation Engine — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-265` — VOL-265 Code Provenance — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-266` — VOL-266 Duplication Detector — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-267` — VOL-267 Module Ownership — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-268` — VOL-268 CODEOWNERS Generation — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-269` — VOL-269 Documentation as Code — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-270` — VOL-270 Diagram as Code — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-271` — VOL-271 Architecture Snapshots — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-272` — VOL-272 Release Reproducibility — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-273` — VOL-273 Build Hermeticity — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-274` — VOL-274 Build Cache — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-275` — VOL-275 Binary Provenance — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-276` — VOL-276 Installer Security — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-277` — VOL-277 Update Security — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-278` — VOL-278 Bootstrap Recovery — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-279` — VOL-279 Crash Diagnostics — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-280` — VOL-280 Support Bundle — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-281` — VOL-281 Doctor Command — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-282` — VOL-282 Self-Diagnosis — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-283` — VOL-283 Safe Repair — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-284` — VOL-284 System Digital Twin — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-285` — VOL-285 Deployment Planner — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-286` — VOL-286 Resource Scheduler — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-287` — VOL-287 Fairness / Starvation Control — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-288` — VOL-288 Backpressure — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-289` — VOL-289 Load Shedding — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-290` — VOL-290 Queue Congestion Control — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-291` — VOL-291 Retry Budgets — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-292` — VOL-292 Circuit Breaker Standard — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-293` — VOL-293 Bulkhead Architecture — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-294` — VOL-294 Dead-Letter Workflow — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-295` — VOL-295 Operation Replay — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-296` — VOL-296 Determinism Envelope — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-297` — VOL-297 Time Architecture — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-298` — VOL-298 Identifier Standard — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-299` — VOL-299 Logical Clocks / Event Ordering — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-260` — VOL-260 Migration Engine — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-261` — VOL-261 Legacy Compatibility — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-262` — VOL-262 Deprecation Process — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-263` — VOL-263 Architecture Archaeology — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-264` — VOL-264 Repository Consolidation Engine — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-265` — VOL-265 Code Provenance — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-266` — VOL-266 Duplication Detector — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-267` — VOL-267 Module Ownership — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-268` — VOL-268 CODEOWNERS Generation — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-269` — VOL-269 Documentation as Code — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-270` — VOL-270 Diagram as Code — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-271` — VOL-271 Architecture Snapshots — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-272` — VOL-272 Release Reproducibility — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-273` — VOL-273 Build Hermeticity — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-274` — VOL-274 Build Cache — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-275` — VOL-275 Binary Provenance — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-276` — VOL-276 Installer Security — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-277` — VOL-277 Update Security — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-278` — VOL-278 Bootstrap Recovery — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-279` — VOL-279 Crash Diagnostics — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-280` — VOL-280 Support Bundle — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-281` — VOL-281 Doctor Command — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-282` — VOL-282 Self-Diagnosis — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-283` — VOL-283 Safe Repair — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-284` — VOL-284 System Digital Twin — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-285` — VOL-285 Deployment Planner — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-286` — VOL-286 Resource Scheduler — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-287` — VOL-287 Fairness / Starvation Control — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-288` — VOL-288 Backpressure — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-289` — VOL-289 Load Shedding — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-290` — VOL-290 Queue Congestion Control — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-291` — VOL-291 Retry Budgets — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-292` — VOL-292 Circuit Breaker Standard — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-293` — VOL-293 Bulkhead Architecture — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-294` — VOL-294 Dead-Letter Workflow — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-295` — VOL-295 Operation Replay — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-296` — VOL-296 Determinism Envelope — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-297` — VOL-297 Time Architecture — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-298` — VOL-298 Identifier Standard — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-299` — VOL-299 Logical Clocks / Event Ordering — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-300` — VOL-300 Final Master Control Plane — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-301` — VOL-301 System Objective Model — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-302` — VOL-302 Objective Normalization — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
