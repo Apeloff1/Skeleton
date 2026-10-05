@@ -7,7 +7,10 @@ class ToolComposition: bindings:tuple[ToolBinding,...]; granted:frozenset[str]
 class CompositionResult: valid:bool; reason:str
 def validate(c):
  if not c.bindings:return CompositionResult(False,"empty composition")
- if any(not b.tool or not b.input_schema or not b.output_schema or not b.trust for b in c.bindings):return CompositionResult(False,"invalid binding")
+ if any(not p for p in c.granted):return CompositionResult(False,"invalid granted permission")
+ names=[b.tool for b in c.bindings]
+ if len(names)!=len(set(names)):return CompositionResult(False,"duplicate tool binding")
+ if any(not b.tool or not b.input_schema or not b.output_schema or not b.trust or any(not p for p in b.permissions) for b in c.bindings):return CompositionResult(False,"invalid binding")
  if any(not b.permissions.issubset(c.granted) for b in c.bindings):return CompositionResult(False,"permission amplification")
  effective=set(c.bindings[0].permissions)
  for b in c.bindings[1:]:effective.intersection_update(b.permissions)
