@@ -659,7 +659,7 @@
       "id": "ACC-VOL-007",
       "type": "volume",
       "title": "VOL-007 Inference Engine",
-      "status": "unverified",
+      "status": "implemented",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
