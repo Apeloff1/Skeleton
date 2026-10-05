@@ -84,3 +84,17 @@ def test_rank_requires_bounded_typed_decisions():
  e=PriorityEngine();d=e.decide("ITEM.X",())
  with pytest.raises(PriorityError,match="typed tuple"):e.rank([d])
  with pytest.raises(PriorityError,match="typed tuple"):e.rank((object(),))
+
+def test_forged_decision_cannot_escape_derivable_score_bounds():
+ good="0"*64
+ with pytest.raises(PriorityError,match="score exceeds"):
+  PriorityDecision("ITEM.X",False,2560.0001,0.0,(),(),0.0,good)
+ with pytest.raises(PriorityError,match="effective_score exceeds"):
+  PriorityDecision("ITEM.X",False,0.0,2575.0001,(),(),0.0,good)
+
+def test_forged_decision_identity_collections_are_bounded():
+ good="0"*64
+ with pytest.raises(PriorityError,match="factor_ids exceeds policy bound"):
+  PriorityDecision("ITEM.X",False,0.0,0.0,tuple(f"FACTOR.X{i}" for i in range(257)),(),0.0,good)
+ with pytest.raises(PriorityError,match="blocker_ids exceeds policy bound"):
+  PriorityDecision("ITEM.X",True,0.0,0.0,(),tuple(f"BLOCK.X{i}" for i in range(257)),0.0,good)
