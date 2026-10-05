@@ -6,14 +6,20 @@ on:
       - main
     paths:
       - "skeleton/agents/blast_radius.py"
+      - "skeleton/automation/agents/blast_radius.py"
       - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/agents/core/blast_radius.py"
       - "skeleton/agents/human_control.py"
       - "skeleton/agents/autonomy_control.py"
       - "skeleton/contracts/risk_evidence.py"
+      - "skeleton/contracts/safety_hazards.py"
+      - "skeleton/ai/runtime/contracts/safety_hazards.py"
+      - "skeleton/contracts/__init__.py"
+      - "skeleton/ai/runtime/contracts/__init__.py"
       - "skeleton/agents/__init__.py"
       - "skeleton/ai/agents/core/__init__.py"
       - "skeleton/testing/test_blast_radius_alignment.py"
+      - "skeleton/testing/test_vol025_safety_hazard_policy.py"
       - ".github/workflows/p1-blast-radius-alignment.yml"
   pull_request:
     branches:
@@ -22,14 +28,20 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/agents/blast_radius.py"
+      - "skeleton/automation/agents/blast_radius.py"
       - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/agents/core/blast_radius.py"
       - "skeleton/agents/human_control.py"
       - "skeleton/agents/autonomy_control.py"
       - "skeleton/contracts/risk_evidence.py"
+      - "skeleton/contracts/safety_hazards.py"
+      - "skeleton/ai/runtime/contracts/safety_hazards.py"
+      - "skeleton/contracts/__init__.py"
+      - "skeleton/ai/runtime/contracts/__init__.py"
       - "skeleton/agents/__init__.py"
       - "skeleton/ai/agents/core/__init__.py"
       - "skeleton/testing/test_blast_radius_alignment.py"
+      - "skeleton/testing/test_vol025_safety_hazard_policy.py"
       - ".github/workflows/p1-blast-radius-alignment.yml"
   workflow_dispatch:
 
@@ -74,12 +86,16 @@ jobs:
         run: >-
           python -m compileall -q
           skeleton/agents/blast_radius.py
+          skeleton/automation/agents/blast_radius.py
           skeleton/ai/agents/core/blast_radius.py
+          skeleton/contracts/safety_hazards.py
+          skeleton/ai/runtime/contracts/safety_hazards.py
 
       - name: Run AUTO-05 through AUTO-02 regressions
         run: >-
           python -m pytest -q --noconftest
           skeleton/testing/test_blast_radius_alignment.py
+          skeleton/testing/test_vol025_safety_hazard_policy.py
           skeleton/testing/test_human_control.py
           skeleton/testing/test_autonomy_deescalation.py
           skeleton/testing/test_agent_delegation_qualification.py
@@ -118,6 +134,12 @@ jobs:
               RiskSeverity,
               evaluate_risk_binding,
               make_obligation_id,
+          )
+          from skeleton.contracts.safety_hazards import (
+              DEFAULT_SAFETY_HAZARD_MANIFEST,
+              DEFAULT_SAFETY_HAZARD_MANIFEST_DIGEST,
+              DEFAULT_SAFETY_POLICY_ID,
+              DEFAULT_SAFETY_POLICY_VERSION,
           )
 
           now = 1_800_000_000.0
@@ -258,6 +280,18 @@ jobs:
           )
           if not decision.accepted:
               raise SystemExit(f"AUTO-05 fixture rejected: {decision.reasons}")
+          if decision.safety_policy_id != DEFAULT_SAFETY_POLICY_ID:
+              raise SystemExit("AUTO-05 safety policy id drift")
+          if decision.safety_policy_version != DEFAULT_SAFETY_POLICY_VERSION:
+              raise SystemExit("AUTO-05 safety policy version drift")
+          if decision.hazard_manifest_digest != DEFAULT_SAFETY_HAZARD_MANIFEST_DIGEST:
+              raise SystemExit("AUTO-05 hazard manifest identity drift")
+          if not decision.triggered_hazard_ids:
+              raise SystemExit("AUTO-05 high-impact fixture emitted no hazards")
+          if not set(decision.triggered_hazard_ids).issubset(
+              set(DEFAULT_SAFETY_HAZARD_MANIFEST.hazard_ids)
+          ):
+              raise SystemExit("AUTO-05 emitted undeclared hazard id")
           evidence = decision.accepted_evidence_ref()
           Path(".p1-auto-05/decision.json").write_text(
               json.dumps(decision.payload(), indent=2, sort_keys=True) + "\n",
@@ -294,7 +328,9 @@ jobs:
               return h.hexdigest()
 
           Path(".p1-auto-05/config.digest").write_text(
-              hashlib.sha256(b"p1-auto-05-blast-radius-v1").hexdigest(),
+              hashlib.sha256(
+                  b"p1-auto-05-blast-radius-v2-safety-policy"
+              ).hexdigest(),
               encoding="utf-8",
           )
           Path(".p1-auto-05/environment.digest").write_text(
@@ -306,7 +342,11 @@ jobs:
           Path(".p1-auto-05/verifier.digest").write_text(
               digest([
                   "skeleton/agents/blast_radius.py",
+                  "skeleton/automation/agents/blast_radius.py",
+                  "skeleton/ai/agents/core/blast_radius.py",
                   "skeleton/contracts/risk_evidence.py",
+                  "skeleton/contracts/safety_hazards.py",
+                  "skeleton/ai/runtime/contracts/safety_hazards.py",
                   ".github/workflows/p1-blast-radius-alignment.yml",
               ]),
               encoding="utf-8",
@@ -314,6 +354,7 @@ jobs:
           Path(".p1-auto-05/tests.digest").write_text(
               digest([
                   "skeleton/testing/test_blast_radius_alignment.py",
+                  "skeleton/testing/test_vol025_safety_hazard_policy.py",
                   "skeleton/testing/test_human_control.py",
                   "skeleton/testing/test_autonomy_deescalation.py",
                   "skeleton/testing/test_agent_delegation_qualification.py",

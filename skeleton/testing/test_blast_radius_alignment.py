@@ -24,9 +24,25 @@ from skeleton.agents.human_control import (
 )
 from skeleton.contracts.canonical import EvidenceRef
 from skeleton.contracts.risk_evidence import RiskBindingEvaluation
+from skeleton.contracts.safety_hazards import (
+    DEFAULT_SAFETY_HAZARD_MANIFEST,
+    DEFAULT_SAFETY_HAZARD_MANIFEST_DIGEST,
+    DEFAULT_SAFETY_POLICY_ID,
+    DEFAULT_SAFETY_POLICY_VERSION,
+    SafetyHazardClass,
+    SafetyHazardManifest,
+)
 
 
 NOW = 1_800_000_000.0
+
+
+def _hazard_id(hazard_class: SafetyHazardClass) -> str:
+    return next(
+        item.hazard_id
+        for item in DEFAULT_SAFETY_HAZARD_MANIFEST.hazards
+        if item.hazard_class is hazard_class
+    )
 
 
 def _ref(
@@ -180,6 +196,10 @@ def test_low_impact_exact_action_needs_no_human_or_risk_binding() -> None:
     assert decision.impact is ImpactClass.LOW
     assert decision.risk_evaluation_digest is None
     assert decision.human_receipt_digest is None
+    assert decision.safety_policy_id == DEFAULT_SAFETY_POLICY_ID
+    assert decision.safety_policy_version == DEFAULT_SAFETY_POLICY_VERSION
+    assert decision.hazard_manifest_digest == DEFAULT_SAFETY_HAZARD_MANIFEST_DIGEST
+    assert decision.triggered_hazard_ids == ()
     evidence = decision.accepted_evidence_ref()
     assert evidence.category == "blast_radius_alignment_qualification"
     assert evidence.digest == decision.decision_digest
@@ -214,6 +234,12 @@ def test_high_impact_requires_resolved_risk_and_exact_human_approval() -> None:
     assert missing.impact is ImpactClass.HIGH
     assert "human-approval-missing" in missing.reasons
     assert "risk-binding-missing" in missing.reasons
+    assert _hazard_id(
+        SafetyHazardClass.AUTHORITY_ESCALATION
+    ) in missing.triggered_hazard_ids
+    assert _hazard_id(
+        SafetyHazardClass.IRREVERSIBLE_SIDE_EFFECT
+    ) in missing.triggered_hazard_ids
 
     accepted = qualify_blast_radius(
         profile=profile,
@@ -225,6 +251,15 @@ def test_high_impact_requires_resolved_risk_and_exact_human_approval() -> None:
     assert accepted.accepted is True
     assert accepted.risk_evaluation_digest is not None
     assert accepted.human_receipt_digest is not None
+    assert accepted.safety_policy_id == DEFAULT_SAFETY_POLICY_ID
+    assert accepted.safety_policy_version == DEFAULT_SAFETY_POLICY_VERSION
+    assert accepted.hazard_manifest_digest == DEFAULT_SAFETY_HAZARD_MANIFEST_DIGEST
+    assert _hazard_id(
+        SafetyHazardClass.AUTHORITY_ESCALATION
+    ) in accepted.triggered_hazard_ids
+    assert _hazard_id(
+        SafetyHazardClass.IRREVERSIBLE_SIDE_EFFECT
+    ) in accepted.triggered_hazard_ids
 
 
 def test_irreversible_action_is_critical_and_requires_critical_risk_binding() -> None:
@@ -485,3 +520,50 @@ def test_invalid_policy_and_profile_shapes_fail_closed() -> None:
         _profile(affected_tenants=0)
     with pytest.raises(BlastRadiusError, match="action_digest"):
         _profile(action_digest="not-a-digest")
+
+
+
+def test_runtime_decision_binds_explicit_safety_policy_version() -> None:
+    manifest = SafetyHazardManifest(
+        policy_id=DEFAULT_SAFETY_POLICY_ID,
+        policy_version=2,
+        hazards=DEFAULT_SAFETY_HAZARD_MANIFEST.hazards,
+    )
+    policy = BlastRadiusPolicy(hazard_manifest=manifest)
+    profile = _profile()
+
+    decision = qualify_blast_radius(
+        profile=profile,
+        alignment=_alignment(profile),
+        observed_at=NOW,
+        policy=policy,
+    )
+
+    assert decision.accepted is True
+    assert decision.safety_policy_id == DEFAULT_SAFETY_POLICY_ID
+    assert decision.safety_policy_version == 2
+    assert decision.hazard_manifest_digest == manifest.manifest_digest
+    assert decision.policy_digest == policy.digest
+    assert decision.policy_digest != BlastRadiusPolicy().digest
+
+
+def test_goal_drift_binds_formal_goal_drift_hazard() -> None:
+    profile = _profile()
+    decision = qualify_blast_radius(
+        profile=profile,
+        alignment=_alignment(profile, goal_drift_detected=True),
+        observed_at=NOW,
+    )
+
+    assert decision.accepted is False
+    assert _hazard_id(SafetyHazardClass.GOAL_DRIFT) in decision.triggered_hazard_ids
+
+
+def test_blast_radius_source_and_ai_mirror_are_byte_identical() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    source = root / "skeleton/automation/agents/blast_radius.py"
+    mirror = root / "skeleton/ai/agents/core/blast_radius.py"
+
+    assert source.read_bytes() == mirror.read_bytes()
