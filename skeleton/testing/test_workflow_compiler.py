@@ -12,3 +12,8 @@ def test_cycle_rejected():
 def test_invalid_compensation_rejected():
  r=compile_workflow("w",["a"],[],[],set(),{"a":"missing"})
  assert not r.ok and "invalid-compensation:a" in r.diagnostics
+
+def test_generator_nodes_are_not_consumed_twice():
+ r=compile_workflow("w",(x for x in ("a","b")),(),(),(),{})
+ assert r.ok and r.workflow.nodes==("a","b")
+def test_missing_workflow_identity_fails_closed():assert not compile_workflow("",("a",),(),(),(),{}).ok
