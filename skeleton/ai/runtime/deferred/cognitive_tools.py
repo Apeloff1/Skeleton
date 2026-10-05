@@ -27,6 +27,7 @@ class CostAttribution: operation_id:str; total_units:float; records:int
 def attribute_cost(xs):
  if not xs:return CostAttribution("",0,0)
  op=xs[0].operation_id
+ if not op or any(not x.strategy.name or not x.strategy.version or not x.model or not x.model_version or x.units<0 for x in xs):raise ValueError("invalid reasoning cost identity")
  if any(x.operation_id!=op for x in xs):raise ValueError("mixed operations")
  return CostAttribution(op,sum(x.units for x in xs),len(xs))
 class Severity(str,Enum): INFO="info"; WARNING="warning"; ERROR="error"
