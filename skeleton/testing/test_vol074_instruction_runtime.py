@@ -54,6 +54,7 @@ def evidence(
     hints_used: int = 0,
     learner_id: str = "learner.test",
     prior_attempt_id: str | None = None,
+    success_threshold: float = 0.5,
 ) -> LearnerEvidence:
     return LearnerEvidence(
         evidence_id=evidence_id,
@@ -67,6 +68,7 @@ def evidence(
         hints_used=hints_used,
         source_ref=f"exercise:{evidence_id}",
         response_digest=digest(f"response:{evidence_id}"),
+        success_threshold=success_threshold,
         prior_attempt_id=prior_attempt_id,
     )
 
@@ -1426,3 +1428,118 @@ def test_outcome_evaluator_rejects_unproven_correction_lineage() -> None:
             ),
             new_evidence=(correction,),
         )
+
+
+def test_evidence_success_is_bound_to_declared_score_threshold() -> None:
+    passing = evidence(
+        "passing",
+        score=0.80,
+        success=True,
+        success_threshold=0.75,
+    )
+    failing = evidence(
+        "failing",
+        score=0.70,
+        success=False,
+        success_threshold=0.75,
+    )
+
+    assert passing.success is True
+    assert failing.success is False
+
+    with pytest.raises(
+        InstructionRuntimeError,
+        match="success must match score",
+    ):
+        evidence(
+            "inconsistent",
+            score=0.20,
+            success=True,
+            success_threshold=0.75,
+        )
+
+
+def test_outcome_evaluator_rejects_evidence_older_than_baseline_state() -> None:
+    before = replace(
+        state(),
+        last_observed_at=10.0,
+    )
+    after = replace(
+        state(mastery=0.75),
+        last_observed_at=10.0,
+    )
+
+    with pytest.raises(
+        InstructionRuntimeError,
+        match="predates baseline state",
+    ):
+        OutcomeEvaluator().evaluate(
+            before=before,
+            after=after,
+            new_evidence=(
+                evidence(
+                    "old",
+                    observed_at=9.0,
+                ),
+            ),
+        )
+
+
+def test_instruction_policy_is_identity_neutral_for_equal_learning_state() -> None:
+    curriculum = graph(
+        objective(
+            mastery_target=0.80,
+            max_uncertainty=0.50,
+        )
+    )
+    first_state = state(
+        learner_id="learner.alpha",
+        mastery=0.60,
+        uncertainty=0.20,
+    )
+    second_state = replace(
+        first_state,
+        learner_id="learner.beta",
+        evidence_digest=digest("same-evidence-shape-beta"),
+    )
+
+    first = InstructionPlanner().plan(
+        learner_id="learner.alpha",
+        graph=curriculum,
+        states={"objective.basics": first_state},
+    )
+    second = InstructionPlanner().plan(
+        learner_id="learner.beta",
+        graph=curriculum,
+        states={"objective.basics": second_state},
+    )
+
+    first_policy = tuple(
+        (
+            step.objective_id,
+            step.mode,
+            step.required_evidence_kind,
+            step.success_threshold,
+            step.max_hints,
+        )
+        for step in first.steps
+    )
+    second_policy = tuple(
+        (
+            step.objective_id,
+            step.mode,
+            step.required_evidence_kind,
+            step.success_threshold,
+            step.max_hints,
+        )
+        for step in second.steps
+    )
+
+    assert first_policy == second_policy
+
+
+def test_learning_package_exports_remain_byte_identical() -> None:
+    canonical = ROOT / "skeleton/learning/__init__.py"
+    mirror = ROOT / "skeleton/ai/learning/__init__.py"
+
+    assert canonical.read_bytes() == mirror.read_bytes()
