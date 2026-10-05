@@ -136,3 +136,18 @@ def test_tool_authorization_source_and_ai_mirror_are_byte_identical() -> None:
     mirror = root / "skeleton/ai/runtime/security/tool_authorization.py"
 
     assert source.read_bytes() == mirror.read_bytes()
+
+
+
+@pytest.mark.parametrize(
+    "factory",
+    (
+        lambda: SecurityContext(" worker-1", "ctx-1", (_grant(),)),
+        lambda: SecurityContext("worker-1", "", (_grant(),)),
+        lambda: ToolRequest("git", "", "repo:a", "read", D),
+        lambda: ToolRequest(" git", "repo.read", "repo:a", "read", D),
+    ),
+)
+def test_malformed_runtime_authorization_inputs_fail_closed(factory) -> None:
+    with pytest.raises(SecurityContractError):
+        factory()
