@@ -12,3 +12,8 @@ def test_uncertain_change_requires_reversible_stage():
 def test_empty_or_partial_gate_set_fails_closed():
  import pytest
  with pytest.raises(PermissionError):SafeChangePlan((ChangeStep("x",True,"r"),),(),1,1,False)
+
+def test_duplicate_gate_rejected():
+ import pytest
+ gs=(ChangeGate("ownership",True,"e"),ChangeGate("ownership",True,"e2"),ChangeGate("compatibility",True,"e"),ChangeGate("risk",True,"e"))
+ with pytest.raises(ValueError):SafeChangePlan((ChangeStep("s",True,"r"),),gs,1,1,False)
