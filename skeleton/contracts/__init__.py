@@ -6,6 +6,7 @@ from .canonical import (
     EvidenceRef,
     Identity,
     evidence_ref_identity,
+    canonical_conformance_vector,
 )
 from .ai_execution import (
     AI_EXECUTION_SCHEMA_VERSION,
@@ -219,6 +220,7 @@ __all__ = [
     "EvidenceRef",
     "Identity",
     "evidence_ref_identity",
+    "canonical_conformance_vector",
     "MATURITY_ORDER",
     "MaturityEvaluation",
     "MaturityReconciliation",
