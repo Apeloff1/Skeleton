@@ -42,11 +42,16 @@ def _specs(src:SourceFile)->tuple[str,...]:
 def _resolve(source:str,spec:str,paths:set[str])->str|None:
  base=PurePosixPath(source).parent
  if spec.startswith("."):
-  raw=str(base/spec)
-  candidates=[raw,raw+".py",raw+".js",raw+".ts",raw+".tsx",raw+"/index.js",raw+"/index.ts"]
+  depth=len(spec)-len(spec.lstrip("."))
+  remainder=spec[depth:]
+  root=base
+  for _ in range(max(0,depth-1)):root=root.parent
+  rel=remainder.replace(".","/").lstrip("/")
+  raw=str(root/rel) if rel else str(root)
+  candidates=[raw,raw+".py",raw+".js",raw+".ts",raw+".tsx",raw+"/__init__.py",raw+"/index.js",raw+"/index.ts"]
  else:
   dotted=spec.replace("::","/").replace(".","/")
-  candidates=[dotted+e for e in _EXT]+[dotted+"/__init__.py"]
+  candidates=[dotted+e for e in _EXT]+[dotted+"/__init__.py",dotted+"/index.js",dotted+"/index.ts"]
  matches=[p for p in candidates if p in paths]
  return matches[0] if len(matches)==1 else None
 def build_repository_graph(sources:tuple[SourceFile,...])->RepositoryGraph:
