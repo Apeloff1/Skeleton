@@ -32,7 +32,9 @@ class SagaInstance: saga_id:str; instance_id:str; completed:int; durable_revisio
 @dataclass(frozen=True,slots=True)
 class SagaTransition: previous_revision:int; revision:int; completed:int
 def advance_saga(d,i):
- if d.saga_id!=i.saga_id or not(len(d.steps)==len(d.idempotency_keys)==len(d.timeouts)==len(d.compensations)):raise ValueError("invalid saga")
+ if not d.saga_id or not i.instance_id or d.saga_id!=i.saga_id or not d.steps or not(len(d.steps)==len(d.idempotency_keys)==len(d.timeouts)==len(d.compensations)):raise ValueError("invalid saga")
+ if any(not s for s in d.steps) or len(set(d.steps))!=len(d.steps) or any(not k for k in d.idempotency_keys) or len(set(d.idempotency_keys))!=len(d.idempotency_keys):raise ValueError("invalid saga identity")
+ if any(t<0 for t in d.timeouts) or i.completed<0 or i.durable_revision<0 or i.completed>len(d.steps):raise ValueError("invalid saga state")
  if i.completed>=len(d.steps):return i,SagaTransition(i.durable_revision,i.durable_revision,i.completed)
  n=SagaInstance(i.saga_id,i.instance_id,i.completed+1,i.durable_revision+1)
  return n,SagaTransition(i.durable_revision,n.durable_revision,n.completed)
