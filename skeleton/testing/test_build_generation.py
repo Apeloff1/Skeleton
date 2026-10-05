@@ -33,3 +33,12 @@ def test_rebuild_fail_closed_on_empty_or_unidentified_inputs():
  assert not rebuild_admissible(RebuildPlan((RebuildStep("",("x",),"v",True),)))
  assert not rebuild_admissible(RebuildPlan((RebuildStep("a",(),"v",True),)))
  assert not rebuild_verified(RebuildEvidence("","d","d",True))
+
+
+def test_impact_and_risk_inputs_fail_closed():
+ import pytest
+ evidence=ImpactEvidence(True,True,True,())
+ with pytest.raises(ValueError): impact(ImpactQuery(()),{}, {}, evidence)
+ with pytest.raises(ValueError): estimate_risk((), "cal")
+ with pytest.raises(ValueError): estimate_risk((RiskFactor("blast",-1,.5),), "cal")
+ with pytest.raises(ValueError): estimate_risk((RiskFactor("blast",1,1.01),), "cal")
