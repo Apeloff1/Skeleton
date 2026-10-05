@@ -15,7 +15,8 @@ class AppendixReference:
  reference_id:str;canonical_path:str;canonical_digest:str;label:str
  def __post_init__(self):
   object.__setattr__(self,"reference_id",_id(self.reference_id,"reference_id"));_sha(self.canonical_digest,"canonical_digest")
-  if not isinstance(self.canonical_path,str) or not isinstance(self.label,str) or not self.canonical_path.strip() or not self.label.strip():raise AppendixError("reference path and label required")\n  if self.canonical_path.startswith("/") or "\\\\" in self.canonical_path or ".." in self.canonical_path.split("/"):raise AppendixError("canonical_path must be repository relative")
+  if not isinstance(self.canonical_path,str) or not isinstance(self.label,str) or not self.canonical_path.strip() or not self.label.strip():raise AppendixError("reference path and label required")
+  if self.canonical_path.startswith("/") or "\\\\" in self.canonical_path or ".." in self.canonical_path.split("/"):raise AppendixError("canonical_path must be repository relative")
 @dataclass(frozen=True,slots=True)
 class TermDefinition:
  term_id:str;term:str;definition:str;owner_id:str;version:int
@@ -24,7 +25,8 @@ class TermDefinition:
   if not isinstance(self.term,str) or not isinstance(self.definition,str) or not self.term.strip() or not self.definition.strip() or not isinstance(self.version,int) or isinstance(self.version,bool) or self.version<1:raise AppendixError("normative term definition invalid")
 class ReferenceIndex:
  def __init__(self,references,terms):
-  if not isinstance(references,tuple) or not isinstance(terms,tuple) or any(not isinstance(x,AppendixReference) for x in references) or any(not isinstance(x,TermDefinition) for x in terms):raise AppendixError("references and terms must be typed tuples")\n  refs=references;ts=terms;self.references={x.reference_id:x for x in refs};self.terms={x.term_id:x for x in ts}
+  if not isinstance(references,tuple) or not isinstance(terms,tuple) or any(not isinstance(x,AppendixReference) for x in references) or any(not isinstance(x,TermDefinition) for x in terms):raise AppendixError("references and terms must be typed tuples")
+  refs=references;ts=terms;self.references={x.reference_id:x for x in refs};self.terms={x.term_id:x for x in ts}
   if len(self.references)!=len(refs):raise AppendixError("duplicate appendix reference")
   if len(self.terms)!=len(ts):raise AppendixError("duplicate normative term id")
   names=[x.term.casefold() for x in ts]
