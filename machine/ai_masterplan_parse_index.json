@@ -3,10 +3,10 @@
   "kind": "ai-masterplan-parse-index",
   "sources": {
     "machine/ai_master_plan.json": {
-      "git_blob_sha": "b49c116f0bdfa58757c4ec4b84cb356c8f5092fc"
+      "git_blob_sha": "26d873b55b59f20735969244d4f5e654254a76d0"
     },
     "machine/ai_build_accountability.json": {
-      "git_blob_sha": "d722f62e2b2b049a00d885e445b103b6f46fa5ea"
+      "git_blob_sha": "09c67654313d925c60fdfe4d983113b6aa2092d4"
     }
   },
   "policy": {
@@ -17,12 +17,12 @@
   },
   "volume_summary": {
     "total": 421,
-    "implementation_signed": 201,
+    "implementation_signed": 209,
     "verification_signed": 20,
     "complete": 20,
-    "implementation_signed_open": 181,
+    "implementation_signed_open": 189,
     "gap_free_waiting_verification": 24,
-    "implementation_unsigned": 220
+    "implementation_unsigned": 212
   },
   "fast_sets": {
     "fully_complete": [
@@ -110,12 +110,6 @@
       "VOL-185",
       "VOL-186",
       "VOL-187",
-      "VOL-188",
-      "VOL-189",
-      "VOL-190",
-      "VOL-191",
-      "VOL-192",
-      "VOL-193",
       "VOL-194",
       "VOL-195",
       "VOL-197",
@@ -124,8 +118,6 @@
       "VOL-200",
       "VOL-203",
       "VOL-204",
-      "VOL-206",
-      "VOL-209",
       "VOL-210",
       "VOL-211",
       "VOL-212",
@@ -323,13 +315,13 @@
     },
     "DP-161-200": {
       "total": 40,
-      "implementation_signed": 10,
+      "implementation_signed": 16,
       "complete": 0,
       "gap_free_waiting_verification": 1
     },
     "DP-201-240": {
       "total": 40,
-      "implementation_signed": 5,
+      "implementation_signed": 7,
       "complete": 0,
       "gap_free_waiting_verification": 0
     },
@@ -367,14 +359,14 @@
   "accountability_summary": {
     "volume": {
       "total": 421,
-      "implementation_signed": 201,
+      "implementation_signed": 209,
       "verification_signed": 20,
       "complete": 20,
       "status_counts": {
         "verified": 13,
-        "implemented": 181,
+        "implemented": 189,
         "hardened": 7,
-        "unverified": 220
+        "unverified": 212
       }
     },
     "work_package": {
