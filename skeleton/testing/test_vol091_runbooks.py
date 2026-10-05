@@ -1,5 +1,6 @@
 from __future__ import annotations
 import hashlib
+from datetime import datetime, timezone
 import pytest
 from skeleton.observability.runbooks import Runbook,RunbookError,RunbookRegistry,RunbookStep,RunbookValidation,StepKind,ValidationStatus
 
@@ -71,3 +72,21 @@ def test_cycle_with_exit_to_terminal_is_allowed():
       RunbookStep("STEP.STOP",StepKind.STOP,"stop"),
     )
     assert Runbook("RUNBOOK.RETRY","V1","ops","degraded","STEP.START",s).entry_step_id=="STEP.START"
+
+def test_validation_status_cannot_be_free_form():
+    b=book()
+    with pytest.raises(RunbookError,match="ValidationStatus"):
+        RunbookValidation("VALIDATION.BAD",b.runbook_id,b.digest,"DRILL.BAD","passed",SHA)
+
+def test_drill_observation_time_is_normalized_and_precise():
+    b=book()
+    receipt=RunbookValidation("VALIDATION.TIME",b.runbook_id,b.digest,"DRILL.TIME",ValidationStatus.PASSED,SHA,datetime(2026,10,5,15,0,tzinfo=timezone.utc))
+    assert receipt.observed_at.tzinfo is timezone.utc
+    with pytest.raises(RunbookError,match="whole-second"):
+        RunbookValidation("VALIDATION.SUBSECOND",b.runbook_id,b.digest,"DRILL.SUBSECOND",ValidationStatus.PASSED,SHA,datetime(2026,10,5,15,0,0,1,tzinfo=timezone.utc))
+
+def test_duplicate_drill_receipt_for_exact_runbook_is_rejected():
+    r=RunbookRegistry(); b=book(); r.register(b)
+    r.record_validation(RunbookValidation("VALIDATION.A",b.runbook_id,b.digest,"DRILL.SAME",ValidationStatus.PASSED,SHA))
+    with pytest.raises(RunbookError,match="drill identity"):
+        r.record_validation(RunbookValidation("VALIDATION.B",b.runbook_id,b.digest,"DRILL.SAME",ValidationStatus.FAILED,SHA))
