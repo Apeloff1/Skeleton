@@ -30,3 +30,11 @@ def test_signoff_approval_is_strict_boolean():
  with pytest.raises(AcceptanceError,match="approved must be bool"):AcceptanceSignoff(b.digest,"ACTOR.REVIEWER",b.builder_id,1)
 def test_acceptance_evidence_collection_must_be_typed_tuple():
  with pytest.raises(AcceptanceError,match="typed tuple"):FunctionalAIAcceptance("ACCEPT.X",S("s"),S("c"),S("m"),S("e"),list(evidence()),"ACTOR.BUILDER")
+
+def test_duplicate_criterion_evidence_rejected():
+ ev=list(evidence());ev.append(AcceptanceEvidence("EVID.EXTRA",Criterion.SECURITY,S("extra"),True))
+ with pytest.raises(AcceptanceError,match="exactly one"):bundle(tuple(ev))
+def test_signoff_replay_rejects_source_drift():
+ b=bundle();s=sign(b,"ACTOR.REVIEWER");verify_signoff(b,s)
+ changed=FunctionalAIAcceptance(b.acceptance_id,S("changed"),b.config_digest,b.model_digest,b.environment_digest,b.evidence,b.builder_id)
+ with pytest.raises(AcceptanceError,match="stale or mismatched"):verify_signoff(changed,s)
