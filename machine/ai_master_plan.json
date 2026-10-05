@@ -5567,7 +5567,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Select formal-method targets by consequence and ambiguity rather than prestige.",
         "Bind each formal model to named implementation contracts and assumptions.",
@@ -5580,21 +5580,36 @@
       ],
       "contracts": [
         "FormalSpecification",
+        "FormalAssumption",
+        "ImplementationBinding",
+        "StateVariable",
+        "FormalState",
         "ProofObligation",
-        "Counterexample"
+        "ProofResult",
+        "Counterexample",
+        "FormalRunReport",
+        "FormalSpecificationRegistry",
+        "ModelSemantics",
+        "BoundedModelChecker"
       ],
       "implementation_paths": [
-        "formal",
-        "scripts",
-        "skeleton/testing"
+        "skeleton/contracts/formal_methods.py",
+        "skeleton/contracts/formal_targets.py",
+        "skeleton/contracts/__init__.py",
+        "skeleton/ai/runtime/contracts/formal_methods.py",
+        "skeleton/ai/runtime/contracts/formal_targets.py",
+        "skeleton/ai/runtime/contracts/__init__.py",
+        "skeleton/contracts/operation.py",
+        "skeleton/contracts/protocol.py",
+        "machine/ai_file_tree.json"
       ],
       "tests": [
-        "planned:skeleton/testing/test_formal_contract_registry.py",
-        "planned:formal model conformance tests"
+        "skeleton/testing/test_vol081_formal_methods.py"
       ],
       "evaluations": [
-        "planned:model/code conformance evaluation",
-        "planned:state-space/assumption review"
+        "skeleton/testing/test_vol081_formal_methods.py",
+        "P0.OPERATION.LIFECYCLE",
+        "P0.PROTOCOL.REPLAY"
       ],
       "evidence": [],
       "risks": [
@@ -5602,10 +5617,7 @@
         "state explosion",
         "proof overclaim"
       ],
-      "gaps": [
-        "select P0 formal targets",
-        "establish model-to-code traceability"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-081",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
