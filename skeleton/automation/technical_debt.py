@@ -11,14 +11,14 @@ def _id(v,f):
 class DebtImpact:
  operational_interest:int;engineering_interest:int;risk:int
  def __post_init__(self):
-  if min(self.operational_interest,self.engineering_interest,self.risk)<0:raise DebtError("debt impact must be nonnegative")
+  for f in ("operational_interest","engineering_interest","risk"):\n   v=getattr(self,f)\n   if not isinstance(v,int) or isinstance(v,bool) or v<0:raise DebtError("debt impact must be nonnegative integers")
 @dataclass(frozen=True,slots=True)
 class DebtItem:
  debt_id:str;source:str;contract_ids:tuple[str,...];owner_id:str;target_disposition:str;impact:DebtImpact
  def __post_init__(self):
   object.__setattr__(self,"debt_id",_id(self.debt_id,"debt_id"));object.__setattr__(self,"owner_id",_id(self.owner_id,"owner_id"))
-  contracts=tuple(sorted(set(_id(x,"contract_id") for x in self.contract_ids)))
-  if not self.source.strip() or not contracts or not self.target_disposition.strip():raise DebtError("source contracts and disposition required")
+  if not isinstance(self.contract_ids,tuple):raise DebtError("contract_ids must be tuple")\n  contracts=tuple(_id(x,"contract_id") for x in self.contract_ids)\n  if len(set(contracts))!=len(contracts):raise DebtError("duplicate affected contract")\n  contracts=tuple(sorted(contracts))
+  if not isinstance(self.source,str) or not isinstance(self.target_disposition,str) or not self.source.strip() or not contracts or not self.target_disposition.strip():raise DebtError("source contracts and disposition required")\n  if not isinstance(self.impact,DebtImpact):raise DebtError("impact must be DebtImpact")
   object.__setattr__(self,"contract_ids",contracts)
 @dataclass(frozen=True,slots=True)
 class DebtRetirement:
