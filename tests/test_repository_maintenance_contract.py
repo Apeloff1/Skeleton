@@ -53,3 +53,14 @@ def test_update_rejects_changed_resource_since_observation():
 def test_update_with_exact_resource_evidence_can_be_authorized():
  t=task(action=MaintenanceAction.UPDATE,risk=MaintenanceRisk.MEDIUM)
  assert authorize(t,owner(),evidence()).decision is MaintenanceDecision.ALLOW
+
+def test_task_policy_enums_are_typed():
+ with pytest.raises(MaintenanceError,match="MaintenanceAction"):task(action="remove")
+ with pytest.raises(MaintenanceError,match="MaintenanceRisk"):task(risk="unsafe")
+
+def test_ownership_policy_enums_are_typed():
+ with pytest.raises(MaintenanceError,match="ResourceKind"):owner(kind="unknown")
+ with pytest.raises(MaintenanceError,match="OwnershipClass"):owner(ownership="unknown")
+
+def test_resource_evidence_boolean_claims_are_typed():
+ with pytest.raises(MaintenanceError,match="reachable must be bool"):evidence(reachable=1)
