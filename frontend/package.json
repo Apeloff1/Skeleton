@@ -21,7 +21,8 @@
     "test:skeleton-forge": "node --test scripts/skeleton-forge/*.test.cjs",
     "test:forge-operator": "node --test scripts/forge-operator/*.test.cjs",
     "test:product-projection": "node --test scripts/test-product-projection.mjs",
-    "test:accessibility": "node --test scripts/test-accessibility-contract.mjs"
+    "test:accessibility": "node --test scripts/test-accessibility-contract.mjs",
+    "test:localization": "node --test scripts/test-localization-contract.mjs"
   },
   "engines": {
     "node": ">=24"
