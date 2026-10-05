@@ -103,12 +103,17 @@ class BacklogRegistry:
   return tuple(sorted(x.item_id for x in self._items.values() if x.item_id!=item_id and x.fingerprint==item.fingerprint))
  def deduplicate(self,canonical_id:str,duplicate_id:str,disposition_id:str,reason:str):
   canonical=self._items[canonical_id];duplicate=self._items[duplicate_id]
+  if canonical_id==duplicate_id:raise BacklogError("item cannot duplicate itself")
+  if canonical.state in (BacklogState.CLOSED,BacklogState.RETIRED) or duplicate.state in (BacklogState.CLOSED,BacklogState.RETIRED):raise BacklogError("terminal item cannot participate in deduplication")
   if canonical.fingerprint!=duplicate.fingerprint:raise BacklogError("items are not deterministic duplicates")
   merged={(s.kind,s.source_id):s for s in canonical.sources}
   merged.update({(s.kind,s.source_id):s for s in duplicate.sources})
   self._items[canonical_id]=replace(canonical,sources=tuple(merged.values()))
   self._items[duplicate_id]=replace(duplicate,state=BacklogState.RETIRED)
-  disp=BacklogDisposition(disposition_id,duplicate_id,DispositionKind.DUPLICATE,reason,canonical_id);self._dispositions[disposition_id]=disp
+  disp=BacklogDisposition(disposition_id,duplicate_id,DispositionKind.DUPLICATE,reason,canonical_id)
+  prior=self._dispositions.get(disposition_id)
+  if prior is not None and prior!=disp:raise BacklogError("disposition identity is immutable")
+  self._dispositions[disposition_id]=disp
   return disp
  def reconcile(self,item_id:str)->BacklogItem:
   item=self._items[item_id]
