@@ -400,7 +400,14 @@ class CapabilitySnapshot:
                 raw["capability_id"], state, guarantees, raw["reason"],
                 raw["evidence_digest"], dependency_states,
             ))
+        capability_ids = [item.capability_id for item in capabilities]
+        if len(capability_ids) != len(set(capability_ids)):
+            raise CapabilityError("duplicate snapshot capability")
+        if capability_ids != sorted(capability_ids):
+            raise CapabilityError("snapshot capabilities must be canonical order")
         result = cls(registry_digest, tuple(capabilities))
+        if not isinstance(value["healthy"], bool):
+            raise CapabilityError("capability snapshot health must be boolean")
         if value["healthy"] is not result.healthy:
             raise CapabilityError("capability snapshot health mismatch")
         if value["digest"] != result.digest:
