@@ -11126,7 +11126,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-10-05T00:26:34Z",
+      "last_event_at_utc": "2026-10-05T18:24:15Z",
       "history": [
         {
           "sequence": 1,
@@ -11173,6 +11173,27 @@
             "skeleton/testing/test_vol074_instruction_runtime.py",
             "machine/ai_file_tree.json"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "evidence_refreshed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "evidence-steward",
+          "at_utc": "2026-10-05T18:24:15Z",
+          "git_sha": "31f7539c3476d12a2a5498264db6c51e6e1ea45e",
+          "statement": "Bind adversarial learner-state hardening that treats equally newest evidence as one conservative cohort so a lexicographically later success cannot mask an equally fresh failure. This strengthens implementation evidence only; independent verification and completion remain unsigned.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/31f7539c3476d12a2a5498264db6c51e6e1ea45e",
+          "from_status": "implemented",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2965",
+            "https://github.com/Apeloff1/Skeleton/commit/31f7539c3476d12a2a5498264db6c51e6e1ea45e",
+            "skeleton/learning/instruction_runtime.py",
+            "skeleton/ai/learning/instruction_runtime.py",
+            "skeleton/testing/test_vol074_instruction_runtime.py"
+          ]
         }
       ],
       "evidence": [
@@ -11187,7 +11208,9 @@
         "skeleton/ai/learning/instruction_runtime.py",
         "skeleton/ai/learning/__init__.py",
         "skeleton/testing/test_vol074_instruction_runtime.py",
-        "machine/ai_file_tree.json"
+        "machine/ai_file_tree.json",
+        "https://github.com/Apeloff1/Skeleton/pull/2965",
+        "https://github.com/Apeloff1/Skeleton/commit/31f7539c3476d12a2a5498264db6c51e6e1ea45e"
       ],
       "baseline_status": "unverified"
     },
