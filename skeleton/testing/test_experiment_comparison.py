@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from skeleton.ai.runtime.deferred.research_evaluation import ExperimentRun
 from skeleton.ai.runtime.deferred.research_evaluation_assurance import compare_experiment_runs
 
@@ -33,7 +35,7 @@ def test_experiment_comparison_requires_matching_identity_surface() -> None:
         run("candidate", value=0.7),
     )
     assert evidence.eligible is True
-    assert evidence.delta == 0.2
+    assert evidence.delta == pytest.approx(0.2)
     assert evidence.reason_code == "eligible"
 
 
