@@ -1,0 +1,119 @@
+name: Masterplan Research Evaluation Gapfill
+
+on:
+  pull_request:
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_file_tree.json"
+      - "machine/ai_research_evaluation_gapfill_candidate.json"
+      - "skeleton/research/**"
+      - "skeleton/ai/research/**"
+      - "skeleton/artifacts/reproduction_package.py"
+      - "skeleton/ai/runtime/extensions/artifacts/reproduction_package.py"
+      - "skeleton/eval/**"
+      - "skeleton/ai/evaluation/**"
+      - "skeleton/testing/test_research_agent_team.py"
+      - "skeleton/testing/test_literature_watch.py"
+      - "skeleton/testing/test_citation_graph.py"
+      - "skeleton/testing/test_reproduction_packages.py"
+      - "skeleton/testing/test_experiment_comparison.py"
+      - "skeleton/testing/test_statistical_analysis.py"
+      - "skeleton/testing/test_model_eval_harness.py"
+      - "skeleton/testing/test_agent_eval_harness.py"
+      - "skeleton/testing/test_long_horizon_benchmarks.py"
+      - "skeleton/testing/test_contamination_auditor.py"
+      - "skeleton/testing/test_human_evaluation.py"
+      - "skeleton/testing/test_research_evaluation_review.py"
+      - "scripts/check_ai_research_evaluation_gapfill.py"
+      - "tests/test_ai_research_evaluation_gapfill.py"
+      - "docs/plan/RESEARCH_EVALUATION_GAPFILL_210_220.md"
+      - ".github/workflows/masterplan-research-evaluation-gapfill.yml"
+  push:
+    branches: [main]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_file_tree.json"
+      - "machine/ai_research_evaluation_gapfill_candidate.json"
+      - "skeleton/research/**"
+      - "skeleton/artifacts/reproduction_package.py"
+      - "skeleton/eval/**"
+      - "scripts/check_ai_research_evaluation_gapfill.py"
+      - ".github/workflows/masterplan-research-evaluation-gapfill.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-evaluation-gapfill-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-head:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused test runtime
+        run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+
+      - name: Compile tranche surfaces
+        run: >-
+          python -m compileall -q
+          skeleton/research
+          skeleton/artifacts/reproduction_package.py
+          skeleton/eval
+          skeleton/ai/research
+          skeleton/ai/runtime/extensions/artifacts/reproduction_package.py
+          skeleton/ai/evaluation
+          scripts/check_ai_research_evaluation_gapfill.py
+
+      - name: Validate masterplan and AI-tree
+        run: |
+          python scripts/check_ai_master_plan.py
+          python scripts/check_ai_file_tree.py
+
+      - name: Validate exact-head candidate
+        run: |
+          HEAD_SHA="$(git rev-parse HEAD)"
+          python scripts/check_ai_research_evaluation_gapfill.py --head "$HEAD_SHA" --json
+
+      - name: Run candidate validator tests
+        run: python -m pytest -q --noconftest tests/test_ai_research_evaluation_gapfill.py
+
+      - name: Run VOL-210 through VOL-220 regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_research_agent_team.py
+          skeleton/testing/test_literature_watch.py
+          skeleton/testing/test_citation_graph.py
+          skeleton/testing/test_reproduction_packages.py
+          skeleton/testing/test_experiment_comparison.py
+          skeleton/testing/test_statistical_analysis.py
+          skeleton/testing/test_model_eval_harness.py
+          skeleton/testing/test_agent_eval_harness.py
+          skeleton/testing/test_long_horizon_benchmarks.py
+          skeleton/testing/test_contamination_auditor.py
+          skeleton/testing/test_human_evaluation.py
+          skeleton/testing/test_research_evaluation_review.py
+
+      - name: Run cross-plane regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_long_horizon_autonomy.py
+          skeleton/testing/test_long_horizon_aging.py
+          skeleton/testing/test_citations.py
