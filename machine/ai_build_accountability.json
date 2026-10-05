@@ -4142,7 +4142,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-10-05T16:10:31Z",
+      "last_event_at_utc": "2026-10-05T17:52:55Z",
       "history": [
         {
           "sequence": 1,
@@ -4187,6 +4187,26 @@
             "skeleton/vault/deletion_proof.py",
             "skeleton/vault/regional_privacy.py"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "evidence_refreshed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "evidence-steward",
+          "at_utc": "2026-10-05T17:52:55Z",
+          "git_sha": "3236db1474412b5b0108629159a24f6bc3149a24",
+          "statement": "Bind adversarial deletion-proof hardening that makes erasure completion self-validating against exact record/store topology identity and rejects forged complete proofs. This strengthens implementation evidence only; independent verification and completion remain unsigned.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/3236db1474412b5b0108629159a24f6bc3149a24",
+          "from_status": "implemented",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2942",
+            "https://github.com/Apeloff1/Skeleton/commit/3236db1474412b5b0108629159a24f6bc3149a24",
+            "skeleton/vault/deletion_proof.py",
+            "skeleton/testing/test_vol027_privacy_completion.py"
+          ]
         }
       ],
       "evidence": [
@@ -4200,7 +4220,9 @@
         "skeleton/testing/test_vol027_privacy_completion.py",
         "skeleton/vault",
         "skeleton/vault/deletion_proof.py",
-        "skeleton/vault/regional_privacy.py"
+        "skeleton/vault/regional_privacy.py",
+        "https://github.com/Apeloff1/Skeleton/pull/2942",
+        "https://github.com/Apeloff1/Skeleton/commit/3236db1474412b5b0108629159a24f6bc3149a24"
       ],
       "baseline_status": "unverified"
     },
@@ -10774,7 +10796,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-10-05T00:12:14Z",
+      "last_event_at_utc": "2026-10-05T17:52:55Z",
       "history": [
         {
           "sequence": 1,
@@ -10820,6 +10842,27 @@
             "skeleton/testing/test_vol073_scenario_runtime.py",
             "machine/ai_file_tree.json"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "evidence_refreshed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "evidence-steward",
+          "at_utc": "2026-10-05T17:52:55Z",
+          "git_sha": "bf8a3c44fa6bc300b8a54b99cd82a0ccaf4256dd",
+          "statement": "Bind adversarial scenario-replay hardening that verifies exact conservative uncertainty accumulation across every parent/edge/child link and rejects understated simulated risk. This strengthens implementation evidence only; independent verification and completion remain unsigned.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/bf8a3c44fa6bc300b8a54b99cd82a0ccaf4256dd",
+          "from_status": "implemented",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2945",
+            "https://github.com/Apeloff1/Skeleton/commit/bf8a3c44fa6bc300b8a54b99cd82a0ccaf4256dd",
+            "skeleton/simulation/scenario_runtime.py",
+            "skeleton/ai/simulation/scenario_runtime.py",
+            "skeleton/testing/test_vol073_scenario_runtime.py"
+          ]
         }
       ],
       "evidence": [
@@ -10833,7 +10876,9 @@
         "skeleton/ai/simulation/scenario_runtime.py",
         "skeleton/testing/test_simulation_authority_boundary.py",
         "skeleton/testing/test_vol073_scenario_runtime.py",
-        "machine/ai_file_tree.json"
+        "machine/ai_file_tree.json",
+        "https://github.com/Apeloff1/Skeleton/pull/2945",
+        "https://github.com/Apeloff1/Skeleton/commit/bf8a3c44fa6bc300b8a54b99cd82a0ccaf4256dd"
       ],
       "baseline_status": "unverified"
     },
@@ -13213,7 +13258,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-10-05T16:10:31Z",
+      "last_event_at_utc": "2026-10-05T17:52:55Z",
       "history": [
         {
           "sequence": 1,
@@ -13254,6 +13299,27 @@
             "skeleton/contracts/compliance.py",
             "skeleton/testing/test_vol088_compliance.py"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "evidence_refreshed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "evidence-steward",
+          "at_utc": "2026-10-05T17:52:55Z",
+          "git_sha": "a440985361657ffe91069151eac6e7631848367e",
+          "statement": "Bind adversarial compliance hardening that evaluates the complete newest evidence cohort and fails closed when equally fresh identity-bound evidence contains a failure. This strengthens implementation evidence only; independent verification and completion remain unsigned.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/a440985361657ffe91069151eac6e7631848367e",
+          "from_status": "implemented",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2944",
+            "https://github.com/Apeloff1/Skeleton/commit/a440985361657ffe91069151eac6e7631848367e",
+            "skeleton/contracts/compliance.py",
+            "skeleton/ai/runtime/contracts/compliance.py",
+            "skeleton/testing/test_vol088_compliance.py"
+          ]
         }
       ],
       "evidence": [
@@ -13263,7 +13329,9 @@
         "skeleton/ai/runtime/contracts/compliance.py",
         "skeleton/contracts/__init__.py",
         "skeleton/contracts/compliance.py",
-        "skeleton/testing/test_vol088_compliance.py"
+        "skeleton/testing/test_vol088_compliance.py",
+        "https://github.com/Apeloff1/Skeleton/pull/2944",
+        "https://github.com/Apeloff1/Skeleton/commit/a440985361657ffe91069151eac6e7631848367e"
       ],
       "baseline_status": "unverified"
     },
@@ -13500,7 +13568,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-10-05T16:10:31Z",
+      "last_event_at_utc": "2026-10-05T17:52:55Z",
       "history": [
         {
           "sequence": 1,
@@ -13543,6 +13611,27 @@
             "skeleton/observability/runbooks.py",
             "skeleton/testing/test_vol091_runbooks.py"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "evidence_refreshed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "evidence-steward",
+          "at_utc": "2026-10-05T17:52:55Z",
+          "git_sha": "24ff16f5eedd235a50a569d59b33cc6f51cd25e5",
+          "statement": "Bind adversarial runbook hardening that makes the newest exact-version drill cohort authoritative, invalidates stale historical passes, and fails closed on conflicting latest outcomes. This strengthens implementation evidence only; independent verification and completion remain unsigned.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/24ff16f5eedd235a50a569d59b33cc6f51cd25e5",
+          "from_status": "implemented",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2941",
+            "https://github.com/Apeloff1/Skeleton/commit/24ff16f5eedd235a50a569d59b33cc6f51cd25e5",
+            "skeleton/observability/runbooks.py",
+            "skeleton/ai/runtime/observability/runbooks.py",
+            "skeleton/testing/test_vol091_runbooks.py"
+          ]
         }
       ],
       "evidence": [
@@ -13554,7 +13643,9 @@
         "skeleton/ai/runtime/observability/runbooks.py",
         "skeleton/observability/__init__.py",
         "skeleton/observability/runbooks.py",
-        "skeleton/testing/test_vol091_runbooks.py"
+        "skeleton/testing/test_vol091_runbooks.py",
+        "https://github.com/Apeloff1/Skeleton/pull/2941",
+        "https://github.com/Apeloff1/Skeleton/commit/24ff16f5eedd235a50a569d59b33cc6f51cd25e5"
       ],
       "baseline_status": "unverified"
     },
@@ -14020,7 +14111,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-10-05T16:10:31Z",
+      "last_event_at_utc": "2026-10-05T17:52:55Z",
       "history": [
         {
           "sequence": 1,
@@ -14058,13 +14149,35 @@
             "skeleton/persistence/foundation_recovery.py",
             "skeleton/testing/test_vs000_foundation_recovery.py"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "evidence_refreshed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "evidence-steward",
+          "at_utc": "2026-10-05T17:52:55Z",
+          "git_sha": "a80c3ccba5acc70fe9ac4da2cd52d0f409c81003",
+          "statement": "Bind adversarial foundation-recovery hardening that makes recovered status structurally require checkpoint and rebuilt-projection proof while preventing fail-closed evidence from claiming successful reconstruction. This strengthens implementation evidence only; independent verification and completion remain unsigned.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/a80c3ccba5acc70fe9ac4da2cd52d0f409c81003",
+          "from_status": "implemented",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2940",
+            "https://github.com/Apeloff1/Skeleton/commit/a80c3ccba5acc70fe9ac4da2cd52d0f409c81003",
+            "skeleton/persistence/foundation_recovery.py",
+            "skeleton/testing/test_vs000_foundation_recovery.py"
+          ]
         }
       ],
       "evidence": [
         "git-head:2a7b06dcda9b00257bf5dfcb739dd0ff736d051d",
         "https://github.com/Apeloff1/Skeleton/commit/2a7b06dcda9b00257bf5dfcb739dd0ff736d051d",
         "skeleton/persistence/foundation_recovery.py",
-        "skeleton/testing/test_vs000_foundation_recovery.py"
+        "skeleton/testing/test_vs000_foundation_recovery.py",
+        "https://github.com/Apeloff1/Skeleton/pull/2940",
+        "https://github.com/Apeloff1/Skeleton/commit/a80c3ccba5acc70fe9ac4da2cd52d0f409c81003"
       ],
       "baseline_status": "unverified"
     },
@@ -14780,7 +14893,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-10-05T17:47:16Z",
+      "last_event_at_utc": "2026-10-05T17:52:55Z",
       "history": [
         {
           "sequence": 1,
@@ -14841,6 +14954,27 @@
             "https://github.com/Apeloff1/Skeleton/commit/a0cb5a4bc2a082b66de0dbd21a20ee7ad4eee325",
             "skeleton/testing/test_functional_ai_acceptance.py"
           ]
+        },
+        {
+          "sequence": 4,
+          "event_type": "evidence_refreshed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "evidence-steward",
+          "at_utc": "2026-10-05T17:52:55Z",
+          "git_sha": "f9abe9dbab87ea5cffc0ae354e7b08228674c5b7",
+          "statement": "Bind the current-main VOL-104 replay hardening that rechecks bundle eligibility during verification and rejects manually forged approval over failed acceptance criteria across canonical and governed mirrors. This strengthens implementation evidence only; independent verification and completion remain unsigned.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/f9abe9dbab87ea5cffc0ae354e7b08228674c5b7",
+          "from_status": "implemented",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2938",
+            "https://github.com/Apeloff1/Skeleton/commit/f9abe9dbab87ea5cffc0ae354e7b08228674c5b7",
+            "skeleton/eval/functional_acceptance.py",
+            "skeleton/ai/evaluation/functional_acceptance.py",
+            "skeleton/testing/test_functional_ai_acceptance.py"
+          ]
         }
       ],
       "evidence": [
@@ -14853,7 +14987,10 @@
         "skeleton/eval/functional_acceptance.py",
         "skeleton/testing/test_functional_ai_acceptance.py",
         "https://github.com/Apeloff1/Skeleton/pull/2923",
-        "https://github.com/Apeloff1/Skeleton/commit/a0cb5a4bc2a082b66de0dbd21a20ee7ad4eee325"
+        "https://github.com/Apeloff1/Skeleton/commit/a0cb5a4bc2a082b66de0dbd21a20ee7ad4eee325",
+        "https://github.com/Apeloff1/Skeleton/pull/2938",
+        "https://github.com/Apeloff1/Skeleton/commit/f9abe9dbab87ea5cffc0ae354e7b08228674c5b7",
+        "skeleton/ai/evaluation/functional_acceptance.py"
       ],
       "baseline_status": "unverified"
     },
@@ -15372,7 +15509,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-10-05T16:10:31Z",
+      "last_event_at_utc": "2026-10-05T17:52:55Z",
       "history": [
         {
           "sequence": 1,
@@ -15416,6 +15553,27 @@
             "skeleton/testing/test_definition_of_done.py",
             "skeleton/testing/test_vol110_definition_of_done.py"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "evidence_refreshed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "evidence-steward",
+          "at_utc": "2026-10-05T17:52:55Z",
+          "git_sha": "6eaa351e6667a5ee47128bcd0ba66d7e86bf4bf1",
+          "statement": "Bind adversarial Definition-of-Done hardening that rejects the declared owner as an independent requirement verifier and preserves canonical/governed runtime parity. This strengthens implementation evidence only; independent verification and completion remain unsigned.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6eaa351e6667a5ee47128bcd0ba66d7e86bf4bf1",
+          "from_status": "implemented",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2939",
+            "https://github.com/Apeloff1/Skeleton/commit/6eaa351e6667a5ee47128bcd0ba66d7e86bf4bf1",
+            "skeleton/contracts/definition_of_done.py",
+            "skeleton/ai/runtime/contracts/definition_of_done.py",
+            "skeleton/testing/test_vol110_definition_of_done.py"
+          ]
         }
       ],
       "evidence": [
@@ -15428,7 +15586,9 @@
         "skeleton/contracts/__init__.py",
         "skeleton/contracts/definition_of_done.py",
         "skeleton/testing/test_definition_of_done.py",
-        "skeleton/testing/test_vol110_definition_of_done.py"
+        "skeleton/testing/test_vol110_definition_of_done.py",
+        "https://github.com/Apeloff1/Skeleton/pull/2939",
+        "https://github.com/Apeloff1/Skeleton/commit/6eaa351e6667a5ee47128bcd0ba66d7e86bf4bf1"
       ],
       "baseline_status": "unverified"
     },
