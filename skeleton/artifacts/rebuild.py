@@ -13,7 +13,9 @@ def execute_rebuild(plan,verified_inputs,producer):
  out=[]
  for s in plan.steps:
   if any(x not in verified_inputs for x in s.input_digests):raise PermissionError("unverified rebuild input")
-  actual=producer(s.artifact_id,s.producer_version,s.input_digests)
+  if not s.artifact_id or not s.producer_version or not s.expected_digest or not s.input_digests:raise ValueError("complete rebuild step identity required")
+  try: actual=producer(s.artifact_id,s.producer_version,s.input_digests)
+  except Exception as exc: raise RuntimeError("artifact producer failed") from exc
   out.append(RebuildEvidence(s.artifact_id,s.expected_digest,actual,actual==s.expected_digest))
   if actual!=s.expected_digest:raise ValueError("rebuilt digest mismatch")
  return tuple(out)
