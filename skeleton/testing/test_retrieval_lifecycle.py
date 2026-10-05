@@ -27,3 +27,9 @@ def test_source_trust_is_claim_domain_and_time_scoped():
 def test_untrusted_content_remains_data_not_instruction():
  t=SourceTrust(SourceIdentity("s","o","l"),(),False)
  assert content_role(t,"c","d",0)=="data" and not t.trusted_for_instruction
+
+
+def test_health_properties_are_executable():
+ freshness=FreshnessSLI(10,9,1)
+ assert freshness.healthy
+ assert DataServiceHealth(True,True,True).healthy
