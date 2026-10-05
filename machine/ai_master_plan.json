@@ -6622,7 +6622,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Assign explicit roles, scopes, leases and handoff packets to each agent.",
         "Detect overlapping mutation/conflict domains before commit.",
@@ -6641,17 +6641,22 @@
       "implementation_paths": [
         "skeleton/ai/agents",
         "skeleton/ai/build",
-        "skeleton/swarm"
+        "skeleton/swarm",
+        "skeleton/ai/agents/multi_agent_engineering.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_vs004_multi_agent_engineering.py",
-        "planned:conflict/lease integration tests"
+        "skeleton/testing/test_vs004_coordination_contracts.py"
       ],
       "evaluations": [
         "planned:agent-crash coordination drill",
         "planned:false-consensus evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/3000ce6635129346cf53768ddc949b5e65e045f3",
+        "https://github.com/Apeloff1/Skeleton/commit/ca72b7860a523b0520f7c619f7c06c5e65edcc26",
+        "skeleton/ai/agents/multi_agent_engineering.py",
+        "skeleton/testing/test_vs004_coordination_contracts.py"
+      ],
       "risks": [
         "authority amplification",
         "lost update",
@@ -6674,7 +6679,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Generate candidates only in isolated experiment scope.",
         "Compare challenger against champion on predeclared quality, safety, cost and robustness evidence.",
@@ -6693,17 +6698,22 @@
       "implementation_paths": [
         "skeleton/ai/forge",
         "skeleton/learning",
-        "skeleton/eval"
+        "skeleton/eval",
+        "skeleton/learning/promotion_control.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_vs005_self_improvement.py",
-        "planned:promotion rollback integration"
+        "skeleton/testing/test_vs005_promotion_control.py"
       ],
       "evaluations": [
         "planned:reward-hacking challenge",
         "planned:canary regression evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/41c9fc48bc8a13dccd879f695905736f284a5837",
+        "https://github.com/Apeloff1/Skeleton/commit/4ec393f8c98853385a123f4fdca436e34701a3df",
+        "skeleton/learning/promotion_control.py",
+        "skeleton/testing/test_vs005_promotion_control.py"
+      ],
       "risks": [
         "self-promotion",
         "benchmark gaming",
@@ -6726,7 +6736,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Distribute only work with explicit identity, lease/fencing and idempotency semantics.",
         "Exercise worker loss, partition, delayed messages and recovery.",
@@ -6745,17 +6755,22 @@
       "implementation_paths": [
         "skeleton/ai",
         "skeleton/network",
-        "skeleton/reliability"
+        "skeleton/reliability",
+        "skeleton/reliability/distributed_execution.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_vs006_distributed_execution.py",
-        "planned:partition/failover integration"
+        "skeleton/testing/test_vs006_distributed_reconciliation.py"
       ],
       "evaluations": [
         "planned:split-brain campaign",
         "planned:unknown-outcome reconciliation drill"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/3f80b3d303aa2bdd99d70375b2ea3162f1f70921",
+        "https://github.com/Apeloff1/Skeleton/commit/08848a10594c64e94813818ce2fc3daf65b02c5d",
+        "skeleton/reliability/distributed_execution.py",
+        "skeleton/testing/test_vs006_distributed_reconciliation.py"
+      ],
       "risks": [
         "duplicate effects",
         "stale lease",
@@ -6778,7 +6793,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Install from signed release artifact on clean supported environment.",
         "Complete VS-001-level AI operation and produce a governed artifact.",
@@ -6797,17 +6812,22 @@
       "implementation_paths": [
         "skeleton/app",
         "installer",
-        "desktop"
+        "desktop",
+        "skeleton/app/desktop_release.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_vs007_desktop_product.py",
-        "planned:clean-machine desktop release E2E"
+        "skeleton/testing/test_vs007_release_continuity.py"
       ],
       "evaluations": [
         "planned:update interruption drill",
         "planned:rollback data-compatibility evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/0d0ced6d062d52934d3be11b5372a5dbb9464fd5",
+        "https://github.com/Apeloff1/Skeleton/commit/a91efdf4e557d530ad16e917ec0058c20f407e0b",
+        "skeleton/app/desktop_release.py",
+        "skeleton/testing/test_vs007_release_continuity.py"
+      ],
       "risks": [
         "install/runtime mismatch",
         "migration loss",
