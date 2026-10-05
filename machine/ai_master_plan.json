@@ -5666,7 +5666,13 @@
         "P0.OPERATION.LIFECYCLE",
         "P0.PROTOCOL.REPLAY"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/pull/2951",
+        "https://github.com/Apeloff1/Skeleton/commit/dae3b8ed3985201b727da92cfe4623d7837ccf57",
+        "skeleton/contracts/formal_methods.py",
+        "skeleton/ai/runtime/contracts/formal_methods.py",
+        "skeleton/testing/test_vol081_formal_methods.py"
+      ],
       "risks": [
         "spec/code drift",
         "state explosion",
