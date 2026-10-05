@@ -386,6 +386,15 @@
       "notes": "Refined the over-broad simulation owner without moving code. Galaxy follows its AIFT distributed/multi-agent runtime contract under ai-runtime; Social follows its AIFT research-evidence intake contract as transitional/no-serving-authority; Organism is isolated as owner-sensitive core support with security-owned secret exceptions preserved; Era is classified as historical GB-39 lineage. The simulation zone now owns only skeleton/simulation/ and the Godot pointer surface. Merge reconciliation: the original TREE-033 identifier collides with the integrated Era migration and is retained as source_batch_id. Existing TREE-033 through TREE-040 migrations remain authoritative: Galaxy, Social and Era legacy roots are compatibility surfaces, with canonical owners at skeleton/distributed/galaxy, skeleton/research/social and skeleton/simulation/era. Organism receives its separate core-support zone. No duplicate prefix owners or reverse migrations are introduced.",
       "source_batch_id": "TREE-033",
       "source_commit": "f5e19db27aceaa22224b9dce247eecd2cb30d0f6"
+    },
+    {
+      "id": "TREE-042",
+      "source": "docs/{ARCHITECTURE*,CANONICAL_MODULE_BOUNDARIES,FRONTIER_ARCHITECTURE,CONSOLIDATION*,SECURITY*,RELEASE_SECURITY_EVIDENCE,JEEVES*,OWNER*,CI_REQUIRED_CHECKS,REPRODUCIBLE_RELEASES}.md",
+      "destination": "docs/{architecture,consolidation,security,jeeves,operations}/",
+      "mode": "move-with-link-stubs",
+      "state": "canonicalized",
+      "compatibility": "legacy docs/*.md compatibility pointers",
+      "notes": "Nineteen root-level domain documents were canonicalized into existing documentation concern directories. Relative links were rewritten where directory depth changed; old root paths are lightweight navigation stubs so existing links remain valid while new references converge on canonical paths. docs/README.md now provides the documentation entry map. No runtime ownership or behavior changed."
     }
   ]
 }
