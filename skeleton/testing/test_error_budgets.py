@@ -144,7 +144,6 @@ def test_budget_exhaustion_is_reported_even_when_independent_gates_pass() -> Non
         burn_rate=rate,
         safety_gate_passed=True,
         reliability_gate_passed=True,
-        budget_exhausted=False,
     )
 
     assert decision.status == "exhausted"

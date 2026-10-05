@@ -10744,7 +10744,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Specify SLI, target, window and excluded conditions explicitly.",
         "Use SLOs to drive operations and capacity rather than decorative dashboards."
@@ -10760,11 +10760,12 @@
         "SLOWindow"
       ],
       "implementation_paths": [
-        "skeleton/observability",
-        "machine"
+        "skeleton/observability/slo.py",
+        "skeleton/observability/operations_review.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_slo_registry.py"
+        "skeleton/testing/test_slo_registry.py",
+        "skeleton/testing/test_operations_review.py"
       ],
       "evaluations": [
         "planned:SLI correctness evaluation"
@@ -10775,8 +10776,7 @@
         "unowned objective"
       ],
       "gaps": [
-        "define core service SLOs",
-        "bind alerts/error budgets"
+        "independent exact-head SLO/SLI and operations-review verification remains pending"
       ],
       "accountability_id": "ACC-VOL-180",
       "completion_checkbox": false,
@@ -10791,7 +10791,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Calculate budgets from authoritative SLI data and declared windows.",
         "Prevent budget override from silently disabling safety/reliability gates."
@@ -10807,11 +10807,12 @@
         "BudgetDecision"
       ],
       "implementation_paths": [
-        "skeleton/observability",
-        "release"
+        "skeleton/observability/error_budget_policy.py",
+        "skeleton/observability/operations_review.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_error_budgets.py"
+        "skeleton/testing/test_error_budgets.py",
+        "skeleton/testing/test_operations_review.py"
       ],
       "evaluations": [
         "planned:burn-rate scenario evaluation"
@@ -10822,8 +10823,7 @@
         "budget used to excuse critical failure"
       ],
       "gaps": [
-        "define burn policy",
-        "bind to canary/release gates"
+        "independent exact-head error-budget burn/release-boundary verification remains pending"
       ],
       "accountability_id": "ACC-VOL-181",
       "completion_checkbox": false,
@@ -10838,7 +10838,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Declare allowed label sets and high-cardinality exceptions.",
         "Reject secrets/user content as uncontrolled telemetry dimensions."
@@ -10854,11 +10854,12 @@
         "SamplingPolicy"
       ],
       "implementation_paths": [
-        "skeleton/observability",
-        "machine"
+        "skeleton/observability/cardinality_control.py",
+        "skeleton/observability/operations_review.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_observability_cardinality.py"
+        "skeleton/testing/test_observability_cardinality.py",
+        "skeleton/testing/test_operations_review.py"
       ],
       "evaluations": [
         "planned:cardinality explosion evaluation"
@@ -10869,8 +10870,7 @@
         "PII in labels"
       ],
       "gaps": [
-        "inventory metric labels",
-        "add cardinality linting"
+        "independent exact-head telemetry-cardinality and sensitive-label verification remains pending"
       ],
       "accountability_id": "ACC-VOL-182",
       "completion_checkbox": false,
@@ -10885,7 +10885,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Use stable operation/correlation identity across process boundaries.",
         "Record causal links without making telemetry authoritative state."
@@ -10901,11 +10901,12 @@
         "TraceLink"
       ],
       "implementation_paths": [
-        "skeleton/observability",
-        "skeleton/ai"
+        "skeleton/observability/trace_model.py",
+        "skeleton/observability/operations_review.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_trace_model.py"
+        "skeleton/testing/test_trace_model.py",
+        "skeleton/testing/test_operations_review.py"
       ],
       "evaluations": [
         "planned:trace completeness evaluation"
@@ -10916,8 +10917,7 @@
         "trace contains secrets"
       ],
       "gaps": [
-        "define span taxonomy",
-        "bind receipts/events to traces"
+        "independent exact-head trace-causality and non-authoritative telemetry verification remains pending"
       ],
       "accountability_id": "ACC-VOL-183",
       "completion_checkbox": false,
@@ -10932,7 +10932,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Profile before optimization and retain workload/environment identity.",
         "Separate steady-state, startup and tail-path costs."
@@ -10948,11 +10948,12 @@
         "PerformanceFinding"
       ],
       "implementation_paths": [
-        "benchmarks",
-        "skeleton/observability"
+        "skeleton/observability/profile_records.py",
+        "skeleton/observability/operations_review.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_profile_records.py"
+        "skeleton/testing/test_profile_records.py",
+        "skeleton/testing/test_operations_review.py"
       ],
       "evaluations": [
         "planned:representative workload profiles"
@@ -10963,8 +10964,7 @@
         "profiler overhead misread"
       ],
       "gaps": [
-        "standardize profile bundles",
-        "bind findings to backlog"
+        "independent exact-head profile-identity and regression verification remains pending"
       ],
       "accountability_id": "ACC-VOL-184",
       "completion_checkbox": false,
@@ -10979,7 +10979,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Set percentile budgets per operation class and environment.",
         "Expose budget exhaustion/degradation rather than hiding latency with retries."
@@ -10995,11 +10995,12 @@
         "LatencyObservation"
       ],
       "implementation_paths": [
-        "skeleton/observability",
-        "machine"
+        "skeleton/observability/latency_budget.py",
+        "skeleton/observability/operations_review.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_latency_budgets.py"
+        "skeleton/testing/test_latency_budgets.py",
+        "skeleton/testing/test_operations_review.py"
       ],
       "evaluations": [
         "planned:p95/p99 budget evaluation"
@@ -11010,8 +11011,7 @@
         "stage budget oversubscription"
       ],
       "gaps": [
-        "define canonical operation budgets",
-        "bind routing/admission"
+        "independent exact-head percentile/stage latency-budget verification remains pending"
       ],
       "accountability_id": "ACC-VOL-185",
       "completion_checkbox": false,
@@ -11026,7 +11026,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Reserve/charge/refund costs using durable accounting semantics.",
         "Budget exhaustion may reduce capability only through declared safe fallback."
@@ -11042,11 +11042,12 @@
         "CostDecision"
       ],
       "implementation_paths": [
-        "skeleton/ai",
-        "skeleton/observability"
+        "skeleton/observability/cost_governor.py",
+        "skeleton/observability/operations_review.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_cost_governor.py"
+        "skeleton/testing/test_cost_governor.py",
+        "skeleton/testing/test_operations_review.py"
       ],
       "evaluations": [
         "planned:retry/runaway-spend campaign"
@@ -11057,8 +11058,7 @@
         "unsafe cheap fallback"
       ],
       "gaps": [
-        "unify cost ledger",
-        "bind model/tool routing"
+        "independent exact-head durable cost reservation/fallback verification remains pending"
       ],
       "accountability_id": "ACC-VOL-186",
       "completion_checkbox": false,
@@ -11073,7 +11073,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Use hardware/workload-normalized measurements.",
         "Require quality/reliability equivalence for efficiency claims."
@@ -11089,11 +11089,12 @@
         "EfficiencyClaim"
       ],
       "implementation_paths": [
-        "benchmarks",
-        "skeleton/observability"
+        "skeleton/observability/efficiency_metrics.py",
+        "skeleton/observability/operations_review.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_efficiency_metrics.py"
+        "skeleton/testing/test_efficiency_metrics.py",
+        "skeleton/testing/test_operations_review.py"
       ],
       "evaluations": [
         "planned:quality-normalized efficiency benchmark"
@@ -11104,8 +11105,7 @@
         "quality loss hidden by efficiency"
       ],
       "gaps": [
-        "define measurement methodology",
-        "bind to capacity/cost reviews"
+        "independent exact-head quality-normalized efficiency verification remains pending"
       ],
       "accountability_id": "ACC-VOL-187",
       "completion_checkbox": false,
