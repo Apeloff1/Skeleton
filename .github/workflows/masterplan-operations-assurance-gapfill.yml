@@ -1,0 +1,96 @@
+name: Masterplan Operations Assurance Gapfill
+
+on:
+  pull_request:
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_operations_assurance_gapfill_candidate.json"
+      - "machine/ai_vol195_local_development_blocker.json"
+      - "skeleton/ai/runtime/deferred/operations_assurance.py"
+      - "skeleton/testing/test_operations_assurance_gapfill.py"
+      - "scripts/check_ai_operations_assurance_gapfill.py"
+      - "tests/test_ai_operations_assurance_gapfill.py"
+      - "docs/plan/OPERATIONS_ASSURANCE_GAPFILL_188_200.md"
+      - ".github/workflows/masterplan-operations-assurance-gapfill.yml"
+  push:
+    branches: [main]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_operations_assurance_gapfill_candidate.json"
+      - "machine/ai_vol195_local_development_blocker.json"
+      - "skeleton/ai/runtime/deferred/operations_assurance.py"
+      - "scripts/check_ai_operations_assurance_gapfill.py"
+      - ".github/workflows/masterplan-operations-assurance-gapfill.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: operations-assurance-gapfill-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-head:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 24
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      OPENAI_API_KEY: ""
+      XAI_API_KEY: ""
+      ANTHROPIC_API_KEY: ""
+      GOOGLE_API_KEY: ""
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pydantic==2.13.5"
+          "pydantic-settings==2.15.0"
+          "fastapi==0.136.1"
+
+      - name: Compile assurance surfaces
+        run: >-
+          python -m compileall -q
+          skeleton/ai/runtime/deferred/operations_assurance.py
+          scripts/check_ai_operations_assurance_gapfill.py
+
+      - name: Validate masterplan and exact-head candidate
+        run: |
+          HEAD_SHA="$(git rev-parse HEAD)"
+          python scripts/check_ai_master_plan.py
+          python scripts/check_ai_operations_assurance_gapfill.py --head "$HEAD_SHA" --json
+
+      - name: Validate candidate contract tests
+        run: python -m pytest -q --noconftest tests/test_ai_operations_assurance_gapfill.py
+
+      - name: Execute new assurance regressions
+        run: python -m pytest -q --noconftest skeleton/testing/test_operations_assurance_gapfill.py
+
+      - name: Execute existing primary regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_ai_chaos_recovery_controls.py
+          skeleton/testing/test_ai_release_qualification_policy.py
+          skeleton/testing/test_ai_deployment_safety.py
+          skeleton/testing/test_vol194_developer_experience.py
+          skeleton/testing/test_vol196_fixture_platform.py
+          skeleton/testing/test_vol197_simulation_mode.py
+          skeleton/testing/test_vol198_contract_fuzzing.py
+          skeleton/testing/test_property_invariants.py
+          skeleton/testing/test_vol200_formal_candidates.py
+          skeleton/testing/test_vol195_local_development.py
+          skeleton/testing/test_local_bootstrap.py

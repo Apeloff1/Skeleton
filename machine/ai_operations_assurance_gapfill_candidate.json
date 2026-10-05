@@ -1,0 +1,82 @@
+{
+  "schema_version": "skeleton.ai.operations_assurance_gapfill_candidate.v1",
+  "candidate_id": "P3-DEFERRED-OPERATIONS-ASSURANCE-01",
+  "status": "implementation_candidate",
+  "source_frontier": "machine/ai_masterplan_continuation_frontier.json",
+  "master_plan": "machine/ai_master_plan.json",
+  "source_queue_state": "queued_unmodified",
+  "volume_refs": [
+    "VOL-188",
+    "VOL-189",
+    "VOL-190",
+    "VOL-191",
+    "VOL-192",
+    "VOL-193",
+    "VOL-194",
+    "VOL-196",
+    "VOL-197",
+    "VOL-198",
+    "VOL-199",
+    "VOL-200"
+  ],
+  "excluded_blocker": {
+    "volume_ref": "VOL-195",
+    "receipt": "machine/ai_vol195_local_development_blocker.json",
+    "must_remain_unverified": true,
+    "required_missing_artifact": "uv.lock"
+  },
+  "primary_implementation_by_volume": {
+    "VOL-188": "skeleton/ai/runtime/deferred/reliability_release.py",
+    "VOL-189": "skeleton/ai/runtime/deferred/reliability_release.py",
+    "VOL-190": "skeleton/ai/runtime/deferred/reliability_release.py",
+    "VOL-191": "skeleton/ai/runtime/deferred/reliability_release.py",
+    "VOL-192": "skeleton/ai/runtime/deferred/reliability_release.py",
+    "VOL-193": "skeleton/ai/runtime/deferred/reliability_release.py",
+    "VOL-194": "skeleton/ai/runtime/deferred/developer_experience.py",
+    "VOL-196": "skeleton/ai/runtime/deferred/fixture_platform.py",
+    "VOL-197": "skeleton/ai/runtime/deferred/simulation_mode.py",
+    "VOL-198": "skeleton/ai/runtime/deferred/contract_fuzzing.py",
+    "VOL-199": "skeleton/testing/property_invariants.py",
+    "VOL-200": "skeleton/contracts/formal_candidates.py"
+  },
+  "primary_test_by_volume": {
+    "VOL-188": "skeleton/testing/test_ai_chaos_recovery_controls.py",
+    "VOL-189": "skeleton/testing/test_ai_chaos_recovery_controls.py",
+    "VOL-190": "skeleton/testing/test_ai_release_qualification_policy.py",
+    "VOL-191": "skeleton/testing/test_ai_deployment_safety.py",
+    "VOL-192": "skeleton/testing/test_ai_deployment_safety.py",
+    "VOL-193": "skeleton/testing/test_ai_deployment_safety.py",
+    "VOL-194": "skeleton/testing/test_vol194_developer_experience.py",
+    "VOL-196": "skeleton/testing/test_vol196_fixture_platform.py",
+    "VOL-197": "skeleton/testing/test_vol197_simulation_mode.py",
+    "VOL-198": "skeleton/testing/test_vol198_contract_fuzzing.py",
+    "VOL-199": "skeleton/testing/test_property_invariants.py",
+    "VOL-200": "skeleton/testing/test_vol200_formal_candidates.py"
+  },
+  "gapfill_implementation": "skeleton/ai/runtime/deferred/operations_assurance.py",
+  "gapfill_test": "skeleton/testing/test_operations_assurance_gapfill.py",
+  "mapping_requirements": {
+    "VOL-188": "AIFT-RELIABILITY",
+    "VOL-189": "AIFT-RESILIENCE",
+    "VOL-191": "AIFT-OBSERVABILITY",
+    "VOL-192": "AIFT-CONFIG",
+    "VOL-193": "AIFT-RESILIENCE",
+    "VOL-194": "AIFT-DEVELOPER",
+    "VOL-197": "AIFT-SIMULATION",
+    "VOL-200": "AIFT-CONTRACTS"
+  },
+  "evidence_policy": {
+    "exact_head_ci_required": true,
+    "independent_closure_required": true,
+    "queued_frontier_must_remain_unchanged": true,
+    "blocked_volume_must_not_be_promoted": true,
+    "completion_may_not_be_self_granted": true
+  },
+  "promotion_state": {
+    "completion_checkbox": false,
+    "implementation_signed": false,
+    "verification_signed": false,
+    "may_self_close": false,
+    "production_authority": false
+  }
+}

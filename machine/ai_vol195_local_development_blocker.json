@@ -1,0 +1,29 @@
+{
+  "schema_version": "skeleton.ai.local_development_blocker.v1",
+  "volume_ref": "VOL-195",
+  "status": "blocked",
+  "blocking_artifact": "uv.lock",
+  "blocking_reason": "canonical root uv.lock is absent; reproducible bootstrap cannot bind the authoritative dependency graph",
+  "observed_contracts": [
+    "pyproject.toml",
+    "skeleton/developer/bootstrap.py",
+    "skeleton/ai/runtime/deferred/local_development.py",
+    "skeleton/testing/test_vol195_local_development.py",
+    "skeleton/testing/test_local_bootstrap.py"
+  ],
+  "fail_closed_behavior": {
+    "bootstrap_refuses_missing_lock": true,
+    "unlocked_resolution_allowed": false,
+    "completion_checkbox": false,
+    "implementation_signed": false,
+    "verification_signed": false,
+    "production_authority": false
+  },
+  "closure_requirements": [
+    "generate uv.lock using the pyproject.toml-pinned uv version",
+    "check uv.lock into repository root",
+    "bind exact uv.lock digest into local bootstrap evidence",
+    "run clean-machine locked bootstrap and focused VOL-195 regressions on exact head",
+    "retain independent verification before completion/signature"
+  ]
+}
