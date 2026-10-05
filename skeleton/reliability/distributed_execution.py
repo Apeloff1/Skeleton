@@ -17,7 +17,8 @@ def _dig(v):return hashlib.sha256(json.dumps(v,sort_keys=True,separators=(",",":
 class DistributedTask:
  task_id:str;payload_digest:str;idempotency_key:str;external_effect:bool
  def __post_init__(self):
-  object.__setattr__(self,"task_id",_id(self.task_id,"task_id"));object.__setattr__(self,"idempotency_key",_id(self.idempotency_key,"idempotency_key"));_sha(self.payload_digest,"payload_digest")\n  if not isinstance(self.external_effect,bool):raise DistributedError("external_effect must be bool")
+  object.__setattr__(self,"task_id",_id(self.task_id,"task_id"));object.__setattr__(self,"idempotency_key",_id(self.idempotency_key,"idempotency_key"));_sha(self.payload_digest,"payload_digest")
+  if not isinstance(self.external_effect,bool):raise DistributedError("external_effect must be bool")
  @property
  def digest(self):return _dig({"task_id":self.task_id,"payload":self.payload_digest,"idempotency":self.idempotency_key,"external_effect":self.external_effect})
 @dataclass(frozen=True,slots=True)
@@ -31,7 +32,9 @@ class WorkerLease:
 class DistributedReceipt:
  task_digest:str;lease_id:str;fence_token:int;state:OutcomeState;result_digest:str|None;provider_evidence_digest:str|None
  def __post_init__(self):
-  _sha(self.task_digest,"task_digest");object.__setattr__(self,"lease_id",_id(self.lease_id,"lease_id"))\n  if not isinstance(self.fence_token,int) or isinstance(self.fence_token,bool) or self.fence_token<1:raise DistributedError("receipt fence token invalid")\n  if not isinstance(self.state,OutcomeState):raise DistributedError("state must be OutcomeState")
+  _sha(self.task_digest,"task_digest");object.__setattr__(self,"lease_id",_id(self.lease_id,"lease_id"))
+  if not isinstance(self.fence_token,int) or isinstance(self.fence_token,bool) or self.fence_token<1:raise DistributedError("receipt fence token invalid")
+  if not isinstance(self.state,OutcomeState):raise DistributedError("state must be OutcomeState")
   if self.result_digest is not None:_sha(self.result_digest,"result_digest")
   if self.provider_evidence_digest is not None:_sha(self.provider_evidence_digest,"provider_evidence_digest")
   if self.state is OutcomeState.SUCCEEDED and self.result_digest is None:raise DistributedError("success requires result")
@@ -61,6 +64,8 @@ class DistributedScheduler:
   state=OutcomeState.FAILED if failed else OutcomeState.SUCCEEDED
   if state is OutcomeState.SUCCEEDED and result_digest is None:raise DistributedError("successful reconciliation requires result")
   receipt=DistributedReceipt(task.digest,unknown.lease_id,unknown.fence_token,state,result_digest,provider_evidence_digest)
-  prior=self._terminal.get(task.task_id)\n  if prior is not None and prior!=receipt:raise DistributedError("terminal outcome immutable")\n  self._terminal[task.task_id]=receipt;self._active.pop(task.task_id,None);return receipt
+  prior=self._terminal.get(task.task_id)
+  if prior is not None and prior!=receipt:raise DistributedError("terminal outcome immutable")
+  self._terminal[task.task_id]=receipt;self._active.pop(task.task_id,None);return receipt
  def may_reissue(self,task):
   return task.task_id not in self._terminal and task.task_id not in self._active
