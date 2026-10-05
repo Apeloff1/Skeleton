@@ -58,7 +58,11 @@ class RecoveryEvidence:
   if not _SHA.fullmatch(self.scenario_digest):raise RecoveryError("scenario_digest must be sha256")
   for f in ("checkpoint_digest","rebuilt_projection_digest"):
    v=getattr(self,f)
-   if v is not None and not _SHA.fullmatch(v):raise RecoveryError(f"{f} must be sha256")
+   if v is not None and (not isinstance(v,str) or not _SHA.fullmatch(v)):raise RecoveryError(f"{f} must be sha256")
+  if not isinstance(self.reason,str) or not self.reason.strip():raise RecoveryError("reason must be non-empty")
+  if self.checkpoint_digest is None:raise RecoveryError("recovery evidence requires checkpoint digest")
+  if self.status is RecoveryStatus.RECOVERED and self.rebuilt_projection_digest is None:raise RecoveryError("recovered evidence requires rebuilt projection digest")
+  if self.status is RecoveryStatus.FAIL_CLOSED and self.rebuilt_projection_digest is not None:raise RecoveryError("fail-closed evidence cannot claim rebuilt projection")
  @property
  def digest(self):return _dig({"scenario_id":self.scenario_id,"scenario_digest":self.scenario_digest,"status":self.status.value,"checkpoint_digest":self.checkpoint_digest,"rebuilt_projection_digest":self.rebuilt_projection_digest,"reason":self.reason})
 def scenario_digest(scenario:VS000Scenario):
