@@ -62,6 +62,8 @@ class ToolComposition: bindings:tuple[ToolBinding,...]; requested_authority:froz
 class CompositionResult: admissible:bool; effective_authority:frozenset[str]; reason:str
 def compose_tools(c):
  if not c.bindings:return CompositionResult(False,frozenset(),"no tools")
+ if any(not b.tool_id or not b.version or not b.input_schema or not b.output_schema or not b.trust_class for b in c.bindings):return CompositionResult(False,frozenset(),"incomplete tool identity")
+ if len({(b.tool_id,b.version) for b in c.bindings})!=len(c.bindings):return CompositionResult(False,frozenset(),"duplicate tool binding")
  common=set(c.bindings[0].authority)
  for b in c.bindings[1:]:common&=b.authority
  effective=frozenset(common)&c.requested_authority
