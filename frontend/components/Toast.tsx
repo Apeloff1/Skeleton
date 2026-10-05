@@ -127,15 +127,19 @@ function ToastRow({ entry }: { entry: ToastEntry }) {
   return (
     <Animated.View
       style={[styles.row, { backgroundColor: v.bg, borderColor: v.border }, animStyle]}
-      {...accessibleStatusProps(
-        entry.variant === 'error'
-          ? 'Error notification: ' + entry.message
-          : 'Notification: ' + entry.message,
-        { assertive: entry.variant === 'error' },
-      )}
     >
       <Ionicons name={v.icon} size={18} color={v.border} accessible={false} />
-      <Text style={[styles.msg, { color: v.fg }]} numberOfLines={2} allowFontScaling>
+      <Text
+        style={[styles.msg, { color: v.fg }]}
+        numberOfLines={2}
+        allowFontScaling
+        {...accessibleStatusProps(
+          entry.variant === 'error'
+            ? 'Error notification: ' + entry.message
+            : 'Notification: ' + entry.message,
+          { assertive: entry.variant === 'error' },
+        )}
+      >
         {entry.message}
       </Text>
       {entry.action ? (
