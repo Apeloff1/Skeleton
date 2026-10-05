@@ -22,3 +22,14 @@ def test_release_and_receipt_schema_must_match():
 def test_same_release_cannot_be_update_target():
  t=DesktopUpdateTransaction(rel(),receipt())
  with pytest.raises(DesktopReleaseError,match="differ"):t.stage(rel())
+
+def test_schema_versions_reject_boolean_aliases():
+ with pytest.raises(DesktopReleaseError,match="schema_version"):rel(schema=True)
+ with pytest.raises(DesktopReleaseError,match="schema_version"):DesktopArtifactReceipt("RELEASE.V1",S("state"),S("artifact"),True)
+def test_acceptance_artifact_must_match_signed_target():
+ t=DesktopUpdateTransaction(rel(),receipt());target=rel("RELEASE.V2",2);t.stage(target);t.migrate(S("state-v2"))
+ bad=DesktopAcceptanceRun("RUN.1",target.release_id,S("env"),S("vs001"),S("wrong"))
+ with pytest.raises(DesktopReleaseError,match="signed target"):t.commit(bad)
+def test_parallel_update_cannot_replace_staged_target():
+ t=DesktopUpdateTransaction(rel(),receipt());t.stage(rel("RELEASE.V2",2))
+ with pytest.raises(DesktopReleaseError,match="already in progress"):t.stage(rel("RELEASE.V3",3))
