@@ -29,8 +29,8 @@ class CapabilityMap:
  def __init__(self,descriptors,live):
   self.descriptors={d.capability_id:d for d in descriptors};self.live={x.capability_id:x for x in live}
   for d in self.descriptors.values():
-   if any(x not in self.descriptors for x in d.dependency_ids):raise CapabilityError("unknown capability dependency")
- def resolve(self,capability_id):
+   if any(x not in self.descriptors for x in d.dependency_ids):raise CapabilityError("unknown capability dependency")\n  self._reject_cycles()
+ def _reject_cycles(self):\n  visiting=set();visited=set()\n  def visit(cid):\n   if cid in visiting:raise CapabilityError("capability dependency cycle")\n   if cid in visited:return\n   visiting.add(cid)\n   for dep in self.descriptors[cid].dependency_ids:visit(dep)\n   visiting.remove(cid);visited.add(cid)\n  for cid in sorted(self.descriptors):visit(cid)\n def resolve(self,capability_id):
   _id(capability_id,"capability_id")
   d=self.descriptors.get(capability_id)
   if d is None:raise CapabilityError("unknown capability")
