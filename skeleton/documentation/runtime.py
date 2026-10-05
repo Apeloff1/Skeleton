@@ -46,6 +46,18 @@ def _sha(value: str, field: str) -> str:
     return value
 
 
+def _repo_path(value: str, field: str) -> str:
+    value = _id(value, field)
+    parts = value.split("/")
+    if (
+        value.startswith("/")
+        or "\\" in value
+        or any(part in ("", ".", "..") for part in parts)
+    ):
+        raise DocumentationError(f"{field} must be a safe repository-relative path")
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class DocumentationSource:
     source_id: str
@@ -57,7 +69,7 @@ class DocumentationSource:
         object.__setattr__(self, "source_id", _id(self.source_id, "source_id"))
         if not isinstance(self.kind, SourceKind):
             raise DocumentationError("kind must be a SourceKind")
-        object.__setattr__(self, "path", _id(self.path, "path"))
+        object.__setattr__(self, "path", _repo_path(self.path, "path"))
         object.__setattr__(self, "digest", _sha(self.digest, "digest"))
 
 
@@ -140,7 +152,7 @@ class GeneratedDocument:
     sections: tuple[GeneratedSection, ...]
 
     def __post_init__(self):
-        object.__setattr__(self, "path", _id(self.path, "path"))
+        object.__setattr__(self, "path", _repo_path(self.path, "path"))
         if not isinstance(self.generator, GeneratorIdentity) or not isinstance(self.source_set, SourceDigestSet):
             raise DocumentationError("generated document identities are invalid")
         if not isinstance(self.sections, tuple) or not self.sections:
@@ -206,6 +218,26 @@ def replace_generated_section(document: str, section: GeneratedSection) -> str:
     return document[:start] + render_section(section) + document[end_pos:]
 
 
+def render_generated_document(
+    template: str,
+    document: GeneratedDocument,
+) -> str:
+    """Materialize all owned sections into an existing human-authored template.
+
+    Generated section order is canonical, each section must already have one
+    unique ownership boundary in the template, and text outside those
+    boundaries is preserved byte-for-byte.
+    """
+    if not isinstance(template, str):
+        raise DocumentationError("template must be text")
+    if not isinstance(document, GeneratedDocument):
+        raise DocumentationError("document must be GeneratedDocument")
+    rendered = template
+    for section in document.sections:
+        rendered = replace_generated_section(rendered, section)
+    return rendered
+
+
 def validate_owned_sections(document: str, section_ids: Iterable[str]) -> tuple[DocumentationCheck, ...]:
     checks: list[DocumentationCheck] = []
     for section_id in sorted(set(section_ids)):
@@ -221,9 +253,18 @@ def validate_owned_sections(document: str, section_ids: Iterable[str]) -> tuple[
 
 def validate_references(document: str, known_ids: Iterable[str]) -> tuple[DocumentationCheck, ...]:
     """Validate explicit [[ref:IDENTIFIER]] references without guessing prose links."""
+    if not isinstance(document, str):
+        raise DocumentationError("document must be text")
     known = {_id(item, "known_id") for item in known_ids}
-    raw_refs = sorted(set(re.findall(r"\[\[ref:([^\]]+)\]\]", document)))
+    proper = re.findall(r"\[\[ref:([^\]]+)\]\]", document)
+    raw_refs = sorted(set(proper))
     checks: list[DocumentationCheck] = []
+    if document.count("[[ref:") != len(proper):
+        checks.append(DocumentationCheck(
+            check_id=f"reference-invalid-framing:{canonical_digest(document)[:16]}",
+            status=CheckStatus.FAIL,
+            detail="reference marker is unterminated or malformed",
+        ))
     for raw in raw_refs:
         try:
             ref = _id(raw, "reference")
