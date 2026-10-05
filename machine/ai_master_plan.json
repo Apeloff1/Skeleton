@@ -6208,7 +6208,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Classify maintenance actions by risk and require bounded automated mutation.",
         "Preserve active migration, generated, release and evidence artifacts through explicit ownership rules.",
@@ -6225,17 +6225,13 @@
         "MaintenanceReceipt"
       ],
       "implementation_paths": [
-        "scripts",
-        ".github/workflows",
-        "machine"
+        "skeleton/automation/repository_maintenance.py"
       ],
       "tests": [
-        "planned:tests/test_repository_maintenance_contract.py",
-        "planned:tests/test_safe_cleanup.py"
+        "tests/test_repository_maintenance_contract.py"
       ],
       "evaluations": [
-        "planned:stale-resource cleanup simulation",
-        "planned:maintenance-churn evaluation"
+        "tests/test_repository_maintenance_contract.py"
       ],
       "evidence": [],
       "risks": [
@@ -6243,10 +6239,7 @@
         "bot churn",
         "orphan ownership"
       ],
-      "gaps": [
-        "define maintenance ownership registry",
-        "bind deletion to reachability/retention checks"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-092",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
