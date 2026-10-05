@@ -280,9 +280,11 @@ class DecisionFactor:
 
         source_ref = _text(self.source_ref, "source_ref", maximum=_MAX_SOURCE_REF)
         lower_ref = source_ref.casefold()
+        lower_id = self.factor_id.casefold()
         sensitivity = self.sensitivity
         if sensitivity is FactorSensitivity.SAFE and any(
-            marker in lower_ref for marker in _HIDDEN_SOURCE_MARKERS
+            marker in lower_ref or marker in lower_id
+            for marker in _HIDDEN_SOURCE_MARKERS
         ):
             sensitivity = FactorSensitivity.INTERNAL
             object.__setattr__(self, "sensitivity", sensitivity)
@@ -563,6 +565,24 @@ class ExplanationRecord:
             raise ExplanationError(
                 "factor_set_digest does not bind visible and withheld factors"
             )
+        expected_explanation_id = "explanation-" + _digest(
+            {
+                "schema": EXPLANATION_SCHEMA,
+                "operation_snapshot_digest": (
+                    self.provenance.operation_snapshot_digest
+                ),
+                "decision_id": self.decision_id,
+                "policy_digest": self.policy_digest,
+                "generated_at": self.generated_at,
+                "outcome_summary": self.outcome_summary,
+                "factor_set_digest": self.factor_set_digest,
+            },
+            "explanation identity",
+        )[:32]
+        if self.explanation_id != expected_explanation_id:
+            raise ExplanationError(
+                "explanation_id does not bind record content"
+            )
 
     @property
     def withheld_factor_count(self) -> int:
@@ -591,7 +611,6 @@ class ExplanationRecord:
             "explanation_id": self.explanation_id,
             "decision_id": self.decision_id,
             "operation_id": self.provenance.operation_id,
-            "trace_id": self.provenance.trace_id,
             "operation_state": self.provenance.state,
             "operation_snapshot_digest": self.provenance.operation_snapshot_digest,
             "policy_id": self.policy_id,
@@ -608,6 +627,7 @@ class ExplanationRecord:
         payload["operation_identity_digest"] = (
             self.provenance.operation_identity_digest
         )
+        payload["trace_id"] = self.provenance.trace_id
         payload["policy_digest"] = self.policy_digest
         payload["withheld_factor_digests"] = list(
             self.withheld_factor_digests
@@ -755,7 +775,41 @@ class ExplanationBuilder:
         if policy.require_uncertainty_for_model_output:
             self._require_model_uncertainty(by_id)
 
-        tainted = self._tainted_ids(by_id)
+        tainted = set(self._tainted_ids(by_id))
+        if policy.require_uncertainty_for_model_output:
+            changed = True
+            while changed:
+                changed = False
+                for model_factor in by_id.values():
+                    if (
+                        model_factor.kind is not DecisionFactorKind.MODEL_OUTPUT
+                        or model_factor.factor_id in tainted
+                    ):
+                        continue
+                    disclosures = tuple(
+                        disclosure
+                        for disclosure in by_id.values()
+                        if (
+                            disclosure.kind is DecisionFactorKind.UNCERTAINTY
+                            and model_factor.factor_id in disclosure.depends_on
+                        )
+                    )
+                    if disclosures and all(
+                        disclosure.factor_id in tainted
+                        for disclosure in disclosures
+                    ):
+                        tainted.add(model_factor.factor_id)
+                        changed = True
+                for candidate in by_id.values():
+                    if candidate.factor_id in tainted:
+                        continue
+                    if any(
+                        dependency in tainted
+                        for dependency in candidate.depends_on
+                    ):
+                        tainted.add(candidate.factor_id)
+                        changed = True
+
         visible = tuple(
             sorted(
                 (
