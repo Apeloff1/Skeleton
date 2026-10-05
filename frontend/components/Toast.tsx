@@ -27,6 +27,7 @@ import {
   accessibleButtonProps,
   accessibleStatusProps,
 } from '../src/accessibility/runtime';
+import { useI18n } from '../src/i18n';
 
 export type ToastVariant = 'info' | 'success' | 'warn' | 'error';
 
@@ -103,6 +104,7 @@ const VARIANT_STYLE: Record<ToastVariant, { bg: string; border: string; fg: stri
 function ToastRow({ entry }: { entry: ToastEntry }) {
   const v = VARIANT_STYLE[entry.variant];
   const reduceMotion = useReduceMotion();
+  const { t } = useI18n();
   const ty = useSharedValue(40);
   const op = useSharedValue(0);
 
@@ -156,7 +158,7 @@ function ToastRow({ entry }: { entry: ToastEntry }) {
           onPress={() => toast.dismiss(entry.id)}
           hitSlop={8}
           style={styles.control}
-          {...accessibleButtonProps('Dismiss notification')}
+          {...accessibleButtonProps(t('notification.dismiss'))}
         >
           <Ionicons name="close" size={16} color={v.fg} accessible={false} />
         </Pressable>
