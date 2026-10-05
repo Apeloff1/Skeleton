@@ -29,7 +29,7 @@ class AutonomyControlEvidence:
  authority_digest:str;delegated_authority:tuple[str,...];parent_authority:tuple[str,...];state:ControlState;override_evidence_digest:str|None
  def __post_init__(self):
   _sha(self.authority_digest,"authority_digest")
-  object.__setattr__(self,"delegated_authority",tuple(sorted(set(self.delegated_authority))));object.__setattr__(self,"parent_authority",tuple(sorted(set(self.parent_authority))))
+  if not isinstance(self.state,ControlState):raise AutonomyAcceptanceError("state must be ControlState")\n  for f in ("delegated_authority","parent_authority"):\n   raw=getattr(self,f)\n   if not isinstance(raw,tuple) or not raw or len(raw)>256 or any(not isinstance(x,str) or not x.strip() for x in raw):raise AutonomyAcceptanceError(f"{f} must be non-empty bounded tuple")\n   object.__setattr__(self,f,tuple(sorted(set(x.strip() for x in raw))))
   if not set(self.delegated_authority)<=set(self.parent_authority):raise AutonomyAcceptanceError("delegated authority exceeds parent")
   if self.state is not ControlState.ACTIVE and self.override_evidence_digest is None:raise AutonomyAcceptanceError("revocation/override requires evidence")
   if self.override_evidence_digest is not None:_sha(self.override_evidence_digest,"override_evidence_digest")
@@ -38,13 +38,13 @@ class CheckpointEvidence:
  checkpoint_id:str;state_digest:str;tick:int;recovery_digest:str
  def __post_init__(self):
   object.__setattr__(self,"checkpoint_id",_id(self.checkpoint_id,"checkpoint_id"));_sha(self.state_digest,"state_digest");_sha(self.recovery_digest,"recovery_digest")
-  if self.tick<0:raise AutonomyAcceptanceError("checkpoint tick invalid")
+  if not isinstance(self.tick,int) or isinstance(self.tick,bool) or self.tick<0:raise AutonomyAcceptanceError("checkpoint tick invalid")
 @dataclass(frozen=True,slots=True)
 class AutonomousWorkerAcceptance:
  acceptance_id:str;objective_digest:str;budget:AutonomyBudgetEvidence;control:AutonomyControlEvidence;checkpoint:CheckpointEvidence;current_tick:int;deadline_tick:int;max_checkpoint_age:int;failure_evidence:tuple[str,...]
  def __post_init__(self):
   object.__setattr__(self,"acceptance_id",_id(self.acceptance_id,"acceptance_id"));_sha(self.objective_digest,"objective_digest")
-  if self.current_tick<0 or self.deadline_tick<0 or self.max_checkpoint_age<0:raise AutonomyAcceptanceError("time bounds invalid")
+  if not isinstance(self.budget,AutonomyBudgetEvidence) or not isinstance(self.control,AutonomyControlEvidence) or not isinstance(self.checkpoint,CheckpointEvidence):raise AutonomyAcceptanceError("acceptance evidence must be typed")\n  if any(not isinstance(v,int) or isinstance(v,bool) or v<0 for v in (self.current_tick,self.deadline_tick,self.max_checkpoint_age)):raise AutonomyAcceptanceError("time bounds invalid")\n  if not isinstance(self.failure_evidence,tuple) or not self.failure_evidence or len(self.failure_evidence)>256:raise AutonomyAcceptanceError("failure_evidence must be non-empty bounded tuple")
   for d in self.failure_evidence:_sha(d,"failure_evidence")
  @property
  def eligible(self):
