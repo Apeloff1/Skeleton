@@ -31,3 +31,15 @@ def test_tool_composition_checks_schema_and_trust_transitions():
 def test_simulation_evidence_is_explicitly_non_production():
  simulation=simulate_plan(("step",))
  assert simulation.production_evidence is False
+
+
+def test_cognitive_controls_fail_closed_on_invalid_identity():
+ import pytest
+ bad=CognitiveStrategy(StrategyVersion("","v1"),(StrategyEvidence("bench",True,1),))
+ assert not production_eligible(bad)
+ with pytest.raises(ValueError): select_strategy(StrategySelection((),StrategyConstraint(frozenset(),-1)))
+ with pytest.raises(ValueError): attribute_cost((ReasoningCost("op",StrategyVersion("s","v"),"m","mv",ReasoningStage.PLAN,-1),))
+ incomplete=ToolBinding("tool","v",frozenset({"read"}),"","out","trusted")
+ assert not compose_tools(ToolComposition((incomplete,),frozenset({"read"}))).admissible
+ binding=ToolBinding("tool","v",frozenset({"read"}),"in","out","trusted")
+ assert not compose_tools(ToolComposition((binding,binding),frozenset({"read"}))).admissible
