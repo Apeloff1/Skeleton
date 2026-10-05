@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tree_version": "1.6.6",
+  "tree_version": "1.6.7",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
@@ -66,7 +66,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/providers/runtime.py",
       "kind": "file",
-      "source_git_object_sha": "3e336c2b6992a9f71eb0741fa6f594dedec6d10f",
+      "source_git_object_sha": "cc15bd41c0f4b945afa5d59ed5473135db04f140",
       "role": "credential-bearing provider runtime",
       "work_package_refs": [
         "WP-W05",
@@ -94,7 +94,7 @@
       "source": "skeleton/contracts",
       "destination": "skeleton/ai/runtime/contracts",
       "kind": "tree",
-      "source_git_object_sha": "e2abcdcc7b6d578433eb2a1670c3b6eab48a221e",
+      "source_git_object_sha": "dd09077ec78cdf3a795a8fe50b631eedc4f32efa",
       "role": "canonical operation/conversation/context/formal/localization/compliance/Definition-of-Done contracts with governed AI runtime mirrors, deterministic identity, and fail-closed evidence/maturity boundaries",
       "work_package_refs": [
         "WP-W00",
@@ -117,7 +117,13 @@
         "VOL-081",
         "VOL-087",
         "VOL-088",
-        "VOL-110"
+        "VOL-110",
+        "VOL-112",
+        "VOL-114",
+        "VOL-115",
+        "VOL-116",
+        "VOL-117",
+        "VOL-118"
       ]
     },
     {
@@ -125,7 +131,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "43089eae50fa1dedda736c45cdf9ebdba72b49bb",
+      "source_git_object_sha": "91e23d200dd0a490024693290d91b7afedc0c7a9",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -155,7 +161,7 @@
       "source": "skeleton/context",
       "destination": "skeleton/ai/runtime/context",
       "kind": "tree",
-      "source_git_object_sha": "e795e85e081e7619015132a90c196c55f5668c29",
+      "source_git_object_sha": "4a7e68dc28aabfa9e7ba170c0ce076f37ad600ea",
       "role": "context compilation",
       "work_package_refs": [
         "WP-W10"
@@ -206,7 +212,7 @@
       "source": "skeleton/memory",
       "destination": "skeleton/ai/runtime/memory",
       "kind": "tree",
-      "source_git_object_sha": "216e8c8f49ab8ae09940ffcfa3c421b4bfa1ff92",
+      "source_git_object_sha": "9715bc1e66e9ef7fdbd548f16cbb87dff2997d3e",
       "role": "memory authority and recall",
       "work_package_refs": [
         "WP-W07"
@@ -228,7 +234,7 @@
       "source": "skeleton/intelligence",
       "destination": "skeleton/ai/runtime/intelligence",
       "kind": "tree",
-      "source_git_object_sha": "a0ba0bd7a2cd17513f43c17463e00a7d55d31299",
+      "source_git_object_sha": "9ca062b9e62e2a8c6a9b9bad90d73cd7337347b9",
       "role": "admission verification and execution",
       "work_package_refs": [
         "WP-W06",
@@ -253,7 +259,7 @@
       "source": "skeleton/frontier",
       "destination": "skeleton/ai/runtime/frontier",
       "kind": "tree",
-      "source_git_object_sha": "9204317afe2fa6bb82d87ce232bcb89dc9fc0cbd",
+      "source_git_object_sha": "557205cb8ca09fa1643947bdba17d365811d3f0f",
       "role": "Frontier domain runtime with canonical runtime/control-plane primitives under runtime/, progression/meta systems under progression/, ecology/lifecycle systems under ecology/, commerce/cooking/crafting/energy/equipment systems under economy/, NPC/character systems under characters/, and gameplay/voyage/world systems under game/, mirrored exactly into skeleton/ai/runtime/frontier.",
       "work_package_refs": [
         "WP-W04",
@@ -277,7 +283,7 @@
       "source": "skeleton/skills",
       "destination": "skeleton/ai/runtime/skills",
       "kind": "tree",
-      "source_git_object_sha": "0a67f045f59a79897eee058a969e81a6c3c41e95",
+      "source_git_object_sha": "bd0c81106081917156f01115ebc02402af287543",
       "role": "tool and skill runtime",
       "work_package_refs": [
         "WP-W13",
@@ -301,7 +307,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "231f07dbc7cd12bfc98d63dc10b8d5026e59a4b0",
+      "source_git_object_sha": "6285331ae16af1a246cece822838dc6bf8074b69",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -358,7 +364,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "8f62d6938c25b374310940e98a87867f3e6487dd",
+      "source_git_object_sha": "854a772974c5d5559b9b7ea5920ba1bcd7072fae",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -427,7 +433,7 @@
       "source": "skeleton/automation/agents",
       "destination": "skeleton/ai/agents/core",
       "kind": "tree",
-      "source_git_object_sha": "dadbb23a9eee8b7a172761409ef18765ab4bf718",
+      "source_git_object_sha": "c21ad1fe0d0dca814aa81987cd6b0ea9c220427b",
       "role": "canonical agent/swarm execution runtime under automation ownership",
       "work_package_refs": [
         "WP-W00",
@@ -460,7 +466,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "e9e5cddc61cdfe9d76cd550b7a3106e61c65452f",
+      "source_git_object_sha": "4e6406df9dbdde23f90e2c9c9c9af2f674b3ad9e",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -543,6 +549,14 @@
         "overseer",
         "shift_supervisor",
         "swarm"
+      ],
+      "volume_refs": [
+        "VOL-112",
+        "VOL-114",
+        "VOL-115",
+        "VOL-116",
+        "VOL-118",
+        "VOL-119"
       ]
     },
     {
@@ -584,7 +598,7 @@
       "source": "skeleton/observability",
       "destination": "skeleton/ai/runtime/observability",
       "kind": "tree",
-      "source_git_object_sha": "3f7f261ac997a6e7f2381b1f952643b444838cd3",
+      "source_git_object_sha": "79627520c9f446bdfa0a3169e6367dd62bc8a5e5",
       "role": "AI runtime observability, telemetry, audit, provenance-bound explainability, and executable operations runbook plane",
       "work_package_refs": [
         "WP-W00",
@@ -613,7 +627,8 @@
       "source_disposition": "retain_until_import_inversion_and_regression_gates",
       "volume_refs": [
         "VOL-085",
-        "VOL-091"
+        "VOL-091",
+        "VOL-117"
       ]
     },
     {
@@ -653,7 +668,7 @@
       "source": "skeleton/security",
       "destination": "skeleton/ai/runtime/security",
       "kind": "tree",
-      "source_git_object_sha": "2f46e62b5a76e6fe053d16aa751fcee099bb9a6e",
+      "source_git_object_sha": "e0aacacba8cbf3c61576df67405fa206fda2c1fb",
       "role": "AI runtime security and activation controls",
       "work_package_refs": [
         "WP-W00",
@@ -699,7 +714,7 @@
       "source": "skeleton/eval",
       "destination": "skeleton/ai/evaluation",
       "kind": "tree",
-      "source_git_object_sha": "376037bc7f3cd1ec14a200dd0fc53126fdb14d32",
+      "source_git_object_sha": "bcbb9820d0ee1b5c04437add48796e695dff9dd1",
       "role": "evaluation and evidence support",
       "work_package_refs": [
         "WP-W00",
@@ -734,7 +749,7 @@
       "source": "skeleton/kernel",
       "destination": "skeleton/ai/runtime/kernel",
       "kind": "tree",
-      "source_git_object_sha": "1a869638d7f6ac5598566d86621cc3f49f1efbf6",
+      "source_git_object_sha": "75c2b95ba4cdf5a27aa6ab2460bbb43a1cf7a685",
       "role": "engine kernel and governance primitives",
       "work_package_refs": [
         "WP-W00",
@@ -766,7 +781,7 @@
       "source": "skeleton/reliability",
       "destination": "skeleton/ai/runtime/reliability",
       "kind": "tree",
-      "source_git_object_sha": "ec394e725cc718fa63d071c6a30746c46689b5e6",
+      "source_git_object_sha": "93f10ea935d8df0f97d2faa3b2ab8cb571322649",
       "role": "runtime reliability controls",
       "work_package_refs": [
         "WP-W00",
@@ -801,7 +816,7 @@
       "source": "skeleton/learning",
       "destination": "skeleton/ai/learning",
       "kind": "tree",
-      "source_git_object_sha": "8b832e8e7f6ca97511e4206139bc18da44d02646",
+      "source_git_object_sha": "50438e92c161f5058cefced8bf5a62c8aa46c263",
       "role": "controlled learning support with evidence-grounded learner-state inference, objective planning, and outcome evaluation",
       "work_package_refs": [
         "WP-W00",
@@ -967,7 +982,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "ccbbaae31345e87ec74e2d10cc22e28b2365a9aa",
+      "source_git_object_sha": "d6570aa8e540bcbf100d3340dafc8b4e2a7170ed",
       "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -993,7 +1008,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "0228ea9027d75e733b3c2330f28402cd52447b90",
+      "source_git_object_sha": "d749dc9d71e81911fedb5115b06d7d52a02c04dc",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -1710,7 +1725,7 @@
       "source": "skeleton/repo_machine",
       "destination": "skeleton/ai/build/repo_machine",
       "kind": "tree",
-      "source_git_object_sha": "1f4854df16014f163a44a7b2bb52a5495d26879d",
+      "source_git_object_sha": "1520a1f5ce0a59af8d75ac757eacaff27eca3c54",
       "role": "Repository model, impact, workgraph, governance, stewardship, ownership-aware maintenance, and bounded cleanup authority for autonomous repository engineering.",
       "work_package_refs": [
         "WP-W11",
@@ -1792,7 +1807,7 @@
       "source": "skeleton/automation/swarm",
       "destination": "skeleton/ai/agents/swarm",
       "kind": "tree",
-      "source_git_object_sha": "5a69b6573beb734f92aafbd6e7220d8a9e1b3951",
+      "source_git_object_sha": "eec4dbb2cf19e3238ffe7dbd5789bc8f855f22ac",
       "role": "Agent mesh, DAG scheduling, handoff, negotiation, and bounded wave execution belong in the canonical multi-agent plane.",
       "work_package_refs": [
         "WP-W15",
@@ -1859,7 +1874,7 @@
       "source": "skeleton/tools/integrations",
       "destination": "skeleton/ai/runtime/tools/integrations",
       "kind": "tree",
-      "source_git_object_sha": "7a342bbbcfac4bd26124df1c96bbf86df1b183d7",
+      "source_git_object_sha": "f9d5390927342827fb052b429159f07d4583fb23",
       "role": "Connectors/webhooks/credential references are privileged tool-edge integrations and belong under governed tool execution.",
       "work_package_refs": [
         "WP-W13",
@@ -2666,7 +2681,7 @@
       "source": "skeleton/config",
       "destination": "skeleton/ai/runtime/config",
       "kind": "tree",
-      "source_git_object_sha": "deb783b39705076d2559cc263b51ed46054dfdfd",
+      "source_git_object_sha": "13f1b59dff5ca688f80925468dd2026c138a035f",
       "role": "typed engine configuration, secret references, immutable settings and redacted configuration snapshots",
       "work_package_refs": [
         "WP-W00",
@@ -4739,7 +4754,7 @@
       "source": "skeleton/tools",
       "destination": "skeleton/ai/runtime/tools",
       "kind": "tree",
-      "source_git_object_sha": "63239f151af1b31b36db84ead936f9557aa62fb1",
+      "source_git_object_sha": "8e510627d2f55a55b43756934102e3303b168e1e",
       "role": "Canonical governed tool-edge runtime parent with independently governed connector and webhook integrations.",
       "work_package_refs": [
         "WP-W13",
@@ -4835,7 +4850,7 @@
       "source": "skeleton/research/__init__.py",
       "destination": "skeleton/ai/research/__init__.py",
       "kind": "file",
-      "source_git_object_sha": "8d4beabff6281e385dd926a5ff2911c4b3ee401d",
+      "source_git_object_sha": "0c1404f3a32f1cc2d5beda6fe3a6c85abf0469c3",
       "role": "Research namespace entrypoint; social and existing AI research lineage remain independently governed.",
       "work_package_refs": [
         "WP-W11"
@@ -5223,7 +5238,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "154_mapping_transfer_v2_wave_2b_reconciled_current_main_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "164_mapping_current_main_parity_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -5320,7 +5335,7 @@
       }
     }
   ],
-  "assignment_basis_git_sha": "2291e57f40c55b4aa705faa64a5e5c1ae34e437a",
+  "assignment_basis_git_sha": "03a5ff12967a0d597784112a1208c73718098d5b",
   "assignment_policy": {
     "version": "1.0.0",
     "source_identity": "Each pending assignment is bound to the source Git tree/blob object on assignment_basis_git_sha.",
@@ -6095,6 +6110,72 @@
         "VOL-142"
       ],
       "policy": "Applied after current-main global mapping reconciliation; preserves existing mapping identities while binding the hardened P3-T2 data implementation tree, adversarial validation, and exact mirror evidence without granting closure authority."
+    },
+    "masterplan_completion_ai_tree_reconciliation_2026_10_05": {
+      "base_main_sha": "03a5ff12967a0d597784112a1208c73718098d5b",
+      "repaired_mapping_count": 5,
+      "repaired_mappings": [
+        {
+          "id": "AIFT-CONTRACTS",
+          "files": [
+            "architecture_fitness.py",
+            "project_metrics.py",
+            "roadmap_control.py",
+            "technical_debt.py",
+            "technology_radar.py",
+            "traceability.py"
+          ]
+        },
+        {
+          "id": "AIFT-PERSISTENCE",
+          "files": [
+            "foundation_recovery.py"
+          ]
+        },
+        {
+          "id": "AIFT-AUTOMATION",
+          "files": [
+            "__init__.py",
+            "architecture_fitness.py",
+            "build_order.py",
+            "completion_model.py",
+            "definition_of_done.py",
+            "independent_review.py",
+            "master_appendices.py",
+            "priority_engine.py",
+            "roadmap_control.py",
+            "technical_debt.py",
+            "technology_radar.py",
+            "traceability.py",
+            "transactional_workspace.py",
+            "work_packages.py"
+          ]
+        },
+        {
+          "id": "AIFT-OBSERVABILITY",
+          "files": [
+            "project_metrics.py"
+          ]
+        },
+        {
+          "id": "AIFT-SECURITY",
+          "files": [
+            "zero_trust.py"
+          ]
+        }
+      ],
+      "refreshed_source_identity_count": 164,
+      "volume_refs": [
+        "VOL-112",
+        "VOL-113",
+        "VOL-114",
+        "VOL-115",
+        "VOL-116",
+        "VOL-117",
+        "VOL-118",
+        "VOL-119"
+      ],
+      "policy": "Restore declared source-to-AI staged-mirror parity while honoring source exclusions, overlays, and compatibility-facade exceptions; reconcile landed implementation evidence without granting completion signoff, cutover, source retirement, or independent-verification authority."
     }
   }
 }
