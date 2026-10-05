@@ -11,3 +11,7 @@ def test_duplicate_nodes_and_untyped_edges_rejected():
  n=ArtifactNode("a","v","x")
  with pytest.raises(ValueError):ArtifactGraph((n,n),())
  with pytest.raises(ValueError):ArtifactGraph((n,), (ArtifactDependency("a","v","a","v",""),))
+
+def test_empty_artifact_identity_rejected():
+ import pytest
+ with pytest.raises(ValueError):ArtifactGraph((ArtifactNode("","v","build"),),())
