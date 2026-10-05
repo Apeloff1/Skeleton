@@ -12883,22 +12883,32 @@
       "id": "ACC-VOL-092",
       "type": "volume",
       "title": "VOL-092 Repository Maintenance",
-      "status": "unverified",
+      "status": "implemented",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-10-05T14:20:32Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-10-05T14:20:32Z",
+        "git_sha": "d07770dac4362d4abf484cbea72ab42a225e2953",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/pull/2845",
+          "https://github.com/Apeloff1/Skeleton/commit/d07770dac4362d4abf484cbea72ab42a225e2953",
+          "skeleton/repo_machine/maintenance.py",
+          "skeleton/repo_machine/__init__.py",
+          "skeleton/ai/build/repo_machine/maintenance.py",
+          "skeleton/ai/build/repo_machine/__init__.py",
+          "scripts/plan_repository_maintenance.py",
+          "machine/ai_file_tree.json",
+          "skeleton/testing/test_vol092_repository_maintenance.py"
+        ],
+        "statement": "Implementation-signed after auditing the merged VOL-092 implementation against its canonical maintenance runtime, governed AI mirror, planner, and adversarial regression suite. This grants no independent verification or completion.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/d07770dac4362d4abf484cbea72ab42a225e2953"
       },
       "verification_signoff": {
         "signed": false,
@@ -12914,9 +12924,63 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-10-05T14:20:32Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T14:20:32Z",
+          "git_sha": "d07770dac4362d4abf484cbea72ab42a225e2953",
+          "statement": "Begin evidence reconciliation for the already-merged VOL-092 implementation.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/d07770dac4362d4abf484cbea72ab42a225e2953",
+          "from_status": "unverified",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2845",
+            "https://github.com/Apeloff1/Skeleton/commit/d07770dac4362d4abf484cbea72ab42a225e2953"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T14:20:32Z",
+          "git_sha": "d07770dac4362d4abf484cbea72ab42a225e2953",
+          "statement": "Implementation-signed after auditing the merged VOL-092 implementation against its canonical maintenance runtime, governed AI mirror, planner, and adversarial regression suite. This grants no independent verification or completion.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/d07770dac4362d4abf484cbea72ab42a225e2953",
+          "from_status": "in_progress",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2845",
+            "https://github.com/Apeloff1/Skeleton/commit/d07770dac4362d4abf484cbea72ab42a225e2953",
+            "skeleton/repo_machine/maintenance.py",
+            "skeleton/repo_machine/__init__.py",
+            "skeleton/ai/build/repo_machine/maintenance.py",
+            "skeleton/ai/build/repo_machine/__init__.py",
+            "scripts/plan_repository_maintenance.py",
+            "machine/ai_file_tree.json",
+            "skeleton/testing/test_vol092_repository_maintenance.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/pull/2845",
+        "https://github.com/Apeloff1/Skeleton/commit/d07770dac4362d4abf484cbea72ab42a225e2953",
+        "skeleton/repo_machine/maintenance.py",
+        "skeleton/repo_machine/__init__.py",
+        "skeleton/ai/build/repo_machine/maintenance.py",
+        "skeleton/ai/build/repo_machine/__init__.py",
+        "scripts/plan_repository_maintenance.py",
+        "machine/ai_file_tree.json",
+        "skeleton/testing/test_vol092_repository_maintenance.py"
+      ],
       "baseline_status": "unverified"
     },
     {
