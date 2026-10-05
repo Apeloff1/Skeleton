@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "tree_version": "1.6.8",
+  "tree_version": "1.6.9",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
-  "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
+  "baseline_git_sha": "ec49c5a9a5999ffe3b6ca94501e6b43b264b5010",
   "canonical_root": "skeleton/ai",
   "migration_mode": "strangler_mirror_then_explicit_cutover",
   "purpose": "Consolidate build-plan-relevant AI engine, governance, shell/control-plane, agent, evaluation, reliability, build-control code, historical research lineage, Jeeves, and selected legacy backend/GameForge AI recovery surfaces into one governed file tree without breaking existing imports or fabricating completion.",
@@ -131,7 +131,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "91e23d200dd0a490024693290d91b7afedc0c7a9",
+      "source_git_object_sha": "fe6794c1288410d5be3aac3566a7fc96c1fc4704",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -398,7 +398,7 @@
       "source": "skeleton/vault",
       "destination": "skeleton/ai/runtime/vault",
       "kind": "tree",
-      "source_git_object_sha": "3bc2239ceba7abcb5749836861c90f30e7949403",
+      "source_git_object_sha": "c64aba5a0befc84a82606e95c1031ec0823cf30f",
       "role": "data governance lifecycle and audit authority",
       "work_package_refs": [
         "WP-W00",
@@ -466,7 +466,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "4e6406df9dbdde23f90e2c9c9c9af2f674b3ad9e",
+      "source_git_object_sha": "242cece6995aaff4d49d3b79d372f21585aabe32",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -715,7 +715,7 @@
       "source": "skeleton/eval",
       "destination": "skeleton/ai/evaluation",
       "kind": "tree",
-      "source_git_object_sha": "bcbb9820d0ee1b5c04437add48796e695dff9dd1",
+      "source_git_object_sha": "dab794f1a709d821b6782fb38f200c6eca20e050",
       "role": "evaluation and evidence support",
       "work_package_refs": [
         "WP-W00",
