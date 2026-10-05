@@ -39,6 +39,8 @@ class IndexValidation: recall_ok:bool; quality_ok:bool; freshness_ok:bool
 @dataclass(frozen=True,slots=True)
 class IndexMigration: active:VectorIndexVersion; shadow:VectorIndexVersion; validation:IndexValidation
 def promote_index(m):
+ if not all((m.active.index_id,m.active.version,m.shadow.index_id,m.shadow.version)) or m.active.index_id!=m.shadow.index_id:raise ValueError("index migration identity mismatch")
+ if m.active.embedding!=m.shadow.embedding:raise ValueError("index embedding mismatch")
  if not m.shadow.shadow or not all((m.validation.recall_ok,m.validation.quality_ok,m.validation.freshness_ok)):return m.active
  return VectorIndexVersion(m.shadow.index_id,m.shadow.version,m.shadow.embedding,False)
 @dataclass(frozen=True,slots=True)
@@ -58,6 +60,7 @@ class FreshnessRequirement:
 @dataclass(frozen=True,slots=True)
 class FreshnessDecision: state:FreshnessState; action:StaleAction|None
 def freshness(req,source_watermark,evidence_watermark):
+ if source_watermark is not None and source_watermark<0 or evidence_watermark is not None and evidence_watermark<0:raise ValueError("watermarks must be nonnegative")
  if source_watermark is None or evidence_watermark is None:return FreshnessDecision(FreshnessState.UNKNOWN,StaleAction.ABSTAIN)
  if source_watermark-evidence_watermark<=req.maximum_lag:return FreshnessDecision(FreshnessState.FRESH,None)
  return FreshnessDecision(FreshnessState.STALE,req.stale_action)
@@ -67,5 +70,8 @@ class SourceIdentity: source_id:str; owner:str; lineage:str
 class TrustEvidence: evidence_id:str; claim_scope:str; domain:str; valid_until:int
 @dataclass(frozen=True,slots=True)
 class SourceTrust: identity:SourceIdentity; evidence:tuple[TrustEvidence,...]; trusted_for_instruction:bool=False
-def trust_for(t,claim_scope,domain,now):return any(e.claim_scope==claim_scope and e.domain==domain and now<=e.valid_until for e in t.evidence)
+def trust_for(t,claim_scope,domain,now):
+ if not all((t.identity.source_id,t.identity.owner,t.identity.lineage,claim_scope,domain)) or now<0:return False
+ if len({e.evidence_id for e in t.evidence})!=len(t.evidence) or any(not all((e.evidence_id,e.claim_scope,e.domain)) or e.valid_until<0 for e in t.evidence):return False
+ return any(e.claim_scope==claim_scope and e.domain==domain and now<=e.valid_until for e in t.evidence)
 def content_role(t,claim_scope,domain,now):return "data" if not trust_for(t,claim_scope,domain,now) else "evidence"
