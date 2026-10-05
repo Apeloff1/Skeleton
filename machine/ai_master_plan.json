@@ -4982,7 +4982,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Represent world/simulation state, rules and uncertainty explicitly.",
         "Keep simulated actions/evidence typed so they cannot authorize real side effects.",
@@ -4996,20 +4996,31 @@
       "contracts": [
         "WorldState",
         "SimulationAction",
-        "SimulationEvidence"
+        "SimulationEvidence",
+        "SimulationAuthority",
+        "SimulationBudget",
+        "ScenarioTransition",
+        "ScenarioNode",
+        "ScenarioEdge",
+        "ScenarioTree",
+        "ScenarioResourceUsage"
       ],
       "implementation_paths": [
-        "skeleton/ai",
-        "planned:skeleton/simulation",
-        "machine"
+        "skeleton/simulation/environment.py",
+        "skeleton/simulation/world_model.py",
+        "skeleton/simulation/scenario_runtime.py",
+        "skeleton/ai/simulation/environment.py",
+        "skeleton/ai/simulation/world_model.py",
+        "skeleton/ai/simulation/scenario_runtime.py",
+        "machine/ai_file_tree.json"
       ],
       "tests": [
-        "planned:skeleton/testing/test_simulation_authority_boundary.py",
-        "planned:skeleton/testing/test_simulation_budgets.py"
+        "skeleton/testing/test_simulation_authority_boundary.py",
+        "skeleton/testing/test_vol073_scenario_runtime.py"
       ],
       "evaluations": [
-        "planned:rollout divergence evaluation",
-        "planned:simulated-to-real boundary attack suite"
+        "skeleton/testing/test_simulation_authority_boundary.py",
+        "skeleton/testing/test_vol073_scenario_runtime.py"
       ],
       "evidence": [],
       "risks": [
@@ -5017,10 +5028,7 @@
         "unbounded rollouts",
         "world model bias"
       ],
-      "gaps": [
-        "define simulation state contract",
-        "materialize resource/authority guards"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-073",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
