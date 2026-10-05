@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plan_version": "1.6.1",
+  "plan_version": "1.6.2",
   "status": "active",
   "architecture_lane": "PR-1904",
   "architecture_branch": "integration/architecture-map-v1",
@@ -7672,7 +7672,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Run applicable vertical slices in release-like environment from signed artifacts.",
         "Exercise cross-component failure, restore, upgrade, rollback and authority controls.",
@@ -7689,27 +7689,27 @@
         "FinalAssemblyEvidence"
       ],
       "implementation_paths": [
-        "scripts",
-        "skeleton/app",
-        "machine"
+        "skeleton/app/final_assembly.py",
+        "skeleton/testing/test_final_assembly.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_final_assembly.py",
-        "planned:release-like full slice harness"
+        "skeleton/testing/test_final_assembly.py"
       ],
       "evaluations": [
         "planned:VS-000..VS-007 qualification",
         "planned:compound-fault final campaign"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/5a6c677fec8b3c550b42e640353ea25c1dc6c2ea"
+      ],
       "risks": [
         "integration-only failure",
         "environment mismatch",
         "incomplete release evidence"
       ],
       "gaps": [
-        "materialize final assembly harness",
-        "bind release promotion to final evidence digest"
+        "independent final-assembly verification remains pending",
+        "P2-QUAL-01 release-qualification dependencies remain external to this bounded implementation"
       ],
       "accountability_id": "ACC-VOL-120",
       "completion_checkbox": false,
@@ -7724,7 +7724,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Keep appendices derived from or linked to canonical machine contracts.",
         "Version normative terms and references used across the construction program."
@@ -7740,23 +7740,25 @@
         "ReferenceIndex"
       ],
       "implementation_paths": [
-        "docs/plan",
-        "machine"
+        "skeleton/automation/master_appendices.py",
+        "skeleton/ai/build/automation/master_appendices.py",
+        "machine/ai_file_tree.json"
       ],
       "tests": [
-        "planned:skeleton/testing/test_master_appendices.py"
+        "skeleton/testing/test_master_appendices.py"
       ],
       "evaluations": [
         "planned:appendix reference integrity audit"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/107efcf61a3962ecaa718efbe09c9c02c5478a0d"
+      ],
       "risks": [
         "stale appendix overrides canonical source",
         "duplicate definitions"
       ],
       "gaps": [
-        "generate cross-reference inventory",
-        "bind normative terms to owners"
+        "independent reference-integrity evaluation remains pending"
       ],
       "accountability_id": "ACC-VOL-121",
       "completion_checkbox": false,
