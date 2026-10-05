@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plan_version": "1.6.0",
+  "plan_version": "1.6.1",
   "status": "active",
   "architecture_lane": "PR-1904",
   "architecture_branch": "integration/architecture-map-v1",
@@ -7233,7 +7233,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Give every traceable node stable identity and typed edges.",
         "Reject dangling or contradictory traceability references.",
@@ -7250,27 +7250,30 @@
         "TraceabilityMatrix"
       ],
       "implementation_paths": [
-        "machine",
-        "scripts",
-        "docs/plan"
+        "skeleton/contracts/traceability.py",
+        "skeleton/automation/traceability.py",
+        "skeleton/ai/runtime/contracts/traceability.py",
+        "skeleton/ai/build/automation/traceability.py",
+        "machine/ai_file_tree.json"
       ],
       "tests": [
-        "planned:skeleton/testing/test_master_traceability.py",
-        "planned:orphan trace tests"
+        "skeleton/testing/test_master_traceability.py"
       ],
       "evaluations": [
         "planned:change-impact replay",
         "planned:trace completeness audit"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/5b242858a52d8cdc7d3a01fe146b056d5a20a0dc"
+      ],
       "risks": [
         "dangling lineage",
         "stale edges",
         "false completeness"
       ],
       "gaps": [
-        "materialize canonical trace graph",
-        "bind PR impact checks to trace edges"
+        "repository-wide trace population remains separate",
+        "independent completeness audit remains pending"
       ],
       "accountability_id": "ACC-VOL-112",
       "completion_checkbox": false,
@@ -7285,7 +7288,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Give capabilities stable IDs, owners, maturity and dependency metadata.",
         "Separate implemented availability from target-plan intent.",
@@ -7302,27 +7305,28 @@
         "CapabilityAvailability"
       ],
       "implementation_paths": [
-        "machine/capability_interfaces.json",
-        "machine",
-        "skeleton/ai"
+        "skeleton/ai/capability_map.py",
+        "skeleton/ai/__init__.py",
+        "machine/ai_file_tree.json"
       ],
       "tests": [
-        "planned:skeleton/testing/test_capability_map.py",
-        "planned:capability availability tests"
+        "skeleton/testing/test_capability_map.py"
       ],
       "evaluations": [
         "planned:degraded-capability evaluation",
         "planned:planned-vs-live audit"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/4ece6cbbd59bb168699798bdb1d8c79395ecb239"
+      ],
       "risks": [
         "false capability advertising",
         "stale dependency",
         "silent degraded fallback"
       ],
       "gaps": [
-        "unify capability descriptors",
-        "bind runtime discovery to registry"
+        "repository-wide capability descriptor/evidence population remains separate",
+        "independent capability maturity verification remains pending"
       ],
       "accountability_id": "ACC-VOL-113",
       "completion_checkbox": false,
@@ -7337,7 +7341,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Record candidate purpose, baseline, risks, owner, budget and decision horizon.",
         "Keep experiments sandboxed until promotion evidence exists.",
@@ -7354,27 +7358,31 @@
         "TechnologyExitCriteria"
       ],
       "implementation_paths": [
-        "docs/plan",
-        "machine",
-        "experiments"
+        "skeleton/contracts/technology_radar.py",
+        "skeleton/automation/technology_radar.py",
+        "skeleton/ai/runtime/contracts/technology_radar.py",
+        "skeleton/ai/build/automation/technology_radar.py",
+        "machine/ai_file_tree.json"
       ],
       "tests": [
-        "planned:skeleton/testing/test_technology_radar.py",
-        "planned:radar decision evidence tests"
+        "skeleton/testing/test_technology_radar.py"
       ],
       "evaluations": [
         "planned:candidate baseline evaluation",
         "planned:stale experiment audit"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/544530e8bbf354729935b21dcdf5aba5c7d2e51e",
+        "https://github.com/Apeloff1/Skeleton/commit/8ab4f8c30f02c4c279a2d3563a64d2e1d0dbce1b"
+      ],
       "risks": [
         "novelty bias",
         "permanent experiment",
         "vendor lock-in"
       ],
       "gaps": [
-        "define radar state machine",
-        "bind adopted tech to architecture decisions"
+        "independent candidate-baseline evaluation remains pending",
+        "architecture-decision verification remains pending"
       ],
       "accountability_id": "ACC-VOL-114",
       "completion_checkbox": false,
@@ -7389,7 +7397,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Record debt source, affected contracts, risk, owner and target disposition.",
         "Measure operational/engineering interest where possible.",
@@ -7406,27 +7414,31 @@
         "DebtRetirement"
       ],
       "implementation_paths": [
-        "machine",
-        "docs/plan",
-        "scripts"
+        "skeleton/contracts/technical_debt.py",
+        "skeleton/automation/technical_debt.py",
+        "skeleton/ai/runtime/contracts/technical_debt.py",
+        "skeleton/ai/build/automation/technical_debt.py",
+        "skeleton/repo_machine",
+        "skeleton/ai/build/repo_machine",
+        "machine/ai_file_tree.json"
       ],
       "tests": [
-        "planned:skeleton/testing/test_technical_debt_ledger.py",
-        "planned:debt retirement validation"
+        "skeleton/testing/test_technical_debt_ledger.py"
       ],
       "evaluations": [
         "planned:debt-interest review",
         "planned:cleanup compatibility evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/69e1f65abfb41253a842e085198a956f2999eadb"
+      ],
       "risks": [
         "unowned debt",
         "debt inflation",
         "unsafe cleanup"
       ],
       "gaps": [
-        "establish debt IDs and ownership",
-        "bind debt to risk/backlog/ADR"
+        "independent cleanup-compatibility evaluation remains pending"
       ],
       "accountability_id": "ACC-VOL-115",
       "completion_checkbox": false,
@@ -7441,7 +7453,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Turn high-value architecture rules into deterministic executable checks.",
         "Version rules with architecture decisions and focused regression fixtures.",
@@ -7458,27 +7470,29 @@
         "FitnessWaiver"
       ],
       "implementation_paths": [
-        "scripts",
-        "machine",
-        "tests"
+        "skeleton/contracts/architecture_fitness.py",
+        "skeleton/automation/architecture_fitness.py",
+        "skeleton/ai/runtime/contracts/architecture_fitness.py",
+        "skeleton/ai/build/automation/architecture_fitness.py",
+        "machine/ai_file_tree.json"
       ],
       "tests": [
-        "tests/test_architecture_boundaries.py",
-        "planned:skeleton/testing/test_architecture_fitness_registry.py"
+        "skeleton/testing/test_architecture_fitness.py"
       ],
       "evaluations": [
         "planned:mutation-of-architecture evaluation",
         "planned:waiver expiry audit"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/891d6d04191701fdb4240abfe71a32002d10d862"
+      ],
       "risks": [
         "stale fitness rule",
         "broad exemption",
         "false green"
       ],
       "gaps": [
-        "unify architecture check registry",
-        "bind rules to ADR/ownership"
+        "independent architecture-rule and waiver verification remains pending"
       ],
       "accountability_id": "ACC-VOL-116",
       "completion_checkbox": false,
@@ -7493,7 +7507,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Separate activity, throughput, quality, risk and outcome metrics.",
         "Derive metrics from authoritative artifacts/events where possible.",
@@ -7510,27 +7524,29 @@
         "MetricDefinition"
       ],
       "implementation_paths": [
-        "skeleton/observability",
-        "machine",
-        "docs/plan"
+        "skeleton/contracts/project_metrics.py",
+        "skeleton/observability/project_metrics.py",
+        "skeleton/ai/runtime/contracts/project_metrics.py",
+        "skeleton/ai/runtime/observability/project_metrics.py",
+        "machine/ai_file_tree.json"
       ],
       "tests": [
-        "planned:skeleton/testing/test_project_metrics.py",
-        "planned:metric provenance tests"
+        "skeleton/testing/test_project_metrics.py"
       ],
       "evaluations": [
         "planned:Goodhart/adversarial metric review",
         "planned:metric drift evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/8aceef7786c9dd1284a4019f640ce984f6b09e83"
+      ],
       "risks": [
         "vanity metrics",
         "Goodhart effects",
         "stale denominator"
       ],
       "gaps": [
-        "define metric registry",
-        "bind progress percentages to traceable state"
+        "independent metric-provenance verification remains pending"
       ],
       "accountability_id": "ACC-VOL-117",
       "completion_checkbox": false,
@@ -7545,7 +7561,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Link roadmap items to work packages, risks, dependencies and acceptance gates.",
         "Replan explicitly when assumptions change while preserving decision history.",
@@ -7562,27 +7578,31 @@
         "RoadmapRevision"
       ],
       "implementation_paths": [
-        "docs/plan",
-        "machine",
-        "skeleton/automation"
+        "skeleton/contracts/roadmap_control.py",
+        "skeleton/automation/roadmap_control.py",
+        "skeleton/ai/runtime/contracts/roadmap_control.py",
+        "skeleton/ai/build/automation/roadmap_control.py",
+        "skeleton/repo_machine",
+        "skeleton/ai/build/repo_machine",
+        "machine/ai_file_tree.json"
       ],
       "tests": [
-        "planned:skeleton/testing/test_roadmap_control.py",
-        "planned:breadth-freeze roadmap tests"
+        "skeleton/testing/test_roadmap_control.py"
       ],
       "evaluations": [
         "planned:blocker-driven replan simulation",
         "planned:scope-creep challenge"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/ca7464f5056cbb9ae01dd351d30892ba9c9198b9"
+      ],
       "risks": [
         "schedule fiction",
         "hidden scope growth",
         "lost revision rationale"
       ],
       "gaps": [
-        "bind roadmap to build DAG",
-        "materialize revision lineage"
+        "independent roadmap-control verification remains pending"
       ],
       "accountability_id": "ACC-VOL-118",
       "completion_checkbox": false,
@@ -7597,7 +7617,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Use signed atomic task/accountability records as the completion source.",
         "Define deterministic aggregation for packages, waves, slices and volumes.",
@@ -7614,27 +7634,30 @@
         "CompletionBlocker"
       ],
       "implementation_paths": [
-        "machine/ai_build_accountability.json",
-        "machine/ai_build_queue.json",
-        "scripts"
+        "skeleton/automation/completion_model.py",
+        "skeleton/ai/build/automation/completion_model.py",
+        "skeleton/repo_machine",
+        "skeleton/ai/build/repo_machine",
+        "machine/ai_file_tree.json"
       ],
       "tests": [
-        "planned:skeleton/testing/test_completion_model.py",
-        "planned:completion rollup invariants"
+        "skeleton/testing/test_completion_model.py"
       ],
       "evaluations": [
         "planned:critical-blocker aggregation test",
         "planned:stale-signoff invalidation evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/72f64f7a1ad2078cd522f63868dfa34e4db7fee6"
+      ],
       "risks": [
         "manual status drift",
         "averaged-away blocker",
         "double counting"
       ],
       "gaps": [
-        "implement canonical rollup function",
-        "bind UI progress to derived completion only"
+        "independent stale-signoff evaluation remains pending",
+        "independent critical-blocker evaluation remains pending"
       ],
       "accountability_id": "ACC-VOL-119",
       "completion_checkbox": false,
