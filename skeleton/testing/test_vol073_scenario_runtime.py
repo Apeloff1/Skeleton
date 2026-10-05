@@ -647,3 +647,37 @@ def test_root_identity_changes_when_rule_contract_changes() -> None:
 
     assert first_tree.root_id != second_tree.root_id
     assert first_tree.digest != second_tree.digest
+
+
+def test_action_payload_is_deeply_immutable_and_detached_from_caller() -> None:
+    source = {"path": {"x": 1}, "items": [1, 2]}
+    candidate = action("immutable.action", parameters=source)
+    original_digest = candidate.digest
+
+    source["path"]["x"] = 99
+    source["items"].append(3)
+
+    assert candidate.digest == original_digest
+    assert candidate.parameters["path"]["x"] == 1
+    assert candidate.parameters["items"] == (1, 2)
+    with pytest.raises(TypeError):
+        candidate.parameters["new"] = 1
+    with pytest.raises(TypeError):
+        candidate.parameters["path"]["x"] = 2
+
+
+def test_rule_payload_is_deeply_immutable() -> None:
+    source = {"limits": {"speed": 3}, "modes": ["walk", "run"]}
+    rule = SimulationRule(
+        rule_id="immutable-rule",
+        description="Immutable nested rule content.",
+        parameters=source,
+    )
+    original_digest = rule.digest
+
+    source["limits"]["speed"] = 999
+    source["modes"].append("teleport")
+
+    assert rule.digest == original_digest
+    assert rule.parameters["limits"]["speed"] == 3
+    assert rule.parameters["modes"] == ("walk", "run")
