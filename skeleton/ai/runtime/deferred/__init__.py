@@ -16,6 +16,22 @@ from .executor import (
     ExecutionReceipt,
     FailureReceipt,
 )
+from .operational_health import (
+    DependencyHealth,
+    DependencyKind,
+    DependencyRisk,
+    FailoverDecision,
+    HealthBlocker,
+    HealthDimension,
+    HealthScorecard,
+    HealthState,
+    ProviderDependency,
+    ProviderHealth,
+    ProviderOutcome,
+    ProviderProfile,
+    ProviderRisk,
+    decide_failover,
+)
 from .contract_fuzzing import ContractFuzzer, FuzzBudget, FuzzFailure, FuzzReport
 from .simulation_mode import SimulationAuthority, SimulationEvidence, SimulationRequest, SimulationResult, SimulationRuntime
 from .journal import (
@@ -34,6 +50,19 @@ __all__ = [
     "FuzzFailure",
     "FuzzReport",
     "DEFERRED_165_SPECS",
+    "DependencyHealth",
+    "DependencyKind",
+    "DependencyRisk",
+    "FailoverDecision",
+    "HealthBlocker",
+    "HealthDimension",
+    "HealthScorecard",
+    "HealthState",
+    "ProviderDependency",
+    "ProviderHealth",
+    "ProviderOutcome",
+    "ProviderProfile",
+    "ProviderRisk",
     "DeferredEffectAuthority",
     "DeferredExecutionError",
     "DeferredExecutionJournal",
@@ -54,5 +83,6 @@ __all__ = [
     "SimulationRuntime",
     "SqliteDeferredExecutionJournal",
     "build_registry",
+    "decide_failover",
     "volume_ids",
 ]
