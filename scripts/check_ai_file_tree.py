@@ -700,6 +700,35 @@ def validate() -> list[str]:
                 elif ref not in known_volume_keys:
                     errors.append(f"{owner_id}: unknown volume ref {ref}")
 
+    try:
+        tracked_ai = subprocess.run(
+            ["git", "ls-files", "-z", "skeleton/ai"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.split("\0")
+    except (OSError, subprocess.CalledProcessError) as exc:
+        errors.append(f"cannot enumerate tracked AI-tree files for ownership audit: {exc}")
+        tracked_ai = []
+
+    unowned_ai_files = []
+    for repo_relative in tracked_ai:
+        if not repo_relative:
+            continue
+        mapping_owned = any(
+            _path_within(repo_relative, destination)
+            for destination in declared_destinations
+        )
+        native_owned = _owned_native_ai_path(native_owners, repo_relative) is not None
+        if not mapping_owned and not native_owned:
+            unowned_ai_files.append(repo_relative)
+    if unowned_ai_files:
+        errors.append(
+            "tracked AI-tree files lack governed ownership: "
+            + ", ".join(sorted(unowned_ai_files)[:25])
+        )
+
     mature_volume_states = {"implemented", "hardened", "verified", "complete", "completed"}
     volumes = master_plan.get("volumes", []) if isinstance(master_plan, dict) else []
     if not isinstance(volumes, list):

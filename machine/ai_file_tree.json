@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "tree_version": "1.7.8",
+  "tree_version": "1.7.9",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
-  "baseline_git_sha": "ae8f8dd30f133adfc3f09d861ee635591e07f654",
+  "baseline_git_sha": "43867c098e9beb4851c6dc1cc936f8e196e64720",
   "canonical_root": "skeleton/ai",
   "migration_mode": "strangler_mirror_then_explicit_cutover",
   "purpose": "Consolidate build-plan-relevant AI engine, governance, shell/control-plane, agent, evaluation, reliability, build-control code, historical research lineage, Jeeves, and selected legacy backend/GameForge AI recovery surfaces into one governed file tree without breaking existing imports or fabricating completion.",
@@ -6023,7 +6023,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "177_mapping_plus_10_native_owner_current_main_governance_lineage_refreshed_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "177_mapping_18_native_owner_file_complete_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -6581,9 +6581,9 @@
     }
   ],
   "classification_coverage": {
-    "status": "closed_after_completed_work_fill",
+    "status": "closed_after_file_level_native_owner_fill",
     "rule": "Every first-level skeleton/* path is either a governed mapping source, a pending assignment source, an architecture-approved external path, an explicit exclusion, or retained_outside_ai_tree.",
-    "source_head": "3f80b3d303aa2bdd99d70375b2ea3162f1f70921"
+    "source_head": "43867c098e9beb4851c6dc1cc936f8e196e64720"
   },
   "priority_one_migration": {
     "status": "mirrored_governed_cutover_pending",
@@ -6824,7 +6824,7 @@
       "BASE-FRONTEND-SSR-RAF-01"
     ],
     "invariant": "Preparation metadata and move tags authorize staging only; the reconciled mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion.",
-    "native_ai_owner_count": 10
+    "native_ai_owner_count": 18
   },
   "validation_request": {
     "requested_at_utc": "2026-09-22T15:47:00Z",
@@ -7289,6 +7289,24 @@
         ]
       },
       "policy": "Bind already-landed mature implementation volumes to their existing governed AI-tree owners without moving product/backend authority, changing runtime behavior, granting cutover, or asserting independent completion verification."
+    },
+    "completed_work_native_ownership_fill_2026_10_05": {
+      "base_main_sha": "43867c098e9beb4851c6dc1cc936f8e196e64720",
+      "unowned_tracked_ai_files_before": 180,
+      "target_unowned_tracked_ai_files_after": 0,
+      "native_owner_count_before": 10,
+      "native_owner_count_after": 18,
+      "owner_ids_added": [
+        "AIFT-NATIVE-AI-README",
+        "AIFT-NATIVE-ASSISTANT-ROOT",
+        "AIFT-NATIVE-COMPAT-ROOT",
+        "AIFT-NATIVE-INTEGRATIONS-ROOT",
+        "AIFT-NATIVE-PLANNING-ROOT",
+        "AIFT-NATIVE-PROVIDERS-ROOT",
+        "AIFT-NATIVE-RESEARCH-ROOT",
+        "AIFT-NATIVE-RUNTIME-ROOT"
+      ],
+      "policy": "Classify already-landed canonical AI-native work without fabricating source mappings. More-specific migration destinations remain authoritative; residual owners cover only otherwise-unclaimed tracked AI files. This grants no source retirement, import cutover, completion signoff, or independent-verification authority."
     }
   },
   "native_ai_owners": [
@@ -7420,6 +7438,108 @@
       "role": "Canonical AI-native artifact review implementation.",
       "volume_refs": [
         "VOL-209"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-AI-README",
+      "path": "skeleton/ai/README.md",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical documentation for the governed AI assembly tree and its ownership rules.",
+      "volume_refs": [
+        "VOL-000"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-ASSISTANT-ROOT",
+      "path": "skeleton/ai/assistant",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI-native assistant control-plane, context, tooling, routing, provenance, memory, automation, and handoff surfaces.",
+      "volume_refs": [
+        "VOL-097"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-COMPAT-ROOT",
+      "path": "skeleton/ai/compat",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": true,
+      "role": "Residual compatibility package surfaces not claimed by more-specific convergence mappings; compatibility never creates independent production authority.",
+      "volume_refs": [
+        "VOL-003",
+        "VOL-060",
+        "VOL-261"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-INTEGRATIONS-ROOT",
+      "path": "skeleton/ai/integrations",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI-native bounded integration adapters and open-source interoperability surfaces.",
+      "volume_refs": [
+        "VOL-007",
+        "VOL-162",
+        "VOL-343"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-PLANNING-ROOT",
+      "path": "skeleton/ai/planning",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI-native construction/planning authority support distinct from mirrored runtime planning implementations.",
+      "volume_refs": [
+        "VOL-014",
+        "VOL-095"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-PROVIDERS-ROOT",
+      "path": "skeleton/ai/providers",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": true,
+      "role": "Residual provider package/export surfaces around more-specific governed provider contract and runtime mappings.",
+      "volume_refs": [
+        "VOL-007"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-RESEARCH-ROOT",
+      "path": "skeleton/ai/research",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": true,
+      "role": "Residual AI-native research and quarantined external reference material not claimed by more-specific historical/acquired/legacy mappings.",
+      "volume_refs": [
+        "VOL-001",
+        "VOL-099",
+        "VOL-106",
+        "VOL-409"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-RUNTIME-ROOT",
+      "path": "skeleton/ai/runtime",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": true,
+      "role": "Residual canonical AI-native runtime surfaces—including autonomous engineering, effects, local inference, learning foundation, training, functional AI, provider runtime, and system completion—not claimed by more-specific mappings or native owners.",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-007",
+        "VOL-015",
+        "VOL-022",
+        "VOL-097",
+        "VOL-119",
+        "VOL-143"
       ]
     }
   ]
