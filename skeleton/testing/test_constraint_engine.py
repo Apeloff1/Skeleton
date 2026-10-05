@@ -86,3 +86,7 @@ def test_conflict_cannot_be_self_referential_or_unexplained() -> None:
     other = constraint("two", ConstraintStrength.HARD, lambda _: True)
     with pytest.raises(ValueError):
         explain_conflict(rule, other, "")
+
+def test_raw_hard_string_cannot_downgrade_constraint():
+ import pytest
+ with pytest.raises(TypeError):Constraint("c","d","hard","p",lambda _:False)
