@@ -6468,7 +6468,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Start from durable conversation and explicit user objective.",
         "Compile governed context, invoke provider-neutral inference, authorize any tool side effect and verify result.",
@@ -6487,17 +6487,21 @@
       "implementation_paths": [
         "skeleton/ai",
         "backend",
-        "frontend"
+        "frontend",
+        "skeleton/ai/functional_transaction.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_vs001_functional_ai.py",
-        "planned:frontend VS-001 reconnect E2E"
+        "skeleton/testing/test_vs001_transaction_contract.py"
       ],
       "evaluations": [
         "planned:full functional AI acceptance",
         "planned:tool failure/recovery variant"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/21cc015099f55749e18d7e204d4e55f0488adb46",
+        "skeleton/ai/functional_transaction.py",
+        "skeleton/testing/test_vs001_transaction_contract.py"
+      ],
       "risks": [
         "authority gap",
         "context trust loss",
@@ -6520,7 +6524,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Use repository graph and explicit task objective to produce a bounded change plan.",
         "Acquire mutation lease/fencing before edits and preserve provenance for every change.",
@@ -6539,17 +6543,22 @@
       "implementation_paths": [
         "skeleton/ai/build",
         "skeleton/repo_intelligence",
-        "scripts"
+        "scripts",
+        "skeleton/ai/build/engineering_agent.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_vs002_engineering_agent.py",
-        "planned:repository rollback integration"
+        "skeleton/testing/test_vs002_mutation_custody.py"
       ],
       "evaluations": [
         "planned:conflicting-agent lease evaluation",
         "planned:test-gaming adversarial run"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/361b68ec3f5cfc60aafb01561828afa9688c3f7a",
+        "https://github.com/Apeloff1/Skeleton/commit/980f186591f795524ab7535ff34e6d68176cc582",
+        "skeleton/ai/build/engineering_agent.py",
+        "skeleton/testing/test_vs002_mutation_custody.py"
+      ],
       "risks": [
         "unleased mutation",
         "destructive edit",
