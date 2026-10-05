@@ -11,6 +11,7 @@ from urllib.parse import urlsplit
 
 _SHA = re.compile(r"^[0-9a-f]{64}$")
 _ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{1,191}$")
+_MARKER_PREFIX = "<!-- skeleton:generated:"
 _BEGIN = "<!-- skeleton:generated:{id}:begin -->"
 _END = "<!-- skeleton:generated:{id}:end -->"
 
@@ -130,8 +131,7 @@ class GeneratedSection:
         object.__setattr__(self, "generator_digest", _sha(self.generator_digest, "generator_digest"))
         if not isinstance(self.body, str) or "\x00" in self.body:
             raise DocumentationError("body must be safe text")
-        begin, end = markers(self.section_id)
-        if begin in self.body or end in self.body:
+        if _MARKER_PREFIX in self.body:
             raise DocumentationError("generated body cannot contain ownership markers")
 
     @property
