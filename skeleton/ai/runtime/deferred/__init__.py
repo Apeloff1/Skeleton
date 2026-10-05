@@ -14,6 +14,13 @@ from .lifecycle_safety import (
     MigrationReceipt, MigrationState, MigrationStep, ParityEvidence,
     RetirementDecision, can_remove_adapter, decide_retirement,
 )
+from .reliability_controls import (
+    BackpressureSignal, BreakerDecision, BreakerState, BufferLimit, CircuitBreaker,
+    CongestionState, FailureClass, LoadShedPolicy, PressureDecision, PressureLevel,
+    ProbeResult, QueueBudget, QueueDecision, QueueKind, RetryAttempt, RetryBudget,
+    RetryDecision, ShedDecision, WorkClass, breaker, pressure, queue_decision,
+    retry, shed,
+)
 from .contract_fuzzing import ContractFuzzer, FuzzBudget, FuzzFailure, FuzzReport
 from .simulation_mode import SimulationAuthority, SimulationEvidence, SimulationRequest, SimulationResult, SimulationRuntime
 from .journal import DeferredExecutionJournal, DeferredJournalConflict, DeferredJournalError, DeferredJournalRecord, SqliteDeferredExecutionJournal
