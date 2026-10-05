@@ -69,7 +69,7 @@ class WorkloadTrace: task_durations:tuple[int,...]; assumptions:tuple[str,...]
 class SimulationMetric: throughput:float; latency:float; fairness:float; resource:float
 @dataclass(frozen=True,slots=True)
 class SchedulingSimulation:
- trace:WorkloadTrace; policy:SchedulingPolicy; metric:SimulationMetric
+    trace:WorkloadTrace; policy:SchedulingPolicy; metric:SimulationMetric
     @property
     def authoritative(self):
         return False
