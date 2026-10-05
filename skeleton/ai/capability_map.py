@@ -343,6 +343,70 @@ class CapabilitySnapshot:
         )
 
 
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "schema": CAPABILITY_MAP_SCHEMA,
+            "registry_digest": self.registry_digest,
+            "capabilities": [
+                {
+                    "capability_id": item.capability_id,
+                    "state": item.state.value,
+                    "guarantees": list(item.guarantees),
+                    "reason": item.reason,
+                    "evidence_digest": item.evidence_digest,
+                    "dependency_states": [
+                        [dependency_id, state.value]
+                        for dependency_id, state in item.dependency_states
+                    ],
+                }
+                for item in self.capabilities
+            ],
+            "healthy": self.healthy,
+            "digest": self.digest,
+        }
+
+    @classmethod
+    def from_dict(cls, value: object) -> "CapabilitySnapshot":
+        if not isinstance(value, dict):
+            raise CapabilityError("capability snapshot payload must be mapping")
+        expected = {"schema", "registry_digest", "capabilities", "healthy", "digest"}
+        if set(value) != expected:
+            raise CapabilityError("capability snapshot has unknown or missing fields")
+        if value["schema"] != CAPABILITY_MAP_SCHEMA:
+            raise CapabilityError("unsupported capability snapshot schema")
+        registry_digest = _sha(value["registry_digest"], "registry_digest")
+        raw_capabilities = value["capabilities"]
+        if not isinstance(raw_capabilities, list):
+            raise CapabilityError("snapshot capabilities must be list")
+        if len(raw_capabilities) > _MAX_CAPABILITIES:
+            raise CapabilityError("snapshot capability count exceeds safety bound")
+        capabilities = []
+        for raw in raw_capabilities:
+            if not isinstance(raw, dict):
+                raise CapabilityError("snapshot capability must be mapping")
+            fields = {"capability_id", "state", "guarantees", "reason", "evidence_digest", "dependency_states"}
+            if set(raw) != fields:
+                raise CapabilityError("snapshot capability has unknown or missing fields")
+            try:
+                state = Availability(raw["state"])
+                guarantees = tuple(raw["guarantees"])
+                dependency_states = tuple(
+                    (item[0], Availability(item[1]))
+                    for item in raw["dependency_states"]
+                )
+            except (TypeError, ValueError, IndexError) as exc:
+                raise CapabilityError("malformed snapshot capability") from exc
+            capabilities.append(CapabilityAvailability(
+                raw["capability_id"], state, guarantees, raw["reason"],
+                raw["evidence_digest"], dependency_states,
+            ))
+        result = cls(registry_digest, tuple(capabilities))
+        if value["healthy"] is not result.healthy:
+            raise CapabilityError("capability snapshot health mismatch")
+        if value["digest"] != result.digest:
+            raise CapabilityError("capability snapshot digest mismatch")
+        return result
+
 class CapabilityMap:
     """Resolve exact live capability guarantees without fallback."""
 
