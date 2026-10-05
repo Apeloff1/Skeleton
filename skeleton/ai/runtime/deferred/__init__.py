@@ -55,3 +55,11 @@ from .policy_refresh import (
     RefreshReceipt, RefreshState, RetrievalDocument, RetrievalFilter,
     RetrievalPolicy, RouteConstraint, RouteDecision, RoutingPolicy, retrieve, route,
 )
+
+from .model_instruction_ops import (
+    EvidenceState, ResearchFindingView, ResearchGap, ResearchDashboard,
+    ModelDeployment, ModelHealth, ModelOpsDecision, decide_promotion,
+    ModelVersionFence, ModelRollbackPlan, ModelRollbackReceipt,
+    InstructionVersion, InstructionAsset, InstructionBinding, bind_instruction,
+    PromptBaseline, PromptTest, PromptRegression, evaluate_prompt,
+)
