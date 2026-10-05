@@ -582,7 +582,7 @@
       "destination": "skeleton/ai/runtime/observability",
       "kind": "tree",
       "source_git_object_sha": "3f7f261ac997a6e7f2381b1f952643b444838cd3",
-      "role": "AI runtime observability audit and telemetry plane",
+      "role": "AI runtime observability, telemetry, audit, and provenance-bound explainability plane with redacted user-safe surfaces",
       "work_package_refs": [
         "WP-W00",
         "WP-W01",
@@ -607,7 +607,10 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-085"
+      ]
     },
     {
       "id": "AIFT-CONTEXTS",
