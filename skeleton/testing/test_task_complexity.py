@@ -15,3 +15,8 @@ def test_revision_cannot_forge_limit():
 def test_invalid_uncertainty_and_features_fail_closed():
  with pytest.raises(ValueError):estimate_complexity((f(1),),calibration_version="v1",hard_limit=5,uncertainty=2)
  with pytest.raises(ValueError):ComplexityFeature("x",-1,1)
+
+def test_nonfinite_and_boolean_complexity_values_rejected():
+ import pytest,math
+ with pytest.raises(ValueError):ComplexityFeature("x",math.nan,1)
+ with pytest.raises(ValueError):ComplexityEstimate(1,.1,"v",(),True)
