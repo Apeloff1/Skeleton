@@ -1,15 +1,16 @@
 """Uncertainty-aware task complexity estimates for VOL-312."""
 from dataclasses import dataclass
+import math
 @dataclass(frozen=True)
 class ComplexityFeature:
  name:str; value:float; weight:float
  def __post_init__(self):
-  if not self.name or self.value<0 or self.weight<0:raise ValueError("invalid complexity feature")
+  if not self.name or any(isinstance(x,bool) or not isinstance(x,(int,float)) or not math.isfinite(x) or x<0 for x in (self.value,self.weight)):raise ValueError("invalid complexity feature")
 @dataclass(frozen=True)
 class ComplexityEstimate:
  score:float; uncertainty:float; calibration_version:str; features:tuple[ComplexityFeature,...]; hard_limit:int
  def __post_init__(self):
-  if self.score<0 or not 0<=self.uncertainty<=1 or not self.calibration_version or self.hard_limit<0:raise ValueError("invalid estimate")
+  if any(isinstance(x,bool) or not isinstance(x,(int,float)) or not math.isfinite(x) for x in (self.score,self.uncertainty)) or self.score<0 or not 0<=self.uncertainty<=1 or not self.calibration_version or isinstance(self.hard_limit,bool) or not isinstance(self.hard_limit,int) or self.hard_limit<0:raise ValueError("invalid estimate")
  @property
  def admitted(self):return self.score<=self.hard_limit
 @dataclass(frozen=True)
