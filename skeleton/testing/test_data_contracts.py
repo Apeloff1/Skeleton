@@ -4,3 +4,9 @@ def c(unit="ms",cons=True):return DataContract("latency","v1",(DataField("x","la
 def test_semantic_unit_change_is_breaking():assert require_migration(c(),c("s"))==("x",)
 def test_breaking_change_requires_consumer_inventory():
  with pytest.raises(ValueError):require_migration(c(cons=False),c("s",False))
+
+def test_duplicate_field_and_negative_freshness_rejected():
+ import pytest
+ f=DataField("x","m",False,"u","public")
+ with pytest.raises(ValueError):DataContract("c","v",(f,f),1,())
+ with pytest.raises(ValueError):DataContract("c","v",(f,),-1,())
