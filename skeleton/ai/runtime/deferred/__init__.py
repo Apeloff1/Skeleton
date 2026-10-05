@@ -14,6 +14,14 @@ from .lifecycle_safety import (
     MigrationReceipt, MigrationState, MigrationStep, ParityEvidence,
     RetirementDecision, can_remove_adapter, decide_retirement,
 )
+from .cognitive_tools import (
+    CognitiveStrategy, CompositionResult, CostAttribution, PlanAnalysis,
+    PlanDiagnostic, PlanLintRule, PlanSimulation, ReasoningCost, ReasoningStage,
+    Severity, SimulatedStep, SimulationFinding, StrategyConstraint,
+    StrategyDecision, StrategyEvidence, StrategySelection, StrategyVersion,
+    ToolBinding, ToolComposition, analyze_plan, attribute_cost, compose_tools,
+    production_eligible, select_strategy, simulate_plan,
+)
 from .contract_fuzzing import ContractFuzzer, FuzzBudget, FuzzFailure, FuzzReport
 from .simulation_mode import SimulationAuthority, SimulationEvidence, SimulationRequest, SimulationResult, SimulationRuntime
 from .journal import DeferredExecutionJournal, DeferredJournalConflict, DeferredJournalError, DeferredJournalRecord, SqliteDeferredExecutionJournal
