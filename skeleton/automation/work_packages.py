@@ -93,3 +93,9 @@ class WorkPackageRegistry:
   if complete & impl:raise WorkPackageError("completion signer cannot be implementation actor")
   if complete & verify:raise WorkPackageError("completion signer cannot be verification actor")
   return PackageState.COMPLETE
+
+ def evidence_rollup(self,pid):
+  state=self.state(pid)
+  p=self.packages[pid]
+  ev=tuple(sorted((e for e in self.evidence.values() if e.package_id==pid),key=lambda x:(x.role.value,x.evidence_id)))
+  return {"package_id":pid,"package_digest":p.digest,"state":state.value,"evidence_ids":tuple(e.evidence_id for e in ev),"artifact_digests":tuple(e.artifact_digest for e in ev)}
