@@ -21,3 +21,23 @@ def test_pass_requires_verified_rollback():
 def test_noop_change_rejected():
  c=MutationCustody();t=task();l=c.acquire(t,"ACTOR.A")
  with pytest.raises(EngineeringError,match="alter"):c.record(t,l,"CHANGE.1",S("same"),S("same"),("tests",))
+
+def test_task_collections_are_typed_and_bounded():
+ with pytest.raises(EngineeringError,match="must be tuple"):EngineeringTask("TASK.X","x",S("repo"),["tests"],("TEST.X",),"rb")
+ with pytest.raises(EngineeringError,match="exceeds policy bound"):EngineeringTask("TASK.X","x",S("repo"),tuple(f"p/{i}" for i in range(257)),("TEST.X",),"rb")
+def test_runtime_enum_and_boolean_impostors_fail_closed():
+ from skeleton.ai.build.engineering_agent import ChangeRecord,LeaseState,MutationLease
+ t=task()
+ with pytest.raises(EngineeringError,match="LeaseState"):MutationLease("LEASE.X",t.digest,"ACTOR.X",1,t.scope_paths,"active")
+ with pytest.raises(EngineeringError,match="VerificationDecision"):EngineeringEvidence("EVID.X",t.digest,S("change"),"ACTOR.A","ACTOR.B","pass",S("tests"),True)
+ with pytest.raises(EngineeringError,match="rollback_verified"):EngineeringEvidence("EVID.X",t.digest,S("change"),"ACTOR.A","ACTOR.B",VerificationDecision.FAIL,S("tests"),1)
+ with pytest.raises(EngineeringError,match="fence_token"):ChangeRecord("CHANGE.X",t.digest,"LEASE.X",True,S("a"),S("b"),("tests",))
+def test_change_digest_binds_custody_and_repository_transition():
+ c=MutationCustody();t=task();l=c.acquire(t,"ACTOR.A")
+ a=c.record(t,l,"CHANGE.1",S("a"),S("b"),("tests",))
+ b=c.record(t,l,"CHANGE.2",S("a"),S("b"),("tests",))
+ assert a.digest!=b.digest
+ assert len(a.digest)==64
+def test_mutation_paths_require_typed_nonempty_tuple():
+ c=MutationCustody();t=task();l=c.acquire(t,"ACTOR.A")
+ with pytest.raises(EngineeringError,match="non-empty tuple"):c.record(t,l,"CHANGE.1",S("a"),S("b"),[])
