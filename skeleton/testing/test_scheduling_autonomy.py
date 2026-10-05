@@ -28,3 +28,16 @@ def test_escalation_requires_eligibility_and_explicit_approval():
  r=AutonomyEscalation("r",frozenset({"write"}),EscalationEvidence(True,None));assert grant_escalation(r,"later") is None
  g=grant_escalation(AutonomyEscalation("r",frozenset({"write"}),EscalationEvidence(True,"approval")),"later")
  assert g and g.expires_at=="later" and not g.revoked
+
+
+def test_scheduling_autonomy_depth_invariants_fail_closed():
+ import pytest
+ t=Subtask("t",1,frozenset({"run"}),frozenset(),True)
+ assert not validate_decomposition(TaskDecomposition(frozenset({"run"}),frozenset(),(t,),(TaskDependency("t","t"),)))
+ d=TaskDecomposition(frozenset({"run"}),frozenset(),(t,),())
+ with pytest.raises(ValueError):schedule_ready(d,set(),("w","w"),{"w"}, {"w":frozenset({"run"})})
+ with pytest.raises(ValueError):schedule_ready(d,{"unknown"},("w",),{"w"},{"w":frozenset({"run"})})
+ with pytest.raises(ValueError):control(AutonomyController(-1,1),ControlState(0,1,1),policy_allowed=True,authority_allowed=True)
+ with pytest.raises(ValueError):control(AutonomyController(1,1),ControlState(0,1,-1),policy_allowed=True,authority_allowed=True)
+ assert grant_escalation(AutonomyEscalation("",frozenset({"run"}),EscalationEvidence(True,"receipt")),"later") is None
+ assert grant_escalation(AutonomyEscalation("r",frozenset(),EscalationEvidence(True,"receipt")),"later") is None
