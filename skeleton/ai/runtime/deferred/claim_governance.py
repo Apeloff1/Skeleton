@@ -39,7 +39,9 @@ def merge_claims(items):
  if not items:raise ValueError("claims required")
  base=items[0][1]
  if any(x[1].normalized_text!=base.normalized_text or not scope_compatibility(base.scope,x[1].scope).compatible for x in items[1:]):raise ValueError("incompatible claims")
- ids=tuple(x[0] for x in items);return ClaimMerge(ClaimCluster(base,ids),ids)
+ ids=tuple(x[0] for x in items)
+ if any(not x for x in ids) or len(set(ids))!=len(ids):raise ValueError("unique claim identity required")
+ return ClaimMerge(ClaimCluster(base,ids),ids)
 class ClaimValidity(str,Enum): CURRENT="current"; STALE="stale"
 @dataclass(frozen=True,slots=True)
 class ExpirationPolicy:
@@ -75,4 +77,7 @@ class KnowledgeSnapshot:
 class KnowledgeSnapshotDigest: digest:str
 @dataclass(frozen=True,slots=True)
 class KnowledgeDiff: changed:tuple[str,...]
-def restore_allowed(snapshot,current_source_watermark):return snapshot.source_watermark==current_source_watermark
+def restore_allowed(snapshot,current_source_watermark,current_index_watermark=None,current_model_version=None,current_schema_version=None):
+ if not current_source_watermark:return False
+ checks=(snapshot.source_watermark==current_source_watermark,current_index_watermark is None or snapshot.index_watermark==current_index_watermark,current_model_version is None or snapshot.model_version==current_model_version,current_schema_version is None or snapshot.schema_version==current_schema_version)
+ return all(checks)
