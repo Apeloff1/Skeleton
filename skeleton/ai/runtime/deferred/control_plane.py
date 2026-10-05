@@ -28,6 +28,7 @@ class ConstraintSet: constraints:tuple[Constraint,...]
 @dataclass(frozen=True,slots=True)
 class ConstraintResult: admissible:bool; violated:tuple[str,...]; conflicts:tuple[str,...]
 def evaluate_constraints(cs:ConstraintSet,satisfied:dict[str,bool])->ConstraintResult:
+ if len({x.constraint_id for x in cs.constraints})!=len(cs.constraints) or any(not all((x.constraint_id,x.predicate,x.provenance)) for x in cs.constraints):raise ValueError("unique constraint identity required")
  bad=tuple(c.constraint_id for c in cs.constraints if not satisfied.get(c.constraint_id,False))
  hard=any(c.strength is ConstraintStrength.HARD and c.constraint_id in bad for c in cs.constraints)
  return ConstraintResult(not hard,bad,())
@@ -39,10 +40,12 @@ class DecisionContext: objective_id:str; constraint_result:ConstraintResult; opt
 @dataclass(frozen=True,slots=True)
 class Decision: option_id:str|None; reason:str
 def decide(c:DecisionContext)->Decision:
+ if not c.objective_id or len({o.option_id for o in c.options})!=len(c.options) or any(not o.option_id or not 0<=o.uncertainty<=1 or any(not e for e in o.evidence) for o in c.options):raise ValueError("valid decision identity required")
  if not c.constraint_result.admissible:return Decision(None,"hard constraint failure")
  options=[o for o in c.options if o.admissible]
  if not options:return Decision(None,"no admissible option")
- return Decision(max(options,key=lambda o:o.utility).option_id,"best admissible utility")
+ best=max(o.utility for o in options);winners=sorted(o.option_id for o in options if o.utility==best)
+ return Decision(winners[0],"best admissible utility")
 
 @dataclass(frozen=True,slots=True)
 class DecisionRecord:
