@@ -31,6 +31,7 @@ import {
   accessibleButtonProps,
   accessibleStatusProps,
 } from '../src/accessibility/runtime';
+import { useI18n } from '../src/i18n';
 
 const WELCOME_FLAG_KEY = '@codedock:welcome_seen:v1';
 const WARM_BOOT_MAX_AGE_MS = 90_000;
@@ -90,6 +91,8 @@ function DecorativeStarfall({ enabled }: { enabled: boolean }) {
 function ProgressBar({ pct, reduceMotion }: { pct: number; reduceMotion: boolean }) {
   const value = React.useRef(new Animated.Value(0)).current;
   const boundedPct = Math.max(0, Math.min(100, pct));
+  const { t } = useI18n();
+  const progressLabel = t('status.startup_progress', { percent: boundedPct });
 
   React.useEffect(() => {
     const next = boundedPct / 100;
@@ -109,13 +112,13 @@ function ProgressBar({ pct, reduceMotion }: { pct: number; reduceMotion: boolean
     <View
       style={styles.barOuter}
       {...accessibleStatusProps(
-        'Startup progress: ' + boundedPct + ' percent',
+        progressLabel,
         {
           progress: {
             min: 0,
             max: 100,
             now: boundedPct,
-            text: boundedPct + ' percent',
+            text: progressLabel,
           },
         },
       )}
@@ -131,6 +134,7 @@ function ProgressBar({ pct, reduceMotion }: { pct: number; reduceMotion: boolean
 }
 
 export default function BootLauncher({ onReady, onEscalate }: Props) {
+  const { t } = useI18n();
   const [progress, setProgress] = React.useState(0);
   const [phase1Pct, setPhase1Pct] = React.useState(0);
   const [activeLabel, setActiveLabel] = React.useState('Starting up…');
@@ -463,9 +467,9 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
               style={styles.primaryBtn}
               onPress={handleEnterPress}
               activeOpacity={0.85}
-              {...accessibleButtonProps('Enter Product')}
+              {...accessibleButtonProps(t('launcher.enter_product'))}
             >
-              <Text style={styles.primaryBtnText}>Enter Product</Text>
+              <Text style={styles.primaryBtnText}>{t('launcher.enter_product')}</Text>
             </TouchableOpacity>
           </>
         )}
@@ -484,11 +488,11 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
             <Text
               style={[styles.subtitle, { color: '#fbbf24' }]}
               {...accessibleStatusProps(
-                'Boot failed. We hit a snag while preparing the app.',
+                t('recovery.boot_failed'),
                 { assertive: true },
               )}
             >
-              We hit a snag while preparing the app.
+              {t('recovery.boot_failed')}
             </Text>
             {failedStages.length > 0 && (
               <View style={styles.failList}>
@@ -503,27 +507,27 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
               style={styles.primaryBtn}
               onPress={handleRetryBoot}
               activeOpacity={0.85}
-              {...accessibleButtonProps('Retry boot')}
+              {...accessibleButtonProps(t('recovery.retry'))}
             >
-              <Text style={styles.primaryBtnText}>Retry boot</Text>
+              <Text style={styles.primaryBtnText}>{t('recovery.retry')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.secondaryBtn, { marginTop: 10 }]}
               onPress={() => onEscalate('bootlauncher_user_continue')}
               activeOpacity={0.85}
-              {...accessibleButtonProps('Continue anyway', {
-                hint: 'Continue into the product despite boot preparation failures.',
+              {...accessibleButtonProps(t('recovery.continue_anyway'), {
+                hint: t('recovery.boot_failed'),
               })}
             >
-              <Text style={styles.secondaryBtnText}>Continue anyway</Text>
+              <Text style={styles.secondaryBtnText}>{t('recovery.continue_anyway')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.secondaryBtn, { marginTop: 10 }]}
               onPress={() => onEscalate('bootlauncher_user_safe_mode')}
               activeOpacity={0.85}
-              {...accessibleButtonProps('Open Safe Mode')}
+              {...accessibleButtonProps(t('recovery.safe_mode'))}
             >
-              <Text style={styles.secondaryBtnText}>Open Safe Mode</Text>
+              <Text style={styles.secondaryBtnText}>{t('recovery.safe_mode')}</Text>
             </TouchableOpacity>
           </>
         )}
