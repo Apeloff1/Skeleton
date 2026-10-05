@@ -35,9 +35,9 @@ class PriorityConstraint:
 
 @dataclass(frozen=True,slots=True)
 class PriorityDecision:
- item_id:str;blocked:bool;score:float;effective_score:float;factor_ids:tuple[str,...];blocker_ids:tuple[str,...];age_boost:float
+ item_id:str;blocked:bool;score:float;effective_score:float;factor_ids:tuple[str,...];blocker_ids:tuple[str,...];age_boost:float;input_digest:str
  @property
- def digest(self):return _digest({"item_id":self.item_id,"blocked":self.blocked,"score":self.score,"effective_score":self.effective_score,"factor_ids":self.factor_ids,"blocker_ids":self.blocker_ids,"age_boost":self.age_boost})
+ def digest(self):return _digest({"item_id":self.item_id,"blocked":self.blocked,"score":self.score,"effective_score":self.effective_score,"factor_ids":self.factor_ids,"blocker_ids":self.blocker_ids,"age_boost":self.age_boost,"input_digest":self.input_digest})
 
 class PriorityEngine:
  def __init__(self,*,max_age_boost:float=5.0,age_step:float=.1,hysteresis:float=.25):
@@ -62,7 +62,8 @@ class PriorityEngine:
   target=raw+age
   effective=target
   if previous_score is not None and abs(target-previous_score)<self.hysteresis:effective=previous_score
-  return PriorityDecision(item_id,bool(blockers),round(raw,8),round(effective,8),tuple(f.factor_id for f in factors),blockers,round(age,8))
+  input_digest=_digest({"item_id":item_id,"factors":[{"factor_id":f.factor_id,"provenance_ref":f.provenance_ref,"value":f.value,"weight":f.weight} for f in factors],"constraints":[{"constraint_id":x.constraint_id,"kind":x.kind.value,"active":x.active,"provenance_ref":x.provenance_ref,"reason":x.reason.strip()} for x in constraint_set],"age_epochs":age_epochs,"previous_score":previous_score,"engine":{"max_age_boost":self.max_age_boost,"age_step":self.age_step,"hysteresis":self.hysteresis}})
+  return PriorityDecision(item_id,bool(blockers),round(raw,8),round(effective,8),tuple(f.factor_id for f in factors),blockers,round(age,8),input_digest)
  def rank(self,decisions):
   items=tuple(decisions)
   if len({d.item_id for d in items})!=len(items):raise PriorityError("duplicate decision item")
