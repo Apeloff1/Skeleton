@@ -6014,7 +6014,10 @@
       "contracts": [
         "ComplianceRequirement",
         "ComplianceControl",
+        "ControlKind",
+        "EnforcementMode",
         "ComplianceEvidence",
+        "ControlAssessment",
         "ComplianceRegistry",
         "ComplianceAssessment"
       ],

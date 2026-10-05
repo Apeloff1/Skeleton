@@ -43,6 +43,14 @@ class EnforcementMode(str, Enum):
     REVIEW_ONLY = "review_only"
 
 
+class ControlKind(str, Enum):
+    ACCESS = "access"
+    DATA = "data"
+    RETENTION = "retention"
+    SECURITY = "security"
+    EVIDENCE = "evidence"
+
+
 class EvidenceResult(str, Enum):
     PASS = "pass"
     FAIL = "fail"
@@ -180,6 +188,9 @@ class ComplianceControl:
     requirement_ids: tuple[str, ...]
     evidence_ttl_seconds: int
     description: str
+    kind: ControlKind
+    implementation_ref: str
+    verifier_id: str
     enforcement_mode: EnforcementMode = EnforcementMode.TECHNICAL
 
     def __post_init__(self) -> None:
@@ -204,6 +215,18 @@ class ComplianceControl:
         object.__setattr__(
             self, "description", _text(self.description, "description")
         )
+        if not isinstance(self.kind, ControlKind):
+            raise ComplianceError("invalid control kind")
+        object.__setattr__(
+            self,
+            "implementation_ref",
+            _token(self.implementation_ref, "implementation_ref"),
+        )
+        object.__setattr__(
+            self,
+            "verifier_id",
+            _token(self.verifier_id, "verifier_id"),
+        )
         if not isinstance(self.enforcement_mode, EnforcementMode):
             raise ComplianceError("invalid enforcement mode")
 
@@ -217,6 +240,9 @@ class ComplianceControl:
                 self.requirement_ids,
                 self.evidence_ttl_seconds,
                 self.description,
+                self.kind.value,
+                self.implementation_ref,
+                self.verifier_id,
                 self.enforcement_mode.value,
             ]
         )
@@ -228,12 +254,13 @@ class ComplianceEvidence:
     control_id: str
     control_digest: str
     owner: str
+    verifier_id: str
     artifact_digest: str
     observed_at: datetime
     result: EvidenceResult
 
     def __post_init__(self) -> None:
-        for field in ("evidence_id", "control_id", "owner"):
+        for field in ("evidence_id", "control_id", "owner", "verifier_id"):
             object.__setattr__(self, field, _token(getattr(self, field), field))
         object.__setattr__(
             self, "control_digest", _sha(self.control_digest, "control_digest")
@@ -256,6 +283,7 @@ class ComplianceEvidence:
                 self.control_id,
                 self.control_digest,
                 self.owner,
+                self.verifier_id,
                 self.artifact_digest,
                 self.observed_at.isoformat(),
                 self.result.value,
@@ -430,6 +458,7 @@ class ComplianceRegistry:
                 for item in candidates
                 if item.control_digest == control.digest
                 and item.owner == control.owner
+                and item.verifier_id == control.verifier_id
                 and item.observed_at <= now
             ]
             if not identity_bound:
