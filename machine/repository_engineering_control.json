@@ -284,10 +284,10 @@
   ],
   "backlog": {
     "summary": {
-      "item_count": 1776,
-      "gap_count": 796,
+      "item_count": 1774,
+      "gap_count": 794,
       "risk_count": 980,
-      "open_count": 1776,
+      "open_count": 1774,
       "closed_count": 0
     },
     "items": [
@@ -609,7 +609,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind deterministic quality/reconciliation decisions into governed promotion, gc, retention and unresolved-conflict workflows"
+        "deduplication_key": "gap:bind deterministic quality/reconciliation decisions into governed promotion, GC, retention and unresolved-conflict workflows"
       },
       {
         "backlog_id": "BL-GAP-VOL-011-001",
@@ -705,7 +705,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:human override ux/api must be unified"
+        "deduplication_key": "gap:human override UX/API must be unified"
       },
       {
         "backlog_id": "BL-GAP-VOL-019-001",
@@ -1009,7 +1009,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:policy dsl/compiler needs implementation"
+        "deduplication_key": "gap:policy DSL/compiler needs implementation"
       },
       {
         "backlog_id": "BL-GAP-VOL-028-002",
@@ -1057,7 +1057,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:connect slo/error-budget state to admission control"
+        "deduplication_key": "gap:connect SLO/error-budget state to admission control"
       },
       {
         "backlog_id": "BL-GAP-VOL-030-001",
@@ -1169,7 +1169,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:identify workloads where jvm is actually beneficial"
+        "deduplication_key": "gap:identify workloads where JVM is actually beneficial"
       },
       {
         "backlog_id": "BL-GAP-VOL-033-002",
@@ -1265,7 +1265,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize api schema registry"
+        "deduplication_key": "gap:materialize API schema registry"
       },
       {
         "backlog_id": "BL-GAP-VOL-041-002",
@@ -1585,7 +1585,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind all ai roots to one ownership graph"
+        "deduplication_key": "gap:bind all AI roots to one ownership graph"
       },
       {
         "backlog_id": "BL-GAP-VOL-051-002",
@@ -1745,7 +1745,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:create canonical adr index schema"
+        "deduplication_key": "gap:create canonical ADR index schema"
       },
       {
         "backlog_id": "BL-GAP-VOL-058-002",
@@ -1761,7 +1761,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind cross-cutting changes to adr check"
+        "deduplication_key": "gap:bind cross-cutting changes to ADR check"
       },
       {
         "backlog_id": "BL-GAP-VOL-060-001",
@@ -1953,7 +1953,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize full dr evidence bundle"
+        "deduplication_key": "gap:materialize full DR evidence bundle"
       },
       {
         "backlog_id": "BL-GAP-VOL-066-001",
@@ -2161,7 +2161,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:finish jeeves custody map"
+        "deduplication_key": "gap:finish Jeeves custody map"
       },
       {
         "backlog_id": "BL-GAP-VOL-072-002",
@@ -2370,38 +2370,6 @@
         "state": "open",
         "closure_evidence_refs": [],
         "deduplication_key": "gap:materialize revocation propagation proof"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-085-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-085:gap:001",
-        "volume_ref": "VOL-085",
-        "statement": "define explanation evidence contract",
-        "accountability_id": "ACC-VOL-085",
-        "requirement_refs": [
-          "REQ:VOL-085:001",
-          "REQ:VOL-085:002",
-          "REQ:VOL-085:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define explanation evidence contract"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-085-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-085:gap:002",
-        "volume_ref": "VOL-085",
-        "statement": "bind explanations to operation provenance",
-        "accountability_id": "ACC-VOL-085",
-        "requirement_refs": [
-          "REQ:VOL-085:001",
-          "REQ:VOL-085:002",
-          "REQ:VOL-085:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind explanations to operation provenance"
       },
       {
         "backlog_id": "BL-GAP-VOL-086-001",
@@ -2641,7 +2609,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:establish canonical backlog ids"
+        "deduplication_key": "gap:establish canonical backlog IDs"
       },
       {
         "backlog_id": "BL-GAP-VOL-093-002",
@@ -2737,7 +2705,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize end-to-end vs-000 harness"
+        "deduplication_key": "gap:materialize end-to-end VS-000 harness"
       },
       {
         "backlog_id": "BL-GAP-VOL-096-002",
@@ -2769,7 +2737,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize canonical vs-001 fixture"
+        "deduplication_key": "gap:materialize canonical VS-001 fixture"
       },
       {
         "backlog_id": "BL-GAP-VOL-097-002",
@@ -2785,7 +2753,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind all w00-w17 dependencies"
+        "deduplication_key": "gap:bind all W00-W17 dependencies"
       },
       {
         "backlog_id": "BL-GAP-VOL-098-001",
@@ -3137,7 +3105,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind detectable patterns to ci"
+        "deduplication_key": "gap:bind detectable patterns to CI"
       },
       {
         "backlog_id": "BL-GAP-VOL-109-001",
@@ -3153,7 +3121,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind every aiq task into construction dag"
+        "deduplication_key": "gap:bind every AIQ task into construction DAG"
       },
       {
         "backlog_id": "BL-GAP-VOL-109-002",
@@ -3185,7 +3153,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:unify maturity and dod rules"
+        "deduplication_key": "gap:unify maturity and DoD rules"
       },
       {
         "backlog_id": "BL-GAP-VOL-110-002",
@@ -3201,7 +3169,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind change-impact triggers to dod"
+        "deduplication_key": "gap:bind change-impact triggers to DoD"
       },
       {
         "backlog_id": "BL-GAP-VOL-111-001",
@@ -3265,7 +3233,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind pr impact checks to trace edges"
+        "deduplication_key": "gap:bind PR impact checks to trace edges"
       },
       {
         "backlog_id": "BL-GAP-VOL-113-001",
@@ -3345,7 +3313,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:establish debt ids and ownership"
+        "deduplication_key": "gap:establish debt IDs and ownership"
       },
       {
         "backlog_id": "BL-GAP-VOL-115-002",
@@ -3361,7 +3329,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind debt to risk/backlog/adr"
+        "deduplication_key": "gap:bind debt to risk/backlog/ADR"
       },
       {
         "backlog_id": "BL-GAP-VOL-116-001",
@@ -3393,7 +3361,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind rules to adr/ownership"
+        "deduplication_key": "gap:bind rules to ADR/ownership"
       },
       {
         "backlog_id": "BL-GAP-VOL-117-001",
@@ -3441,7 +3409,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind roadmap to build dag"
+        "deduplication_key": "gap:bind roadmap to build DAG"
       },
       {
         "backlog_id": "BL-GAP-VOL-118-002",
@@ -3489,7 +3457,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind ui progress to derived completion only"
+        "deduplication_key": "gap:bind UI progress to derived completion only"
       },
       {
         "backlog_id": "BL-GAP-VOL-120-001",
@@ -3566,7 +3534,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize canonical requirement ids"
+        "deduplication_key": "gap:materialize canonical requirement IDs"
       },
       {
         "backlog_id": "BL-GAP-VOL-122-002",
@@ -3596,7 +3564,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind all production claims to nfr ids"
+        "deduplication_key": "gap:bind all production claims to NFR IDs"
       },
       {
         "backlog_id": "BL-GAP-VOL-123-002",
@@ -3701,7 +3669,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind behaviors to requirement ids"
+        "deduplication_key": "gap:bind behaviors to requirement IDs"
       },
       {
         "backlog_id": "BL-GAP-VOL-127-001",
@@ -3806,7 +3774,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind schema/api versions to matrix"
+        "deduplication_key": "gap:bind schema/API versions to matrix"
       },
       {
         "backlog_id": "BL-GAP-VOL-130-002",
@@ -3986,7 +3954,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:unify with vol-076 cas"
+        "deduplication_key": "gap:unify with VOL-076 CAS"
       },
       {
         "backlog_id": "BL-GAP-VOL-136-002",
@@ -4271,7 +4239,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind retention and cas"
+        "deduplication_key": "gap:bind retention and CAS"
       },
       {
         "backlog_id": "BL-GAP-VOL-146-001",
@@ -4706,7 +4674,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize sdk package"
+        "deduplication_key": "gap:materialize SDK package"
       },
       {
         "backlog_id": "BL-GAP-VOL-160-002",
@@ -4736,7 +4704,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize connector sdk"
+        "deduplication_key": "gap:materialize connector SDK"
       },
       {
         "backlog_id": "BL-GAP-VOL-161-002",
@@ -4916,7 +4884,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize threat ids"
+        "deduplication_key": "gap:materialize threat IDs"
       },
       {
         "backlog_id": "BL-GAP-VOL-167-002",
@@ -4931,7 +4899,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind pr impact triggers"
+        "deduplication_key": "gap:bind PR impact triggers"
       },
       {
         "backlog_id": "BL-GAP-VOL-168-001",
@@ -5021,7 +4989,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind internal rpc auth"
+        "deduplication_key": "gap:bind internal RPC auth"
       },
       {
         "backlog_id": "BL-GAP-VOL-171-001",
@@ -5111,7 +5079,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind detectors to ci/runtime"
+        "deduplication_key": "gap:bind detectors to CI/runtime"
       },
       {
         "backlog_id": "BL-GAP-VOL-174-001",
@@ -5126,7 +5094,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define kms abstraction"
+        "deduplication_key": "gap:define KMS abstraction"
       },
       {
         "backlog_id": "BL-GAP-VOL-174-002",
@@ -5246,7 +5214,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:select sbom format"
+        "deduplication_key": "gap:select SBOM format"
       },
       {
         "backlog_id": "BL-GAP-VOL-178-002",
@@ -5276,7 +5244,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define mbom schema"
+        "deduplication_key": "gap:define MBOM schema"
       },
       {
         "backlog_id": "BL-GAP-VOL-179-002",
@@ -5306,7 +5274,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define core service slos"
+        "deduplication_key": "gap:define core service SLOs"
       },
       {
         "backlog_id": "BL-GAP-VOL-180-002",
@@ -5846,7 +5814,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:select p0 contract targets"
+        "deduplication_key": "gap:select P0 contract targets"
       },
       {
         "backlog_id": "BL-GAP-VOL-198-002",
@@ -6221,7 +6189,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind to vs-003"
+        "deduplication_key": "gap:bind to VS-003"
       },
       {
         "backlog_id": "BL-GAP-VOL-211-001",
@@ -6491,7 +6459,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind audit to sota claims"
+        "deduplication_key": "gap:bind audit to SOTA claims"
       },
       {
         "backlog_id": "BL-GAP-VOL-220-001",
@@ -6551,7 +6519,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:generate from mbom/evals"
+        "deduplication_key": "gap:generate from MBOM/evals"
       },
       {
         "backlog_id": "BL-GAP-VOL-222-001",
@@ -6596,7 +6564,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:generate from tooldefinition"
+        "deduplication_key": "gap:generate from ToolDefinition"
       },
       {
         "backlog_id": "BL-GAP-VOL-223-002",
@@ -6686,7 +6654,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:connect sbom to health"
+        "deduplication_key": "gap:connect SBOM to health"
       },
       {
         "backlog_id": "BL-GAP-VOL-226-002",
@@ -6956,7 +6924,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define audit api contract"
+        "deduplication_key": "gap:define audit API contract"
       },
       {
         "backlog_id": "BL-GAP-VOL-235-002",
@@ -7766,7 +7734,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:evolve ai-tree cutover contract"
+        "deduplication_key": "gap:evolve AI-tree cutover contract"
       },
       {
         "backlog_id": "BL-GAP-VOL-264-002",
@@ -7871,7 +7839,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind codeowners"
+        "deduplication_key": "gap:bind CODEOWNERS"
       },
       {
         "backlog_id": "BL-GAP-VOL-268-001",
@@ -7916,7 +7884,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:expand doc ci"
+        "deduplication_key": "gap:expand doc CI"
       },
       {
         "backlog_id": "BL-GAP-VOL-269-002",
@@ -8306,7 +8274,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define diagnostic api"
+        "deduplication_key": "gap:define diagnostic API"
       },
       {
         "backlog_id": "BL-GAP-VOL-282-002",
@@ -8531,7 +8499,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind capacity/slos"
+        "deduplication_key": "gap:bind capacity/SLOs"
       },
       {
         "backlog_id": "BL-GAP-VOL-290-001",
@@ -8666,7 +8634,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define dlq schema"
+        "deduplication_key": "gap:define DLQ schema"
       },
       {
         "backlog_id": "BL-GAP-VOL-294-002",
@@ -8681,7 +8649,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind operator ui/runbook"
+        "deduplication_key": "gap:bind operator UI/runbook"
       },
       {
         "backlog_id": "BL-GAP-VOL-295-001",
@@ -8786,7 +8754,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:inventory id formats"
+        "deduplication_key": "gap:inventory ID formats"
       },
       {
         "backlog_id": "BL-GAP-VOL-298-002",
@@ -9011,7 +8979,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind adr/runtime decisions"
+        "deduplication_key": "gap:bind ADR/runtime decisions"
       },
       {
         "backlog_id": "BL-GAP-VOL-306-001",
@@ -9026,7 +8994,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define ir schema"
+        "deduplication_key": "gap:define IR schema"
       },
       {
         "backlog_id": "BL-GAP-VOL-306-002",
@@ -9041,7 +9009,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind dsl/compiler"
+        "deduplication_key": "gap:bind DSL/compiler"
       },
       {
         "backlog_id": "BL-GAP-VOL-307-001",
@@ -9596,7 +9564,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind action receipts to plan dag"
+        "deduplication_key": "gap:bind action receipts to plan DAG"
       },
       {
         "backlog_id": "BL-GAP-VOL-325-002",
@@ -9686,7 +9654,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define trust ui patterns"
+        "deduplication_key": "gap:define trust UI patterns"
       },
       {
         "backlog_id": "BL-GAP-VOL-328-002",
@@ -9941,7 +9909,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind changeset budget/ci"
+        "deduplication_key": "gap:bind changeset budget/CI"
       },
       {
         "backlog_id": "BL-GAP-VOL-337-001",
@@ -10076,7 +10044,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define source api schema"
+        "deduplication_key": "gap:define source API schema"
       },
       {
         "backlog_id": "BL-GAP-VOL-341-002",
@@ -10091,7 +10059,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:publish sdk artifacts"
+        "deduplication_key": "gap:publish SDK artifacts"
       },
       {
         "backlog_id": "BL-GAP-VOL-342-001",
@@ -10226,7 +10194,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define sdk contracts"
+        "deduplication_key": "gap:define SDK contracts"
       },
       {
         "backlog_id": "BL-GAP-VOL-346-002",
@@ -10721,7 +10689,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind implemented quality scoring to governed promotion, contradiction resolution and gc decisions"
+        "deduplication_key": "gap:bind implemented quality scoring to governed promotion, contradiction resolution and GC decisions"
       },
       {
         "backlog_id": "BL-GAP-VOL-363-001",
@@ -10766,7 +10734,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind immutable revision history into memory api/export and operator rollback workflows"
+        "deduplication_key": "gap:bind immutable revision history into memory API/export and operator rollback workflows"
       },
       {
         "backlog_id": "BL-GAP-VOL-364-002",
@@ -10886,7 +10854,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define stage ids"
+        "deduplication_key": "gap:define stage IDs"
       },
       {
         "backlog_id": "BL-GAP-VOL-368-002",
@@ -11036,7 +11004,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define composition ir"
+        "deduplication_key": "gap:define composition IR"
       },
       {
         "backlog_id": "BL-GAP-VOL-373-002",
@@ -11051,7 +11019,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind tool sdk/workflows"
+        "deduplication_key": "gap:bind tool SDK/workflows"
       },
       {
         "backlog_id": "BL-GAP-VOL-374-001",
@@ -11141,7 +11109,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind tool sdk"
+        "deduplication_key": "gap:bind tool SDK"
       },
       {
         "backlog_id": "BL-GAP-VOL-377-001",
@@ -11351,7 +11319,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind model/kv caches"
+        "deduplication_key": "gap:bind model/KV caches"
       },
       {
         "backlog_id": "BL-GAP-VOL-384-001",
@@ -11471,7 +11439,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind gpu memory manager"
+        "deduplication_key": "gap:bind GPU memory manager"
       },
       {
         "backlog_id": "BL-GAP-VOL-388-001",
@@ -11636,7 +11604,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:implement linux-aware adapter"
+        "deduplication_key": "gap:implement Linux-aware adapter"
       },
       {
         "backlog_id": "BL-GAP-VOL-393-002",
@@ -11711,7 +11679,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind cas/model/data registries"
+        "deduplication_key": "gap:bind CAS/model/data registries"
       },
       {
         "backlog_id": "BL-GAP-VOL-396-001",
@@ -11876,7 +11844,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind evaluation sdk"
+        "deduplication_key": "gap:bind Evaluation SDK"
       },
       {
         "backlog_id": "BL-GAP-VOL-401-002",
@@ -12056,7 +12024,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind sbom/mbom/datasets"
+        "deduplication_key": "gap:bind SBOM/MBOM/datasets"
       },
       {
         "backlog_id": "BL-GAP-VOL-407-002",
@@ -12191,7 +12159,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind model ops/mbom"
+        "deduplication_key": "gap:bind model ops/MBOM"
       },
       {
         "backlog_id": "BL-GAP-VOL-412-001",
@@ -12815,7 +12783,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:kv/prefix cache semantic corruption"
+        "deduplication_key": "risk:KV/prefix cache semantic corruption"
       },
       {
         "backlog_id": "BL-RISK-VOL-007-003",
@@ -13791,7 +13759,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:toctou"
+        "deduplication_key": "risk:TOCTOU"
       },
       {
         "backlog_id": "BL-RISK-VOL-026-002",
@@ -13807,7 +13775,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:ssrf/dns rebinding"
+        "deduplication_key": "risk:SSRF/DNS rebinding"
       },
       {
         "backlog_id": "BL-RISK-VOL-026-003",
@@ -14095,7 +14063,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:aba/stale lease"
+        "deduplication_key": "risk:ABA/stale lease"
       },
       {
         "backlog_id": "BL-RISK-VOL-030-004",
@@ -14127,7 +14095,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:vram fragmentation"
+        "deduplication_key": "risk:VRAM fragmentation"
       },
       {
         "backlog_id": "BL-RISK-VOL-031-002",
@@ -14159,7 +14127,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:numa/interconnect penalties"
+        "deduplication_key": "risk:NUMA/interconnect penalties"
       },
       {
         "backlog_id": "BL-RISK-VOL-031-004",
@@ -14207,7 +14175,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:abi drift"
+        "deduplication_key": "risk:ABI drift"
       },
       {
         "backlog_id": "BL-RISK-VOL-032-003",
@@ -14271,7 +14239,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:gc pauses"
+        "deduplication_key": "risk:GC pauses"
       },
       {
         "backlog_id": "BL-RISK-VOL-033-003",
@@ -14719,7 +14687,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:ui-specific fields leak into core contracts"
+        "deduplication_key": "risk:UI-specific fields leak into core contracts"
       },
       {
         "backlog_id": "BL-RISK-VOL-042-001",
@@ -14735,7 +14703,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:ui becomes authoritative"
+        "deduplication_key": "risk:UI becomes authoritative"
       },
       {
         "backlog_id": "BL-RISK-VOL-042-002",
@@ -15519,7 +15487,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:stale adr authority"
+        "deduplication_key": "risk:stale ADR authority"
       },
       {
         "backlog_id": "BL-RISK-VOL-058-003",
@@ -15871,7 +15839,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:rpo/rto unproven"
+        "deduplication_key": "risk:RPO/RTO unproven"
       },
       {
         "backlog_id": "BL-RISK-VOL-066-001",
@@ -16175,7 +16143,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:parallel jeeves authority"
+        "deduplication_key": "risk:parallel Jeeves authority"
       },
       {
         "backlog_id": "BL-RISK-VOL-072-002",
@@ -18351,7 +18319,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:goodhart effects"
+        "deduplication_key": "risk:Goodhart effects"
       },
       {
         "backlog_id": "BL-RISK-VOL-117-003",
@@ -19306,7 +19274,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:silent nan propagation"
+        "deduplication_key": "risk:silent NaN propagation"
       },
       {
         "backlog_id": "BL-RISK-VOL-147-002",
@@ -19546,7 +19514,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:ocr hallucination"
+        "deduplication_key": "risk:OCR hallucination"
       },
       {
         "backlog_id": "BL-RISK-VOL-155-002",
@@ -19651,7 +19619,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:a/v timestamp drift"
+        "deduplication_key": "risk:A/V timestamp drift"
       },
       {
         "backlog_id": "BL-RISK-VOL-159-001",
@@ -20056,7 +20024,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:ssrf"
+        "deduplication_key": "risk:SSRF"
       },
       {
         "backlog_id": "BL-RISK-VOL-172-002",
@@ -20296,7 +20264,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:misleading sli"
+        "deduplication_key": "risk:misleading SLI"
       },
       {
         "backlog_id": "BL-RISK-VOL-180-002",
@@ -20371,7 +20339,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:pii in labels"
+        "deduplication_key": "risk:PII in labels"
       },
       {
         "backlog_id": "BL-RISK-VOL-183-001",
@@ -20731,7 +20699,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:tooling drifts from ci"
+        "deduplication_key": "risk:tooling drifts from CI"
       },
       {
         "backlog_id": "BL-RISK-VOL-195-001",
@@ -21001,7 +20969,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:goodhart behavior"
+        "deduplication_key": "risk:Goodhart behavior"
       },
       {
         "backlog_id": "BL-RISK-VOL-204-001",
@@ -21916,7 +21884,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:admin csrf/confused deputy"
+        "deduplication_key": "risk:admin CSRF/confused deputy"
       },
       {
         "backlog_id": "BL-RISK-VOL-234-002",
@@ -22006,7 +21974,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:ui authority bypass"
+        "deduplication_key": "risk:UI authority bypass"
       },
       {
         "backlog_id": "BL-RISK-VOL-237-002",
@@ -22111,7 +22079,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:stale kv/cache semantics"
+        "deduplication_key": "risk:stale KV/cache semantics"
       },
       {
         "backlog_id": "BL-RISK-VOL-241-001",
@@ -22471,7 +22439,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:voi bypasses policy"
+        "deduplication_key": "risk:VOI bypasses policy"
       },
       {
         "backlog_id": "BL-RISK-VOL-253-001",
@@ -23296,7 +23264,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:pii/secret leakage"
+        "deduplication_key": "risk:PII/secret leakage"
       },
       {
         "backlog_id": "BL-RISK-VOL-280-002",
@@ -23836,7 +23804,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:id collision"
+        "deduplication_key": "risk:ID collision"
       },
       {
         "backlog_id": "BL-RISK-VOL-298-002",
@@ -23851,7 +23819,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:case/unicode ambiguity"
+        "deduplication_key": "risk:case/Unicode ambiguity"
       },
       {
         "backlog_id": "BL-RISK-VOL-299-001",
@@ -24091,7 +24059,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:invalid dag"
+        "deduplication_key": "risk:invalid DAG"
       },
       {
         "backlog_id": "BL-RISK-VOL-307-001",
@@ -24676,7 +24644,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:confusing critical ui"
+        "deduplication_key": "risk:confusing critical UI"
       },
       {
         "backlog_id": "BL-RISK-VOL-326-002",
@@ -24991,7 +24959,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:overbroad impact slows ci"
+        "deduplication_key": "risk:overbroad impact slows CI"
       },
       {
         "backlog_id": "BL-RISK-VOL-337-001",
@@ -25156,7 +25124,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:sdk becomes god api"
+        "deduplication_key": "risk:SDK becomes god API"
       },
       {
         "backlog_id": "BL-RISK-VOL-342-002",
@@ -25381,7 +25349,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:sli sampled incorrectly"
+        "deduplication_key": "risk:SLI sampled incorrectly"
       },
       {
         "backlog_id": "BL-RISK-VOL-350-001",
@@ -26146,7 +26114,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:200-ok but wrong result"
+        "deduplication_key": "risk:200-OK but wrong result"
       },
       {
         "backlog_id": "BL-RISK-VOL-375-002",
@@ -26356,7 +26324,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:oom placement"
+        "deduplication_key": "risk:OOM placement"
       },
       {
         "backlog_id": "BL-RISK-VOL-382-002",
@@ -26386,7 +26354,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:gpu oom"
+        "deduplication_key": "risk:GPU OOM"
       },
       {
         "backlog_id": "BL-RISK-VOL-383-002",
