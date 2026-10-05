@@ -35,9 +35,13 @@ def merge_claims(items):
 class ClaimValidity(str,Enum): CURRENT="current"; STALE="stale"
 @dataclass(frozen=True,slots=True)
 class ExpirationPolicy: normal_ttl:int; volatile_ttl:int
+    def __post_init__(self):
+        if self.normal_ttl<0 or self.volatile_ttl<0:raise ValueError("claim TTL must be nonnegative")
 @dataclass(frozen=True,slots=True)
 class RevalidationRequest: claim_id:str; prior_evidence:tuple[str,...]
-def claim_validity(observed_at,now,policy,volatile):return ClaimValidity.CURRENT if now-observed_at<=(policy.volatile_ttl if volatile else policy.normal_ttl) else ClaimValidity.STALE
+def claim_validity(observed_at,now,policy,volatile):
+ if now<observed_at:raise ValueError("claim observation cannot be in the future")
+ return ClaimValidity.CURRENT if now-observed_at<=(policy.volatile_ttl if volatile else policy.normal_ttl) else ClaimValidity.STALE
 @dataclass(frozen=True,slots=True)
 class KnowledgeConflict: claim_ids:tuple[str,...]; evidence_ids:tuple[str,...]
 @dataclass(frozen=True,slots=True)
