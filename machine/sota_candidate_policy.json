@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "volume": "VOL-107",
+  "status": "implementation_contract",
+  "claim_scope": "bounded_sota_candidate",
+  "policy": {
+    "claim_rule": "A SOTA claim is always bounded to an exact task scope, population, benchmark digest, dataset digest, and source revision.",
+    "metric_rule": "Every declared metric is non-compensable and evaluated in its declared maximize/minimize direction; aggregate-only qualification is forbidden.",
+    "contamination_rule": "Qualification requires a clean contamination status bound to an immutable audit digest.",
+    "replay_rule": "Qualification requires an exact independent replay from a verifier identity and verifier family distinct from the generator.",
+    "authority_rule": "Qualification is evaluation evidence only and cannot deploy, promote, route traffic, or mark masterplan completion."
+  },
+  "prohibited_shortcuts": [
+    "aggregate_only_scoring",
+    "benchmark_digest_substitution",
+    "contamination_unknown_or_dirty",
+    "dataset_digest_substitution",
+    "evidence_omission",
+    "metric_omission",
+    "metric_regression_compensation",
+    "replay_metric_drift",
+    "replay_without_exact_revision",
+    "same_family_verification",
+    "self_verification",
+    "unbounded_sota_claim"
+  ],
+  "required_bindings": [
+    "benchmark_digest",
+    "dataset_digest",
+    "source_revision",
+    "contamination_audit_digest",
+    "robustness_evidence_digest",
+    "security_evidence_digest",
+    "efficiency_evidence_digest",
+    "independent_replay_digest"
+  ],
+  "implementation": {
+    "runtime": "skeleton/eval/sota_candidate.py",
+    "package": "skeleton/eval/__init__.py",
+    "tests": "skeleton/testing/test_vol107_sota_candidate.py",
+    "verifier": "scripts/check_vol107_sota_candidate.py",
+    "integration": "skeleton/eval/p3_acceptance.py"
+  }
+}
