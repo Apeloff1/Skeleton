@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass,replace
 from enum import Enum
 import hashlib,json,re
+from datetime import datetime,timezone
 from typing import Iterable
 _ID=re.compile(r"^[A-Z][A-Z0-9_.:-]{2,127}$")
 class BacklogError(ValueError):pass
@@ -20,7 +21,9 @@ def _digest(v):return hashlib.sha256(json.dumps(v,sort_keys=True,separators=(","
 @dataclass(frozen=True,slots=True)
 class BacklogSource:
  source_id:str;kind:SourceKind;rationale:str
- def __post_init__(self):object.__setattr__(self,"source_id",_id(self.source_id,"source_id"));object.__setattr__(self,"rationale",_text(self.rationale,"rationale"))
+ def __post_init__(self):
+  object.__setattr__(self,"source_id",_id(self.source_id,"source_id"));object.__setattr__(self,"rationale",_text(self.rationale,"rationale"))
+  if not isinstance(self.kind,SourceKind):raise BacklogError("kind must be SourceKind")
  @property
  def digest(self):return _digest({"source_id":self.source_id,"kind":self.kind.value,"rationale":self.rationale})
 
@@ -30,12 +33,16 @@ class BacklogDependency:
  def __post_init__(self):
   for f in ("dependency_id","item_id","depends_on"):object.__setattr__(self,f,_id(getattr(self,f),f))
   if self.item_id==self.depends_on:raise BacklogError("item cannot depend on itself")
+  if not isinstance(self.required_state,BacklogState):raise BacklogError("required_state must be BacklogState")
 
 @dataclass(frozen=True,slots=True)
 class BacklogItem:
  item_id:str;title:str;owner:str;closure_rule:str;sources:tuple[BacklogSource,...];state:BacklogState=BacklogState.OPEN
  def __post_init__(self):
   object.__setattr__(self,"item_id",_id(self.item_id,"item_id"));object.__setattr__(self,"title",_text(self.title,"title"));object.__setattr__(self,"owner",_text(self.owner,"owner"));object.__setattr__(self,"closure_rule",_text(self.closure_rule,"closure_rule"))
+  if not isinstance(self.state,BacklogState):raise BacklogError("state must be BacklogState")
+  if not isinstance(self.sources,tuple) or any(not isinstance(s,BacklogSource) for s in self.sources):raise BacklogError("sources must be typed tuple")
+  if len(self.sources)>256:raise BacklogError("source provenance exceeds policy bound")
   sources=tuple(sorted(self.sources,key=lambda s:(s.kind.value,s.source_id)))
   if not sources:raise BacklogError("backlog item requires source provenance")
   if len({(s.kind,s.source_id) for s in sources})!=len(sources):raise BacklogError("duplicate source provenance")
@@ -50,6 +57,7 @@ class BacklogDisposition:
  disposition_id:str;item_id:str;kind:DispositionKind;reason:str;target_item_id:str|None=None
  def __post_init__(self):
   object.__setattr__(self,"disposition_id",_id(self.disposition_id,"disposition_id"));object.__setattr__(self,"item_id",_id(self.item_id,"item_id"));object.__setattr__(self,"reason",_text(self.reason,"reason"))
+  if not isinstance(self.kind,DispositionKind):raise BacklogError("kind must be DispositionKind")
   if self.target_item_id is not None:object.__setattr__(self,"target_item_id",_id(self.target_item_id,"target_item_id"))
   if self.kind is DispositionKind.DUPLICATE and not self.target_item_id:raise BacklogError("duplicate disposition requires target")
   if self.kind is not DispositionKind.DUPLICATE and self.target_item_id:raise BacklogError("only duplicate disposition may target another item")
