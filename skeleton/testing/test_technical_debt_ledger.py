@@ -13,3 +13,14 @@ def test_retired_debt_leaves_active_risk_queue():
 def test_debt_cannot_be_retired_twice():
  l=DebtLedger((item(),));l.retire(receipt())
  with pytest.raises(DebtError,match="already"):l.retire(receipt())
+
+def test_debt_impact_rejects_boolean_and_non_integer_interest():
+ with pytest.raises(DebtError,match="integers"):DebtImpact(True,1,1)
+ with pytest.raises(DebtError,match="integers"):DebtImpact(1,1.5,1)
+def test_duplicate_debt_and_contract_identity_rejected():
+ with pytest.raises(DebtError,match="duplicate affected contract"):DebtItem("DEBT.2","x",("CONTRACT.X","CONTRACT.X"),"OWNER.X","fix",DebtImpact(1,1,1))
+ with pytest.raises(DebtError,match="duplicate debt identity"):DebtLedger((item(),item()))
+def test_unknown_interest_query_fails_with_domain_error():
+ with pytest.raises(DebtError,match="unknown debt"):DebtLedger((item(),)).interest("DEBT.9")
+def test_retirement_receipt_is_runtime_typed():
+ with pytest.raises(DebtError,match="receipt must"):DebtLedger((item(),)).retire("DEBT.1")
