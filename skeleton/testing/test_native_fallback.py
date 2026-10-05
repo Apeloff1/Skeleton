@@ -36,3 +36,12 @@ def test_isolation_receipt_digest_is_order_independent_for_mapping_payloads():
 def test_isolation_rejects_nonfinite_request_before_process_start():
  with pytest.raises(AcceleratorIsolationError,match="canonical-JSON"):
   run_json_process([sys.executable,"-c",_ECHO],{"value":float("nan")},timeout_s=5)
+
+
+def test_speedup_cannot_compensate_for_isolation_failure():
+ evidence=[ProfileEvidence(f"fast-{i}","native","src","env",128,1000000,1,True,0.0) for i in range(2)]
+ decision=evaluate_candidate(candidate_id="native",current_source_identity="src",reference_available=True,isolation_satisfied=False,protocol_compatible=True,evidence=evidence,policy=SelectionPolicy())
+ assert not decision.qualified
+ assert decision.route=="reference"
+ assert decision.worst_speedup==1000000.0
+ assert decision.reason_codes==("isolation_requirement_unsatisfied",)
