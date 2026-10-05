@@ -5934,7 +5934,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Keep persisted numbers, timestamps, enums and identifiers locale-neutral.",
         "Localize presentation, formatting and messages through versioned resources.",
@@ -5947,21 +5947,38 @@
       ],
       "contracts": [
         "LocaleId",
+        "TranslationEntry",
         "TranslationCatalog",
-        "LocaleFallbackPolicy"
+        "LocaleFallbackPolicy",
+        "TranslationResolution",
+        "TranslationRegistry",
+        "LocaleProvider"
       ],
       "implementation_paths": [
-        "frontend",
-        "skeleton/ai",
-        "docs"
+        "skeleton/contracts/localization.py",
+        "skeleton/contracts/__init__.py",
+        "skeleton/ai/runtime/contracts/localization.py",
+        "skeleton/ai/runtime/contracts/__init__.py",
+        "frontend/src/i18n/runtime.ts",
+        "frontend/src/i18n/react.tsx",
+        "frontend/src/i18n/catalogs/en.ts",
+        "frontend/src/i18n/catalogs/nb.ts",
+        "frontend/app/_layout.tsx",
+        "frontend/app/index.tsx",
+        "frontend/components/LaunchCascade.tsx",
+        "frontend/components/BootLauncher.tsx",
+        "frontend/components/ActionSheet.tsx",
+        "frontend/components/Toast.tsx",
+        "frontend/src/components/StabilityBanner.tsx"
       ],
       "tests": [
-        "planned:frontend locale tests",
-        "planned:skeleton/testing/test_locale_neutral_contracts.py"
+        "skeleton/testing/test_vol087_localization.py",
+        "frontend/scripts/test-localization-contract.mjs",
+        "frontend:test:localization"
       ],
       "evaluations": [
-        "planned:locale matrix evaluation",
-        "planned:missing-critical-translation test"
+        "skeleton/testing/test_vol087_localization.py",
+        "frontend:test:localization"
       ],
       "evidence": [],
       "risks": [
@@ -5969,10 +5986,7 @@
         "translation drift",
         "unsafe fallback text"
       ],
-      "gaps": [
-        "define canonical locale policy",
-        "materialize critical-string coverage"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-087",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
