@@ -63,6 +63,7 @@ class InstallerSecurityPolicy: allowed_roots:tuple[str,...]; trusted_signers:tup
 @dataclass(frozen=True,slots=True)
 class InstallPath: root:str; relative_path:str; contains_symlink:bool=False
  def __post_init__(self):
+  _t(self.root,"root");_t(self.relative_path,"relative_path")
   if self.relative_path.startswith("/") or ".." in self.relative_path.split("/"): raise ValueError("install path traversal")
   if self.contains_symlink: raise ValueError("symlink install target rejected")
 @dataclass(frozen=True,slots=True)
@@ -71,16 +72,22 @@ class InstallVerification: artifact_digest:str; signature_verified:bool; path_ve
  def privileged_write_allowed(self)->bool: return self.signature_verified and self.path_verified
 
 @dataclass(frozen=True,slots=True)
-class VersionFloor: minimum_version:int
+class VersionFloor:
+ minimum_version:int
+ def __post_init__(self):
+  if self.minimum_version<0:raise ValueError("version floor must be nonnegative")
 @dataclass(frozen=True,slots=True)
 class UpdateSignature: metadata_digest:str; signer_id:str
 @dataclass(frozen=True,slots=True)
 class UpdateMetadata:
  version:int; artifact_digest:str; metadata_digest:str; signature:UpdateSignature; authorized_rollback:bool=False
  def __post_init__(self):
+  if self.version<0:raise ValueError("update version must be nonnegative")
   object.__setattr__(self,"artifact_digest",_d(self.artifact_digest,"artifact_digest")); object.__setattr__(self,"metadata_digest",_d(self.metadata_digest,"metadata_digest"))
+  _d(self.signature.metadata_digest,"signature_metadata_digest");_t(self.signature.signer_id,"signer_id")
   if self.signature.metadata_digest!=self.metadata_digest: raise ValueError("signature must bind update metadata")
 def admit_update(m:UpdateMetadata,floor:VersionFloor,trusted_signers:tuple[str,...])->bool:
+ if len(set(trusted_signers))!=len(trusted_signers) or any(not x for x in trusted_signers):return False
  if m.signature.signer_id not in trusted_signers: return False
  if m.version<floor.minimum_version and not m.authorized_rollback: return False
  return True
