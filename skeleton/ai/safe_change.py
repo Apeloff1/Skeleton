@@ -12,6 +12,8 @@ class SafeChangePlan:
   if not self.steps or self.estimated_cost>self.budget:raise ValueError("missing steps or budget exceeded")
   if len({s.step_id for s in self.steps})!=len(self.steps):raise ValueError("change step IDs must be unique")
   names={g.name for g in self.gates}
+  if len(names)!=len(self.gates):raise ValueError("duplicate change gate")
   if not _REQUIRED_GATES.issubset(names):raise PermissionError("required ownership/compatibility/risk gates missing")
   if any(g.passed is not True or not g.evidence_id for g in self.gates):raise PermissionError("ownership/compatibility/risk gate failed")
+  if not isinstance(self.uncertain,bool):raise ValueError("uncertainty must be explicit boolean")
   if self.uncertain and any(not s.reversible or not s.rollback for s in self.steps):raise ValueError("uncertain work must be reversible with rollback")
