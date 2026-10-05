@@ -4,6 +4,13 @@ import hashlib
 
 import pytest
 
+from skeleton.automation.agents.authority_policy_bridge import (
+    principal_from_agent_delegation,
+)
+from skeleton.automation.agents.delegation_qualification import (
+    AgentDelegationAuthority,
+    DelegationBudget,
+)
 from skeleton.contracts.canonical import canonical_json_bytes
 from skeleton.vault.authority_policy import (
     AuthorityPolicyError,
@@ -346,4 +353,88 @@ def test_vault_exports_source_and_ai_mirror_remain_byte_identical() -> None:
     root = Path(__file__).resolve().parents[2]
     source = root / "skeleton/vault/__init__.py"
     mirror = root / "skeleton/ai/runtime/vault/__init__.py"
+    assert source.read_bytes() == mirror.read_bytes()
+
+
+def test_existing_agent_delegation_projects_losslessly_into_unified_policy() -> None:
+    authority = AgentDelegationAuthority(
+        agent_id="agent-1",
+        parent_agent_id="supervisor-1",
+        generation=3,
+        capabilities=("repo.read", "repo.write"),
+        scopes=("repo:a",),
+        budget=DelegationBudget(
+            max_parallel_tasks=2,
+            max_steps=20,
+            max_tokens=10000,
+            max_cost_units=5.0,
+            max_wall_time_s=60.0,
+        ),
+        expires_at=500.0,
+        delegation_id="delegation-3",
+    )
+    projected = principal_from_agent_delegation(
+        authority,
+        tenant_id="tenant-a",
+    )
+
+    assert projected.kind is PrincipalKind.AGENT
+    assert projected.principal_id == authority.agent_id
+    assert projected.generation == authority.generation
+    assert projected.capabilities == authority.capabilities
+    assert projected.scopes == authority.scopes
+    assert projected.expires_at == authority.expires_at
+
+    policy = compile_authority_policy(BASE_POLICY)
+    decision = evaluate_authority(
+        policy=policy,
+        principal=projected,
+        request=AuthorityRequest(
+            principal_id="agent-1",
+            tenant_id="tenant-a",
+            capability="repo.read",
+            scope="repo:a",
+            operation_id="op-agent",
+            requested_generation=3,
+        ),
+        observed_at=100.0,
+    )
+    assert decision.allowed is True
+
+
+def test_agent_bridge_cannot_unrevoke_or_expand_delegated_authority() -> None:
+    authority = AgentDelegationAuthority(
+        agent_id="agent-1",
+        parent_agent_id="supervisor-1",
+        generation=4,
+        capabilities=("repo.read",),
+        scopes=("repo:a",),
+        budget=DelegationBudget(
+            max_parallel_tasks=1,
+            max_steps=10,
+            max_tokens=1000,
+            max_cost_units=1.0,
+            max_wall_time_s=30.0,
+        ),
+        expires_at=250.0,
+        delegation_id="delegation-4",
+    )
+    projected = principal_from_agent_delegation(
+        authority,
+        tenant_id="tenant-a",
+        revoked=True,
+    )
+
+    assert projected.revoked is True
+    assert projected.capabilities == ("repo.read",)
+    assert projected.scopes == ("repo:a",)
+    assert projected.generation == 4
+
+
+def test_agent_authority_bridge_source_and_ai_mirror_are_byte_identical() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    source = root / "skeleton/automation/agents/authority_policy_bridge.py"
+    mirror = root / "skeleton/ai/agents/core/authority_policy_bridge.py"
     assert source.read_bytes() == mirror.read_bytes()
