@@ -1938,7 +1938,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Enforce least privilege, secret isolation, sandboxing, egress control and supply-chain integrity across model/tool/CI/runtime boundaries.",
         "Authorize normalized resources at the last responsible moment to resist TOCTOU and parsing differentials.",
@@ -1960,13 +1960,15 @@
         "backend/scripts",
         "scripts/check_repository_python_sast.py",
         "skeleton/security/contracts.py",
-        "skeleton/security/capability_security.py"
+        "skeleton/security/capability_security.py",
+        "skeleton/security/threat_model.py"
       ],
       "tests": [
         "skeleton/testing/test_security_rooted_fs.py",
         "skeleton/testing/test_security_archive_sandbox.py",
         "skeleton/testing/test_security_outbound_http.py",
-        "skeleton/testing/test_vol026_capability_security.py"
+        "skeleton/testing/test_vol026_capability_security.py",
+        "skeleton/testing/test_vol026_threat_model.py"
       ],
       "evaluations": [
         "planned:threat-model coverage review",
@@ -1980,9 +1982,7 @@
         "secret leakage",
         "dependency compromise"
       ],
-      "gaps": [
-        "complete unified threat model"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-026",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
