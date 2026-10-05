@@ -108,7 +108,7 @@ def test_retention_must_be_finite_and_bounded(seconds: int) -> None:
 
 
 def test_region_must_resolve_to_registered_privacy_policy() -> None:
-    with pytest.raises(Exception):
+    with pytest.raises(LearningRetentionError, match="region is not governed"):
         _policy(region="unknown")
 
 
@@ -151,3 +151,27 @@ def test_eval_init_source_and_ai_mirror_remain_byte_identical() -> None:
     mirror = root / "skeleton/ai/evaluation/__init__.py"
 
     assert source.read_bytes() == mirror.read_bytes()
+
+
+def test_learning_signal_lifecycle_survives_registry_restart(tmp_path) -> None:
+    path = tmp_path / "learning-retention.sqlite3"
+    first = DataLifecycleRegistry(path)
+    binding = register_learning_signal_lifecycle(
+        registry=first,
+        signal=_signal(),
+        tenant_id="tenant-a",
+        policy=_policy(retention_seconds=10),
+        created_at=100.0,
+    )
+    first.close()
+
+    restarted = DataLifecycleRegistry(path)
+    row = restarted.get(binding.record_id)
+    assert row["tenant_id"] == "tenant-a"
+    assert row["retention_until"] == 110.0
+    assert row["source_ref"] == f"learning-signal://{binding.signal_digest}"
+
+    plans = restarted.plan_retention_expiry(now=110.0)
+    assert len(plans) == 1
+    assert plans[0].tenant_id == "tenant-a"
+    restarted.close()
