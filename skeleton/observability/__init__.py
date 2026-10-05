@@ -64,9 +64,27 @@ from skeleton.observability.resilient_telemetry import (
     ResilientTelemetryError,
     TelemetryEmitResult,
 )
+from skeleton.observability.runbooks import (
+    RUNBOOK_SCHEMA,
+    Runbook,
+    RunbookError,
+    RunbookRegistry,
+    RunbookStep,
+    RunbookValidation,
+    StepKind,
+    ValidationStatus,
+)
 from skeleton.observability.tracing import InMemoryExporter, Span, Tracer
 
 __all__ = [
+    "RUNBOOK_SCHEMA",
+    "Runbook",
+    "RunbookError",
+    "RunbookRegistry",
+    "RunbookStep",
+    "RunbookValidation",
+    "StepKind",
+    "ValidationStatus",
     "EXPLANATION_SCHEMA",
     "DecisionFactor",
     "DecisionFactorKind",
