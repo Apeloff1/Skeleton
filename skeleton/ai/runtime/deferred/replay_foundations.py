@@ -10,6 +10,9 @@ class Bulkhead: bulkhead_id:str; domain:str; limit:BulkheadLimit; active:int
 @dataclass(frozen=True,slots=True)
 class OverflowDecision: admitted:bool; target_bulkhead:str|None; reason:str
 def overflow(source:Bulkhead,target:Bulkhead|None,*,authority_compatible:bool)->OverflowDecision:
+ for b in (source,)+( (target,) if target else () ):
+  if not b.bulkhead_id or not b.domain or b.limit.concurrency<1 or b.limit.capacity<1 or b.active<0 or b.active>b.limit.capacity:raise ValueError("invalid bulkhead state")
+ if target and target.bulkhead_id==source.bulkhead_id:raise ValueError("overflow target must be distinct")
  if source.active<source.limit.concurrency:return OverflowDecision(True,source.bulkhead_id,"source capacity")
  if target and authority_compatible and target.active<target.limit.concurrency:return OverflowDecision(True,target.bulkhead_id,"explicit overflow")
  return OverflowDecision(False,None,"isolated capacity exhausted")
@@ -22,6 +25,7 @@ class ReplayAuthorization:
  operation_id:str; current_authorization:bool; compatibility_verified:bool; idempotency_verified:bool
 class DeadLetterDisposition(str,Enum): HOLD="hold"; REPLAY="replay"; DISCARD="discard"
 def dead_letter_disposition(d:DeadLetter,a:ReplayAuthorization)->DeadLetterDisposition:
+ if not all((d.operation_id,d.payload_digest,d.failure_cause,a.operation_id)) or d.attempts<0:return DeadLetterDisposition.HOLD
  if d.operation_id!=a.operation_id:return DeadLetterDisposition.HOLD
  if a.current_authorization and a.compatibility_verified and a.idempotency_verified:return DeadLetterDisposition.REPLAY
  return DeadLetterDisposition.HOLD
@@ -32,6 +36,7 @@ class ReplayRequest: operation_id:str; mode:ReplayMode; reconciled:bool=False; i
 @dataclass(frozen=True,slots=True)
 class ReplayResult: operation_id:str; allowed:bool; external_effects:bool; reason:str
 def replay(r:ReplayRequest)->ReplayResult:
+ if not r.operation_id:return ReplayResult(r.operation_id,False,False,"operation identity required")
  if r.mode is not ReplayMode.REAL_EFFECT:return ReplayResult(r.operation_id,True,False,r.mode.value)
  ok=r.reconciled and r.idempotent
  return ReplayResult(r.operation_id,ok,ok,"effect replay admitted" if ok else "effect replay requires reconciliation and idempotency")
