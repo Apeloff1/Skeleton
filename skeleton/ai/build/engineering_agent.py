@@ -19,9 +19,13 @@ class EngineeringTask:
  task_id:str;objective:str;repository_digest:str;scope_paths:tuple[str,...];test_refs:tuple[str,...];rollback_ref:str
  def __post_init__(self):
   object.__setattr__(self,"task_id",_id(self.task_id,"task_id"));_sha(self.repository_digest,"repository_digest")
-  if not isinstance(self.objective,str) or not self.objective.strip():raise EngineeringError("objective required")\n  object.__setattr__(self,"objective",self.objective.strip())
+  if not isinstance(self.objective,str) or not self.objective.strip():raise EngineeringError("objective required")
+  object.__setattr__(self,"objective",self.objective.strip())
   for f in ("scope_paths","test_refs"):
-   raw=getattr(self,f)\n   if not isinstance(raw,tuple):raise EngineeringError(f"{f} must be tuple")\n   if len(raw)>256:raise EngineeringError(f"{f} exceeds policy bound")\n   vals=tuple(sorted(set(raw)))
+   raw=getattr(self,f)
+   if not isinstance(raw,tuple):raise EngineeringError(f"{f} must be tuple")
+   if len(raw)>256:raise EngineeringError(f"{f} exceeds policy bound")
+   vals=tuple(sorted(set(raw)))
    if not vals or any(not isinstance(v,str) or not v.strip() for v in vals):raise EngineeringError(f"{f} required")
    object.__setattr__(self,f,vals)
   if not self.rollback_ref.strip():raise EngineeringError("rollback_ref required")
@@ -34,22 +38,30 @@ class MutationLease:
   for f in ("lease_id","holder_id"):object.__setattr__(self,f,_id(getattr(self,f),f))
   _sha(self.task_digest,"task_digest")
   if not isinstance(self.fence_token,int) or isinstance(self.fence_token,bool) or self.fence_token<1:raise EngineeringError("fence_token must be positive")
-  if not isinstance(self.state,LeaseState):raise EngineeringError("state must be LeaseState")\n  if not isinstance(self.scope_paths,tuple) or not self.scope_paths:raise EngineeringError("scope_paths must be non-empty tuple")\n  object.__setattr__(self,"scope_paths",tuple(sorted(set(self.scope_paths))))
+  if not isinstance(self.state,LeaseState):raise EngineeringError("state must be LeaseState")
+  if not isinstance(self.scope_paths,tuple) or not self.scope_paths:raise EngineeringError("scope_paths must be non-empty tuple")
+  object.__setattr__(self,"scope_paths",tuple(sorted(set(self.scope_paths))))
 @dataclass(frozen=True,slots=True)
 class ChangeRecord:
  change_id:str;task_digest:str;lease_id:str;fence_token:int;before_digest:str;after_digest:str;paths:tuple[str,...]
  def __post_init__(self):
   for f in ("change_id","lease_id"):object.__setattr__(self,f,_id(getattr(self,f),f))
   for f in ("task_digest","before_digest","after_digest"):_sha(getattr(self,f),f)
-  if not isinstance(self.fence_token,int) or isinstance(self.fence_token,bool) or self.fence_token<1:raise EngineeringError("fence_token must be positive")\n  if self.before_digest==self.after_digest:raise EngineeringError("change must alter repository state")\n  if not isinstance(self.paths,tuple) or not self.paths:raise EngineeringError("paths must be non-empty tuple")
-  object.__setattr__(self,"paths",tuple(sorted(set(self.paths))))\n @property\n def digest(self):return _dig({"change_id":self.change_id,"task_digest":self.task_digest,"lease_id":self.lease_id,"fence_token":self.fence_token,"before_digest":self.before_digest,"after_digest":self.after_digest,"paths":self.paths})
+  if not isinstance(self.fence_token,int) or isinstance(self.fence_token,bool) or self.fence_token<1:raise EngineeringError("fence_token must be positive")
+  if self.before_digest==self.after_digest:raise EngineeringError("change must alter repository state")
+  if not isinstance(self.paths,tuple) or not self.paths:raise EngineeringError("paths must be non-empty tuple")
+  object.__setattr__(self,"paths",tuple(sorted(set(self.paths))))
+ @property
+ def digest(self):return _dig({"change_id":self.change_id,"task_digest":self.task_digest,"lease_id":self.lease_id,"fence_token":self.fence_token,"before_digest":self.before_digest,"after_digest":self.after_digest,"paths":self.paths})
 @dataclass(frozen=True,slots=True)
 class EngineeringEvidence:
  evidence_id:str;task_digest:str;change_digest:str;builder_id:str;verifier_id:str;decision:VerificationDecision;test_digest:str;rollback_verified:bool
  def __post_init__(self):
   for f in ("evidence_id","builder_id","verifier_id"):object.__setattr__(self,f,_id(getattr(self,f),f))
   for f in ("task_digest","change_digest","test_digest"):_sha(getattr(self,f),f)
-  if not isinstance(self.decision,VerificationDecision):raise EngineeringError("decision must be VerificationDecision")\n  if not isinstance(self.rollback_verified,bool):raise EngineeringError("rollback_verified must be bool")\n  if self.builder_id==self.verifier_id:raise EngineeringError("verifier must be independent from builder")
+  if not isinstance(self.decision,VerificationDecision):raise EngineeringError("decision must be VerificationDecision")
+  if not isinstance(self.rollback_verified,bool):raise EngineeringError("rollback_verified must be bool")
+  if self.builder_id==self.verifier_id:raise EngineeringError("verifier must be independent from builder")
   if self.decision is VerificationDecision.PASS and not self.rollback_verified:raise EngineeringError("passing evidence requires verified rollback")
 class MutationCustody:
  def __init__(self):self._latest={};self._active={}
@@ -64,7 +76,8 @@ class MutationCustody:
   active=self._active.get(task.task_id)
   if active is None or active.state is not LeaseState.ACTIVE or active!=lease:raise EngineeringError("mutation lease is stale or inactive")
   if lease.task_digest!=task.digest:raise EngineeringError("lease/task mismatch")
-  if any(not isinstance(p,str) or not p.strip() for p in paths):raise EngineeringError("mutation paths invalid")\n  if not set(paths)<=set(lease.scope_paths):raise EngineeringError("mutation escapes leased scope")
+  if any(not isinstance(p,str) or not p.strip() for p in paths):raise EngineeringError("mutation paths invalid")
+  if not set(paths)<=set(lease.scope_paths):raise EngineeringError("mutation escapes leased scope")
  def record(self,task:EngineeringTask,lease:MutationLease,change_id:str,before:str,after:str,paths)->ChangeRecord:
   self.assert_authorized(task,lease,paths);return ChangeRecord(change_id,task.digest,lease.lease_id,lease.fence_token,before,after,tuple(paths))
 
