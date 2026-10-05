@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   defaultFallbackPolicy,
+  interpolateTranslation,
   LocalizationError,
   normalizeLocale,
   TranslationKey,
@@ -25,7 +26,10 @@ function detectSystemLocale(): string {
 interface LocaleContextValue {
   locale: string;
   setLocale: (locale: string) => void;
-  t: (key: TranslationKey) => string;
+  t: (
+    key: TranslationKey,
+    values?: Readonly<Record<string, string | number>>,
+  ) => string;
   availableLocales: readonly string[];
 }
 
@@ -38,8 +42,12 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     setLocaleState(normalizeLocale(next));
   }, []);
 
-  const t = React.useCallback((key: TranslationKey) => {
-    return registry.resolve(key, locale, defaultFallbackPolicy()).text;
+  const t = React.useCallback((
+    key: TranslationKey,
+    values?: Readonly<Record<string, string | number>>,
+  ) => {
+    const resolved = registry.resolve(key, locale, defaultFallbackPolicy()).text;
+    return values ? interpolateTranslation(resolved, values) : resolved;
   }, [locale]);
 
   const value = React.useMemo<LocaleContextValue>(() => ({
