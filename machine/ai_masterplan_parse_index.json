@@ -6,7 +6,7 @@
       "git_blob_sha": "7a7aba1b24e1e91cc80d5e10bd45a5d5d2179ada"
     },
     "machine/ai_build_accountability.json": {
-      "git_blob_sha": "75be572bb83de31fe40e63634d01f59a0eec45a3"
+      "git_blob_sha": "f5567a81af91bd1c724e4be68412cac3b5e00071"
     }
   },
   "policy": {
@@ -17,12 +17,12 @@
   },
   "volume_summary": {
     "total": 421,
-    "implementation_signed": 355,
+    "implementation_signed": 379,
     "verification_signed": 20,
     "complete": 20,
-    "implementation_signed_open": 335,
+    "implementation_signed_open": 359,
     "gap_free_waiting_verification": 24,
-    "implementation_unsigned": 66
+    "implementation_unsigned": 42
   },
   "fast_sets": {
     "fully_complete": [
@@ -92,24 +92,6 @@
       "VOL-131",
       "VOL-132",
       "VOL-134",
-      "VOL-166",
-      "VOL-167",
-      "VOL-169",
-      "VOL-172",
-      "VOL-173",
-      "VOL-174",
-      "VOL-175",
-      "VOL-176",
-      "VOL-177",
-      "VOL-178",
-      "VOL-180",
-      "VOL-181",
-      "VOL-182",
-      "VOL-183",
-      "VOL-184",
-      "VOL-185",
-      "VOL-186",
-      "VOL-187",
       "VOL-195",
       "VOL-210",
       "VOL-211",
@@ -133,13 +115,7 @@
       "VOL-243",
       "VOL-244",
       "VOL-245",
-      "VOL-246",
-      "VOL-313",
-      "VOL-314",
-      "VOL-315",
-      "VOL-316",
-      "VOL-317",
-      "VOL-319"
+      "VOL-246"
     ]
   },
   "by_depth_pass": {
@@ -169,7 +145,7 @@
     },
     "DP-161-200": {
       "total": 40,
-      "implementation_signed": 21,
+      "implementation_signed": 39,
       "complete": 0,
       "gap_free_waiting_verification": 1
     },
@@ -187,7 +163,7 @@
     },
     "DP-281-320": {
       "total": 40,
-      "implementation_signed": 34,
+      "implementation_signed": 40,
       "complete": 0,
       "gap_free_waiting_verification": 0
     },
@@ -213,14 +189,14 @@
   "accountability_summary": {
     "volume": {
       "total": 421,
-      "implementation_signed": 355,
+      "implementation_signed": 379,
       "verification_signed": 20,
       "complete": 20,
       "status_counts": {
         "verified": 13,
-        "implemented": 335,
+        "implemented": 359,
         "hardened": 7,
-        "unverified": 66
+        "unverified": 42
       }
     },
     "work_package": {
