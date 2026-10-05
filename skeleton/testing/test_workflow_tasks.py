@@ -34,3 +34,18 @@ def test_unknown_task_is_conservative_generic():
 def test_complexity_revision_preserves_calibration():
  e=ComplexityEstimate(1,.5,"cal",(ComplexityFeature("files",2),));r=revise(e,4,.2,"runtime")
  assert r.revised.calibration_id=="cal" and r.runtime_evidence=="runtime"
+
+
+def test_workflow_task_depth_invariants_fail_closed():
+ import pytest
+ s=WorkflowSource("s",DSLVersion(1,0),"x",())
+ links=(WorkflowLink("a","cap",None),)
+ assert compile_workflow(s,links,("cap",),(("a","missing"),)).workflow is None
+ assert compile_workflow(s,(links[0],links[0]),("cap",),()).workflow is None
+ w=WorkflowVersion("w",1,"d")
+ with pytest.raises(ValueError):rebind(WorkflowBinding("r",w),WorkflowVersion("other",2,"d2"),WorkflowCompatibility(1,2,True),explicit_migration=True)
+ with pytest.raises(ValueError):migrate(WorkflowMigration("m",1,1,(),False),compatible=True)
+ profiles={t:TaskProfile(t,1,()) for t in TaskType};profiles.pop(TaskType.CODE)
+ with pytest.raises(ValueError):classify("generic",profiles)
+ e=ComplexityEstimate(1,0.2,"cal",(ComplexityFeature("x",1),ComplexityFeature("x",2)))
+ with pytest.raises(ValueError):revise(e,1,0.2,"evidence")
