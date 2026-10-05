@@ -10,7 +10,7 @@ def steps():
       RunbookStep("STEP.OBSERVE",StepKind.OBSERVE,"Inspect queue depth",signal_ref="SIGNAL.QUEUE.DEPTH",next_step_ids=("STEP.DECIDE",)),
       RunbookStep("STEP.DECIDE",StepKind.DECISION,"Choose recovery or escalation",next_step_ids=("STEP.RECOVER","STEP.ESCALATE")),
       RunbookStep("STEP.RECOVER",StepKind.COMMAND,"Restart bounded worker",command_ref="CMD.WORKER.RESTART",authority_ref="AUTH.OPERATOR.RECOVERY",rollback_step_id="STEP.ROLLBACK",next_step_ids=("STEP.STOP",)),
-      RunbookStep("STEP.ROLLBACK",StepKind.ROLLBACK,"Restore previous worker",command_ref="CMD.WORKER.ROLLBACK",next_step_ids=("STEP.STOP",)),
+      RunbookStep("STEP.ROLLBACK",StepKind.ROLLBACK,"Restore previous worker",command_ref="CMD.WORKER.ROLLBACK",authority_ref="AUTH.OPERATOR.RECOVERY",next_step_ids=("STEP.STOP",)),
       RunbookStep("STEP.ESCALATE",StepKind.ESCALATE,"Escalate to incident commander"),
       RunbookStep("STEP.STOP",StepKind.STOP,"Stop automation and preserve evidence"),
     )
@@ -50,3 +50,24 @@ def test_failed_drill_does_not_validate():
     r=RunbookRegistry(); b=book();r.register(b)
     r.record_validation(RunbookValidation("VALIDATION.1",b.runbook_id,b.digest,"DRILL.1",ValidationStatus.FAILED,SHA))
     assert r.validated(b.runbook_id,b.version) is False
+
+def test_rollback_requires_named_command_and_authority():
+    with pytest.raises(RunbookError,match="command_ref and authority_ref"):
+        RunbookStep("STEP.ROLLBACK",StepKind.ROLLBACK,"restore",command_ref="CMD.RESTORE")
+
+def test_reachable_nonterminating_cycle_is_rejected():
+    s=(
+      RunbookStep("STEP.START",StepKind.DECISION,"choose",next_step_ids=("STEP.LOOP","STEP.STOP")),
+      RunbookStep("STEP.LOOP",StepKind.DECISION,"loop",next_step_ids=("STEP.LOOP",)),
+      RunbookStep("STEP.STOP",StepKind.STOP,"stop"),
+    )
+    with pytest.raises(RunbookError,match="path to stop or escalation"):
+        Runbook("RUNBOOK.LOOP","V1","ops","degraded","STEP.START",s)
+
+def test_cycle_with_exit_to_terminal_is_allowed():
+    s=(
+      RunbookStep("STEP.START",StepKind.DECISION,"choose",next_step_ids=("STEP.LOOP",)),
+      RunbookStep("STEP.LOOP",StepKind.DECISION,"retry or stop",next_step_ids=("STEP.LOOP","STEP.STOP")),
+      RunbookStep("STEP.STOP",StepKind.STOP,"stop"),
+    )
+    assert Runbook("RUNBOOK.RETRY","V1","ops","degraded","STEP.START",s).entry_step_id=="STEP.START"
