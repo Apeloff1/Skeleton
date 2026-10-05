@@ -81,3 +81,19 @@ def test_dependency_identity_is_immutable():
  r=WorkPackageRegistry();r.add(pkg("PKG.A"));r.add(pkg("PKG.B"));r.add(pkg("PKG.C"))
  r.depend(WorkPackageDependency("DEP.X","PKG.B","PKG.A"))
  with pytest.raises(WorkPackageError,match="dependency identity"):r.depend(WorkPackageDependency("DEP.X","PKG.C","PKG.A"))
+
+def test_completion_signer_must_be_independent_from_verifier():
+ r=WorkPackageRegistry();p=pkg();r.add(p)
+ r.attest(ev("EVID.I",EvidenceRole.IMPLEMENTATION,"ACTOR.I",package=p))
+ r.attest(ev("EVID.V",EvidenceRole.VERIFICATION,"ACTOR.V",package=p))
+ r.attest(ev("EVID.C",EvidenceRole.COMPLETION,"ACTOR.V",package=p))
+ with pytest.raises(WorkPackageError,match="verification actor"):r.state(p.package_id)
+
+def test_evidence_rollup_is_deterministic_and_exact_version_bound():
+ r=WorkPackageRegistry();p=pkg();r.add(p)
+ r.attest(ev("EVID.I",EvidenceRole.IMPLEMENTATION,"ACTOR.I",package=p))
+ roll=r.evidence_rollup(p.package_id)
+ assert roll["package_digest"]==p.digest
+ assert roll["state"]==PackageState.IMPLEMENTED.value
+ assert roll["evidence_ids"]==("EVID.I",)
+ assert roll["artifact_digests"]==(SHA,)
