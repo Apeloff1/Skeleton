@@ -41,3 +41,13 @@ def test_change_digest_binds_custody_and_repository_transition():
 def test_mutation_paths_require_typed_nonempty_tuple():
  c=MutationCustody();t=task();l=c.acquire(t,"ACTOR.A")
  with pytest.raises(EngineeringError,match="non-empty tuple"):c.record(t,l,"CHANGE.1",S("a"),S("b"),[])
+
+def test_acceptance_requires_exact_change_and_passing_independent_evidence():
+ from skeleton.ai.build.engineering_agent import accept_change
+ c=MutationCustody();t=task();l=c.acquire(t,"ACTOR.BUILDER");change=c.record(t,l,"CHANGE.1",S("a"),S("b"),("tests",))
+ good=EngineeringEvidence("EVID.1",t.digest,change.digest,"ACTOR.BUILDER","ACTOR.VERIFIER",VerificationDecision.PASS,S("tests"),True)
+ accepted=accept_change(t,change,good);assert accepted.change_digest==change.digest
+ wrong=EngineeringEvidence("EVID.2",t.digest,S("other"),"ACTOR.BUILDER","ACTOR.VERIFIER",VerificationDecision.PASS,S("tests"),True)
+ with pytest.raises(EngineeringError,match="evidence/change"):accept_change(t,change,wrong)
+ failed=EngineeringEvidence("EVID.3",t.digest,change.digest,"ACTOR.BUILDER","ACTOR.VERIFIER",VerificationDecision.FAIL,S("tests"),True)
+ with pytest.raises(EngineeringError,match="failed verification"):accept_change(t,change,failed)
