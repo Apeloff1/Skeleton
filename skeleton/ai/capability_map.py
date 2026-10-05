@@ -15,16 +15,16 @@ class CapabilityDescriptor:
  capability_id:str;owner_id:str;maturity:Maturity;dependency_ids:tuple[str,...];guarantees:tuple[str,...]
  def __post_init__(self):
   object.__setattr__(self,"capability_id",_id(self.capability_id,"capability_id"));object.__setattr__(self,"owner_id",_id(self.owner_id,"owner_id"))
-  deps=tuple(sorted(set(_id(x,"dependency_id") for x in self.dependency_ids)))
+  if not isinstance(self.maturity,Maturity):raise CapabilityError("maturity must be Maturity")\n  if not isinstance(self.dependency_ids,tuple) or not isinstance(self.guarantees,tuple):raise CapabilityError("dependencies and guarantees must be tuples")\n  deps=tuple(_id(x,"dependency_id") for x in self.dependency_ids)\n  if len(set(deps))!=len(deps):raise CapabilityError("duplicate capability dependency")\n  deps=tuple(sorted(deps))
   if self.capability_id in deps:raise CapabilityError("self dependency")
-  if not self.guarantees:raise CapabilityError("capability guarantees required")
+  if not self.guarantees or any(not isinstance(x,str) or not x.strip() for x in self.guarantees):raise CapabilityError("capability guarantees required")\n  if len(set(self.guarantees))!=len(self.guarantees):raise CapabilityError("duplicate capability guarantee")
   object.__setattr__(self,"dependency_ids",deps);object.__setattr__(self,"guarantees",tuple(sorted(set(self.guarantees))))
 @dataclass(frozen=True,slots=True)
 class CapabilityAvailability:
  capability_id:str;state:Availability;reason:str
  def __post_init__(self):
   object.__setattr__(self,"capability_id",_id(self.capability_id,"capability_id"))
-  if self.state is not Availability.AVAILABLE and not self.reason.strip():raise CapabilityError("degraded/unavailable capability requires reason")
+  if not isinstance(self.state,Availability):raise CapabilityError("state must be Availability")\n  if not isinstance(self.reason,str):raise CapabilityError("reason must be str")\n  if self.state is Availability.AVAILABLE and self.reason:raise CapabilityError("available capability cannot carry degradation reason")\n  if self.state is not Availability.AVAILABLE and not self.reason.strip():raise CapabilityError("degraded/unavailable capability requires reason")
 class CapabilityMap:
  def __init__(self,descriptors,live):
   self.descriptors={d.capability_id:d for d in descriptors};self.live={x.capability_id:x for x in live}
