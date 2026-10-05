@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from enum import Enum
 @dataclass(frozen=True,slots=True)
 class FreshnessSLI: source_watermark:int; observed_watermark:int; maximum_lag:int
+    def __post_init__(self):
+        if self.maximum_lag<0:raise ValueError("maximum lag must be nonnegative")
     @property
     def healthy(self):return self.source_watermark-self.observed_watermark<=self.maximum_lag
 @dataclass(frozen=True,slots=True)
@@ -42,6 +44,8 @@ class FreshnessState(str,Enum): FRESH="fresh"; STALE="stale"; UNKNOWN="unknown"
 class StaleAction(str,Enum): REFRESH="refresh"; QUALIFY="qualify"; ABSTAIN="abstain"
 @dataclass(frozen=True,slots=True)
 class FreshnessRequirement: maximum_lag:int; stale_action:StaleAction
+    def __post_init__(self):
+        if self.maximum_lag<0:raise ValueError("maximum lag must be nonnegative")
 @dataclass(frozen=True,slots=True)
 class FreshnessDecision: state:FreshnessState; action:StaleAction|None
 def freshness(req,source_watermark,evidence_watermark):
