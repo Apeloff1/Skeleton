@@ -25,10 +25,14 @@ objects already in the repository. Existing imports remain compatibility paths. 
 - `agents/core/` — core agent/swarm execution runtime.
 - `shell/` — AI control-plane/shell implementation: governance, planning, policy, verification, durable recovery, trust and release evidence.
 - `cognition/`, `learning/`, `evaluation/` — cognition, controlled learning, and evaluation support.
+- `modeling/` — governed model registry, model-development training/evaluation, and publication support.
+- `training/` — governed training control, distributed/checkpoint/recovery, evaluation-gate, post-training, curriculum, RL-environment, and verifier-model support.
+- `runtime/extensions/{artifacts,audio,connectors,document_vision,plugins,speech,supply_chain,video,vision}/` — bounded multimodal, connector/plugin, and model-supply-chain contracts; credential references remain opaque and no implicit model execution/promotion authority is created.
 - `research/historical/architecture_registry/` — base architecture metadata and numbered architecture rounds retained as non-authoritative research lineage.
 - `simulation/`, `forge/` — explicit masterplan domains for bounded world-model simulation and candidate forge workflows.
 - `build/shift_supervisor/` — planning/scheduling/build-control code promoted from the transitional `core/` root.
 - `build/{automation,repo_intelligence}/` — repository-side AI build/control support.
+- `build/documentation/` — deterministic generated/human documentation support for AI build and plan artifacts; no model execution authority.
 - `compat/` — legacy runtime surfaces staged for convergence into an existing canonical owner; these paths never create new production authority.
 
 No compatibility source may be deleted until imports, ownership, focused
