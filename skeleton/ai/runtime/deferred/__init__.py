@@ -14,6 +14,14 @@ from .lifecycle_safety import (
     MigrationReceipt, MigrationState, MigrationStep, ParityEvidence,
     RetirementDecision, can_remove_adapter, decide_retirement,
 )
+from .claim_governance import (
+    ClaimCluster, ClaimFingerprint, ClaimMerge, ClaimScope, ClaimValidity,
+    DiversityScore, EvidenceIndependence, ExpirationPolicy, KnowledgeConflict,
+    KnowledgeDiff, KnowledgeSnapshot, KnowledgeSnapshotDigest, ReconciliationCase,
+    ReconciliationDecision, RevalidationRequest, ScopeCompatibility, ScopeDimension,
+    SourceCluster, claim_validity, diversity, merge_claims, reconcile,
+    restore_allowed, scope_compatibility,
+)
 from .contract_fuzzing import ContractFuzzer, FuzzBudget, FuzzFailure, FuzzReport
 from .simulation_mode import SimulationAuthority, SimulationEvidence, SimulationRequest, SimulationResult, SimulationRuntime
 from .journal import DeferredExecutionJournal, DeferredJournalConflict, DeferredJournalError, DeferredJournalRecord, SqliteDeferredExecutionJournal
