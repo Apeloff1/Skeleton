@@ -123,3 +123,20 @@ def test_boolean_ticks_and_unbounded_actions_are_rejected() -> None:
             0,
             100,
         )
+
+
+def test_resource_prefix_requires_path_boundary() -> None:
+    scoped = InternalGrant(
+        "GRANT.PATH",
+        "WORKLOAD.API",
+        "INSTANCE.1",
+        frozenset({"read"}),
+        "tenant/a",
+        0,
+        100,
+    )
+    assert authorize(IDENTITY, scoped, "read", "tenant/a", 10).allowed
+    assert authorize(IDENTITY, scoped, "read", "tenant/a/item", 10).allowed
+    denied = authorize(IDENTITY, scoped, "read", "tenant/a-evil/item", 10)
+    assert not denied.allowed
+    assert denied.reason == "least_privilege_denied"
