@@ -17,6 +17,9 @@ on:
       - "skeleton/testing/test_vol026_capability_security.py"
       - "skeleton/testing/test_vol026_threat_model.py"
       - "skeleton/testing/test_vol026_tool_authorization.py"
+      - "skeleton/testing/test_security_rooted_fs.py"
+      - "skeleton/testing/test_security_outbound_http.py"
+      - "scripts/check_repository_python_sast.py"
       - "scripts/verify_vol026_security_closure.py"
       - "tests/test_vol026_security_independent_verifier.py"
       - "machine/ai_master_plan.json"
@@ -36,6 +39,9 @@ on:
       - "skeleton/testing/test_vol026_capability_security.py"
       - "skeleton/testing/test_vol026_threat_model.py"
       - "skeleton/testing/test_vol026_tool_authorization.py"
+      - "skeleton/testing/test_security_rooted_fs.py"
+      - "skeleton/testing/test_security_outbound_http.py"
+      - "scripts/check_repository_python_sast.py"
       - "scripts/verify_vol026_security_closure.py"
       - "tests/test_vol026_security_independent_verifier.py"
       - "machine/ai_master_plan.json"
@@ -100,6 +106,9 @@ jobs:
           python -m pytest -q --noconftest
           skeleton/testing/test_security_rooted_fs.py
           skeleton/testing/test_security_outbound_http.py
+
+      - name: Run referenced repository SAST validation
+        run: python scripts/check_repository_python_sast.py
 
       - name: Build independent exact-head security receipt
         env:
