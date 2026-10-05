@@ -7,6 +7,7 @@ class ArtifactDependency: source:str; source_version:str; target:str; target_ver
 class ArtifactGraph:
  nodes:tuple[ArtifactNode,...]; edges:tuple[ArtifactDependency,...]
  def __post_init__(self):
+  if any(not n.artifact_id or not n.version or not n.artifact_class for n in self.nodes):raise ValueError("complete artifact node identity required")
   known={(n.artifact_id,n.version) for n in self.nodes}
   if len(known)!=len(self.nodes):raise ValueError("duplicate artifact node")
   if any(not e.kind for e in self.edges):raise ValueError("dependency kind required")
