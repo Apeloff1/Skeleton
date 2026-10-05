@@ -6000,7 +6000,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Represent jurisdiction, applicability, owner and review date for compliance requirements.",
         "Map applicable obligations to concrete data, security, retention, access and evidence controls.",
@@ -6014,20 +6014,21 @@
       "contracts": [
         "ComplianceRequirement",
         "ComplianceControl",
-        "ComplianceEvidence"
+        "ComplianceEvidence",
+        "ComplianceRegistry",
+        "ComplianceAssessment"
       ],
       "implementation_paths": [
-        "docs",
-        "machine",
-        "skeleton/security"
+        "skeleton/contracts/compliance.py",
+        "skeleton/contracts/__init__.py",
+        "skeleton/ai/runtime/contracts/compliance.py",
+        "skeleton/ai/runtime/contracts/__init__.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_compliance_registry.py",
-        "planned:skeleton/testing/test_compliance_control_mapping.py"
+        "skeleton/testing/test_vol088_compliance.py"
       ],
       "evaluations": [
-        "planned:control evidence audit",
-        "planned:jurisdiction/applicability review"
+        "skeleton/testing/test_vol088_compliance.py"
       ],
       "evidence": [],
       "risks": [
@@ -6035,10 +6036,7 @@
         "missing evidence",
         "stale applicability"
       ],
-      "gaps": [
-        "define compliance registry schema",
-        "bind controls to evidence owners"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-088",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
