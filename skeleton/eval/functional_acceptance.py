@@ -17,14 +17,14 @@ def _dig(v):return hashlib.sha256(json.dumps(v,sort_keys=True,separators=(",",":
 class AcceptanceEvidence:
  evidence_id:str;criterion:Criterion;artifact_digest:str;passed:bool;negative_findings:tuple[str,...]=()
  def __post_init__(self):
-  object.__setattr__(self,"evidence_id",_id(self.evidence_id,"evidence_id"));_sha(self.artifact_digest,"artifact_digest");object.__setattr__(self,"negative_findings",tuple(sorted(set(self.negative_findings))))
+  object.__setattr__(self,"evidence_id",_id(self.evidence_id,"evidence_id"));_sha(self.artifact_digest,"artifact_digest")\n  if not isinstance(self.criterion,Criterion):raise AcceptanceError("criterion must be Criterion")\n  if not isinstance(self.passed,bool):raise AcceptanceError("passed must be bool")\n  if not isinstance(self.negative_findings,tuple) or len(self.negative_findings)>256:raise AcceptanceError("negative_findings must be bounded tuple")\n  if any(not isinstance(x,str) or not x.strip() for x in self.negative_findings):raise AcceptanceError("negative finding invalid")\n  object.__setattr__(self,"negative_findings",tuple(sorted(set(x.strip() for x in self.negative_findings))))
 @dataclass(frozen=True,slots=True)
 class FunctionalAIAcceptance:
  acceptance_id:str;source_digest:str;config_digest:str;model_digest:str;environment_digest:str;evidence:tuple[AcceptanceEvidence,...];builder_id:str
  def __post_init__(self):
   object.__setattr__(self,"acceptance_id",_id(self.acceptance_id,"acceptance_id"));object.__setattr__(self,"builder_id",_id(self.builder_id,"builder_id"))
   for f in ("source_digest","config_digest","model_digest","environment_digest"):_sha(getattr(self,f),f)
-  ev=tuple(sorted(self.evidence,key=lambda x:(x.criterion.value,x.evidence_id)))
+  if not isinstance(self.evidence,tuple) or any(not isinstance(x,AcceptanceEvidence) for x in self.evidence):raise AcceptanceError("evidence must be typed tuple")\n  ev=tuple(sorted(self.evidence,key=lambda x:(x.criterion.value,x.evidence_id)))
   if len({x.evidence_id for x in ev})!=len(ev):raise AcceptanceError("duplicate evidence identity")
   required=set(Criterion);present={x.criterion for x in ev}
   if present!=required:raise AcceptanceError("acceptance matrix incomplete")
