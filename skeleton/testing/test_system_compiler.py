@@ -11,3 +11,7 @@ def test_nonfinite_source_rejected():
 def test_artifact_cannot_be_constructed_authoritative():
  import pytest
  with pytest.raises(ValueError):SystemArtifact("x",b"x","d",True,True)
+
+def test_empty_target_identity_rejected():
+ import pytest
+ with pytest.raises(ValueError):compile_system(SystemSource("c","v",{}),SystemCompilePlan(("",)))
