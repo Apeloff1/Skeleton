@@ -444,6 +444,43 @@ class RadarSnapshot:
     states: tuple[tuple[str, RadarState], ...]
     transition_digests: tuple[str, ...]
 
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "registry_digest",
+            _sha(self.registry_digest, "registry_digest"),
+        )
+        if not isinstance(self.states, tuple):
+            raise RadarError("snapshot states must be tuple")
+        if len(self.states) > _MAX_CANDIDATES:
+            raise RadarError("snapshot state count exceeds safety bound")
+        normalized_states: list[tuple[str, RadarState]] = []
+        seen: set[str] = set()
+        for item in self.states:
+            if not isinstance(item, tuple) or len(item) != 2:
+                raise RadarError("snapshot state must be (technology_id, state)")
+            technology_id, state = item
+            technology_id = _id(technology_id, "technology_id")
+            if not isinstance(state, RadarState):
+                raise RadarError("snapshot state must use RadarState")
+            if technology_id in seen:
+                raise RadarError("duplicate snapshot technology state")
+            seen.add(technology_id)
+            normalized_states.append((technology_id, state))
+        if normalized_states != sorted(normalized_states):
+            raise RadarError("snapshot states must be canonical order")
+
+        if not isinstance(self.transition_digests, tuple):
+            raise RadarError("transition_digests must be tuple")
+        if len(self.transition_digests) > _MAX_EVIDENCE:
+            raise RadarError("snapshot transition count exceeds safety bound")
+        normalized_digests = tuple(
+            _sha(item, "transition_digest")
+            for item in self.transition_digests
+        )
+        object.__setattr__(self, "states", tuple(normalized_states))
+        object.__setattr__(self, "transition_digests", normalized_digests)
+
     @property
     def digest(self) -> str:
         return _digest(
