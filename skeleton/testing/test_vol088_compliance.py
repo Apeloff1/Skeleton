@@ -1,43 +1,222 @@
-from datetime import datetime,timedelta,timezone
+from datetime import datetime, timedelta, timezone
+
 import pytest
-from skeleton.contracts.compliance import *
 
-def setup_registry():
-    req=ComplianceRequirement("REQ-1","policy.example","Retain immutable evidence","security.owner")
-    ctrl=ComplianceControl("CTRL-1","security.owner",("REQ-1",),3600,"Verify immutable evidence")
-    return ComplianceRegistry((req,),(ctrl,)),ctrl
+from skeleton.contracts.compliance import (
+    ComplianceControl,
+    ComplianceError,
+    ComplianceEvidence,
+    ComplianceRegistry,
+    ComplianceRequirement,
+    ControlStatus,
+    EnforcementMode,
+    EvidenceResult,
+    RequirementDisposition,
+)
 
-def evidence(ctrl,now,result=EvidenceResult.PASS,**kw):
-    values=dict(evidence_id="EV-1",control_id=ctrl.control_id,control_digest=ctrl.digest,owner=ctrl.owner,artifact_digest="a"*64,observed_at=now,result=result); values.update(kw); return ComplianceEvidence(**values)
+NOW = datetime(2026, 10, 5, 12, 0, 0, tzinfo=timezone.utc)
 
-def test_identity_is_deterministic_and_order_independent():
-    a=ComplianceRequirement("REQ-A","policy.a","A statement","owner.a"); b=ComplianceRequirement("REQ-B","policy.b","B statement","owner.b",RequirementDisposition.NOT_APPLICABLE,"out of scope")
-    ca=ComplianceControl("CTRL-A","owner.a",("REQ-A",),60,"A control"); cb=ComplianceControl("CTRL-B","owner.b",("REQ-B",),60,"B control")
-    assert ComplianceRegistry((a,b),(ca,cb)).digest==ComplianceRegistry((b,a),(cb,ca)).digest
 
-def test_missing_or_mismatched_evidence_fails_closed():
-    registry,ctrl=setup_registry(); now=datetime(2026,1,1,tzinfo=timezone.utc)
-    assert registry.assess((),at=now).controls[0].status is ControlStatus.EVIDENCE_MISSING
-    assert registry.assess((evidence(ctrl,now,control_digest="b"*64),),at=now).controls[0].status is ControlStatus.EVIDENCE_MISSING
+def requirement(
+    requirement_id="REQ-1",
+    *,
+    disposition=RequirementDisposition.REQUIRED,
+    reviewed_at=NOW,
+    review_ttl_seconds=86400,
+    jurisdiction="NO",
+):
+    return ComplianceRequirement(
+        requirement_id=requirement_id,
+        source="policy.example",
+        jurisdiction=jurisdiction,
+        statement="Retain immutable evidence",
+        owner="security.owner",
+        legal_reviewer="legal.owner",
+        reviewed_at=reviewed_at,
+        review_ttl_seconds=review_ttl_seconds,
+        disposition=disposition,
+        applicability_reason="in scope" if disposition is RequirementDisposition.REQUIRED else "out of scope",
+    )
+
+
+def control(
+    requirement_ids=("REQ-1",),
+    *,
+    mode=EnforcementMode.TECHNICAL,
+):
+    return ComplianceControl(
+        control_id="CTRL-1",
+        owner="security.owner",
+        requirement_ids=requirement_ids,
+        evidence_ttl_seconds=3600,
+        description="Verify immutable evidence",
+        enforcement_mode=mode,
+    )
+
+
+def evidence(ctrl, *, observed_at=NOW, result=EvidenceResult.PASS, **overrides):
+    values = {
+        "evidence_id": "EV-1",
+        "control_id": ctrl.control_id,
+        "control_digest": ctrl.digest,
+        "owner": ctrl.owner,
+        "artifact_digest": "a" * 64,
+        "observed_at": observed_at,
+        "result": result,
+    }
+    values.update(overrides)
+    return ComplianceEvidence(**values)
+
+
+def registry(req=None, ctrl=None):
+    req = req or requirement()
+    ctrl = ctrl or control((req.requirement_id,))
+    return ComplianceRegistry((req,), (ctrl,)), ctrl
+
+
+def test_registry_identity_is_order_independent_and_jurisdiction_bound():
+    a = requirement("REQ-A", jurisdiction="NO")
+    b = requirement("REQ-B", jurisdiction="EU")
+    ca = ComplianceControl("CTRL-A", "security.owner", ("REQ-A",), 60, "A")
+    cb = ComplianceControl("CTRL-B", "security.owner", ("REQ-B",), 60, "B")
+    first = ComplianceRegistry((a, b), (ca, cb))
+    second = ComplianceRegistry((b, a), (cb, ca))
+    assert first.digest == second.digest
+    changed = ComplianceRegistry(
+        (requirement("REQ-A", jurisdiction="US"), b),
+        (ca, cb),
+    )
+    assert changed.digest != first.digest
+
+
+def test_required_requirement_without_control_is_rejected():
+    req = requirement()
+    other = requirement("REQ-2", disposition=RequirementDisposition.NOT_APPLICABLE)
+    other_control = control(("REQ-2",))
+    with pytest.raises(ComplianceError, match="lacks control"):
+        ComplianceRegistry((req, other), (other_control,))
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "expected"),
+    [
+        ({}, ControlStatus.EVIDENCE_MISSING),
+        ({"control_digest": "b" * 64}, ControlStatus.EVIDENCE_MISSING),
+        ({"owner": "other.owner"}, ControlStatus.EVIDENCE_MISSING),
+        (
+            {"observed_at": NOW + timedelta(seconds=1)},
+            ControlStatus.EVIDENCE_MISSING,
+        ),
+    ],
+)
+def test_unbound_or_future_evidence_fails_closed(kwargs, expected):
+    reg, ctrl = registry()
+    items = () if not kwargs else (evidence(ctrl, **kwargs),)
+    assessment = reg.assess(items, at=NOW)
+    assert assessment.controls[0].status is expected
+    assert not assessment.compliant
+
 
 def test_stale_and_failed_evidence_never_complies():
-    registry,ctrl=setup_registry(); now=datetime(2026,1,1,tzinfo=timezone.utc)
-    stale=registry.assess((evidence(ctrl,now-timedelta(seconds=3601)),),at=now); failed=registry.assess((evidence(ctrl,now,EvidenceResult.FAIL),),at=now)
-    assert stale.controls[0].status is ControlStatus.EVIDENCE_STALE and not stale.compliant
-    assert failed.controls[0].status is ControlStatus.FAILED and not failed.compliant
+    reg, ctrl = registry()
+    stale = reg.assess(
+        (evidence(ctrl, observed_at=NOW - timedelta(seconds=3601)),),
+        at=NOW,
+    )
+    failed = reg.assess(
+        (evidence(ctrl, result=EvidenceResult.FAIL),),
+        at=NOW,
+    )
+    assert stale.controls[0].status is ControlStatus.EVIDENCE_STALE
+    assert failed.controls[0].status is ControlStatus.FAILED
+    assert not stale.compliant
+    assert not failed.compliant
 
-def test_fresh_pass_and_not_applicable_are_explicit():
-    registry,ctrl=setup_registry(); now=datetime(2026,1,1,tzinfo=timezone.utc)
-    assert registry.assess((evidence(ctrl,now),),at=now).compliant
-    req=ComplianceRequirement("REQ-X","policy.x","Out of scope","owner.x",RequirementDisposition.NOT_APPLICABLE,"disabled")
-    c=ComplianceControl("CTRL-X","owner.x",("REQ-X",),60,"Applicability control")
-    assert ComplianceRegistry((req,),(c,)).assess((),at=now).controls[0].status is ControlStatus.NOT_APPLICABLE
 
-def test_uncontrolled_required_requirement_is_rejected():
-    req=ComplianceRequirement("REQ-1","policy.x","Must be controlled","owner.a"); other=ComplianceRequirement("REQ-2","policy.x","Other","owner.b",RequirementDisposition.NOT_APPLICABLE,"excluded"); c=ComplianceControl("CTRL-2","owner.b",("REQ-2",),60,"Other control")
-    with pytest.raises(ComplianceError,match="lacks control"): ComplianceRegistry((req,other),(c,))
+def test_fresh_identity_bound_pass_is_compliant():
+    reg, ctrl = registry()
+    assessment = reg.assess((evidence(ctrl),), at=NOW)
+    assert assessment.controls[0].status is ControlStatus.SATISFIED
+    assert assessment.compliant
 
-def test_future_and_unknown_evidence_fail_closed():
-    registry,ctrl=setup_registry(); now=datetime(2026,1,1,tzinfo=timezone.utc)
-    assert registry.assess((evidence(ctrl,now+timedelta(seconds=1)),),at=now).controls[0].status is ControlStatus.EVIDENCE_MISSING
-    with pytest.raises(ComplianceError,match="unknown control"): registry.assess((evidence(ctrl,now,control_id="CTRL-X"),),at=now)
+
+def test_stale_applicability_review_blocks_even_fresh_passing_evidence():
+    req = requirement(
+        reviewed_at=NOW - timedelta(days=2),
+        review_ttl_seconds=86400,
+    )
+    reg, ctrl = registry(req=req)
+    assessment = reg.assess((evidence(ctrl),), at=NOW)
+    assert assessment.controls[0].status is ControlStatus.APPLICABILITY_STALE
+    assert assessment.controls[0].evidence_digest is None
+    assert not assessment.compliant
+
+
+def test_future_dated_legal_review_fails_closed():
+    req = requirement(reviewed_at=NOW + timedelta(seconds=1))
+    reg, ctrl = registry(req=req)
+    assessment = reg.assess((), at=NOW)
+    assert assessment.controls[0].status is ControlStatus.APPLICABILITY_STALE
+    assert not assessment.compliant
+
+
+def test_review_only_legal_interpretation_cannot_be_auto_satisfied():
+    req = requirement()
+    ctrl = control(mode=EnforcementMode.REVIEW_ONLY)
+    reg = ComplianceRegistry((req,), (ctrl,))
+    assessment = reg.assess((evidence(ctrl),), at=NOW)
+    assert assessment.controls[0].status is ControlStatus.REVIEW_REQUIRED
+    assert assessment.controls[0].evidence_digest is None
+    assert not assessment.compliant
+
+
+def test_reviewed_not_applicable_is_explicit_and_requires_current_review():
+    req = requirement(disposition=RequirementDisposition.NOT_APPLICABLE)
+    reg, _ = registry(req=req)
+    assessment = reg.assess((), at=NOW)
+    assert assessment.controls[0].status is ControlStatus.NOT_APPLICABLE
+    assert assessment.compliant
+
+    stale = requirement(
+        disposition=RequirementDisposition.NOT_APPLICABLE,
+        reviewed_at=NOW - timedelta(days=2),
+        review_ttl_seconds=86400,
+    )
+    stale_reg, _ = registry(req=stale)
+    stale_assessment = stale_reg.assess((), at=NOW)
+    assert stale_assessment.controls[0].status is ControlStatus.APPLICABILITY_STALE
+    assert not stale_assessment.compliant
+
+
+def test_unknown_control_evidence_is_rejected():
+    reg, ctrl = registry()
+    with pytest.raises(ComplianceError, match="unknown control"):
+        reg.assess((evidence(ctrl, control_id="CTRL-X"),), at=NOW)
+
+
+def test_duplicate_ids_and_unknown_requirement_mapping_are_rejected():
+    req = requirement()
+    ctrl = control()
+    with pytest.raises(ComplianceError, match="duplicate requirement"):
+        ComplianceRegistry((req, req), (ctrl,))
+    bad = control(("REQ-X",))
+    with pytest.raises(ComplianceError, match="unknown requirement"):
+        ComplianceRegistry((req,), (bad,))
+
+
+def test_noncanonical_time_precision_and_digest_are_rejected():
+    with pytest.raises(ComplianceError, match="whole-second"):
+        requirement(reviewed_at=NOW.replace(microsecond=1))
+    reg, ctrl = registry()
+    del reg
+    with pytest.raises(ComplianceError, match="sha256"):
+        evidence(ctrl, artifact_digest="A" * 64)
+
+
+def test_canonical_and_governed_ai_mirror_are_byte_identical():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    canonical = root / "skeleton/contracts/compliance.py"
+    mirror = root / "skeleton/ai/runtime/contracts/compliance.py"
+    assert canonical.read_bytes() == mirror.read_bytes()
