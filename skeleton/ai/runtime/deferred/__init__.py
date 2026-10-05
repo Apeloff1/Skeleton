@@ -16,6 +16,13 @@ from .executor import (
     ExecutionReceipt,
     FailureReceipt,
 )
+from .simulation_mode import (
+    SimulationAuthority,
+    SimulationEvidence,
+    SimulationRequest,
+    SimulationResult,
+    SimulationRuntime,
+)
 from .journal import (
     DeferredExecutionJournal,
     DeferredJournalConflict,
@@ -42,6 +49,11 @@ __all__ = [
     "ExecutionReceipt",
     "FailureReceipt",
     "SqliteDeferredExecutionJournal",
+    "SimulationAuthority",
+    "SimulationEvidence",
+    "SimulationRequest",
+    "SimulationResult",
+    "SimulationRuntime",
     "build_registry",
     "volume_ids",
 ]
