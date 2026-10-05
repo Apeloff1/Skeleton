@@ -80,6 +80,7 @@ class ControlSignal: adjustment:float; bounded:bool
 @dataclass(frozen=True,slots=True)
 class AutonomyController: gain:float; max_adjustment:float
 def control(c,s,*,policy_allowed,authority_allowed):
+ if c.gain<0 or c.max_adjustment<0 or s.resource_remaining<0:raise ValueError("invalid autonomy control bounds")
  if not policy_allowed or not authority_allowed or s.resource_remaining<=0:return ControlSignal(0,True)
  raw=c.gain*(s.target-s.measured);return ControlSignal(max(-c.max_adjustment,min(c.max_adjustment,raw)),True)
 @dataclass(frozen=True,slots=True)
@@ -89,5 +90,7 @@ class AutonomyEscalation: request_id:str; requested_authority:frozenset[str]; ev
 @dataclass(frozen=True,slots=True)
 class EscalationGrant: request_id:str; authority:frozenset[str]; expires_at:str; revoked:bool=False
 def grant_escalation(r,expires_at):
+ if not r.request_id or not expires_at or not r.requested_authority:return None
+ if any(not a for a in r.requested_authority):return None
  if not r.evidence.eligibility or not r.evidence.approval_receipt:return None
  return EscalationGrant(r.request_id,r.requested_authority,expires_at)
