@@ -63,4 +63,5 @@ def review_workspace(receipt:WorkspaceReceipt,*,proposer_id:str,reviewer_id:str,
 
 def verify_review(workspace:WorkspaceReceipt,review:ReviewReceipt)->bool:
     if not isinstance(workspace,WorkspaceReceipt) or not isinstance(review,ReviewReceipt): return False
+    if review.decision != "approve" or any(finding.blocking for finding in review.findings): return False
     return hmac.compare_digest(workspace.result_digest,review.workspace_result_digest) and hmac.compare_digest(workspace.operation_digest,review.workspace_operation_digest)
