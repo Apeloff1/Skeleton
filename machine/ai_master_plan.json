@@ -2065,7 +2065,12 @@
         "planned:deletion completeness drill",
         "planned:provider-data-minimization audit"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/pull/2942",
+        "https://github.com/Apeloff1/Skeleton/commit/3236db1474412b5b0108629159a24f6bc3149a24",
+        "skeleton/vault/deletion_proof.py",
+        "skeleton/testing/test_vol027_privacy_completion.py"
+      ],
       "risks": [
         "derived data survives deletion",
         "backup retains sensitive data",
@@ -5063,7 +5068,13 @@
         "skeleton/testing/test_simulation_authority_boundary.py",
         "skeleton/testing/test_vol073_scenario_runtime.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/pull/2945",
+        "https://github.com/Apeloff1/Skeleton/commit/bf8a3c44fa6bc300b8a54b99cd82a0ccaf4256dd",
+        "skeleton/simulation/scenario_runtime.py",
+        "skeleton/ai/simulation/scenario_runtime.py",
+        "skeleton/testing/test_vol073_scenario_runtime.py"
+      ],
       "risks": [
         "simulation/real confusion",
         "unbounded rollouts",
@@ -6072,7 +6083,13 @@
       "evaluations": [
         "skeleton/testing/test_vol088_compliance.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/pull/2944",
+        "https://github.com/Apeloff1/Skeleton/commit/a440985361657ffe91069151eac6e7631848367e",
+        "skeleton/contracts/compliance.py",
+        "skeleton/ai/runtime/contracts/compliance.py",
+        "skeleton/testing/test_vol088_compliance.py"
+      ],
       "risks": [
         "overbroad legal assumptions",
         "missing evidence",
@@ -6220,7 +6237,13 @@
         "skeleton/testing/test_vol091_runbooks.py",
         "scripts/validate_runbook.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/pull/2941",
+        "https://github.com/Apeloff1/Skeleton/commit/24ff16f5eedd235a50a569d59b33cc6f51cd25e5",
+        "skeleton/observability/runbooks.py",
+        "skeleton/ai/runtime/observability/runbooks.py",
+        "skeleton/testing/test_vol091_runbooks.py"
+      ],
       "risks": [
         "stale commands",
         "missing escalation",
@@ -6472,7 +6495,12 @@
       "evaluations": [
         "skeleton/testing/test_vs000_foundation_recovery.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/pull/2940",
+        "https://github.com/Apeloff1/Skeleton/commit/a80c3ccba5acc70fe9ac4da2cd52d0f409c81003",
+        "skeleton/persistence/foundation_recovery.py",
+        "skeleton/testing/test_vs000_foundation_recovery.py"
+      ],
       "risks": [
         "unrecoverable state",
         "duplicate event replay",
@@ -6920,7 +6948,10 @@
         "skeleton/eval/functional_acceptance.py",
         "skeleton/testing/test_functional_ai_acceptance.py",
         "https://github.com/Apeloff1/Skeleton/pull/2923",
-        "https://github.com/Apeloff1/Skeleton/commit/a0cb5a4bc2a082b66de0dbd21a20ee7ad4eee325"
+        "https://github.com/Apeloff1/Skeleton/commit/a0cb5a4bc2a082b66de0dbd21a20ee7ad4eee325",
+        "https://github.com/Apeloff1/Skeleton/pull/2938",
+        "https://github.com/Apeloff1/Skeleton/commit/f9abe9dbab87ea5cffc0ae354e7b08228674c5b7",
+        "skeleton/ai/evaluation/functional_acceptance.py"
       ],
       "risks": [
         "demo-only acceptance",
@@ -7231,7 +7262,13 @@
       "evaluations": [
         "skeleton/testing/test_vol110_definition_of_done.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/pull/2939",
+        "https://github.com/Apeloff1/Skeleton/commit/6eaa351e6667a5ee47128bcd0ba66d7e86bf4bf1",
+        "skeleton/contracts/definition_of_done.py",
+        "skeleton/ai/runtime/contracts/definition_of_done.py",
+        "skeleton/testing/test_vol110_definition_of_done.py"
+      ],
       "risks": [
         "checkbox completion",
         "evidence omission",
