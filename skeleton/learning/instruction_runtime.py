@@ -520,8 +520,15 @@ class LearnerStateEstimator:
             elif record.kind is LearnerEvidenceKind.RETENTION:
                 retention_evidence += 1
 
-            latest_success = record.success
             last_observed_at = record.observed_at
+
+        if records:
+            assert last_observed_at is not None
+            latest_success = all(
+                record.success
+                for record in records
+                if record.observed_at == last_observed_at
+            )
 
         total = alpha + beta
         mastery = alpha / total
