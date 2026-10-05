@@ -459,22 +459,30 @@
       "id": "ACC-VOL-002",
       "type": "volume",
       "title": "VOL-002 System Architecture",
-      "status": "unverified",
+      "status": "implemented",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-10-05T17:03:00Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-10-05T17:03:00Z",
+        "git_sha": "bb080fccd082fe969d695b82190be992e3b2aed3",
+        "evidence_refs": [
+          "docs/ARCHITECTURE_MAP.md",
+          "git-head:d4334086eaf1c7cbbff46890b727fc954fde1677",
+          "https://github.com/Apeloff1/Skeleton/commit/d4334086eaf1c7cbbff46890b727fc954fde1677",
+          "machine/architecture.json",
+          "scripts/check_architecture_map.py",
+          "skeleton/testing/test_architecture_map.py",
+          "tests/test_architecture_boundaries.py"
+        ],
+        "statement": "Retroactively implementation-signed from landed runtime/test surfaces and concrete commit lineage. Existing masterplan gaps remain open; this grants no independent verification or completion.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/bb080fccd082fe969d695b82190be992e3b2aed3"
       },
       "verification_signoff": {
         "signed": false,
@@ -490,9 +498,58 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-10-05T17:03:00Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T17:03:00Z",
+          "git_sha": "bb080fccd082fe969d695b82190be992e3b2aed3",
+          "statement": "Begin retroactive implementation-accountability reconciliation from landed repository state.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/bb080fccd082fe969d695b82190be992e3b2aed3",
+          "from_status": "unverified",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/d4334086eaf1c7cbbff46890b727fc954fde1677"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T17:03:00Z",
+          "git_sha": "bb080fccd082fe969d695b82190be992e3b2aed3",
+          "statement": "Retroactively implementation-signed from landed runtime/test surfaces and concrete commit lineage. Existing masterplan gaps remain open; this grants no independent verification or completion.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/bb080fccd082fe969d695b82190be992e3b2aed3",
+          "from_status": "in_progress",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "docs/ARCHITECTURE_MAP.md",
+            "git-head:d4334086eaf1c7cbbff46890b727fc954fde1677",
+            "https://github.com/Apeloff1/Skeleton/commit/d4334086eaf1c7cbbff46890b727fc954fde1677",
+            "machine/architecture.json",
+            "scripts/check_architecture_map.py",
+            "skeleton/testing/test_architecture_map.py",
+            "tests/test_architecture_boundaries.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/ARCHITECTURE_MAP.md",
+        "git-head:d4334086eaf1c7cbbff46890b727fc954fde1677",
+        "https://github.com/Apeloff1/Skeleton/commit/d4334086eaf1c7cbbff46890b727fc954fde1677",
+        "machine/architecture.json",
+        "scripts/check_architecture_map.py",
+        "skeleton/testing/test_architecture_map.py",
+        "tests/test_architecture_boundaries.py"
+      ],
       "baseline_status": "unverified"
     },
     {
@@ -539,22 +596,32 @@
       "id": "ACC-VOL-004",
       "type": "volume",
       "title": "VOL-004 Kernel & Execution Foundation",
-      "status": "unverified",
+      "status": "implemented",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-10-05T17:03:00Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-10-05T17:03:00Z",
+        "git_sha": "bb080fccd082fe969d695b82190be992e3b2aed3",
+        "evidence_refs": [
+          "git-head:be408977891328b78522074c1fe693267b01ce5b",
+          "https://github.com/Apeloff1/Skeleton/commit/be408977891328b78522074c1fe693267b01ce5b",
+          "machine/manifest.json",
+          "skeleton/api/server.py",
+          "skeleton/app",
+          "skeleton/persistence/operation_runtime.py",
+          "skeleton/testing/test_app_assembly.py",
+          "skeleton/testing/test_operation_runtime.py",
+          "skeleton/testing/test_operation_server_binding.py"
+        ],
+        "statement": "Retroactively implementation-signed from landed runtime/test surfaces and concrete commit lineage. Existing masterplan gaps remain open; this grants no independent verification or completion.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/bb080fccd082fe969d695b82190be992e3b2aed3"
       },
       "verification_signoff": {
         "signed": false,
@@ -570,31 +637,94 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-10-05T17:03:00Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T17:03:00Z",
+          "git_sha": "bb080fccd082fe969d695b82190be992e3b2aed3",
+          "statement": "Begin retroactive implementation-accountability reconciliation from landed repository state.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/bb080fccd082fe969d695b82190be992e3b2aed3",
+          "from_status": "unverified",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/be408977891328b78522074c1fe693267b01ce5b"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T17:03:00Z",
+          "git_sha": "bb080fccd082fe969d695b82190be992e3b2aed3",
+          "statement": "Retroactively implementation-signed from landed runtime/test surfaces and concrete commit lineage. Existing masterplan gaps remain open; this grants no independent verification or completion.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/bb080fccd082fe969d695b82190be992e3b2aed3",
+          "from_status": "in_progress",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "git-head:be408977891328b78522074c1fe693267b01ce5b",
+            "https://github.com/Apeloff1/Skeleton/commit/be408977891328b78522074c1fe693267b01ce5b",
+            "machine/manifest.json",
+            "skeleton/api/server.py",
+            "skeleton/app",
+            "skeleton/persistence/operation_runtime.py",
+            "skeleton/testing/test_app_assembly.py",
+            "skeleton/testing/test_operation_runtime.py",
+            "skeleton/testing/test_operation_server_binding.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "git-head:be408977891328b78522074c1fe693267b01ce5b",
+        "https://github.com/Apeloff1/Skeleton/commit/be408977891328b78522074c1fe693267b01ce5b",
+        "machine/manifest.json",
+        "skeleton/api/server.py",
+        "skeleton/app",
+        "skeleton/persistence/operation_runtime.py",
+        "skeleton/testing/test_app_assembly.py",
+        "skeleton/testing/test_operation_runtime.py",
+        "skeleton/testing/test_operation_server_binding.py"
+      ],
       "baseline_status": "unverified"
     },
     {
       "id": "ACC-VOL-005",
       "type": "volume",
       "title": "VOL-005 Data & Persistence",
-      "status": "unverified",
+      "status": "implemented",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-10-05T17:03:00Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-10-05T17:03:00Z",
+        "git_sha": "bb080fccd082fe969d695b82190be992e3b2aed3",
+        "evidence_refs": [
+          "backend/services/database.py",
+          "backend/tests/test_rag_state_authority.py",
+          "git-head:f9053d8c9a2dfddcff431a4ff37863a5d962eded",
+          "https://github.com/Apeloff1/Skeleton/commit/f9053d8c9a2dfddcff431a4ff37863a5d962eded",
+          "machine/state_topology.json",
+          "scripts/state_recovery_drill.py",
+          "skeleton/persistence",
+          "skeleton/testing/test_operation_store.py",
+          "skeleton/testing/test_state_recovery_drill.py"
+        ],
+        "statement": "Retroactively implementation-signed from landed runtime/test surfaces and concrete commit lineage. Existing masterplan gaps remain open; this grants no independent verification or completion.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/bb080fccd082fe969d695b82190be992e3b2aed3"
       },
       "verification_signoff": {
         "signed": false,
@@ -610,9 +740,62 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-10-05T17:03:00Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T17:03:00Z",
+          "git_sha": "bb080fccd082fe969d695b82190be992e3b2aed3",
+          "statement": "Begin retroactive implementation-accountability reconciliation from landed repository state.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/bb080fccd082fe969d695b82190be992e3b2aed3",
+          "from_status": "unverified",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/f9053d8c9a2dfddcff431a4ff37863a5d962eded"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T17:03:00Z",
+          "git_sha": "bb080fccd082fe969d695b82190be992e3b2aed3",
+          "statement": "Retroactively implementation-signed from landed runtime/test surfaces and concrete commit lineage. Existing masterplan gaps remain open; this grants no independent verification or completion.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/bb080fccd082fe969d695b82190be992e3b2aed3",
+          "from_status": "in_progress",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "backend/services/database.py",
+            "backend/tests/test_rag_state_authority.py",
+            "git-head:f9053d8c9a2dfddcff431a4ff37863a5d962eded",
+            "https://github.com/Apeloff1/Skeleton/commit/f9053d8c9a2dfddcff431a4ff37863a5d962eded",
+            "machine/state_topology.json",
+            "scripts/state_recovery_drill.py",
+            "skeleton/persistence",
+            "skeleton/testing/test_operation_store.py",
+            "skeleton/testing/test_state_recovery_drill.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "backend/services/database.py",
+        "backend/tests/test_rag_state_authority.py",
+        "git-head:f9053d8c9a2dfddcff431a4ff37863a5d962eded",
+        "https://github.com/Apeloff1/Skeleton/commit/f9053d8c9a2dfddcff431a4ff37863a5d962eded",
+        "machine/state_topology.json",
+        "scripts/state_recovery_drill.py",
+        "skeleton/persistence",
+        "skeleton/testing/test_operation_store.py",
+        "skeleton/testing/test_state_recovery_drill.py"
+      ],
       "baseline_status": "unverified"
     },
     {
@@ -30113,22 +30296,31 @@
       "id": "ACC-VOL-364",
       "type": "volume",
       "title": "VOL-364 Memory Versioning",
-      "status": "unverified",
+      "status": "implemented",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-10-05T17:03:00Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-10-05T17:03:00Z",
+        "git_sha": "bb080fccd082fe969d695b82190be992e3b2aed3",
+        "evidence_refs": [
+          "git-head:39f4b48424133d3823c1d9dc17952135778852fc",
+          "https://github.com/Apeloff1/Skeleton/commit/39f4b48424133d3823c1d9dc17952135778852fc",
+          "skeleton/ai",
+          "skeleton/contracts/memory_record.py",
+          "skeleton/persistence",
+          "skeleton/persistence/memory_repository.py",
+          "skeleton/testing/test_memory_repository.py",
+          "skeleton/testing/test_mongo_memory_repository.py"
+        ],
+        "statement": "Retroactively implementation-signed from landed runtime/test surfaces and concrete commit lineage. Existing masterplan gaps remain open; this grants no independent verification or completion.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/bb080fccd082fe969d695b82190be992e3b2aed3"
       },
       "verification_signoff": {
         "signed": false,
@@ -30144,31 +30336,90 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-10-05T17:03:00Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T17:03:00Z",
+          "git_sha": "bb080fccd082fe969d695b82190be992e3b2aed3",
+          "statement": "Begin retroactive implementation-accountability reconciliation from landed repository state.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/bb080fccd082fe969d695b82190be992e3b2aed3",
+          "from_status": "unverified",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/39f4b48424133d3823c1d9dc17952135778852fc"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T17:03:00Z",
+          "git_sha": "bb080fccd082fe969d695b82190be992e3b2aed3",
+          "statement": "Retroactively implementation-signed from landed runtime/test surfaces and concrete commit lineage. Existing masterplan gaps remain open; this grants no independent verification or completion.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/bb080fccd082fe969d695b82190be992e3b2aed3",
+          "from_status": "in_progress",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "git-head:39f4b48424133d3823c1d9dc17952135778852fc",
+            "https://github.com/Apeloff1/Skeleton/commit/39f4b48424133d3823c1d9dc17952135778852fc",
+            "skeleton/ai",
+            "skeleton/contracts/memory_record.py",
+            "skeleton/persistence",
+            "skeleton/persistence/memory_repository.py",
+            "skeleton/testing/test_memory_repository.py",
+            "skeleton/testing/test_mongo_memory_repository.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "git-head:39f4b48424133d3823c1d9dc17952135778852fc",
+        "https://github.com/Apeloff1/Skeleton/commit/39f4b48424133d3823c1d9dc17952135778852fc",
+        "skeleton/ai",
+        "skeleton/contracts/memory_record.py",
+        "skeleton/persistence",
+        "skeleton/persistence/memory_repository.py",
+        "skeleton/testing/test_memory_repository.py",
+        "skeleton/testing/test_mongo_memory_repository.py"
+      ],
       "baseline_status": "unverified"
     },
     {
       "id": "ACC-VOL-365",
       "type": "volume",
       "title": "VOL-365 Memory Reconciliation",
-      "status": "unverified",
+      "status": "implemented",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-10-05T17:03:00Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-10-05T17:03:00Z",
+        "git_sha": "bb080fccd082fe969d695b82190be992e3b2aed3",
+        "evidence_refs": [
+          "git-head:fb6b42094c41139d866ebbbdce402f51af7dd140",
+          "https://github.com/Apeloff1/Skeleton/commit/fb6b42094c41139d866ebbbdce402f51af7dd140",
+          "skeleton/ai",
+          "skeleton/eval",
+          "skeleton/memory/reconciliation.py",
+          "skeleton/persistence/memory_repository.py",
+          "tests/test_memory_reconciliation.py"
+        ],
+        "statement": "Retroactively implementation-signed from landed runtime/test surfaces and concrete commit lineage. Existing masterplan gaps remain open; this grants no independent verification or completion.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/bb080fccd082fe969d695b82190be992e3b2aed3"
       },
       "verification_signoff": {
         "signed": false,
@@ -30184,9 +30435,58 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-10-05T17:03:00Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T17:03:00Z",
+          "git_sha": "bb080fccd082fe969d695b82190be992e3b2aed3",
+          "statement": "Begin retroactive implementation-accountability reconciliation from landed repository state.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/bb080fccd082fe969d695b82190be992e3b2aed3",
+          "from_status": "unverified",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/fb6b42094c41139d866ebbbdce402f51af7dd140"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T17:03:00Z",
+          "git_sha": "bb080fccd082fe969d695b82190be992e3b2aed3",
+          "statement": "Retroactively implementation-signed from landed runtime/test surfaces and concrete commit lineage. Existing masterplan gaps remain open; this grants no independent verification or completion.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/bb080fccd082fe969d695b82190be992e3b2aed3",
+          "from_status": "in_progress",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "git-head:fb6b42094c41139d866ebbbdce402f51af7dd140",
+            "https://github.com/Apeloff1/Skeleton/commit/fb6b42094c41139d866ebbbdce402f51af7dd140",
+            "skeleton/ai",
+            "skeleton/eval",
+            "skeleton/memory/reconciliation.py",
+            "skeleton/persistence/memory_repository.py",
+            "tests/test_memory_reconciliation.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "git-head:fb6b42094c41139d866ebbbdce402f51af7dd140",
+        "https://github.com/Apeloff1/Skeleton/commit/fb6b42094c41139d866ebbbdce402f51af7dd140",
+        "skeleton/ai",
+        "skeleton/eval",
+        "skeleton/memory/reconciliation.py",
+        "skeleton/persistence/memory_repository.py",
+        "tests/test_memory_reconciliation.py"
+      ],
       "baseline_status": "unverified"
     },
     {
