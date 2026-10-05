@@ -10,7 +10,7 @@ import sys
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "skeleton/jeeves/evidence_response.py"
 SPEC = importlib.util.spec_from_file_location("vol072_evidence_response_test", MODULE_PATH)
 assert SPEC and SPEC.loader
