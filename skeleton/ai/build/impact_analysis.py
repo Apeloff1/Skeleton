@@ -6,8 +6,10 @@ class ImpactEvidence: source:str; edge_count:int; complete:bool
 @dataclass(frozen=True)
 class ImpactSet: affected:tuple[str,...]; owners:tuple[str,...]; tests:tuple[str,...]; uncertainty:float; evidence:tuple[ImpactEvidence,...]
 def analyze_impact(q,graphs,owners,tests):
+ if not q.changed or any(not x for x in q.changed) or len(q.changed)!=len(set(q.changed)):raise ValueError("unique changed artifact identities required")
  affected=set(q.changed);ev=[];complete=True
  for name,g,is_complete in graphs:
+  if not name or not isinstance(is_complete,bool):raise ValueError("graph evidence identity/completeness required")
   ev.append(ImpactEvidence(name,sum(len(v) for v in g.values()),is_complete));complete &= is_complete
   frontier=list(affected)
   while frontier:
