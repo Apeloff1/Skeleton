@@ -331,10 +331,7 @@ _DEFAULT_HAZARDS = (
         SafetyHazardClass.SENSITIVE_DATA_EXPOSURE,
         "An action may expose or mutate sensitive data outside its intended boundary.",
         SafetyHazardSeverity.CRITICAL,
-        (
-            "data.sensitive",
-            "effect.external_persistent",
-        ),
+        ("data.sensitive",),
         (
             "data-governance",
             "human-approval",
