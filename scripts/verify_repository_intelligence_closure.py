@@ -33,6 +33,19 @@ GRAPH_TEST = "skeleton/testing/test_vol021_repository_graph.py"
 EXTRACTION_TEST = "skeleton/testing/test_vol021_source_extraction.py"
 GIT_INDEX_TEST = "skeleton/testing/test_repo_intelligence_git_index.py"
 WORKFLOW = ".github/workflows/repository-intelligence-closure.yml"
+WORKFLOW_REQUIRED_PATHS = (
+    CANONICAL_GRAPH,
+    MIRROR_GRAPH,
+    CANONICAL_EXTRACTOR,
+    MIRROR_EXTRACTOR,
+    CANONICAL_PLANNER,
+    MIRROR_PLANNER,
+    GRAPH_TEST,
+    EXTRACTION_TEST,
+    GIT_INDEX_TEST,
+    "scripts/verify_repository_intelligence_closure.py",
+    "tests/test_repository_intelligence_independent_verifier.py",
+)
 
 REQUIRED_GRAPH_TOKENS = (
     "class FileNode",
@@ -381,6 +394,7 @@ def verify_repository(
         GRAPH_TEST,
         EXTRACTION_TEST,
         GIT_INDEX_TEST,
+        WORKFLOW,
         "machine/ai_master_plan.json",
     )
     for relative in required_paths:
@@ -405,6 +419,14 @@ def verify_repository(
     for token in REQUIRED_PLANNER_TOKENS:
         if token not in texts.get(CANONICAL_PLANNER, ""):
             errors.append(f"{CANONICAL_PLANNER} lost required token: {token}")
+
+    if (root / WORKFLOW).is_file():
+        workflow = _read(root, WORKFLOW)
+        for required in WORKFLOW_REQUIRED_PATHS:
+            if required not in workflow:
+                errors.append(
+                    f"{WORKFLOW} lost repository-intelligence coverage: {required}"
+                )
 
     if "json.dumps" in texts.get(CANONICAL_GRAPH, ""):
         errors.append(
@@ -489,7 +511,7 @@ def verify_repository(
     _validate_behavior(observed_behavior, errors)
 
     boundary_digests: dict[str, str] = {}
-    for relative in required_paths + (WORKFLOW, __file_relative()):
+    for relative in required_paths + (__file_relative(),):
         path = root / relative
         if path.is_file():
             boundary_digests[relative] = hashlib.sha256(
