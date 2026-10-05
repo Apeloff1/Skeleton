@@ -12504,7 +12504,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-10-05T00:39:36Z",
+      "last_event_at_utc": "2026-10-05T18:14:55Z",
       "history": [
         {
           "sequence": 1,
@@ -12551,6 +12551,27 @@
             "skeleton/testing/test_vol081_formal_methods.py",
             "machine/ai_file_tree.json"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "evidence_refreshed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "evidence-steward",
+          "at_utc": "2026-10-05T18:14:55Z",
+          "git_sha": "dae3b8ed3985201b727da92cfe4623d7837ccf57",
+          "statement": "Bind adversarial formal-method hardening that requires complete bounded exploration before aggregate all-obligations-proved authority can be true. This strengthens implementation evidence only; independent verification and completion remain unsigned.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/dae3b8ed3985201b727da92cfe4623d7837ccf57",
+          "from_status": "implemented",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2951",
+            "https://github.com/Apeloff1/Skeleton/commit/dae3b8ed3985201b727da92cfe4623d7837ccf57",
+            "skeleton/contracts/formal_methods.py",
+            "skeleton/ai/runtime/contracts/formal_methods.py",
+            "skeleton/testing/test_vol081_formal_methods.py"
+          ]
         }
       ],
       "evidence": [
@@ -12565,7 +12586,9 @@
         "skeleton/contracts/operation.py",
         "skeleton/contracts/protocol.py",
         "skeleton/testing/test_vol081_formal_methods.py",
-        "machine/ai_file_tree.json"
+        "machine/ai_file_tree.json",
+        "https://github.com/Apeloff1/Skeleton/pull/2951",
+        "https://github.com/Apeloff1/Skeleton/commit/dae3b8ed3985201b727da92cfe4623d7837ccf57"
       ],
       "baseline_status": "unverified"
     },
