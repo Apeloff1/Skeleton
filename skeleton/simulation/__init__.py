@@ -7,6 +7,14 @@ from .environment import (
     SimulationBoundaryError,
     SimulationEvidence,
 )
+from .authority import (
+    RolloutRequest,
+    SimulationAuthorityError,
+    SimulationAuthorityGuard,
+    SimulationPermit,
+    SimulationResourceBudget,
+)
+from .world import SimulationAction, WorldRule, WorldRules
 from .world_model import (
     Assumption,
     AssumptionSet,
@@ -27,6 +35,14 @@ __all__ = [
     "EnvironmentTransition",
     "SimulationBoundaryError",
     "SimulationEvidence",
+    "RolloutRequest",
+    "SimulationAuthorityError",
+    "SimulationAuthorityGuard",
+    "SimulationPermit",
+    "SimulationResourceBudget",
+    "SimulationAction",
+    "WorldRule",
+    "WorldRules",
     "Assumption",
     "AssumptionSet",
     "CounterfactualResult",
