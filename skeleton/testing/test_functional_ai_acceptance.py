@@ -20,3 +20,13 @@ def test_signoff_binds_exact_source_config_model_environment_bundle():
 def test_duplicate_evidence_identity_rejected():
  ev=list(evidence());ev[-1]=AcceptanceEvidence(ev[0].evidence_id,ev[-1].criterion,ev[-1].artifact_digest,True)
  with pytest.raises(AcceptanceError,match="duplicate"):bundle(tuple(ev))
+
+def test_evidence_runtime_types_fail_closed():
+ with pytest.raises(AcceptanceError,match="criterion must be Criterion"):AcceptanceEvidence("EVID.X","security",S("x"),True)
+ with pytest.raises(AcceptanceError,match="passed must be bool"):AcceptanceEvidence("EVID.X",Criterion.SECURITY,S("x"),1)
+ with pytest.raises(AcceptanceError,match="bounded tuple"):AcceptanceEvidence("EVID.X",Criterion.SECURITY,S("x"),True,["bad"])
+def test_signoff_approval_is_strict_boolean():
+ b=bundle()
+ with pytest.raises(AcceptanceError,match="approved must be bool"):AcceptanceSignoff(b.digest,"ACTOR.REVIEWER",b.builder_id,1)
+def test_acceptance_evidence_collection_must_be_typed_tuple():
+ with pytest.raises(AcceptanceError,match="typed tuple"):FunctionalAIAcceptance("ACCEPT.X",S("s"),S("c"),S("m"),S("e"),list(evidence()),"ACTOR.BUILDER")
