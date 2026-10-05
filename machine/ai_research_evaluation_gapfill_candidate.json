@@ -1,0 +1,83 @@
+{
+  "schema_version": "skeleton.ai.research_evaluation_gapfill_candidate.v1",
+  "candidate_id": "P3-DEFERRED-RESEARCH-EVALUATION-01",
+  "status": "implementation_candidate",
+  "source_frontier": "machine/ai_masterplan_continuation_frontier.json",
+  "master_plan": "machine/ai_master_plan.json",
+  "ai_file_tree": "machine/ai_file_tree.json",
+  "source_queue_state": "queued_unmodified",
+  "volume_refs": [
+    "VOL-210","VOL-211","VOL-212","VOL-213","VOL-214","VOL-215",
+    "VOL-216","VOL-217","VOL-218","VOL-219","VOL-220"
+  ],
+  "primary_implementation_by_volume": {
+    "VOL-210": "skeleton/research/research_agent_team.py",
+    "VOL-211": "skeleton/research/literature_watch.py",
+    "VOL-212": "skeleton/research/citation_graph.py",
+    "VOL-213": "skeleton/artifacts/reproduction_package.py",
+    "VOL-214": "skeleton/eval/experiment_comparison.py",
+    "VOL-215": "skeleton/eval/statistical_analysis.py",
+    "VOL-216": "skeleton/eval/model_eval_harness.py",
+    "VOL-217": "skeleton/eval/agent_eval_harness.py",
+    "VOL-218": "skeleton/eval/long_horizon_benchmarks.py",
+    "VOL-219": "skeleton/eval/contamination_auditor.py",
+    "VOL-220": "skeleton/eval/human_evaluation.py"
+  },
+  "primary_test_by_volume": {
+    "VOL-210": "skeleton/testing/test_research_agent_team.py",
+    "VOL-211": "skeleton/testing/test_literature_watch.py",
+    "VOL-212": "skeleton/testing/test_citation_graph.py",
+    "VOL-213": "skeleton/testing/test_reproduction_packages.py",
+    "VOL-214": "skeleton/testing/test_experiment_comparison.py",
+    "VOL-215": "skeleton/testing/test_statistical_analysis.py",
+    "VOL-216": "skeleton/testing/test_model_eval_harness.py",
+    "VOL-217": "skeleton/testing/test_agent_eval_harness.py",
+    "VOL-218": "skeleton/testing/test_long_horizon_benchmarks.py",
+    "VOL-219": "skeleton/testing/test_contamination_auditor.py",
+    "VOL-220": "skeleton/testing/test_human_evaluation.py"
+  },
+  "shared_integration_module": "skeleton/eval/research_evaluation_review.py",
+  "shared_integration_test": "skeleton/testing/test_research_evaluation_review.py",
+  "cross_plane_tests": [
+    "skeleton/testing/test_long_horizon_autonomy.py",
+    "skeleton/testing/test_long_horizon_aging.py",
+    "skeleton/testing/test_citations.py"
+  ],
+  "mirror_pairs": [
+    ["skeleton/research/research_agent_team.py","skeleton/ai/research/research_agent_team.py"],
+    ["skeleton/research/literature_watch.py","skeleton/ai/research/literature_watch.py"],
+    ["skeleton/research/citation_graph.py","skeleton/ai/research/citation_graph.py"],
+    ["skeleton/artifacts/reproduction_package.py","skeleton/ai/runtime/extensions/artifacts/reproduction_package.py"],
+    ["skeleton/eval/experiment_comparison.py","skeleton/ai/evaluation/experiment_comparison.py"],
+    ["skeleton/eval/statistical_analysis.py","skeleton/ai/evaluation/statistical_analysis.py"],
+    ["skeleton/eval/model_eval_harness.py","skeleton/ai/evaluation/model_eval_harness.py"],
+    ["skeleton/eval/agent_eval_harness.py","skeleton/ai/evaluation/agent_eval_harness.py"],
+    ["skeleton/eval/long_horizon_benchmarks.py","skeleton/ai/evaluation/long_horizon_benchmarks.py"],
+    ["skeleton/eval/contamination_auditor.py","skeleton/ai/evaluation/contamination_auditor.py"],
+    ["skeleton/eval/human_evaluation.py","skeleton/ai/evaluation/human_evaluation.py"],
+    ["skeleton/eval/research_evaluation_review.py","skeleton/ai/evaluation/research_evaluation_review.py"]
+  ],
+  "mapping_ids": [
+    "AIFT-RESEARCH-AGENT-TEAM",
+    "AIFT-RESEARCH-LITERATURE-WATCH",
+    "AIFT-RESEARCH-CITATION-GRAPH",
+    "AIFT-ARTIFACTS",
+    "AIFT-EVALUATION"
+  ],
+  "evidence_policy": {
+    "exact_head_ci_required": true,
+    "independent_closure_required": true,
+    "queued_frontier_must_remain_unchanged": true,
+    "canonical_ai_mirror_parity_required": true,
+    "single_revision_review_required": true,
+    "independent_verifier_required": true,
+    "completion_may_not_be_self_granted": true
+  },
+  "promotion_state": {
+    "completion_checkbox": false,
+    "implementation_signed": false,
+    "verification_signed": false,
+    "may_self_close": false,
+    "production_authority": false
+  }
+}
