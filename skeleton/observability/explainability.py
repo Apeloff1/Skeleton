@@ -30,6 +30,7 @@ from uuid import UUID
 
 from skeleton.contracts.operation import OperationEnvelope, OperationState
 from skeleton.observability.redaction import REDACTED, redact_text
+from skeleton.observability.resilient_telemetry import ReconstructionReceipt
 
 EXPLANATION_SCHEMA = "skeleton.observability.explanation.v1"
 _MAX_FACTORS = 2048
@@ -63,6 +64,7 @@ class DecisionFactorKind(str, Enum):
     OBSERVED_INPUT = "observed_input"
     RULE = "rule"
     TOOL_RECEIPT = "tool_receipt"
+    EVIDENCE_RECEIPT = "evidence_receipt"
     MODEL_OUTPUT = "model_output"
     OPERATION_STATE = "operation_state"
     DERIVED_SUMMARY = "derived_summary"
@@ -945,6 +947,35 @@ class ExplanationLedger:
         )
 
 
+def factor_from_reconstruction_receipt(
+    *,
+    operation: OperationEnvelope,
+    factor_id: str,
+    receipt: ReconstructionReceipt,
+    summary: str,
+    observed_at: str,
+    relation: FactorRelation = FactorRelation.SUPPORTING_EVIDENCE,
+    sensitivity: FactorSensitivity = FactorSensitivity.SAFE,
+) -> DecisionFactor:
+    """Bind an explanation factor to an existing observability receipt."""
+
+    if not isinstance(operation, OperationEnvelope):
+        raise TypeError("operation must be OperationEnvelope")
+    if not isinstance(receipt, ReconstructionReceipt):
+        raise TypeError("receipt must be ReconstructionReceipt")
+    return DecisionFactor(
+        factor_id=factor_id,
+        operation_id=operation.operation_id,
+        kind=DecisionFactorKind.EVIDENCE_RECEIPT,
+        relation=relation,
+        summary=summary,
+        source_ref=f"telemetry:{receipt.kind}:{receipt.sequence}",
+        source_digest=receipt.event_digest,
+        observed_at=observed_at,
+        sensitivity=sensitivity,
+    )
+
+
 def source_digest(value: object) -> str:
     """Create a canonical digest for JSON-shaped source evidence.
 
@@ -968,5 +999,6 @@ __all__ = [
     "FactorRelation",
     "FactorSensitivity",
     "OperationProvenance",
+    "factor_from_reconstruction_receipt",
     "source_digest",
 ]
