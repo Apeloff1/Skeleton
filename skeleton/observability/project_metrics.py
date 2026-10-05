@@ -17,7 +17,7 @@ class MetricDefinition:
  metric_id:str;metric_class:MetricClass;unit:str;source_kind:str;completion_authority:bool=False
  def __post_init__(self):
   object.__setattr__(self,"metric_id",_id(self.metric_id,"metric_id"))
-  if not self.unit.strip() or not self.source_kind.strip():raise MetricError("metric unit and source required")
+  if not isinstance(self.metric_class,MetricClass):raise MetricError("metric_class must be MetricClass")\n  if not isinstance(self.unit,str) or not isinstance(self.source_kind,str) or not self.unit.strip() or not self.source_kind.strip():raise MetricError("metric unit and source required")\n  if not isinstance(self.completion_authority,bool):raise MetricError("completion_authority must be bool")
   if self.completion_authority:raise MetricError("diagnostic metric cannot be completion authority")
 @dataclass(frozen=True,slots=True)
 class MetricObservation:
