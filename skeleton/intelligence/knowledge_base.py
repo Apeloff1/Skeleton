@@ -7,12 +7,16 @@ relevant docs from doctor card alerts.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+from skeleton.contracts.canonical import canonical_json_bytes
+from skeleton.knowledge.store import KnowledgeClaim, KnowledgeEvidence, KnowledgeStore, VerificationState
 
 
 _DOC_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
@@ -46,8 +50,16 @@ class Document:
 class KnowledgeBase:
     """Versioned searchable document store."""
 
-    def __init__(self, root: Optional[Path] = None):
+    def __init__(self, root: Optional[Path] = None, *, claim_store: Optional[KnowledgeStore] = None, scope_key: Optional[str] = None):
         self.root = root or Path(".skeleton")
+        if (claim_store is None) != (scope_key is None):
+            raise KnowledgeError("claim_store and scope_key must be configured together")
+        if claim_store is not None and not isinstance(claim_store, KnowledgeStore):
+            raise TypeError("claim_store must be KnowledgeStore")
+        if scope_key is not None and (not isinstance(scope_key, str) or not scope_key.strip()):
+            raise KnowledgeError("scope_key must be non-empty")
+        self._claim_store = claim_store
+        self._scope_key = scope_key
         self._docs: Dict[str, Document] = {}
         self._file = self.root / "knowledge.json"
         self._load()
@@ -127,7 +139,40 @@ class KnowledgeBase:
         doc = self._document(doc_id, title, body, kept_tags, kept_subsystems, version, time.time_ns())
         self._docs[doc_id] = doc
         self._save()
+        self._record_claim(doc)
         return doc
+
+
+    def _record_claim(self, doc: Document) -> None:
+        """Project an operational document revision into the canonical claim store."""
+        if self._claim_store is None:
+            return
+        payload = {
+            "doc_id": doc.doc_id,
+            "title": doc.title,
+            "body": doc.body,
+            "tags": sorted(set(doc.tags)),
+            "subsystems": sorted(set(doc.subsystems)),
+            "version": doc.version,
+        }
+        content_digest = hashlib.sha256(canonical_json_bytes(payload)).hexdigest()
+        evidence = KnowledgeEvidence(
+            source=f"knowledge-base://{doc.doc_id}/v{doc.version}",
+            digest=content_digest,
+            observed_at=float(doc.updated_ns),
+        )
+        claim = KnowledgeClaim(
+            claim_id=f"knowledge-base:{doc.doc_id}:v{doc.version}",
+            scope_key=self._scope_key or "",
+            subject=f"knowledge-document:{doc.doc_id}",
+            predicate="revision",
+            value_digest=content_digest,
+            confidence=1.0,
+            verification=VerificationState.CORROBORATED,
+            evidence=(evidence,),
+            recorded_at=float(doc.updated_ns),
+        )
+        self._claim_store.record(claim)
 
     def get(self, doc_id: str) -> Optional[Document]:
         return self._docs.get(doc_id)
