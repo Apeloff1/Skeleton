@@ -169,6 +169,7 @@ class LearnerEvidence:
     hints_used: int
     source_ref: str
     response_digest: str
+    success_threshold: float = 0.5
     prior_attempt_id: str | None = None
 
     def __post_init__(self) -> None:
@@ -223,6 +224,16 @@ class LearnerEvidence:
             "response_digest",
             _sha256(self.response_digest, "response_digest"),
         )
+        object.__setattr__(
+            self,
+            "success_threshold",
+            _unit(self.success_threshold, "success_threshold"),
+        )
+        observed_success = self.score >= self.success_threshold
+        if self.success is not observed_success:
+            raise InstructionRuntimeError(
+                "success must match score against success_threshold"
+            )
 
         if self.kind is LearnerEvidenceKind.CORRECTION:
             if self.prior_attempt_id is None:
@@ -260,6 +271,7 @@ class LearnerEvidence:
                 "hints_used": self.hints_used,
                 "source_ref": self.source_ref,
                 "response_digest": self.response_digest,
+                "success_threshold": self.success_threshold,
                 "prior_attempt_id": self.prior_attempt_id,
             }
         )
@@ -1279,6 +1291,13 @@ class OutcomeEvaluator:
             if record.evidence_id in seen_ids:
                 raise InstructionRuntimeError(
                     "duplicate outcome evidence identity"
+                )
+            if (
+                before.last_observed_at is not None
+                and record.observed_at < before.last_observed_at
+            ):
+                raise InstructionRuntimeError(
+                    "new outcome evidence predates baseline state"
                 )
             seen_ids.add(record.evidence_id)
             records.append(record)
