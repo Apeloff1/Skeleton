@@ -65,6 +65,9 @@ class DataConsumer: consumer_id:str; contract_version:str
 @dataclass(frozen=True,slots=True)
 class DataContract: name:str; version:str; fields:tuple[DataField,...]; consumers:tuple[DataConsumer,...]
 def breaking_change(old,new,*,migration_declared):
+ for c in (old,new):
+  if not c.name or not c.version or any(not all((f.name,f.meaning,f.freshness,f.classification)) for f in c.fields) or len({f.name for f in c.fields})!=len(c.fields):raise ValueError("invalid data contract identity")
+  if any(not x.consumer_id or not x.contract_version for x in c.consumers) or len({x.consumer_id for x in c.consumers})!=len(c.consumers):raise ValueError("invalid data consumer identity")
  oldf={f.name:f for f in old.fields};newf={f.name:f for f in new.fields}
  breaking=any(n not in newf or oldf[n]!=newf[n] for n in oldf)
  return breaking and not migration_declared
