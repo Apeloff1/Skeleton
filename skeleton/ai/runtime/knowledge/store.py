@@ -8,12 +8,13 @@ retained and surfaced until an explicit, evidence-backed resolution is recorded.
 from __future__ import annotations
 
 import hashlib
-import json
 import math
 from dataclasses import dataclass
 from enum import Enum
 from threading import RLock
 from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
+
+from skeleton.contracts.canonical import CanonicalContractError, canonical_json_bytes
 
 STATE_VERSION = 1
 
@@ -45,10 +46,6 @@ def _confidence(value: Any) -> float:
     if not math.isfinite(value) or not 0.0 <= value <= 1.0:
         raise ValueError("confidence must be in [0, 1]")
     return value
-
-
-def _canonical(payload: Mapping[str, Any]) -> bytes:
-    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,7 +116,7 @@ class KnowledgeClaim:
 
     @property
     def identity(self) -> str:
-        return hashlib.sha256(_canonical(self.to_dict())).hexdigest()
+        return hashlib.sha256(canonical_json_bytes(self.to_dict())).hexdigest()
 
 
 @dataclass(frozen=True, slots=True)
@@ -161,14 +158,14 @@ class KnowledgeStore:
         return KnowledgeView(
             claims=claims,
             conflicting=len(values) > 1,
-            snapshot_digest=hashlib.sha256(_canonical(payload)).hexdigest(),
+            snapshot_digest=hashlib.sha256(canonical_json_bytes(payload)).hexdigest(),
         )
 
     def snapshot(self) -> Dict[str, Any]:
         with self._lock:
             claims = sorted(self._claims.values(), key=lambda c: c.claim_id)
         body = {"version": STATE_VERSION, "claims": [c.to_dict() for c in claims]}
-        return {**body, "snapshot_digest": hashlib.sha256(_canonical(body)).hexdigest()}
+        return {**body, "snapshot_digest": hashlib.sha256(canonical_json_bytes(body)).hexdigest()}
 
     @classmethod
     def from_snapshot(cls, payload: Mapping[str, Any]) -> "KnowledgeStore":
@@ -179,7 +176,11 @@ class KnowledgeStore:
         if not isinstance(rows, list) or not isinstance(supplied, str):
             raise ValueError("malformed knowledge snapshot")
         body = {"version": STATE_VERSION, "claims": rows}
-        if hashlib.sha256(_canonical(body)).hexdigest() != supplied:
+        try:
+            actual_digest = hashlib.sha256(canonical_json_bytes(body)).hexdigest()
+        except CanonicalContractError as exc:
+            raise ValueError("knowledge snapshot is not strict canonical JSON") from exc
+        if actual_digest != supplied:
             raise ValueError("knowledge snapshot digest mismatch")
         store = cls()
         for row in rows:
