@@ -64,6 +64,6 @@ class MutationCustody:
   active=self._active.get(task.task_id)
   if active is None or active.state is not LeaseState.ACTIVE or active!=lease:raise EngineeringError("mutation lease is stale or inactive")
   if lease.task_digest!=task.digest:raise EngineeringError("lease/task mismatch")
-  if not set(paths)<=set(lease.scope_paths):raise EngineeringError("mutation escapes leased scope")
+  if any(not isinstance(p,str) or not p.strip() for p in paths):raise EngineeringError("mutation paths invalid")\n  if not set(paths)<=set(lease.scope_paths):raise EngineeringError("mutation escapes leased scope")
  def record(self,task:EngineeringTask,lease:MutationLease,change_id:str,before:str,after:str,paths)->ChangeRecord:
   self.assert_authorized(task,lease,paths);return ChangeRecord(change_id,task.digest,lease.lease_id,lease.fence_token,before,after,tuple(paths))
