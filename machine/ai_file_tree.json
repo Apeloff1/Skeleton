@@ -916,7 +916,7 @@
       "source": "skeleton/eval",
       "destination": "skeleton/ai/evaluation",
       "kind": "tree",
-      "source_git_object_sha": "d9dff0b5bb6a90450d2feaff27289961967aa63c",
+      "source_git_object_sha": "54ad6edb4ad521059ade189dc68684e92d0be4c8",
       "role": "evaluation and evidence support",
       "work_package_refs": [
         "WP-W00",
@@ -964,6 +964,13 @@
         "VOL-206",
         "VOL-207",
         "VOL-208",
+        "VOL-214",
+        "VOL-215",
+        "VOL-216",
+        "VOL-217",
+        "VOL-218",
+        "VOL-219",
+        "VOL-220",
         "VOL-248",
         "VOL-252",
         "VOL-323",
@@ -5369,7 +5376,7 @@
       "source": "skeleton/artifacts",
       "destination": "skeleton/ai/runtime/extensions/artifacts",
       "kind": "tree",
-      "source_git_object_sha": "eaaf487f9aae5300ac1e30e51016f8e8eff15a0c",
+      "source_git_object_sha": "c4af6f37e09574ab5b76893b60a9db39646b869c",
       "role": "Governed artifact and multimodal-ingestion contracts that admit bounded content before decode and preserve content-addressed transformation lineage.",
       "work_package_refs": [
         "WP-W28",
@@ -5379,7 +5386,8 @@
         "AIQ-S7-E2E-01"
       ],
       "volume_refs": [
-        "VOL-153"
+        "VOL-153",
+        "VOL-213"
       ],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
@@ -5687,6 +5695,32 @@
       ],
       "move_batch": "B1-core-runtime",
       "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-RESEARCH-PLATFORM",
+      "source": "skeleton/research",
+      "destination": "skeleton/ai/research",
+      "kind": "tree",
+      "source_git_object_sha": "69f6f1d4772056369b9ed4a4ac749b2e4403100c",
+      "role": "Governed research-team, literature-watch, citation-graph, and source-lineage evidence surfaces.",
+      "work_package_refs": [
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "research_platform_mirror_pending_independent_cutover_validation",
+      "volume_refs": [
+        "VOL-210",
+        "VOL-211",
+        "VOL-212"
+      ]
     }
   ],
   "ci_enforcement": {
