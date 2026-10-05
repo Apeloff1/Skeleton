@@ -92,7 +92,11 @@ class ArtifactDependency: source:ArtifactNode; target:ArtifactNode; kind:Depende
 @dataclass(frozen=True,slots=True)
 class ArtifactGraph: nodes:tuple[ArtifactNode,...]; edges:tuple[ArtifactDependency,...]
 def artifact_cycle(g):
- adj={(n.artifact_id,n.version):[] for n in g.nodes}
+ ids=[(n.artifact_id,n.version) for n in g.nodes]
+ if any(not all(x) for x in ids) or len(set(ids))!=len(ids):raise ValueError("unique artifact node identity required")
+ known=set(ids)
+ if any((e.source.artifact_id,e.source.version) not in known or (e.target.artifact_id,e.target.version) not in known for e in g.edges):raise ValueError("artifact edge endpoint missing")
+ adj={x:[] for x in ids}
  for e in g.edges:adj[(e.source.artifact_id,e.source.version)].append((e.target.artifact_id,e.target.version))
  active=set();done=set()
  def visit(n):
