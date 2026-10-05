@@ -73,6 +73,8 @@ class WorkPackageRegistry:
   if not isinstance(e,WorkPackageEvidence):raise WorkPackageError("evidence must be WorkPackageEvidence")
   if e.package_id not in self.packages:raise WorkPackageError("evidence references unknown package")
   if e.package_digest!=self.packages[e.package_id].digest:raise WorkPackageError("evidence is stale or bound to another package version")
+  same=[x for x in self.evidence.values() if x.package_id==e.package_id and x.package_digest==e.package_digest and x.role is e.role]
+  if any(x.actor_id==e.actor_id and x.artifact_digest!=e.artifact_digest for x in same):raise WorkPackageError("actor cannot contradict evidence for same package role")
   prior=self.evidence.get(e.evidence_id)
   if prior is not None and prior!=e:raise WorkPackageError("evidence identity immutable")
   self.evidence[e.evidence_id]=e
@@ -88,4 +90,5 @@ class WorkPackageRegistry:
   if EvidenceRole.COMPLETION not in roles:return PackageState.VERIFIED
   complete={e.actor_id for e in ev if e.role is EvidenceRole.COMPLETION}
   if complete & impl:raise WorkPackageError("completion signer cannot be implementation actor")
+  if complete & verify:raise WorkPackageError("completion signer cannot be verification actor")
   return PackageState.COMPLETE
