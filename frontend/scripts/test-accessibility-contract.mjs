@@ -212,3 +212,28 @@ test('Entry route announces startup safety status before launcher mounts', () =>
   assert.match(content, /accessibleStatusProps\('Checking startup safety'\)/);
   assert.match(content, /accessibilityElementsHidden/);
 });
+
+
+test('contrast evaluation measures critical foreground/background pairs', () => {
+  assert.equal(Math.round(a11y.contrastRatio('#000000', '#FFFFFF') * 10) / 10, 21);
+  const findings = a11y.validateAccessibleContrast({
+    id: 'contrast.bad',
+    flow: 'critical',
+    foreground: '#777777',
+    background: '#888888',
+    largeText: false,
+    critical: true,
+  });
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].requirementId, 'A11Y.CONTRAST.TEXT');
+});
+
+test('default critical contrast inventory is complete and passing', () => {
+  const report = a11y.evaluateAccessibilityAcceptance(
+    a11y.CRITICAL_ACCESSIBILITY_SNAPSHOT,
+  );
+  assert.equal(report.criticalPassed, true);
+  assert.ok(report.evaluatedContrastIds.includes('boot.primary'));
+  assert.ok(report.evaluatedContrastIds.includes('connectivity.offline'));
+  assert.ok(report.evaluatedContrastIds.includes('toast.error'));
+});
