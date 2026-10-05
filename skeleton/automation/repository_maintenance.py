@@ -31,6 +31,8 @@ class RepositoryOwnership:
     retention_reason:str; active_refs:tuple[str,...]=()
     def __post_init__(self):
         object.__setattr__(self,"resource_id",_id(self.resource_id,"resource_id"));object.__setattr__(self,"owner",_text(self.owner,"owner"));object.__setattr__(self,"retention_reason",_text(self.retention_reason,"retention_reason"))
+        if not isinstance(self.kind,ResourceKind): raise MaintenanceError("kind must be ResourceKind")
+        if not isinstance(self.ownership,OwnershipClass): raise MaintenanceError("ownership must be OwnershipClass")
         refs=tuple(sorted(set(self.active_refs)))
         for r in refs:_id(r,"active_ref")
         object.__setattr__(self,"active_refs",refs)
@@ -39,11 +41,13 @@ class RepositoryOwnership:
     def digest(self):return _digest({"resource_id":self.resource_id,"kind":self.kind.value,"ownership":self.ownership.value,"owner":self.owner,"retention_reason":self.retention_reason,"active_refs":self.active_refs})
 
 @dataclass(frozen=True,slots=True)
-class DeletionEvidence:
+class ResourceEvidence:
     evidence_id:str; resource_id:str; observed_digest:str
     reachable:bool; retention_satisfied:bool; active_migration:bool; release_bound:bool; evidence_bound:bool
     def __post_init__(self):
         object.__setattr__(self,"evidence_id",_id(self.evidence_id,"evidence_id"));object.__setattr__(self,"resource_id",_id(self.resource_id,"resource_id"));object.__setattr__(self,"observed_digest",_sha(self.observed_digest,"observed_digest"))
+        for f in ("reachable","retention_satisfied","active_migration","release_bound","evidence_bound"):
+            if not isinstance(getattr(self,f),bool): raise MaintenanceError(f"{f} must be bool")
     @property
     def digest(self):return _digest({"evidence_id":self.evidence_id,"resource_id":self.resource_id,"observed_digest":self.observed_digest,"reachable":self.reachable,"retention_satisfied":self.retention_satisfied,"active_migration":self.active_migration,"release_bound":self.release_bound,"evidence_bound":self.evidence_bound})
 
@@ -52,6 +56,8 @@ class MaintenanceTask:
     task_id:str; resource_id:str; action:MaintenanceAction; risk:MaintenanceRisk; expected_digest:str; mutation_limit:int
     def __post_init__(self):
         object.__setattr__(self,"task_id",_id(self.task_id,"task_id"));object.__setattr__(self,"resource_id",_id(self.resource_id,"resource_id"));object.__setattr__(self,"expected_digest",_sha(self.expected_digest,"expected_digest"))
+        if not isinstance(self.action,MaintenanceAction): raise MaintenanceError("action must be MaintenanceAction")
+        if not isinstance(self.risk,MaintenanceRisk): raise MaintenanceError("risk must be MaintenanceRisk")
         if not isinstance(self.mutation_limit,int) or isinstance(self.mutation_limit,bool) or not 1<=self.mutation_limit<=100: raise MaintenanceError("mutation_limit must be bounded 1..100")
         if self.action is MaintenanceAction.DELETE and self.risk in (MaintenanceRisk.LOW,MaintenanceRisk.MEDIUM): raise MaintenanceError("deletion cannot be classified below high risk")
     @property
@@ -68,14 +74,17 @@ class MaintenanceReceipt:
     @property
     def digest(self):return _digest({"task_digest":self.task_digest,"ownership_digest":self.ownership_digest,"evidence_digest":self.evidence_digest,"decision":self.decision.value,"reasons":self.reasons})
 
-def authorize(task:MaintenanceTask, ownership:RepositoryOwnership, evidence:DeletionEvidence|None=None)->MaintenanceReceipt:
+def authorize(task:MaintenanceTask, ownership:RepositoryOwnership, evidence:ResourceEvidence|None=None)->MaintenanceReceipt:
     if task.resource_id!=ownership.resource_id: raise MaintenanceError("task/ownership resource mismatch")
     reasons=[]
-    if task.action is MaintenanceAction.DELETE:
-        if evidence is None: reasons.append("missing_deletion_evidence")
+    mutating=task.action in (MaintenanceAction.UPDATE,MaintenanceAction.DELETE)
+    if mutating:
+        if evidence is None: reasons.append("missing_resource_evidence")
         else:
-            if evidence.resource_id!=task.resource_id: raise MaintenanceError("deletion evidence resource mismatch")
+            if evidence.resource_id!=task.resource_id: raise MaintenanceError("resource evidence mismatch")
             if evidence.observed_digest!=task.expected_digest: reasons.append("resource_changed_since_observation")
+    if task.action is MaintenanceAction.DELETE:
+        if evidence is not None:
             if evidence.reachable: reasons.append("resource_reachable")
             if not evidence.retention_satisfied: reasons.append("retention_not_satisfied")
             if evidence.active_migration: reasons.append("active_migration")
