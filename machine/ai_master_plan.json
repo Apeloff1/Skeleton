@@ -2945,7 +2945,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Use versioned event envelopes with stable identity, causation/correlation and ordering metadata.",
         "Implement transactional outbox/inbox where events bridge durable state and async consumers.",
@@ -2960,32 +2960,44 @@
         "EventEnvelope",
         "EventCursor",
         "OutboxRecord",
-        "InboxRecord"
+        "InboxRecord",
+        "EventSchemaContract",
+        "EventCompatibilityRegistry",
+        "EventRetentionPolicy",
+        "RetentionDecision"
       ],
       "implementation_paths": [
         "skeleton/frontier/operation_stream.py",
         "skeleton/frontier/operation_stream_store.py",
-        "skeleton/persistence"
+        "skeleton/persistence",
+        "skeleton/frontier/runtime/event_architecture.py",
+        "skeleton/frontier/event_architecture.py",
+        "skeleton/frontier/runtime/operation_stream_store.py"
       ],
       "tests": [
         "skeleton/testing/test_operation_stream.py",
         "skeleton/testing/test_operation_stream_store.py",
-        "planned:skeleton/testing/test_event_replay.py"
+        "skeleton/testing/test_event_architecture.py"
       ],
       "evaluations": [
-        "planned:duplicate/out-of-order fault suite",
-        "planned:event replay determinism evaluation"
+        "skeleton/testing/test_event_architecture.py",
+        "skeleton/testing/test_operation_stream_store.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/045ea42ab2601127faabeb1aa93ec64964f4c98b",
+        "https://github.com/Apeloff1/Skeleton/commit/123e99b9e16421d82bd557a148bb90402d64957a",
+        "https://github.com/Apeloff1/Skeleton/commit/e7fe0cb092ec93bddb1b0b11cf1f2f05800ef730",
+        "https://github.com/Apeloff1/Skeleton/commit/8d2453ebfbb153f7cef0e53977529ddcdd84acda",
+        "skeleton/frontier/runtime/event_architecture.py",
+        "skeleton/frontier/runtime/operation_stream_store.py",
+        "skeleton/testing/test_event_architecture.py"
+      ],
       "risks": [
         "duplicate/out-of-order events",
         "consumer side effect before inbox marker",
         "schema drift"
       ],
-      "gaps": [
-        "formalize event compatibility registry",
-        "add compaction/replay retention contracts"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-039",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
