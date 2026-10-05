@@ -24,3 +24,20 @@ def test_machine_conformance_vectors_are_unique_and_fail_closed():
  assert len(ids)==len(set(ids))
  assert {"JSON-DUPLICATE-KEY","JSON-NAN","JSON-INFINITY","JSON-NEG-INFINITY","JSON-UNICODE-ROUNDTRIP","SCHEMA-ABSENT-REQUIRED","SCHEMA-NULL-NONNULLABLE","SCHEMA-UNKNOWN-ENUM","SCHEMA-NULL-NULLABLE"}<=set(ids)
  assert all(v["expected"] in {"accept","reject"} for v in vectors)
+
+
+def test_machine_validator_executes_complete_inventory_and_vectors():
+ import importlib.util
+ spec=importlib.util.spec_from_file_location("contract_conformance",ROOT/"scripts/check_architecture_contract_conformance.py")
+ assert spec and spec.loader
+ module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+ result=module.validate(ROOT)
+ assert result["status"]=="valid"
+ assert result["contract_count"]==36
+ assert result["executed_vector_count"]==result["vector_count"]
+
+def test_governed_canonical_conformance_surface_matches_canonical():
+ from skeleton.contracts.canonical import CanonicalEnvelope,EvidenceRef,Identity,canonical_conformance_vector
+ from skeleton.ai.runtime.contracts.canonical import canonical_conformance_vector as governed
+ envelope=CanonicalEnvelope(1,"compat",Identity("Apeloff1/Skeleton","a"*40),(EvidenceRef("repo","b"*64),),("b","a"),{"snow":"Ω"})
+ assert governed(envelope)==canonical_conformance_vector(envelope)
