@@ -8,18 +8,15 @@ configuration.
 from __future__ import annotations
 
 import hashlib
-import json
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
+
+from skeleton.contracts.canonical import CanonicalContractError, canonical_json_bytes
 
 from skeleton.frontier.runtime.model_routing import ModelRouter, ProviderMetadata, ProviderMetadataError
 from skeleton.frontier.runtime.model_runtime import ProviderAdapter
 
 REGISTRY_SCHEMA_VERSION = 1
-
-
-def _canonical(value: Any) -> bytes:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
 
 
 def _metadata_dict(item: ProviderMetadata) -> dict[str, Any]:
@@ -83,7 +80,7 @@ class RouterRegistry:
         }
         return RouterRegistrySnapshot(
             providers=providers,
-            digest=hashlib.sha256(_canonical(body)).hexdigest(),
+            digest=hashlib.sha256(canonical_json_bytes(body)).hexdigest(),
         )
 
     @classmethod
@@ -97,7 +94,11 @@ class RouterRegistry:
         if not isinstance(rows, list) or not isinstance(digest, str):
             raise ProviderMetadataError("malformed registry snapshot")
         body = {"schema_version": REGISTRY_SCHEMA_VERSION, "providers": rows}
-        if hashlib.sha256(_canonical(body)).hexdigest() != digest:
+        try:
+            actual_digest = hashlib.sha256(canonical_json_bytes(body)).hexdigest()
+        except CanonicalContractError as exc:
+            raise ProviderMetadataError("registry snapshot is not strict canonical JSON") from exc
+        if actual_digest != digest:
             raise ProviderMetadataError("registry snapshot digest mismatch")
         return cls(rows)
 
