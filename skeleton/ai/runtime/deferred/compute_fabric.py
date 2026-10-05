@@ -24,6 +24,7 @@ class BuildFarmJob: job_id:str; source_digest:str; build_input_digest:str
 @dataclass(frozen=True,slots=True)
 class BuildFarmArtifact: job_id:str; worker_id:str; environment_id:str; artifact_digest:str; log_digest:str; attested:bool
 def build_artifact(job,worker,artifact_digest,log_digest):
+ if not all((job.job_id,job.source_digest,job.build_input_digest,worker.worker_id,worker.environment_id,artifact_digest,log_digest)):raise ValueError("complete build provenance required")
  if not worker.attested:raise ValueError("worker not attested")
  return BuildFarmArtifact(job.job_id,worker.worker_id,worker.environment_id,artifact_digest,log_digest,True)
 @dataclass(frozen=True,slots=True)
@@ -33,6 +34,7 @@ class EvaluationFarmJob: job_id:str; eval_digest:str; model_digest:str; dataset_
 @dataclass(frozen=True,slots=True)
 class EvaluationFarmResult: job_id:str; worker_id:str; environment_id:str; scorer_version:str; metric:str; value:float
 def aggregate_results(results):
+ if any(not all((x.job_id,x.worker_id,x.environment_id,x.scorer_version,x.metric)) for x in results):raise ValueError("complete evaluation result identity required")
  return tuple(sorted(results,key=lambda x:(x.metric,x.worker_id,x.environment_id,x.value)))
 class ResearchPriority(int,Enum): BACKGROUND=1; NORMAL=2; URGENT=3
 @dataclass(frozen=True,slots=True)
