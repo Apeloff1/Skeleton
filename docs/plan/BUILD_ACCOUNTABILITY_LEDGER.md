@@ -52,7 +52,7 @@ Completion requires implementation sign-off plus independent verification sign-o
 - [x] `ACC-VOL-017` — VOL-017 Multi-Agent Orchestration — status: `hardened` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:P1 Multi-Agent Orchestration Gate** — completed_at_utc: `2026-10-04T15:47:01Z`
 - [ ] `ACC-VOL-018` — VOL-018 Long-Horizon Autonomy — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-019` — VOL-019 World Models & Simulation — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-020` — VOL-020 Multimodal Intelligence — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-020` — VOL-020 Multimodal Intelligence — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-021` — VOL-021 Code Intelligence — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-022` — VOL-022 Autonomous Repository Engineering — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-023` — VOL-023 Forge — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
