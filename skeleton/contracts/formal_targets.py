@@ -226,6 +226,8 @@ def operation_lifecycle_specification() -> FormalSpecification:
             ImplementationBinding.from_object(
                 contract_id="OperationEnvelope.transition",
                 obj=OperationEnvelope.transition,
+                canonical_module_path="skeleton.contracts.operation",
+                canonical_symbol="OperationEnvelope.transition",
             ),
         ),
         obligations=(
@@ -456,6 +458,8 @@ def protocol_replay_specification() -> FormalSpecification:
             ImplementationBinding.from_object(
                 contract_id="ProtocolReplayGuard.accept",
                 obj=ProtocolReplayGuard.accept,
+                canonical_module_path="skeleton.contracts.protocol",
+                canonical_symbol="ProtocolReplayGuard.accept",
             ),
         ),
         obligations=(
