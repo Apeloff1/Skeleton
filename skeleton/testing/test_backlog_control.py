@@ -61,3 +61,15 @@ def test_closure_evidence_requires_canonical_timestamp_and_digests():
 def test_lifecycle_inputs_are_typed():
  with pytest.raises(BacklogError,match="SourceKind"):src(kind="gap")
  with pytest.raises(BacklogError,match="BacklogState"):item("ITEM.1",state="open")
+
+def test_dedup_cannot_rewrite_terminal_or_self_identity():
+ r=BacklogRegistry();r.add(item("ITEM.1"));ready=r.reconcile("ITEM.1");r.close("ITEM.1",proof(ready))
+ r.add(item("ITEM.2"))
+ with pytest.raises(BacklogError,match="terminal"):r.deduplicate("ITEM.1","ITEM.2","DISP.1","same")
+ with pytest.raises(BacklogError,match="itself"):r.deduplicate("ITEM.2","ITEM.2","DISP.2","same")
+
+def test_disposition_identity_is_immutable():
+ r=BacklogRegistry();r.add(item("ITEM.1"));r.add(item("ITEM.2"))
+ r.deduplicate("ITEM.1","ITEM.2","DISP.1","same")
+ r.add(item("ITEM.3"));r.add(item("ITEM.4"))
+ with pytest.raises(BacklogError,match="disposition identity"):r.deduplicate("ITEM.3","ITEM.4","DISP.1","same")
