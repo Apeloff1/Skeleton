@@ -29,3 +29,17 @@ def test_invalid_saga_shape_is_rejected():
  d=SagaDefinition("s",("a",),(),(10,),(None,))
  try:advance_saga(d,SagaInstance("s","i",0,0));assert False
  except ValueError:pass
+
+
+def test_tool_effect_governance_rejects_ambiguous_identity():
+ import pytest
+ cycle=ToolGraph((ToolDependency("a","1","b","1","runtime"),ToolDependency("b","1","a","1","runtime")),frozenset({("a","1"),("b","1")}))
+ assert not tool_compatibility(cycle).compatible
+ assert "dependency-cycle" in tool_compatibility(cycle).unavailable
+ with pytest.raises(ValueError): effect_receipt(EffectAttempt(SideEffect("","op","key","write"),True),True)
+ bad=Compensation("c",(CompensationStep("s","e","k"),CompensationStep("s","e2","k2")))
+ with pytest.raises(ValueError): compensation_result(bad,(True,True))
+ duplicate=SagaDefinition("s",("a","a"),("ka","kb"),(10,10),(None,None))
+ with pytest.raises(ValueError): advance_saga(duplicate,SagaInstance("s","i",0,0))
+ negative=SagaDefinition("s",("a",),("ka",),(-1,),(None,))
+ with pytest.raises(ValueError): advance_saga(negative,SagaInstance("s","i",0,0))
