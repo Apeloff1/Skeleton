@@ -637,7 +637,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Expose provider-neutral inference with streaming, cancellation, structured output and bounded retries.",
         "Treat caches/batching/speculation as optimizations that cannot alter semantic correctness.",
@@ -658,25 +658,35 @@
         "skeleton/provider_runtime.py",
         "skeleton/provider_contract.py",
         "backend/services/ai_service.py",
-        "planned:skeleton/inference"
+        "skeleton/inference/__init__.py",
+        "skeleton/inference/session.py",
+        "skeleton/inference/provider_bridge.py",
+        "skeleton/inference/replay.py",
+        "skeleton/inference/async_runtime.py"
       ],
       "tests": [
         "tests/test_model_runtime.py",
         "backend/tests/test_ai_provider_reliability.py",
-        "skeleton/testing/test_provider_stream_reliability_profiles.py"
+        "skeleton/testing/test_provider_stream_reliability_profiles.py",
+        "skeleton/testing/test_vol007_inference_session.py",
+        "skeleton/testing/test_vol007_provider_bridge.py",
+        "skeleton/testing/test_vol007_inference_replay.py",
+        "skeleton/testing/test_vol007_async_runtime.py"
       ],
       "evaluations": [
         "planned:stream/cancel/failover matrix",
         "planned:latency-cost-quality characterization"
       ],
-      "evidence": [],
+      "evidence": [
+        "implementation-head:a6bacd6b09b83c09ff1f397a05bb48a8cfcdd2f9"
+      ],
       "risks": [
         "duplicate provider effects during retry",
         "KV/prefix cache semantic corruption",
         "uncancelled expensive work"
       ],
       "gaps": [
-        "continuous batching and local serving need dedicated implementation",
+        "continuous batching and local serving optimization remain future performance work",
         "speculative decoding requires measured correctness gates"
       ],
       "accountability_id": "ACC-VOL-007",
