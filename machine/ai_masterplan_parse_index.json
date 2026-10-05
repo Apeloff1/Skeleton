@@ -6,7 +6,7 @@
       "git_blob_sha": "7a7aba1b24e1e91cc80d5e10bd45a5d5d2179ada"
     },
     "machine/ai_build_accountability.json": {
-      "git_blob_sha": "7ed745badd87a49a3f34cc8c7fccd434d2c804e2"
+      "git_blob_sha": "75be572bb83de31fe40e63634d01f59a0eec45a3"
     }
   },
   "policy": {
@@ -17,12 +17,12 @@
   },
   "volume_summary": {
     "total": 421,
-    "implementation_signed": 273,
+    "implementation_signed": 355,
     "verification_signed": 20,
     "complete": 20,
-    "implementation_signed_open": 253,
+    "implementation_signed_open": 335,
     "gap_free_waiting_verification": 24,
-    "implementation_unsigned": 148
+    "implementation_unsigned": 66
   },
   "fast_sets": {
     "fully_complete": [
@@ -134,94 +134,12 @@
       "VOL-244",
       "VOL-245",
       "VOL-246",
-      "VOL-300",
-      "VOL-301",
-      "VOL-302",
-      "VOL-303",
-      "VOL-304",
-      "VOL-305",
-      "VOL-306",
-      "VOL-307",
-      "VOL-308",
-      "VOL-309",
-      "VOL-310",
-      "VOL-311",
-      "VOL-312",
       "VOL-313",
       "VOL-314",
       "VOL-315",
       "VOL-316",
       "VOL-317",
-      "VOL-319",
-      "VOL-326",
-      "VOL-327",
-      "VOL-328",
-      "VOL-329",
-      "VOL-330",
-      "VOL-331",
-      "VOL-332",
-      "VOL-333",
-      "VOL-334",
-      "VOL-335",
-      "VOL-336",
-      "VOL-337",
-      "VOL-338",
-      "VOL-339",
-      "VOL-340",
-      "VOL-341",
-      "VOL-342",
-      "VOL-343",
-      "VOL-344",
-      "VOL-345",
-      "VOL-346",
-      "VOL-347",
-      "VOL-348",
-      "VOL-349",
-      "VOL-350",
-      "VOL-351",
-      "VOL-352",
-      "VOL-353",
-      "VOL-354",
-      "VOL-355",
-      "VOL-356",
-      "VOL-357",
-      "VOL-358",
-      "VOL-359",
-      "VOL-360",
-      "VOL-366",
-      "VOL-367",
-      "VOL-368",
-      "VOL-371",
-      "VOL-372",
-      "VOL-373",
-      "VOL-374",
-      "VOL-375",
-      "VOL-376",
-      "VOL-377",
-      "VOL-378",
-      "VOL-379",
-      "VOL-380",
-      "VOL-383",
-      "VOL-384",
-      "VOL-387",
-      "VOL-388",
-      "VOL-389",
-      "VOL-393",
-      "VOL-394",
-      "VOL-395",
-      "VOL-396",
-      "VOL-400",
-      "VOL-401",
-      "VOL-402",
-      "VOL-407",
-      "VOL-408",
-      "VOL-410",
-      "VOL-411",
-      "VOL-412",
-      "VOL-413",
-      "VOL-416",
-      "VOL-417",
-      "VOL-418"
+      "VOL-319"
     ]
   },
   "by_depth_pass": {
@@ -269,25 +187,25 @@
     },
     "DP-281-320": {
       "total": 40,
-      "implementation_signed": 21,
+      "implementation_signed": 34,
       "complete": 0,
       "gap_free_waiting_verification": 0
     },
     "DP-321-360": {
       "total": 40,
-      "implementation_signed": 5,
+      "implementation_signed": 40,
       "complete": 0,
       "gap_free_waiting_verification": 0
     },
     "DP-361-400": {
       "total": 40,
-      "implementation_signed": 17,
+      "implementation_signed": 40,
       "complete": 0,
       "gap_free_waiting_verification": 0
     },
     "DP-401-420": {
       "total": 20,
-      "implementation_signed": 9,
+      "implementation_signed": 20,
       "complete": 1,
       "gap_free_waiting_verification": 0
     }
@@ -295,14 +213,14 @@
   "accountability_summary": {
     "volume": {
       "total": 421,
-      "implementation_signed": 273,
+      "implementation_signed": 355,
       "verification_signed": 20,
       "complete": 20,
       "status_counts": {
         "verified": 13,
-        "implemented": 253,
+        "implemented": 335,
         "hardened": 7,
-        "unverified": 148
+        "unverified": 66
       }
     },
     "work_package": {
