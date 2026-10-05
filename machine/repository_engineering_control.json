@@ -284,10 +284,10 @@
   ],
   "backlog": {
     "summary": {
-      "item_count": 1772,
-      "gap_count": 792,
+      "item_count": 1766,
+      "gap_count": 786,
       "risk_count": 980,
-      "open_count": 1772,
+      "open_count": 1766,
       "closed_count": 0
     },
     "items": [
@@ -2082,102 +2082,6 @@
         "state": "open",
         "closure_evidence_refs": [],
         "deduplication_key": "gap:bind budget decisions to routing evidence"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-070-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-070:gap:001",
-        "volume_ref": "VOL-070",
-        "statement": "bind dimensions to eval suites",
-        "accountability_id": "ACC-VOL-070",
-        "requirement_refs": [
-          "REQ:VOL-070:001",
-          "REQ:VOL-070:002",
-          "REQ:VOL-070:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind dimensions to eval suites"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-070-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-070:gap:002",
-        "volume_ref": "VOL-070",
-        "statement": "define non-compensable failure rules",
-        "accountability_id": "ACC-VOL-070",
-        "requirement_refs": [
-          "REQ:VOL-070:001",
-          "REQ:VOL-070:002",
-          "REQ:VOL-070:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define non-compensable failure rules"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-071-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-071:gap:001",
-        "volume_ref": "VOL-071",
-        "statement": "define domain registry",
-        "accountability_id": "ACC-VOL-071",
-        "requirement_refs": [
-          "REQ:VOL-071:001",
-          "REQ:VOL-071:002",
-          "REQ:VOL-071:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define domain registry"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-071-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-071:gap:002",
-        "volume_ref": "VOL-071",
-        "statement": "bind specialization to explicit eval ownership",
-        "accountability_id": "ACC-VOL-071",
-        "requirement_refs": [
-          "REQ:VOL-071:001",
-          "REQ:VOL-071:002",
-          "REQ:VOL-071:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind specialization to explicit eval ownership"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-072-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-072:gap:001",
-        "volume_ref": "VOL-072",
-        "statement": "finish Jeeves custody map",
-        "accountability_id": "ACC-VOL-072",
-        "requirement_refs": [
-          "REQ:VOL-072:001",
-          "REQ:VOL-072:002",
-          "REQ:VOL-072:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:finish jeeves custody map"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-072-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-072:gap:002",
-        "volume_ref": "VOL-072",
-        "statement": "bind data freshness/provenance into responses",
-        "accountability_id": "ACC-VOL-072",
-        "requirement_refs": [
-          "REQ:VOL-072:001",
-          "REQ:VOL-072:002",
-          "REQ:VOL-072:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind data freshness/provenance into responses"
       },
       {
         "backlog_id": "BL-GAP-VOL-075-001",
