@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "tree_version": "1.7.8",
+  "tree_version": "1.7.9",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
-  "baseline_git_sha": "ae8f8dd30f133adfc3f09d861ee635591e07f654",
+  "baseline_git_sha": "43867c098e9beb4851c6dc1cc936f8e196e64720",
   "canonical_root": "skeleton/ai",
   "migration_mode": "strangler_mirror_then_explicit_cutover",
   "purpose": "Consolidate build-plan-relevant AI engine, governance, shell/control-plane, agent, evaluation, reliability, build-control code, historical research lineage, Jeeves, and selected legacy backend/GameForge AI recovery surfaces into one governed file tree without breaking existing imports or fabricating completion.",
@@ -511,7 +511,8 @@
       "move_batch": "B1-core-runtime",
       "source_disposition": "retain_until_import_inversion_and_regression_gates",
       "volume_refs": [
-        "VOL-004"
+        "VOL-004",
+        "VOL-020"
       ]
     },
     {
@@ -1111,7 +1112,11 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-189",
+        "VOL-193"
+      ]
     },
     {
       "id": "AIFT-COGNITION",
@@ -2956,7 +2961,10 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-192"
+      ]
     },
     {
       "id": "AIFT-AI-SHELL",
@@ -6023,7 +6031,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "177_mapping_plus_10_native_owner_current_main_governance_lineage_refreshed_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "177_mapping_plus_10_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -7289,6 +7297,35 @@
         ]
       },
       "policy": "Bind already-landed mature implementation volumes to their existing governed AI-tree owners without moving product/backend authority, changing runtime behavior, granting cutover, or asserting independent completion verification."
+    },
+    "mature_volume_path_reconciliation_2026_10_05": {
+      "base_main_sha": "43867c098e9beb4851c6dc1cc936f8e196e64720",
+      "repaired_volume_count": 9,
+      "repaired_stale_path_count": 11,
+      "repaired_volumes": [
+        "VOL-007",
+        "VOL-020",
+        "VOL-103",
+        "VOL-188",
+        "VOL-189",
+        "VOL-190",
+        "VOL-191",
+        "VOL-192",
+        "VOL-193"
+      ],
+      "added_mapping_volume_refs": {
+        "AIFT-ENGINE-API": [
+          "VOL-020"
+        ],
+        "AIFT-RESILIENCE": [
+          "VOL-189",
+          "VOL-193"
+        ],
+        "AIFT-CONFIG": [
+          "VOL-192"
+        ]
+      },
+      "policy": "Replace stale or shorthand mature-volume implementation paths with current repository owners and bind newly exposed governed AI owners without changing runtime behavior, cutover authority, implementation maturity, completion signatures, or independent verification."
     }
   },
   "native_ai_owners": [

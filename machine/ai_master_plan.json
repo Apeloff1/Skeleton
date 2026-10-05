@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plan_version": "1.6.2",
+  "plan_version": "1.6.3",
   "status": "active",
   "architecture_lane": "PR-1904",
   "architecture_branch": "integration/architecture-map-v1",
@@ -679,7 +679,7 @@
       "implementation_paths": [
         "skeleton/provider_runtime.py",
         "skeleton/provider_contract.py",
-        "backend/services/ai_service.py",
+        "backend/core/engine_text.py",
         "skeleton/inference/__init__.py",
         "skeleton/inference/session.py",
         "skeleton/inference/provider_bridge.py",
@@ -1655,7 +1655,7 @@
       "implementation_paths": [
         "skeleton/multimodal/contracts.py",
         "skeleton/multimodal/__init__.py",
-        "backend/routes/media.py",
+        "skeleton/api/engine_routes.py",
         "skeleton/multimodal/sanitize.py",
         "skeleton/multimodal/ingest.py"
       ],
@@ -6929,8 +6929,7 @@
       ],
       "implementation_paths": [
         "skeleton/app",
-        "installer",
-        "desktop",
+        "skeleton/app/installer.py",
         "skeleton/app/desktop_release.py"
       ],
       "tests": [
@@ -11134,7 +11133,6 @@
       ],
       "implementation_paths": [
         "skeleton/reliability",
-        "experiments",
         "skeleton/ai/runtime/deferred/reliability_release.py"
       ],
       "tests": [
@@ -11185,7 +11183,7 @@
         "DrillFinding"
       ],
       "implementation_paths": [
-        "recovery",
+        "skeleton/resilience",
         "docs",
         "skeleton/ai/runtime/deferred/reliability_release.py"
       ],
@@ -11237,7 +11235,7 @@
         "QualificationResult"
       ],
       "implementation_paths": [
-        "release",
+        "skeleton/release",
         "machine",
         "skeleton/ai/runtime/deferred/reliability_release.py"
       ],
@@ -11289,7 +11287,7 @@
         "CanaryDecision"
       ],
       "implementation_paths": [
-        "deploy",
+        "skeleton/deployment",
         "skeleton/observability",
         "skeleton/ai/runtime/deferred/reliability_release.py"
       ],
@@ -11341,7 +11339,7 @@
         "FlagLifecycle"
       ],
       "implementation_paths": [
-        "config",
+        "skeleton/config",
         "machine",
         "skeleton/ai/runtime/deferred/reliability_release.py"
       ],
@@ -11393,8 +11391,8 @@
         "RollbackEvidence"
       ],
       "implementation_paths": [
-        "release",
-        "recovery",
+        "skeleton/release",
+        "skeleton/resilience",
         "skeleton/ai/runtime/deferred/reliability_release.py"
       ],
       "tests": [
