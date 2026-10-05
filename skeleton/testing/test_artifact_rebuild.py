@@ -8,3 +8,11 @@ def test_unverified_input_or_digest_mismatch_fails_closed():
  with pytest.raises(ValueError):execute_rebuild(RebuildPlan((step(),)),{"in1"},lambda *x:"wrong")
 def test_cascade_is_bounded():
  with pytest.raises(ValueError):execute_rebuild(RebuildPlan((step(),step()),1),{"in1"},lambda *x:"out")
+
+def test_nonpositive_rebuild_bound_rejected():
+ import pytest
+ with pytest.raises(ValueError):execute_rebuild(RebuildPlan((),0),set(),lambda *x:"")
+def test_duplicate_artifact_steps_rejected():
+ import pytest
+ s=RebuildStep("a","v",(),"d")
+ with pytest.raises(ValueError):execute_rebuild(RebuildPlan((s,s)),set(),lambda *x:"d")
