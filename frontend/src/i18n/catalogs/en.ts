@@ -15,6 +15,7 @@ export const EN_MESSAGES: Readonly<Record<TranslationKey, string>> = Object.free
   'recovery.boot_failed': 'Boot failed. We hit a snag while preparing the app.',
   'status.starting': 'Starting Skeleton',
   'status.startup_check': 'Checking startup safety',
+  'status.startup_progress': 'Startup progress: {percent} percent',
   'status.connectivity.offline': 'Offline — changes will sync when you reconnect',
   'status.connectivity.down': 'Server unreachable — retrying…',
   'status.connectivity.degraded': 'Server is slow — some actions may be delayed',
