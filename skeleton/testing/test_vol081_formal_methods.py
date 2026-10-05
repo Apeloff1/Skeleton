@@ -993,3 +993,20 @@ def test_spec_rejects_cartesian_state_space_above_hard_bound() -> None:
             initial_predicate_name="initial",
             transition_relation_name="transition",
         )
+
+def test_aggregate_proof_claim_fails_closed_when_report_is_incomplete() -> None:
+    report = BoundedModelChecker().check(
+        linear_spec(obligations=standard_obligations()),
+        linear_semantics(predicates=standard_predicates()),
+    )
+    assert report.all_obligations_proved_within_model is True
+
+    forged = replace(
+        report,
+        stop_reason=ExplorationStop.DEPTH_BOUND,
+    )
+    assert all(
+        result.status is ProofStatus.PROVED_WITHIN_MODEL
+        for result in forged.results
+    )
+    assert forged.all_obligations_proved_within_model is False
