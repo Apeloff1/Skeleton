@@ -59,7 +59,7 @@ class DecisionOutcome: record_id:str; result_digest:str; success:bool
 class WorkflowNode:
  node_id:str; capability:str; authority:tuple[str,...]; retries:int; timeout_ms:int; compensation_node:str|None
  def __post_init__(self):
-  if self.retries<0 or self.timeout_ms<=0:raise ValueError("invalid retry/timeout")
+  if not self.node_id or not self.capability or self.retries<0 or self.timeout_ms<=0 or any(not a for a in self.authority):raise ValueError("invalid workflow node")
 @dataclass(frozen=True,slots=True)
 class WorkflowEdge: source:str; target:str
 @dataclass(frozen=True,slots=True)
@@ -67,6 +67,10 @@ class WorkflowIR:
  version:str; nodes:tuple[WorkflowNode,...]; edges:tuple[WorkflowEdge,...]
  @property
  def identity(self)->str:
+  if not self.version or not self.nodes or len({n.node_id for n in self.nodes})!=len(self.nodes):raise ValueError("unique workflow identity required")
+  ids={n.node_id for n in self.nodes}
+  if len({(e.source,e.target) for e in self.edges})!=len(self.edges) or any(not e.source or not e.target or e.source==e.target or e.source not in ids or e.target not in ids for e in self.edges):raise ValueError("invalid workflow edge")
+  if any(n.compensation_node is not None and n.compensation_node not in ids for n in self.nodes):raise ValueError("invalid compensation node")
   return sha256_json({"version":self.version,"nodes":[(n.node_id,n.capability,n.authority,n.retries,n.timeout_ms,n.compensation_node) for n in self.nodes],"edges":[(e.source,e.target) for e in self.edges]})
 
 @dataclass(frozen=True,slots=True)
@@ -79,6 +83,9 @@ class ControlPlaneState:
 class ControlPlaneReceipt:
  command_id:str; previous_revision:int; revision:int; accepted:bool; reason:str
 def apply_command(state:ControlPlaneState,command:ControlPlaneCommand,*,policy_valid:bool,authority_valid:bool)->tuple[ControlPlaneState,ControlPlaneReceipt]:
+ if state.revision<0 or not state.durable_state_digest:raise ValueError("valid control state required")
+ if not all((command.command_id,command.objective_id,command.policy_receipt,command.authority_receipt)):return state,ControlPlaneReceipt(command.command_id,state.revision,state.revision,False,"incomplete command identity")
+ if command.command_id==state.last_command_id:return state,ControlPlaneReceipt(command.command_id,state.revision,state.revision,False,"duplicate command")
  if not policy_valid or not authority_valid:
   return state,ControlPlaneReceipt(command.command_id,state.revision,state.revision,False,"independent gate rejected")
  new=ControlPlaneState(state.revision+1,command.workflow.identity,command.command_id,sha256_json({"previous":state.durable_state_digest,"command":command.command_id,"workflow":command.workflow.identity}))
