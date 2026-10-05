@@ -11,3 +11,7 @@ def test_cross_tenant_not_returned():
 def test_latest_alias_orders_numeric_versions_naturally():
  reg=({"tenant":"t","project":"p","name":"n","version":"v2","lifecycle":"active"},{"tenant":"t","project":"p","name":"n","version":"v10","lifecycle":"active"})
  h,r=resolve_resource(ResourceQuery("t","p","n",None),reg,authorized=True);assert ":v10:" in h.canonical_ref and r.alias_used
+
+def test_malformed_registry_fails_closed():
+ import pytest
+ with pytest.raises(ValueError):resolve_resource(ResourceQuery("t","p","n",None),({"tenant":"t"},),authorized=True)
