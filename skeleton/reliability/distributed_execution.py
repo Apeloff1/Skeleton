@@ -51,7 +51,7 @@ class DistributedScheduler:
   prior=self._terminal.get(task.task_id)
   receipt=DistributedReceipt(task.digest,lease.lease_id,lease.fence_token,state,result_digest,provider_evidence_digest)
   if prior is not None and prior!=receipt:raise DistributedError("terminal outcome immutable")
-  if state in (OutcomeState.SUCCEEDED,OutcomeState.FAILED):self._terminal[task.task_id]=receipt
+  if state in (OutcomeState.SUCCEEDED,OutcomeState.FAILED):\n   self._terminal[task.task_id]=receipt;self._active.pop(task.task_id,None)
   return receipt
  def worker_lost(self,task,lease,effect_may_have_escaped):
   if self._active.get(task.task_id)!=lease:raise DistributedError("stale worker loss report")
