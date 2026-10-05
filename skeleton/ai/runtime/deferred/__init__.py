@@ -14,6 +14,13 @@ from .lifecycle_safety import (
     MigrationReceipt, MigrationState, MigrationStep, ParityEvidence,
     RetirementDecision, can_remove_adapter, decide_retirement,
 )
+from .scheduling_autonomy import (
+    Assignment, AutonomyController, AutonomyEscalation, ControlSignal, ControlState,
+    CriticalPath, EscalationEvidence, EscalationGrant, PathBlocker, Schedule,
+    SchedulingPolicy, SchedulingSimulation, SimulationMetric, Subtask,
+    TaskDecomposition, TaskDependency, TaskSlack, WorkloadTrace, control,
+    critical_path, grant_escalation, schedule_ready, validate_decomposition,
+)
 from .contract_fuzzing import ContractFuzzer, FuzzBudget, FuzzFailure, FuzzReport
 from .simulation_mode import SimulationAuthority, SimulationEvidence, SimulationRequest, SimulationResult, SimulationRuntime
 from .journal import DeferredExecutionJournal, DeferredJournalConflict, DeferredJournalError, DeferredJournalRecord, SqliteDeferredExecutionJournal
