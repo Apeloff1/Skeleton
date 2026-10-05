@@ -10,6 +10,7 @@ from skeleton.ai.capability_map import (
     CapabilityError,
     CapabilityEvidence,
     CapabilityMap,
+    CapabilitySnapshot,
     Maturity,
 )
 
