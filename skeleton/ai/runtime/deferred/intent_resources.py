@@ -53,7 +53,7 @@ def member_authorized(w,principal,permission):
 @dataclass(frozen=True,slots=True)
 class ResourceName:
  tenant:str; project:str; name:str; version:str
- def __post_init__(self):
+    def __post_init__(self):
   if not all((self.tenant,self.project,self.name,self.version)):raise ValueError("resource scope required")
   if any(x in self.name for x in ("..","/","\\","%2f","%2F")) or self.name!=self.name.strip():raise ValueError("ambiguous resource name")
 @dataclass(frozen=True,slots=True)
