@@ -22,6 +22,7 @@ from enum import Enum
 from hashlib import sha256
 import json
 import re
+from itertools import islice
 from typing import Iterable, Mapping
 
 TRACEABILITY_SCHEMA = "skeleton.contracts.traceability.v1"
@@ -239,8 +240,14 @@ class TraceabilityMatrix:
         nodes: Iterable[TraceNode],
         edges: Iterable[TraceEdge],
     ) -> None:
-        materialized_nodes = tuple(nodes)
-        materialized_edges = tuple(edges)
+        try:
+            materialized_nodes = tuple(islice(iter(nodes), _MAX_NODES + 1))
+        except TypeError as exc:
+            raise TypeError("nodes must be iterable") from exc
+        try:
+            materialized_edges = tuple(islice(iter(edges), _MAX_EDGES + 1))
+        except TypeError as exc:
+            raise TypeError("edges must be iterable") from exc
 
         if len(materialized_nodes) > _MAX_NODES:
             raise TraceError("trace node count exceeds safety bound")
