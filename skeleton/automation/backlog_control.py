@@ -116,10 +116,14 @@ class BacklogRegistry:
   deps=[d for d in self._deps.values() if d.item_id==item_id]
   desired=BacklogState.READY if all(self._items[d.depends_on].state is d.required_state for d in deps) else BacklogState.BLOCKED
   updated=replace(item,state=desired);self._items[item_id]=updated;return updated
- def close(self,item_id:str,evidence:bool)->BacklogItem:
+ def close(self,item_id:str,evidence:ClosureEvidence)->BacklogItem:
   item=self.reconcile(item_id)
   if item.state is not BacklogState.READY:raise BacklogError("blocked item cannot close")
-  if not evidence:raise BacklogError("closure rule requires evidence")
+  if not isinstance(evidence,ClosureEvidence):raise BacklogError("closure rule requires typed evidence")
+  if evidence.item_id!=item_id or evidence.item_digest!=item.digest:raise BacklogError("closure evidence is stale or bound to another item")
+  prior=self._closures.get(evidence.evidence_id)
+  if prior is not None and prior!=evidence:raise BacklogError("closure evidence identity is immutable")
+  self._closures[evidence.evidence_id]=evidence
   item=replace(item,state=BacklogState.CLOSED);self._items[item_id]=item;return item
  def revalidate_dependents(self,upstream_id:str)->tuple[BacklogItem,...]:
   affected=sorted({d.item_id for d in self._deps.values() if d.depends_on==upstream_id})
