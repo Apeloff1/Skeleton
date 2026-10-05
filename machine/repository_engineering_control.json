@@ -284,10 +284,10 @@
   ],
   "backlog": {
     "summary": {
-      "item_count": 1764,
-      "gap_count": 784,
+      "item_count": 1754,
+      "gap_count": 774,
       "risk_count": 980,
-      "open_count": 1764,
+      "open_count": 1754,
       "closed_count": 0
     },
     "items": [
@@ -2276,134 +2276,6 @@
         "deduplication_key": "gap:materialize revocation propagation proof"
       },
       {
-        "backlog_id": "BL-GAP-VOL-088-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-088:gap:001",
-        "volume_ref": "VOL-088",
-        "statement": "define compliance registry schema",
-        "accountability_id": "ACC-VOL-088",
-        "requirement_refs": [
-          "REQ:VOL-088:001",
-          "REQ:VOL-088:002",
-          "REQ:VOL-088:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define compliance registry schema"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-088-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-088:gap:002",
-        "volume_ref": "VOL-088",
-        "statement": "bind controls to evidence owners",
-        "accountability_id": "ACC-VOL-088",
-        "requirement_refs": [
-          "REQ:VOL-088:001",
-          "REQ:VOL-088:002",
-          "REQ:VOL-088:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind controls to evidence owners"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-089-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-089:gap:001",
-        "volume_ref": "VOL-089",
-        "statement": "define generated-doc boundaries",
-        "accountability_id": "ACC-VOL-089",
-        "requirement_refs": [
-          "REQ:VOL-089:001",
-          "REQ:VOL-089:002",
-          "REQ:VOL-089:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define generated-doc boundaries"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-089-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-089:gap:002",
-        "volume_ref": "VOL-089",
-        "statement": "materialize doc drift gate",
-        "accountability_id": "ACC-VOL-089",
-        "requirement_refs": [
-          "REQ:VOL-089:001",
-          "REQ:VOL-089:002",
-          "REQ:VOL-089:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize doc drift gate"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-090-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-090:gap:001",
-        "volume_ref": "VOL-090",
-        "statement": "define generated artifact manifest",
-        "accountability_id": "ACC-VOL-090",
-        "requirement_refs": [
-          "REQ:VOL-090:001",
-          "REQ:VOL-090:002",
-          "REQ:VOL-090:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define generated artifact manifest"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-090-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-090:gap:002",
-        "volume_ref": "VOL-090",
-        "statement": "add regeneration cleanliness gate",
-        "accountability_id": "ACC-VOL-090",
-        "requirement_refs": [
-          "REQ:VOL-090:001",
-          "REQ:VOL-090:002",
-          "REQ:VOL-090:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:add regeneration cleanliness gate"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-091-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-091:gap:001",
-        "volume_ref": "VOL-091",
-        "statement": "establish runbook registry",
-        "accountability_id": "ACC-VOL-091",
-        "requirement_refs": [
-          "REQ:VOL-091:001",
-          "REQ:VOL-091:002",
-          "REQ:VOL-091:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:establish runbook registry"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-091-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-091:gap:002",
-        "volume_ref": "VOL-091",
-        "statement": "bind drills to runbook versions",
-        "accountability_id": "ACC-VOL-091",
-        "requirement_refs": [
-          "REQ:VOL-091:001",
-          "REQ:VOL-091:002",
-          "REQ:VOL-091:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind drills to runbook versions"
-      },
-      {
         "backlog_id": "BL-GAP-VOL-092-001",
         "source_kind": "gap",
         "source_ref": "VOL-092:gap:001",
@@ -2978,38 +2850,6 @@
         "state": "open",
         "closure_evidence_refs": [],
         "deduplication_key": "gap:materialize cycle/blocked-state reporting"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-110-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-110:gap:001",
-        "volume_ref": "VOL-110",
-        "statement": "unify maturity and DoD rules",
-        "accountability_id": "ACC-VOL-110",
-        "requirement_refs": [
-          "REQ:VOL-110:001",
-          "REQ:VOL-110:002",
-          "REQ:VOL-110:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:unify maturity and dod rules"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-110-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-110:gap:002",
-        "volume_ref": "VOL-110",
-        "statement": "bind change-impact triggers to DoD",
-        "accountability_id": "ACC-VOL-110",
-        "requirement_refs": [
-          "REQ:VOL-110:001",
-          "REQ:VOL-110:002",
-          "REQ:VOL-110:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind change-impact triggers to dod"
       },
       {
         "backlog_id": "BL-GAP-VOL-111-001",
