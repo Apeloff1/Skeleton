@@ -6824,7 +6824,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Require successful VS-001 plus mapped failure, recovery, security and quality evidence.",
         "Verify authoritative state, tool governance, provenance and terminal streaming semantics.",
@@ -6838,31 +6838,35 @@
       "contracts": [
         "FunctionalAIAcceptance",
         "AcceptanceCriterion",
-        "AcceptanceEvidence"
+        "AcceptanceEvidence",
+        "AcceptanceSignoff",
+        "Criterion"
       ],
       "implementation_paths": [
         "machine",
         "docs/plan",
-        "skeleton/eval"
+        "skeleton/eval",
+        "skeleton/eval/functional_acceptance.py",
+        "skeleton/testing/test_functional_ai_acceptance.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_functional_ai_acceptance.py",
-        "planned:acceptance evidence integrity tests"
+        "skeleton/testing/test_functional_ai_acceptance.py"
       ],
       "evaluations": [
-        "planned:acceptance replay evaluation",
-        "planned:failure-mode coverage audit"
+        "skeleton/testing/test_functional_ai_acceptance.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/0b6e84a423f2e8c92dc88869b531e25e9b6bacd7",
+        "https://github.com/Apeloff1/Skeleton/commit/3a74fad27e74047723d2fda750b73adb77649db3",
+        "skeleton/eval/functional_acceptance.py",
+        "skeleton/testing/test_functional_ai_acceptance.py"
+      ],
       "risks": [
         "demo-only acceptance",
         "missing negative evidence",
         "stale signoff"
       ],
-      "gaps": [
-        "define exact acceptance matrix",
-        "bind signoff to immutable evidence bundle"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-104",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
