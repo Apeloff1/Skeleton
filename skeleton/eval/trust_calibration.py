@@ -10,7 +10,7 @@ class CalibrationObservation:
 class TrustSignal:
  confidence:float; uncertainty:float; degraded:bool; evidence:tuple[str,...]
  def __post_init__(self):
-  if any(isinstance(x,bool) or not isinstance(x,(int,float)) or not math.isfinite(x) for x in (self.confidence,self.uncertainty)) or not 0<=self.confidence<=1 or not 0<=self.uncertainty<=1:raise ValueError("invalid trust signal")
+  if not isinstance(self.degraded,bool) or any(not isinstance(e,str) or not e.strip() for e in self.evidence) or len(self.evidence)!=len(set(self.evidence)) or any(isinstance(x,bool) or not isinstance(x,(int,float)) or not math.isfinite(x) for x in (self.confidence,self.uncertainty)) or not 0<=self.confidence<=1 or not 0<=self.uncertainty<=1:raise ValueError("invalid trust signal")
 @dataclass(frozen=True)
 class TrustPresentation:
  label:str; confidence:float; uncertainty:float; degraded:bool; calibration_error:float|None
