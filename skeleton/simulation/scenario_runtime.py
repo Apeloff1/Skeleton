@@ -478,6 +478,7 @@ class ScenarioEdge:
     transition_digest: str
     reward: float
     local_uncertainty: float
+    cost_units: int
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -508,6 +509,11 @@ class ScenarioEdge:
             "local_uncertainty",
             _unit(self.local_uncertainty, "local_uncertainty"),
         )
+        object.__setattr__(
+            self,
+            "cost_units",
+            _positive_int(self.cost_units, "cost_units"),
+        )
 
     @property
     def digest(self) -> str:
@@ -521,6 +527,7 @@ class ScenarioEdge:
                 "transition_digest": self.transition_digest,
                 "reward": self.reward,
                 "local_uncertainty": self.local_uncertainty,
+                "cost_units": self.cost_units,
             }
         )
 
@@ -632,6 +639,8 @@ class ScenarioTree:
             raise ScenarioRuntimeError("usage.nodes does not match tree")
         if self.usage.actions != len(self.edges):
             raise ScenarioRuntimeError("usage.actions does not match tree")
+        if self.usage.cost_units != sum(edge.cost_units for edge in self.edges):
+            raise ScenarioRuntimeError("usage.cost_units does not match tree")
         if self.usage.max_depth_reached != max(node.depth for node in self.nodes):
             raise ScenarioRuntimeError("usage.max_depth_reached does not match tree")
 
@@ -899,6 +908,7 @@ class ScenarioRuntime:
                     transition_digest=transition.digest,
                     reward=transition.reward,
                     local_uncertainty=transition.local_uncertainty,
+                    cost_units=transition.action.cost_units,
                 )
                 nodes.append(child)
                 edges.append(edge)
@@ -996,9 +1006,12 @@ class ScenarioRuntime:
                 raise ScenarioRuntimeError(
                     "tree uncertainty decreases along an edge"
                 )
-            if child.cumulative_cost_units < parent.cumulative_cost_units:
+            if (
+                child.cumulative_cost_units
+                != parent.cumulative_cost_units + edge.cost_units
+            ):
                 raise ScenarioRuntimeError(
-                    "tree cumulative cost decreases along an edge"
+                    "tree cumulative cost does not match edge cost"
                 )
             if child.action_count != parent.action_count + 1:
                 raise ScenarioRuntimeError(
