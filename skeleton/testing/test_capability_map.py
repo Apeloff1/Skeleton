@@ -523,3 +523,32 @@ def test_snapshot_replay_rejects_unknown_fields() -> None:
     payload["authority_override"] = True
     with pytest.raises(CapabilityError, match="unknown or missing fields"):
         CapabilitySnapshot.from_dict(payload)
+
+
+def test_snapshot_replay_rejects_duplicate_authority() -> None:
+    root = descriptor("CAP.ROOT")
+    payload = CapabilityMap((root,), (live(root),)).resolve_all().to_dict()
+    payload["capabilities"].append(dict(payload["capabilities"][0]))
+    with pytest.raises(CapabilityError, match="duplicate snapshot capability"):
+        CapabilitySnapshot.from_dict(payload)
+
+
+def test_snapshot_replay_rejects_noncanonical_order() -> None:
+    first = descriptor("CAP.AAA")
+    second = descriptor("CAP.BBB")
+    snapshot = CapabilityMap(
+        (first, second),
+        (live(first, evidence_id="EVID.AAA"), live(second, evidence_id="EVID.BBB")),
+    ).resolve_all()
+    payload = snapshot.to_dict()
+    payload["capabilities"].reverse()
+    with pytest.raises(CapabilityError, match="canonical order"):
+        CapabilitySnapshot.from_dict(payload)
+
+
+def test_snapshot_replay_rejects_non_boolean_health() -> None:
+    root = descriptor("CAP.ROOT")
+    payload = CapabilityMap((root,), (live(root),)).resolve_all().to_dict()
+    payload["healthy"] = 1
+    with pytest.raises(CapabilityError, match="health must be boolean"):
+        CapabilitySnapshot.from_dict(payload)
