@@ -3,7 +3,9 @@ import hashlib,pytest
 from skeleton.automation.work_packages import *
 SHA=hashlib.sha256(b"x").hexdigest()
 def pkg(i="PKG.095"):return WorkPackage(i,"VOL.095","Build exact package",("Do not merge",),("API.X",),("OWNER.X",),("RISK.X",),("TEST.X",),"Rollback commit",("REQ.1",),("AIQ.1",))
-def ev(i,role,actor,p="PKG.095"):return WorkPackageEvidence(i,p,role,actor,SHA)
+def ev(i,role,actor,p="PKG.095",package=None,digest=None):
+ target=package or pkg(p)
+ return WorkPackageEvidence(i,p,digest or target.digest,role,actor,SHA)
 def test_package_requires_all_structural_fields():
  with pytest.raises(WorkPackageError,match="tests"):WorkPackage("PKG.X","VOL.095","x",("n",),("i",),("o",),("r",),(),"rb",("q",),("a",))
 def test_state_is_derived_not_manually_set():
@@ -25,3 +27,23 @@ def test_cycle_rejected():
 def test_package_identity_immutable():
  r=WorkPackageRegistry();r.add(pkg())
  with pytest.raises(WorkPackageError,match="immutable"):r.add(WorkPackage("PKG.095","VOL.095","changed",("n",),("i",),("o",),("r",),("t",),"rb",("q",),("a",)))
+
+def test_evidence_is_bound_to_exact_package_digest():
+ r=WorkPackageRegistry();p=pkg();r.add(p)
+ with pytest.raises(WorkPackageError,match="stale or bound"):
+  r.attest(ev("EVID.I",EvidenceRole.IMPLEMENTATION,"ACTOR.X",package=p,digest=hashlib.sha256(b"old").hexdigest()))
+
+def test_evidence_role_must_be_typed():
+ p=pkg()
+ with pytest.raises(WorkPackageError,match="EvidenceRole"):
+  WorkPackageEvidence("EVID.X",p.package_id,p.digest,"implementation","ACTOR.X",SHA)
+
+def test_dependency_identity_is_immutable():
+ r=WorkPackageRegistry();r.add(pkg("PKG.A"));r.add(pkg("PKG.B"));r.add(pkg("PKG.C"))
+ r.depend(WorkPackageDependency("DEP.X","PKG.B","PKG.A"))
+ with pytest.raises(WorkPackageError,match="dependency identity immutable"):
+  r.depend(WorkPackageDependency("DEP.X","PKG.C","PKG.A"))
+
+def test_structural_collections_are_typed_and_bounded():
+ with pytest.raises(WorkPackageError,match="non_goals must be tuple"):
+  WorkPackage("PKG.X","VOL.095","x",["n"],("i",),("o",),("r",),("t",),"rb",("q",),("a",))
