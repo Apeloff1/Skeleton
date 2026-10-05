@@ -972,6 +972,13 @@
         "VOL-206",
         "VOL-207",
         "VOL-208",
+        "VOL-214",
+        "VOL-215",
+        "VOL-216",
+        "VOL-217",
+        "VOL-218",
+        "VOL-219",
+        "VOL-220",
         "VOL-248",
         "VOL-252",
         "VOL-323",
@@ -5160,7 +5167,8 @@
       "move_batch": "B4-research-quarantine",
       "source_disposition": "canonical_namespace_entrypoint_with_independently_governed_children",
       "volume_refs": [
-        "VOL-001"
+        "VOL-001",
+        "VOL-213"
       ]
     },
     {
@@ -5184,7 +5192,8 @@
       "move_batch": "B4-research-quarantine",
       "source_disposition": "research_lineage_quarantine_mirror_pending_independent_cutover_validation",
       "volume_refs": [
-        "VOL-001"
+        "VOL-001",
+        "VOL-212"
       ]
     },
     {
