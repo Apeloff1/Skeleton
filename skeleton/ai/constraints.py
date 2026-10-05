@@ -22,6 +22,10 @@ class Constraint(Generic[T]):
     predicate: Callable[[T], bool]
 
     def __post_init__(self) -> None:
+        if not isinstance(self.strength, ConstraintStrength):
+            raise TypeError("constraint strength must be ConstraintStrength")
+        if not callable(self.predicate):
+            raise TypeError("constraint predicate must be callable")
         for value, label in (
             (self.constraint_id, "constraint_id"),
             (self.description, "description"),
