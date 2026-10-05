@@ -16,7 +16,13 @@ from .executor import (
     ExecutionReceipt,
     FailureReceipt,
 )
-from .contract_fuzzing import ContractFuzzer, FuzzBudget, FuzzFailure, FuzzReport
+from .simulation_mode import (
+    SimulationAuthority,
+    SimulationEvidence,
+    SimulationRequest,
+    SimulationResult,
+    SimulationRuntime,
+)
 from .journal import (
     DeferredExecutionJournal,
     DeferredJournalConflict,
@@ -28,10 +34,6 @@ from .journal import (
 __all__ = [
     "CapabilityRegistry",
     "CapabilitySpec",
-    "ContractFuzzer",
-    "FuzzBudget",
-    "FuzzFailure",
-    "FuzzReport",
     "DEFERRED_165_SPECS",
     "DeferredEffectAuthority",
     "DeferredExecutionError",
@@ -47,6 +49,11 @@ __all__ = [
     "ExecutionReceipt",
     "FailureReceipt",
     "SqliteDeferredExecutionJournal",
+    "SimulationAuthority",
+    "SimulationEvidence",
+    "SimulationRequest",
+    "SimulationResult",
+    "SimulationRuntime",
     "build_registry",
     "volume_ids",
 ]
