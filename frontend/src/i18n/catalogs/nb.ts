@@ -4,6 +4,7 @@ export const NB_MESSAGES: Readonly<Record<TranslationKey, string>> = Object.free
   'app.name': 'Skeleton',
   'app.tagline': 'Samlet produkt',
   'launcher.open': 'Åpne Skeleton',
+  'launcher.enter_product': 'Gå inn i produktet',
   'launcher.minimal': 'Bruk minimal oppstart',
   'operation.cancel': 'Avbryt operasjon',
   'authority.approve': 'Godkjenn',
