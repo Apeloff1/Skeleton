@@ -8,6 +8,7 @@ from skeleton.contracts.compliance import (
     ComplianceEvidence,
     ComplianceRegistry,
     ComplianceRequirement,
+    ControlKind,
     ControlStatus,
     EnforcementMode,
     EvidenceResult,
@@ -43,6 +44,9 @@ def control(
     requirement_ids=("REQ-1",),
     *,
     mode=EnforcementMode.TECHNICAL,
+    kind=ControlKind.SECURITY,
+    implementation_ref="skeleton/security/evidence",
+    verifier_id="verify.evidence.v1",
 ):
     return ComplianceControl(
         control_id="CTRL-1",
@@ -50,6 +54,9 @@ def control(
         requirement_ids=requirement_ids,
         evidence_ttl_seconds=3600,
         description="Verify immutable evidence",
+        kind=kind,
+        implementation_ref=implementation_ref,
+        verifier_id=verifier_id,
         enforcement_mode=mode,
     )
 
@@ -60,6 +67,7 @@ def evidence(ctrl, *, observed_at=NOW, result=EvidenceResult.PASS, **overrides):
         "control_id": ctrl.control_id,
         "control_digest": ctrl.digest,
         "owner": ctrl.owner,
+        "verifier_id": ctrl.verifier_id,
         "artifact_digest": "a" * 64,
         "observed_at": observed_at,
         "result": result,
@@ -77,8 +85,26 @@ def registry(req=None, ctrl=None):
 def test_registry_identity_is_order_independent_and_jurisdiction_bound():
     a = requirement("REQ-A", jurisdiction="NO")
     b = requirement("REQ-B", jurisdiction="EU")
-    ca = ComplianceControl("CTRL-A", "security.owner", ("REQ-A",), 60, "A")
-    cb = ComplianceControl("CTRL-B", "security.owner", ("REQ-B",), 60, "B")
+    ca = ComplianceControl(
+        "CTRL-A",
+        "security.owner",
+        ("REQ-A",),
+        60,
+        "A",
+        ControlKind.SECURITY,
+        "skeleton/security/a",
+        "verify.a.v1",
+    )
+    cb = ComplianceControl(
+        "CTRL-B",
+        "security.owner",
+        ("REQ-B",),
+        60,
+        "B",
+        ControlKind.RETENTION,
+        "skeleton/security/b",
+        "verify.b.v1",
+    )
     first = ComplianceRegistry((a, b), (ca, cb))
     second = ComplianceRegistry((b, a), (cb, ca))
     assert first.digest == second.digest
@@ -232,3 +258,32 @@ def test_canonical_and_governed_ai_mirror_are_byte_identical():
     canonical = root / "skeleton/contracts/compliance.py"
     mirror = root / "skeleton/ai/runtime/contracts/compliance.py"
     assert canonical.read_bytes() == mirror.read_bytes()
+
+
+def test_verifier_substitution_cannot_satisfy_control():
+    reg, ctrl = registry()
+    assessment = reg.assess(
+        (evidence(ctrl, verifier_id="verify.other.v1"),),
+        at=NOW,
+    )
+    assert assessment.controls[0].status is ControlStatus.EVIDENCE_MISSING
+    assert not assessment.compliant
+
+
+def test_control_identity_binds_kind_implementation_and_verifier():
+    original = control()
+    changed_kind = control(kind=ControlKind.RETENTION)
+    changed_impl = control(implementation_ref="skeleton/security/other")
+    changed_verifier = control(verifier_id="verify.other.v1")
+
+    assert original.digest != changed_kind.digest
+    assert original.digest != changed_impl.digest
+    assert original.digest != changed_verifier.digest
+
+
+def test_evidence_digest_binds_verifier_identity():
+    _, ctrl = registry()
+    original = evidence(ctrl)
+    substituted = evidence(ctrl, verifier_id="verify.other.v1")
+
+    assert original.digest != substituted.digest
