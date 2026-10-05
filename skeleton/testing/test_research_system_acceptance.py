@@ -31,3 +31,11 @@ def test_research_signoff_invalidates_on_evidence_drift():
  a=acceptance();s=sign_acceptance(a);verify_acceptance(a,s)
  changed=acceptance(conclusion_digest=S("changed"))
  with pytest.raises(ResearchAcceptanceError,match="stale or mismatched"):verify_acceptance(changed,s)
+
+def test_lineage_qualification_is_bound_into_acceptance_identity():
+ a=acceptance(lineage_qualification_digest=S("lineage-v1"));s=sign_acceptance(a);verify_acceptance(a,s)
+ changed=acceptance(lineage_qualification_digest=S("lineage-v2"))
+ assert changed.digest!=a.digest
+ with pytest.raises(ResearchAcceptanceError,match="stale or mismatched"):verify_acceptance(changed,s)
+def test_malformed_lineage_qualification_digest_rejected():
+ with pytest.raises(ResearchAcceptanceError,match="lineage_qualification_digest"):acceptance(lineage_qualification_digest="forged")
