@@ -1,17 +1,5 @@
-# Skeleton consolidation finalization
+# CONSOLIDATION FINAL
 
-This marker closes the active consolidation/hardening workstream.
+This document moved to [`consolidation/CONSOLIDATION_FINAL.md`](consolidation/CONSOLIDATION_FINAL.md) in TREE-042.
 
-## Finalized areas
-
-- Swarm runtime admission, leasing, rollback, recovery, checkpoint, tenant accounting, and recovery archive invariants are hardened with focused regression coverage.
-- Tenant/runtime cutover paths include recovery-generation fencing and transactional accounting compensation.
-- Backend process execution is guarded by fail-closed static safety checks and CI enforcement.
-- Frontend, backend, Jeeves, Cockpit, GameForge, Docker, and focused swarm suites are represented in repository CI gates.
-- Retired external Emergent SDK dependency is replaced by the repository-local compatibility boundary.
-
-## Release rule
-
-This document is a consolidation freeze marker, not a substitute for CI. A release is considered validated only when the repository's required GitHub Actions gates complete successfully on the frozen head.
-
-Further commits after this marker begin a new development cycle and should be treated as post-consolidation work.
+This file is a compatibility pointer only. Update new references to the canonical path above; do not add new content here.
