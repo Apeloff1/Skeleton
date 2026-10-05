@@ -4927,7 +4927,7 @@
       "source": "skeleton/knowledge",
       "destination": "skeleton/ai/runtime/knowledge",
       "kind": "tree",
-      "source_git_object_sha": "518f871ec380c08d8226adbfb0122493efd85d13",
+      "source_git_object_sha": "b3d713a209d0afb4616b86393f01202dfb31b608",
       "role": "Canonical reusable knowledge and reasoning substrate parent with independently governed graph primitives.",
       "work_package_refs": [
         "WP-W09",
