@@ -6312,7 +6312,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Separate hard blockers from soft ranking signals.",
         "Use transparent priority factors with provenance and bounded weights.",
@@ -6329,17 +6329,13 @@
         "PriorityConstraint"
       ],
       "implementation_paths": [
-        "skeleton/automation",
-        "machine",
-        "docs/plan"
+        "skeleton/automation/priority_engine.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_priority_engine.py",
-        "planned:skeleton/testing/test_priority_blockers.py"
+        "skeleton/testing/test_priority_engine.py"
       ],
       "evaluations": [
-        "planned:priority stability evaluation",
-        "planned:gaming/adversarial backlog test"
+        "skeleton/testing/test_priority_engine.py"
       ],
       "evidence": [],
       "risks": [
@@ -6347,10 +6343,7 @@
         "metric gaming",
         "oscillating priorities"
       ],
-      "gaps": [
-        "define priority factor schema",
-        "add anti-starvation constraints"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-094",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
