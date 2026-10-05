@@ -47,6 +47,10 @@ class VariancePolicy: absolute_tolerance:float; relative_tolerance:float
 @dataclass(frozen=True,slots=True)
 class DeterminismEnvelope:
  classification:DeterminismClass; seed:int|None; variance:VariancePolicy; nondeterminism_sources:tuple[str,...]
+ def __post_init__(self):
+  if self.variance.absolute_tolerance<0 or self.variance.relative_tolerance<0:raise ValueError("variance tolerance must be nonnegative")
+  if any(not x for x in self.nondeterminism_sources) or len(set(self.nondeterminism_sources))!=len(self.nondeterminism_sources):raise ValueError("unique nondeterminism sources required")
+  if self.classification is DeterminismClass.EXACT and self.nondeterminism_sources:raise ValueError("exact envelope cannot declare nondeterminism")
  def equivalent(self,a:float,b:float)->bool:
   if self.classification is DeterminismClass.EXACT:return a==b
   if self.classification is DeterminismClass.NONDETERMINISTIC:return False
@@ -61,7 +65,11 @@ class Duration: monotonic_ns:int
 @dataclass(frozen=True,slots=True)
 class Deadline:
  start_monotonic_ns:int; duration:Duration
- def expired(self,now_monotonic_ns:int)->bool:return now_monotonic_ns-self.start_monotonic_ns>=self.duration.monotonic_ns
+ def __post_init__(self):
+  if self.start_monotonic_ns<0:raise ValueError("deadline start must be nonnegative")
+ def expired(self,now_monotonic_ns:int)->bool:
+  if now_monotonic_ns<0:raise ValueError("monotonic clock must be nonnegative")
+  return now_monotonic_ns-self.start_monotonic_ns>=self.duration.monotonic_ns
 
 class IdentifierKind(str,Enum): OPERATION="operation"; PRINCIPAL="principal"; RESOURCE="resource"
 @dataclass(frozen=True,slots=True)
@@ -78,10 +86,15 @@ class IdentifierCodec:
  def render(i:Identifier)->str:return f"{i.kind.value}:{i.value}"
 
 @dataclass(frozen=True,slots=True)
-class SequenceNumber: domain:str; value:int
+class SequenceNumber:
+ domain:str; value:int
+ def __post_init__(self):
+  if not self.domain or self.value<0:raise ValueError("valid sequence identity required")
 @dataclass(frozen=True,slots=True)
 class LogicalClock:
  node_id:str; counter:int
+ def __post_init__(self):
+  if not self.node_id or self.counter<0:raise ValueError("valid logical clock required")
  def tick(self)->"LogicalClock": return LogicalClock(self.node_id,self.counter+1)
 class CausalRelation(str,Enum): BEFORE="before"; AFTER="after"; CONCURRENT="concurrent"; UNKNOWN="unknown"
 def compare_sequence(a:SequenceNumber,b:SequenceNumber)->CausalRelation:
