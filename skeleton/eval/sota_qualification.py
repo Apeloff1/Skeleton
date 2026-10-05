@@ -17,7 +17,8 @@ class SOTACandidateClaim:
  def __post_init__(self):
   for f in ("claim_id","benchmark_id","metric_id","researcher_id"):object.__setattr__(self,f,_id(getattr(self,f),f))
   _sha(self.candidate_digest,"candidate_digest")
-  if not isinstance(self.task_scope,str) or not isinstance(self.population_scope,str) or not self.task_scope.strip() or not self.population_scope.strip():raise QualificationError("claim scope must be explicit")\n  object.__setattr__(self,"task_scope",self.task_scope.strip());object.__setattr__(self,"population_scope",self.population_scope.strip())
+  if not isinstance(self.task_scope,str) or not isinstance(self.population_scope,str) or not self.task_scope.strip() or not self.population_scope.strip():raise QualificationError("claim scope must be explicit")
+  object.__setattr__(self,"task_scope",self.task_scope.strip());object.__setattr__(self,"population_scope",self.population_scope.strip())
  @property
  def digest(self):return _dig([self.claim_id,self.candidate_digest,self.benchmark_id,self.task_scope,self.population_scope,self.metric_id,self.researcher_id])
 @dataclass(frozen=True,slots=True)
@@ -25,7 +26,9 @@ class BaselineComparison:
  claim_digest:str;baseline_id:str;baseline_digest:str;candidate_score:float;baseline_score:float;effect_size:float;confidence_low:float;contamination_checked:bool
  def __post_init__(self):
   _sha(self.claim_digest,"claim_digest");object.__setattr__(self,"baseline_id",_id(self.baseline_id,"baseline_id"));_sha(self.baseline_digest,"baseline_digest")
-  for v in (self.candidate_score,self.baseline_score,self.effect_size,self.confidence_low):\n   if not isinstance(v,(int,float)) or isinstance(v,bool) or not math.isfinite(v):raise QualificationError("comparison statistics must be finite numeric")\n  if not isinstance(self.contamination_checked,bool):raise QualificationError("contamination_checked must be bool")
+  for v in (self.candidate_score,self.baseline_score,self.effect_size,self.confidence_low):
+   if not isinstance(v,(int,float)) or isinstance(v,bool) or not math.isfinite(v):raise QualificationError("comparison statistics must be finite numeric")
+  if not isinstance(self.contamination_checked,bool):raise QualificationError("contamination_checked must be bool")
  @property
  def supported(self):return self.contamination_checked and self.candidate_score>self.baseline_score and self.effect_size>0 and self.confidence_low>0
 @dataclass(frozen=True,slots=True)
@@ -36,7 +39,8 @@ class QualificationEvidence:
   for f in ("replayer_id","researcher_id"):object.__setattr__(self,f,_id(getattr(self,f),f))
   for f in ("replay_digest","robustness_digest","security_digest","latency_digest","cost_digest","operations_digest"):_sha(getattr(self,f),f)
   if self.comparison.claim_digest!=self.claim_digest:raise QualificationError("baseline comparison targets wrong claim")
-  if self.replayer_id==self.researcher_id:raise QualificationError("benchmark replay must be independent")\n  if not self.comparison.supported:raise QualificationError("baseline comparison is not statistically supported")
+  if self.replayer_id==self.researcher_id:raise QualificationError("benchmark replay must be independent")
+  if not self.comparison.supported:raise QualificationError("baseline comparison is not statistically supported")
  @property
  def qualified(self):return True
 
