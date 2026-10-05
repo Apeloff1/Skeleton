@@ -68,7 +68,9 @@ class PlanSimulation: steps:tuple[SimulatedStep,...]; findings:tuple[SimulationF
 def simulate_plan(step_ids):
  if not step_ids or any(not s for s in step_ids) or len(set(step_ids))!=len(step_ids):raise ValueError("unique simulation steps required")
  scenarios=("success","failure","timeout","resource_exhaustion")
- return PlanSimulation(tuple(SimulatedStep(s,x,"simulated") for s in step_ids for x in scenarios),tuple())
+ steps=tuple(SimulatedStep(s,x,"simulated") for s in step_ids for x in scenarios)
+ findings=tuple(SimulationFinding(x,"simulated adverse outcome") for x in scenarios if x!="success")
+ return PlanSimulation(steps,findings)
 @dataclass(frozen=True,slots=True)
 class ToolBinding: tool_id:str; version:str; authority:frozenset[str]; input_schema:str; output_schema:str; trust_class:str
 @dataclass(frozen=True,slots=True)
