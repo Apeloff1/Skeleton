@@ -14,6 +14,18 @@ from .lifecycle_safety import (
     MigrationReceipt, MigrationState, MigrationStep, ParityEvidence,
     RetirementDecision, can_remove_adapter, decide_retirement,
 )
+from .lifecycle_governance import (
+    DataRights, EthicsDecision, EthicsReview, ExperimentExposure,
+    ExperimentKillSwitch, ExperimentalFeature, LicenseCompatibility,
+    LicenseObligation, LicenseRecord, ModelConsumer, ModelDeprecation,
+    ModelGovernanceEvidence, ModelLifecycle, ModelRetirement, ModelState,
+    ModelTransition, ProviderCutover, ProviderMigration, ProviderParity,
+    ResearchBranch, ResearchBranchPolicy, ResearchMergeCandidate, ResearchRisk,
+    RetirementEvidence, RightsDecision, Technique, TechniqueRetirement,
+    UsageGrant, ethics_decision, experiment_allowed, license_compatibility,
+    provider_cutover, research_merge, retirement_complete, retire_model,
+    rights_decision, transition_model,
+)
 from .contract_fuzzing import ContractFuzzer, FuzzBudget, FuzzFailure, FuzzReport
 from .simulation_mode import SimulationAuthority, SimulationEvidence, SimulationRequest, SimulationResult, SimulationRuntime
 from .journal import DeferredExecutionJournal, DeferredJournalConflict, DeferredJournalError, DeferredJournalRecord, SqliteDeferredExecutionJournal
