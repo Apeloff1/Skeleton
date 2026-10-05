@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "volume": "VOL-074",
+  "status": "implementation_contract",
+  "policy": {
+    "evidence_rule": "Observed learner evidence and inferred mastery are distinct records. Inferred mastery cannot masquerade as source evidence.",
+    "planning_rule": "Instruction is planned against an explicit objective DAG; unmet or uncertain prerequisites are handled before advancing the target.",
+    "outcome_rule": "Pedagogy is evaluated by independently owned learning outcomes, score change, retained performance, and misconception correction. Engagement alone is never a promotion criterion."
+  },
+  "objectives": [
+    {
+      "objective_id": "reasoning.evidence-separation",
+      "description": "Distinguish observed evidence from inference and unsupported claims.",
+      "prerequisites": [],
+      "mastery_threshold": 0.8,
+      "uncertainty_ceiling": 0.35
+    },
+    {
+      "objective_id": "reasoning.calibrated-conclusion",
+      "description": "Form conclusions whose strength is calibrated to the available evidence.",
+      "prerequisites": ["reasoning.evidence-separation"],
+      "mastery_threshold": 0.82,
+      "uncertainty_ceiling": 0.3
+    },
+    {
+      "objective_id": "reasoning.counterexample",
+      "description": "Test a proposed conclusion against counterexamples and boundary cases.",
+      "prerequisites": ["reasoning.calibrated-conclusion"],
+      "mastery_threshold": 0.82,
+      "uncertainty_ceiling": 0.3
+    }
+  ],
+  "outcome_binding": {
+    "owner_id": "eval-learning-outcomes",
+    "suite_id": "education-vol074-v1",
+    "minimum_post_score": 0.8,
+    "minimum_gain": 0.1,
+    "max_allowed_regression": 0.02,
+    "require_misconception_correction": true
+  },
+  "forbidden_promotion_signals": [
+    "click-count",
+    "dwell-time",
+    "message-count",
+    "session-length"
+  ],
+  "implementation": {
+    "runtime": "skeleton/education/learning.py",
+    "package": "skeleton/education/__init__.py",
+    "tests": "tests/test_vol074_education_intelligence.py",
+    "verifier": "scripts/check_vol074_education_intelligence.py",
+    "workflow": ".github/workflows/vol074-education-intelligence.yml"
+  }
+}
