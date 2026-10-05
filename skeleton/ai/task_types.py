@@ -1,6 +1,7 @@
 """Conservative semantic task classification for VOL-311."""
 from __future__ import annotations
 from dataclasses import dataclass
+import math
 from enum import Enum
 class TaskType(str,Enum):
  GENERIC="generic"; RESEARCH="research"; CODE_CHANGE="code_change"; SECURITY="security"; DATA_CHANGE="data_change"; RELEASE="release"
@@ -8,13 +9,13 @@ class TaskType(str,Enum):
 class TaskProfile:
  task_type:TaskType; default_budget:int; required_tests:tuple[str,...]; policy_tags:tuple[str,...]; grants_privilege:bool=False
  def __post_init__(self):
-  if self.default_budget<0:raise ValueError("budget must be nonnegative")
+  if isinstance(self.default_budget,bool) or not isinstance(self.default_budget,int) or self.default_budget<0:raise ValueError("budget must be nonnegative")
   if self.grants_privilege:raise ValueError("task profiles cannot grant privilege")
 @dataclass(frozen=True)
 class TaskClassification:
  task_type:TaskType; confidence:float; reasons:tuple[str,...]; profile:TaskProfile
  def __post_init__(self):
-  if not 0<=self.confidence<=1:raise ValueError("confidence out of range")
+  if isinstance(self.confidence,bool) or not isinstance(self.confidence,(int,float)) or not math.isfinite(self.confidence) or not 0<=self.confidence<=1:raise ValueError("confidence out of range")
   if self.profile.task_type is not self.task_type:raise ValueError("profile/type mismatch")
 _PROFILES={
  TaskType.GENERIC:TaskProfile(TaskType.GENERIC,1,("generic-validation",),("conservative",)),
