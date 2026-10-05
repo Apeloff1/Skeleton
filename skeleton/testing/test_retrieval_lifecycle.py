@@ -17,3 +17,21 @@ def test_source_trust_is_claim_domain_and_time_scoped():
  t=SourceTrust(SourceIdentity("s","o","l"),(TrustEvidence("e","claim","finance",10),));assert trust_for(t,"claim","finance",9) and not trust_for(t,"claim","medical",9) and not trust_for(t,"claim","finance",11)
 def test_untrusted_content_remains_data_not_instruction():
  assert content_role(SourceTrust(SourceIdentity("s","o","l"),(),False),"c","d",0)=="data"
+
+
+def test_retrieval_lifecycle_depth_invariants_fail_closed():
+ import pytest
+ with pytest.raises(ValueError): data_health(DataSLO(1.1,1.0,FreshnessSLI(1,1,0)),1.0,1.0)
+ v=EmbeddingVersion("m","1",2,"p")
+ with pytest.raises(ValueError): EmbeddingMigration(v,v,True)
+ active=VectorIndexVersion("idx","1",v,False)
+ other=VectorIndexVersion("other","2",v,True)
+ with pytest.raises(ValueError): promote_index(IndexMigration(active,other,IndexValidation(True,True,True)))
+ v2=EmbeddingVersion("m","2",2,"p")
+ with pytest.raises(ValueError): promote_index(IndexMigration(active,VectorIndexVersion("idx","2",v2,True),IndexValidation(True,True,True)))
+ with pytest.raises(ValueError): freshness(FreshnessRequirement(1,StaleAction.ABSTAIN),-1,0)
+ evidence=TrustEvidence("e","claim","domain",10)
+ bad=SourceTrust(SourceIdentity("","owner","lineage"),(evidence,))
+ assert not trust_for(bad,"claim","domain",1)
+ duplicate=SourceTrust(SourceIdentity("s","owner","lineage"),(evidence,evidence))
+ assert not trust_for(duplicate,"claim","domain",1)
