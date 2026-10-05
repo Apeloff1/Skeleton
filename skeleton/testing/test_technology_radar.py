@@ -10,6 +10,7 @@ from skeleton.contracts.technology_radar import (
     RadarDecision,
     RadarError,
     RadarState,
+    RadarSnapshot,
     TechnologyCandidate,
     TechnologyEvidence,
     TechnologyExitCriteria,
@@ -789,3 +790,27 @@ def test_non_iterable_registry_inputs_fail_with_stable_type_errors() -> None:
         TechnologyRadar((), (), None)  # type: ignore[arg-type]
     with pytest.raises(TypeError, match="items must be iterable"):
         technology_evidence_set_digest(None)  # type: ignore[arg-type]
+
+
+def test_snapshot_rejects_duplicate_and_noncanonical_authority() -> None:
+    with pytest.raises(RadarError, match="duplicate snapshot technology state"):
+        RadarSnapshot(
+            ARTIFACT,
+            (("TECH.1", RadarState.CANDIDATE), ("TECH.1", RadarState.RETIRED)),
+            (),
+        )
+    with pytest.raises(RadarError, match="canonical order"):
+        RadarSnapshot(
+            ARTIFACT,
+            (("TECH.2", RadarState.CANDIDATE), ("TECH.1", RadarState.CANDIDATE)),
+            (),
+        )
+
+
+def test_snapshot_rejects_malformed_identity_and_unbounded_history() -> None:
+    with pytest.raises(RadarError, match="registry_digest must be lowercase sha256"):
+        RadarSnapshot("not-a-digest", (), ())
+    with pytest.raises(RadarError, match="snapshot states must be tuple"):
+        RadarSnapshot(ARTIFACT, [], ())  # type: ignore[arg-type]
+    with pytest.raises(RadarError, match="snapshot transition count exceeds safety bound"):
+        RadarSnapshot(ARTIFACT, (), (ARTIFACT,) * 50_001)
