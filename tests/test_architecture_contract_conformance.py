@@ -25,6 +25,9 @@ class ContractConformanceTests(unittest.TestCase):
         self.assertEqual(result["contract_count"], 36)
         self.assertEqual(result["override_count"], 3)
         self.assertEqual(result["executed_vector_count"], result["vector_count"])
+        self.assertEqual(result["authority_scope"], "contract-conformance-only")
+        self.assertEqual(len(result["qualification_digest"]), 64)
+        self.assertEqual(set(result["source_digests"]), {"catalog", "schema_catalog", "interface_registry"})
 
     def _fixture(self) -> Path:
         temp = Path(tempfile.mkdtemp(prefix="contract-conformance-"))
@@ -69,6 +72,27 @@ class ContractConformanceTests(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.ContractConformanceError, "expected accept"):
             MODULE.validate(root)
 
+    def test_qualification_digest_changes_with_schema_source_identity(self) -> None:
+        root = self._fixture()
+        before = MODULE.validate(root)
+        path = root / "machine/ai_runtime_schemas.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["qualification_probe"] = "identity-only"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        after = MODULE.validate(root)
+        self.assertNotEqual(before["source_digests"]["schema_catalog"], after["source_digests"]["schema_catalog"])
+        self.assertNotEqual(before["qualification_digest"], after["qualification_digest"])
+
+    def test_qualification_digest_changes_with_interface_source_identity(self) -> None:
+        root = self._fixture()
+        before = MODULE.validate(root)
+        path = root / "machine/capability_interfaces.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["qualification_probe"] = "identity-only"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        after = MODULE.validate(root)
+        self.assertNotEqual(before["source_digests"]["interface_registry"], after["source_digests"]["interface_registry"])
+        self.assertNotEqual(before["qualification_digest"], after["qualification_digest"])
 
 if __name__ == "__main__":
     unittest.main()
