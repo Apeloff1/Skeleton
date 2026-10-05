@@ -48,7 +48,15 @@ class ProviderOutcomeEvidence:
             object.__setattr__(self, name, _digest(getattr(self, name), name))
 
     def signed_material(self) -> dict[str, str]:
-        return {"operation_id": self.operation_id, "invocation_fingerprint": self.invocation_fingerprint, "handler_identity": self.handler_identity, "provider_identity": self.provider_identity, "outcome": self.outcome, "outcome_digest": self.outcome_digest, "evidence_nonce": self.evidence_nonce}
+        return {
+            "operation_id": self.operation_id,
+            "invocation_fingerprint": self.invocation_fingerprint,
+            "handler_identity": self.handler_identity,
+            "provider_identity": self.provider_identity,
+            "outcome": self.outcome,
+            "outcome_digest": self.outcome_digest,
+            "evidence_nonce": self.evidence_nonce,
+        }
 
     @property
     def evidence_digest(self) -> str:
@@ -65,7 +73,15 @@ class ReconciliationReceipt:
 
     @property
     def digest(self) -> str:
-        return sha256_json({"schema_version": 1, "operation_id": self.operation_id, "journal_record_digest": self.journal_record_digest, "evidence_digest": self.evidence_digest, "provider_identity": self.provider_identity, "outcome": self.outcome, "terminal_record_digest": self.terminal_record_digest})
+        return sha256_json({
+            "schema_version": 1,
+            "operation_id": self.operation_id,
+            "journal_record_digest": self.journal_record_digest,
+            "evidence_digest": self.evidence_digest,
+            "provider_identity": self.provider_identity,
+            "outcome": self.outcome,
+            "terminal_record_digest": self.terminal_record_digest,
+        })
 
 class DeferredOutcomeReconciler:
     """Resolve unknown durable outcomes without replaying their effects."""
@@ -90,8 +106,19 @@ class DeferredOutcomeReconciler:
             raise DeferredJournalConflict("provider evidence handler identity mismatch")
         if not self.verify_signature(evidence.provider_identity, evidence.signed_material(), evidence.signature):
             raise PermissionError("provider outcome evidence signature rejected")
+
         invocation = record.invocation
-        common = {"operation_id": evidence.operation_id, "volume_id": invocation["volume_id"], "spec_digest": invocation["spec_digest"], "authority_digest": invocation["authority_digest"], "payload_digest": invocation["payload_digest"], "handler_identity": record.handler_identity, "attempt": 1, "cost_units": invocation["cost_units"], "latency_ms": invocation["latency_ms"]}
+        common = {
+            "operation_id": evidence.operation_id,
+            "volume_id": invocation["volume_id"],
+            "spec_digest": invocation["spec_digest"],
+            "authority_digest": invocation["authority_digest"],
+            "payload_digest": invocation["payload_digest"],
+            "handler_identity": record.handler_identity,
+            "attempt": 1,
+            "cost_units": invocation["cost_units"],
+            "latency_ms": invocation["latency_ms"],
+        }
         if evidence.outcome == "succeeded":
             if result is None:
                 raise ValueError("successful reconciliation requires result")
@@ -100,14 +127,36 @@ class DeferredOutcomeReconciler:
             if actual != evidence.outcome_digest:
                 raise DeferredJournalConflict("provider success result digest mismatch")
             receipt = ExecutionReceipt(**common, result_digest=actual)
-            terminal = {"receipt": receipt.as_dict(), "receipt_digest": receipt.digest, "result": json.loads(encoded), "reconciliation": {"provider_identity": evidence.provider_identity, "evidence_digest": evidence.evidence_digest}}
+            terminal = {
+                "receipt": receipt.as_dict(),
+                "receipt_digest": receipt.digest,
+                "result": json.loads(encoded),
+                "reconciliation": {"provider_identity": evidence.provider_identity, "evidence_digest": evidence.evidence_digest},
+            }
         else:
             if result is not None:
                 raise ValueError("failed reconciliation must not include result")
             error_type = _text(error_type, "error_type")
             receipt = FailureReceipt(**common, error_type=error_type, error_digest=evidence.outcome_digest)
-            terminal = {"receipt": receipt.as_dict(), "receipt_digest": receipt.digest, "reconciliation": {"provider_identity": evidence.provider_identity, "evidence_digest": evidence.evidence_digest}}
-        terminal_record = self.journal.record_terminal(operation_id=evidence.operation_id, fingerprint=evidence.invocation_fingerprint, state=evidence.outcome, terminal=terminal)
-        return ReconciliationReceipt(operation_id=evidence.operation_id, journal_record_digest=record.record_digest, evidence_digest=evidence.evidence_digest, provider_identity=evidence.provider_identity, outcome=evidence.outcome, terminal_record_digest=terminal_record.record_digest)
+            terminal = {
+                "receipt": receipt.as_dict(),
+                "receipt_digest": receipt.digest,
+                "reconciliation": {"provider_identity": evidence.provider_identity, "evidence_digest": evidence.evidence_digest},
+            }
+
+        terminal_record = self.journal.record_terminal(
+            operation_id=evidence.operation_id,
+            fingerprint=evidence.invocation_fingerprint,
+            state=evidence.outcome,
+            terminal=terminal,
+        )
+        return ReconciliationReceipt(
+            operation_id=evidence.operation_id,
+            journal_record_digest=record.record_digest,
+            evidence_digest=evidence.evidence_digest,
+            provider_identity=evidence.provider_identity,
+            outcome=evidence.outcome,
+            terminal_record_digest=terminal_record.record_digest,
+        )
 
 __all__ = ["DeferredOutcomeReconciler", "ProviderOutcomeEvidence", "ReconciliationReceipt"]
