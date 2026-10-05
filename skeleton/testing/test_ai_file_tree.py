@@ -444,3 +444,33 @@ def test_native_ai_owners_are_canonical_and_residual_where_needed() -> None:
     assert owners["AIFT-NATIVE-EXTENSIONS-ROOT"]["residual_only"] is True
     assert owners["AIFT-NATIVE-DEFERRED-RUNTIME"]["residual_only"] is False
     assert "VOL-209" in owners["AIFT-NATIVE-ARTIFACT-REVIEW"]["volume_refs"]
+
+
+def test_every_tracked_ai_file_has_governed_owner() -> None:
+    import json
+    import subprocess
+
+    module = _module()
+    manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
+    destinations = {
+        item["destination"]
+        for item in manifest["mappings"]
+        if isinstance(item, dict) and isinstance(item.get("destination"), str)
+    }
+    native_owners = manifest["native_ai_owners"]
+    tracked = subprocess.run(
+        ["git", "ls-files", "-z", "skeleton/ai"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.split("\0")
+    unowned = []
+    for path in tracked:
+        if not path:
+            continue
+        mapping_owned = any(module._path_within(path, destination) for destination in destinations)
+        native_owned = module._owned_native_ai_path(native_owners, path) is not None
+        if not mapping_owned and not native_owned:
+            unowned.append(path)
+    assert unowned == []
