@@ -15,7 +15,7 @@ def _d(v:object,n:str)->str:
 @dataclass(frozen=True,slots=True)
 class SafeRepairPlan:
  repair_id:str; affected_state_digest:str; mutation_digest:str; rollback_digest:str; target_invariant:str
- def __post_init__(self):
+    def __post_init__(self):
   object.__setattr__(self,"repair_id",_t(self.repair_id,"repair_id"));object.__setattr__(self,"target_invariant",_t(self.target_invariant,"target_invariant"))
   for n in ("affected_state_digest","mutation_digest","rollback_digest"): object.__setattr__(self,n,_d(getattr(self,n),n))
 @dataclass(frozen=True,slots=True)
@@ -32,19 +32,19 @@ def admit_repair_completion(plan:SafeRepairPlan,checkpoint:RepairCheckpoint,evid
 @dataclass(frozen=True,slots=True)
 class TwinObservation:
  component:str; observed_state_digest:str; observed_at:str; uncertainty:float; governed:bool
- def __post_init__(self):
+    def __post_init__(self):
   _t(self.component,"component");_d(self.observed_state_digest,"observed_state_digest");_t(self.observed_at,"observed_at")
   if not 0<=self.uncertainty<=1: raise ValueError("uncertainty must be in [0,1]")
 @dataclass(frozen=True,slots=True)
 class DigitalTwin:
  twin_id:str; observations:tuple[TwinObservation,...]
- @property
- def authoritative(self)->bool: return False
- @property
- def current(self)->bool: return bool(self.observations) and all(o.governed for o in self.observations)
+    @property
+    def authoritative(self)->bool: return False
+    @property
+    def current(self)->bool: return bool(self.observations) and all(o.governed for o in self.observations)
 @dataclass(frozen=True,slots=True)
 class TwinScenario: scenario_id:str; twin_id:str; proposed_effects:tuple[str,...]; simulation_only:bool=True
- def __post_init__(self):
+    def __post_init__(self):
   if not self.simulation_only: raise ValueError("digital twin cannot authorize real effects")
 
 @dataclass(frozen=True,slots=True)
@@ -53,7 +53,7 @@ class DeploymentConstraint:
 @dataclass(frozen=True,slots=True)
 class DeploymentProposal:
  proposal_id:str; compatibility_verified:bool; required_resources:int; estimated_blast_radius:int; expected_slo:float; authorized:bool=False
- def __post_init__(self):
+    def __post_init__(self):
   if self.authorized: raise ValueError("planner output cannot self-authorize deployment")
 @dataclass(frozen=True,slots=True)
 class DeploymentSequence: proposal_id:str; steps:tuple[str,...]; rollback_steps:tuple[str,...]
@@ -65,7 +65,7 @@ def plan_deployment(p:DeploymentProposal,c:DeploymentConstraint)->DeploymentSequ
 @dataclass(frozen=True,slots=True)
 class ResourceRequest:
  request_id:str; owner:str; cpu:int; memory:int; priority:int
- def __post_init__(self):
+    def __post_init__(self):
   _t(self.request_id,"request_id");_t(self.owner,"owner")
   if self.cpu<=0 or self.memory<=0: raise ValueError("resource request must be positive")
 @dataclass(frozen=True,slots=True)
