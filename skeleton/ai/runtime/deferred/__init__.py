@@ -14,6 +14,13 @@ from .lifecycle_safety import (
     MigrationReceipt, MigrationState, MigrationStep, ParityEvidence,
     RetirementDecision, can_remove_adapter, decide_retirement,
 )
+from .replay_foundations import (
+    Bulkhead, BulkheadLimit, CausalRelation, DeadLetter, DeadLetterDisposition,
+    Deadline, DeterminismClass, DeterminismEnvelope, Duration, Identifier,
+    IdentifierCodec, IdentifierKind, Instant, LogicalClock, OverflowDecision,
+    ReplayAuthorization, ReplayMode, ReplayRequest, ReplayResult, SequenceNumber,
+    VariancePolicy, compare_sequence, dead_letter_disposition, overflow, replay,
+)
 from .contract_fuzzing import ContractFuzzer, FuzzBudget, FuzzFailure, FuzzReport
 from .simulation_mode import SimulationAuthority, SimulationEvidence, SimulationRequest, SimulationResult, SimulationRuntime
 from .journal import DeferredExecutionJournal, DeferredJournalConflict, DeferredJournalError, DeferredJournalRecord, SqliteDeferredExecutionJournal
