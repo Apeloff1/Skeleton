@@ -8,8 +8,21 @@ class ToolGraph: dependencies:tuple[ToolDependency,...]; available:frozenset[tup
 @dataclass(frozen=True,slots=True)
 class ToolCompatibility: compatible:bool; unavailable:tuple[str,...]
 def tool_compatibility(g):
- missing=tuple(sorted({f"{d.target}@{d.target_version}" for d in g.dependencies if (d.target,d.target_version) not in g.available}))
- return ToolCompatibility(not missing,missing)
+ missing=set(f"{d.target}@{d.target_version}" for d in g.dependencies if (d.target,d.target_version) not in g.available)
+ graph={x:set() for x in g.available}
+ for d in g.dependencies:
+  source=(d.source,d.source_version);target=(d.target,d.target_version)
+  if not all((d.source,d.source_version,d.target,d.target_version,d.kind)):missing.add("invalid-dependency")
+  graph.setdefault(source,set()).add(target)
+ visiting=set();visited=set()
+ def cycle(n):
+  if n in visiting:return True
+  if n in visited:return False
+  visiting.add(n)
+  if any(cycle(x) for x in graph.get(n,())):return True
+  visiting.remove(n);visited.add(n);return False
+ if any(cycle(n) for n in sorted(graph) if n not in visited):missing.add("dependency-cycle")
+ unavailable=tuple(sorted(missing));return ToolCompatibility(not unavailable,unavailable)
 class ToolHealthState(str,Enum): HEALTHY="healthy"; DEGRADED="degraded"; STALE="stale"
 @dataclass(frozen=True,slots=True)
 class ToolProbe: transport_ok:bool; semantic_ok:bool; auth_ok:bool; quota_ok:bool; observed_at:int
