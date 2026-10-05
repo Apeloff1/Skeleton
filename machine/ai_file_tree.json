@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "tree_version": "1.7.3",
+  "tree_version": "1.7.4",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
-  "baseline_git_sha": "909ebf8b316c75cc345c46b9ca1d6d190faf28ee",
+  "baseline_git_sha": "4af23641c3b971f4d41440b45b595543fedce70e",
   "canonical_root": "skeleton/ai",
   "migration_mode": "strangler_mirror_then_explicit_cutover",
   "purpose": "Consolidate build-plan-relevant AI engine, governance, shell/control-plane, agent, evaluation, reliability, build-control code, historical research lineage, Jeeves, and selected legacy backend/GameForge AI recovery surfaces into one governed file tree without breaking existing imports or fabricating completion.",
@@ -87,7 +87,10 @@
         "cutover:owner-sensitive"
       ],
       "move_batch": "B3-owner-sensitive",
-      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
+      "source_disposition": "retain_until_explicit_owner_and_import_cutover",
+      "volume_refs": [
+        "VOL-007"
+      ]
     },
     {
       "id": "AIFT-CONTRACTS",
@@ -114,7 +117,27 @@
       "move_batch": "B1-core-runtime",
       "source_disposition": "retain_until_import_inversion_and_regression_gates",
       "volume_refs": [
+        "VOL-000",
+        "VOL-010",
+        "VOL-025",
+        "VOL-034",
+        "VOL-035",
+        "VOL-036",
+        "VOL-037",
+        "VOL-038",
+        "VOL-045",
+        "VOL-048",
+        "VOL-056",
+        "VOL-057",
+        "VOL-059",
+        "VOL-061",
+        "VOL-062",
+        "VOL-063",
+        "VOL-078",
+        "VOL-079",
+        "VOL-080",
         "VOL-081",
+        "VOL-085",
         "VOL-087",
         "VOL-088",
         "VOL-110",
@@ -123,7 +146,18 @@
         "VOL-115",
         "VOL-116",
         "VOL-117",
-        "VOL-118"
+        "VOL-118",
+        "VOL-168",
+        "VOL-170",
+        "VOL-207",
+        "VOL-208",
+        "VOL-257",
+        "VOL-258",
+        "VOL-259",
+        "VOL-323",
+        "VOL-324",
+        "VOL-325",
+        "VOL-364"
       ]
     },
     {
@@ -154,6 +188,20 @@
       "source_disposition": "canonical_persistence_tree_with_governed_core_overlay",
       "source_exclusions": [
         "core"
+      ],
+      "volume_refs": [
+        "VOL-004",
+        "VOL-005",
+        "VOL-010",
+        "VOL-046",
+        "VOL-064",
+        "VOL-075",
+        "VOL-076",
+        "VOL-096",
+        "VOL-361",
+        "VOL-364",
+        "VOL-365",
+        "VOL-404"
       ]
     },
     {
@@ -182,6 +230,11 @@
       ],
       "source_exclusions": [
         "domains"
+      ],
+      "volume_refs": [
+        "VOL-008",
+        "VOL-009",
+        "VOL-034"
       ]
     },
     {
@@ -205,7 +258,16 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-010",
+        "VOL-011",
+        "VOL-012",
+        "VOL-251",
+        "VOL-361",
+        "VOL-362",
+        "VOL-363"
+      ]
     },
     {
       "id": "AIFT-MEMORY",
@@ -227,7 +289,16 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-010",
+        "VOL-011",
+        "VOL-012",
+        "VOL-361",
+        "VOL-362",
+        "VOL-363",
+        "VOL-365"
+      ]
     },
     {
       "id": "AIFT-INTELLIGENCE",
@@ -252,7 +323,30 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-008",
+        "VOL-009",
+        "VOL-010",
+        "VOL-011",
+        "VOL-012",
+        "VOL-013",
+        "VOL-014",
+        "VOL-025",
+        "VOL-034",
+        "VOL-037",
+        "VOL-248",
+        "VOL-251",
+        "VOL-252",
+        "VOL-253",
+        "VOL-254",
+        "VOL-255",
+        "VOL-361",
+        "VOL-362",
+        "VOL-363",
+        "VOL-369",
+        "VOL-370"
+      ]
     },
     {
       "id": "AIFT-FRONTIER",
@@ -276,7 +370,16 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "canonical_frontier_tree_with_flat_runtime_progression_ecology_economy_character_and_game_compatibility_shims"
+      "source_disposition": "canonical_frontier_tree_with_flat_runtime_progression_ecology_economy_character_and_game_compatibility_shims",
+      "volume_refs": [
+        "VOL-008",
+        "VOL-009",
+        "VOL-034",
+        "VOL-040",
+        "VOL-042",
+        "VOL-044",
+        "VOL-045"
+      ]
     },
     {
       "id": "AIFT-SKILLS",
@@ -300,7 +403,14 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-015",
+        "VOL-028",
+        "VOL-164",
+        "VOL-165",
+        "VOL-208"
+      ]
     },
     {
       "id": "AIFT-JEEVES",
@@ -327,7 +437,11 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-072",
+        "VOL-074"
+      ]
     },
     {
       "id": "AIFT-BUILD-PLANNING",
@@ -391,7 +505,10 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-004"
+      ]
     },
     {
       "id": "AIFT-VAULT",
@@ -426,7 +543,12 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-010",
+        "VOL-027",
+        "VOL-028"
+      ]
     },
     {
       "id": "AIFT-AGENTS",
@@ -459,7 +581,10 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "canonical_automation_agents_with_legacy_root_shims"
+      "source_disposition": "canonical_automation_agents_with_legacy_root_shims",
+      "volume_refs": [
+        "VOL-016"
+      ]
     },
     {
       "id": "AIFT-AUTOMATION",
@@ -551,9 +676,16 @@
         "swarm"
       ],
       "volume_refs": [
+        "VOL-015",
+        "VOL-016",
+        "VOL-017",
         "VOL-022",
+        "VOL-093",
         "VOL-094",
         "VOL-095",
+        "VOL-109",
+        "VOL-110",
+        "VOL-111",
         "VOL-112",
         "VOL-114",
         "VOL-115",
@@ -630,9 +762,19 @@
       "move_batch": "B1-core-runtime",
       "source_disposition": "retain_until_import_inversion_and_regression_gates",
       "volume_refs": [
+        "VOL-034",
+        "VOL-066",
+        "VOL-068",
+        "VOL-069",
         "VOL-085",
         "VOL-091",
-        "VOL-117"
+        "VOL-117",
+        "VOL-325",
+        "VOL-390",
+        "VOL-403",
+        "VOL-404",
+        "VOL-405",
+        "VOL-406"
       ]
     },
     {
@@ -711,7 +853,24 @@
         "cutover:owner-sensitive"
       ],
       "move_batch": "B3-owner-sensitive",
-      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
+      "source_disposition": "retain_until_explicit_owner_and_import_cutover",
+      "volume_refs": [
+        "VOL-026",
+        "VOL-046",
+        "VOL-083",
+        "VOL-084",
+        "VOL-164",
+        "VOL-165",
+        "VOL-168",
+        "VOL-170",
+        "VOL-205",
+        "VOL-256",
+        "VOL-257",
+        "VOL-318",
+        "VOL-320",
+        "VOL-321",
+        "VOL-399"
+      ]
     },
     {
       "id": "AIFT-EVALUATION",
@@ -746,7 +905,39 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-024",
+        "VOL-035",
+        "VOL-070",
+        "VOL-077",
+        "VOL-082",
+        "VOL-083",
+        "VOL-101",
+        "VOL-104",
+        "VOL-105",
+        "VOL-106",
+        "VOL-107",
+        "VOL-108",
+        "VOL-168",
+        "VOL-207",
+        "VOL-208",
+        "VOL-248",
+        "VOL-252",
+        "VOL-323",
+        "VOL-324",
+        "VOL-362",
+        "VOL-363",
+        "VOL-365",
+        "VOL-369",
+        "VOL-391",
+        "VOL-405",
+        "VOL-406",
+        "VOL-414",
+        "VOL-415",
+        "VOL-419"
+      ]
     },
     {
       "id": "AIFT-KERNEL",
@@ -813,7 +1004,11 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-029",
+        "VOL-102"
+      ]
     },
     {
       "id": "AIFT-LEARNING",
@@ -850,7 +1045,8 @@
       "move_batch": "B1-core-runtime",
       "source_disposition": "retain_until_import_inversion_and_regression_gates",
       "volume_refs": [
-        "VOL-074"
+        "VOL-074",
+        "VOL-101"
       ]
     },
     {
@@ -981,6 +1177,7 @@
       "move_batch": "B2-domain-build",
       "source_disposition": "retain_until_import_inversion_and_regression_gates",
       "volume_refs": [
+        "VOL-021",
         "VOL-098"
       ]
     },
@@ -1291,9 +1488,9 @@
       "volume_refs": [
         "VOL-005",
         "VOL-039",
-        "VOL-139",
         "VOL-137",
         "VOL-138",
+        "VOL-139",
         "VOL-140",
         "VOL-141",
         "VOL-142"
@@ -5755,7 +5952,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "177_mapping_current_main_parity_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "177_mapping_current_main_parity_reconciled_completed_volume_traceability_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -6862,6 +7059,14 @@
         }
       ],
       "policy": "Fill completed AI implementation ownership and restore exact staged-mirror parity without source retirement, import inversion, backend/product ownership capture, or completion-signature authority."
+    },
+    "completed_volume_traceability_2026_10_05": {
+      "base_main_sha": "4af23641c3b971f4d41440b45b595543fedce70e",
+      "governed_mapping_count": 177,
+      "mature_volume_count": 196,
+      "bound_volume_count": 159,
+      "added_volume_binding_count": 167,
+      "policy": "Bind mature masterplan implementation paths to their governed AI-tree owners without changing runtime ownership, cutover authority, completion signoff, or intentionally external product/release boundaries."
     }
   }
 }
