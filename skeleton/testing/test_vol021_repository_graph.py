@@ -28,3 +28,9 @@ def test_change_plan_evidence_cannot_be_forged_or_noncanonical():
  with pytest.raises(RepositoryGraphError,match="invalid graph digest"):ChangePlan("forged",p.changed_paths,p.impacted_paths,p.required_tests,p.owners)
  with pytest.raises(RepositoryGraphError,match="changed paths must be impacted"):ChangePlan(p.graph_digest,("src/a.py",),("src/b.ts",),p.required_tests,p.owners)
  with pytest.raises(RepositoryGraphError,match="must be canonical"):ChangePlan(p.graph_digest,("src/a.py","src/a.py"),p.impacted_paths,p.required_tests,p.owners)
+
+def test_graph_metadata_and_edge_paths_fail_closed():
+ with pytest.raises(RepositoryGraphError,match="tests must be safe"):FileNode("a.py","python",D,tests=("../escape.py",))
+ with pytest.raises(RepositoryGraphError,match="invalid edge path"):DependencyEdge("../a.py","b.py","import")
+ with pytest.raises(RepositoryGraphError,match="nodes and edges must be tuples"):RepositoryGraph([],())
+ with pytest.raises(RepositoryGraphError,match="typed nodes and edges required"):RepositoryGraph(("not-a-node",),())
