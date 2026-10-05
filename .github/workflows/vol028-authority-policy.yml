@@ -61,8 +61,13 @@ jobs:
           "pytest>=8,<9"
 
       - name: Compile authority boundaries
-        run: |
-          python -m py_compile             skeleton/vault/authority_policy.py             skeleton/ai/runtime/vault/authority_policy.py             skeleton/testing/test_vol028_authority_policy.py
+        run: >-
+          python -m py_compile
+          skeleton/vault/authority_policy.py
+          skeleton/ai/runtime/vault/authority_policy.py
+          skeleton/automation/agents/authority_policy_bridge.py
+          skeleton/ai/agents/core/authority_policy_bridge.py
+          skeleton/testing/test_vol028_authority_policy.py
 
       - name: Run authority policy regressions
         run: >-
