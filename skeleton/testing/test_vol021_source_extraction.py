@@ -28,3 +28,8 @@ def test_source_metadata_is_bounded_and_deterministic():
  x=SourceFile("a.py","",hashlib.sha256(b"").hexdigest(),"core",("z.py","a.py","z.py"))
  assert x.tests==("a.py","z.py")
  with pytest.raises(RepositoryGraphError,match="source tests"):SourceFile("a.py","",hashlib.sha256(b"").hexdigest(),tests=("",))
+
+def test_relative_resolution_normalizes_module_paths():
+ g=build_repository_graph((s("pkg/sub/a.py","from .. import b"),s("pkg/b.py",""),s("web/sub/a.ts","import x from '../b'"),s("web/b.ts","")))
+ assert ("pkg/sub/a.py","pkg/b.py","import") in g.edges
+ assert ("web/sub/a.ts","web/b.ts","import") in g.edges
