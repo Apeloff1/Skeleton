@@ -15,6 +15,7 @@ export type AccessibilityRequirementCategory =
   | 'non_color_signal'
   | 'motion'
   | 'text_scaling'
+  | 'contrast'
   | 'modal';
 export type AccessibilityRole =
   | 'button'
@@ -72,6 +73,15 @@ export interface AccessibleMotion {
   reducedDurationMs: number;
 }
 
+export interface AccessibleContrast {
+  id: string;
+  flow: string;
+  foreground: string;
+  background: string;
+  largeText: boolean;
+  critical: boolean;
+}
+
 export interface AccessibilityFinding {
   code: string;
   requirementId: string;
@@ -87,12 +97,14 @@ export interface AccessibilityAcceptanceMatrix {
   requiredControlIds: readonly string[];
   requiredStatusIds: readonly string[];
   requiredMotionIds: readonly string[];
+  requiredContrastIds: readonly string[];
 }
 
 export interface AccessibilitySnapshot {
   controls: readonly AccessibleControl[];
   statuses: readonly AccessibleStatus[];
   motions: readonly AccessibleMotion[];
+  contrasts: readonly AccessibleContrast[];
 }
 
 export interface AccessibilityAcceptanceReport {
@@ -104,6 +116,7 @@ export interface AccessibilityAcceptanceReport {
   evaluatedControlIds: readonly string[];
   evaluatedStatusIds: readonly string[];
   evaluatedMotionIds: readonly string[];
+  evaluatedContrastIds: readonly string[];
 }
 
 const TOKEN = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$/;
@@ -186,6 +199,13 @@ export const ACCESSIBILITY_REQUIREMENTS: readonly AccessibilityRequirement[] =
       critical: true,
     }),
     freezeRequirement({
+      id: 'A11Y.CONTRAST.TEXT',
+      category: 'contrast',
+      description:
+        'Critical text and status surfaces meet measurable foreground/background contrast.',
+      critical: true,
+    }),
+    freezeRequirement({
       id: 'A11Y.TEXT.SCALE',
       category: 'text_scaling',
       description:
@@ -229,6 +249,15 @@ export const DEFAULT_ACCESSIBILITY_MATRIX: AccessibilityAcceptanceMatrix =
       'boot.motion',
       'connectivity.motion',
       'toast.motion',
+    ]),
+    requiredContrastIds: Object.freeze([
+      'actionsheet.default',
+      'boot.primary',
+      'connectivity.degraded',
+      'connectivity.down',
+      'connectivity.offline',
+      'toast.error',
+      'toast.info',
     ]),
   });
 
@@ -322,6 +351,66 @@ export function defineAccessibleMotion(motion: AccessibleMotion): AccessibleMoti
     );
   }
   return Object.freeze(normalized);
+}
+
+
+function hexChannel(value: string, offset: number): number {
+  return parseInt(value.slice(offset, offset + 2), 16) / 255;
+}
+
+function relativeLuminance(hex: string): number {
+  if (!/^#[0-9a-fA-F]{6}$/.test(hex)) {
+    throw new TypeError('contrast colors must be #RRGGBB hex values');
+  }
+  const linear = [1, 3, 5].map((offset) => {
+    const channel = hexChannel(hex, offset);
+    return channel <= 0.04045
+      ? channel / 12.92
+      : Math.pow((channel + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+}
+
+export function contrastRatio(foreground: string, background: string): number {
+  const first = relativeLuminance(foreground);
+  const second = relativeLuminance(background);
+  const high = Math.max(first, second);
+  const low = Math.min(first, second);
+  return (high + 0.05) / (low + 0.05);
+}
+
+export function defineAccessibleContrast(
+  contrast: AccessibleContrast,
+): AccessibleContrast {
+  contrastRatio(contrast.foreground, contrast.background);
+  return Object.freeze({
+    id: token(contrast.id, 'contrast.id'),
+    flow: token(contrast.flow, 'contrast.flow'),
+    foreground: contrast.foreground.toUpperCase(),
+    background: contrast.background.toUpperCase(),
+    largeText: Boolean(contrast.largeText),
+    critical: Boolean(contrast.critical),
+  });
+}
+
+export function validateAccessibleContrast(
+  contrast: AccessibleContrast,
+  matrix: AccessibilityAcceptanceMatrix = DEFAULT_ACCESSIBILITY_MATRIX,
+): readonly AccessibilityFinding[] {
+  const item = defineAccessibleContrast(contrast);
+  const ratio = contrastRatio(item.foreground, item.background);
+  const minimum = item.largeText ? 3 : 4.5;
+  if (item.critical && ratio < minimum) {
+    return Object.freeze([
+      finding(
+        matrix,
+        'A11Y.CONTRAST.TEXT',
+        item.id,
+        'Critical foreground/background contrast is below the required ratio.',
+      ),
+    ]);
+  }
+  return Object.freeze([]);
 }
 
 export function validateAccessibleControl(
@@ -453,7 +542,7 @@ export function validateAccessibleMotion(
 }
 
 function duplicateFindings(
-  kind: 'control' | 'status' | 'motion',
+  kind: 'control' | 'status' | 'motion' | 'contrast',
   values: readonly { id: string }[],
 ): AccessibilityFinding[] {
   const seen = new Set<string>();
@@ -477,7 +566,7 @@ function duplicateFindings(
 
 function missingRequiredFindings(
   matrix: AccessibilityAcceptanceMatrix,
-  kind: 'control' | 'status' | 'motion',
+  kind: 'control' | 'status' | 'motion' | 'contrast',
   required: readonly string[],
   present: ReadonlySet<string>,
 ): AccessibilityFinding[] {
@@ -486,7 +575,9 @@ function missingRequiredFindings(
       ? 'A11Y.KEYBOARD.CRITICAL'
       : kind === 'status'
         ? 'A11Y.STATUS.LIVE_TEXT'
-        : 'A11Y.MOTION.REDUCE';
+        : kind === 'motion'
+          ? 'A11Y.MOTION.REDUCE'
+          : 'A11Y.CONTRAST.TEXT';
   return [...new Set(required)]
     .sort()
     .filter((id) => !present.has(id))
@@ -511,19 +602,23 @@ export function evaluateAccessibilityAcceptance(
   const controls = snapshot.controls.map(defineAccessibleControl);
   const statuses = snapshot.statuses.map(defineAccessibleStatus);
   const motions = snapshot.motions.map(defineAccessibleMotion);
+  const contrasts = snapshot.contrasts.map(defineAccessibleContrast);
   const findings: AccessibilityFinding[] = [
     ...duplicateFindings('control', controls),
     ...duplicateFindings('status', statuses),
     ...duplicateFindings('motion', motions),
+    ...duplicateFindings('contrast', contrasts),
   ];
 
   controls.forEach((item) => findings.push(...validateAccessibleControl(item, matrix)));
   statuses.forEach((item) => findings.push(...validateAccessibleStatus(item, matrix)));
   motions.forEach((item) => findings.push(...validateAccessibleMotion(item, matrix)));
+  contrasts.forEach((item) => findings.push(...validateAccessibleContrast(item, matrix)));
 
   const controlIds = new Set(controls.map((item) => item.id));
   const statusIds = new Set(statuses.map((item) => item.id));
   const motionIds = new Set(motions.map((item) => item.id));
+  const contrastIds = new Set(contrasts.map((item) => item.id));
 
   findings.push(
     ...missingRequiredFindings(
@@ -543,6 +638,12 @@ export function evaluateAccessibilityAcceptance(
       'motion',
       matrix.requiredMotionIds,
       motionIds,
+    ),
+    ...missingRequiredFindings(
+      matrix,
+      'contrast',
+      matrix.requiredContrastIds,
+      contrastIds,
     ),
   );
 
@@ -566,6 +667,7 @@ export function evaluateAccessibilityAcceptance(
     evaluatedControlIds: Object.freeze([...controlIds].sort()),
     evaluatedStatusIds: Object.freeze([...statusIds].sort()),
     evaluatedMotionIds: Object.freeze([...motionIds].sort()),
+    evaluatedContrastIds: Object.freeze([...contrastIds].sort()),
   });
 }
 
@@ -795,6 +897,64 @@ export const CRITICAL_ACCESSIBILITY_SNAPSHOT: AccessibilitySnapshot =
         critical: true,
         hasTextSignal: true,
         supportsTextScaling: true,
+      }),
+    ]),
+    contrasts: Object.freeze([
+      defineAccessibleContrast({
+        id: 'boot.primary',
+        flow: 'boot',
+        foreground: '#FFFFFF',
+        background: '#7C3AED',
+        largeText: false,
+        critical: true,
+      }),
+      defineAccessibleContrast({
+        id: 'actionsheet.default',
+        flow: 'modal',
+        foreground: '#E2E8F0',
+        background: '#1E293B',
+        largeText: false,
+        critical: true,
+      }),
+      defineAccessibleContrast({
+        id: 'connectivity.down',
+        flow: 'connectivity',
+        foreground: '#FEE2E2',
+        background: '#7F1D1D',
+        largeText: false,
+        critical: true,
+      }),
+      defineAccessibleContrast({
+        id: 'connectivity.offline',
+        flow: 'connectivity',
+        foreground: '#FFF7ED',
+        background: '#7C2D12',
+        largeText: false,
+        critical: true,
+      }),
+      defineAccessibleContrast({
+        id: 'connectivity.degraded',
+        flow: 'connectivity',
+        foreground: '#FEF3C7',
+        background: '#854D0E',
+        largeText: false,
+        critical: true,
+      }),
+      defineAccessibleContrast({
+        id: 'toast.info',
+        flow: 'notification',
+        foreground: '#E2E8F0',
+        background: '#1E293B',
+        largeText: false,
+        critical: true,
+      }),
+      defineAccessibleContrast({
+        id: 'toast.error',
+        flow: 'notification',
+        foreground: '#FECACA',
+        background: '#450A0A',
+        largeText: false,
+        critical: true,
       }),
     ]),
     motions: Object.freeze([
