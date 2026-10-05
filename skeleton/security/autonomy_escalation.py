@@ -14,6 +14,8 @@ class EscalationGrant:
   if now<self.issued_at:raise ValueError("invalid revocation time")
   return EscalationGrant(self.request_id,self.subject_id,self.level,self.issued_at,self.expires_at,now)
 def approve_escalation(request:AutonomyEscalation,*,now:int,ttl:int,max_level:int):
+ if not request.request_id or not request.subject_id or not request.evidence.evidence_id:raise ValueError("escalation identity required")
  if not request.evidence.eligible or not request.evidence.approver_id:raise PermissionError("independent eligibility and approval required")
- if request.requested_level>max_level or ttl<=0:raise PermissionError("escalation outside policy")
+ if request.evidence.approver_id==request.subject_id:raise PermissionError("self approval forbidden")
+ if isinstance(request.requested_level,bool) or request.requested_level<0 or request.requested_level>max_level or ttl<=0:raise PermissionError("escalation outside policy")
  return EscalationGrant(request.request_id,request.subject_id,request.requested_level,now,now+ttl)
