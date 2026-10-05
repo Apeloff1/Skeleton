@@ -1,0 +1,55 @@
+{
+  "schema_version": "skeleton.ai.research_evaluation_gapfill_candidate.v1",
+  "candidate_id": "P3-DEFERRED-RESEARCH-EVALUATION-01",
+  "status": "implementation_candidate",
+  "source_frontier": "machine/ai_masterplan_continuation_frontier.json",
+  "master_plan": "machine/ai_master_plan.json",
+  "ai_file_tree": "machine/ai_file_tree.json",
+  "source_queue_state": "queued_unmodified",
+  "volume_refs": [
+    "VOL-210","VOL-211","VOL-212","VOL-213","VOL-214","VOL-215",
+    "VOL-216","VOL-217","VOL-218","VOL-219","VOL-220"
+  ],
+  "shared_implementation": "skeleton/ai/runtime/deferred/research_evaluation.py",
+  "assurance_implementation": "skeleton/ai/runtime/deferred/research_evaluation_assurance.py",
+  "primary_test_by_volume": {
+    "VOL-210": "skeleton/testing/test_research_agent_team.py",
+    "VOL-211": "skeleton/testing/test_literature_watch.py",
+    "VOL-212": "skeleton/testing/test_citation_graph.py",
+    "VOL-213": "skeleton/testing/test_reproduction_packages.py",
+    "VOL-214": "skeleton/testing/test_experiment_comparison.py",
+    "VOL-215": "skeleton/testing/test_statistical_analysis.py",
+    "VOL-216": "skeleton/testing/test_model_eval_harness.py",
+    "VOL-217": "skeleton/testing/test_agent_eval_harness.py",
+    "VOL-218": "skeleton/testing/test_long_horizon_benchmarks.py",
+    "VOL-219": "skeleton/testing/test_contamination_auditor.py",
+    "VOL-220": "skeleton/testing/test_human_evaluation.py"
+  },
+  "mapping_requirements": {
+    "VOL-210": "AIFT-SOCIAL",
+    "VOL-211": "AIFT-SOCIAL",
+    "VOL-212": "AIFT-RESEARCH-SOURCE-LINEAGE",
+    "VOL-213": "AIFT-RESEARCH",
+    "VOL-214": "AIFT-EVALUATION",
+    "VOL-215": "AIFT-EVALUATION",
+    "VOL-216": "AIFT-EVALUATION",
+    "VOL-217": "AIFT-EVALUATION",
+    "VOL-218": "AIFT-EVALUATION",
+    "VOL-219": "AIFT-EVALUATION",
+    "VOL-220": "AIFT-EVALUATION"
+  },
+  "evidence_policy": {
+    "exact_head_ci_required": true,
+    "independent_closure_required": true,
+    "queued_frontier_must_remain_unchanged": true,
+    "completion_may_not_be_self_granted": true,
+    "production_authority_must_remain_false": true
+  },
+  "promotion_state": {
+    "completion_checkbox": false,
+    "implementation_signed": false,
+    "verification_signed": false,
+    "may_self_close": false,
+    "production_authority": false
+  }
+}
