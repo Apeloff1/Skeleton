@@ -314,13 +314,28 @@ class ImplementationBinding:
         *,
         contract_id: str,
         obj: object,
+        canonical_module_path: str | None = None,
+        canonical_symbol: str | None = None,
     ) -> "ImplementationBinding":
-        module_path = getattr(obj, "__module__", None)
-        symbol = getattr(obj, "__qualname__", None) or getattr(obj, "__name__", None)
-        if not isinstance(module_path, str) or not module_path:
+        discovered_module = getattr(obj, "__module__", None)
+        discovered_symbol = (
+            getattr(obj, "__qualname__", None)
+            or getattr(obj, "__name__", None)
+        )
+        if not isinstance(discovered_module, str) or not discovered_module:
             raise FormalMethodError("implementation object has no module")
-        if not isinstance(symbol, str) or not symbol:
+        if not isinstance(discovered_symbol, str) or not discovered_symbol:
             raise FormalMethodError("implementation object has no symbol name")
+        module_path = (
+            discovered_module
+            if canonical_module_path is None
+            else _token(canonical_module_path, "canonical_module_path")
+        )
+        symbol = (
+            discovered_symbol
+            if canonical_symbol is None
+            else _token(canonical_symbol, "canonical_symbol")
+        )
         try:
             source = inspect.getsource(obj)
         except (OSError, TypeError) as exc:
