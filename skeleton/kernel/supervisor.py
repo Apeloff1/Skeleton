@@ -26,6 +26,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Callable, Dict, List, Optional, Tuple
 
+from skeleton.shells.cancellation import CancellationReason, CancellationToken
+
 from .errors import KernelError
 
 
@@ -68,6 +70,7 @@ class SupervisedNode:
     last_restart_at: float = 0.0
     state: Lifecycle = Lifecycle.STARTED
     health: Health = Health.ALIVE
+    cancellation: Optional[CancellationToken] = None
 
 
 class HeartbeatMonitor:
@@ -117,7 +120,13 @@ class Supervisor:
     # Registry
     # ------------------------------------------------------------------
 
-    def supervise(self, node_id: str, policy: Optional[RestartPolicy] = None) -> None:
+    def supervise(
+        self,
+        node_id: str,
+        policy: Optional[RestartPolicy] = None,
+        *,
+        cancellation: Optional[CancellationToken] = None,
+    ) -> None:
         if node_id in self._nodes:
             raise SupervisorError("node already supervised", context={"node": node_id})
         now = self._now()
@@ -126,6 +135,7 @@ class Supervisor:
             policy=policy or RestartPolicy(),
             last_heartbeat=now,
             started_at=now,
+            cancellation=cancellation,
         )
 
     def release(self, node_id: str) -> None:
@@ -151,6 +161,13 @@ class Supervisor:
         for node in self._nodes.values():
             if node.state in (Lifecycle.ESCALATED, Lifecycle.STOPPED):
                 continue
+            if node.cancellation is not None and node.cancellation.cancelled:
+                old = node.health
+                node.state = Lifecycle.STOPPED
+                transition = Transition(node.node_id, old, old, Lifecycle.STOPPED, 0.0, now)
+                out.append(transition)
+                self._log.append(transition)
+                continue
             new_health = self.monitor.assess(now - node.last_heartbeat)
             if new_health == node.health:
                 continue
@@ -165,6 +182,9 @@ class Supervisor:
         backoff = 0.0
         action = node.state
         if new_health == Health.DEAD:
+            if node.cancellation is not None and node.cancellation.cancelled:
+                node.state = Lifecycle.STOPPED
+                return Transition(node.node_id, old, new_health, Lifecycle.STOPPED, 0.0, now)
             node.attempts += 1
             if node.attempts > node.policy.max_attempts:
                 node.state = Lifecycle.ESCALATED
