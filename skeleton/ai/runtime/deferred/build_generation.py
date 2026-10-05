@@ -7,7 +7,7 @@ class RebuildStep: artifact_id:str; input_digests:tuple[str,...]; producer_versi
 class RebuildPlan: steps:tuple[RebuildStep,...]
 @dataclass(frozen=True,slots=True)
 class RebuildEvidence: artifact_id:str; expected_digest:str; rebuilt_digest:str; semantic_match:bool
-def rebuild_admissible(p): return bool(p.steps) and all(bool(s.artifact_id) and bool(s.input_digests) and all(bool(d) for d in s.input_digests) and s.verified_inputs and bool(s.producer_version) for s in p.steps)
+def rebuild_admissible(p): return bool(p.steps) and len({s.artifact_id for s in p.steps})==len(p.steps) and all(bool(s.artifact_id) and bool(s.input_digests) and all(bool(d) for d in s.input_digests) and s.verified_inputs and bool(s.producer_version) for s in p.steps)
 def rebuild_verified(e): return bool(e.artifact_id) and bool(e.expected_digest) and e.expected_digest==e.rebuilt_digest and e.semantic_match
 @dataclass(frozen=True,slots=True)
 class ImpactQuery: changed_objects:tuple[str,...]
@@ -16,7 +16,8 @@ class ImpactEvidence: architecture:bool; traces:bool; ownership:bool; missing_ed
 @dataclass(frozen=True,slots=True)
 class ImpactSet: affected:tuple[str,...]; owners:tuple[str,...]; uncertainty:float; evidence:ImpactEvidence
 def impact(q,edges,owners,evidence):
- if not q.changed_objects: raise ValueError("changed objects required")
+ if not q.changed_objects or any(not x for x in q.changed_objects) or len(set(q.changed_objects))!=len(q.changed_objects): raise ValueError("unique changed objects required")
+ if any(not x or any(not y for y in ys) for x,ys in edges.items()):raise ValueError("valid impact edges required")
  seen=set(q.changed_objects);front=list(seen)
  while front:
   x=front.pop()
@@ -32,7 +33,7 @@ class RiskCalibration: calibration_id:str; predicted:float; observed_incident:bo
 class ChangeRisk: score:float; factors:tuple[RiskFactor,...]; calibration_id:str
 def estimate_risk(factors,calibration_id):
  if not calibration_id or not factors: raise ValueError("risk evidence required")
- if any(x.weight<0 or x.observed<0 or x.observed>1 for x in factors): raise ValueError("invalid risk factor")
+ if any(not x.name or x.weight<0 or x.observed<0 or x.observed>1 for x in factors) or len({x.name for x in factors})!=len(factors): raise ValueError("invalid risk factor")
  return ChangeRisk(sum(x.weight*x.observed for x in factors),tuple(factors),calibration_id)
 @dataclass(frozen=True,slots=True)
 class ChangeGate: name:str; passed:bool; hard:bool=True
