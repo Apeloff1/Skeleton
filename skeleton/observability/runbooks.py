@@ -418,13 +418,18 @@ class RunbookRegistry:
         book = self._books.get((runbook_id, version))
         if book is None:
             raise RunbookError("unknown runbook version")
-        return any(
-            item.runbook_id == runbook_id
+        matching = tuple(
+            item
+            for item in self._validations.values()
+            if item.runbook_id == runbook_id
             and item.runbook_version == version
             and item.runbook_digest == book.digest
-            and item.status is ValidationStatus.PASSED
-            for item in self._validations.values()
         )
+        if not matching:
+            return False
+        latest_at = max(item.observed_at for item in matching)
+        latest = tuple(item for item in matching if item.observed_at == latest_at)
+        return all(item.status is ValidationStatus.PASSED for item in latest)
 
     def validations_for(
         self,
