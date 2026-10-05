@@ -15016,22 +15016,27 @@
       "id": "ACC-VOL-143",
       "type": "volume",
       "title": "VOL-143 Training Control Plane",
-      "status": "unverified",
+      "status": "implemented",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-10-05T16:10:00Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-10-05T16:10:00Z",
+        "git_sha": "6e0533d9ec6f12c58035050ca4b4985eef178980",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/pull/2894",
+          "https://github.com/Apeloff1/Skeleton/commit/6e0533d9ec6f12c58035050ca4b4985eef178980",
+          "skeleton/training/control_plane.py",
+          "skeleton/testing/test_training_control_plane.py"
+        ],
+        "statement": "Retroactively implementation-signed after review of the merged VOL-143 implementation and current-main production/test artifacts. Independent verification remains pending; this does not grant completion.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6e0533d9ec6f12c58035050ca4b4985eef178980"
       },
       "verification_signoff": {
         "signed": false,
@@ -15047,31 +15052,80 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-10-05T16:10:00Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T16:10:00Z",
+          "git_sha": "6e0533d9ec6f12c58035050ca4b4985eef178980",
+          "statement": "Begin evidence reconciliation for the already-merged VOL-143 implementation.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6e0533d9ec6f12c58035050ca4b4985eef178980",
+          "from_status": "unverified",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2894",
+            "https://github.com/Apeloff1/Skeleton/commit/6e0533d9ec6f12c58035050ca4b4985eef178980"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T16:10:00Z",
+          "git_sha": "6e0533d9ec6f12c58035050ca4b4985eef178980",
+          "statement": "Retroactively implementation-signed after review of the merged VOL-143 implementation and current-main production/test artifacts. Independent verification remains pending; this does not grant completion.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6e0533d9ec6f12c58035050ca4b4985eef178980",
+          "from_status": "in_progress",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2894",
+            "https://github.com/Apeloff1/Skeleton/commit/6e0533d9ec6f12c58035050ca4b4985eef178980",
+            "skeleton/training/control_plane.py",
+            "skeleton/testing/test_training_control_plane.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/pull/2894",
+        "https://github.com/Apeloff1/Skeleton/commit/6e0533d9ec6f12c58035050ca4b4985eef178980",
+        "skeleton/training/control_plane.py",
+        "skeleton/testing/test_training_control_plane.py"
+      ],
       "baseline_status": "unverified"
     },
     {
       "id": "ACC-VOL-144",
       "type": "volume",
       "title": "VOL-144 Distributed Training",
-      "status": "unverified",
+      "status": "implemented",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-10-05T16:10:00Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-10-05T16:10:00Z",
+        "git_sha": "7ffc19a4597918a344415784ba6327b4d47eff35",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/pull/2895",
+          "https://github.com/Apeloff1/Skeleton/commit/7ffc19a4597918a344415784ba6327b4d47eff35",
+          "skeleton/training/distributed.py",
+          "skeleton/testing/test_distributed_training.py"
+        ],
+        "statement": "Retroactively implementation-signed after review of the merged VOL-144 implementation and current-main production/test artifacts. Independent verification remains pending; this does not grant completion.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/7ffc19a4597918a344415784ba6327b4d47eff35"
       },
       "verification_signoff": {
         "signed": false,
@@ -15087,9 +15141,53 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-10-05T16:10:00Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T16:10:00Z",
+          "git_sha": "7ffc19a4597918a344415784ba6327b4d47eff35",
+          "statement": "Begin evidence reconciliation for the already-merged VOL-144 implementation.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/7ffc19a4597918a344415784ba6327b4d47eff35",
+          "from_status": "unverified",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2895",
+            "https://github.com/Apeloff1/Skeleton/commit/7ffc19a4597918a344415784ba6327b4d47eff35"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T16:10:00Z",
+          "git_sha": "7ffc19a4597918a344415784ba6327b4d47eff35",
+          "statement": "Retroactively implementation-signed after review of the merged VOL-144 implementation and current-main production/test artifacts. Independent verification remains pending; this does not grant completion.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/7ffc19a4597918a344415784ba6327b4d47eff35",
+          "from_status": "in_progress",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2895",
+            "https://github.com/Apeloff1/Skeleton/commit/7ffc19a4597918a344415784ba6327b4d47eff35",
+            "skeleton/training/distributed.py",
+            "skeleton/testing/test_distributed_training.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/pull/2895",
+        "https://github.com/Apeloff1/Skeleton/commit/7ffc19a4597918a344415784ba6327b4d47eff35",
+        "skeleton/training/distributed.py",
+        "skeleton/testing/test_distributed_training.py"
+      ],
       "baseline_status": "unverified"
     },
     {
@@ -15176,22 +15274,27 @@
       "id": "ACC-VOL-147",
       "type": "volume",
       "title": "VOL-147 Training Observability",
-      "status": "unverified",
+      "status": "implemented",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-10-05T16:10:00Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-10-05T16:10:00Z",
+        "git_sha": "73463dda21f269449db3cdf0fcd340fa682e784d",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/pull/2892",
+          "https://github.com/Apeloff1/Skeleton/commit/73463dda21f269449db3cdf0fcd340fa682e784d",
+          "skeleton/training/observability.py",
+          "skeleton/testing/test_training_observability.py"
+        ],
+        "statement": "Retroactively implementation-signed after review of the merged VOL-147 implementation and current-main production/test artifacts. Independent verification remains pending; this does not grant completion.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/73463dda21f269449db3cdf0fcd340fa682e784d"
       },
       "verification_signoff": {
         "signed": false,
@@ -15207,31 +15310,80 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-10-05T16:10:00Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T16:10:00Z",
+          "git_sha": "73463dda21f269449db3cdf0fcd340fa682e784d",
+          "statement": "Begin evidence reconciliation for the already-merged VOL-147 implementation.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/73463dda21f269449db3cdf0fcd340fa682e784d",
+          "from_status": "unverified",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2892",
+            "https://github.com/Apeloff1/Skeleton/commit/73463dda21f269449db3cdf0fcd340fa682e784d"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T16:10:00Z",
+          "git_sha": "73463dda21f269449db3cdf0fcd340fa682e784d",
+          "statement": "Retroactively implementation-signed after review of the merged VOL-147 implementation and current-main production/test artifacts. Independent verification remains pending; this does not grant completion.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/73463dda21f269449db3cdf0fcd340fa682e784d",
+          "from_status": "in_progress",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2892",
+            "https://github.com/Apeloff1/Skeleton/commit/73463dda21f269449db3cdf0fcd340fa682e784d",
+            "skeleton/training/observability.py",
+            "skeleton/testing/test_training_observability.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/pull/2892",
+        "https://github.com/Apeloff1/Skeleton/commit/73463dda21f269449db3cdf0fcd340fa682e784d",
+        "skeleton/training/observability.py",
+        "skeleton/testing/test_training_observability.py"
+      ],
       "baseline_status": "unverified"
     },
     {
       "id": "ACC-VOL-148",
       "type": "volume",
       "title": "VOL-148 Training Evaluation Gates",
-      "status": "unverified",
+      "status": "implemented",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-10-05T16:10:00Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-10-05T16:10:00Z",
+        "git_sha": "59acbe8469b79a5e75a7020c6eeeab36ce583c17",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/pull/2893",
+          "https://github.com/Apeloff1/Skeleton/commit/59acbe8469b79a5e75a7020c6eeeab36ce583c17",
+          "skeleton/training/eval_gates.py",
+          "skeleton/testing/test_training_eval_gates.py"
+        ],
+        "statement": "Retroactively implementation-signed after review of the merged VOL-148 implementation and current-main production/test artifacts. Independent verification remains pending; this does not grant completion.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/59acbe8469b79a5e75a7020c6eeeab36ce583c17"
       },
       "verification_signoff": {
         "signed": false,
@@ -15247,31 +15399,80 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-10-05T16:10:00Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T16:10:00Z",
+          "git_sha": "59acbe8469b79a5e75a7020c6eeeab36ce583c17",
+          "statement": "Begin evidence reconciliation for the already-merged VOL-148 implementation.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/59acbe8469b79a5e75a7020c6eeeab36ce583c17",
+          "from_status": "unverified",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2893",
+            "https://github.com/Apeloff1/Skeleton/commit/59acbe8469b79a5e75a7020c6eeeab36ce583c17"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T16:10:00Z",
+          "git_sha": "59acbe8469b79a5e75a7020c6eeeab36ce583c17",
+          "statement": "Retroactively implementation-signed after review of the merged VOL-148 implementation and current-main production/test artifacts. Independent verification remains pending; this does not grant completion.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/59acbe8469b79a5e75a7020c6eeeab36ce583c17",
+          "from_status": "in_progress",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2893",
+            "https://github.com/Apeloff1/Skeleton/commit/59acbe8469b79a5e75a7020c6eeeab36ce583c17",
+            "skeleton/training/eval_gates.py",
+            "skeleton/testing/test_training_eval_gates.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/pull/2893",
+        "https://github.com/Apeloff1/Skeleton/commit/59acbe8469b79a5e75a7020c6eeeab36ce583c17",
+        "skeleton/training/eval_gates.py",
+        "skeleton/testing/test_training_eval_gates.py"
+      ],
       "baseline_status": "unverified"
     },
     {
       "id": "ACC-VOL-149",
       "type": "volume",
       "title": "VOL-149 Post-Training Lab",
-      "status": "unverified",
+      "status": "implemented",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-10-05T16:10:00Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-10-05T16:10:00Z",
+        "git_sha": "4bba10289d27060ff4f78ec487634c815cd114a0",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/pull/2896",
+          "https://github.com/Apeloff1/Skeleton/commit/4bba10289d27060ff4f78ec487634c815cd114a0",
+          "skeleton/training/post_training.py",
+          "skeleton/testing/test_post_training_lab.py"
+        ],
+        "statement": "Retroactively implementation-signed after review of the merged VOL-149 implementation and current-main production/test artifacts. Independent verification remains pending; this does not grant completion.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/4bba10289d27060ff4f78ec487634c815cd114a0"
       },
       "verification_signoff": {
         "signed": false,
@@ -15287,9 +15488,53 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-10-05T16:10:00Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T16:10:00Z",
+          "git_sha": "4bba10289d27060ff4f78ec487634c815cd114a0",
+          "statement": "Begin evidence reconciliation for the already-merged VOL-149 implementation.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/4bba10289d27060ff4f78ec487634c815cd114a0",
+          "from_status": "unverified",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2896",
+            "https://github.com/Apeloff1/Skeleton/commit/4bba10289d27060ff4f78ec487634c815cd114a0"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T16:10:00Z",
+          "git_sha": "4bba10289d27060ff4f78ec487634c815cd114a0",
+          "statement": "Retroactively implementation-signed after review of the merged VOL-149 implementation and current-main production/test artifacts. Independent verification remains pending; this does not grant completion.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/4bba10289d27060ff4f78ec487634c815cd114a0",
+          "from_status": "in_progress",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2896",
+            "https://github.com/Apeloff1/Skeleton/commit/4bba10289d27060ff4f78ec487634c815cd114a0",
+            "skeleton/training/post_training.py",
+            "skeleton/testing/test_post_training_lab.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/pull/2896",
+        "https://github.com/Apeloff1/Skeleton/commit/4bba10289d27060ff4f78ec487634c815cd114a0",
+        "skeleton/training/post_training.py",
+        "skeleton/testing/test_post_training_lab.py"
+      ],
       "baseline_status": "unverified"
     },
     {
@@ -15416,22 +15661,30 @@
       "id": "ACC-VOL-153",
       "type": "volume",
       "title": "VOL-153 Multimodal Ingestion Core",
-      "status": "unverified",
+      "status": "implemented",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-10-05T16:10:00Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-10-05T16:10:00Z",
+        "git_sha": "3c8d9c5c40c243349b183cb2a165b48772eb632e",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/pull/2853",
+          "https://github.com/Apeloff1/Skeleton/pull/2872",
+          "https://github.com/Apeloff1/Skeleton/commit/445e5f69770dfc21de4a70fc0fdc38ead0dfbb35",
+          "https://github.com/Apeloff1/Skeleton/commit/3c8d9c5c40c243349b183cb2a165b48772eb632e",
+          "skeleton/artifacts/__init__.py",
+          "skeleton/artifacts/multimodal_ingestion.py",
+          "skeleton/testing/test_multimodal_ingestion.py"
+        ],
+        "statement": "Retroactively implementation-signed after review of the merged VOL-153 implementation and current-main production/test artifacts. Independent verification remains pending; this does not grant completion.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/3c8d9c5c40c243349b183cb2a165b48772eb632e"
       },
       "verification_signoff": {
         "signed": false,
@@ -15447,9 +15700,61 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-10-05T16:10:00Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T16:10:00Z",
+          "git_sha": "3c8d9c5c40c243349b183cb2a165b48772eb632e",
+          "statement": "Begin evidence reconciliation for the already-merged VOL-153 implementation.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/3c8d9c5c40c243349b183cb2a165b48772eb632e",
+          "from_status": "unverified",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2853",
+            "https://github.com/Apeloff1/Skeleton/pull/2872",
+            "https://github.com/Apeloff1/Skeleton/commit/445e5f69770dfc21de4a70fc0fdc38ead0dfbb35",
+            "https://github.com/Apeloff1/Skeleton/commit/3c8d9c5c40c243349b183cb2a165b48772eb632e"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T16:10:00Z",
+          "git_sha": "3c8d9c5c40c243349b183cb2a165b48772eb632e",
+          "statement": "Retroactively implementation-signed after review of the merged VOL-153 implementation and current-main production/test artifacts. Independent verification remains pending; this does not grant completion.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/3c8d9c5c40c243349b183cb2a165b48772eb632e",
+          "from_status": "in_progress",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2853",
+            "https://github.com/Apeloff1/Skeleton/pull/2872",
+            "https://github.com/Apeloff1/Skeleton/commit/445e5f69770dfc21de4a70fc0fdc38ead0dfbb35",
+            "https://github.com/Apeloff1/Skeleton/commit/3c8d9c5c40c243349b183cb2a165b48772eb632e",
+            "skeleton/artifacts/__init__.py",
+            "skeleton/artifacts/multimodal_ingestion.py",
+            "skeleton/testing/test_multimodal_ingestion.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/pull/2853",
+        "https://github.com/Apeloff1/Skeleton/pull/2872",
+        "https://github.com/Apeloff1/Skeleton/commit/445e5f69770dfc21de4a70fc0fdc38ead0dfbb35",
+        "https://github.com/Apeloff1/Skeleton/commit/3c8d9c5c40c243349b183cb2a165b48772eb632e",
+        "skeleton/artifacts/__init__.py",
+        "skeleton/artifacts/multimodal_ingestion.py",
+        "skeleton/testing/test_multimodal_ingestion.py"
+      ],
       "baseline_status": "unverified"
     },
     {
@@ -15776,22 +16081,27 @@
       "id": "ACC-VOL-162",
       "type": "volume",
       "title": "VOL-162 Plugin Ecosystem",
-      "status": "unverified",
+      "status": "implemented",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-10-05T16:10:00Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-10-05T16:10:00Z",
+        "git_sha": "2a4e496ef58559371fd458d187713e4ae017157f",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/pull/2865",
+          "https://github.com/Apeloff1/Skeleton/commit/2a4e496ef58559371fd458d187713e4ae017157f",
+          "skeleton/plugins/lifecycle.py",
+          "skeleton/testing/test_plugin_ecosystem.py"
+        ],
+        "statement": "Retroactively implementation-signed after review of the merged VOL-162 implementation and current-main production/test artifacts. Independent verification remains pending; this does not grant completion.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/2a4e496ef58559371fd458d187713e4ae017157f"
       },
       "verification_signoff": {
         "signed": false,
@@ -15807,9 +16117,53 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-10-05T16:10:00Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T16:10:00Z",
+          "git_sha": "2a4e496ef58559371fd458d187713e4ae017157f",
+          "statement": "Begin evidence reconciliation for the already-merged VOL-162 implementation.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/2a4e496ef58559371fd458d187713e4ae017157f",
+          "from_status": "unverified",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2865",
+            "https://github.com/Apeloff1/Skeleton/commit/2a4e496ef58559371fd458d187713e4ae017157f"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T16:10:00Z",
+          "git_sha": "2a4e496ef58559371fd458d187713e4ae017157f",
+          "statement": "Retroactively implementation-signed after review of the merged VOL-162 implementation and current-main production/test artifacts. Independent verification remains pending; this does not grant completion.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/2a4e496ef58559371fd458d187713e4ae017157f",
+          "from_status": "in_progress",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2865",
+            "https://github.com/Apeloff1/Skeleton/commit/2a4e496ef58559371fd458d187713e4ae017157f",
+            "skeleton/plugins/lifecycle.py",
+            "skeleton/testing/test_plugin_ecosystem.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/pull/2865",
+        "https://github.com/Apeloff1/Skeleton/commit/2a4e496ef58559371fd458d187713e4ae017157f",
+        "skeleton/plugins/lifecycle.py",
+        "skeleton/testing/test_plugin_ecosystem.py"
+      ],
       "baseline_status": "unverified"
     },
     {
