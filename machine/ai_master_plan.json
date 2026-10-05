@@ -5816,7 +5816,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Explain decisions using observable inputs, rules, evidence, tool receipts and model outputs.",
         "Separate causal/provenance facts from post-hoc summaries and uncertainty.",
@@ -5828,22 +5828,31 @@
         "uncertainty disclosure"
       ],
       "contracts": [
-        "ExplanationRecord",
+        "OperationProvenance",
         "DecisionFactor",
-        "ExplanationPolicy"
+        "DecisionFactorKind",
+        "FactorRelation",
+        "FactorSensitivity",
+        "ExplanationPolicy",
+        "ExplanationRecord",
+        "ExplanationBuilder",
+        "ExplanationLedger"
       ],
       "implementation_paths": [
-        "skeleton/ai",
-        "skeleton/observability",
-        "frontend"
+        "skeleton/observability/explainability.py",
+        "skeleton/observability/__init__.py",
+        "skeleton/observability/redaction.py",
+        "skeleton/observability/resilient_telemetry.py",
+        "skeleton/contracts/operation.py",
+        "skeleton/ai/runtime/observability/explainability.py",
+        "skeleton/ai/runtime/observability/__init__.py",
+        "machine/ai_file_tree.json"
       ],
       "tests": [
-        "planned:skeleton/testing/test_explanation_records.py",
-        "planned:skeleton/testing/test_explanation_redaction.py"
+        "skeleton/testing/test_vol085_explainability.py"
       ],
       "evaluations": [
-        "planned:faithfulness/provenance evaluation",
-        "planned:privacy leakage evaluation"
+        "skeleton/testing/test_vol085_explainability.py"
       ],
       "evidence": [],
       "risks": [
@@ -5851,10 +5860,7 @@
         "trace leakage",
         "false certainty"
       ],
-      "gaps": [
-        "define explanation evidence contract",
-        "bind explanations to operation provenance"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-085",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
