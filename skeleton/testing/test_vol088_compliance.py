@@ -188,6 +188,18 @@ def test_reviewed_not_applicable_is_explicit_and_requires_current_review():
     assert not stale_assessment.compliant
 
 
+def test_duplicate_evidence_identity_is_rejected():
+    reg, ctrl = registry()
+    first = evidence(ctrl)
+    duplicate = evidence(
+        ctrl,
+        observed_at=NOW - timedelta(seconds=1),
+        result=EvidenceResult.FAIL,
+    )
+    with pytest.raises(ComplianceError, match="duplicate evidence id"):
+        reg.assess((first, duplicate), at=NOW)
+
+
 def test_unknown_control_evidence_is_rejected():
     reg, ctrl = registry()
     with pytest.raises(ComplianceError, match="unknown control"):
