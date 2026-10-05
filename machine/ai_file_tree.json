@@ -796,6 +796,7 @@
         "VOL-091",
         "VOL-117",
         "VOL-191",
+        "VOL-204",
         "VOL-325",
         "VOL-390",
         "VOL-403",
@@ -948,6 +949,7 @@
         "VOL-107",
         "VOL-108",
         "VOL-168",
+        "VOL-203",
         "VOL-206",
         "VOL-207",
         "VOL-208",
@@ -1226,7 +1228,8 @@
       ],
       "volume_refs": [
         "VOL-019",
-        "VOL-073"
+        "VOL-073",
+        "VOL-197"
       ],
       "move_tags": [
         "ai-tree:mapped",
@@ -7194,20 +7197,21 @@
       "refreshed_source_identity_count": 177,
       "completed_volume_count": 209,
       "unclassified_completed_implementation_paths": 0,
-      "policy": "Restore staged-mirror parity for completed governed work without source retirement, import cutover, product/backend ownership expansion, or fabricated completion authority."
+      "policy": "Restore staged-mirror parity for completed governed work without source retirement, import cutover, product/backend ownership expansion, or fabricated completion authority.",
+      "mature_volume_count": 215
     },
     "completed_work_volume_ref_backfill_2026_10_05": {
       "mapping_id": "AIFT-CONTRACTS",
       "added_volume_refs": [
         "VOL-003"
       ],
-      "mature_volume_count": 209,
+      "mature_volume_count": 215,
       "remaining_missing_mature_volume_mapping_links": 0,
       "policy": "Bind already-completed canonical contract work to its governed AI-tree mapping without changing implementation ownership, maturity, or completion authority."
     },
     "mature_volume_traceability_refresh_2026_10_05": {
       "source_plan_head_sha": "cd454ca86090a3e03dbce349ca3b23ba54553be5",
-      "mature_volume_count": 209,
+      "mature_volume_count": 215,
       "added_links": [
         {
           "volume_ref": "VOL-188",
@@ -7229,8 +7233,30 @@
     "native_ai_completed_work_governance_2026_10_05": {
       "native_owner_count": 10,
       "mature_ai_native_implementation_path_count": 23,
-      "mature_volume_count": 209,
+      "mature_volume_count": 215,
       "policy": "Govern completed implementations born directly inside skeleton/ai without fabricating legacy source mappings; residual native tree owners exclude authority already held by more-specific migration destinations."
+    },
+    "mature_volume_traceability_refresh_215_2026_10_05": {
+      "source_plan_head_sha": "5fc600b724e53b3db340a7af396a6f16346f4bf7",
+      "mature_volume_count": 215,
+      "added_links": [
+        {
+          "volume_ref": "VOL-197",
+          "mapping_id": "AIFT-SIMULATION"
+        },
+        {
+          "volume_ref": "VOL-203",
+          "mapping_id": "AIFT-EVALUATION"
+        },
+        {
+          "volume_ref": "VOL-204",
+          "mapping_id": "AIFT-OBSERVABILITY"
+        }
+      ],
+      "remaining_unclassified_mature_implementation_paths": 0,
+      "remaining_missing_mature_volume_mapping_links": 0,
+      "remaining_unowned_mature_ai_native_paths": 0,
+      "policy": "Keep completed-work ownership traceability synchronized with canonical masterplan maturity without changing implementation authority."
     }
   },
   "native_ai_owners": [
