@@ -37,9 +37,15 @@ class RecoveryCheckpoint:
 class VS000Scenario:
  scenario_id:str;initial_state:dict;events:tuple[DurableEvent,...]
  def __post_init__(self):
-  object.__setattr__(self,"scenario_id",_id(self.scenario_id,"scenario_id"));json.dumps(self.initial_state,sort_keys=True,allow_nan=False)
-  expected=1;prev=None
+  object.__setattr__(self,"scenario_id",_id(self.scenario_id,"scenario_id"))
+  if not isinstance(self.initial_state,dict):raise RecoveryError("initial_state must be dict")
+  if not isinstance(self.events,tuple) or any(not isinstance(e,DurableEvent) for e in self.events):raise RecoveryError("events must be typed tuple")
+  if len(self.events)>100000:raise RecoveryError("event log exceeds recovery bound")
+  object.__setattr__(self,"initial_state",deepcopy(self.initial_state));json.dumps(self.initial_state,sort_keys=True,allow_nan=False)
+  expected=1;prev=None;event_ids=set()
   for e in self.events:
+   if e.event_id in event_ids:raise RecoveryError("duplicate event identity")
+   event_ids.add(e.event_id)
    if e.sequence!=expected:raise RecoveryError("event sequence gap")
    if e.previous_digest!=prev:raise RecoveryError("event chain mismatch")
    expected+=1;prev=e.digest
