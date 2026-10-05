@@ -53,7 +53,7 @@ class DesktopUpdateTransaction:
   if not isinstance(acceptance,DesktopAcceptanceRun):raise DesktopReleaseError("acceptance must be DesktopAcceptanceRun")
   if acceptance.release_id!=self.target.release_id:raise DesktopReleaseError("acceptance targets wrong release")
   if acceptance.governed_artifact_digest!=self.target.artifact_digest:raise DesktopReleaseError("acceptance artifact does not match signed target")
-  self.current=self.target;self.state=UpdateState.COMMITTED;return self.receipt
+  self.current=self.target;self.state=UpdateState.COMMITTED;self.target=None;self.preupdate_digest=None;return self.receipt
  def interrupt(self):
   if self.state not in (UpdateState.STAGED,UpdateState.MIGRATED):raise DesktopReleaseError("no interruptible update")
   return "rollback_required"
