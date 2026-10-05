@@ -4,6 +4,7 @@ export type TranslationKey =
   | 'app.name'
   | 'app.tagline'
   | 'launcher.open'
+  | 'launcher.enter_product'
   | 'launcher.minimal'
   | 'operation.cancel'
   | 'authority.approve'
