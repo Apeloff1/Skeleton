@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import hashlib
+import math
 
 import pytest
+
+from skeleton.contracts.canonical import canonical_json_bytes
 
 from skeleton.knowledge.store import (
     KnowledgeClaim,
@@ -119,3 +123,20 @@ def test_rejected_claim_does_not_create_active_conflict_but_remains_historical()
     view = store.query(scope_key="tenant-a/project-a", subject="earth", predicate="shape")
     assert len(view.claims) == 2
     assert view.conflicting is False
+
+
+def test_snapshot_digest_uses_shared_canonical_contract_bytes() -> None:
+    store = KnowledgeStore()
+    store.record(_claim())
+    snapshot = store.snapshot()
+    body = {"version": snapshot["version"], "claims": snapshot["claims"]}
+    assert snapshot["snapshot_digest"] == hashlib.sha256(canonical_json_bytes(body)).hexdigest()
+
+
+def test_snapshot_restore_rejects_non_finite_values_fail_closed() -> None:
+    store = KnowledgeStore()
+    store.record(_claim())
+    snapshot = store.snapshot()
+    snapshot["claims"][0]["confidence"] = math.nan
+    with pytest.raises(ValueError, match="strict canonical JSON"):
+        KnowledgeStore.from_snapshot(snapshot)
