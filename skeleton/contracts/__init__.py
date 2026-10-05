@@ -100,6 +100,15 @@ from .risk_evidence import (
     evaluate_risk_binding,
     make_obligation_id,
 )
+from .formal_candidates import (
+    FORMAL_CANDIDATE_SCHEMA,
+    FormalCandidate,
+    FormalCandidateError,
+    FormalModelRef,
+    ProofToTestHandoff,
+    VerifiedProperty,
+    rank_formal_candidates,
+)
 from .formal_methods import (
     FORMAL_SCHEMA,
     BoundedModelChecker,
@@ -284,6 +293,13 @@ __all__ = [
     "RiskSeverity",
     "evaluate_risk_binding",
     "make_obligation_id",
+    "FORMAL_CANDIDATE_SCHEMA",
+    "FormalCandidate",
+    "FormalCandidateError",
+    "FormalModelRef",
+    "ProofToTestHandoff",
+    "VerifiedProperty",
+    "rank_formal_candidates",
     "FORMAL_SCHEMA",
     "BoundedModelChecker",
     "Counterexample",
