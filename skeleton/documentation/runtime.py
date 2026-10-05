@@ -7,6 +7,7 @@ import hashlib
 import json
 import re
 from typing import Iterable, Mapping
+from urllib.parse import urlsplit
 
 _SHA = re.compile(r"^[0-9a-f]{64}$")
 _ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{1,191}$")
@@ -206,16 +207,89 @@ def validate_owned_sections(document: str, section_ids: Iterable[str]) -> tuple[
 
 def validate_references(document: str, known_ids: Iterable[str]) -> tuple[DocumentationCheck, ...]:
     """Validate explicit [[ref:IDENTIFIER]] references without guessing prose links."""
-    known = set(known_ids)
-    refs = sorted(set(re.findall(r"\[\[ref:([^\]]+)\]\]", document)))
-    return tuple(
-        DocumentationCheck(
+    known = {_id(item, "known_id") for item in known_ids}
+    raw_refs = sorted(set(re.findall(r"\[\[ref:([^\]]+)\]\]", document)))
+    checks: list[DocumentationCheck] = []
+    for raw in raw_refs:
+        try:
+            ref = _id(raw, "reference")
+        except DocumentationError:
+            checks.append(DocumentationCheck(
+                check_id=f"reference-invalid:{canonical_digest(raw)[:16]}",
+                status=CheckStatus.FAIL,
+                detail="reference syntax is invalid",
+            ))
+            continue
+        checks.append(DocumentationCheck(
             check_id=f"reference:{ref}",
             status=CheckStatus.PASS if ref in known else CheckStatus.FAIL,
             detail="reference resolves" if ref in known else "reference is unknown",
-        )
-        for ref in refs
-    )
+        ))
+    return tuple(checks)
+
+
+def validate_links(
+    document: str,
+    known_paths: Iterable[str],
+    *,
+    allowed_schemes: Iterable[str] = ("https",),
+) -> tuple[DocumentationCheck, ...]:
+    """Validate Markdown links without performing network access.
+
+    Local links must resolve to an explicitly supplied repository path. External
+    links must use an allowed absolute scheme and authority. Anchors are local
+    presentation references and are accepted without pretending to validate a
+    remote resource.
+    """
+    known = set(known_paths)
+    schemes = {item.lower() for item in allowed_schemes}
+    checks: list[DocumentationCheck] = []
+    links = sorted(set(re.findall(r"(?<!!)\[[^\]]*\]\(([^)\s]+)\)", document)))
+    for target in links:
+        digest = canonical_digest(target)[:16]
+        if target.startswith("#"):
+            ok, detail = True, "local anchor is syntactically valid"
+        else:
+            parsed = urlsplit(target)
+            if parsed.scheme:
+                ok = parsed.scheme.lower() in schemes and bool(parsed.netloc)
+                detail = "external link policy satisfied" if ok else "external link scheme or authority is invalid"
+            else:
+                path = parsed.path
+                unsafe = (
+                    not path
+                    or path.startswith("/")
+                    or "\\" in path
+                    or any(part in ("", ".", "..") for part in path.split("/"))
+                )
+                ok = not unsafe and path in known
+                detail = "repository link resolves" if ok else "repository link is unknown or unsafe"
+        checks.append(DocumentationCheck(
+            check_id=f"link:{digest}",
+            status=CheckStatus.PASS if ok else CheckStatus.FAIL,
+            detail=detail,
+        ))
+    return tuple(checks)
+
+
+def validate_version_relationships(
+    declared: Mapping[str, str],
+    expected: Mapping[str, str],
+) -> tuple[DocumentationCheck, ...]:
+    """Require documented version relationships to match authoritative values."""
+    keys = sorted(set(declared) | set(expected))
+    checks: list[DocumentationCheck] = []
+    for key in keys:
+        stable = _id(key, "version relationship")
+        actual = declared.get(key)
+        wanted = expected.get(key)
+        ok = actual is not None and wanted is not None and actual == wanted
+        checks.append(DocumentationCheck(
+            check_id=f"version:{stable}",
+            status=CheckStatus.PASS if ok else CheckStatus.FAIL,
+            detail="version relationship matches authority" if ok else "version relationship is missing or stale",
+        ))
+    return tuple(checks)
 
 
 def assert_clean_regeneration(existing: str, generated: str) -> None:
