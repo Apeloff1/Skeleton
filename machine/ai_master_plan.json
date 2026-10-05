@@ -6843,11 +6843,7 @@
         "Criterion"
       ],
       "implementation_paths": [
-        "machine",
-        "docs/plan",
-        "skeleton/eval",
-        "skeleton/eval/functional_acceptance.py",
-        "skeleton/testing/test_functional_ai_acceptance.py"
+        "skeleton/eval/functional_acceptance.py"
       ],
       "tests": [
         "skeleton/testing/test_functional_ai_acceptance.py"
@@ -6866,7 +6862,9 @@
         "missing negative evidence",
         "stale signoff"
       ],
-      "gaps": [],
+      "gaps": [
+        "independent functional-AI acceptance evidence-integrity verification remains pending"
+      ],
       "accountability_id": "ACC-VOL-104",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
@@ -8292,7 +8290,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Choose atomic transaction, saga or reconciliation model per operation.",
         "Persist compensation/recovery state before external effects where required."
@@ -8308,9 +8306,8 @@
         "CompensationReceipt"
       ],
       "implementation_paths": [
-        "skeleton/ai",
-        "skeleton/persistence",
-        "skeleton/storage/cas"
+        "skeleton/storage/cas/__init__.py",
+        "skeleton/ai/runtime/storage/cas/__init__.py"
       ],
       "tests": [
         "skeleton/testing/test_distributed_transactions.py"
@@ -8318,14 +8315,15 @@
       "evaluations": [
         "planned:partial-commit recovery campaign"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/ed7035334243bb60c2b4d231cab4b86ee648ec0c"
+      ],
       "risks": [
         "half-committed operation",
         "non-idempotent compensation"
       ],
       "gaps": [
-        "identify multi-resource operations",
-        "materialize saga state store"
+        "independent distributed-transaction recovery and compensation verification remains pending"
       ],
       "accountability_id": "ACC-VOL-133",
       "completion_checkbox": false,
@@ -8387,7 +8385,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Never let cache contents become sole authoritative state.",
         "Bind cache keys to tenant/version/trust context and define stale behavior."
@@ -8403,9 +8401,8 @@
         "CacheEntry"
       ],
       "implementation_paths": [
-        "skeleton/ai/runtime/state",
-        "skeleton/persistence",
-        "skeleton/storage/cas"
+        "skeleton/storage/cas/__init__.py",
+        "skeleton/ai/runtime/storage/cas/__init__.py"
       ],
       "tests": [
         "skeleton/testing/test_cache_architecture.py"
@@ -8413,14 +8410,15 @@
       "evaluations": [
         "planned:stale/poisoned cache evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/ed7035334243bb60c2b4d231cab4b86ee648ec0c"
+      ],
       "risks": [
         "cache poisoning",
         "cross-tenant key collision"
       ],
       "gaps": [
-        "catalog caches",
-        "define invalidation/rebuild contracts"
+        "independent cache-identity, invalidation, and poison-resistance verification remains pending"
       ],
       "accountability_id": "ACC-VOL-135",
       "completion_checkbox": false,
@@ -8435,7 +8433,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Canonicalize bytes before digest where a format requires it.",
         "Support digest migration without confusing logical identity."
@@ -8451,8 +8449,8 @@
         "DigestPolicy"
       ],
       "implementation_paths": [
-        "planned:skeleton/artifacts",
-        "skeleton/storage/cas"
+        "skeleton/storage/cas/__init__.py",
+        "skeleton/ai/runtime/storage/cas/__init__.py"
       ],
       "tests": [
         "skeleton/testing/test_content_addressing.py"
@@ -8460,14 +8458,15 @@
       "evaluations": [
         "planned:digest migration evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/ed7035334243bb60c2b4d231cab4b86ee648ec0c"
+      ],
       "risks": [
         "canonicalization mismatch",
         "hash algorithm lock-in"
       ],
       "gaps": [
-        "unify with VOL-076 CAS",
-        "define digest migration procedure"
+        "independent content-addressing digest-migration and integrity verification remains pending"
       ],
       "accountability_id": "ACC-VOL-136",
       "completion_checkbox": false,
@@ -8482,7 +8481,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Preserve source identity, acquisition time, rights/classification and parser version.",
         "Quarantine malformed/untrusted inputs before downstream indexing."
@@ -8498,9 +8497,8 @@
         "QuarantineRecord"
       ],
       "implementation_paths": [
-        "skeleton/ai",
-        "skeleton/data",
-        "skeleton/data/ingestion.py"
+        "skeleton/data/ingestion.py",
+        "skeleton/ai/runtime/data/ingestion.py"
       ],
       "tests": [
         "skeleton/testing/test_data_ingestion.py"
@@ -8508,14 +8506,15 @@
       "evaluations": [
         "planned:malformed/replayed ingestion corpus"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/573658f64efc0ae8a52e08ddec256f98ce963617"
+      ],
       "risks": [
         "parser bombs",
         "duplicate ingest"
       ],
       "gaps": [
-        "converge acquired ingest lineage",
-        "bind ingestion to data lineage"
+        "independent ingestion lineage, quarantine, and trust-bound verification remains pending"
       ],
       "accountability_id": "ACC-VOL-137",
       "completion_checkbox": false,
@@ -8530,7 +8529,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Preserve page/region coordinates and extraction method for every derived claim.",
         "Separate OCR/vision uncertainty from source text."
@@ -8546,9 +8545,8 @@
         "ExtractionEvidence"
       ],
       "implementation_paths": [
-        "skeleton/ai",
-        "planned:skeleton/document",
-        "skeleton/data/document_intelligence.py"
+        "skeleton/data/document_intelligence.py",
+        "skeleton/ai/runtime/data/document_intelligence.py"
       ],
       "tests": [
         "skeleton/testing/test_document_intelligence.py"
@@ -8556,14 +8554,15 @@
       "evaluations": [
         "planned:layout/OCR adversarial corpus"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/573658f64efc0ae8a52e08ddec256f98ce963617"
+      ],
       "risks": [
         "lost page provenance",
         "prompt injection in document"
       ],
       "gaps": [
-        "define document schema",
-        "integrate trust labels with context"
+        "independent document uncertainty, coordinate, and trust-label verification remains pending"
       ],
       "accountability_id": "ACC-VOL-138",
       "completion_checkbox": false,
@@ -8578,7 +8577,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Record transformation identity, inputs, outputs and environment/version.",
         "Propagate deletion, classification and trust constraints through derived data."
@@ -8594,9 +8593,8 @@
         "TransformationReceipt"
       ],
       "implementation_paths": [
-        "skeleton/persistence",
-        "machine",
-        "skeleton/data/lineage_governance.py"
+        "skeleton/data/lineage_governance.py",
+        "skeleton/ai/runtime/data/lineage_governance.py"
       ],
       "tests": [
         "skeleton/testing/test_data_lineage.py"
@@ -8604,14 +8602,15 @@
       "evaluations": [
         "planned:deletion propagation evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/573658f64efc0ae8a52e08ddec256f98ce963617"
+      ],
       "risks": [
         "orphan derivative",
         "classification laundering"
       ],
       "gaps": [
-        "materialize lineage graph",
-        "bind artifacts/datasets/indexes"
+        "independent lineage governance, deletion, and provenance verification remains pending"
       ],
       "accountability_id": "ACC-VOL-139",
       "completion_checkbox": false,
@@ -8626,7 +8625,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Define quality checks per dataset/use case and retain raw measurements.",
         "Block promotion when critical quality failures violate declared thresholds."
@@ -8642,9 +8641,8 @@
         "QualityReport"
       ],
       "implementation_paths": [
-        "skeleton/ai",
-        "skeleton/eval",
-        "skeleton/data/quality.py"
+        "skeleton/data/quality.py",
+        "skeleton/ai/runtime/data/quality.py"
       ],
       "tests": [
         "skeleton/testing/test_data_quality.py"
@@ -8652,14 +8650,15 @@
       "evaluations": [
         "planned:drift/anomaly benchmark"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/573658f64efc0ae8a52e08ddec256f98ce963617"
+      ],
       "risks": [
         "quality score masks critical defect",
         "silent distribution drift"
       ],
       "gaps": [
-        "define rule registry",
-        "bind dataset gates"
+        "independent raw-observation quality-gate and policy verification remains pending"
       ],
       "accountability_id": "ACC-VOL-140",
       "completion_checkbox": false,
@@ -8674,7 +8673,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Give every dataset/split immutable identity and provenance.",
         "Track permitted use, retention, PII and benchmark contamination."
@@ -8690,9 +8689,8 @@
         "DatasetSplit"
       ],
       "implementation_paths": [
-        "machine",
-        "datasets",
-        "skeleton/data/dataset_registry.py"
+        "skeleton/data/dataset_registry.py",
+        "skeleton/ai/runtime/data/dataset_registry.py"
       ],
       "tests": [
         "skeleton/testing/test_dataset_registry.py"
@@ -8700,14 +8698,15 @@
       "evaluations": [
         "planned:dataset fingerprint reproducibility"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/573658f64efc0ae8a52e08ddec256f98ce963617"
+      ],
       "risks": [
         "split leakage",
         "rights ambiguity"
       ],
       "gaps": [
-        "materialize dataset manifests",
-        "bind training/eval consumers"
+        "independent dataset-registry rights, retention, split, and contamination verification remains pending"
       ],
       "accountability_id": "ACC-VOL-141",
       "completion_checkbox": false,
@@ -8722,7 +8721,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Label synthetic origin and generator configuration permanently.",
         "Measure diversity, validity, bias and leakage against real/reference data."
@@ -8738,9 +8737,8 @@
         "SyntheticQuality"
       ],
       "implementation_paths": [
-        "skeleton/ai",
-        "experiments",
-        "skeleton/data/synthetic.py"
+        "skeleton/data/synthetic.py",
+        "skeleton/ai/runtime/data/synthetic.py"
       ],
       "tests": [
         "skeleton/testing/test_synthetic_data_factory.py"
@@ -8748,14 +8746,15 @@
       "evaluations": [
         "planned:memorization/leakage evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/573658f64efc0ae8a52e08ddec256f98ce963617"
+      ],
       "risks": [
         "feedback-loop collapse",
         "synthetic contamination"
       ],
       "gaps": [
-        "define generator lineage",
-        "add diversity/leakage gates"
+        "independent synthetic-data lineage, diversity, memorization, and collapse-gate verification remains pending"
       ],
       "accountability_id": "ACC-VOL-142",
       "completion_checkbox": false,
