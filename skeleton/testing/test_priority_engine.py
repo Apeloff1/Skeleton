@@ -51,3 +51,18 @@ def test_decision_inputs_are_typed_and_bounded():
 def test_age_and_previous_score_are_canonical_numeric_inputs():
  with pytest.raises(PriorityError,match="non-negative integer"):PriorityEngine().decide("ITEM.1",(),age_epochs=1.5)
  with pytest.raises(PriorityError,match="finite numeric"):PriorityEngine().decide("ITEM.1",(),previous_score=float("nan"))
+
+def test_decision_identity_binds_factor_provenance_and_engine_inputs():
+ e=PriorityEngine()
+ a=e.decide("ITEM.1",(f(p="RISK.1"),))
+ b=e.decide("ITEM.1",(f(p="RISK.2"),))
+ assert a.score==b.score
+ assert a.input_digest!=b.input_digest
+ assert a.digest!=b.digest
+
+def test_decision_identity_changes_when_blocker_reason_or_age_changes():
+ e=PriorityEngine()
+ a=e.decide("ITEM.1",(),(PriorityConstraint("BLOCK.X",ConstraintKind.HARD_BLOCKER,True,"DEP.X","first reason"),),age_epochs=1)
+ b=e.decide("ITEM.1",(),(PriorityConstraint("BLOCK.X",ConstraintKind.HARD_BLOCKER,True,"DEP.X","new reason"),),age_epochs=1)
+ c=e.decide("ITEM.1",(),(PriorityConstraint("BLOCK.X",ConstraintKind.HARD_BLOCKER,True,"DEP.X","first reason"),),age_epochs=2)
+ assert len({a.input_digest,b.input_digest,c.input_digest})==3
