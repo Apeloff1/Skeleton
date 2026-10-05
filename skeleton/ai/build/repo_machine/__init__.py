@@ -15,6 +15,29 @@ from .health import HealthReport, repository_health
 from .hotspots import Hotspot, structural_hotspots
 from .impact import ImpactReport, analyze_impact
 from .manifest import ManifestDelta, compare_manifest_states, save_manifest
+from .maintenance import (
+    MAINTENANCE_SCHEMA,
+    DeletionAssessment,
+    MaintenanceAction,
+    MaintenanceDecision,
+    MaintenanceError,
+    MaintenancePlan,
+    MaintenancePolicyError,
+    MaintenanceReceipt,
+    MaintenanceRegistry,
+    MaintenanceRisk,
+    MaintenanceTask,
+    MaintenanceVerdict,
+    OwnershipClass,
+    RepositoryOwnership,
+    ResourceEvidence,
+    ResourceKind,
+    authorize,
+    enforce_mutation_budget,
+    evaluate_batch,
+    evaluate_deletion,
+    plan_summary,
+)
 from .metrics import StructureMetrics, structural_metrics
 from .model import FileRecord, Finding, RepositoryModel, SubsystemRecord, TopologyEdge, ZoneRule
 from .model_diff import RepositoryModelDelta, compare_models
@@ -35,12 +58,12 @@ __all__ = [
     "AtlasZone", "CapabilityRecord", "ContextShard", "CoordinationDecision", "CoordinationPlan",
     "ExecutionObservation", "ExecutionPlan", "ExecutionState", "FileRecord", "Finding", "GovernanceViolation",
     "GrowthRecommendation", "HealthReport", "Hotspot", "ImpactReport", "ManifestDelta",
-    "NavigationIndex", "OwnershipReport", "PathPlacement", "PlanStep", "PolicyDecision", "Relation",
+    "MAINTENANCE_SCHEMA",     "DeletionAssessment",     "MaintenanceAction",     "MaintenanceDecision",     "MaintenanceError",     "MaintenancePlan",     "MaintenancePolicyError",     "MaintenanceReceipt",     "MaintenanceRegistry",     "MaintenanceRisk",     "MaintenanceTask",     "MaintenanceVerdict",     "OwnershipClass",     "RepositoryOwnership",     "ResourceEvidence",     "ResourceKind",     "NavigationIndex", "OwnershipReport", "PathPlacement", "PlanStep", "PolicyDecision", "Relation",
     "ReorganizationProposal", "RepositoryAtlas", "RepositoryCatalog", "RepositoryModel",
     "RepositoryModelBuilder", "RepositoryModelDelta", "RepositoryQuery", "RepositoryRetrievalIndex",
     "SearchHit", "StewardObjective", "StewardPlan", "StructureMetrics", "SubsystemContract",
     "SubsystemRecord", "TopologyEdge", "WorkCandidate", "WorkGraph", "WorkNode", "ZoneBudget", "ZoneRule",
-    "advance_execution", "analyze_impact", "analyze_ownership", "build_catalog", "build_context_shards",
+    "authorize",     "enforce_mutation_budget",     "evaluate_batch",     "evaluate_deletion",     "plan_summary",     "advance_execution", "analyze_impact", "analyze_ownership", "build_catalog", "build_context_shards",
     "build_coordination_plan", "build_execution_plan", "build_relations", "build_repository_atlas",
     "build_repository_model", "build_work_graph", "compare_manifest_states", "compare_models",
     "context_for_intent", "derive_contracts", "derive_work_candidates", "derive_zone_budgets",
