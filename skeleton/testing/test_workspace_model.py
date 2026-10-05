@@ -6,3 +6,8 @@ def test_membership_change_invalidates_active_operation():
  w=w.update_member(WorkspaceMember("u",(),1))
  with pytest.raises(PermissionError):w.authorize("u","read",0)
  with pytest.raises(PermissionError):w.authorize("u","read",w.revision)
+
+def test_stale_member_revision_rejected():
+ import pytest
+ w=Workspace("w",(),(),2)
+ with pytest.raises(ValueError):w.update_member(WorkspaceMember("u",("read",),2))
