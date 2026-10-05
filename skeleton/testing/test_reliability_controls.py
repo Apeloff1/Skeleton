@@ -34,3 +34,14 @@ def test_fallback_is_only_signaled_when_policy_compatible():
  b=CircuitBreaker("db","storage",BreakerState.OPEN,3,3)
  assert not breaker(b,fallback_policy_compatible=False).fallback_allowed
  assert breaker(b,fallback_policy_compatible=True).fallback_allowed
+
+
+def test_reliability_depth_invariants_fail_closed():
+ import pytest
+ with pytest.raises(ValueError):pressure(BackpressureSignal(-1,BufferLimit(2,1)))
+ with pytest.raises(ValueError):shed(LoadShedPolicy((WorkClass.OPTIONAL,WorkClass.OPTIONAL)),WorkClass.OPTIONAL)
+ with pytest.raises(ValueError):queue_decision(QueueBudget(0,1),CongestionState(0,0,1),QueueKind.NEW)
+ with pytest.raises(ValueError):RetryBudget("",1)
+ b=RetryBudget("b",1);assert not retry(b,RetryAttempt("",FailureClass.TRANSIENT,True)).allowed
+ with pytest.raises(ValueError):breaker(CircuitBreaker("","d",BreakerState.CLOSED,1,0))
+ with pytest.raises(ValueError):breaker(CircuitBreaker("dep","d",BreakerState.CLOSED,0,0))
