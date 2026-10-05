@@ -112,3 +112,48 @@ def test_exact_lineage_revision_changes_mbom_identity() -> None:
         changed_lineage,
     )
     assert original.digest != changed.digest
+
+
+def test_mbom_replay_round_trips_exact_identity() -> None:
+    original = bom()
+    replayed = MBOM.from_dict(original.to_dict())
+    assert replayed == original
+    assert replayed.digest == original.digest
+
+
+def test_mbom_replay_rejects_identity_tampering() -> None:
+    payload = bom().to_dict()
+    payload["model"] = sha("tampered-model")
+    with pytest.raises(MBOMError, match="digest mismatch"):
+        MBOM.from_dict(payload)
+
+
+def test_mbom_replay_rejects_unknown_fields_and_schema() -> None:
+    payload = bom().to_dict()
+    payload["unexpected"] = "authority-confusion"
+    with pytest.raises(MBOMError, match="fields must be exact"):
+        MBOM.from_dict(payload)
+    payload = bom().to_dict()
+    payload["schema"] = "skeleton.model_bom.v2"
+    with pytest.raises(MBOMError, match="unsupported"):
+        MBOM.from_dict(payload)
+
+
+def test_mbom_replay_rejects_noncanonical_component_order() -> None:
+    payload = bom().to_dict()
+    components = payload["components"]
+    assert isinstance(components, list)
+    payload["components"] = list(reversed(components))
+    with pytest.raises(MBOMError, match="canonical order"):
+        MBOM.from_dict(payload)
+
+
+def test_mbom_replay_rejects_malformed_nested_shapes() -> None:
+    payload = bom().to_dict()
+    payload["components"] = [["COMP.BASE", "base_model"]]
+    with pytest.raises(MBOMError, match="malformed MBOM component"):
+        MBOM.from_dict(payload)
+    payload = bom().to_dict()
+    payload["lineage"] = ["RUN.TRAIN.1"]
+    with pytest.raises(MBOMError, match="malformed MBOM lineage"):
+        MBOM.from_dict(payload)
