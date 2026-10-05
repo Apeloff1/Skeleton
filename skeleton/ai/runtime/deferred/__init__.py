@@ -14,6 +14,13 @@ from .lifecycle_safety import (
     MigrationReceipt, MigrationState, MigrationStep, ParityEvidence,
     RetirementDecision, can_remove_adapter, decide_retirement,
 )
+
+from .identity_operations import (
+    AdminAction, AdminPolicy, AdminReceipt, AgentControlAction, AgentOpsAlert,
+    AgentOpsView, AuditEntry, AuditQuery, AuditView, FederatedIdentity,
+    FederationConfig, IdentityClaim, OperationsDashboard, OpsAlert, OpsMetric,
+    TelemetryState, authorize_admin, map_identity, project_agent_ops, project_audit,
+)
 from .contract_fuzzing import ContractFuzzer, FuzzBudget, FuzzFailure, FuzzReport
 from .simulation_mode import SimulationAuthority, SimulationEvidence, SimulationRequest, SimulationResult, SimulationRuntime
 from .journal import DeferredExecutionJournal, DeferredJournalConflict, DeferredJournalError, DeferredJournalRecord, SqliteDeferredExecutionJournal
