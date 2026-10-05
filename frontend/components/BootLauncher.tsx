@@ -15,7 +15,6 @@ import {
   Animated,
   Easing,
   ScrollView,
-  AccessibilityInfo,
 } from 'react-native';
 
 
@@ -27,6 +26,11 @@ import { traceStep, getMemoryTrace, clearCrashes } from '../utils/bootTracer';
 import { STAGES, BootRunner, RunnerSnapshot, readBootCache, writeBootCache } from '../src/boot';
 import api from '../src/utils/apiClient';
 import { onMemoryPressure, getMemTier } from '../utils/memoryGuard';
+import { useReduceMotion } from '../src/hooks/useReduceMotion';
+import {
+  accessibleButtonProps,
+  accessibleStatusProps,
+} from '../src/accessibility/runtime';
 
 const WELCOME_FLAG_KEY = '@codedock:welcome_seen:v1';
 const WARM_BOOT_MAX_AGE_MS = 90_000;
@@ -83,20 +87,39 @@ function DecorativeStarfall({ enabled }: { enabled: boolean }) {
   return <Component count={10} colorBase="#a78bfa" speedMs={[2400, 5200]} />;
 }
 
-function ProgressBar({ pct }: { pct: number }) {
+function ProgressBar({ pct, reduceMotion }: { pct: number; reduceMotion: boolean }) {
   const value = React.useRef(new Animated.Value(0)).current;
+  const boundedPct = Math.max(0, Math.min(100, pct));
 
   React.useEffect(() => {
+    const next = boundedPct / 100;
+    if (reduceMotion) {
+      value.setValue(next);
+      return;
+    }
     Animated.timing(value, {
-      toValue: Math.max(0, Math.min(1, pct / 100)),
+      toValue: next,
       duration: 280,
       easing: Easing.out(Easing.quad),
       useNativeDriver: false,
     }).start();
-  }, [pct, value]);
+  }, [boundedPct, reduceMotion, value]);
 
   return (
-    <View style={styles.barOuter}>
+    <View
+      style={styles.barOuter}
+      {...accessibleStatusProps(
+        'Startup progress: ' + boundedPct + ' percent',
+        {
+          progress: {
+            min: 0,
+            max: 100,
+            now: boundedPct,
+            text: boundedPct + ' percent',
+          },
+        },
+      )}
+    >
       <Animated.View
         style={[
           styles.barInner,
@@ -116,7 +139,7 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
   const [welcomeSeen, setWelcomeSeen] = React.useState<boolean | null>(null);
   const [showDiag, setShowDiag] = React.useState(false);
   const [, setLongPressCount] = React.useState(0);
-  const [reduceMotion, setReduceMotion] = React.useState(false);
+  const reduceMotion = useReduceMotion();
   const [retryKey, setRetryKey] = React.useState(0);
   const [failedStages, setFailedStages] = React.useState<CheckResult[]>([]);
   const [warmBoot, setWarmBoot] = React.useState(false);
@@ -146,21 +169,6 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
       setWelcomeSeen(!!value);
     });
     return () => { durable('unmount'); };
-  }, []);
-
-  React.useEffect(() => {
-    let mounted = true;
-    AccessibilityInfo.isReduceMotionEnabled()
-      .then(value => { if (mounted) setReduceMotion(!!value); })
-      .catch(() => {});
-    const subscription = AccessibilityInfo.addEventListener?.(
-      'reduceMotionChanged',
-      (value: boolean) => { if (mounted) setReduceMotion(!!value); },
-    );
-    return () => {
-      mounted = false;
-      try { (subscription as any)?.remove?.(); } catch {}
-    };
   }, []);
 
   React.useEffect(() => {
@@ -424,7 +432,12 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
       </View>
 
       <Animated.View style={[styles.center, { opacity: fadeIn, pointerEvents: 'box-none' }]}>
-        <TouchableOpacity onLongPress={handleLogoLongPress} delayLongPress={500} activeOpacity={1}>
+        <TouchableOpacity
+          onLongPress={handleLogoLongPress}
+          delayLongPress={500}
+          activeOpacity={1}
+          {...accessibleButtonProps('Open boot diagnostics')}
+        >
           <View style={styles.logoBubble}>
             <Text style={styles.logoGlyph}>{'</>'}</Text>
           </View>
@@ -436,7 +449,7 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
         {phase === 'running' && (
           <>
             <Text style={styles.subtitle}>{activeLabel}…</Text>
-            <ProgressBar pct={progress} />
+            <ProgressBar pct={progress} reduceMotion={reduceMotion} />
             <Text style={styles.pctLabel}>{progress}%</Text>
           </>
         )}
@@ -446,7 +459,12 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
             <Text style={styles.subtitle}>
               Hyperscale game-build factory · 600K+ knowledge assets · live RAG
             </Text>
-            <TouchableOpacity style={styles.primaryBtn} onPress={handleEnterPress} activeOpacity={0.85}>
+            <TouchableOpacity
+              style={styles.primaryBtn}
+              onPress={handleEnterPress}
+              activeOpacity={0.85}
+              {...accessibleButtonProps('Enter Product')}
+            >
               <Text style={styles.primaryBtnText}>Enter Product</Text>
             </TouchableOpacity>
           </>
@@ -454,7 +472,7 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
 
         {phase === 'ready' && welcomeSeen === true && (
           <>
-            <ProgressBar pct={100} />
+            <ProgressBar pct={100} reduceMotion={reduceMotion} />
             <Text style={styles.pctLabel}>
               {warmBoot ? 'Resuming — launching…' : 'Ready — launching…'}
             </Text>
@@ -463,7 +481,13 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
 
         {phase === 'failed' && (
           <>
-            <Text style={[styles.subtitle, { color: '#fbbf24' }]}>
+            <Text
+              style={[styles.subtitle, { color: '#fbbf24' }]}
+              {...accessibleStatusProps(
+                'Boot failed. We hit a snag while preparing the app.',
+                { assertive: true },
+              )}
+            >
               We hit a snag while preparing the app.
             </Text>
             {failedStages.length > 0 && (
@@ -475,13 +499,21 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
                 ))}
               </View>
             )}
-            <TouchableOpacity style={styles.primaryBtn} onPress={handleRetryBoot} activeOpacity={0.85}>
+            <TouchableOpacity
+              style={styles.primaryBtn}
+              onPress={handleRetryBoot}
+              activeOpacity={0.85}
+              {...accessibleButtonProps('Retry boot')}
+            >
               <Text style={styles.primaryBtnText}>Retry boot</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.secondaryBtn, { marginTop: 10 }]}
               onPress={() => onEscalate('bootlauncher_user_continue')}
               activeOpacity={0.85}
+              {...accessibleButtonProps('Continue anyway', {
+                hint: 'Continue into the product despite boot preparation failures.',
+              })}
             >
               <Text style={styles.secondaryBtnText}>Continue anyway</Text>
             </TouchableOpacity>
@@ -489,6 +521,7 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
               style={[styles.secondaryBtn, { marginTop: 10 }]}
               onPress={() => onEscalate('bootlauncher_user_safe_mode')}
               activeOpacity={0.85}
+              {...accessibleButtonProps('Open Safe Mode')}
             >
               <Text style={styles.secondaryBtnText}>Open Safe Mode</Text>
             </TouchableOpacity>
@@ -504,7 +537,11 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
       </Animated.View>
 
       {showDiag && (
-        <View style={styles.diagSheet}>
+        <View
+          style={styles.diagSheet}
+          accessibilityViewIsModal
+          accessibilityLabel="Boot diagnostics"
+        >
           <Text style={styles.diagTitle}>Boot diagnostics</Text>
           <ScrollView style={styles.diagScroll}>
             {results.map(result => (
@@ -520,7 +557,11 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
               </Text>
             ))}
           </ScrollView>
-          <TouchableOpacity onPress={() => setShowDiag(false)} style={[styles.secondaryBtn, { marginTop: 10 }]}>
+          <TouchableOpacity
+            onPress={() => setShowDiag(false)}
+            style={[styles.secondaryBtn, { marginTop: 10 }]}
+            {...accessibleButtonProps('Close boot diagnostics')}
+          >
             <Text style={styles.secondaryBtnText}>Close</Text>
           </TouchableOpacity>
         </View>

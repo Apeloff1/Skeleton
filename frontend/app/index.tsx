@@ -19,6 +19,7 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Redirect } from 'expo-router';
 import { bootGuard, traceStep, traceStepSync } from '../utils/bootTracer';
 import LaunchCascade from '../components/LaunchCascade';
+import { accessibleStatusProps } from '../src/accessibility/runtime';
 
 type Decision = 'cascade' | 'safe-mode' | null;
 
@@ -82,8 +83,15 @@ export default function Entry() {
 
   if (decision === null) {
     return (
-      <View style={styles.loader}>
-        <ActivityIndicator size="small" color="#a78bfa" />
+      <View
+        style={styles.loader}
+        {...accessibleStatusProps('Checking startup safety')}
+      >
+        <ActivityIndicator
+          size="small"
+          color="#a78bfa"
+          accessibilityElementsHidden
+        />
       </View>
     );
   }
