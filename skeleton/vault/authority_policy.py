@@ -61,6 +61,15 @@ def _positive_int(value: object, field: str) -> int:
     return value
 
 
+def _tokens(values: tuple[str, ...], field: str) -> tuple[str, ...]:
+    if not isinstance(values, tuple) or not values:
+        raise AuthorityPolicyError(f"{field} must be a non-empty tuple")
+    normalized = tuple(sorted(_token(value, field) for value in values))
+    if len(normalized) != len(set(normalized)):
+        raise AuthorityPolicyError(f"{field} must be unique")
+    return normalized
+
+
 def _finite_positive(value: object, field: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise AuthorityPolicyError(f"{field} must be positive finite numeric")
@@ -82,6 +91,8 @@ class AuthorityPrincipal:
     kind: PrincipalKind | str
     tenant_id: str
     generation: int
+    capabilities: tuple[str, ...]
+    scopes: tuple[str, ...]
     expires_at: float
     revoked: bool = False
 
@@ -108,6 +119,16 @@ class AuthorityPrincipal:
         )
         object.__setattr__(
             self,
+            "capabilities",
+            _tokens(self.capabilities, "capabilities"),
+        )
+        object.__setattr__(
+            self,
+            "scopes",
+            _tokens(self.scopes, "scopes"),
+        )
+        object.__setattr__(
+            self,
             "expires_at",
             _finite_positive(self.expires_at, "expires_at"),
         )
@@ -120,6 +141,8 @@ class AuthorityPrincipal:
             "kind": self.kind.value,
             "tenant_id": self.tenant_id,
             "generation": self.generation,
+            "capabilities": list(self.capabilities),
+            "scopes": list(self.scopes),
             "expires_at": self.expires_at,
             "revoked": self.revoked,
         }
@@ -468,6 +491,10 @@ def evaluate_authority(
         reasons.append("tenant-boundary-mismatch")
     if request.requested_generation != principal.generation:
         reasons.append("authority-generation-mismatch")
+    if request.capability not in principal.capabilities:
+        reasons.append("principal-capability-not-granted")
+    if request.scope not in principal.scopes:
+        reasons.append("principal-scope-not-granted")
 
     matching = tuple(
         rule
