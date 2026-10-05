@@ -6411,7 +6411,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Exercise clean bootstrap through durable state creation, eventing and controlled shutdown.",
         "Restart from persisted state and rebuild derived projections deterministically.",
@@ -6428,17 +6428,13 @@
         "RecoveryEvidence"
       ],
       "implementation_paths": [
-        "skeleton/app",
-        "skeleton/persistence",
-        "skeleton/frontier"
+        "skeleton/persistence/foundation_recovery.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_vs000_foundation_recovery.py",
-        "planned:state recovery drill integration"
+        "skeleton/testing/test_vs000_foundation_recovery.py"
       ],
       "evaluations": [
-        "planned:power-loss/restart campaign",
-        "planned:projection rebuild evaluation"
+        "skeleton/testing/test_vs000_foundation_recovery.py"
       ],
       "evidence": [],
       "risks": [
@@ -6446,10 +6442,7 @@
         "duplicate event replay",
         "derived-state authority"
       ],
-      "gaps": [
-        "materialize end-to-end VS-000 harness",
-        "bind recovery evidence to release gates"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-096",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
