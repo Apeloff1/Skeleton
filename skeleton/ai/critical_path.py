@@ -1,5 +1,6 @@
 """Known-answer critical path analysis for VOL-314."""
 from dataclasses import dataclass
+import math
 @dataclass(frozen=True)
 class TaskSlack: task_id:str; duration:float; earliest_start:float; latest_start:float
 @dataclass(frozen=True)
@@ -8,7 +9,7 @@ class PathBlocker: task_id:str; reason:str
 class CriticalPath:
  task_ids:tuple[str,...]; duration:float; slack:tuple[TaskSlack,...]; blockers:tuple[PathBlocker,...]
 def analyze_critical_path(durations:dict[str,float],dependencies:tuple[tuple[str,str],...],blocked:dict[str,str]|None=None):
- if not durations or any(v<0 for v in durations.values()):raise ValueError("durations required and nonnegative")
+ if not durations or any(not n or isinstance(v,bool) or not isinstance(v,(int,float)) or not math.isfinite(v) or v<0 for n,v in durations.items()):raise ValueError("durations required and nonnegative")
  pred={n:[] for n in durations};succ={n:[] for n in durations}
  for a,b in dependencies:
   if a not in pred or b not in pred or a==b:raise ValueError("invalid dependency")
