@@ -57,6 +57,8 @@ def reconcile(case,resolved_claim_id=None,rule=None):
 @dataclass(frozen=True,slots=True)
 class KnowledgeSnapshot:
  source_watermark:str; index_watermark:str; model_version:str; schema_version:str
+    def __post_init__(self):
+        if not all((self.source_watermark,self.index_watermark,self.model_version,self.schema_version)):raise ValueError("snapshot identity required")
     @property
     def digest(self):return sha256_json({"source":self.source_watermark,"index":self.index_watermark,"model":self.model_version,"schema":self.schema_version})
 @dataclass(frozen=True,slots=True)
