@@ -1575,11 +1575,12 @@
         "AssumptionSet"
       ],
       "implementation_paths": [
-        "planned:skeleton/simulation"
+        "skeleton/simulation/environment.py",
+        "skeleton/simulation/world_model.py",
+        "skeleton/simulation/scenario_runtime.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_simulation_authority_boundary.py",
-        "planned:skeleton/testing/test_simulation_determinism.py"
+        "skeleton/testing/test_vol019_world_model_contract.py"
       ],
       "evaluations": [
         "planned:sim-to-real calibration",
@@ -1591,10 +1592,7 @@
         "model bias compounds through rollouts",
         "non-deterministic environment assumptions"
       ],
-      "gaps": [
-        "environment adapter standard missing",
-        "uncertainty propagation policy needs definition"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-019",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
