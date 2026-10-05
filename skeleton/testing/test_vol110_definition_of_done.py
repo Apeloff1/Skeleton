@@ -921,3 +921,14 @@ def test_production_promotion_receipt_can_participate_in_exact_completion() -> N
         and item.status is RequirementStatus.SATISFIED
         for item in result.requirements
     )
+
+def test_same_timestamp_competing_evidence_is_rejected_as_ambiguous() -> None:
+    policy = default_definition_of_done()
+    p = profile()
+    maturity = MaturityState.IMPLEMENTED
+    items = list(evidence_for_active(policy, p, maturity))
+    req = active(policy, p, maturity)[0]
+    original = next(item for item in items if item.requirement_id == req.requirement_id)
+    items.append(evidence(req, evidence_id="ev.competing", observed_at=original.observed_at, passed=False))
+    with pytest.raises(DefinitionOfDoneError, match="ambiguous latest"):
+        evaluate_without_signoff(policy, p, maturity, tuple(items))
