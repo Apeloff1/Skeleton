@@ -457,6 +457,24 @@ def test_hard_failure_ledger_tampering_is_detected() -> None:
         now=NOW,
     )
     forged = replace(vector, hard_failures=())
+    payload = forged.to_wire()
+    payload.pop("receipt_digest")
+    forged = replace(
+        forged,
+        receipt_digest=hashlib.sha256(
+            json.dumps(
+                {
+                    "schema": MODULE.QUALITY_VECTOR_SCHEMA,
+                    "kind": "quality-vector",
+                    **payload,
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
+            ).encode("utf-8")
+        ).hexdigest(),
+    )
     with pytest.raises(QualityContractError, match="hard-failure ledger"):
         policy().verify(forged)
 
