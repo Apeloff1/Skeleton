@@ -584,7 +584,7 @@
       "destination": "skeleton/ai/runtime/observability",
       "kind": "tree",
       "source_git_object_sha": "3f7f261ac997a6e7f2381b1f952643b444838cd3",
-      "role": "AI runtime observability, telemetry, audit, and provenance-bound explainability plane with redacted user-safe surfaces",
+      "role": "AI runtime observability, telemetry, audit, provenance-bound explainability, and executable operations runbook plane",
       "work_package_refs": [
         "WP-W00",
         "WP-W01",
@@ -611,7 +611,8 @@
       "move_batch": "B1-core-runtime",
       "source_disposition": "retain_until_import_inversion_and_regression_gates",
       "volume_refs": [
-        "VOL-085"
+        "VOL-085",
+        "VOL-091"
       ]
     },
     {
