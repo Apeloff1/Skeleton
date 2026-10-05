@@ -6,7 +6,13 @@ class ToolComposition: bindings:tuple[ToolBinding,...]; granted:frozenset[str]
 @dataclass(frozen=True)
 class CompositionResult: valid:bool; reason:str
 def validate(c):
- if any(not c.granted.issuperset(b.permissions) for b in c.bindings):return CompositionResult(False,"permission amplification")
+ if not c.bindings:return CompositionResult(False,"empty composition")
+ if any(not b.tool or not b.input_schema or not b.output_schema or not b.trust for b in c.bindings):return CompositionResult(False,"invalid binding")
+ if any(not b.permissions.issubset(c.granted) for b in c.bindings):return CompositionResult(False,"permission amplification")
+ effective=set(c.bindings[0].permissions)
+ for b in c.bindings[1:]:effective.intersection_update(b.permissions)
+ used=set().union(*(b.permissions for b in c.bindings))
+ if used-effective:return CompositionResult(False,"composition would aggregate authority")
  for a,b in zip(c.bindings,c.bindings[1:]):
   if a.output_schema!=b.input_schema:return CompositionResult(False,"schema mismatch")
   if a.trust!=b.trust:return CompositionResult(False,"trust boundary requires adapter")
