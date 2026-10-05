@@ -7,7 +7,8 @@ from skeleton.documentation.runtime import (
     CheckStatus, DocumentationError, DocumentationSource, GeneratedDocument,
     GeneratedSection, GeneratorIdentity, SourceDigestSet, SourceKind,
     assert_clean_regeneration, generated_manifest, markers,
-    replace_generated_section, validate_links, validate_owned_sections, validate_references,
+    render_generated_document, replace_generated_section, validate_links,
+    validate_owned_sections, validate_references,
     validate_version_relationships,
 )
 
@@ -199,3 +200,66 @@ def test_document_requires_nonempty_typed_sections():
 def test_source_kind_must_be_typed_not_free_form():
     with pytest.raises(DocumentationError, match="SourceKind"):
         DocumentationSource("source.plan", "machine", "machine/plan.json", sha("x"))
+
+
+def test_unterminated_reference_marker_is_reported_as_failure():
+    checks = validate_references(
+        "See [[ref:VOL-089 and [[ref:VOL-090]].",
+        {"VOL-089", "VOL-090"},
+    )
+    assert any(
+        check.status is CheckStatus.FAIL
+        and check.check_id.startswith("reference-invalid-framing:")
+        for check in checks
+    )
+
+
+def test_repository_paths_reject_traversal_segments():
+    with pytest.raises(DocumentationError, match="repository-relative"):
+        DocumentationSource(
+            "source.escape",
+            SourceKind.MACHINE,
+            "docs/../secret.md",
+            sha("x"),
+        )
+    sources = source_set()
+    gen = generator()
+    with pytest.raises(DocumentationError, match="repository-relative"):
+        GeneratedDocument(
+            "docs/../generated.md",
+            gen,
+            sources,
+            (section(sources=sources, gen=gen),),
+        )
+
+
+def test_multi_section_materialization_is_deterministic_and_preserves_human_bytes():
+    sources = source_set()
+    gen = generator()
+    first = GeneratedSection("alpha", sources.digest, gen.digest, "A")
+    second = GeneratedSection("beta", sources.digest, gen.digest, "B")
+    document = GeneratedDocument(
+        "docs/generated/example.md",
+        gen,
+        sources,
+        (second, first),
+    )
+    alpha_begin, alpha_end = markers("alpha")
+    beta_begin, beta_end = markers("beta")
+    template = (
+        "# Human rationale\nKEEP\n"
+        + beta_begin + "\nold-b\n" + beta_end
+        + "\nwarning\n"
+        + alpha_begin + "\nold-a\n" + alpha_end
+        + "\nTAIL\n"
+    )
+
+    rendered = render_generated_document(template, document)
+
+    assert rendered.startswith("# Human rationale\nKEEP\n")
+    assert rendered.endswith("\nTAIL\n")
+    assert "\nwarning\n" in rendered
+    assert "old-a" not in rendered and "old-b" not in rendered
+    assert alpha_begin + "\nA\n" + alpha_end in rendered
+    assert beta_begin + "\nB\n" + beta_end in rendered
+    assert render_generated_document(rendered, document) == rendered
