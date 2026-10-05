@@ -344,9 +344,33 @@ class FeatureFlag:
             raise ValueError("expires_at must be positive integer")
 
     def effective(self, now: int) -> bool:
+        if isinstance(now, bool) or not isinstance(now, int) or now < 0:
+            raise ValueError("now must be non-negative integer")
         if now >= self.expires_at:
             return False
         return self.enabled
+
+
+@dataclass(frozen=True, slots=True)
+class FeatureFlagAuthority:
+    principal_id: str
+    mutable_flags: tuple[str, ...]
+    may_enable_security_sensitive: bool = False
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "principal_id", _text(self.principal_id, "principal_id"))
+        if not self.mutable_flags or len(self.mutable_flags) != len(set(self.mutable_flags)):
+            raise ValueError("mutable_flags must be unique and non-empty")
+        if not isinstance(self.may_enable_security_sensitive, bool):
+            raise TypeError("may_enable_security_sensitive must be boolean")
+
+    def authorize(self, flag: FeatureFlag, *, enable: bool) -> None:
+        if not isinstance(enable, bool):
+            raise TypeError("enable must be boolean")
+        if flag.flag_id not in self.mutable_flags:
+            raise PermissionError("feature flag is outside principal authority")
+        if enable and flag.security_sensitive and not self.may_enable_security_sensitive:
+            raise PermissionError("security-sensitive feature flag enable is not authorized")
 
 
 @dataclass(frozen=True, slots=True)
@@ -359,12 +383,107 @@ class RollbackPlan:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "release_id", _text(self.release_id, "release_id"))
-        if not self.steps:
-            raise ValueError("rollback plan needs steps")
+        for name in ("reversible", "data_compatible", "external_effects_reconciled"):
+            if not isinstance(getattr(self, name), bool):
+                raise TypeError(f"{name} must be boolean")
+        normalized = tuple(_text(step, "rollback step") for step in self.steps)
+        if not normalized or len(normalized) != len(set(normalized)):
+            raise ValueError("rollback plan needs unique non-empty steps")
+        object.__setattr__(self, "steps", normalized)
 
     @property
     def safe(self) -> bool:
         return self.reversible and self.data_compatible and self.external_effects_reconciled
+
+    @property
+    def digest(self) -> str:
+        return sha256_json({
+            "release_id": self.release_id,
+            "reversible": self.reversible,
+            "data_compatible": self.data_compatible,
+            "external_effects_reconciled": self.external_effects_reconciled,
+            "steps": list(self.steps),
+        })
+
+
+@dataclass(frozen=True, slots=True)
+class DeploymentReceipt:
+    release_id: str
+    canary_decision: str
+    rollback_digest: str
+    flag_id: str | None
+    flag_effective: bool
+    decision: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "release_id", _text(self.release_id, "release_id"))
+        if self.canary_decision not in {"hold", "rollback", "promote"}:
+            raise ValueError("unknown canary decision")
+        if not isinstance(self.rollback_digest, str) or len(self.rollback_digest) != 64:
+            raise ValueError("rollback_digest must be sha256")
+        if self.flag_id is not None:
+            object.__setattr__(self, "flag_id", _text(self.flag_id, "flag_id"))
+        if not isinstance(self.flag_effective, bool):
+            raise TypeError("flag_effective must be boolean")
+        if self.decision not in {"hold", "rollback", "promote"}:
+            raise ValueError("unknown deployment decision")
+
+    @property
+    def digest(self) -> str:
+        return sha256_json({
+            "release_id": self.release_id,
+            "canary_decision": self.canary_decision,
+            "rollback_digest": self.rollback_digest,
+            "flag_id": self.flag_id,
+            "flag_effective": self.flag_effective,
+            "decision": self.decision,
+        })
+
+
+class DeploymentSafety:
+    """Couples canary promotion to rollback preflight and optional flag authority."""
+
+    @staticmethod
+    def decide(
+        *,
+        release_id: str,
+        canary: CanaryController,
+        observation: CanaryObservation,
+        rollback: RollbackPlan,
+        now: int,
+        flag: FeatureFlag | None = None,
+        flag_authority: FeatureFlagAuthority | None = None,
+    ) -> DeploymentReceipt:
+        release_id = _text(release_id, "release_id")
+        if rollback.release_id != release_id:
+            raise ValueError("rollback plan release mismatch")
+        canary_decision = canary.decide(observation)
+        if canary_decision == "rollback":
+            decision = "rollback"
+        elif not rollback.safe:
+            decision = "hold"
+        else:
+            decision = canary_decision
+
+        flag_id: str | None = None
+        flag_effective = False
+        if flag is not None:
+            if flag_authority is None:
+                raise PermissionError("feature flag mutation requires explicit authority")
+            flag_authority.authorize(flag, enable=flag.enabled)
+            flag_id = flag.flag_id
+            flag_effective = flag.effective(now)
+            if flag.enabled and not flag_effective and decision == "promote":
+                decision = "hold"
+
+        return DeploymentReceipt(
+            release_id=release_id,
+            canary_decision=canary_decision,
+            rollback_digest=rollback.digest,
+            flag_id=flag_id,
+            flag_effective=flag_effective,
+            decision=decision,
+        )
 
 
 @dataclass(slots=True)
