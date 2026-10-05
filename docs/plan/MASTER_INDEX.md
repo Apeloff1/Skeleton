@@ -36,6 +36,19 @@ Fast masterplan parse index: [`machine/ai_masterplan_parse_index.json`](../../ma
 
 Parse-index freshness validator: [`scripts/check_ai_masterplan_parse_index.py`](../../scripts/check_ai_masterplan_parse_index.py)
 
+
+### Fast masterplan parsing protocol
+
+For status, signing, and next-work scans, read `machine/ai_masterplan_parse_index.json` before loading the full masterplan/accountability pair.
+
+1. Confirm the index's two `sources.*.git_blob_sha` values still match the current Git blobs for `machine/ai_master_plan.json` and `machine/ai_build_accountability.json`.
+2. If they match, treat `fast_sets.fully_complete` as settled for implementation/verification-gap parsing and skip implementation-signature reconciliation for already implementation-signed records.
+3. Use `fast_sets.gap_free_waiting_verification` as the narrow independent-verification frontier.
+4. Use `fast_sets.implementation_unsigned` as the construction/signing frontier.
+5. If either source identity differs, reject the index as stale and regenerate it with `python scripts/check_ai_masterplan_parse_index.py --write` before relying on any fast set.
+
+The parse index is a derived navigation accelerator only. It never replaces the canonical masterplan or accountability ledger and never grants completion authority.
+
 Master build sequence: [`MASTER_BUILD_SEQUENCE.md`](MASTER_BUILD_SEQUENCE.md)
 
 Machine build sequence: [`machine/ai_master_build_sequence.json`](../../machine/ai_master_build_sequence.json)
