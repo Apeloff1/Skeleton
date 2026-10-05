@@ -1618,11 +1618,13 @@
       "implementation_paths": [
         "skeleton/multimodal/contracts.py",
         "skeleton/multimodal/__init__.py",
-        "backend/routes/media.py"
+        "backend/routes/media.py",
+        "skeleton/multimodal/sanitize.py"
       ],
       "tests": [
         "backend/tests/test_ai_provider_media.py",
-        "skeleton/testing/test_vol020_multimodal_contracts.py"
+        "skeleton/testing/test_vol020_multimodal_contracts.py",
+        "skeleton/testing/test_vol020_multimodal_sanitize.py"
       ],
       "evaluations": [
         "planned:cross-modal retrieval eval",
@@ -1635,8 +1637,7 @@
         "cross-modal misalignment"
       ],
       "gaps": [
-        "document/audio/video ingestion adapters still need convergence onto the canonical MediaArtifact contract",
-        "modality-specific payload sanitizers remain to be implemented above the untrusted-metadata boundary"
+        "document/audio/video ingestion adapters still need convergence onto the canonical MediaArtifact contract"
       ],
       "accountability_id": "ACC-VOL-020",
       "completion_checkbox": false,
