@@ -399,13 +399,14 @@ def test_namespace_composition_rejects_unmapped_members(tmp_path: Path, monkeypa
     assert not module._mappings_cover_planned_source(mappings, "skeleton/research")
 
 
-def test_mature_volume_paths_are_traceable_to_governed_ai_tree_mappings() -> None:
+def test_mature_volume_paths_are_traceable_to_governed_ai_tree_owners() -> None:
     import json
 
     module = _module()
     manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
     master_plan = json.loads((ROOT / "machine/ai_master_plan.json").read_text(encoding="utf-8"))
     mappings = manifest["mappings"]
+    native_owners = manifest["native_ai_owners"]
     mature = {"implemented", "hardened", "verified", "complete", "completed"}
 
     for volume in master_plan["volumes"]:
@@ -419,7 +420,27 @@ def test_mature_volume_paths_are_traceable_to_governed_ai_tree_mappings() -> Non
                 continue
             owner = module._owned_mapping_for_implementation_path(mappings, implementation_path)
             if owner is not None:
-                owners.add(owner["id"])
-        for owner_id in owners:
-            owner = next(item for item in mappings if item["id"] == owner_id)
+                owners.add(("mapping", owner["id"]))
+                continue
+            native_owner = module._owned_native_ai_path(native_owners, implementation_path)
+            if native_owner is not None:
+                owners.add(("native", native_owner["id"]))
+                continue
+            if implementation_path.startswith("skeleton/ai/"):
+                raise AssertionError((volume["key"], implementation_path))
+        for owner_kind, owner_id in owners:
+            collection = mappings if owner_kind == "mapping" else native_owners
+            owner = next(item for item in collection if item["id"] == owner_id)
             assert volume["key"] in owner.get("volume_refs", []), (volume["key"], owner_id)
+
+
+def test_native_ai_owners_are_canonical_and_residual_where_needed() -> None:
+    import json
+
+    manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
+    owners = {item["id"]: item for item in manifest["native_ai_owners"]}
+    assert owners["AIFT-NATIVE-AGENTS-ROOT"]["residual_only"] is True
+    assert owners["AIFT-NATIVE-BUILD-ROOT"]["residual_only"] is True
+    assert owners["AIFT-NATIVE-EXTENSIONS-ROOT"]["residual_only"] is True
+    assert owners["AIFT-NATIVE-DEFERRED-RUNTIME"]["residual_only"] is False
+    assert "VOL-209" in owners["AIFT-NATIVE-ARTIFACT-REVIEW"]["volume_refs"]

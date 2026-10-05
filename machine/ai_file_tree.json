@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tree_version": "1.7.6",
+  "tree_version": "1.7.7",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "0e38037c096059b12bd6447fe5e502f81218f870",
@@ -6002,7 +6002,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "177_mapping_current_main_parity_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "177_mapping_plus_10_native_owner_current_main_governance_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -6802,7 +6802,8 @@
     "global_cutover_blockers": [
       "BASE-FRONTEND-SSR-RAF-01"
     ],
-    "invariant": "Preparation metadata and move tags authorize staging only; the reconciled mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion."
+    "invariant": "Preparation metadata and move tags authorize staging only; the reconciled mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion.",
+    "native_ai_owner_count": 10
   },
   "validation_request": {
     "requested_at_utc": "2026-09-22T15:47:00Z",
@@ -7224,6 +7225,144 @@
       "remaining_unclassified_mature_implementation_paths": 0,
       "remaining_missing_mature_volume_mapping_links": 0,
       "policy": "Reflect newly promoted completed work in governed AI-tree traceability without changing implementation ownership or completion authority."
+    },
+    "native_ai_completed_work_governance_2026_10_05": {
+      "native_owner_count": 10,
+      "mature_ai_native_implementation_path_count": 23,
+      "mature_volume_count": 209,
+      "policy": "Govern completed implementations born directly inside skeleton/ai without fabricating legacy source mappings; residual native tree owners exclude authority already held by more-specific migration destinations."
     }
-  }
+  },
+  "native_ai_owners": [
+    {
+      "id": "AIFT-NATIVE-AI-PACKAGE",
+      "path": "skeleton/ai/__init__.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI package export surface for AI-native capabilities.",
+      "volume_refs": [
+        "VOL-113"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-SPECIALIZATION-DOMAIN",
+      "path": "skeleton/ai/specialization/domain_registry.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI-native specialization/domain registry.",
+      "volume_refs": [
+        "VOL-071"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-FUNCTIONAL-TRANSACTION",
+      "path": "skeleton/ai/functional_transaction.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI-native functional transaction boundary.",
+      "volume_refs": [
+        "VOL-097"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-BUILD-ROOT",
+      "path": "skeleton/ai/build",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": true,
+      "role": "Residual AI-native build/engineering surfaces not owned by more-specific mirrored build mappings.",
+      "volume_refs": [
+        "VOL-098",
+        "VOL-100",
+        "VOL-259"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-RESEARCH-RUNTIME",
+      "path": "skeleton/ai/research.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI-native research runtime distinct from quarantined research mirrors.",
+      "volume_refs": [
+        "VOL-099"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-AGENTS-ROOT",
+      "path": "skeleton/ai/agents",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": true,
+      "role": "Residual AI-native multi-agent engineering surfaces outside mirrored Jeeves/core/swarm subtrees.",
+      "volume_refs": [
+        "VOL-100",
+        "VOL-201",
+        "VOL-202",
+        "VOL-203",
+        "VOL-204",
+        "VOL-205",
+        "VOL-206",
+        "VOL-207"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-CAPABILITY-MAP",
+      "path": "skeleton/ai/capability_map.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI capability-map runtime.",
+      "volume_refs": [
+        "VOL-113"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-EXTENSIONS-ROOT",
+      "path": "skeleton/ai/runtime/extensions",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": true,
+      "role": "Residual AI-native extension ecosystem/multimodal surfaces outside mirrored extension domains.",
+      "volume_refs": [
+        "VOL-159",
+        "VOL-160",
+        "VOL-163"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-DEFERRED-RUNTIME",
+      "path": "skeleton/ai/runtime/deferred",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI-native deferred capability runtime and qualification surfaces.",
+      "volume_refs": [
+        "VOL-188",
+        "VOL-189",
+        "VOL-190",
+        "VOL-191",
+        "VOL-192",
+        "VOL-193",
+        "VOL-194",
+        "VOL-196",
+        "VOL-197",
+        "VOL-198"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-ARTIFACT-REVIEW",
+      "path": "skeleton/ai/artifact_review.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI-native artifact review implementation.",
+      "volume_refs": [
+        "VOL-209"
+      ]
+    }
+  ]
 }
