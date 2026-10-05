@@ -3,10 +3,10 @@
   "kind": "ai-masterplan-parse-index",
   "sources": {
     "machine/ai_master_plan.json": {
-      "git_blob_sha": "f6cbe8ade6ad4e3b9f103ca1681d3fd3a50d3177"
+      "git_blob_sha": "825fea2d25d6100325290c4b2cfbb8e03b87263d"
     },
     "machine/ai_build_accountability.json": {
-      "git_blob_sha": "2630abff7ed64156296e2a803f9b80c7388d4208"
+      "git_blob_sha": "fedc907634965625af5f2344c56a67c3a084e6fa"
     }
   },
   "policy": {
@@ -17,12 +17,12 @@
   },
   "volume_summary": {
     "total": 421,
-    "implementation_signed": 170,
+    "implementation_signed": 184,
     "verification_signed": 20,
     "complete": 20,
-    "implementation_signed_open": 150,
+    "implementation_signed_open": 164,
     "gap_free_waiting_verification": 19,
-    "implementation_unsigned": 251
+    "implementation_unsigned": 237
   },
   "fast_sets": {
     "fully_complete": [
@@ -70,10 +70,7 @@
     ],
     "implementation_unsigned": [
       "VOL-001",
-      "VOL-002",
       "VOL-003",
-      "VOL-004",
-      "VOL-005",
       "VOL-020",
       "VOL-021",
       "VOL-032",
@@ -102,16 +99,7 @@
       "VOL-130",
       "VOL-131",
       "VOL-132",
-      "VOL-133",
       "VOL-134",
-      "VOL-135",
-      "VOL-136",
-      "VOL-137",
-      "VOL-138",
-      "VOL-139",
-      "VOL-140",
-      "VOL-141",
-      "VOL-142",
       "VOL-159",
       "VOL-160",
       "VOL-163",
@@ -284,8 +272,6 @@
       "VOL-358",
       "VOL-359",
       "VOL-360",
-      "VOL-364",
-      "VOL-365",
       "VOL-366",
       "VOL-367",
       "VOL-368",
@@ -325,7 +311,7 @@
   "by_depth_pass": {
     "DP-000-040": {
       "total": 41,
-      "implementation_signed": 31,
+      "implementation_signed": 34,
       "complete": 11,
       "gap_free_waiting_verification": 3
     },
@@ -343,7 +329,7 @@
     },
     "DP-121-160": {
       "total": 40,
-      "implementation_signed": 17,
+      "implementation_signed": 26,
       "complete": 0,
       "gap_free_waiting_verification": 0
     },
@@ -379,7 +365,7 @@
     },
     "DP-361-400": {
       "total": 40,
-      "implementation_signed": 15,
+      "implementation_signed": 17,
       "complete": 0,
       "gap_free_waiting_verification": 0
     },
@@ -393,13 +379,13 @@
   "accountability_summary": {
     "volume": {
       "total": 421,
-      "implementation_signed": 170,
+      "implementation_signed": 184,
       "verification_signed": 20,
       "complete": 20,
       "status_counts": {
         "verified": 13,
-        "unverified": 251,
-        "implemented": 150,
+        "unverified": 237,
+        "implemented": 164,
         "hardened": 7
       }
     },
