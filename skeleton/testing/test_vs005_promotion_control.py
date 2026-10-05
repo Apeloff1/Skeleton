@@ -44,3 +44,11 @@ def test_rejected_candidate_cannot_claim_promotion_rollback():
  c=candidate();d=decide(c,evaluation(safety_passed=False),"ACTOR.VERIFIER",canary_digest=None)
  r=RollbackReceipt(d.decision_id,c.challenger_digest,c.champion_digest,S("rollback"))
  with pytest.raises(ImprovementError,match="promoted candidate"):validate_rollback(c,d,r)
+
+def test_outcome_bound_canary_must_match_candidate_and_pass_all_gates():
+ c=candidate();e=evaluation();good=CanaryEvidence(c.digest,S("run"),True,True,True)
+ d=promote_with_canary(c,e,"ACTOR.VERIFIER",good);assert d.canary_digest==good.digest
+ other=CanaryEvidence(S("other"),S("run"),True,True,True)
+ with pytest.raises(ImprovementError,match="canary/candidate"):promote_with_canary(c,e,"ACTOR.VERIFIER",other)
+ failed=CanaryEvidence(c.digest,S("run"),True,False,True)
+ with pytest.raises(ImprovementError,match="canary gates"):promote_with_canary(c,e,"ACTOR.VERIFIER",failed)
