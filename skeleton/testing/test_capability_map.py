@@ -491,3 +491,34 @@ def test_canonical_ai_package_exports_capability_contract_by_identity() -> None:
     assert set(public_ai.__all__) == expected
     for name in expected:
         assert getattr(public_ai, name) is getattr(canonical_capability_map, name)
+
+
+def test_snapshot_round_trip_preserves_authoritative_identity() -> None:
+    root = descriptor("CAP.ROOT")
+    evidence = live(root)
+    snapshot = CapabilityMap((root,), (evidence,)).resolve_all()
+    replayed = CapabilitySnapshot.from_dict(snapshot.to_dict())
+    assert replayed == snapshot
+    assert replayed.digest == snapshot.digest
+
+
+def test_snapshot_replay_rejects_tampered_health_and_digest() -> None:
+    root = descriptor("CAP.ROOT")
+    snapshot = CapabilityMap((root,), (live(root),)).resolve_all()
+    payload = snapshot.to_dict()
+    payload["healthy"] = False
+    with pytest.raises(CapabilityError, match="health mismatch"):
+        CapabilitySnapshot.from_dict(payload)
+
+    payload = snapshot.to_dict()
+    payload["digest"] = "0" * 64
+    with pytest.raises(CapabilityError, match="digest mismatch"):
+        CapabilitySnapshot.from_dict(payload)
+
+
+def test_snapshot_replay_rejects_unknown_fields() -> None:
+    root = descriptor("CAP.ROOT")
+    payload = CapabilityMap((root,), (live(root),)).resolve_all().to_dict()
+    payload["authority_override"] = True
+    with pytest.raises(CapabilityError, match="unknown or missing fields"):
+        CapabilitySnapshot.from_dict(payload)
