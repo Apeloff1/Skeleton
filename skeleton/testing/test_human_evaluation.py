@@ -28,7 +28,7 @@ def test_blinded_human_evaluation_binds_rubric_and_quality_vector() -> None:
         (judgment("r1", 0.8), judgment("r2", 0.9)),
     )
     assert evidence.passed is True
-    assert evidence.case_scores == (("case-1", pytest.approx(0.85)),)
+    assert evidence.case_scores[0][0] == "case-1"\n    assert evidence.case_scores[0][1] == pytest.approx(0.85)
     assert evidence.quality_vector_eligible is True
     assert evidence.production_authority is False
 
