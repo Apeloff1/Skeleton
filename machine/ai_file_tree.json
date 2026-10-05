@@ -59,7 +59,11 @@
       "source_disposition": "canonical_provider_contract_with_governed_ai_facade",
       "note": "Provider-neutral class ownership remains at skeleton/providers/contract.py; the governed AI destination is a non-owning compatibility facade until explicit import/ownership cutover.",
       "parity_mode": "compatibility_facade",
-      "facade_required_import": "from skeleton.providers.contract import"
+      "facade_required_import": "from skeleton.providers.contract import",
+      "volume_refs": [
+        "VOL-227",
+        "VOL-228"
+      ]
     },
     {
       "id": "AIFT-PROVIDER-RUNTIME",
@@ -601,6 +605,7 @@
         "VOL-205",
         "VOL-207",
         "VOL-208",
+        "VOL-224",
         "VOL-256",
         "VOL-257",
         "VOL-258",
@@ -807,6 +812,7 @@
         "VOL-187",
         "VOL-191",
         "VOL-204",
+        "VOL-225",
         "VOL-325",
         "VOL-390",
         "VOL-403",
@@ -911,6 +917,7 @@
         "VOL-176",
         "VOL-177",
         "VOL-205",
+        "VOL-230",
         "VOL-256",
         "VOL-257",
         "VOL-318",
@@ -2201,7 +2208,8 @@
       ],
       "volume_refs": [
         "VOL-113",
-        "VOL-124"
+        "VOL-124",
+        "VOL-229"
       ],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
@@ -5050,7 +5058,8 @@
       ],
       "volume_refs": [
         "VOL-015",
-        "VOL-026"
+        "VOL-026",
+        "VOL-223"
       ],
       "overlay_children": [
         "integrations"
@@ -5396,7 +5405,8 @@
         "AIQ-S7-E2E-01"
       ],
       "volume_refs": [
-        "VOL-153"
+        "VOL-153",
+        "VOL-222"
       ],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
@@ -5656,7 +5666,9 @@
       ],
       "volume_refs": [
         "VOL-178",
-        "VOL-179"
+        "VOL-179",
+        "VOL-221",
+        "VOL-226"
       ],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
