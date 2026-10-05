@@ -73,3 +73,28 @@ def test_disposition_identity_is_immutable():
  r.deduplicate("ITEM.1","ITEM.2","DISP.1","same")
  r.add(item("ITEM.3"));r.add(item("ITEM.4"))
  with pytest.raises(BacklogError,match="disposition identity"):r.deduplicate("ITEM.3","ITEM.4","DISP.1","same")
+
+def test_failed_cycle_does_not_poison_dependency_registry():
+ r=BacklogRegistry();r.add(item("ITEM.1"));r.add(item("ITEM.2"))
+ r.add_dependency(BacklogDependency("DEP.1","ITEM.2","ITEM.1"))
+ with pytest.raises(BacklogError,match="cycle"):r.add_dependency(BacklogDependency("DEP.2","ITEM.1","ITEM.2"))
+ assert "DEP.2" not in r._deps
+ assert r.reconcile("ITEM.1").state is BacklogState.READY
+ assert r.reconcile("ITEM.2").state is BacklogState.BLOCKED
+
+def test_failed_disposition_conflict_is_transactional():
+ r=BacklogRegistry()
+ for i in range(1,5):r.add(item(f"ITEM.{i}"))
+ r.deduplicate("ITEM.1","ITEM.2","DISP.1","same")
+ before3=r._items["ITEM.3"];before4=r._items["ITEM.4"]
+ with pytest.raises(BacklogError,match="disposition identity"):
+  r.deduplicate("ITEM.3","ITEM.4","DISP.1","same")
+ assert r._items["ITEM.3"]==before3
+ assert r._items["ITEM.4"]==before4
+ assert r._items["ITEM.4"].state is BacklogState.OPEN
+
+def test_unknown_item_operations_fail_closed_with_domain_error():
+ r=BacklogRegistry()
+ with pytest.raises(BacklogError,match="unknown backlog item"):r.duplicates("ITEM.MISSING")
+ with pytest.raises(BacklogError,match="unknown backlog item"):r.reconcile("ITEM.MISSING")
+ with pytest.raises(BacklogError,match="unknown backlog item"):r.revalidate_dependents("ITEM.MISSING")
