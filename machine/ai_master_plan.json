@@ -7137,7 +7137,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Define required artifacts/evidence by maturity and change impact.",
         "Require tests, failure/recovery behavior, observability, rollback and ownership where applicable.",
@@ -7151,20 +7151,26 @@
       "contracts": [
         "DefinitionOfDone",
         "DoDRequirement",
-        "CompletionEvidence"
+        "ChangeImpactProfile",
+        "CompletionEvidence",
+        "CompletionSignoff",
+        "CompletionEvaluation",
+        "DefinitionOfDoneEvaluator"
       ],
       "implementation_paths": [
-        "machine",
-        "docs/plan",
-        "scripts"
+        "skeleton/contracts/definition_of_done.py",
+        "skeleton/contracts/__init__.py",
+        "skeleton/ai/runtime/contracts/definition_of_done.py",
+        "skeleton/ai/runtime/contracts/__init__.py",
+        "skeleton/automation/definition_of_done.py",
+        "machine/ai_file_tree.json"
       ],
       "tests": [
-        "planned:skeleton/testing/test_definition_of_done.py",
-        "planned:completion derivation tests"
+        "skeleton/testing/test_vol110_definition_of_done.py",
+        "skeleton/testing/test_definition_of_done.py"
       ],
       "evaluations": [
-        "planned:incomplete-evidence rejection suite",
-        "planned:promotion downgrade evaluation"
+        "skeleton/testing/test_vol110_definition_of_done.py"
       ],
       "evidence": [],
       "risks": [
@@ -7172,10 +7178,7 @@
         "evidence omission",
         "scope-dependent requirement lost"
       ],
-      "gaps": [
-        "unify maturity and DoD rules",
-        "bind change-impact triggers to DoD"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-110",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",

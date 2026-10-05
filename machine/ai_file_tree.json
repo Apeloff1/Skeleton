@@ -95,7 +95,7 @@
       "destination": "skeleton/ai/runtime/contracts",
       "kind": "tree",
       "source_git_object_sha": "e2abcdcc7b6d578433eb2a1670c3b6eab48a221e",
-      "role": "canonical operation/conversation/context/formal/localization/compliance contracts with governed AI runtime mirrors, deterministic identity, and fail-closed evidence/applicability boundaries",
+      "role": "canonical operation/conversation/context/formal/localization/compliance/Definition-of-Done contracts with governed AI runtime mirrors, deterministic identity, and fail-closed evidence/maturity boundaries",
       "work_package_refs": [
         "WP-W00",
         "WP-W01",
@@ -116,7 +116,8 @@
       "volume_refs": [
         "VOL-081",
         "VOL-087",
-        "VOL-088"
+        "VOL-088",
+        "VOL-110"
       ]
     },
     {
