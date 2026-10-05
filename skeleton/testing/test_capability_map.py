@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import pytest
 
+import skeleton.ai as public_ai
+from skeleton.ai import capability_map as canonical_capability_map
 from skeleton.ai.capability_map import (
     Availability,
     CapabilityDescriptor,
@@ -482,3 +484,10 @@ def test_generator_materialization_stops_at_safety_bound() -> None:
     with pytest.raises(CapabilityError, match="capability count exceeds safety bound"):
         CapabilityMap(descriptors(), ())
     assert consumed == 10_001
+
+
+def test_canonical_ai_package_exports_capability_contract_by_identity() -> None:
+    expected = set(canonical_capability_map.__all__)
+    assert set(public_ai.__all__) == expected
+    for name in expected:
+        assert getattr(public_ai, name) is getattr(canonical_capability_map, name)
