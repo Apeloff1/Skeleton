@@ -41,11 +41,13 @@ class DistributedReceipt:
   if self.state is OutcomeState.UNKNOWN_EXTERNAL and self.provider_evidence_digest is not None:raise DistributedError("unknown outcome cannot claim provider evidence")
 class DistributedScheduler:
  def __init__(self):self._fence={};self._active={};self._terminal={};self._idempotency={}
- def lease(self,task,worker_id):
+ def _bind_task(self,task):
   if not isinstance(task,DistributedTask):raise DistributedError("task must be DistributedTask")
-  bound=self._idempotency.get(task.idempotency_key)
-  if bound is not None and bound!=task.digest:raise DistributedError("idempotency key reused for different task")
+  prior=self._idempotency.get(task.idempotency_key)
+  if prior is not None and prior!=task.digest:raise DistributedError("idempotency key reused for different task")
   self._idempotency[task.idempotency_key]=task.digest
+ def lease(self,task,worker_id):
+  self._bind_task(task)
   if task.task_id in self._terminal:return None
   token=self._fence.get(task.task_id,0)+1;self._fence[task.task_id]=token
   lease=WorkerLease(f"LEASE.{task.task_id}.{token}",task.digest,worker_id,token);self._active[task.task_id]=lease;return lease
@@ -60,16 +62,17 @@ class DistributedScheduler:
   return receipt
  def worker_lost(self,task,lease,effect_may_have_escaped):
   if not isinstance(effect_may_have_escaped,bool):raise DistributedError("effect_may_have_escaped must be bool")
+  if effect_may_have_escaped and not task.external_effect:raise DistributedError("non-external task cannot report escaped effect")
   if self._active.get(task.task_id)!=lease:raise DistributedError("stale worker loss report")
-  if not task.external_effect and effect_may_have_escaped:raise DistributedError("non-external task cannot report escaped effect")
   if task.external_effect and effect_may_have_escaped:
    return self.commit(task,lease,OutcomeState.UNKNOWN_EXTERNAL)
   self._active.pop(task.task_id,None);return None
  def reconcile(self,task,unknown,*,provider_evidence_digest,result_digest=None,failed=False):
-  if unknown.state is not OutcomeState.UNKNOWN_EXTERNAL:raise DistributedError("reconciliation requires unknown outcome")
+  self._bind_task(task)
   if unknown.task_digest!=task.digest:raise DistributedError("receipt/task mismatch")
   active=self._active.get(task.task_id)
-  if active is None or active.lease_id!=unknown.lease_id or active.fence_token!=unknown.fence_token or active.task_digest!=task.digest:raise DistributedError("unknown receipt does not match authoritative active lease")
+  if active is not None and (active.lease_id!=unknown.lease_id or active.fence_token!=unknown.fence_token):raise DistributedError("unknown receipt is not authoritative active lease")
+  if unknown.state is not OutcomeState.UNKNOWN_EXTERNAL:raise DistributedError("reconciliation requires unknown outcome")
   _sha(provider_evidence_digest,"provider_evidence_digest")
   state=OutcomeState.FAILED if failed else OutcomeState.SUCCEEDED
   if state is OutcomeState.SUCCEEDED and result_digest is None:raise DistributedError("successful reconciliation requires result")
