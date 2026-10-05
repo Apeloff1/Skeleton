@@ -50,5 +50,6 @@ local-inference = ["numpy==2.4.6", "Pillow>=11,<13"]
 [project.scripts]
 skeleton = "skeleton.__main__:main"
 skeleton-dev = "skeleton.developer.cli:main"
+skeleton-bootstrap = "skeleton.developer.bootstrap:main"
 skeleton-repo-machine = "skeleton.repo_machine.cli:main"
 skeleton-train-local-model = "skeleton.ai.runtime.inference.train:main"
