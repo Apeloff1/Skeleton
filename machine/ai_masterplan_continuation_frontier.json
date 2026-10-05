@@ -669,7 +669,16 @@
         ],
         "completion_checkbox": false,
         "implementation_signed": false,
-        "verification_signed": false
+        "verification_signed": false,
+        "implementation_candidate": {
+          "status": "branch_pending_exact_head_validation",
+          "candidate_branch": "feat/p3t2-training-learning-multimodal-gapfill-20261005",
+          "candidate_contract": "machine/ai_p3t2_training_candidate.json",
+          "candidate_status": "implementation_candidate",
+          "exact_head_validation_required": true,
+          "exact_head_validation_status": "pending",
+          "promotion_authority": false
+        }
       },
       {
         "task_id": "P3T2-LEARNING-01",
@@ -694,7 +703,16 @@
         ],
         "completion_checkbox": false,
         "implementation_signed": false,
-        "verification_signed": false
+        "verification_signed": false,
+        "implementation_candidate": {
+          "status": "branch_pending_exact_head_validation",
+          "candidate_branch": "feat/p3t2-training-learning-multimodal-gapfill-20261005",
+          "candidate_contract": "machine/ai_p3t2_learning_candidate.json",
+          "candidate_status": "implementation_candidate",
+          "exact_head_validation_required": true,
+          "exact_head_validation_status": "pending",
+          "promotion_authority": false
+        }
       },
       {
         "task_id": "P3T2-MULTIMODAL-01",
@@ -725,7 +743,16 @@
         ],
         "completion_checkbox": false,
         "implementation_signed": false,
-        "verification_signed": false
+        "verification_signed": false,
+        "implementation_candidate": {
+          "status": "branch_pending_exact_head_validation",
+          "candidate_branch": "feat/p3t2-training-learning-multimodal-gapfill-20261005",
+          "candidate_contract": "machine/ai_p3t2_multimodal_candidate.json",
+          "candidate_status": "implementation_candidate",
+          "exact_head_validation_required": true,
+          "exact_head_validation_status": "pending",
+          "promotion_authority": false
+        }
       },
       {
         "task_id": "P3T2-LIFECYCLE-01",
@@ -758,8 +785,9 @@
       }
     ],
     "owner_count": 6,
-    "implementation_candidate_count": 2,
-    "landed_unpromoted_owner_count": 0
+    "implementation_candidate_count": 5,
+    "landed_unpromoted_owner_count": 0,
+    "branch_implementation_candidate_count": 3
   },
   "reconciliation": {
     "native_training_core_volume_count": 19,

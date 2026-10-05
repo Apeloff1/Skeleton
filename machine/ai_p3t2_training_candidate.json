@@ -1,0 +1,71 @@
+{
+  "schema_version": "skeleton.ai.p3t2.training_candidate.v2",
+  "task_id": "P3T2-TRAINING-01",
+  "lane_id": "P3T2-L2",
+  "status": "implementation_candidate",
+  "depends_on_task_ids": ["P3T2-DATA-01"],
+  "dependency_candidate_paths": [
+    "machine/ai_p3t2_data_candidate.json"
+  ],
+  "source_frontier": "machine/ai_masterplan_continuation_frontier.json",
+  "master_plan": "machine/ai_master_plan.json",
+  "volume_refs": [
+    "VOL-143",
+    "VOL-144",
+    "VOL-145",
+    "VOL-146",
+    "VOL-147",
+    "VOL-148",
+    "VOL-149"
+  ],
+  "implementation_modules": [
+    "skeleton/training/control_plane.py",
+    "skeleton/training/distributed.py",
+    "skeleton/training/checkpointing.py",
+    "skeleton/training/elastic_recovery.py",
+    "skeleton/training/observability.py",
+    "skeleton/training/eval_gates.py",
+    "skeleton/training/post_training.py"
+  ],
+  "executable_tests": [
+    "skeleton/testing/test_training_control_plane.py",
+    "skeleton/testing/test_distributed_training.py",
+    "skeleton/testing/test_training_checkpointing.py",
+    "skeleton/testing/test_elastic_training_recovery.py",
+    "skeleton/testing/test_training_observability.py",
+    "skeleton/testing/test_training_eval_gates.py",
+    "skeleton/testing/test_post_training_lab.py"
+  ],
+  "mirror_pairs": [
+    ["skeleton/training/control_plane.py", "skeleton/ai/training/control_plane.py"],
+    ["skeleton/training/distributed.py", "skeleton/ai/training/distributed.py"],
+    ["skeleton/training/checkpointing.py", "skeleton/ai/training/checkpointing.py"],
+    ["skeleton/training/elastic_recovery.py", "skeleton/ai/training/elastic_recovery.py"],
+    ["skeleton/training/observability.py", "skeleton/ai/training/observability.py"],
+    ["skeleton/training/eval_gates.py", "skeleton/ai/training/eval_gates.py"],
+    ["skeleton/training/post_training.py", "skeleton/ai/training/post_training.py"]
+  ],
+  "cross_plane_regressions": [
+    "skeleton/testing/test_p3_training_control.py",
+    "skeleton/testing/test_p3_training_data.py",
+    "skeleton/testing/test_p3_local_training_evaluation.py",
+    "tests/test_p3_training_acceptance.py",
+    "skeleton/testing/test_p3t2_evidence.py"
+  ],
+  "evidence_contract": "skeleton/ai/runtime/p3t2/evidence.py",
+  "evidence_policy": {
+    "exact_head_ci_required": true,
+    "independent_closure_required": true,
+    "current_main_reconciliation_required": true,
+    "data_dependency_candidate_required": true,
+    "single_revision_proof_required": true,
+    "single_execution_subject_required": true,
+    "independent_verifier_required": true
+  },
+  "promotion_state": {
+    "completion_checkbox": false,
+    "implementation_signed": false,
+    "verification_signed": false,
+    "may_self_close": false
+  }
+}
