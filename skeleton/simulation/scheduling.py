@@ -9,6 +9,8 @@ class WorkloadTrace:
 @dataclass(frozen=True)
 class SimulationMetric:
  throughput:float; mean_latency:float; fairness:float; utilization:float
+ def __post_init__(self):
+  if any(isinstance(x,bool) or not isinstance(x,(int,float)) or not math.isfinite(x) or x<0 for x in (self.throughput,self.mean_latency,self.fairness,self.utilization)) or self.fairness>1 or self.utilization>1:raise ValueError("invalid simulation metric")
 @dataclass(frozen=True)
 class SchedulingSimulation:
  policy:str; trace:WorkloadTrace; metric:SimulationMetric; authoritative:bool=False
