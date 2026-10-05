@@ -4,6 +4,7 @@ export const EN_MESSAGES: Readonly<Record<TranslationKey, string>> = Object.free
   'app.name': 'Skeleton',
   'app.tagline': 'Unified Product',
   'launcher.open': 'Open Skeleton',
+  'launcher.enter_product': 'Enter Product',
   'launcher.minimal': 'Use minimal launcher',
   'operation.cancel': 'Cancel operation',
   'authority.approve': 'Approve',
