@@ -33,6 +33,14 @@ from .compute_fabric import (
     StorageTier, TierMove, TieringPolicy, TransferPlan, aggregate_results,
     allocate_research, build_artifact, plan_transfer, tier_move_valid,
 )
+from .runtime_resources import (
+    CollectivePlacement, DraftToken, DrainState, EvictionPolicy, GPUAllocation,
+    GPUInterconnect, GPUMemoryPool, GPUMemoryReservation, GPUPath, KVCacheEntry,
+    KVCacheKey, KVCacheLease, ModelEviction, NUMAAffinity, NUMANode,
+    NUMAPlacement, PrefixArtifact, PrefixCacheKey, PrefixReuseDecision,
+    SpeculativePlan, VerificationStep, collective_path, evict_model, kv_reusable,
+    numa_place, prefix_reuse, reserve_gpu, verify_draft,
+)
 from .contract_fuzzing import ContractFuzzer, FuzzBudget, FuzzFailure, FuzzReport
 from .simulation_mode import SimulationAuthority, SimulationEvidence, SimulationRequest, SimulationResult, SimulationRuntime
 from .journal import DeferredExecutionJournal, DeferredJournalConflict, DeferredJournalError, DeferredJournalRecord, SqliteDeferredExecutionJournal
