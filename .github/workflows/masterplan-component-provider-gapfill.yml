@@ -1,0 +1,64 @@
+name: Masterplan Component Provider Gapfill
+
+on:
+  pull_request:
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_file_tree.json"
+      - "machine/ai_component_provider_gapfill_candidate.json"
+      - "skeleton/ai/runtime/deferred/component_provider_assurance.py"
+      - "skeleton/testing/test_model_cards.py"
+      - "skeleton/testing/test_dataset_cards.py"
+      - "skeleton/testing/test_tool_cards.py"
+      - "skeleton/testing/test_agent_cards.py"
+      - "skeleton/testing/test_component_health_scorecard.py"
+      - "skeleton/testing/test_dependency_health.py"
+      - "skeleton/testing/test_provider_risk.py"
+      - "skeleton/testing/test_provider_failover.py"
+      - "skeleton/testing/test_offline_mode.py"
+      - "skeleton/testing/test_air_gapped_profile.py"
+      - "scripts/check_ai_component_provider_gapfill.py"
+      - "tests/test_ai_component_provider_gapfill.py"
+      - ".github/workflows/masterplan-component-provider-gapfill.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-head:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+      - run: python -m compileall -q skeleton/ai/runtime/deferred/component_provider_assurance.py scripts/check_ai_component_provider_gapfill.py
+      - name: Validate exact head
+        run: |
+          HEAD_SHA="$(git rev-parse HEAD)"
+          python scripts/check_ai_master_plan.py
+          python scripts/check_ai_component_provider_gapfill.py --head "$HEAD_SHA" --json
+      - run: python -m pytest -q --noconftest tests/test_ai_component_provider_gapfill.py
+      - name: Focused VOL-221..230 regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_model_cards.py
+          skeleton/testing/test_dataset_cards.py
+          skeleton/testing/test_tool_cards.py
+          skeleton/testing/test_agent_cards.py
+          skeleton/testing/test_component_health_scorecard.py
+          skeleton/testing/test_dependency_health.py
+          skeleton/testing/test_provider_risk.py
+          skeleton/testing/test_provider_failover.py
+          skeleton/testing/test_offline_mode.py
+          skeleton/testing/test_air_gapped_profile.py

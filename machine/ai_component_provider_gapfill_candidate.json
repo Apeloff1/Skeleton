@@ -1,0 +1,53 @@
+{
+  "schema_version": "skeleton.ai.component_provider_gapfill_candidate.v1",
+  "candidate_id": "P3-DEFERRED-COMPONENT-PROVIDER-01",
+  "status": "implementation_candidate",
+  "source_frontier": "machine/ai_masterplan_continuation_frontier.json",
+  "master_plan": "machine/ai_master_plan.json",
+  "ai_file_tree": "machine/ai_file_tree.json",
+  "source_queue_state": "queued_unmodified",
+  "volume_refs": [
+    "VOL-221","VOL-222","VOL-223","VOL-224","VOL-225",
+    "VOL-226","VOL-227","VOL-228","VOL-229","VOL-230"
+  ],
+  "shared_implementation": "skeleton/ai/runtime/deferred/research_evaluation.py",
+  "assurance_implementation": "skeleton/ai/runtime/deferred/component_provider_assurance.py",
+  "primary_test_by_volume": {
+    "VOL-221": "skeleton/testing/test_model_cards.py",
+    "VOL-222": "skeleton/testing/test_dataset_cards.py",
+    "VOL-223": "skeleton/testing/test_tool_cards.py",
+    "VOL-224": "skeleton/testing/test_agent_cards.py",
+    "VOL-225": "skeleton/testing/test_component_health_scorecard.py",
+    "VOL-226": "skeleton/testing/test_dependency_health.py",
+    "VOL-227": "skeleton/testing/test_provider_risk.py",
+    "VOL-228": "skeleton/testing/test_provider_failover.py",
+    "VOL-229": "skeleton/testing/test_offline_mode.py",
+    "VOL-230": "skeleton/testing/test_air_gapped_profile.py"
+  },
+  "mapping_requirements": {
+    "VOL-221": "AIFT-SUPPLY-CHAIN",
+    "VOL-222": "AIFT-ARTIFACTS",
+    "VOL-223": "AIFT-TOOLS",
+    "VOL-224": "AIFT-AGENTS",
+    "VOL-225": "AIFT-OBSERVABILITY",
+    "VOL-226": "AIFT-SUPPLY-CHAIN",
+    "VOL-227": "AIFT-PROVIDER-CONTRACT",
+    "VOL-228": "AIFT-PROVIDER-CONTRACT",
+    "VOL-229": "AIFT-INVENTORY",
+    "VOL-230": "AIFT-SECURITY"
+  },
+  "evidence_policy": {
+    "exact_head_ci_required": true,
+    "queued_frontier_must_remain_unchanged": true,
+    "independent_closure_required": true,
+    "completion_may_not_be_self_granted": true,
+    "production_authority_must_remain_false": true
+  },
+  "promotion_state": {
+    "completion_checkbox": false,
+    "implementation_signed": false,
+    "verification_signed": false,
+    "may_self_close": false,
+    "production_authority": false
+  }
+}
