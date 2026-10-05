@@ -15,6 +15,7 @@ export const NB_MESSAGES: Readonly<Record<TranslationKey, string>> = Object.free
   'recovery.boot_failed': 'Oppstart mislyktes. Det oppstod et problem under klargjøringen.',
   'status.starting': 'Starter Skeleton',
   'status.startup_check': 'Kontrollerer oppstartssikkerhet',
+  'status.startup_progress': 'Oppstartsframdrift: {percent} prosent',
   'status.connectivity.offline': 'Frakoblet — endringer synkroniseres når du kobler til igjen',
   'status.connectivity.down': 'Serveren kan ikke nås — prøver igjen…',
   'status.connectivity.degraded': 'Serveren er treg — enkelte handlinger kan bli forsinket',
