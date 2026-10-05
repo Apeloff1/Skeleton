@@ -5,7 +5,8 @@ from enum import Enum
 import hashlib,json,re
 _ID=re.compile(r"^[A-Z][A-Z0-9_.:-]{2,127}$");_SHA=re.compile(r"^[0-9a-f]{64}$")
 class AutonomyAcceptanceError(ValueError):pass
-class ControlState(str,Enum): ACTIVE="active"; REVOKED="revoked"; OVERRIDDEN="overridden"\nclass FailureCampaign(str,Enum): INTERRUPTION="interruption"; STALE_WORK="stale_work"; CONFLICT="conflict"; DEADLINE="deadline"; RESOURCE="resource"
+class ControlState(str,Enum): ACTIVE="active"; REVOKED="revoked"; OVERRIDDEN="overridden"
+class FailureCampaign(str,Enum): INTERRUPTION="interruption"; STALE_WORK="stale_work"; CONFLICT="conflict"; DEADLINE="deadline"; RESOURCE="resource"
 def _id(v,f):
  if not isinstance(v,str) or not _ID.fullmatch(v):raise AutonomyAcceptanceError(f"{f} must be stable identifier")
  return v
@@ -39,7 +40,7 @@ class AutonomyControlEvidence:
   if self.override_evidence_digest is not None:_sha(self.override_evidence_digest,"override_evidence_digest")
 @dataclass(frozen=True,slots=True)
 class CheckpointEvidence:
- checkpoint_id:str;state_digest:str;tick:int;recovery_digest:str
+ checkpoint_id:str;objective_digest:str;authority_digest:str;state_digest:str;tick:int;recovery_digest:str
  def __post_init__(self):
   object.__setattr__(self,"checkpoint_id",_id(self.checkpoint_id,"checkpoint_id"));_sha(self.objective_digest,"objective_digest");_sha(self.authority_digest,"authority_digest");_sha(self.state_digest,"state_digest");_sha(self.recovery_digest,"recovery_digest")
   if not isinstance(self.tick,int) or isinstance(self.tick,bool) or self.tick<0:raise AutonomyAcceptanceError("checkpoint tick invalid")
@@ -51,7 +52,12 @@ class AutonomousWorkerAcceptance:
   if not isinstance(self.budget,AutonomyBudgetEvidence) or not isinstance(self.control,AutonomyControlEvidence) or not isinstance(self.checkpoint,CheckpointEvidence):raise AutonomyAcceptanceError("acceptance evidence must be typed")
   if any(not isinstance(v,int) or isinstance(v,bool) or v<0 for v in (self.current_tick,self.deadline_tick,self.max_checkpoint_age)):raise AutonomyAcceptanceError("time bounds invalid")
   if not isinstance(self.failure_evidence,tuple) or not self.failure_evidence or len(self.failure_evidence)>256:raise AutonomyAcceptanceError("failure_evidence must be non-empty bounded tuple")
-  campaigns=set()\n  for campaign,d in self.failure_evidence:\n   if not isinstance(campaign,FailureCampaign):raise AutonomyAcceptanceError("failure campaign must be FailureCampaign")\n   _sha(d,"failure_evidence");campaigns.add(campaign)\n  if campaigns!=set(FailureCampaign):raise AutonomyAcceptanceError("failure campaign matrix incomplete")\n  if self.checkpoint.objective_digest!=self.objective_digest or self.checkpoint.authority_digest!=self.control.authority_digest:raise AutonomyAcceptanceError("checkpoint identity mismatch")
+  campaigns=set()
+  for campaign,d in self.failure_evidence:
+   if not isinstance(campaign,FailureCampaign):raise AutonomyAcceptanceError("failure campaign must be FailureCampaign")
+   _sha(d,"failure_evidence");campaigns.add(campaign)
+  if campaigns!=set(FailureCampaign):raise AutonomyAcceptanceError("failure campaign matrix incomplete")
+  if self.checkpoint.objective_digest!=self.objective_digest or self.checkpoint.authority_digest!=self.control.authority_digest:raise AutonomyAcceptanceError("checkpoint identity mismatch")
  @property
  def eligible(self):
   fresh=0<=self.current_tick-self.checkpoint.tick<=self.max_checkpoint_age
