@@ -748,3 +748,44 @@ def test_invalid_container_types_fail_closed() -> None:
             (),
             ("ADR.1",),  # type: ignore[arg-type]
         )
+
+
+def test_registry_materialization_stops_at_candidate_safety_bound() -> None:
+    consumed = 0
+
+    def candidates():
+        nonlocal consumed
+        while True:
+            consumed += 1
+            yield candidate(technology_id=f"TECH.{consumed}")
+
+    with pytest.raises(RadarError, match="candidate count exceeds safety bound"):
+        TechnologyRadar(candidates())
+    assert consumed == 10_001
+
+
+def test_evidence_set_materialization_stops_at_safety_bound() -> None:
+    subject = candidate()
+    item = evidence(subject, "EVID.BOUNDED", EvidenceKind.FUNCTIONAL)
+    consumed = 0
+
+    def items():
+        nonlocal consumed
+        while True:
+            consumed += 1
+            yield item
+
+    with pytest.raises(RadarError, match="evidence set exceeds safety bound"):
+        technology_evidence_set_digest(items())
+    assert consumed == 50_001
+
+
+def test_non_iterable_registry_inputs_fail_with_stable_type_errors() -> None:
+    with pytest.raises(TypeError, match="candidates must be iterable"):
+        TechnologyRadar(None)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="evidence must be iterable"):
+        TechnologyRadar((), None)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="architecture_decisions must be iterable"):
+        TechnologyRadar((), (), None)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="items must be iterable"):
+        technology_evidence_set_digest(None)  # type: ignore[arg-type]
