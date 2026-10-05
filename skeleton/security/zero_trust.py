@@ -51,6 +51,7 @@ class InternalGrant:
     grant_id: str
     workload_id: str
     instance_id: str
+    attestation_digest: str
     actions: frozenset[str]
     resource_prefix: str
     issued_tick: int
@@ -63,6 +64,11 @@ class InternalGrant:
             raise TrustError("invalid grant workload id")
         if not isinstance(self.instance_id, str) or not _ID.fullmatch(self.instance_id):
             raise TrustError("invalid grant instance id")
+        if (
+            not isinstance(self.attestation_digest, str)
+            or not _SHA.fullmatch(self.attestation_digest)
+        ):
+            raise TrustError("invalid grant attestation digest")
         if not isinstance(self.actions, frozenset) or not self.actions:
             raise TrustError("grant actions must be non-empty frozenset")
         if len(self.actions) > 256 or any(
@@ -82,6 +88,7 @@ class TrustDecision:
     allowed: bool
     reason: str
     grant_id: str | None
+    attestation_digest: str | None
     action: str | None
     resource: str | None
     revalidate_at: int | None
@@ -94,6 +101,7 @@ class TrustDecision:
         if self.allowed:
             if (
                 self.grant_id is None
+                or self.attestation_digest is None
                 or self.action is None
                 or self.resource is None
                 or self.revalidate_at is None
@@ -101,13 +109,19 @@ class TrustDecision:
                 raise TrustError("allowed decision requires complete authority")
         elif any(
             value is not None
-            for value in (self.grant_id, self.action, self.resource, self.revalidate_at)
+            for value in (
+                self.grant_id,
+                self.attestation_digest,
+                self.action,
+                self.resource,
+                self.revalidate_at,
+            )
         ):
             raise TrustError("denied decision cannot carry authority")
 
 
 def _denied(reason: str) -> TrustDecision:
-    return TrustDecision(False, reason, None, None, None, None)
+    return TrustDecision(False, reason, None, None, None, None, None)
 
 
 def _resource_in_scope(resource: str, prefix: str) -> bool:
@@ -138,6 +152,8 @@ def authorize(
         raise TrustError("revalidation interval must be positive")
     if grant.workload_id != identity.workload_id or grant.instance_id != identity.instance_id:
         return _denied("identity_mismatch")
+    if grant.attestation_digest != identity.attestation_digest:
+        return _denied("attestation_mismatch")
     if now < grant.issued_tick or now >= grant.expires_tick:
         return _denied("grant_expired")
     if action not in grant.actions or not _resource_in_scope(resource, grant.resource_prefix):
@@ -146,6 +162,7 @@ def authorize(
         True,
         "authorized",
         grant.grant_id,
+        identity.attestation_digest,
         action,
         resource,
         min(grant.expires_tick, now + interval),
@@ -163,6 +180,8 @@ def revalidate(
         raise TypeError("decision must be TrustDecision")
     if not decision.allowed or decision.grant_id != grant.grant_id:
         raise TrustError("invalid prior decision")
+    if decision.attestation_digest != identity.attestation_digest:
+        return _denied("attestation_mismatch")
     assert decision.action is not None and decision.resource is not None
     return authorize(
         identity,
