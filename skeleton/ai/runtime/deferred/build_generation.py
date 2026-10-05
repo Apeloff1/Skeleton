@@ -67,4 +67,5 @@ class SDKVersion: api_contract_version:str; generator_version:str
 @dataclass(frozen=True,slots=True)
 class ClientSDK: version:SDKVersion; methods:tuple[SDKMethod,...]; contract_digest:str
 def generate_client(version,methods,contract):
+ if len({x.name for x in methods})!=len(methods):raise ValueError("duplicate sdk method")
  return ClientSDK(version,tuple(sorted(methods,key=lambda x:x.name)),sha256_json({"version":version.api_contract_version,"contract":contract}))
