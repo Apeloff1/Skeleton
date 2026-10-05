@@ -14,3 +14,7 @@ def test_duplicate_operations_rejected():
 def test_auth_must_be_boolean():
  import pytest
  with pytest.raises(ValueError):generate_client("v1",({"api_version":"v1","name":"x","method":"GET","path":"/x","auth_required":1},))
+
+def test_server_missing_auth_semantics_is_incompatible():
+ c=generate_client("v",({"api_version":"v","name":"x","method":"GET","path":"/x","auth_required":True},))
+ assert not check_compatibility(c,({"api_version":"v","name":"x","method":"GET","path":"/x"},))
