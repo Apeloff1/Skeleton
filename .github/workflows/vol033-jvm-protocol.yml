@@ -1,0 +1,160 @@
+name: VOL-033 JVM Protocol and Qualification Gate
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/native/jvm_protocol.py"
+      - "skeleton/ai/runtime/native/jvm_protocol.py"
+      - "skeleton/native/jvm_registry.py"
+      - "skeleton/ai/runtime/native/jvm_registry.py"
+      - "java-accelerators/observability/AcceleratorMain.java"
+      - "java-accelerators/vector/VectorSearchMain.java"
+      - "java-accelerators/physics/BroadPhaseMain.java"
+      - "skeleton/testing/test_vol033_jvm_protocol.py"
+      - ".github/workflows/vol033-jvm-protocol.yml"
+  push:
+    branches: [main]
+    paths:
+      - "skeleton/native/jvm_protocol.py"
+      - "skeleton/ai/runtime/native/jvm_protocol.py"
+      - "skeleton/native/jvm_registry.py"
+      - "skeleton/ai/runtime/native/jvm_registry.py"
+      - "java-accelerators/observability/AcceleratorMain.java"
+      - "java-accelerators/vector/VectorSearchMain.java"
+      - "java-accelerators/physics/BroadPhaseMain.java"
+      - "skeleton/testing/test_vol033_jvm_protocol.py"
+      - ".github/workflows/vol033-jvm-protocol.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vol033-jvm-protocol-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  jvm-protocol:
+    name: JVM protocol and workload qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused dependency
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+
+      - name: Compile JVM governance boundaries
+        run: >-
+          python -m py_compile
+          skeleton/native/jvm_protocol.py
+          skeleton/ai/runtime/native/jvm_protocol.py
+          skeleton/native/jvm_registry.py
+          skeleton/ai/runtime/native/jvm_registry.py
+          skeleton/testing/test_vol033_jvm_protocol.py
+
+      - name: Run JVM qualification regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_vol033_jvm_protocol.py
+
+      - name: Audit Java headers against canonical protocol registry
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          from skeleton.native.jvm_protocol import canonical_jvm_capabilities
+
+          root = Path(".")
+          for capability in canonical_jvm_capabilities():
+              source = root / capability.source_path
+              text = source.read_text(encoding="utf-8")
+              if f"public final class {capability.class_name}" not in text:
+                  raise SystemExit(
+                      f"class drift for {capability.capability_id}"
+                  )
+              magic = re.search(
+                  r"static final int MAGIC = 0x([0-9A-Fa-f]+)",
+                  text,
+              )
+              version = re.search(
+                  r"static final short VERSION = ([0-9]+);",
+                  text,
+              )
+              if magic is None or int(magic.group(1), 16) != capability.protocol_magic:
+                  raise SystemExit(
+                      f"magic drift for {capability.capability_id}"
+                  )
+              if version is None or int(version.group(1)) not in capability.protocol_versions:
+                  raise SystemExit(
+                      f"version drift for {capability.capability_id}"
+                  )
+              print(
+                  capability.capability_id,
+                  capability.capability_digest,
+                  "version=",
+                  version.group(1),
+              )
+
+          pairs = (
+              (
+                  root / "skeleton/native/jvm_protocol.py",
+                  root / "skeleton/ai/runtime/native/jvm_protocol.py",
+              ),
+              (
+                  root / "skeleton/native/jvm_registry.py",
+                  root / "skeleton/ai/runtime/native/jvm_registry.py",
+              ),
+          )
+          for source, mirror in pairs:
+              if source.read_bytes() != mirror.read_bytes():
+                  raise SystemExit(f"JVM governed mirror drift: {source}")
+
+          contract = (
+              root / "skeleton/native/jvm_protocol.py"
+          ).read_text(encoding="utf-8")
+          required = (
+              '"protocol-version-incompatible"',
+              '"semantic-equivalence-failed"',
+              '"jvm-speedup-insufficient"',
+              '"jvm-gc-pause-exceeded"',
+              '"benchmark-evidence-stale"',
+              '"request-negotiated-protocol-mismatch"',
+              '"jvm-admission-only"',
+              "production_authority: bool = False",
+          )
+          for token in required:
+              if token not in contract:
+                  raise SystemExit(f"VOL-033 fail-closed token missing: {token}")
+
+          for token in ("subprocess.", "os.system(", "requests.", "httpx."):
+              if token in contract:
+                  raise SystemExit(
+                      f"VOL-033 admission contract gained execution surface: {token}"
+                  )
+
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if not expected:
+              raise SystemExit("exact head SHA missing")
+          print("VOL-033 exact head:", expected)
+          PY
