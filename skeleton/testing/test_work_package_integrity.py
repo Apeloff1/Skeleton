@@ -133,3 +133,20 @@ def test_structural_collections_are_canonical_and_do_not_silently_deduplicate():
 def test_requirement_and_aiq_references_require_stable_ids():
  with pytest.raises(WorkPackageError,match="stable identifier"):
   WorkPackage("PKG.BAD","VOL.095","x",("n",),("i",),("o",),("r",),("t",),"rb",("free text",),("AIQ.1",))
+
+def test_newer_implementation_invalidates_older_verification():
+ r=WorkPackageRegistry();p=pkg();r.add(p)
+ r.attest(ev("EVID.I1",EvidenceRole.IMPLEMENTATION,"ACTOR.I",package=p,observed_at=NOW))
+ r.attest(ev("EVID.V1",EvidenceRole.VERIFICATION,"ACTOR.V",package=p,observed_at=NOW+timedelta(seconds=1)))
+ assert r.state(p.package_id) is PackageState.VERIFIED
+ r.attest(ev("EVID.I2",EvidenceRole.IMPLEMENTATION,"ACTOR.I2",package=p,observed_at=NOW+timedelta(seconds=2)))
+ assert r.state(p.package_id) is PackageState.IMPLEMENTED
+
+def test_newer_verification_invalidates_older_completion():
+ r=WorkPackageRegistry();p=pkg();r.add(p)
+ r.attest(ev("EVID.I",EvidenceRole.IMPLEMENTATION,"ACTOR.I",package=p,observed_at=NOW))
+ r.attest(ev("EVID.V1",EvidenceRole.VERIFICATION,"ACTOR.V1",package=p,observed_at=NOW+timedelta(seconds=1)))
+ r.attest(ev("EVID.C",EvidenceRole.COMPLETION,"ACTOR.C",package=p,observed_at=NOW+timedelta(seconds=2)))
+ assert r.state(p.package_id) is PackageState.COMPLETE
+ r.attest(ev("EVID.V2",EvidenceRole.VERIFICATION,"ACTOR.V2",package=p,observed_at=NOW+timedelta(seconds=3)))
+ assert r.state(p.package_id) is PackageState.VERIFIED
