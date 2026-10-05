@@ -5,7 +5,7 @@ from enum import Enum
 import hashlib,json,re
 _ID=re.compile(r"^[A-Z][A-Z0-9_.:-]{2,127}$");_SHA=re.compile(r"^[0-9a-f]{64}$")
 class AutonomyAcceptanceError(ValueError):pass
-class ControlState(str,Enum): ACTIVE="active"; REVOKED="revoked"; OVERRIDDEN="overridden"
+class ControlState(str,Enum): ACTIVE="active"; REVOKED="revoked"; OVERRIDDEN="overridden"\nclass FailureCampaign(str,Enum): INTERRUPTION="interruption"; STALE_WORK="stale_work"; CONFLICT="conflict"; DEADLINE="deadline"; RESOURCE="resource"
 def _id(v,f):
  if not isinstance(v,str) or not _ID.fullmatch(v):raise AutonomyAcceptanceError(f"{f} must be stable identifier")
  return v
@@ -29,7 +29,11 @@ class AutonomyControlEvidence:
  authority_digest:str;delegated_authority:tuple[str,...];parent_authority:tuple[str,...];state:ControlState;override_evidence_digest:str|None
  def __post_init__(self):
   _sha(self.authority_digest,"authority_digest")
-  if not isinstance(self.state,ControlState):raise AutonomyAcceptanceError("state must be ControlState")\n  for f in ("delegated_authority","parent_authority"):\n   raw=getattr(self,f)\n   if not isinstance(raw,tuple) or not raw or len(raw)>256 or any(not isinstance(x,str) or not x.strip() for x in raw):raise AutonomyAcceptanceError(f"{f} must be non-empty bounded tuple")\n   object.__setattr__(self,f,tuple(sorted(set(x.strip() for x in raw))))
+  if not isinstance(self.state,ControlState):raise AutonomyAcceptanceError("state must be ControlState")
+  for f in ("delegated_authority","parent_authority"):
+   raw=getattr(self,f)
+   if not isinstance(raw,tuple) or not raw or len(raw)>256 or any(not isinstance(x,str) or not x.strip() for x in raw):raise AutonomyAcceptanceError(f"{f} must be non-empty bounded tuple")
+   object.__setattr__(self,f,tuple(sorted(set(x.strip() for x in raw))))
   if not set(self.delegated_authority)<=set(self.parent_authority):raise AutonomyAcceptanceError("delegated authority exceeds parent")
   if self.state is not ControlState.ACTIVE and self.override_evidence_digest is None:raise AutonomyAcceptanceError("revocation/override requires evidence")
   if self.override_evidence_digest is not None:_sha(self.override_evidence_digest,"override_evidence_digest")
@@ -37,18 +41,20 @@ class AutonomyControlEvidence:
 class CheckpointEvidence:
  checkpoint_id:str;state_digest:str;tick:int;recovery_digest:str
  def __post_init__(self):
-  object.__setattr__(self,"checkpoint_id",_id(self.checkpoint_id,"checkpoint_id"));_sha(self.state_digest,"state_digest");_sha(self.recovery_digest,"recovery_digest")
+  object.__setattr__(self,"checkpoint_id",_id(self.checkpoint_id,"checkpoint_id"));_sha(self.objective_digest,"objective_digest");_sha(self.authority_digest,"authority_digest");_sha(self.state_digest,"state_digest");_sha(self.recovery_digest,"recovery_digest")
   if not isinstance(self.tick,int) or isinstance(self.tick,bool) or self.tick<0:raise AutonomyAcceptanceError("checkpoint tick invalid")
 @dataclass(frozen=True,slots=True)
 class AutonomousWorkerAcceptance:
- acceptance_id:str;objective_digest:str;budget:AutonomyBudgetEvidence;control:AutonomyControlEvidence;checkpoint:CheckpointEvidence;current_tick:int;deadline_tick:int;max_checkpoint_age:int;failure_evidence:tuple[str,...]
+ acceptance_id:str;objective_digest:str;budget:AutonomyBudgetEvidence;control:AutonomyControlEvidence;checkpoint:CheckpointEvidence;current_tick:int;deadline_tick:int;max_checkpoint_age:int;failure_evidence:tuple[tuple[FailureCampaign,str],...]
  def __post_init__(self):
   object.__setattr__(self,"acceptance_id",_id(self.acceptance_id,"acceptance_id"));_sha(self.objective_digest,"objective_digest")
-  if not isinstance(self.budget,AutonomyBudgetEvidence) or not isinstance(self.control,AutonomyControlEvidence) or not isinstance(self.checkpoint,CheckpointEvidence):raise AutonomyAcceptanceError("acceptance evidence must be typed")\n  if any(not isinstance(v,int) or isinstance(v,bool) or v<0 for v in (self.current_tick,self.deadline_tick,self.max_checkpoint_age)):raise AutonomyAcceptanceError("time bounds invalid")\n  if not isinstance(self.failure_evidence,tuple) or not self.failure_evidence or len(self.failure_evidence)>256:raise AutonomyAcceptanceError("failure_evidence must be non-empty bounded tuple")
-  for d in self.failure_evidence:_sha(d,"failure_evidence")
+  if not isinstance(self.budget,AutonomyBudgetEvidence) or not isinstance(self.control,AutonomyControlEvidence) or not isinstance(self.checkpoint,CheckpointEvidence):raise AutonomyAcceptanceError("acceptance evidence must be typed")
+  if any(not isinstance(v,int) or isinstance(v,bool) or v<0 for v in (self.current_tick,self.deadline_tick,self.max_checkpoint_age)):raise AutonomyAcceptanceError("time bounds invalid")
+  if not isinstance(self.failure_evidence,tuple) or not self.failure_evidence or len(self.failure_evidence)>256:raise AutonomyAcceptanceError("failure_evidence must be non-empty bounded tuple")
+  campaigns=set()\n  for campaign,d in self.failure_evidence:\n   if not isinstance(campaign,FailureCampaign):raise AutonomyAcceptanceError("failure campaign must be FailureCampaign")\n   _sha(d,"failure_evidence");campaigns.add(campaign)\n  if campaigns!=set(FailureCampaign):raise AutonomyAcceptanceError("failure campaign matrix incomplete")\n  if self.checkpoint.objective_digest!=self.objective_digest or self.checkpoint.authority_digest!=self.control.authority_digest:raise AutonomyAcceptanceError("checkpoint identity mismatch")
  @property
  def eligible(self):
   fresh=0<=self.current_tick-self.checkpoint.tick<=self.max_checkpoint_age
   return self.budget.within_bounds and self.control.state is ControlState.ACTIVE and self.current_tick<=self.deadline_tick and fresh and bool(self.failure_evidence)
  @property
- def digest(self):return _dig({"id":self.acceptance_id,"objective":self.objective_digest,"budget":self.budget.__dict__ if hasattr(self.budget,"__dict__") else [self.budget.budget_id,self.budget.max_steps,self.budget.max_cost_units,self.budget.max_runtime_ticks,self.budget.used_steps,self.budget.used_cost_units,self.budget.used_runtime_ticks],"authority":self.control.authority_digest,"control":self.control.state.value,"checkpoint":[self.checkpoint.checkpoint_id,self.checkpoint.state_digest,self.checkpoint.tick,self.checkpoint.recovery_digest],"current":self.current_tick,"deadline":self.deadline_tick,"max_age":self.max_checkpoint_age,"failure_evidence":self.failure_evidence})
+ def digest(self):return _dig({"id":self.acceptance_id,"objective":self.objective_digest,"budget":self.budget.__dict__ if hasattr(self.budget,"__dict__") else [self.budget.budget_id,self.budget.max_steps,self.budget.max_cost_units,self.budget.max_runtime_ticks,self.budget.used_steps,self.budget.used_cost_units,self.budget.used_runtime_ticks],"authority":self.control.authority_digest,"control":self.control.state.value,"checkpoint":[self.checkpoint.checkpoint_id,self.checkpoint.objective_digest,self.checkpoint.authority_digest,self.checkpoint.state_digest,self.checkpoint.tick,self.checkpoint.recovery_digest],"current":self.current_tick,"deadline":self.deadline_tick,"max_age":self.max_checkpoint_age,"failure_evidence":self.failure_evidence})
