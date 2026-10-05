@@ -51,7 +51,18 @@ class VS000Scenario:
    expected+=1;prev=e.digest
 @dataclass(frozen=True,slots=True)
 class RecoveryEvidence:
- scenario_id:str;status:RecoveryStatus;checkpoint_digest:str|None;rebuilt_projection_digest:str|None;reason:str
+ scenario_id:str;scenario_digest:str;status:RecoveryStatus;checkpoint_digest:str|None;rebuilt_projection_digest:str|None;reason:str
+ def __post_init__(self):
+  object.__setattr__(self,"scenario_id",_id(self.scenario_id,"scenario_id"))
+  if not isinstance(self.status,RecoveryStatus):raise RecoveryError("status must be RecoveryStatus")
+  if not _SHA.fullmatch(self.scenario_digest):raise RecoveryError("scenario_digest must be sha256")
+  for f in ("checkpoint_digest","rebuilt_projection_digest"):
+   v=getattr(self,f)
+   if v is not None and not _SHA.fullmatch(v):raise RecoveryError(f"{f} must be sha256")
+ @property
+ def digest(self):return _dig({"scenario_id":self.scenario_id,"scenario_digest":self.scenario_digest,"status":self.status.value,"checkpoint_digest":self.checkpoint_digest,"rebuilt_projection_digest":self.rebuilt_projection_digest,"reason":self.reason})
+def scenario_digest(scenario:VS000Scenario):
+ return _dig({"scenario_id":scenario.scenario_id,"initial_state":scenario.initial_state,"event_digests":[e.digest for e in scenario.events]})
 def project(initial,events):
  state=json.loads(json.dumps(initial,sort_keys=True))
  for e in events:
@@ -70,6 +81,6 @@ def recover(scenario:VS000Scenario,cp:RecoveryCheckpoint)->RecoveryEvidence:
   if cp.event_digest!=last:raise RecoveryError("checkpoint event digest mismatch")
   rebuilt=_dig(project(scenario.initial_state,scenario.events))
   if rebuilt!=cp.projection_digest:raise RecoveryError("projection digest mismatch")
-  return RecoveryEvidence(scenario.scenario_id,RecoveryStatus.RECOVERED,cp.digest,rebuilt,"deterministic rebuild matched checkpoint")
+  return RecoveryEvidence(scenario.scenario_id,scenario_digest(scenario),RecoveryStatus.RECOVERED,cp.digest,rebuilt,"deterministic rebuild matched checkpoint")
  except RecoveryError as exc:
-  return RecoveryEvidence(scenario.scenario_id,RecoveryStatus.FAIL_CLOSED,cp.digest,None,str(exc))
+  return RecoveryEvidence(scenario.scenario_id,scenario_digest(scenario),RecoveryStatus.FAIL_CLOSED,cp.digest,None,str(exc))
