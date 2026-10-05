@@ -1668,12 +1668,14 @@
         "ImpactQuery"
       ],
       "implementation_paths": [
-        "skeleton/repo_intelligence",
-        "planned:machine/repository_graph.json"
+        "skeleton/repo_intelligence/repository_graph.py",
+        "skeleton/repo_intelligence/change_planner.py",
+        "skeleton/repo_intelligence/git_index.py"
       ],
       "tests": [
         "skeleton/testing/test_repo_intelligence_git_index.py",
-        "planned:skeleton/testing/test_repo_graph_freshness.py"
+        "planned:skeleton/testing/test_repo_graph_freshness.py",
+        "skeleton/testing/test_vol021_repository_graph.py"
       ],
       "evaluations": [
         "planned:impact-prediction precision/recall eval",
@@ -1686,8 +1688,7 @@
         "generated/vendor code pollution"
       ],
       "gaps": [
-        "complete cross-language graph extraction",
-        "connect ownership/test mapping to change planner"
+        "cross-language source extraction adapters still need to materialize import edges from repository contents"
       ],
       "accountability_id": "ACC-VOL-021",
       "completion_checkbox": false,
