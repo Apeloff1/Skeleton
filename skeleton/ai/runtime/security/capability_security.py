@@ -1,7 +1,8 @@
 """Least-privilege capability authorization for runtime tool requests."""
 from dataclasses import dataclass
 from hashlib import sha256
-import json,re
+import re
+from skeleton.contracts.canonical import canonical_json_bytes
 from .contracts import SecurityContractError,SecurityIdentity
 _SHA=re.compile(r"^[0-9a-f]{64}$")
 @dataclass(frozen=True,slots=True)
@@ -12,7 +13,7 @@ class CapabilityGrant:
  operation:str
  @property
  def digest(self):
-  return sha256(json.dumps({"principal_id":self.principal_id,"capability":self.capability,"resource":self.resource,"operation":self.operation},sort_keys=True,separators=(",",":")).encode()).hexdigest()
+  return sha256(canonical_json_bytes({"principal_id":self.principal_id,"capability":self.capability,"resource":self.resource,"operation":self.operation})).hexdigest()
 @dataclass(frozen=True,slots=True)
 class SecurityContext:
  identity:SecurityIdentity
