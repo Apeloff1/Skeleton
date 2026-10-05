@@ -447,6 +447,7 @@ class LearnerStateEstimator:
         last_observed_at: float | None = None
 
         seen_ids: set[str] = set()
+        by_attempt: dict[str, LearnerEvidence] = {}
         digests: list[str] = []
         for record in records:
             if not isinstance(record, LearnerEvidence):
@@ -465,9 +466,31 @@ class LearnerStateEstimator:
                 raise InstructionRuntimeError(
                     "duplicate evidence identity"
                 )
+            if record.attempt_id in by_attempt:
+                raise InstructionRuntimeError(
+                    "duplicate attempt identity"
+                )
             seen_ids.add(record.evidence_id)
+            by_attempt[record.attempt_id] = record
             digests.append(record.digest)
 
+        for record in records:
+            if record.kind is LearnerEvidenceKind.CORRECTION:
+                prior = by_attempt.get(record.prior_attempt_id or "")
+                if prior is None:
+                    raise InstructionRuntimeError(
+                        "correction references unknown prior attempt"
+                    )
+                if prior.success:
+                    raise InstructionRuntimeError(
+                        "correction must reference an unsuccessful attempt"
+                    )
+                if prior.observed_at > record.observed_at:
+                    raise InstructionRuntimeError(
+                        "correction cannot predate prior attempt"
+                    )
+
+        for record in records:
             weight = _kind_weight(record.kind)
             weight /= 1.0 + (0.25 * record.hints_used)
             effective += weight
@@ -1204,6 +1227,7 @@ class OutcomeEvaluator:
         before: LearnerSkillState,
         after: LearnerSkillState,
         new_evidence: Sequence[LearnerEvidence],
+        prior_evidence: Sequence[LearnerEvidence] = (),
     ) -> LearningOutcome:
         if not isinstance(before, LearnerSkillState):
             raise TypeError("before must be LearnerSkillState")
@@ -1223,8 +1247,16 @@ class OutcomeEvaluator:
             raise InstructionRuntimeError(
                 "new_evidence must be a finite sequence"
             )
+        if isinstance(prior_evidence, (str, bytes)) or not isinstance(
+            prior_evidence,
+            Sequence,
+        ):
+            raise InstructionRuntimeError(
+                "prior_evidence must be a finite sequence"
+            )
 
         records: list[LearnerEvidence] = []
+        prior_records: list[LearnerEvidence] = []
         correction_attempts = 0
         correction_successes = 0
         corrected_after_failure = False
@@ -1251,14 +1283,62 @@ class OutcomeEvaluator:
             seen_ids.add(record.evidence_id)
             records.append(record)
 
+        prior_ids: set[str] = set()
+        prior_by_attempt: dict[str, LearnerEvidence] = {}
+        for record in prior_evidence:
+            if not isinstance(record, LearnerEvidence):
+                raise TypeError(
+                    "prior_evidence must contain LearnerEvidence"
+                )
+            if (
+                record.learner_id != after.learner_id
+                or record.objective_id != after.objective_id
+            ):
+                raise InstructionRuntimeError(
+                    "prior outcome evidence identity mismatch"
+                )
+            if record.evidence_id in prior_ids:
+                raise InstructionRuntimeError(
+                    "duplicate prior outcome evidence identity"
+                )
+            if record.attempt_id in prior_by_attempt:
+                raise InstructionRuntimeError(
+                    "duplicate prior outcome attempt identity"
+                )
+            prior_ids.add(record.evidence_id)
+            prior_by_attempt[record.attempt_id] = record
+
+        for record in records:
+            if record.evidence_id in prior_ids:
+                raise InstructionRuntimeError(
+                    "new/prior outcome evidence overlap"
+                )
+            if record.attempt_id in prior_by_attempt:
+                raise InstructionRuntimeError(
+                    "new/prior outcome attempt overlap"
+                )
+            prior_by_attempt[record.attempt_id] = record
+
         for record in records:
             if record.kind is LearnerEvidenceKind.CORRECTION:
                 correction_attempts += 1
+                prior = prior_by_attempt.get(
+                    record.prior_attempt_id or ""
+                )
+                if prior is None or prior is record:
+                    raise InstructionRuntimeError(
+                        "outcome correction references unknown prior attempt"
+                    )
+                if prior.success:
+                    raise InstructionRuntimeError(
+                        "outcome correction must reference a failed attempt"
+                    )
+                if prior.observed_at > record.observed_at:
+                    raise InstructionRuntimeError(
+                        "outcome correction predates prior attempt"
+                    )
                 correction_successes += int(record.success)
                 if record.success:
-                    # The append-only ledger only admits correction records
-                    # whose prior_attempt_id resolves to an unsuccessful
-                    # attempt in the same learner/objective boundary.
                     corrected_after_failure = True
             elif (
                 record.kind is LearnerEvidenceKind.TRANSFER
@@ -1665,6 +1745,7 @@ class InstructionRuntime:
             before=before,
             after=after,
             new_evidence=followup,
+            prior_evidence=baseline,
         )
 
 
