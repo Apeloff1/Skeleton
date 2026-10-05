@@ -20,7 +20,7 @@ class ImprovementCandidate:
   for f in ("candidate_id","builder_id"):object.__setattr__(self,f,_id(getattr(self,f),f))
   _sha(self.champion_digest,"champion_digest");_sha(self.challenger_digest,"challenger_digest")
   if self.champion_digest==self.challenger_digest:raise ImprovementError("challenger must differ from champion")
-  if not self.experiment_scope.strip():raise ImprovementError("isolated experiment scope required")
+  if not isinstance(self.experiment_scope,str) or not self.experiment_scope.strip():raise ImprovementError("isolated experiment scope required")\n  object.__setattr__(self,"experiment_scope",self.experiment_scope.strip())\n  if not isinstance(self.metric_ids,tuple) or len(self.metric_ids)>256:raise ImprovementError("metric_ids must be bounded tuple")
   metrics=tuple(sorted(set(_id(x,"metric_id") for x in self.metric_ids)))
   if not metrics:raise ImprovementError("predeclared metrics required")
   object.__setattr__(self,"metric_ids",metrics)
@@ -61,3 +61,9 @@ def decide(candidate:ImprovementCandidate,evaluation:EvaluationBundle,verifier_i
  if status is PromotionStatus.PROMOTE and canary_digest is None:raise ImprovementError("promotion requires canary evidence")
  evdig=_dig({"candidate":evaluation.candidate_digest,"metrics":evaluation.metric_values,"safety":evaluation.safety_passed,"cost":evaluation.cost_passed,"robustness":evaluation.robustness_passed,"evidence":evaluation.evidence_digest})
  return PromotionDecision("DECISION."+candidate.candidate_id,candidate.digest,verifier_id,status,evdig,canary_digest)
+
+def validate_rollback(candidate:ImprovementCandidate,decision:PromotionDecision,receipt:RollbackReceipt)->None:
+ if not isinstance(candidate,ImprovementCandidate) or not isinstance(decision,PromotionDecision) or not isinstance(receipt,RollbackReceipt):raise ImprovementError("rollback inputs must be typed")
+ if decision.status is not PromotionStatus.PROMOTE:raise ImprovementError("rollback applies only to promoted candidate")
+ if decision.candidate_digest!=candidate.digest or receipt.decision_id!=decision.decision_id:raise ImprovementError("rollback identity mismatch")
+ if receipt.promoted_digest!=candidate.challenger_digest or receipt.restored_digest!=candidate.champion_digest:raise ImprovementError("rollback does not restore exact champion")
