@@ -6,7 +6,7 @@ class ClaimScope:
  dimensions:tuple[ScopeDimension,...]
  def __post_init__(self):
   names=[d.name for d in self.dimensions]
-  if any(not d.name or not d.value for d in self.dimensions) or len(names)!=len(set(names)):raise ValueError("scope dimensions must be unique and nonempty")
+  if not self.dimensions or any(not isinstance(d.name,str) or not isinstance(d.value,str) or not d.name.strip() or not d.value.strip() for d in self.dimensions) or len(names)!=len(set(names)):raise ValueError("scope dimensions must be unique and nonempty")
 @dataclass(frozen=True)
 class ScopeCompatibility: compatible:bool; conflicts:tuple[str,...]
 def compare_scope(a,b):
