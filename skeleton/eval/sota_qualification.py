@@ -39,3 +39,18 @@ class QualificationEvidence:
   if self.replayer_id==self.researcher_id:raise QualificationError("benchmark replay must be independent")
  @property
  def qualified(self):return self.comparison.supported
+
+@dataclass(frozen=True,slots=True)
+class QualificationReceipt:
+ claim_digest:str;evidence_digest:str;verifier_id:str;qualified:bool
+ def __post_init__(self):
+  _sha(self.claim_digest,"claim_digest");_sha(self.evidence_digest,"evidence_digest");object.__setattr__(self,"verifier_id",_id(self.verifier_id,"verifier_id"))
+  if not isinstance(self.qualified,bool):raise QualificationError("qualified must be bool")
+def qualify(claim:SOTACandidateClaim,evidence:QualificationEvidence)->QualificationReceipt:
+ if not isinstance(claim,SOTACandidateClaim) or not isinstance(evidence,QualificationEvidence):raise QualificationError("qualification inputs must be typed")
+ if evidence.claim_digest!=claim.digest or evidence.researcher_id!=claim.researcher_id:raise QualificationError("qualification identity mismatch")
+ if not evidence.qualified:raise QualificationError("candidate evidence is not qualified")
+ return QualificationReceipt(claim.digest,_dig([evidence.claim_digest,evidence.comparison.claim_digest,evidence.comparison.baseline_digest,evidence.replay_digest,evidence.robustness_digest,evidence.security_digest,evidence.latency_digest,evidence.cost_digest,evidence.operations_digest,evidence.replayer_id]),evidence.replayer_id,True)
+def verify_qualification(claim:SOTACandidateClaim,evidence:QualificationEvidence,receipt:QualificationReceipt)->None:
+ expected=qualify(claim,evidence)
+ if receipt!=expected:raise QualificationError("qualification receipt drift or tampering")
