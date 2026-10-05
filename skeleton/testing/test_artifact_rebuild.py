@@ -16,3 +16,8 @@ def test_duplicate_artifact_steps_rejected():
  import pytest
  s=RebuildStep("a","v",(),"d")
  with pytest.raises(ValueError):execute_rebuild(RebuildPlan((s,s)),set(),lambda *x:"d")
+
+def test_producer_exception_is_bounded_failure():
+ import pytest
+ p=RebuildPlan((RebuildStep("a","v",("i",),"d"),))
+ with pytest.raises(RuntimeError):execute_rebuild(p,{"i"},lambda *x:(_ for _ in ()).throw(Exception("boom")))
