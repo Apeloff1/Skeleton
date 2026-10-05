@@ -234,13 +234,168 @@ class ChaosCampaign:
     campaign_id: str
     faults: tuple[Fault, ...]
     rollback_ref: str
+    hypothesis: str = "bounded fault preserves recovery objective"
+    max_affected_targets: int = 1
+    max_total_fault_seconds: int = 60
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "campaign_id", _text(self.campaign_id, "campaign_id"))
         object.__setattr__(self, "rollback_ref", _text(self.rollback_ref, "rollback_ref"))
+        object.__setattr__(self, "hypothesis", _text(self.hypothesis, "hypothesis"))
         ids = [fault.fault_id for fault in self.faults]
         if not ids or len(ids) != len(set(ids)):
             raise ValueError("chaos campaign needs unique faults")
+        for name in ("max_affected_targets", "max_total_fault_seconds"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                raise ValueError(f"{name} must be positive integer")
+        if len({fault.target for fault in self.faults}) > self.max_affected_targets:
+            raise ValueError("chaos campaign exceeds target blast radius")
+        if sum(fault.bounded_seconds for fault in self.faults) > self.max_total_fault_seconds:
+            raise ValueError("chaos campaign exceeds fault-time budget")
+
+    @property
+    def digest(self) -> str:
+        return sha256_json({
+            "campaign_id": self.campaign_id,
+            "hypothesis": self.hypothesis,
+            "rollback_ref": self.rollback_ref,
+            "max_affected_targets": self.max_affected_targets,
+            "max_total_fault_seconds": self.max_total_fault_seconds,
+            "faults": [
+                {
+                    "fault_id": fault.fault_id,
+                    "target": fault.target,
+                    "kind": fault.kind,
+                    "bounded_seconds": fault.bounded_seconds,
+                }
+                for fault in self.faults
+            ],
+        })
+
+
+@dataclass(frozen=True, slots=True)
+class ChaosAuthority:
+    principal_id: str
+    allowed_targets: tuple[str, ...]
+    allowed_fault_kinds: tuple[str, ...]
+    max_fault_seconds: int
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "principal_id", _text(self.principal_id, "principal_id"))
+        if not self.allowed_targets or len(self.allowed_targets) != len(set(self.allowed_targets)):
+            raise ValueError("allowed_targets must be unique and non-empty")
+        if not self.allowed_fault_kinds or len(self.allowed_fault_kinds) != len(set(self.allowed_fault_kinds)):
+            raise ValueError("allowed_fault_kinds must be unique and non-empty")
+        if isinstance(self.max_fault_seconds, bool) or not isinstance(self.max_fault_seconds, int) or self.max_fault_seconds < 1:
+            raise ValueError("max_fault_seconds must be positive integer")
+
+    def authorize(self, campaign: ChaosCampaign) -> None:
+        for fault in campaign.faults:
+            if fault.target not in self.allowed_targets:
+                raise PermissionError(f"chaos target not authorized: {fault.target}")
+            if fault.kind not in self.allowed_fault_kinds:
+                raise PermissionError(f"chaos fault kind not authorized: {fault.kind}")
+            if fault.bounded_seconds > self.max_fault_seconds:
+                raise PermissionError(f"chaos fault duration not authorized: {fault.fault_id}")
+
+
+@dataclass(frozen=True, slots=True)
+class ChaosObservation:
+    campaign_id: str
+    observed_at: int
+    healthy: bool
+    error_budget_remaining: float
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "campaign_id", _text(self.campaign_id, "campaign_id"))
+        if isinstance(self.observed_at, bool) or not isinstance(self.observed_at, int) or self.observed_at < 0:
+            raise ValueError("observed_at must be non-negative integer")
+        if not isinstance(self.healthy, bool):
+            raise TypeError("healthy must be boolean")
+        object.__setattr__(self, "error_budget_remaining", _ratio(self.error_budget_remaining, "error_budget_remaining"))
+
+
+@dataclass(frozen=True, slots=True)
+class ChaosReceipt:
+    campaign_digest: str
+    principal_id: str
+    decision: str
+    observation_digest: str
+    rollback_ref: str
+
+    def __post_init__(self) -> None:
+        for name in ("campaign_digest", "observation_digest"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or len(value) != 64:
+                raise ValueError(f"{name} must be sha256")
+        object.__setattr__(self, "principal_id", _text(self.principal_id, "principal_id"))
+        object.__setattr__(self, "rollback_ref", _text(self.rollback_ref, "rollback_ref"))
+        if self.decision not in {"continue", "abort"}:
+            raise ValueError("decision must be continue or abort")
+
+    @property
+    def digest(self) -> str:
+        return sha256_json({
+            "campaign_digest": self.campaign_digest,
+            "principal_id": self.principal_id,
+            "decision": self.decision,
+            "observation_digest": self.observation_digest,
+            "rollback_ref": self.rollback_ref,
+        })
+
+
+class ChaosController:
+    """Admission and abort boundary. It never injects faults itself."""
+
+    def __init__(self, *, minimum_error_budget: float = 0.25) -> None:
+        self.minimum_error_budget = _ratio(minimum_error_budget, "minimum_error_budget")
+        self._decisions: dict[str, str] = {}
+
+    def evaluate(
+        self,
+        campaign: ChaosCampaign,
+        authority: ChaosAuthority,
+        observation: ChaosObservation,
+    ) -> ChaosReceipt:
+        if observation.campaign_id != campaign.campaign_id:
+            raise ValueError("observation campaign mismatch")
+        authority.authorize(campaign)
+        decision = (
+            "continue"
+            if observation.healthy and observation.error_budget_remaining >= self.minimum_error_budget
+            else "abort"
+        )
+        observation_digest = sha256_json({
+            "campaign_id": observation.campaign_id,
+            "observed_at": observation.observed_at,
+            "healthy": observation.healthy,
+            "error_budget_remaining": observation.error_budget_remaining,
+        })
+        receipt = ChaosReceipt(
+            campaign_digest=campaign.digest,
+            principal_id=authority.principal_id,
+            decision=decision,
+            observation_digest=observation_digest,
+            rollback_ref=campaign.rollback_ref,
+        )
+        prior = self._decisions.get(campaign.digest)
+        if prior is not None and prior != receipt.digest:
+            raise ValueError("non-deterministic chaos decision replay")
+        self._decisions[campaign.digest] = receipt.digest
+        return receipt
+
+
+@dataclass(frozen=True, slots=True)
+class RecoveryObjective:
+    max_recovery_seconds: int
+    max_data_loss_units: int
+
+    def __post_init__(self) -> None:
+        for name in ("max_recovery_seconds", "max_data_loss_units"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ValueError(f"{name} must be non-negative integer")
 
 
 @dataclass(frozen=True, slots=True)
@@ -260,6 +415,15 @@ class RecoveryDrill:
                 raise ValueError(f"{name} must be non-negative integer")
         if not isinstance(self.passed, bool):
             raise TypeError("passed must be boolean")
+
+    def verify(self, objective: RecoveryObjective) -> bool:
+        measured = (
+            self.recovery_seconds <= objective.max_recovery_seconds
+            and self.data_loss_units <= objective.max_data_loss_units
+        )
+        if self.passed != measured:
+            raise ValueError("recovery drill pass claim disagrees with measured objective")
+        return measured
 
 
 @dataclass(frozen=True, slots=True)
