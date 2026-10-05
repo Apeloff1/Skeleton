@@ -795,6 +795,7 @@
         "VOL-085",
         "VOL-091",
         "VOL-117",
+        "VOL-191",
         "VOL-325",
         "VOL-390",
         "VOL-403",
@@ -947,6 +948,7 @@
         "VOL-107",
         "VOL-108",
         "VOL-168",
+        "VOL-206",
         "VOL-207",
         "VOL-208",
         "VOL-248",
@@ -1033,7 +1035,8 @@
       "source_disposition": "retain_until_import_inversion_and_regression_gates",
       "volume_refs": [
         "VOL-029",
-        "VOL-102"
+        "VOL-102",
+        "VOL-188"
       ]
     },
     {
@@ -7188,7 +7191,7 @@
         }
       ],
       "refreshed_source_identity_count": 177,
-      "completed_volume_count": 201,
+      "completed_volume_count": 209,
       "unclassified_completed_implementation_paths": 0,
       "policy": "Restore staged-mirror parity for completed governed work without source retirement, import cutover, product/backend ownership expansion, or fabricated completion authority."
     },
@@ -7197,9 +7200,30 @@
       "added_volume_refs": [
         "VOL-003"
       ],
-      "mature_volume_count": 201,
+      "mature_volume_count": 209,
       "remaining_missing_mature_volume_mapping_links": 0,
       "policy": "Bind already-completed canonical contract work to its governed AI-tree mapping without changing implementation ownership, maturity, or completion authority."
+    },
+    "mature_volume_traceability_refresh_2026_10_05": {
+      "source_plan_head_sha": "cd454ca86090a3e03dbce349ca3b23ba54553be5",
+      "mature_volume_count": 209,
+      "added_links": [
+        {
+          "volume_ref": "VOL-188",
+          "mapping_id": "AIFT-RELIABILITY"
+        },
+        {
+          "volume_ref": "VOL-191",
+          "mapping_id": "AIFT-OBSERVABILITY"
+        },
+        {
+          "volume_ref": "VOL-206",
+          "mapping_id": "AIFT-EVALUATION"
+        }
+      ],
+      "remaining_unclassified_mature_implementation_paths": 0,
+      "remaining_missing_mature_volume_mapping_links": 0,
+      "policy": "Reflect newly promoted completed work in governed AI-tree traceability without changing implementation ownership or completion authority."
     }
   }
 }
