@@ -792,7 +792,7 @@
       "destination": "skeleton/ai/learning",
       "kind": "tree",
       "source_git_object_sha": "8b832e8e7f6ca97511e4206139bc18da44d02646",
-      "role": "controlled learning support",
+      "role": "controlled learning support with evidence-grounded learner-state inference, objective planning, and outcome evaluation",
       "work_package_refs": [
         "WP-W00",
         "WP-W01",
@@ -819,7 +819,10 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-074"
+      ]
     },
     {
       "id": "AIFT-RESILIENCE",
