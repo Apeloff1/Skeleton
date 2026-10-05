@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import copy
+import hashlib
+import math
 
 import pytest
 
 from skeleton.frontier.runtime.model_routing import ProviderMetadataError
 from skeleton.frontier.runtime.model_runtime import ChatResponse, ModelCapability, TokenUsage
+from skeleton.contracts.canonical import canonical_json_bytes
 from skeleton.intelligence.router_registry import RouterRegistry
 
 
@@ -84,3 +87,19 @@ def test_snapshot_contains_no_adapter_or_secret_runtime_state() -> None:
     assert "api_key" not in rendered
     assert "password" not in rendered
     assert "authorization" not in rendered
+
+
+def test_snapshot_rejects_non_finite_numeric_metadata_fail_closed() -> None:
+    snapshot = RouterRegistry([_provider()]).snapshot().as_dict()
+    snapshot["providers"][0]["input_cost_per_million"] = math.nan
+    with pytest.raises(ProviderMetadataError, match="strict canonical JSON"):
+        RouterRegistry.from_snapshot(snapshot)
+
+
+def test_snapshot_digest_uses_shared_canonical_contract_bytes() -> None:
+    snapshot = RouterRegistry([_provider()]).snapshot().as_dict()
+    body = {
+        "schema_version": snapshot["schema_version"],
+        "providers": snapshot["providers"],
+    }
+    assert snapshot["digest"] == hashlib.sha256(canonical_json_bytes(body)).hexdigest()
