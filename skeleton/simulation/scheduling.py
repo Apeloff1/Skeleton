@@ -1,10 +1,11 @@
 """Non-authoritative scheduling simulation for VOL-316."""
 from dataclasses import dataclass
+import math
 @dataclass(frozen=True)
 class WorkloadTrace:
  durations:tuple[float,...]; assumptions:tuple[str,...]
  def __post_init__(self):
-  if any(x<0 for x in self.durations) or not self.assumptions:raise ValueError("trace requires nonnegative durations and labeled assumptions")
+  if any(isinstance(x,bool) or not isinstance(x,(int,float)) or not math.isfinite(x) or x<0 for x in self.durations) or not self.assumptions:raise ValueError("trace requires nonnegative durations and labeled assumptions")
 @dataclass(frozen=True)
 class SimulationMetric:
  throughput:float; mean_latency:float; fairness:float; utilization:float
@@ -14,7 +15,7 @@ class SchedulingSimulation:
  def __post_init__(self):
   if self.authoritative:raise ValueError("simulation can never be authoritative")
 def simulate(trace:WorkloadTrace,policy:str,worker_count:int):
- if worker_count<=0 or not policy:raise ValueError("worker_count and policy required")
+ if isinstance(worker_count,bool) or not isinstance(worker_count,int) or worker_count<=0 or not policy:raise ValueError("worker_count and policy required")
  ds=trace.durations
  if not ds:return SchedulingSimulation(policy,trace,SimulationMetric(0,0,1,0))
  total=sum(ds); horizon=max(ds) if worker_count>=len(ds) else total/worker_count
