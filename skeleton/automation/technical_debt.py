@@ -26,8 +26,8 @@ class DebtRetirement:
  def __post_init__(self):
   for f in ("debt_id","migration_evidence_id","compatibility_evidence_id","rollback_evidence_id","verification_evidence_id"):object.__setattr__(self,f,_id(getattr(self,f),f))
 class DebtLedger:
- def __init__(self,items):self.items={x.debt_id:x for x in items};self.retired={}
- def interest(self,debt_id):i=self.items[debt_id].impact;return i.operational_interest+i.engineering_interest+i.risk
+ def __init__(self,items):\n  if not isinstance(items,tuple) or any(not isinstance(x,DebtItem) for x in items):raise DebtError("items must be typed tuple")\n  if len({x.debt_id for x in items})!=len(items):raise DebtError("duplicate debt identity")\n  self.items={x.debt_id:x for x in items};self.retired={}
+ def interest(self,debt_id):\n  debt_id=_id(debt_id,"debt_id")\n  if debt_id not in self.items:raise DebtError("unknown debt")\n  i=self.items[debt_id].impact;return i.operational_interest+i.engineering_interest+i.risk
  def retire(self,receipt):
   if receipt.debt_id not in self.items:raise DebtError("unknown debt")
   if receipt.debt_id in self.retired:raise DebtError("debt already retired")
