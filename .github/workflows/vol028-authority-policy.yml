@@ -6,6 +6,8 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/vault/authority_policy.py"
+      - "skeleton/automation/agents/authority_policy_bridge.py"
+      - "skeleton/ai/agents/core/authority_policy_bridge.py"
       - "skeleton/ai/runtime/vault/authority_policy.py"
       - "skeleton/vault/__init__.py"
       - "skeleton/ai/runtime/vault/__init__.py"
@@ -15,6 +17,8 @@ on:
     branches: [main]
     paths:
       - "skeleton/vault/authority_policy.py"
+      - "skeleton/automation/agents/authority_policy_bridge.py"
+      - "skeleton/ai/agents/core/authority_policy_bridge.py"
       - "skeleton/ai/runtime/vault/authority_policy.py"
       - "skeleton/vault/__init__.py"
       - "skeleton/ai/runtime/vault/__init__.py"
@@ -77,6 +81,10 @@ jobs:
               (
                   root / "skeleton/vault/authority_policy.py",
                   root / "skeleton/ai/runtime/vault/authority_policy.py",
+              ),
+              (
+                  root / "skeleton/automation/agents/authority_policy_bridge.py",
+                  root / "skeleton/ai/agents/core/authority_policy_bridge.py",
               ),
               (
                   root / "skeleton/vault/__init__.py",
