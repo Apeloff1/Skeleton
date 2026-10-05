@@ -54,3 +54,17 @@ def test_recovery_evidence_binds_exact_scenario():
  changed=VS000Scenario(s.scenario_id,{"boot":False},s.events)
  assert scenario_digest(changed)!=ev.scenario_digest
  assert len(ev.digest)==64
+
+def test_recovery_evidence_status_cannot_be_forged_without_required_digests():
+ s=scenario();sd=scenario_digest(s);cp=checkpoint(s,"CHECKPOINT.1")
+ with pytest.raises(RecoveryError,match="requires checkpoint digest"):
+  RecoveryEvidence(s.scenario_id,sd,RecoveryStatus.RECOVERED,None,cp.projection_digest,"forged")
+ with pytest.raises(RecoveryError,match="requires rebuilt projection"):
+  RecoveryEvidence(s.scenario_id,sd,RecoveryStatus.RECOVERED,cp.digest,None,"forged")
+ with pytest.raises(RecoveryError,match="cannot claim rebuilt projection"):
+  RecoveryEvidence(s.scenario_id,sd,RecoveryStatus.FAIL_CLOSED,cp.digest,cp.projection_digest,"forged")
+
+def test_recovery_evidence_requires_nonempty_reason():
+ s=scenario();cp=checkpoint(s,"CHECKPOINT.1")
+ with pytest.raises(RecoveryError,match="reason must be non-empty"):
+  RecoveryEvidence(s.scenario_id,scenario_digest(s),RecoveryStatus.FAIL_CLOSED,cp.digest,None,"")
