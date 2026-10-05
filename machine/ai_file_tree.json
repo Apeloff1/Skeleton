@@ -5697,12 +5697,12 @@
       "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
-      "id": "AIFT-RESEARCH-PLATFORM",
-      "source": "skeleton/research",
-      "destination": "skeleton/ai/research",
-      "kind": "tree",
-      "source_git_object_sha": "69f6f1d4772056369b9ed4a4ac749b2e4403100c",
-      "role": "Governed research-team, literature-watch, citation-graph, and source-lineage evidence surfaces.",
+      "id": "AIFT-RESEARCH-AGENT-TEAM",
+      "source": "skeleton/research/research_agent_team.py",
+      "destination": "skeleton/ai/research/research_agent_team.py",
+      "kind": "file",
+      "source_git_object_sha": "72268aabeaeef4d8b9a9aa5166a5da5713b0cb97",
+      "role": "Governed research-agent team planning with independent verifier separation.",
       "work_package_refs": [
         "WP-W11"
       ],
@@ -5715,10 +5715,56 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "research_platform_mirror_pending_independent_cutover_validation",
+      "source_disposition": "research_quarantine_mirror_pending_independent_cutover_validation",
       "volume_refs": [
-        "VOL-210",
-        "VOL-211",
+        "VOL-210"
+      ]
+    },
+    {
+      "id": "AIFT-RESEARCH-LITERATURE-WATCH",
+      "source": "skeleton/research/literature_watch.py",
+      "destination": "skeleton/ai/research/literature_watch.py",
+      "kind": "file",
+      "source_git_object_sha": "5062d54f7d5aa3684929fbb1d9af92c332fea717",
+      "role": "Governed literature source-adapter and deterministic research-backlog triage evidence.",
+      "work_package_refs": [
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "research_quarantine_mirror_pending_independent_cutover_validation",
+      "volume_refs": [
+        "VOL-211"
+      ]
+    },
+    {
+      "id": "AIFT-RESEARCH-CITATION-GRAPH",
+      "source": "skeleton/research/citation_graph.py",
+      "destination": "skeleton/ai/research/citation_graph.py",
+      "kind": "file",
+      "source_git_object_sha": "c121225dffe1f392ba3ed86d577fe2bf2f959beb",
+      "role": "Governed citation-graph evidence and deterministic citation analytics.",
+      "work_package_refs": [
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "research_quarantine_mirror_pending_independent_cutover_validation",
+      "volume_refs": [
         "VOL-212"
       ]
     }
