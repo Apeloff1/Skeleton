@@ -35,6 +35,7 @@ class EvaluationFarmJob: job_id:str; eval_digest:str; model_digest:str; dataset_
 class EvaluationFarmResult: job_id:str; worker_id:str; environment_id:str; scorer_version:str; metric:str; value:float
 def aggregate_results(results):
  if any(not all((x.job_id,x.worker_id,x.environment_id,x.scorer_version,x.metric)) for x in results):raise ValueError("complete evaluation result identity required")
+ if len({(x.job_id,x.worker_id,x.metric) for x in results})!=len(results):raise ValueError("duplicate evaluation result identity")
  return tuple(sorted(results,key=lambda x:(x.metric,x.worker_id,x.environment_id,x.value)))
 class ResearchPriority(int,Enum): BACKGROUND=1; NORMAL=2; URGENT=3
 @dataclass(frozen=True,slots=True)
