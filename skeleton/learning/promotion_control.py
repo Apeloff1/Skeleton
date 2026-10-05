@@ -34,14 +34,14 @@ class EvaluationBundle:
   if not isinstance(self.metric_values,tuple) or len(self.metric_values)>256:raise ImprovementError("metric_values must be bounded tuple")\n  vals=tuple(sorted(self.metric_values))
   if not vals:raise ImprovementError("evaluation metrics required")
   if len({k for k,_ in vals})!=len(vals):raise ImprovementError("duplicate evaluation metric")\n  for k,v in vals:\n   _id(k,"metric_id")\n   if not isinstance(v,(int,float)) or isinstance(v,bool) or not math.isfinite(v):raise ImprovementError("metric value must be finite numeric")
-  object.__setattr__(self,"metric_values",vals)
+  for f in ("safety_passed","cost_passed","robustness_passed"):\n   if not isinstance(getattr(self,f),bool):raise ImprovementError(f"{f} must be bool")\n  object.__setattr__(self,"metric_values",vals)
 @dataclass(frozen=True,slots=True)
 class PromotionDecision:
  decision_id:str;candidate_digest:str;verifier_id:str;status:PromotionStatus;evaluation_digest:str;canary_digest:str|None
  def __post_init__(self):
   for f in ("decision_id","verifier_id"):object.__setattr__(self,f,_id(getattr(self,f),f))
   _sha(self.candidate_digest,"candidate_digest");_sha(self.evaluation_digest,"evaluation_digest")
-  if self.canary_digest is not None:_sha(self.canary_digest,"canary_digest")
+  if not isinstance(self.status,PromotionStatus):raise ImprovementError("status must be PromotionStatus")\n  if self.canary_digest is not None:_sha(self.canary_digest,"canary_digest")
   if self.status is PromotionStatus.PROMOTE and self.canary_digest is None:raise ImprovementError("promotion requires canary evidence")
 @dataclass(frozen=True,slots=True)
 class RollbackReceipt:
