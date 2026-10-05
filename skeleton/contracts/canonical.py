@@ -21,8 +21,20 @@ class CanonicalContractError(ValueError):
     """Raised when a canonical envelope violates its contract."""
 
 
+def _validate_mapping_keys(value: Any) -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if type(key) is not str:
+                raise CanonicalContractError("canonical mappings require string keys")
+            _validate_mapping_keys(child)
+    elif isinstance(value, (list, tuple)):
+        for child in value:
+            _validate_mapping_keys(child)
+
+
 def canonical_json_bytes(value: Any) -> bytes:
     """Return one strict deterministic JSON byte representation."""
+    _validate_mapping_keys(value)
     try:
         return json.dumps(
             value,
