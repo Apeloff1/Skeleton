@@ -14,3 +14,8 @@ def test_dropped_constraint_is_explicit_conflict():
  a=UserIntent("a","do",(IntentConstraint("scope","safe"),),True)
  b=UserIntent("b","do",(),True)
  assert reconcile_intent(a,b)==("scope",)
+
+def test_non_authoritative_current_lineage_cannot_be_reconciled():
+ import pytest
+ a=UserIntent("a","x",(),False);b=UserIntent("b","y",(),True)
+ with pytest.raises(PermissionError):reconcile_intent(a,b)
