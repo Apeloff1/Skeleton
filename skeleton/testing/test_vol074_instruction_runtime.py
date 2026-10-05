@@ -850,10 +850,17 @@ def test_successful_correction_counts_as_learning_outcome() -> None:
         correction_successes=1,
         correction_success_rate=1.0,
     )
+    failed = evidence(
+        "failed",
+        attempt_id="attempt.failed",
+        success=False,
+        score=0.0,
+    )
     correction = evidence(
         "correction",
         attempt_id="attempt.correction",
         kind=LearnerEvidenceKind.CORRECTION,
+        observed_at=2.0,
         prior_attempt_id="attempt.failed",
     )
 
@@ -863,6 +870,7 @@ def test_successful_correction_counts_as_learning_outcome() -> None:
         before=before,
         after=after,
         new_evidence=(correction,),
+        prior_evidence=(failed,),
     )
 
     assert outcome.status is OutcomeStatus.IMPROVED
@@ -1325,3 +1333,96 @@ def test_canonical_and_ai_instruction_runtime_are_byte_identical() -> None:
     mirror = ROOT / "skeleton/ai/learning/instruction_runtime.py"
 
     assert canonical.read_bytes() == mirror.read_bytes()
+
+
+def test_estimator_rejects_forged_correction_lineage_without_ledger() -> None:
+    correction = evidence(
+        "forged.correction",
+        attempt_id="attempt.correction",
+        kind=LearnerEvidenceKind.CORRECTION,
+        observed_at=2.0,
+        prior_attempt_id="attempt.missing",
+    )
+
+    with pytest.raises(
+        InstructionRuntimeError,
+        match="unknown prior attempt",
+    ):
+        LearnerStateEstimator().infer(
+            "learner.test",
+            "objective.basics",
+            (correction,),
+        )
+
+
+def test_estimator_rejects_correction_of_success_without_ledger() -> None:
+    successful = evidence(
+        "successful",
+        attempt_id="attempt.successful",
+        success=True,
+    )
+    correction = evidence(
+        "correction.success",
+        attempt_id="attempt.correction",
+        kind=LearnerEvidenceKind.CORRECTION,
+        observed_at=2.0,
+        prior_attempt_id="attempt.successful",
+    )
+
+    with pytest.raises(
+        InstructionRuntimeError,
+        match="unsuccessful attempt",
+    ):
+        LearnerStateEstimator().infer(
+            "learner.test",
+            "objective.basics",
+            (successful, correction),
+        )
+
+
+def test_estimator_rejects_duplicate_attempt_identity() -> None:
+    first = evidence(
+        "first",
+        attempt_id="attempt.same",
+        observed_at=1.0,
+    )
+    second = evidence(
+        "second",
+        attempt_id="attempt.same",
+        observed_at=2.0,
+    )
+
+    with pytest.raises(
+        InstructionRuntimeError,
+        match="duplicate attempt identity",
+    ):
+        LearnerStateEstimator().infer(
+            "learner.test",
+            "objective.basics",
+            (first, second),
+        )
+
+
+def test_outcome_evaluator_rejects_unproven_correction_lineage() -> None:
+    correction = evidence(
+        "correction",
+        attempt_id="attempt.correction",
+        kind=LearnerEvidenceKind.CORRECTION,
+        observed_at=2.0,
+        prior_attempt_id="attempt.missing",
+    )
+
+    with pytest.raises(
+        InstructionRuntimeError,
+        match="unknown prior attempt",
+    ):
+        OutcomeEvaluator().evaluate(
+            before=state(latest_success=False),
+            after=state(
+                mastery=0.75,
+                correction_attempts=1,
+                correction_successes=1,
+                correction_success_rate=1.0,
+            ),
+            new_evidence=(correction,),
+        )
