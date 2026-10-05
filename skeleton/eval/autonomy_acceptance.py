@@ -58,3 +58,16 @@ class AutonomousWorkerAcceptance:
   return self.budget.within_bounds and self.control.state is ControlState.ACTIVE and self.current_tick<=self.deadline_tick and fresh and bool(self.failure_evidence)
  @property
  def digest(self):return _dig({"id":self.acceptance_id,"objective":self.objective_digest,"budget":self.budget.__dict__ if hasattr(self.budget,"__dict__") else [self.budget.budget_id,self.budget.max_steps,self.budget.max_cost_units,self.budget.max_runtime_ticks,self.budget.used_steps,self.budget.used_cost_units,self.budget.used_runtime_ticks],"authority":self.control.authority_digest,"control":self.control.state.value,"checkpoint":[self.checkpoint.checkpoint_id,self.checkpoint.objective_digest,self.checkpoint.authority_digest,self.checkpoint.state_digest,self.checkpoint.tick,self.checkpoint.recovery_digest],"current":self.current_tick,"deadline":self.deadline_tick,"max_age":self.max_checkpoint_age,"failure_evidence":self.failure_evidence})
+
+@dataclass(frozen=True,slots=True)
+class AutonomyAcceptanceSignoff:
+ acceptance_digest:str;reviewer_id:str;approved:bool
+ def __post_init__(self):
+  _sha(self.acceptance_digest,"acceptance_digest");object.__setattr__(self,"reviewer_id",_id(self.reviewer_id,"reviewer_id"))
+  if not isinstance(self.approved,bool):raise AutonomyAcceptanceError("approved must be bool")
+def sign_acceptance(bundle:AutonomousWorkerAcceptance,reviewer_id:str)->AutonomyAcceptanceSignoff:
+ if not isinstance(bundle,AutonomousWorkerAcceptance) or not bundle.eligible:raise AutonomyAcceptanceError("ineligible autonomy acceptance")
+ return AutonomyAcceptanceSignoff(bundle.digest,reviewer_id,True)
+def verify_acceptance(bundle:AutonomousWorkerAcceptance,signoff:AutonomyAcceptanceSignoff)->None:
+ if not isinstance(bundle,AutonomousWorkerAcceptance) or not isinstance(signoff,AutonomyAcceptanceSignoff):raise AutonomyAcceptanceError("signoff inputs must be typed")
+ if not signoff.approved or signoff.acceptance_digest!=bundle.digest:raise AutonomyAcceptanceError("stale or rejected autonomy signoff")
