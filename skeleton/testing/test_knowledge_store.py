@@ -119,3 +119,21 @@ def test_rejected_claim_does_not_create_active_conflict_but_remains_historical()
     view = store.query(scope_key="tenant-a/project-a", subject="earth", predicate="shape")
     assert len(view.claims) == 2
     assert view.conflicting is False
+
+
+def test_store_identity_uses_shared_strict_canonical_bytes() -> None:
+    from skeleton.contracts.canonical import canonical_json_bytes
+
+    claim = _claim(evidence=(_evidence("source://z"), _evidence("source://a")))
+    import hashlib
+    assert claim.identity == hashlib.sha256(canonical_json_bytes(claim.to_dict())).hexdigest()
+
+
+def test_snapshot_restore_rejects_nonfinite_numbers_even_with_matching_digest_shape() -> None:
+    # Strict canonical JSON must reject NaN rather than creating a non-portable identity.
+    store = KnowledgeStore()
+    store.record(_claim())
+    snapshot = store.snapshot()
+    snapshot["claims"][0]["confidence"] = float("nan")
+    with pytest.raises(ValueError):
+        KnowledgeStore.from_snapshot(snapshot)
