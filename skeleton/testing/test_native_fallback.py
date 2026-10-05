@@ -1,0 +1,27 @@
+from __future__ import annotations
+import hashlib,json,sys
+import pytest
+from skeleton.native.isolation import AcceleratorIsolationError,run_json_process
+from skeleton.native.selection import ProfileEvidence,SelectionPolicy,evaluate_candidate
+
+_ECHO="import json,sys;p=json.loads(sys.stdin.buffer.read());sys.stdout.write(json.dumps({'seen':p},sort_keys=True,separators=(',',':')))"
+
+def test_subprocess_receipt_binds_request_response_and_has_no_execution_authority():
+ payload={"value":7}
+ result=run_json_process([sys.executable,"-c",_ECHO],payload,timeout_s=5)
+ request=json.dumps(payload,sort_keys=True,separators=(",",":"),ensure_ascii=False,allow_nan=False).encode()
+ response=json.dumps(result.payload,sort_keys=True,separators=(",",":"),ensure_ascii=False,allow_nan=False).encode()
+ assert result.request_digest==hashlib.sha256(request).hexdigest()
+ assert result.response_digest==hashlib.sha256(response).hexdigest()
+ assert result.isolation_mode=="subprocess-json"
+ assert result.authority_scope=="native-isolation-evidence-only"
+
+def test_crash_prone_candidate_cannot_qualify_without_isolation():
+ evidence=[ProfileEvidence(f"e{i}","native","src","env",64,1000,400,True,0.0) for i in range(2)]
+ decision=evaluate_candidate(candidate_id="native",current_source_identity="src",reference_available=True,isolation_satisfied=False,protocol_compatible=True,evidence=evidence,policy=SelectionPolicy())
+ assert decision.route=="reference"
+ assert "isolation_requirement_unsatisfied" in decision.reason_codes
+
+def test_isolated_crash_never_becomes_success_receipt():
+ with pytest.raises(AcceleratorIsolationError,match="exited"):
+  run_json_process([sys.executable,"-c","raise SystemExit(23)"],{"value":7},timeout_s=5)
