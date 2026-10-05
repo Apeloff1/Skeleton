@@ -17,7 +17,8 @@ class EmbeddingVersion: model:str; version:str; dimension:int; preprocessing:str
 @dataclass(frozen=True,slots=True)
 class EmbeddingRecord: record_id:str; embedding:EmbeddingVersion; vector:tuple[float,...]
     def __post_init__(self):
-  if len(self.vector)!=self.embedding.dimension:raise ValueError("embedding dimension mismatch")
+        if not self.record_id or not self.embedding.model or not self.embedding.version or self.embedding.dimension<=0:raise ValueError("embedding identity required")
+        if len(self.vector)!=self.embedding.dimension:raise ValueError("embedding dimension mismatch")
 @dataclass(frozen=True,slots=True)
 class EmbeddingMigration: source:EmbeddingVersion; target:EmbeddingVersion; validated:bool
 def comparable(a,b):return a.embedding==b.embedding
