@@ -205,3 +205,10 @@ test('LaunchCascade exposes named fallback controls and startup status', () => {
   assert.match(content, /accessibleStatusProps\('Starting Skeleton'\)/);
   assert.match(content, /minHeight: 44/);
 });
+
+
+test('Entry route announces startup safety status before launcher mounts', () => {
+  const content = source('app/index.tsx');
+  assert.match(content, /accessibleStatusProps\('Checking startup safety'\)/);
+  assert.match(content, /accessibilityElementsHidden/);
+});
