@@ -29,7 +29,8 @@ class DesktopAcceptanceRun:
 class DesktopArtifactReceipt:
  release_id:str;authoritative_state_digest:str;artifact_digest:str;schema_version:int
  def __post_init__(self):
-  object.__setattr__(self,"release_id",_id(self.release_id,"release_id"));_sha(self.authoritative_state_digest,"authoritative_state_digest");_sha(self.artifact_digest,"artifact_digest")\n  if not isinstance(self.schema_version,int) or isinstance(self.schema_version,bool) or self.schema_version<1:raise DesktopReleaseError("schema_version invalid")
+  object.__setattr__(self,"release_id",_id(self.release_id,"release_id"));_sha(self.authoritative_state_digest,"authoritative_state_digest");_sha(self.artifact_digest,"artifact_digest")
+  if not isinstance(self.schema_version,int) or isinstance(self.schema_version,bool) or self.schema_version<1:raise DesktopReleaseError("schema_version invalid")
 @dataclass(frozen=True,slots=True)
 class DesktopRollbackEvidence:
  from_release_id:str;to_release_id:str;preupdate_state_digest:str;restored_state_digest:str;rollback_artifact_digest:str
@@ -40,23 +41,25 @@ class DesktopRollbackEvidence:
 class DesktopUpdateTransaction:
  def __init__(self,current:SignedDesktopRelease,receipt:DesktopArtifactReceipt):
   if current.release_id!=receipt.release_id or current.schema_version!=receipt.schema_version:raise DesktopReleaseError("release/receipt mismatch")
-  self.current=current;self.receipt=receipt;self.target=None;self.state=None;self.preupdate_digest=None
+  self.current=current;self.receipt=receipt;self.target=None;self.state=None;self.preupdate_digest=None;self.preupdate_receipt=receipt
  def stage(self,target:SignedDesktopRelease):
   if target.release_id==self.current.release_id:raise DesktopReleaseError("target release must differ")
-  self.target=target;self.preupdate_digest=self.receipt.authoritative_state_digest;self.state=UpdateState.STAGED
+  self.target=target;self.preupdate_digest=self.receipt.authoritative_state_digest;self.preupdate_receipt=self.receipt;self.state=UpdateState.STAGED
  def migrate(self,migrated_state_digest:str):
   if self.state is not UpdateState.STAGED:raise DesktopReleaseError("update not staged")
-  _sha(migrated_state_digest,"migrated_state_digest");self.receipt=DesktopArtifactReceipt(self.target.release_id,migrated_state_digest,self.receipt.artifact_digest,self.target.schema_version);self.state=UpdateState.MIGRATED
+  _sha(migrated_state_digest,"migrated_state_digest");self.receipt=DesktopArtifactReceipt(self.target.release_id,migrated_state_digest,self.target.artifact_digest,self.target.schema_version);self.state=UpdateState.MIGRATED
  def commit(self,acceptance:DesktopAcceptanceRun):
   if self.state is not UpdateState.MIGRATED:raise DesktopReleaseError("migration not complete")
-  if not isinstance(acceptance,DesktopAcceptanceRun):raise DesktopReleaseError("acceptance must be DesktopAcceptanceRun")\n  if acceptance.release_id!=self.target.release_id:raise DesktopReleaseError("acceptance targets wrong release")\n  if acceptance.governed_artifact_digest!=self.target.artifact_digest:raise DesktopReleaseError("acceptance artifact does not match signed target")
+  if not isinstance(acceptance,DesktopAcceptanceRun):raise DesktopReleaseError("acceptance must be DesktopAcceptanceRun")
+  if acceptance.release_id!=self.target.release_id:raise DesktopReleaseError("acceptance targets wrong release")
+  if acceptance.governed_artifact_digest!=self.target.artifact_digest:raise DesktopReleaseError("acceptance artifact does not match signed target")
   self.current=self.target;self.state=UpdateState.COMMITTED;return self.receipt
  def interrupt(self):
   if self.state not in (UpdateState.STAGED,UpdateState.MIGRATED):raise DesktopReleaseError("no interruptible update")
   return "rollback_required"
  def rollback(self,artifact_digest:str):
-  if self.preupdate_digest is None:raise DesktopReleaseError("no staged update")
+  if self.preupdate_digest is None or self.state not in (UpdateState.STAGED,UpdateState.MIGRATED):raise DesktopReleaseError("no rollback-eligible update")
   _sha(artifact_digest,"artifact_digest")
   target_id=self.target.release_id if self.target else self.current.release_id
   evidence=DesktopRollbackEvidence(target_id,self.current.release_id,self.preupdate_digest,self.preupdate_digest,artifact_digest)
-  self.receipt=DesktopArtifactReceipt(self.current.release_id,self.preupdate_digest,self.receipt.artifact_digest,self.current.schema_version);self.state=UpdateState.ROLLED_BACK;return evidence
+  self.receipt=self.preupdate_receipt;self.state=UpdateState.ROLLED_BACK;return evidence
