@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tree_version": "1.6.7",
+  "tree_version": "1.6.8",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
@@ -556,7 +556,8 @@
         "VOL-115",
         "VOL-116",
         "VOL-118",
-        "VOL-119"
+        "VOL-119",
+        "VOL-121"
       ]
     },
     {
@@ -6173,9 +6174,19 @@
         "VOL-116",
         "VOL-117",
         "VOL-118",
-        "VOL-119"
+        "VOL-119",
+        "VOL-120",
+        "VOL-121"
       ],
-      "policy": "Restore declared source-to-AI staged-mirror parity while honoring source exclusions, overlays, and compatibility-facade exceptions; reconcile landed implementation evidence without granting completion signoff, cutover, source retirement, or independent-verification authority."
+      "policy": "Restore declared source-to-AI staged-mirror parity while honoring source exclusions, overlays, and compatibility-facade exceptions; reconcile landed implementation evidence without granting completion signoff, cutover, source retirement, or independent-verification authority.",
+      "external_authority_confirmations": [
+        {
+          "volume_ref": "VOL-120",
+          "path": "skeleton/app/final_assembly.py",
+          "classification": "intentionally_external",
+          "owner": "product/application assembly"
+        }
+      ]
     }
   }
 }
