@@ -7,8 +7,8 @@ class RebuildStep: artifact_id:str; input_digests:tuple[str,...]; producer_versi
 class RebuildPlan: steps:tuple[RebuildStep,...]
 @dataclass(frozen=True,slots=True)
 class RebuildEvidence: artifact_id:str; expected_digest:str; rebuilt_digest:str; semantic_match:bool
-def rebuild_admissible(p):return all(s.verified_inputs and bool(s.producer_version) for s in p.steps)
-def rebuild_verified(e):return e.expected_digest==e.rebuilt_digest and e.semantic_match
+def rebuild_admissible(p):\n return bool(p.steps) and all(bool(s.artifact_id) and bool(s.input_digests) and all(bool(d) for d in s.input_digests) and s.verified_inputs and bool(s.producer_version) for s in p.steps)
+def rebuild_verified(e):return bool(e.artifact_id) and bool(e.expected_digest) and e.expected_digest==e.rebuilt_digest and e.semantic_match
 @dataclass(frozen=True,slots=True)
 class ImpactQuery: changed_objects:tuple[str,...]
 @dataclass(frozen=True,slots=True)
