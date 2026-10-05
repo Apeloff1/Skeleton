@@ -121,6 +121,7 @@ def test_boolean_ticks_and_unbounded_actions_are_rejected() -> None:
             "GRANT.2",
             "WORKLOAD.API",
             "INSTANCE.1",
+            IDENTITY.attestation_digest,
             frozenset(f"action{i}" for i in range(257)),
             "tenant/a/",
             0,
