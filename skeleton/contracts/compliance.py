@@ -364,7 +364,11 @@ class ComplianceRegistry:
     ) -> ComplianceAssessment:
         now = _utc(at, "assessment time")
         by_control: dict[str, list[ComplianceEvidence]] = {}
+        evidence_ids: set[str] = set()
         for item in evidence:
+            if item.evidence_id in evidence_ids:
+                raise ComplianceError("duplicate evidence id")
+            evidence_ids.add(item.evidence_id)
             bucket = by_control.setdefault(item.control_id, [])
             bucket.append(item)
             if len(bucket) > _MAX_EVIDENCE_PER_CONTROL:
