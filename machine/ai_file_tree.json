@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "tree_version": "1.7.7",
+  "tree_version": "1.7.8",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
-  "baseline_git_sha": "0e38037c096059b12bd6447fe5e502f81218f870",
+  "baseline_git_sha": "ae8f8dd30f133adfc3f09d861ee635591e07f654",
   "canonical_root": "skeleton/ai",
   "migration_mode": "strangler_mirror_then_explicit_cutover",
   "purpose": "Consolidate build-plan-relevant AI engine, governance, shell/control-plane, agent, evaluation, reliability, build-control code, historical research lineage, Jeeves, and selected legacy backend/GameForge AI recovery surfaces into one governed file tree without breaking existing imports or fabricating completion.",
@@ -150,6 +150,7 @@
         "VOL-118",
         "VOL-168",
         "VOL-170",
+        "VOL-200",
         "VOL-207",
         "VOL-208",
         "VOL-257",
@@ -796,6 +797,7 @@
         "VOL-091",
         "VOL-117",
         "VOL-191",
+        "VOL-204",
         "VOL-325",
         "VOL-390",
         "VOL-403",
@@ -948,6 +950,7 @@
         "VOL-107",
         "VOL-108",
         "VOL-168",
+        "VOL-203",
         "VOL-206",
         "VOL-207",
         "VOL-208",
@@ -1226,7 +1229,8 @@
       ],
       "volume_refs": [
         "VOL-019",
-        "VOL-073"
+        "VOL-073",
+        "VOL-197"
       ],
       "move_tags": [
         "ai-tree:mapped",
@@ -5091,6 +5095,23 @@
         "galaxy",
         "mesh",
         "network"
+      ],
+      "volume_refs": [
+        "VOL-029",
+        "VOL-030",
+        "VOL-031",
+        "VOL-067",
+        "VOL-068",
+        "VOL-381",
+        "VOL-382",
+        "VOL-385",
+        "VOL-386",
+        "VOL-390",
+        "VOL-391",
+        "VOL-392",
+        "VOL-397",
+        "VOL-398",
+        "VOL-399"
       ]
     },
     {
@@ -6002,7 +6023,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "177_mapping_plus_10_native_owner_current_main_governance_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "177_mapping_plus_10_native_owner_current_main_governance_lineage_refreshed_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -7231,6 +7252,43 @@
       "mature_ai_native_implementation_path_count": 23,
       "mature_volume_count": 209,
       "policy": "Govern completed implementations born directly inside skeleton/ai without fabricating legacy source mappings; residual native tree owners exclude authority already held by more-specific migration destinations."
+    },
+    "mature_volume_traceability_backfill_2026_10_05": {
+      "base_main_sha": "ae8f8dd30f133adfc3f09d861ee635591e07f654",
+      "affected_mapping_count": 5,
+      "added_volume_ref_count": 19,
+      "added_volume_refs": {
+        "AIFT-DISTRIBUTED": [
+          "VOL-029",
+          "VOL-030",
+          "VOL-031",
+          "VOL-067",
+          "VOL-068",
+          "VOL-381",
+          "VOL-382",
+          "VOL-385",
+          "VOL-386",
+          "VOL-390",
+          "VOL-391",
+          "VOL-392",
+          "VOL-397",
+          "VOL-398",
+          "VOL-399"
+        ],
+        "AIFT-SIMULATION": [
+          "VOL-197"
+        ],
+        "AIFT-CONTRACTS": [
+          "VOL-200"
+        ],
+        "AIFT-EVALUATION": [
+          "VOL-203"
+        ],
+        "AIFT-OBSERVABILITY": [
+          "VOL-204"
+        ]
+      },
+      "policy": "Bind already-landed mature implementation volumes to their existing governed AI-tree owners without moving product/backend authority, changing runtime behavior, granting cutover, or asserting independent completion verification."
     }
   },
   "native_ai_owners": [
