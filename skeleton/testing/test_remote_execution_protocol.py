@@ -1,10 +1,18 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import hashlib
 
 import pytest
 
-from skeleton.contracts.canonical import EvidenceRef
+from skeleton.contracts.canonical import EvidenceRef, canonical_json_bytes
+from skeleton.distributed.network.consistency_policy import (
+    ConsistencyMode,
+    DataClassConsistencyRule,
+    DataConsistencyPolicy,
+    canonical_data_consistency_policy,
+)
+from skeleton.vault.data_governance import DataClass
 from skeleton.network.remote_execution import (
     RemoteExecutionError,
     RemoteExecutionRequest,
@@ -955,3 +963,302 @@ def test_rejected_commit_cannot_materialize_promotion_evidence() -> None:
         match="cannot become promotion",
     ):
         commit.accepted_evidence_ref()
+
+
+
+def test_remote_request_binds_canonical_data_consistency_policy() -> None:
+    request = _request()
+    policy = canonical_data_consistency_policy()
+
+    assert request.data_class is DataClass.INTERNAL
+    assert request.consistency_mode is ConsistencyMode.READ_YOUR_WRITES
+    assert request.consistency_policy_digest == policy.policy_digest
+
+
+def test_confidential_remote_request_rejects_weak_consistency() -> None:
+    (
+        clock,
+        _,
+        heartbeats,
+        leases,
+        worker,
+        registration,
+        _,
+        _,
+        _,
+        attestation,
+        _,
+    ) = _runtime()
+    request = _request(
+        operation_id="operation-confidential",
+        execution_id="execution-confidential",
+        request_id="request-confidential",
+        data_class=DataClass.CONFIDENTIAL,
+        consistency_mode=ConsistencyMode.READ_YOUR_WRITES,
+    )
+    lease = leases.acquire(
+        request.lease_key,
+        worker.key,
+        ttl_seconds=30.0,
+    )
+    fence = issue_remote_execution_fence(
+        request=request,
+        worker=worker,
+        lease=lease,
+    )
+
+    decision = qualify_remote_execution(
+        request=request,
+        worker=worker,
+        registration=registration,
+        liveness=heartbeats.liveness(worker),
+        attestation=attestation,
+        lease=lease,
+        fence=fence,
+        observed_at=clock(),
+    )
+
+    assert decision.accepted is False
+    assert "consistency-mode-too-weak" in decision.reasons
+
+
+def test_confidential_remote_request_accepts_linearizable_consistency() -> None:
+    (
+        clock,
+        _,
+        heartbeats,
+        leases,
+        worker,
+        registration,
+        _,
+        _,
+        _,
+        attestation,
+        _,
+    ) = _runtime()
+    request = _request(
+        operation_id="operation-confidential-strong",
+        execution_id="execution-confidential-strong",
+        request_id="request-confidential-strong",
+        data_class=DataClass.CONFIDENTIAL,
+        consistency_mode=ConsistencyMode.LINEARIZABLE,
+    )
+    lease = leases.acquire(
+        request.lease_key,
+        worker.key,
+        ttl_seconds=30.0,
+    )
+    fence = issue_remote_execution_fence(
+        request=request,
+        worker=worker,
+        lease=lease,
+    )
+
+    decision = qualify_remote_execution(
+        request=request,
+        worker=worker,
+        registration=registration,
+        liveness=heartbeats.liveness(worker),
+        attestation=attestation,
+        lease=lease,
+        fence=fence,
+        observed_at=clock(),
+    )
+
+    assert decision.accepted is True
+
+
+def test_remote_request_rejects_consistency_policy_digest_drift() -> None:
+    (
+        clock,
+        _,
+        heartbeats,
+        leases,
+        worker,
+        registration,
+        _,
+        _,
+        _,
+        attestation,
+        _,
+    ) = _runtime()
+    request = _request(
+        operation_id="operation-policy-drift",
+        execution_id="execution-policy-drift",
+        request_id="request-policy-drift",
+        consistency_policy_digest="0" * 64,
+    )
+    lease = leases.acquire(
+        request.lease_key,
+        worker.key,
+        ttl_seconds=30.0,
+    )
+    fence = issue_remote_execution_fence(
+        request=request,
+        worker=worker,
+        lease=lease,
+    )
+
+    decision = qualify_remote_execution(
+        request=request,
+        worker=worker,
+        registration=registration,
+        liveness=heartbeats.liveness(worker),
+        attestation=attestation,
+        lease=lease,
+        fence=fence,
+        observed_at=clock(),
+    )
+
+    assert decision.accepted is False
+    assert "consistency-policy-digest-mismatch" in decision.reasons
+
+
+def test_consistency_policy_can_forbid_remote_execution_for_data_class() -> None:
+    base = canonical_data_consistency_policy()
+    rules = tuple(
+        (
+            DataClassConsistencyRule(
+                rule.data_class,
+                rule.minimum_mode,
+                allow_remote_execution=False,
+            )
+            if rule.data_class is DataClass.RESTRICTED
+            else rule
+        )
+        for rule in base.rules
+    )
+    policy = DataConsistencyPolicy(
+        policy_id=base.policy_id,
+        version=base.version,
+        rules=rules,
+    )
+    (
+        clock,
+        _,
+        heartbeats,
+        leases,
+        worker,
+        registration,
+        _,
+        _,
+        _,
+        attestation,
+        _,
+    ) = _runtime()
+    request = _request(
+        operation_id="operation-restricted",
+        execution_id="execution-restricted",
+        request_id="request-restricted",
+        data_class=DataClass.RESTRICTED,
+        consistency_mode=ConsistencyMode.LINEARIZABLE,
+        consistency_policy_digest=policy.policy_digest,
+    )
+    lease = leases.acquire(
+        request.lease_key,
+        worker.key,
+        ttl_seconds=30.0,
+    )
+    fence = issue_remote_execution_fence(
+        request=request,
+        worker=worker,
+        lease=lease,
+    )
+
+    decision = qualify_remote_execution(
+        request=request,
+        worker=worker,
+        registration=registration,
+        liveness=heartbeats.liveness(worker),
+        attestation=attestation,
+        lease=lease,
+        fence=fence,
+        observed_at=clock(),
+        consistency_policy=policy,
+    )
+
+    assert decision.accepted is False
+    assert "remote-execution-disallowed-for-data-class" in decision.reasons
+
+
+def test_commit_rechecks_consistency_policy_against_current_policy() -> None:
+    (
+        clock,
+        _,
+        heartbeats,
+        _,
+        worker,
+        registration,
+        request,
+        lease,
+        fence,
+        attestation,
+        grant,
+    ) = _runtime()
+    result, message, cursor, _ = _completion_chain(
+        worker,
+        request,
+        grant,
+        fence,
+    )
+    base = canonical_data_consistency_policy()
+    changed_policy = DataConsistencyPolicy(
+        policy_id=base.policy_id,
+        version=base.version,
+        rules=tuple(
+            DataClassConsistencyRule(
+                rule.data_class,
+                (
+                    ConsistencyMode.LINEARIZABLE
+                    if rule.data_class is DataClass.INTERNAL
+                    else rule.minimum_mode
+                ),
+                allow_remote_execution=rule.allow_remote_execution,
+            )
+            for rule in base.rules
+        ),
+    )
+
+    commit = qualify_remote_execution_commit(
+        request=request,
+        worker=worker,
+        registration=registration,
+        liveness=heartbeats.liveness(worker),
+        attestation=attestation,
+        lease=lease,
+        current_fence=fence,
+        grant=grant,
+        result=result,
+        completion=message,
+        protocol_cursor=cursor,
+        observed_at=clock(),
+        consistency_policy=changed_policy,
+    )
+
+    assert commit.accepted is False
+    assert "commit-consistency-policy-digest-mismatch" in commit.reasons
+
+
+def test_consistency_policy_identity_uses_shared_canonical_bytes() -> None:
+    policy = canonical_data_consistency_policy()
+    assert policy.policy_digest == hashlib.sha256(
+        canonical_json_bytes(policy.payload())
+    ).hexdigest()
+
+
+def test_vol030_consistency_and_remote_execution_mirrors_are_identical() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    pairs = (
+        (
+            root / "skeleton/distributed/network/consistency_policy.py",
+            root / "skeleton/ai/runtime/distributed/network/consistency_policy.py",
+        ),
+        (
+            root / "skeleton/distributed/network/remote_execution.py",
+            root / "skeleton/ai/runtime/distributed/network/remote_execution.py",
+        ),
+    )
+    for source, mirror in pairs:
+        assert source.read_bytes() == mirror.read_bytes()
