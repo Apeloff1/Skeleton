@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
+import math
 from typing import Callable, Mapping
 
 
@@ -106,6 +107,15 @@ class DeterministicEnvironmentAdapter:
         action_payload = _state(action)
         prior = dict(self._state)
         next_state_raw, reward, terminal, uncertainty = self.reducer(prior, action_payload, self.seed)
+        if isinstance(reward, bool) or not isinstance(reward, (int, float)) or not math.isfinite(float(reward)):
+            raise SimulationBoundaryError("reward must be finite numeric")
+        if not isinstance(terminal, bool):
+            raise SimulationBoundaryError("terminal must be boolean")
+        if isinstance(uncertainty, bool) or not isinstance(uncertainty, (int, float)):
+            raise SimulationBoundaryError("uncertainty must be numeric")
+        uncertainty_value = float(uncertainty)
+        if not math.isfinite(uncertainty_value) or not 0.0 <= uncertainty_value <= 1.0:
+            raise SimulationBoundaryError("uncertainty must be in [0, 1]")
         next_state = _state(next_state_raw)
         evidence = SimulationEvidence(
             simulation_id=self.simulation_id,
@@ -114,11 +124,11 @@ class DeterministicEnvironmentAdapter:
             prior_state_digest=_digest(prior),
             action_digest=_digest(action_payload),
             next_state_digest=_digest(next_state),
-            uncertainty=float(uncertainty),
+            uncertainty=uncertainty_value,
         )
         self._state = next_state
         self._step += 1
-        return EnvironmentTransition(next_state, float(reward), bool(terminal), evidence)
+        return EnvironmentTransition(next_state, float(reward), terminal, evidence)
 
 
 __all__ = [

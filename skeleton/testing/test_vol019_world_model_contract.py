@@ -55,3 +55,22 @@ def test_uncertainty_policy_rejects_bool_and_out_of_range():
     p=UncertaintyPropagationPolicy()
     for v in (True,-0.1,1.1,float("inf")):
         with pytest.raises(WorldModelError): p.combine(0.1,v)
+
+@pytest.mark.parametrize(
+    ("reward","terminal","uncertainty","match"),
+    [
+        (True, False, 0.1, "reward must be finite numeric"),
+        (float("nan"), False, 0.1, "reward must be finite numeric"),
+        (0.0, 1, 0.1, "terminal must be boolean"),
+        (0.0, "false", 0.1, "terminal must be boolean"),
+        (0.0, False, True, "uncertainty must be numeric"),
+        (0.0, False, "0.1", "uncertainty must be numeric"),
+    ],
+)
+def test_reducer_outputs_fail_closed_without_type_coercion(reward,terminal,uncertainty,match):
+    def bad(state,action,seed):
+        return state,reward,terminal,uncertainty
+    env=DeterministicEnvironmentAdapter(simulation_id="strict",initial_state={},reducer=bad)
+    with pytest.raises(SimulationBoundaryError,match=match):
+        env.step({"x":1})
+    assert env.state=={}
