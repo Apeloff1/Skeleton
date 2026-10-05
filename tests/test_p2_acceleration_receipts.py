@@ -196,6 +196,21 @@ class AccelerationReceiptTests(unittest.TestCase):
                 activate=True,
             )
 
+    def test_activation_authority_requires_boolean(self) -> None:
+        policy = self._policy()
+        for ambiguous in (1, "true", None):
+            with self.subTest(activate=ambiguous):
+                with self.assertRaisesRegex(
+                    MODULE.ReceiptIngestionError,
+                    "activate must be boolean",
+                ):
+                    MODULE.apply_receipt(
+                        policy,
+                        self._receipt(policy, f"receipt-{ambiguous!r}"),
+                        root=ROOT,
+                        activate=ambiguous,
+                    )
+
 
 if __name__ == "__main__":
     unittest.main()
