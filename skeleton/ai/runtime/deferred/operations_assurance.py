@@ -1133,16 +1133,19 @@ class FormalCandidateSelection:
     exact_head_sha: str
 
     def __post_init__(self) -> None:
-        object.__setattr__(
-            self, "candidate_ids", _texts("candidate_id", self.candidate_ids)
-        )
+        if not isinstance(self.candidate_ids, tuple) or not self.candidate_ids:
+            raise OperationsAssuranceError("candidate_ids must be a non-empty tuple")
+        ids = tuple(_text("candidate_id", value) for value in self.candidate_ids)
+        if len(ids) != len(set(ids)):
+            raise OperationsAssuranceError("candidate identities must be unique")
         digests = tuple(_sha("candidate_digest", value) for value in self.candidate_digests)
-        if len(digests) != len(self.candidate_ids):
+        if len(digests) != len(ids):
             raise OperationsAssuranceError(
                 "candidate identity/digest cardinality mismatch"
             )
         if len(set(digests)) != len(digests):
             raise OperationsAssuranceError("candidate digests must be unique")
+        object.__setattr__(self, "candidate_ids", ids)
         object.__setattr__(self, "candidate_digests", digests)
         object.__setattr__(
             self, "exact_head_sha", _sha("exact_head_sha", self.exact_head_sha, length=40)
