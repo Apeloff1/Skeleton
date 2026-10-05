@@ -32,3 +32,16 @@ def test_fairness_never_overrides_security():
  p=FairnessPolicy(0,10); s=QueueShare("t",1,0,1)
  d=fairness(p,s,StarvationSignal("t",100,True),security_allowed=False)
  assert d.boost==0 and not d.safety_override
+
+
+def test_safe_operations_depth_invariants_fail_closed():
+ import pytest
+ d="a"*64
+ with pytest.raises(ValueError):SafeRepairPlan("",d,d,d,"inv")
+ p=SafeRepairPlan("r",d,d,d,"inv")
+ assert not admit_repair_completion(p,RepairCheckpoint("r",d,True),RepairEvidence("r",d,True,"bad"))
+ with pytest.raises(ValueError):TwinObservation("c","bad","now",0.1,True)
+ assert plan_deployment(DeploymentProposal("p",True,1,0,1),DeploymentConstraint(-1,0.9,1)) is None
+ with pytest.raises(ValueError):ResourceRequest("","o",1,1,1)
+ r=ResourceRequest("r","o",1,1,1);assert not place(r,-1,1,"l","later").admitted
+ with pytest.raises(ValueError):fairness(FairnessPolicy(1,1),QueueShare("t",1,0,0),StarvationSignal("other",1,True),security_allowed=True)
