@@ -10,3 +10,8 @@ def test_empty_evidence_is_never_evidence_backed():assert present_trust(TrustSig
 def test_nonfinite_confidence_rejected():
  import pytest,math
  with pytest.raises(ValueError):TrustSignal(math.nan,.1,False,("e",))
+
+def test_duplicate_or_empty_evidence_rejected():
+ import pytest
+ with pytest.raises(ValueError):TrustSignal(.5,.1,False,("e","e"))
+ with pytest.raises(ValueError):TrustSignal(.5,.1,False,("",))
