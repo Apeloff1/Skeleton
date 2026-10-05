@@ -5,6 +5,11 @@ from enum import Enum
 import hashlib,json,re,math
 _ID=re.compile(r"^[A-Z][A-Z0-9_.:-]{2,127}$")
 _SHA=re.compile(r"^[0-9a-f]{64}$")
+_MAX_FACTORS=256
+_MAX_CONSTRAINTS=256
+_MAX_RAW_SCORE=2560.0
+_MIN_EFFECTIVE_SCORE=-2565.0
+_MAX_EFFECTIVE_SCORE=2575.0
 class PriorityError(ValueError):pass
 class ConstraintKind(str,Enum): HARD_BLOCKER="hard_blocker"; SOFT_SIGNAL="soft_signal"
 def _id(v,f):
@@ -43,10 +48,14 @@ class PriorityDecision:
   for f in ("score","effective_score","age_boost"):
    v=getattr(self,f)
    if not isinstance(v,(int,float)) or isinstance(v,bool) or not math.isfinite(v):raise PriorityError(f"{f} must be finite numeric")
+  if not -_MAX_RAW_SCORE<=self.score<=_MAX_RAW_SCORE:raise PriorityError("score exceeds derivable priority bound")
+  if not _MIN_EFFECTIVE_SCORE<=self.effective_score<=_MAX_EFFECTIVE_SCORE:raise PriorityError("effective_score exceeds derivable priority bound")
   if not 0<=self.age_boost<=10:raise PriorityError("age_boost must be bounded 0..10")
   for f in ("factor_ids","blocker_ids"):
    raw=getattr(self,f)
    if not isinstance(raw,tuple):raise PriorityError(f"{f} must be typed tuple")
+   limit=_MAX_FACTORS if f=="factor_ids" else _MAX_CONSTRAINTS
+   if len(raw)>limit:raise PriorityError(f"{f} exceeds policy bound")
    vals=tuple(sorted(_id(v,f) for v in raw))
    if len(vals)!=len(set(vals)):raise PriorityError(f"{f} contains duplicate identities")
    object.__setattr__(self,f,vals)
@@ -65,7 +74,7 @@ class PriorityEngine:
   _id(item_id,"item_id")
   if not isinstance(inputs,tuple) or any(not isinstance(x,PriorityInput) for x in inputs):raise PriorityError("inputs must be typed tuple")
   if not isinstance(constraints,tuple) or any(not isinstance(x,PriorityConstraint) for x in constraints):raise PriorityError("constraints must be typed tuple")
-  if len(inputs)>256 or len(constraints)>256:raise PriorityError("priority input cardinality exceeds policy bound")
+  if len(inputs)>_MAX_FACTORS or len(constraints)>_MAX_CONSTRAINTS:raise PriorityError("priority input cardinality exceeds policy bound")
   factors=tuple(sorted(inputs,key=lambda x:x.factor_id))
   constraint_set=tuple(sorted(constraints,key=lambda x:x.constraint_id))
   if len({f.factor_id for f in factors})!=len(factors):raise PriorityError("duplicate priority factor")
