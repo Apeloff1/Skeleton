@@ -27,3 +27,27 @@ def test_rank_is_deterministic_on_ties():
  e=PriorityEngine();a=e.decide("ITEM.A",());b=e.decide("ITEM.B",());assert [x.item_id for x in e.rank((b,a))]==["ITEM.A","ITEM.B"]
 def test_negative_age_rejected():
  with pytest.raises(PriorityError,match="negative"):PriorityEngine().decide("ITEM.1",(),age_epochs=-1)
+
+@pytest.mark.parametrize("field,value",[
+ ("value",float("nan")),("value",float("inf")),("weight",float("-inf"))
+])
+def test_nonfinite_factor_values_are_rejected(field,value):
+ kw={"v":.5,"w":1};kw[{"value":"v","weight":"w"}[field]]=value
+ with pytest.raises(PriorityError,match="finite numeric"):f(**kw)
+
+def test_duplicate_constraints_are_rejected():
+ c=PriorityConstraint("BLOCK.X",ConstraintKind.HARD_BLOCKER,True,"DEP.X","blocked")
+ with pytest.raises(PriorityError,match="duplicate priority constraint"):
+  PriorityEngine().decide("ITEM.1",(),(c,c))
+
+def test_constraint_policy_inputs_are_typed():
+ with pytest.raises(PriorityError,match="ConstraintKind"):PriorityConstraint("BLOCK.X","hard_blocker",True,"DEP.X","blocked")
+ with pytest.raises(PriorityError,match="active must be bool"):PriorityConstraint("BLOCK.X",ConstraintKind.HARD_BLOCKER,1,"DEP.X","blocked")
+
+def test_decision_inputs_are_typed_and_bounded():
+ with pytest.raises(PriorityError,match="typed tuple"):PriorityEngine().decide("ITEM.1",[f()])
+ with pytest.raises(PriorityError,match="cardinality"):PriorityEngine().decide("ITEM.1",tuple(f(f"FACTOR.X{i}") for i in range(257)))
+
+def test_age_and_previous_score_are_canonical_numeric_inputs():
+ with pytest.raises(PriorityError,match="non-negative integer"):PriorityEngine().decide("ITEM.1",(),age_epochs=1.5)
+ with pytest.raises(PriorityError,match="finite numeric"):PriorityEngine().decide("ITEM.1",(),previous_score=float("nan"))
