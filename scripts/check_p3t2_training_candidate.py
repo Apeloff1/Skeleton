@@ -23,8 +23,7 @@ EXPECTED_VOLUMES = (
     "VOL-149",
 )
 MIRRORS = (
-    ("skeleton/training/__init__.py", "skeleton/ai/runtime/training/__init__.py"),
-    ("skeleton/training/control.py", "skeleton/ai/runtime/training/control.py"),
+    ("skeleton/training/p3t2_ledger.py", "skeleton/ai/runtime/training/p3t2_ledger.py"),
 )
 TESTS = ("skeleton/testing/test_training_control.py",)
 

@@ -1,6 +1,6 @@
-"""P3T2-TRAINING-01 governed training control. Unsigned implementation candidate."""
+"""P3T2-TRAINING-01 unsigned ledger. Does not replace the runtime training plane."""
 
-from skeleton.training.control import (
+from skeleton.training.p3t2_ledger import (
     EvaluationReceipt,
     GovernedTrainingLedger,
     LineageReceipt,

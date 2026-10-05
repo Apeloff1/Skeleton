@@ -16,9 +16,9 @@
   ],
   "implementation_paths": [
     "skeleton/training/__init__.py",
-    "skeleton/training/control.py",
+    "skeleton/training/p3t2_ledger.py",
     "skeleton/ai/runtime/training/__init__.py",
-    "skeleton/ai/runtime/training/control.py"
+    "skeleton/ai/runtime/training/p3t2_ledger.py"
   ],
   "executable_tests": [
     "skeleton/testing/test_training_control.py"
@@ -29,8 +29,8 @@
       "skeleton/ai/runtime/training/__init__.py"
     ],
     [
-      "skeleton/training/control.py",
-      "skeleton/ai/runtime/training/control.py"
+      "skeleton/training/p3t2_ledger.py",
+      "skeleton/ai/runtime/training/p3t2_ledger.py"
     ]
   ],
   "evidence_policy": {

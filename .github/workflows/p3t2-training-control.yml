@@ -51,12 +51,11 @@ jobs:
           python-version: "3.11.16"
 
       - name: Install focused test runner
-        run: python -m pip install --disable-pip-version-check "pytest>=7,<9"
+        run: python -m pip install --disable-pip-version-check "pytest>=7,<9" "pydantic[email]>=2.13.5" "pydantic-settings>=2.15.0"
 
       - name: Verify exact AI-runtime mirror
         run: |
-          cmp skeleton/training/__init__.py skeleton/ai/runtime/training/__init__.py
-          cmp skeleton/training/control.py skeleton/ai/runtime/training/control.py
+          cmp skeleton/training/p3t2_ledger.py skeleton/ai/runtime/training/p3t2_ledger.py
 
       - name: Validate training candidate without closure
         run: python scripts/check_p3t2_training_candidate.py --json

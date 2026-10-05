@@ -19,3 +19,5 @@ Owned volumes, still unsigned:
 The continuation frontier owner registry is not edited. `implementation_candidate` stays absent on `P3T2-TRAINING-01` so `scripts/check_ai_masterplan_continuation.py` remains the promotion authority. Exact-head CI for storage and data remains pending and is not claimed here.
 
 Parent planning authority: `docs/plan/MASTERPLAN_CONTINUATION_FRONTIER_2026-10-03.md`.
+
+The existing `skeleton/ai/runtime/training/control.py` plane is not replaced.

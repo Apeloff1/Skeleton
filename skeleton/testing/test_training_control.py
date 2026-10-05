@@ -6,7 +6,7 @@ import hashlib
 
 import pytest
 
-from skeleton.training.control import (
+from skeleton.training.p3t2_ledger import (
     GovernedTrainingLedger,
     RunAdmission,
     TrainingContractError,

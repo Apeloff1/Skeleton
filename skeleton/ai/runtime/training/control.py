@@ -1,378 +1,485 @@
-"""Governed training control for P3T2-TRAINING-01.
-
-Volumes owned by this candidate, unsigned:
-
-* VOL-143 run identity and admission
-* VOL-144 content-addressed checkpoints
-* VOL-145 monotonic resume cursor
-* VOL-146 independent evaluation binding
-* VOL-147 crash recovery of a staged checkpoint intent
-* VOL-148 hard step/token budget stop
-* VOL-149 lineage receipt that cannot self-sign closure
-
-This module materializes the lane. It does not grant a completion checkbox,
-an implementation signature, or a verification signature.
-"""
+"""Durable native training control, checkpointing and elastic recovery."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 import hashlib
 import json
+import math
+from pathlib import Path
 import sqlite3
 import threading
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
+
+from .data import DatasetRegistry
 
 
-MAX_ID = 256
-MAX_ACTOR = 128
+def _canonical(value: object) -> str:
+    return json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    )
 
 
-class TrainingContractError(ValueError):
-    """A governed training invariant was violated."""
+def _digest(value: object) -> str:
+    return hashlib.sha256(_canonical(value).encode("utf-8")).hexdigest()
 
 
-def _text(value: object, field: str, *, maximum: int = MAX_ID) -> str:
-    if not isinstance(value, str) or not value or value != value.strip():
-        raise TrainingContractError(f"{field} must be a non-empty trimmed string")
-    if len(value) > maximum:
-        raise TrainingContractError(f"{field} exceeds maximum length")
-    if any(ch in value for ch in ("\x00", "\n", "\r")):
-        raise TrainingContractError(f"{field} contains unsafe characters")
-    return value
+def _require_digest(value: str, *, field: str) -> str:
+    text=str(value).strip().lower()
+    if len(text)!=64 or any(ch not in "0123456789abcdef" for ch in text):
+        raise ValueError(f"{field} must be lowercase sha256")
+    return text
 
 
-def _positive(value: object, field: str) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
-        raise TrainingContractError(f"{field} must be a positive integer")
-    return value
+def _utc(value: datetime | None = None) -> str:
+    instant=value or datetime.now(timezone.utc)
+    if instant.tzinfo is None or instant.utcoffset() is None:
+        raise ValueError("timestamp must be timezone-aware")
+    return instant.astimezone(timezone.utc).isoformat()
 
 
-def _nonnegative(value: object, field: str) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-        raise TrainingContractError(f"{field} must be a non-negative integer")
-    return value
-
-
-def _digest(payload: bytes) -> str:
-    return hashlib.sha256(payload).hexdigest()
-
-
-def _canonical(value: object) -> bytes:
+def _require_utc_timestamp(value: str, *, field: str) -> str:
+    text=str(value).strip()
     try:
-        return json.dumps(
-            value,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=True,
-            allow_nan=False,
-        ).encode("utf-8")
-    except (TypeError, ValueError) as exc:
-        raise TrainingContractError("value is not canonically serializable") from exc
+        instant=datetime.fromisoformat(text.replace("Z","+00:00"))
+    except ValueError as exc:
+        raise ValueError(f"{field} must be an ISO-8601 timestamp") from exc
+    if instant.tzinfo is None or instant.utcoffset() is None:
+        raise ValueError(f"{field} must be timezone-aware")
+    return instant.astimezone(timezone.utc).isoformat()
+
+
+_ALLOWED_RUN_STATES={"registered","running","failed","recovering","completed"}
 
 
 @dataclass(frozen=True, slots=True)
-class RunAdmission:
+class TrainingRunManifest:
     run_id: str
-    tenant_id: str
     dataset_digest: str
-    base_checkpoint_digest: str
-    trainer_actor: str
-    max_steps: int
-    max_tokens: int
+    base_model_digest: str
+    code_digest: str
+    environment_digest: str
+    hyperparameters: Mapping[str, Any]
+    seed: int
+    world_size: int = 1
+    parallelism: str = "single"
+    collective_timeout_seconds: float = 60.0
+    resource_budget: Mapping[str, float] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        _text(self.run_id, "run_id")
-        _text(self.tenant_id, "tenant_id")
-        _text(self.dataset_digest, "dataset_digest", maximum=64)
-        _text(self.base_checkpoint_digest, "base_checkpoint_digest", maximum=64)
-        _text(self.trainer_actor, "trainer_actor", maximum=MAX_ACTOR)
-        _positive(self.max_steps, "max_steps")
-        _positive(self.max_tokens, "max_tokens")
-        if len(self.dataset_digest) != 64 or len(self.base_checkpoint_digest) != 64:
-            raise TrainingContractError("dataset and base checkpoint digests must be sha256")
+        if not self.run_id.strip():
+            raise ValueError("run_id must be non-empty")
+        for name in ("dataset_digest","base_model_digest","code_digest","environment_digest"):
+            object.__setattr__(self,name,_require_digest(getattr(self,name),field=name))
+        if isinstance(self.seed,bool) or not isinstance(self.seed,int):
+            raise ValueError("seed must be an integer")
+        if isinstance(self.world_size,bool) or not isinstance(self.world_size,int) or not 1<=self.world_size<=65536:
+            raise ValueError("world_size must be in [1, 65536]")
+        if self.parallelism not in {"single","data_parallel","model_parallel","hybrid"}:
+            raise ValueError("unsupported parallelism")
+        if (
+            isinstance(self.collective_timeout_seconds,bool)
+            or not isinstance(self.collective_timeout_seconds,(int,float))
+            or not math.isfinite(float(self.collective_timeout_seconds))
+            or self.collective_timeout_seconds<=0
+        ):
+            raise ValueError("collective_timeout_seconds must be a positive finite number")
+        hyper=dict(self.hyperparameters)
+        _canonical(hyper)
+        object.__setattr__(self,"hyperparameters",hyper)
+        if any(
+            isinstance(v,bool) or not isinstance(v,(int,float))
+            for v in self.resource_budget.values()
+        ):
+            raise ValueError("resource_budget values must be numeric, not boolean")
+        budget={str(k):float(v) for k,v in self.resource_budget.items()}
+        if any(not math.isfinite(v) or v<0 for v in budget.values()):
+            raise ValueError("resource_budget values must be finite and non-negative")
+        object.__setattr__(self,"resource_budget",budget)
+
+    @property
+    def digest(self) -> str:
+        return _digest(self.as_dict(include_digest=False))
+
+    def as_dict(self, *, include_digest: bool = True) -> dict[str, object]:
+        payload={
+            "run_id":self.run_id,
+            "dataset_digest":self.dataset_digest,
+            "base_model_digest":self.base_model_digest,
+            "code_digest":self.code_digest,
+            "environment_digest":self.environment_digest,
+            "hyperparameters":dict(self.hyperparameters),
+            "seed":self.seed,
+            "world_size":self.world_size,
+            "parallelism":self.parallelism,
+            "collective_timeout_seconds":float(self.collective_timeout_seconds),
+            "resource_budget":dict(sorted(self.resource_budget.items())),
+        }
+        if include_digest:
+            payload["manifest_digest"]=self.digest
+        return payload
+
+    @classmethod
+    def from_dict(cls,payload:Mapping[str,Any])->"TrainingRunManifest":
+        manifest=cls(
+            run_id=str(payload["run_id"]),
+            dataset_digest=str(payload["dataset_digest"]),
+            base_model_digest=str(payload["base_model_digest"]),
+            code_digest=str(payload["code_digest"]),
+            environment_digest=str(payload["environment_digest"]),
+            hyperparameters=dict(payload.get("hyperparameters",{})),
+            seed=payload["seed"],
+            world_size=payload.get("world_size",1),
+            parallelism=str(payload.get("parallelism","single")),
+            collective_timeout_seconds=payload.get("collective_timeout_seconds",60.0),
+            resource_budget=dict(payload.get("resource_budget",{})),
+        )
+        claimed=payload.get("manifest_digest")
+        if claimed is not None and str(claimed)!=manifest.digest:
+            raise ValueError("training manifest digest mismatch")
+        return manifest
 
 
 @dataclass(frozen=True, slots=True)
-class CheckpointReceipt:
+class WorkerLease:
+    run_id: str
+    worker_id: str
+    epoch: int
+    issued_at: str
+
+    def __post_init__(self)->None:
+        if not self.run_id.strip() or not self.worker_id.strip():
+            raise ValueError("worker lease ids must be non-empty")
+        if isinstance(self.epoch,bool) or not isinstance(self.epoch,int) or self.epoch<0:
+            raise ValueError("worker epoch must be non-negative")
+        object.__setattr__(
+            self,
+            "issued_at",
+            _require_utc_timestamp(self.issued_at,field="issued_at"),
+        )
+
+    @property
+    def token(self)->str:
+        return _digest(self.as_dict())
+
+    def as_dict(self)->dict[str,object]:
+        return {"run_id":self.run_id,"worker_id":self.worker_id,"epoch":self.epoch,"issued_at":self.issued_at}
+
+
+@dataclass(frozen=True, slots=True)
+class TrainingCheckpoint:
+    run_id: str
+    manifest_digest: str
+    step: int
+    model_digest: str
+    optimizer_digest: str
+    rng_digest: str
+    data_cursor_digest: str
+    worker_epoch: int
+    created_at: str
+
+    def __post_init__(self)->None:
+        if not self.run_id.strip():
+            raise ValueError("checkpoint run_id must be non-empty")
+        for name in ("manifest_digest","model_digest","optimizer_digest","rng_digest","data_cursor_digest"):
+            object.__setattr__(self,name,_require_digest(getattr(self,name),field=name))
+        if isinstance(self.step,bool) or not isinstance(self.step,int) or self.step<0:
+            raise ValueError("checkpoint step must be non-negative")
+        if isinstance(self.worker_epoch,bool) or not isinstance(self.worker_epoch,int) or self.worker_epoch<0:
+            raise ValueError("worker_epoch must be non-negative")
+        object.__setattr__(
+            self,
+            "created_at",
+            _require_utc_timestamp(self.created_at,field="created_at"),
+        )
+
+    @property
+    def digest(self)->str:
+        return _digest(self.as_dict())
+
+    def as_dict(self)->dict[str,object]:
+        return {
+            "run_id":self.run_id,
+            "manifest_digest":self.manifest_digest,
+            "step":self.step,
+            "model_digest":self.model_digest,
+            "optimizer_digest":self.optimizer_digest,
+            "rng_digest":self.rng_digest,
+            "data_cursor_digest":self.data_cursor_digest,
+            "worker_epoch":self.worker_epoch,
+            "created_at":self.created_at,
+        }
+
+    @classmethod
+    def from_dict(cls,payload:Mapping[str,Any])->"TrainingCheckpoint":
+        return cls(
+            run_id=str(payload["run_id"]),
+            manifest_digest=str(payload["manifest_digest"]),
+            step=payload["step"],
+            model_digest=str(payload["model_digest"]),
+            optimizer_digest=str(payload["optimizer_digest"]),
+            rng_digest=str(payload["rng_digest"]),
+            data_cursor_digest=str(payload["data_cursor_digest"]),
+            worker_epoch=payload["worker_epoch"],
+            created_at=str(payload["created_at"]),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class TrainingTelemetry:
     run_id: str
     step: int
-    tokens: int
-    digest: str
-    parent_digest: str
-    cursor: int
+    metrics: Mapping[str,float]
+    emitted_at: str
 
-
-@dataclass(frozen=True, slots=True)
-class EvaluationReceipt:
-    run_id: str
-    checkpoint_digest: str
-    evaluator_actor: str
-    metric_digest: str
-    passed: bool
-
-
-@dataclass(frozen=True, slots=True)
-class LineageReceipt:
-    run_id: str
-    head_digest: str
-    evaluation_digest: str
-    steps: int
-    tokens: int
-    promotion_authority: bool = False
-
-    def __post_init__(self) -> None:
-        if self.promotion_authority is not False:
-            raise TrainingContractError("lineage receipt cannot grant promotion authority")
-
-
-class GovernedTrainingLedger:
-    """SQLite training ledger. Cache is absent; the ledger is the authority."""
-
-    def __init__(self, path: str = ":memory:") -> None:
-        self._db = sqlite3.connect(path, check_same_thread=False)
-        self._db.row_factory = sqlite3.Row
-        self._lock = threading.RLock()
-        with self._db:
-            self._db.executescript(
-                """
-                PRAGMA foreign_keys = ON;
-                CREATE TABLE IF NOT EXISTS training_run (
-                    run_id TEXT PRIMARY KEY,
-                    tenant_id TEXT NOT NULL,
-                    dataset_digest TEXT NOT NULL,
-                    base_checkpoint_digest TEXT NOT NULL,
-                    trainer_actor TEXT NOT NULL,
-                    max_steps INTEGER NOT NULL,
-                    max_tokens INTEGER NOT NULL,
-                    cursor INTEGER NOT NULL,
-                    tokens INTEGER NOT NULL,
-                    head_digest TEXT NOT NULL,
-                    staged_step INTEGER,
-                    staged_tokens INTEGER,
-                    staged_payload BLOB,
-                    staged_digest TEXT
-                );
-                CREATE TABLE IF NOT EXISTS checkpoint (
-                    run_id TEXT NOT NULL,
-                    step INTEGER NOT NULL,
-                    digest TEXT NOT NULL,
-                    parent_digest TEXT NOT NULL,
-                    payload BLOB NOT NULL,
-                    tokens INTEGER NOT NULL,
-                    PRIMARY KEY (run_id, step),
-                    FOREIGN KEY (run_id) REFERENCES training_run(run_id)
-                );
-                CREATE TABLE IF NOT EXISTS evaluation (
-                    run_id TEXT NOT NULL,
-                    checkpoint_digest TEXT NOT NULL,
-                    evaluator_actor TEXT NOT NULL,
-                    metric_digest TEXT NOT NULL,
-                    passed INTEGER NOT NULL CHECK (passed IN (0, 1)),
-                    PRIMARY KEY (run_id, checkpoint_digest, evaluator_actor),
-                    FOREIGN KEY (run_id) REFERENCES training_run(run_id)
-                );
-                """
-            )
-
-    def close(self) -> None:
-        self._db.close()
-
-    def admit(self, admission: RunAdmission) -> RunAdmission:
-        with self._lock, self._db:
-            existing = self._db.execute(
-                "SELECT * FROM training_run WHERE run_id = ?",
-                (admission.run_id,),
-            ).fetchone()
-            if existing is not None:
-                if (
-                    existing["tenant_id"] != admission.tenant_id
-                    or existing["dataset_digest"] != admission.dataset_digest
-                    or existing["base_checkpoint_digest"] != admission.base_checkpoint_digest
-                    or existing["trainer_actor"] != admission.trainer_actor
-                    or int(existing["max_steps"]) != admission.max_steps
-                    or int(existing["max_tokens"]) != admission.max_tokens
-                ):
-                    raise TrainingContractError("run identity cannot be rebound")
-                return admission
-            self._db.execute(
-                """
-                INSERT INTO training_run(
-                    run_id, tenant_id, dataset_digest, base_checkpoint_digest,
-                    trainer_actor, max_steps, max_tokens, cursor, tokens, head_digest
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, ?)
-                """,
-                (
-                    admission.run_id,
-                    admission.tenant_id,
-                    admission.dataset_digest,
-                    admission.base_checkpoint_digest,
-                    admission.trainer_actor,
-                    admission.max_steps,
-                    admission.max_tokens,
-                    admission.base_checkpoint_digest,
-                ),
-            )
-        return admission
-
-    def stage_checkpoint(
-        self,
-        *,
-        run_id: str,
-        step: int,
-        token_delta: int,
-        payload: bytes,
-    ) -> str:
-        run = _text(run_id, "run_id")
-        checked_step = _positive(step, "step")
-        delta = _nonnegative(token_delta, "token_delta")
-        if not isinstance(payload, bytes) or not payload:
-            raise TrainingContractError("checkpoint payload must be non-empty bytes")
-        digest = _digest(payload)
-        with self._lock, self._db:
-            row = self._require_run(run)
-            if checked_step != int(row["cursor"]) + 1:
-                raise TrainingContractError("checkpoint step must advance the cursor by one")
-            tokens = int(row["tokens"]) + delta
-            if checked_step > int(row["max_steps"]) or tokens > int(row["max_tokens"]):
-                raise TrainingContractError("checkpoint exceeds hard budget")
-            if row["staged_digest"] is not None:
-                raise TrainingContractError("a staged checkpoint intent is already open")
-            self._db.execute(
-                """
-                UPDATE training_run
-                SET staged_step = ?, staged_tokens = ?, staged_payload = ?, staged_digest = ?
-                WHERE run_id = ?
-                """,
-                (checked_step, tokens, payload, digest, run),
-            )
-        return digest
-
-    def finalize_checkpoint(self, *, run_id: str) -> CheckpointReceipt:
-        run = _text(run_id, "run_id")
-        with self._lock, self._db:
-            row = self._require_run(run)
-            if row["staged_digest"] is None or row["staged_payload"] is None:
-                raise TrainingContractError("no staged checkpoint intent to finalize")
-            payload = bytes(row["staged_payload"])
-            digest = _digest(payload)
-            if digest != row["staged_digest"]:
-                raise TrainingContractError("staged checkpoint payload does not match digest")
-            parent = str(row["head_digest"])
-            step = int(row["staged_step"])
-            tokens = int(row["staged_tokens"])
-            self._db.execute(
-                """
-                INSERT INTO checkpoint(run_id, step, digest, parent_digest, payload, tokens)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (run, step, digest, parent, payload, tokens),
-            )
-            self._db.execute(
-                """
-                UPDATE training_run
-                SET cursor = ?, tokens = ?, head_digest = ?,
-                    staged_step = NULL, staged_tokens = NULL,
-                    staged_payload = NULL, staged_digest = NULL
-                WHERE run_id = ?
-                """,
-                (step, tokens, digest, run),
-            )
-        return CheckpointReceipt(run, step, tokens, digest, parent, step)
-
-    def resume(self, *, run_id: str) -> CheckpointReceipt:
-        run = _text(run_id, "run_id")
-        with self._lock:
-            row = self._require_run(run)
-            if row["staged_digest"] is not None:
-                raise TrainingContractError("resume refused while a staged intent is open")
-            cursor = int(row["cursor"])
-            if cursor == 0:
-                raise TrainingContractError("resume refused before the first finalized checkpoint")
-            checkpoint = self._db.execute(
-                "SELECT * FROM checkpoint WHERE run_id = ? AND step = ?",
-                (run, cursor),
-            ).fetchone()
-            if checkpoint is None:
-                raise TrainingContractError("resume cursor has no checkpoint")
-            payload = bytes(checkpoint["payload"])
-            if _digest(payload) != checkpoint["digest"] or checkpoint["digest"] != row["head_digest"]:
-                raise TrainingContractError("resume digest does not match authoritative head")
-        return CheckpointReceipt(
-            run,
-            int(checkpoint["step"]),
-            int(checkpoint["tokens"]),
-            str(checkpoint["digest"]),
-            str(checkpoint["parent_digest"]),
-            int(row["cursor"]),
+    def __post_init__(self)->None:
+        if not self.run_id.strip():
+            raise ValueError("telemetry run_id must be non-empty")
+        if isinstance(self.step,bool) or not isinstance(self.step,int) or self.step<0:
+            raise ValueError("telemetry step must be non-negative")
+        values={str(k):float(v) for k,v in self.metrics.items()}
+        if not values:
+            raise ValueError("telemetry metrics must be non-empty")
+        if any(not math.isfinite(v) for v in values.values()):
+            raise ValueError("telemetry rejects non-finite values")
+        object.__setattr__(
+            self,
+            "emitted_at",
+            _require_utc_timestamp(self.emitted_at,field="emitted_at"),
         )
+        object.__setattr__(self,"metrics",values)
 
-    def evaluate(
-        self,
-        *,
-        run_id: str,
-        checkpoint_digest: str,
-        evaluator_actor: str,
-        metrics: Mapping[str, Any],
-        passed: bool,
-    ) -> EvaluationReceipt:
-        run = _text(run_id, "run_id")
-        digest = _text(checkpoint_digest, "checkpoint_digest", maximum=64)
-        actor = _text(evaluator_actor, "evaluator_actor", maximum=MAX_ACTOR)
-        if not isinstance(passed, bool):
-            raise TrainingContractError("evaluation passed flag must be a real boolean")
-        metric_digest = _digest(_canonical(dict(metrics)))
-        with self._lock, self._db:
-            row = self._require_run(run)
-            if actor == row["trainer_actor"]:
-                raise TrainingContractError("trainer cannot sign its own evaluation")
-            known = self._db.execute(
-                "SELECT 1 FROM checkpoint WHERE run_id = ? AND digest = ?",
-                (run, digest),
-            ).fetchone()
-            if known is None:
-                raise TrainingContractError("evaluation must bind a finalized checkpoint")
-            self._db.execute(
-                """
-                INSERT INTO evaluation(
-                    run_id, checkpoint_digest, evaluator_actor, metric_digest, passed
-                ) VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(run_id, checkpoint_digest, evaluator_actor)
-                DO UPDATE SET metric_digest = excluded.metric_digest, passed = excluded.passed
-                """,
-                (run, digest, actor, metric_digest, 1 if passed else 0),
-            )
-        return EvaluationReceipt(run, digest, actor, metric_digest, passed)
+    @property
+    def digest(self)->str:
+        return _digest(self.as_dict())
 
-    def lineage(self, *, run_id: str) -> LineageReceipt:
-        run = _text(run_id, "run_id")
-        with self._lock:
-            row = self._require_run(run)
-            evaluation = self._db.execute(
-                """
-                SELECT metric_digest FROM evaluation
-                WHERE run_id = ? AND checkpoint_digest = ? AND passed = 1
-                ORDER BY evaluator_actor
-                LIMIT 1
-                """,
-                (run, row["head_digest"]),
-            ).fetchone()
-            if evaluation is None:
-                raise TrainingContractError("lineage requires a passing independent evaluation")
-        return LineageReceipt(
-            run_id=run,
-            head_digest=str(row["head_digest"]),
-            evaluation_digest=str(evaluation["metric_digest"]),
-            steps=int(row["cursor"]),
-            tokens=int(row["tokens"]),
-            promotion_authority=False,
+    def as_dict(self)->dict[str,object]:
+        return {"run_id":self.run_id,"step":self.step,"metrics":dict(sorted(self.metrics.items())),"emitted_at":self.emitted_at}
+
+
+class TrainingStateError(RuntimeError):
+    pass
+
+
+class TrainingRepository:
+    """SQLite authority for manifests, worker fences, checkpoints and telemetry."""
+
+    def __init__(self,path:str|Path=":memory:")->None:
+        self.path=str(path)
+        self._lock=threading.RLock()
+        self._db=sqlite3.connect(self.path,check_same_thread=False)
+        self._db.execute("PRAGMA foreign_keys=ON")
+        self._db.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS training_run (
+                run_id TEXT PRIMARY KEY,
+                manifest_digest TEXT NOT NULL UNIQUE,
+                manifest_json TEXT NOT NULL,
+                state TEXT NOT NULL,
+                worker_epoch INTEGER NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS worker_lease (
+                run_id TEXT NOT NULL,
+                worker_id TEXT NOT NULL,
+                epoch INTEGER NOT NULL,
+                lease_json TEXT NOT NULL,
+                PRIMARY KEY(run_id, worker_id),
+                FOREIGN KEY(run_id) REFERENCES training_run(run_id)
+            );
+            CREATE TABLE IF NOT EXISTS training_checkpoint (
+                checkpoint_digest TEXT PRIMARY KEY,
+                run_id TEXT NOT NULL,
+                step INTEGER NOT NULL,
+                checkpoint_json TEXT NOT NULL,
+                UNIQUE(run_id, step),
+                FOREIGN KEY(run_id) REFERENCES training_run(run_id)
+            );
+            CREATE TABLE IF NOT EXISTS training_telemetry (
+                telemetry_digest TEXT PRIMARY KEY,
+                run_id TEXT NOT NULL,
+                step INTEGER NOT NULL,
+                telemetry_json TEXT NOT NULL,
+                FOREIGN KEY(run_id) REFERENCES training_run(run_id)
+            );
+            """
         )
+        self._db.commit()
 
-    def _require_run(self, run_id: str) -> sqlite3.Row:
-        row = self._db.execute(
-            "SELECT * FROM training_run WHERE run_id = ?",
+    def register_run(self,manifest:TrainingRunManifest,datasets:DatasetRegistry,*,created_at:datetime|None=None)->str:
+        if not isinstance(manifest,TrainingRunManifest):
+            raise TypeError("manifest must be TrainingRunManifest")
+        datasets.require_training_ready(manifest.dataset_digest)
+        encoded=_canonical(manifest.as_dict())
+        with self._lock:
+            row=self._db.execute("SELECT manifest_digest,manifest_json FROM training_run WHERE run_id=?",(manifest.run_id,)).fetchone()
+            if row is not None:
+                if row[0]!=manifest.digest or row[1]!=encoded:
+                    raise TrainingStateError("run_id is already bound to a different immutable manifest")
+                return manifest.digest
+            self._db.execute(
+                "INSERT INTO training_run(run_id,manifest_digest,manifest_json,state,worker_epoch,created_at) VALUES (?,?,?,?,?,?)",
+                (manifest.run_id,manifest.digest,encoded,"registered",0,_utc(created_at)),
+            )
+            self._db.commit()
+        return manifest.digest
+
+    def manifest(self,run_id:str)->TrainingRunManifest:
+        row=self._db.execute(
+            "SELECT manifest_digest,manifest_json FROM training_run WHERE run_id=?",
             (run_id,),
         ).fetchone()
         if row is None:
-            raise TrainingContractError("training run is not admitted")
-        return row
+            raise KeyError(run_id)
+        manifest=TrainingRunManifest.from_dict(json.loads(row[1]))
+        if manifest.run_id!=run_id or manifest.digest!=str(row[0]):
+            raise TrainingStateError("stored training manifest identity mismatch")
+        return manifest
+
+    def state(self,run_id:str)->str:
+        row=self._db.execute("SELECT state FROM training_run WHERE run_id=?",(run_id,)).fetchone()
+        if row is None:
+            raise KeyError(run_id)
+        state=str(row[0])
+        if state not in _ALLOWED_RUN_STATES:
+            raise TrainingStateError("stored training run state is invalid")
+        return state
+
+    def _epoch(self,run_id:str)->int:
+        row=self._db.execute("SELECT worker_epoch FROM training_run WHERE run_id=?",(run_id,)).fetchone()
+        if row is None: raise KeyError(run_id)
+        return int(row[0])
+
+    def start(self,run_id:str)->None:
+        with self._lock:
+            state=self.state(run_id)
+            if state not in {"registered","recovering"}:
+                raise TrainingStateError(f"cannot start run from {state}")
+            self._db.execute("UPDATE training_run SET state='running' WHERE run_id=?",(run_id,))
+            self._db.commit()
+
+    def lease_worker(self,run_id:str,worker_id:str,*,issued_at:datetime|None=None)->WorkerLease:
+        if self.state(run_id)!="running":
+            raise TrainingStateError("worker lease requires running state")
+        lease=WorkerLease(run_id=run_id,worker_id=worker_id,epoch=self._epoch(run_id),issued_at=_utc(issued_at))
+        with self._lock:
+            self._db.execute(
+                "INSERT OR REPLACE INTO worker_lease(run_id,worker_id,epoch,lease_json) VALUES (?,?,?,?)",
+                (run_id,worker_id,lease.epoch,_canonical(lease.as_dict())),
+            )
+            self._db.commit()
+        return lease
+
+    def assert_worker_current(self,lease:WorkerLease)->None:
+        if self.state(lease.run_id)!="running":
+            raise TrainingStateError("run is not running")
+        current=self._epoch(lease.run_id)
+        if lease.epoch!=current:
+            raise TrainingStateError("stale worker epoch rejected")
+        row=self._db.execute(
+            "SELECT epoch,lease_json FROM worker_lease "
+            "WHERE run_id=? AND worker_id=?",
+            (lease.run_id,lease.worker_id),
+        ).fetchone()
+        if (
+            row is None
+            or int(row[0])!=lease.epoch
+            or row[1]!=_canonical(lease.as_dict())
+        ):
+            raise TrainingStateError("worker lease is not current")
+
+    def checkpoint(self,checkpoint:TrainingCheckpoint,lease:WorkerLease)->str:
+        if checkpoint.run_id!=lease.run_id:
+            raise TrainingStateError("checkpoint/lease run mismatch")
+        self.assert_worker_current(lease)
+        manifest=self.manifest(checkpoint.run_id)
+        if checkpoint.manifest_digest!=manifest.digest:
+            raise TrainingStateError("checkpoint manifest identity drift")
+        if checkpoint.worker_epoch!=lease.epoch:
+            raise TrainingStateError("checkpoint worker epoch drift")
+        with self._lock:
+            row=self._db.execute(
+                "SELECT MAX(step) FROM training_checkpoint WHERE run_id=?",
+                (checkpoint.run_id,),
+            ).fetchone()
+            latest=-1 if row is None or row[0] is None else int(row[0])
+            if checkpoint.step<=latest:
+                raise TrainingStateError("checkpoint step must be strictly monotonic")
+            self._db.execute(
+                "INSERT INTO training_checkpoint(checkpoint_digest,run_id,step,checkpoint_json) VALUES (?,?,?,?)",
+                (checkpoint.digest,checkpoint.run_id,checkpoint.step,_canonical(checkpoint.as_dict())),
+            )
+            self._db.commit()
+        return checkpoint.digest
+
+    def latest_checkpoint(self,run_id:str)->TrainingCheckpoint|None:
+        row=self._db.execute(
+            "SELECT checkpoint_digest,run_id,step,checkpoint_json "
+            "FROM training_checkpoint WHERE run_id=? ORDER BY step DESC LIMIT 1",
+            (run_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        checkpoint=TrainingCheckpoint.from_dict(json.loads(row[3]))
+        if (
+            checkpoint.digest!=str(row[0])
+            or checkpoint.run_id!=str(row[1])
+            or checkpoint.step!=int(row[2])
+            or checkpoint.run_id!=run_id
+        ):
+            raise TrainingStateError("stored checkpoint identity mismatch")
+        return checkpoint
+
+    def record_telemetry(self,event:TrainingTelemetry)->str:
+        if self.state(event.run_id)!="running":
+            raise TrainingStateError("telemetry requires running state")
+        with self._lock:
+            self._db.execute(
+                "INSERT OR IGNORE INTO training_telemetry(telemetry_digest,run_id,step,telemetry_json) VALUES (?,?,?,?)",
+                (event.digest,event.run_id,event.step,_canonical(event.as_dict())),
+            )
+            self._db.commit()
+        return event.digest
+
+    def recover(self,run_id:str)->TrainingCheckpoint:
+        with self._lock:
+            state=self.state(run_id)
+            if state not in {"running","failed","recovering"}:
+                raise TrainingStateError(f"cannot recover run from {state}")
+            checkpoint=self.latest_checkpoint(run_id)
+            if checkpoint is None:
+                raise TrainingStateError("run has no durable checkpoint")
+            next_epoch=self._epoch(run_id)+1
+            self._db.execute(
+                "UPDATE training_run SET state='recovering',worker_epoch=? WHERE run_id=?",
+                (next_epoch,run_id),
+            )
+            self._db.execute("DELETE FROM worker_lease WHERE run_id=?",(run_id,))
+            self._db.commit()
+        return checkpoint
+
+    def fail(self,run_id:str)->None:
+        with self._lock:
+            if self.state(run_id)!="running":
+                raise TrainingStateError("only running runs may fail")
+            self._db.execute("UPDATE training_run SET state='failed' WHERE run_id=?",(run_id,))
+            self._db.commit()
+
+    def complete(self,run_id:str)->TrainingCheckpoint:
+        with self._lock:
+            if self.state(run_id)!="running":
+                raise TrainingStateError("only running runs may complete")
+            checkpoint=self.latest_checkpoint(run_id)
+            if checkpoint is None:
+                raise TrainingStateError("completion requires a durable checkpoint")
+            self._db.execute("UPDATE training_run SET state='completed' WHERE run_id=?",(run_id,))
+            self._db.commit()
+        return checkpoint
+
+    def close(self)->None:
+        self._db.close()
