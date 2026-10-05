@@ -3,10 +3,12 @@ from __future__ import annotations
 import hashlib
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from skeleton.contracts.canonical import canonical_json_bytes
+from skeleton.native.jvm_registry import JvmAcceleratorRegistry
 from skeleton.native.jvm_protocol import (
     JvmBenchmarkEvidence,
     JvmCallResult,
@@ -541,3 +543,32 @@ def test_jvm_protocol_source_and_ai_mirror_are_byte_identical() -> None:
 def test_invalid_runtime_descriptor_fails_closed(kwargs: dict[str, object]) -> None:
     with pytest.raises(JvmProtocolError):
         runtime(**kwargs)
+
+
+
+def test_registry_preflight_exposes_protocol_identity_without_starting_java() -> None:
+    source = ROOT / "java-accelerators/vector/VectorSearchMain.java"
+    registry = JvmAcceleratorRegistry(
+        config_providers={
+            "vector": lambda: SimpleNamespace(
+                java_binary="definitely-not-a-java-binary",
+                source=source,
+            ),
+        }
+    )
+
+    preflight = registry.preflight("vector")["vector"]
+    capability = capability_for(JvmWorkload.VECTOR)
+
+    assert registry.initialized("vector") is False
+    assert preflight.capability_digest == capability.capability_digest
+    assert preflight.protocol_versions == capability.protocol_versions
+    assert preflight.minimum_java_major == capability.minimum_java_major
+    assert preflight.source_available is True
+    assert registry.initialized("vector") is False
+
+
+def test_jvm_registry_source_and_ai_mirror_remain_byte_identical() -> None:
+    source = ROOT / "skeleton/native/jvm_registry.py"
+    mirror = ROOT / "skeleton/ai/runtime/native/jvm_registry.py"
+    assert source.read_bytes() == mirror.read_bytes()
