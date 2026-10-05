@@ -34,3 +34,13 @@ def test_review_identity_is_deterministic():
 def test_authority_escalation_rejected():
     p=proposal()
     with pytest.raises(WorkspaceError): ReviewReceipt(p.result_digest,p.operation_digest,"builder","verifier","approve",(),"execution")
+
+def test_rejected_review_never_verifies_as_approval():
+    p=proposal()
+    r=review_workspace(p,proposer_id="builder",reviewer_id="verifier",decision="reject")
+    assert not verify_review(p,r)
+
+def test_rejection_with_blocking_finding_never_verifies():
+    p=proposal(); f=ReviewFinding("TEST-FAIL",D,True)
+    r=review_workspace(p,proposer_id="builder",reviewer_id="verifier",decision="reject",findings=[f])
+    assert not verify_review(p,r)
