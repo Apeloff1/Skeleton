@@ -14,6 +14,17 @@ from .lifecycle_safety import (
     MigrationReceipt, MigrationState, MigrationStep, ParityEvidence,
     RetirementDecision, can_remove_adapter, decide_retirement,
 )
+from .tool_governance import (
+    ToolCapability, ToolCompatibility, ToolDependency, ToolDiscoveryResult,
+    ToolEvidence, ToolGraph, ToolHealth, ToolHealthState, ToolManifest, ToolProbe,
+    ToolResultTrust, ToolValidation, discover, tool_compatibility, tool_health,
+    validate_result,
+)
+from .effect_workflows import (
+    Compensation, CompensationResult, CompensationStep, EffectAttempt,
+    EffectReceipt, EffectState, SagaDefinition, SagaInstance, SagaTransition,
+    SideEffect, advance_saga, compensation_result, effect_receipt,
+)
 from .contract_fuzzing import ContractFuzzer, FuzzBudget, FuzzFailure, FuzzReport
 from .simulation_mode import SimulationAuthority, SimulationEvidence, SimulationRequest, SimulationResult, SimulationRuntime
 from .journal import DeferredExecutionJournal, DeferredJournalConflict, DeferredJournalError, DeferredJournalRecord, SqliteDeferredExecutionJournal
