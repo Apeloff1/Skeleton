@@ -419,22 +419,33 @@
       "id": "ACC-VOL-001",
       "type": "volume",
       "title": "VOL-001 Scientific & Historical Foundation",
-      "status": "unverified",
+      "status": "implemented",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-10-05T18:21:38Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-10-05T18:21:38Z",
+        "git_sha": "becaf3e926783065f8a42011303a6582a5fb2faf",
+        "evidence_refs": [
+          "PR #2721 merged research ingestion/citation lineage implementation",
+          "PR #2950 head 6052b313b9fceacecf06ea4d6f12492c50241325 adds deterministic reconciliation qualification; independent workflow pending",
+          "git-head:becaf3e926783065f8a42011303a6582a5fb2faf",
+          "https://github.com/Apeloff1/Skeleton/commit/72c15259677ed98d9a37dcbc14803e1833ddcd66",
+          "scripts/check_ai_edge_case_catalog.py",
+          "skeleton/ai/research/source_lineage.py",
+          "skeleton/research/__init__.py",
+          "skeleton/research/source_lineage.py",
+          "skeleton/testing/test_research_lineage.py",
+          "skeleton/testing/test_research_system_acceptance.py"
+        ],
+        "statement": "Implementation-signed after deterministic research-lineage reconciliation qualification, acceptance identity binding, canonical/AI-tree parity coverage, and focused regression tests landed on main. Independent exact-head qualification remains a separate verification gap.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/becaf3e926783065f8a42011303a6582a5fb2faf"
       },
       "verification_signoff": {
         "signed": false,
@@ -450,9 +461,64 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-10-05T18:21:38Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T18:21:38Z",
+          "git_sha": "becaf3e926783065f8a42011303a6582a5fb2faf",
+          "statement": "Begin accountability reconciliation for the landed VOL-001 research-lineage implementation.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/becaf3e926783065f8a42011303a6582a5fb2faf",
+          "from_status": "unverified",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/72c15259677ed98d9a37dcbc14803e1833ddcd66"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T18:21:38Z",
+          "git_sha": "becaf3e926783065f8a42011303a6582a5fb2faf",
+          "statement": "Implementation-signed after deterministic research-lineage reconciliation qualification, acceptance identity binding, canonical/AI-tree parity coverage, and focused regression tests landed on main. Independent exact-head qualification remains a separate verification gap.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/becaf3e926783065f8a42011303a6582a5fb2faf",
+          "from_status": "in_progress",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "PR #2721 merged research ingestion/citation lineage implementation",
+            "PR #2950 head 6052b313b9fceacecf06ea4d6f12492c50241325 adds deterministic reconciliation qualification; independent workflow pending",
+            "git-head:becaf3e926783065f8a42011303a6582a5fb2faf",
+            "https://github.com/Apeloff1/Skeleton/commit/72c15259677ed98d9a37dcbc14803e1833ddcd66",
+            "scripts/check_ai_edge_case_catalog.py",
+            "skeleton/ai/research/source_lineage.py",
+            "skeleton/research/__init__.py",
+            "skeleton/research/source_lineage.py",
+            "skeleton/testing/test_research_lineage.py",
+            "skeleton/testing/test_research_system_acceptance.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "PR #2721 merged research ingestion/citation lineage implementation",
+        "PR #2950 head 6052b313b9fceacecf06ea4d6f12492c50241325 adds deterministic reconciliation qualification; independent workflow pending",
+        "git-head:becaf3e926783065f8a42011303a6582a5fb2faf",
+        "https://github.com/Apeloff1/Skeleton/commit/72c15259677ed98d9a37dcbc14803e1833ddcd66",
+        "scripts/check_ai_edge_case_catalog.py",
+        "skeleton/ai/research/source_lineage.py",
+        "skeleton/research/__init__.py",
+        "skeleton/research/source_lineage.py",
+        "skeleton/testing/test_research_lineage.py",
+        "skeleton/testing/test_research_system_acceptance.py"
+      ],
       "baseline_status": "unverified"
     },
     {
