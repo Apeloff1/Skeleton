@@ -844,7 +844,7 @@
       "source": "skeleton/security",
       "destination": "skeleton/ai/runtime/security",
       "kind": "tree",
-      "source_git_object_sha": "10801de024d81f8d6670fcd2b5c63538f1c26eb1",
+      "source_git_object_sha": "f09d2f5a4d92eb5ded0f9ddc0014048c55096125",
       "role": "AI runtime security and activation controls",
       "work_package_refs": [
         "WP-W00",
@@ -891,8 +891,17 @@
         "VOL-084",
         "VOL-164",
         "VOL-165",
+        "VOL-166",
+        "VOL-167",
         "VOL-168",
+        "VOL-169",
         "VOL-170",
+        "VOL-172",
+        "VOL-173",
+        "VOL-174",
+        "VOL-175",
+        "VOL-176",
+        "VOL-177",
         "VOL-205",
         "VOL-256",
         "VOL-257",
@@ -5619,7 +5628,7 @@
       "source": "skeleton/supply_chain",
       "destination": "skeleton/ai/runtime/extensions/supply_chain",
       "kind": "tree",
-      "source_git_object_sha": "40d5a42a079246818e4fea2f2002f52ad6058858",
+      "source_git_object_sha": "9e6703dc1d07b7a1b6a2ea109e527d29ac8c5000",
       "role": "Model BOM, provenance, dependency, and supply-chain evidence contracts supporting governed AI artifact and model release qualification.",
       "work_package_refs": [
         "WP-W20",
@@ -5629,6 +5638,7 @@
         "AIQ-S7-E2E-01"
       ],
       "volume_refs": [
+        "VOL-178",
         "VOL-179"
       ],
       "migration_action": "mirror_then_cutover",
