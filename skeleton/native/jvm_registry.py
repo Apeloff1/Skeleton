@@ -30,9 +30,9 @@ class JvmAcceleratorPreflight:
     source: str
     java_available: bool
     source_available: bool
-    capability_digest: str
-    protocol_versions: tuple[int, ...]
-    minimum_java_major: int
+    capability_digest: str = ""
+    protocol_versions: tuple[int, ...] = ()
+    minimum_java_major: int = 0
 
     @property
     def ready(self) -> bool:
