@@ -5874,7 +5874,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Provide keyboard/screen-reader reachable controls and semantic status for critical workflows.",
         "Support scalable text, contrast, motion reduction and non-color-only signaling.",
@@ -5888,20 +5888,30 @@
       "contracts": [
         "AccessibilityRequirement",
         "AccessibleControl",
-        "AccessibilityFinding"
+        "AccessibleStatus",
+        "AccessibleMotion",
+        "AccessibilityFinding",
+        "AccessibilityAcceptanceMatrix",
+        "AccessibilityAcceptanceReport"
       ],
       "implementation_paths": [
-        "frontend",
-        "desktop",
-        "docs"
+        "frontend/src/accessibility/runtime.ts",
+        "frontend/src/accessibility/index.ts",
+        "frontend/app/index.tsx",
+        "frontend/components/LaunchCascade.tsx",
+        "frontend/components/BootLauncher.tsx",
+        "frontend/components/ActionSheet.tsx",
+        "frontend/components/Toast.tsx",
+        "frontend/src/components/StabilityBanner.tsx",
+        "frontend/src/hooks/useReduceMotion.ts",
+        "frontend/package.json"
       ],
       "tests": [
-        "planned:frontend accessibility contract tests",
-        "planned:keyboard/screen-reader smoke tests"
+        "frontend/scripts/test-accessibility-contract.mjs",
+        "frontend:test:accessibility"
       ],
       "evaluations": [
-        "planned:critical-flow accessibility audit",
-        "planned:reduced-motion evaluation"
+        "frontend:test:accessibility"
       ],
       "evidence": [],
       "risks": [
@@ -5909,10 +5919,7 @@
         "visual-only errors",
         "motion-induced unusability"
       ],
-      "gaps": [
-        "define accessibility acceptance matrix",
-        "automate critical semantic checks"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-086",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
