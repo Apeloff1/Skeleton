@@ -597,6 +597,7 @@ class DefinitionOfDoneEvaluator:
                 and (
                     latest.verifier_id == latest.producer_id
                     or latest.verifier_id == profile.builder_id
+                    or latest.verifier_id == profile.owner_id
                 )
             ):
                 status = RequirementStatus.INDEPENDENCE_VIOLATION
