@@ -2347,7 +2347,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Use native acceleration only behind stable capability/ABI boundaries with safe fallback.",
         "Require memory/thread safety and deterministic error translation across FFI.",
@@ -2366,27 +2366,47 @@
       "implementation_paths": [
         "skeleton/native",
         "java-accelerators",
-        "planned:native"
+        "skeleton/native/isolation.py",
+        "skeleton/native/selection.py",
+        "skeleton/ai/runtime/native/isolation.py",
+        "skeleton/ai/runtime/native/selection.py",
+        "scripts/profile_p2_acceleration.py",
+        "scripts/record_p2_acceleration_profile.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_native_abi.py",
-        "planned:skeleton/testing/test_native_fallback.py"
+        "skeleton/testing/test_native_abi.py",
+        "skeleton/testing/test_native_fallback.py",
+        "tests/test_p2_acceleration_receipts.py",
+        "tests/test_p2_acceleration_isolation.py",
+        "tests/test_p2_acceleration_benchmarks.py"
       ],
       "evaluations": [
-        "planned:native-vs-reference correctness benchmark",
-        "planned:platform ABI matrix"
+        ".github/workflows/p2-profile-gated-acceleration.yml",
+        "scripts/profile_p2_acceleration.py",
+        "scripts/record_p2_acceleration_profile.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/51dee51961e977bf7fd0ccf1bcd9d7860cea7585",
+        "https://github.com/Apeloff1/Skeleton/commit/4d4cd779af93ece01f766520f21acd553b35ccf9",
+        "skeleton/native/isolation.py",
+        "skeleton/native/selection.py",
+        "skeleton/ai/runtime/native/isolation.py",
+        "skeleton/ai/runtime/native/selection.py",
+        "scripts/profile_p2_acceleration.py",
+        "scripts/record_p2_acceleration_profile.py",
+        "skeleton/testing/test_native_abi.py",
+        "skeleton/testing/test_native_fallback.py",
+        "tests/test_p2_acceleration_receipts.py",
+        "tests/test_p2_acceleration_isolation.py",
+        "tests/test_p2_acceleration_benchmarks.py"
+      ],
       "risks": [
         "undefined behavior",
         "ABI drift",
         "native crash corrupts process",
         "silent numerical divergence"
       ],
-      "gaps": [
-        "select acceleration targets by profiling evidence",
-        "expand isolation strategy for crash-prone native code"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-032",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
@@ -11481,7 +11501,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Fixtures must declare scope/ownership and avoid network/clock/randomness leakage by default.",
         "Version complex fixtures and preserve provenance for captured corpora."
@@ -11498,23 +11518,27 @@
       ],
       "implementation_paths": [
         "skeleton/testing",
-        "tests"
+        "tests",
+        "skeleton/ai/runtime/deferred/fixture_platform.py",
+        "skeleton/ai/runtime/deferred/operations_experience.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_fixture_platform.py"
+        "skeleton/testing/test_vol196_fixture_platform.py"
       ],
       "evaluations": [
-        "planned:fixture determinism evaluation"
+        "skeleton/testing/test_vol196_fixture_platform.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/91d5cf9a17b5df8725b05aa5fcb56deeacc21644",
+        "skeleton/ai/runtime/deferred/fixture_platform.py",
+        "skeleton/ai/runtime/deferred/operations_experience.py",
+        "skeleton/testing/test_vol196_fixture_platform.py"
+      ],
       "risks": [
         "brittle shared fixtures",
         "real external side effects"
       ],
-      "gaps": [
-        "catalog fixtures",
-        "add hermeticity checks"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-196",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
