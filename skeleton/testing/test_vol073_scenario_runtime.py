@@ -681,3 +681,29 @@ def test_rule_payload_is_deeply_immutable() -> None:
     assert rule.digest == original_digest
     assert rule.parameters["limits"]["speed"] == 3
     assert rule.parameters["modes"] == ("walk", "run")
+
+def test_runtime_verify_rejects_underreported_uncertainty_chain():
+    def expand(state, node):
+        if node.depth:
+            return ()
+        return (transition("uncertain", 1, uncertainty=0.9),)
+
+    rt = runtime()
+    tree = rt.explore({"position": 0}, expand, initial_uncertainty=0.1)
+    child = next(node for node in tree.nodes if node.parent_id is not None)
+    forged_child = replace(
+        child,
+        cumulative_uncertainty=0.1,
+    )
+    forged = replace(
+        tree,
+        nodes=tuple(
+            forged_child if node.node_id == child.node_id else node
+            for node in tree.nodes
+        ),
+    )
+    with pytest.raises(
+        ScenarioRuntimeError,
+        match="cumulative uncertainty does not match edge uncertainty",
+    ):
+        rt.verify(forged)
