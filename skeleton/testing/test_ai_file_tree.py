@@ -397,3 +397,29 @@ def test_namespace_composition_rejects_unmapped_members(tmp_path: Path, monkeypa
     assert not module._mappings_cover_planned_source(mappings, "skeleton/research")
     members.clear()
     assert not module._mappings_cover_planned_source(mappings, "skeleton/research")
+
+
+def test_mature_volume_paths_are_traceable_to_governed_ai_tree_mappings() -> None:
+    import json
+
+    module = _module()
+    manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
+    master_plan = json.loads((ROOT / "machine/ai_master_plan.json").read_text(encoding="utf-8"))
+    mappings = manifest["mappings"]
+    mature = {"implemented", "hardened", "verified", "complete", "completed"}
+
+    for volume in master_plan["volumes"]:
+        if volume.get("implementation_status") not in mature:
+            continue
+        owners = set()
+        for implementation_path in volume.get("implementation_paths", []):
+            if not isinstance(implementation_path, str) or implementation_path.startswith("planned:"):
+                continue
+            if not implementation_path.startswith(("skeleton/", "backend/")):
+                continue
+            owner = module._owned_mapping_for_implementation_path(mappings, implementation_path)
+            if owner is not None:
+                owners.add(owner["id"])
+        for owner_id in owners:
+            owner = next(item for item in mappings if item["id"] == owner_id)
+            assert volume["key"] in owner.get("volume_refs", []), (volume["key"], owner_id)

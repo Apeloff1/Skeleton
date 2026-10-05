@@ -236,6 +236,33 @@ def _mapping_covers_planned_source(mapping: object, planned_source: str) -> bool
     return planned_source.startswith(source.rstrip("/") + "/")
 
 
+def _path_within(path_value: str, root_value: str) -> bool:
+    root = root_value.rstrip("/")
+    return path_value == root or path_value.startswith(root + "/")
+
+
+def _owned_mapping_for_implementation_path(
+    mappings: list[object],
+    implementation_path: str,
+) -> dict[str, object] | None:
+    """Return the most-specific governed mapping owning one implementation path."""
+    candidates: list[tuple[int, str, dict[str, object]]] = []
+    for raw in mappings:
+        if not isinstance(raw, dict):
+            continue
+        source = raw.get("source")
+        destination = raw.get("destination")
+        mapping_id = raw.get("id")
+        if not isinstance(source, str) or not isinstance(destination, str) or not isinstance(mapping_id, str):
+            continue
+        if _path_within(implementation_path, source) or _path_within(implementation_path, destination):
+            specificity = max(len(source.rstrip("/")), len(destination.rstrip("/")))
+            candidates.append((specificity, mapping_id, raw))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return candidates[0][2]
+
 def _mappings_cover_planned_source(
     mappings: list[object],
     planned_source: str,
@@ -575,6 +602,48 @@ def validate() -> list[str]:
 
         has_jeeves |= src == "skeleton/jeeves" and dst == "skeleton/ai/agents/jeeves"
         has_build |= src == "skeleton/automation/shift_supervisor" and dst == "skeleton/ai/build/shift_supervisor"
+
+    mature_volume_states = {"implemented", "hardened", "verified", "complete", "completed"}
+    volumes = master_plan.get("volumes", []) if isinstance(master_plan, dict) else []
+    if not isinstance(volumes, list):
+        errors.append("master plan volumes must be a list for AI-tree traceability")
+        volumes = []
+    mapping_by_id = {
+        item.get("id"): item
+        for item in mappings
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    }
+    for volume in volumes:
+        if not isinstance(volume, dict) or volume.get("implementation_status") not in mature_volume_states:
+            continue
+        volume_key = volume.get("key")
+        if not isinstance(volume_key, str) or not re.fullmatch(r"VOL-\d{3}", volume_key):
+            errors.append(f"mature masterplan volume has invalid key: {volume_key!r}")
+            continue
+        owner_ids: set[str] = set()
+        implementation_paths = volume.get("implementation_paths", [])
+        if not isinstance(implementation_paths, list):
+            errors.append(f"{volume_key}: implementation_paths must be a list")
+            continue
+        for implementation_path in implementation_paths:
+            if not isinstance(implementation_path, str) or implementation_path.startswith("planned:"):
+                continue
+            if not implementation_path.startswith(("skeleton/", "backend/")):
+                continue
+            owner = _owned_mapping_for_implementation_path(mappings, implementation_path)
+            if owner is None:
+                continue
+            owner_id = owner.get("id")
+            if isinstance(owner_id, str):
+                owner_ids.add(owner_id)
+        for owner_id in sorted(owner_ids):
+            owner = mapping_by_id.get(owner_id)
+            refs = owner.get("volume_refs", []) if isinstance(owner, dict) else []
+            if not isinstance(refs, list) or volume_key not in refs:
+                errors.append(
+                    "mature implementation path lacks AI-tree volume traceability: "
+                    f"{volume_key} -> {owner_id}"
+                )
 
     if not has_jeeves:
         errors.append("Jeeves engine mapping is mandatory")
