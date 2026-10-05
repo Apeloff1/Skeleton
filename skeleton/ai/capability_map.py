@@ -14,6 +14,7 @@ from enum import Enum
 from hashlib import sha256
 import json
 import re
+from itertools import islice
 from typing import Iterable
 
 CAPABILITY_MAP_SCHEMA = "skeleton.ai.capability_map.v1"
@@ -351,11 +352,15 @@ class CapabilityMap:
         evidence: Iterable[CapabilityEvidence],
     ) -> None:
         try:
-            materialized_descriptors = tuple(descriptors)
+            materialized_descriptors = tuple(
+                islice(iter(descriptors), _MAX_CAPABILITIES + 1)
+            )
         except TypeError as exc:
             raise TypeError("descriptors must be iterable") from exc
         try:
-            materialized_evidence = tuple(evidence)
+            materialized_evidence = tuple(
+                islice(iter(evidence), _MAX_CAPABILITIES + 1)
+            )
         except TypeError as exc:
             raise TypeError("evidence must be iterable") from exc
 
