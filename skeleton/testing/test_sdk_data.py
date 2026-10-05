@@ -28,3 +28,19 @@ def test_breaking_data_change_requires_migration():
  new=DataContract("d","2",(),(DataConsumer("c","1"),))
  assert breaking_change(old,new,migration_declared=False)
  assert not breaking_change(old,new,migration_declared=True)
+
+
+def test_sdk_data_depth_invariants_fail_closed():
+ import pytest
+ with pytest.raises(ValueError): supported_export(InternalSDK("v",(SDKExport("x","1"),SDKExport("x","2"))),"x")
+ store=StoreHandle("s",StateClass.DURABLE,Consistency.STRONG,True,True,True)
+ with pytest.raises(ValueError): select_store(StorageSDK((store,store)),StateClass.DURABLE,Consistency.STRONG)
+ assert not event_compatible(EventPublisher("p","v"),EventConsumer("c","v",False,True))
+ with pytest.raises(ValueError): record_evaluation(EvaluationSDK("","m",{}),Scorer("s","1",("i",),("o",),()),1.0)
+ bad=BenchmarkPlugin("p",BenchmarkManifest("1","d","1",("",)))
+ with pytest.raises(ValueError): admit_benchmark(bad,dataset_rights=True,security_allowed=True,resources_allowed=True)
+ field=DataField("x","meaning",False,None,"fresh","public")
+ old=DataContract("d","1",(field,field),())
+ with pytest.raises(ValueError): breaking_change(old,DataContract("d","2",(field,),()),migration_declared=False)
+ consumer=DataConsumer("c","1")
+ with pytest.raises(ValueError): breaking_change(DataContract("d","1",(field,),(consumer,consumer)),DataContract("d","2",(field,),(consumer,)),migration_declared=False)
