@@ -25,7 +25,6 @@ def test_machine_conformance_vectors_are_unique_and_fail_closed():
  assert {"JSON-DUPLICATE-KEY","JSON-NAN","JSON-INFINITY","JSON-NEG-INFINITY","JSON-UNICODE-ROUNDTRIP","SCHEMA-ABSENT-REQUIRED","SCHEMA-NULL-NONNULLABLE","SCHEMA-UNKNOWN-ENUM","SCHEMA-NULL-NULLABLE"}<=set(ids)
  assert all(v["expected"] in {"accept","reject"} for v in vectors)
 
-
 def test_machine_validator_executes_complete_inventory_and_vectors():
  import importlib.util
  spec=importlib.util.spec_from_file_location("contract_conformance",ROOT/"scripts/check_architecture_contract_conformance.py")
@@ -38,6 +37,7 @@ def test_machine_validator_executes_complete_inventory_and_vectors():
 
 def test_governed_canonical_conformance_surface_matches_canonical():
  from skeleton.contracts.canonical import CanonicalEnvelope,EvidenceRef,Identity,canonical_conformance_vector
- from skeleton.ai.runtime.contracts.canonical import canonical_conformance_vector as governed
- envelope=CanonicalEnvelope(1,"compat",Identity("Apeloff1/Skeleton","a"*40),(EvidenceRef("repo","b"*64),),("b","a"),{"snow":"Ω"})
- assert governed(envelope)==canonical_conformance_vector(envelope)
+ from skeleton.ai.runtime.contracts.canonical import CanonicalEnvelope as GEnvelope,EvidenceRef as GEvidenceRef,Identity as GIdentity,canonical_conformance_vector as governed
+ canonical=CanonicalEnvelope(1,"compat",Identity("Apeloff1/Skeleton","a"*40),(EvidenceRef("repo","b"*64),),("b","a"),{"snow":"Ω"})
+ mirrored=GEnvelope(1,"compat",GIdentity("Apeloff1/Skeleton","a"*40),(GEvidenceRef("repo","b"*64),),("b","a"),{"snow":"Ω"})
+ assert governed(mirrored)==canonical_conformance_vector(canonical)
