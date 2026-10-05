@@ -922,6 +922,13 @@ class MaintenanceRegistry:
         ids = [item.resource_id for item in items]
         if len(ids) != len(set(ids)):
             raise MaintenanceError("duplicate resource ownership identity")
+        paths = [
+            item.repository_path
+            for item in items
+            if item.repository_path is not None
+        ]
+        if len(paths) != len(set(paths)):
+            raise MaintenanceError("duplicate repository path ownership")
         self.ownership = items
         self._by_id = {item.resource_id: item for item in items}
 
@@ -975,6 +982,27 @@ class MaintenanceRegistry:
         task_ids = [item.task_id for item in task_items]
         if len(task_ids) != len(set(task_ids)):
             raise MaintenanceError("duplicate maintenance task identity")
+        task_resources = [item.resource_id for item in task_items]
+        if len(task_resources) != len(set(task_resources)):
+            raise MaintenanceError(
+                "multiple maintenance tasks for one resource are ambiguous"
+            )
+
+        deletion_paths: list[str] = []
+        for item in task_items:
+            if item.action is not MaintenanceAction.DELETE:
+                continue
+            policy = self.get(item.resource_id)
+            if policy.repository_path is not None:
+                deletion_paths.append(policy.repository_path)
+        deletion_paths.sort()
+        for index, left in enumerate(deletion_paths):
+            for right in deletion_paths[index + 1 :]:
+                if _under(left, right) or _under(right, left):
+                    raise MaintenanceError(
+                        "overlapping repository deletion paths"
+                    )
+
         evidence_ids = [item.evidence_id for item in evidence_items]
         if len(evidence_ids) != len(set(evidence_ids)):
             raise MaintenanceError("duplicate resource evidence identity")
