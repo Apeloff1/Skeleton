@@ -18,3 +18,7 @@ def test_nonfinite_duration_rejected():
 def test_bool_worker_count_rejected():
  import pytest
  with pytest.raises(ValueError):simulate(WorkloadTrace((1,),("trace",)),"fifo",True)
+
+def test_nonfinite_metric_rejected():
+ import pytest,math
+ with pytest.raises(ValueError):SimulationMetric(math.nan,1,1,1)
