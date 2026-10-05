@@ -11,3 +11,10 @@ def test_unlabeled_or_invalid_trace_fails_closed():
 def test_authoritative_simulation_cannot_be_forged():
  t=WorkloadTrace((1,),("x",))
  with pytest.raises(ValueError):SchedulingSimulation("x",t,SimulationMetric(1,1,1,1),True)
+
+def test_nonfinite_duration_rejected():
+ import pytest,math
+ with pytest.raises(ValueError):WorkloadTrace((math.nan,),("trace",))
+def test_bool_worker_count_rejected():
+ import pytest
+ with pytest.raises(ValueError):simulate(WorkloadTrace((1,),("trace",)),"fifo",True)
