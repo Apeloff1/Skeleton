@@ -26,6 +26,13 @@ from .lifecycle_governance import (
     provider_cutover, research_merge, retirement_complete, retire_model,
     rights_decision, transition_model,
 )
+from .compute_fabric import (
+    BuildFarmArtifact, BuildFarmJob, BuildWorker, DataLocation, EvalWorker,
+    EvaluationFarmJob, EvaluationFarmResult, LocalityConstraint,
+    ResearchAllocation, ResearchComputeJob, ResearchPriority, ResearchQueue,
+    StorageTier, TierMove, TieringPolicy, TransferPlan, aggregate_results,
+    allocate_research, build_artifact, plan_transfer, tier_move_valid,
+)
 from .contract_fuzzing import ContractFuzzer, FuzzBudget, FuzzFailure, FuzzReport
 from .simulation_mode import SimulationAuthority, SimulationEvidence, SimulationRequest, SimulationResult, SimulationRuntime
 from .journal import DeferredExecutionJournal, DeferredJournalConflict, DeferredJournalError, DeferredJournalRecord, SqliteDeferredExecutionJournal
