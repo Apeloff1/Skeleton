@@ -387,12 +387,22 @@ class CapabilitySnapshot:
             fields = {"capability_id", "state", "guarantees", "reason", "evidence_digest", "dependency_states"}
             if set(raw) != fields:
                 raise CapabilityError("snapshot capability has unknown or missing fields")
+            guarantees_raw = raw["guarantees"]
+            dependencies_raw = raw["dependency_states"]
+            if not isinstance(guarantees_raw, list):
+                raise CapabilityError("snapshot guarantees must be list")
+            if len(guarantees_raw) > _MAX_GUARANTEES:
+                raise CapabilityError("snapshot guarantees exceed safety bound")
+            if not isinstance(dependencies_raw, list):
+                raise CapabilityError("snapshot dependency states must be list")
+            if len(dependencies_raw) > _MAX_DEPENDENCIES:
+                raise CapabilityError("snapshot dependency states exceed safety bound")
             try:
                 state = Availability(raw["state"])
-                guarantees = tuple(raw["guarantees"])
+                guarantees = tuple(guarantees_raw)
                 dependency_states = tuple(
                     (item[0], Availability(item[1]))
-                    for item in raw["dependency_states"]
+                    for item in dependencies_raw
                 )
             except (TypeError, ValueError, IndexError) as exc:
                 raise CapabilityError("malformed snapshot capability") from exc
@@ -413,6 +423,7 @@ class CapabilitySnapshot:
         if value["digest"] != result.digest:
             raise CapabilityError("capability snapshot digest mismatch")
         return result
+
 
 class CapabilityMap:
     """Resolve exact live capability guarantees without fallback."""
