@@ -468,3 +468,17 @@ def test_non_iterable_registry_inputs_fail_with_stable_type_errors() -> None:
         CapabilityMap(None, ())  # type: ignore[arg-type]
     with pytest.raises(TypeError, match="evidence must be iterable"):
         CapabilityMap((), None)  # type: ignore[arg-type]
+
+
+def test_generator_materialization_stops_at_safety_bound() -> None:
+    consumed = 0
+
+    def descriptors():
+        nonlocal consumed
+        while True:
+            consumed += 1
+            yield descriptor(f"CAP.{consumed}")
+
+    with pytest.raises(CapabilityError, match="capability count exceeds safety bound"):
+        CapabilityMap(descriptors(), ())
+    assert consumed == 10_001
