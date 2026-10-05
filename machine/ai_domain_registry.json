@@ -63,7 +63,6 @@
   "implementation": {
     "registry": "skeleton/ai/specialization/domain_registry.py",
     "tests": "tests/test_vol071_specialized_intelligence.py",
-    "verifier": "scripts/check_vol071_specialized_intelligence.py",
-    "workflow": ".github/workflows/vol071-specialized-intelligence.yml"
+    "verifier": "scripts/check_vol071_specialized_intelligence.py"
   }
 }
