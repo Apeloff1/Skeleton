@@ -59,3 +59,15 @@ def test_governed_mirror_preserves_acceptance_surface():
  from skeleton.ai.evaluation import functional_acceptance as governed
  assert governed.FunctionalAIAcceptance.__annotations__ == FunctionalAIAcceptance.__annotations__
  assert tuple(x.value for x in governed.Criterion) == tuple(x.value for x in Criterion)
+
+def test_verify_rejects_manually_constructed_approval_for_failed_bundle():
+ b=bundle(evidence(Criterion.SECURITY))
+ forged=AcceptanceSignoff(b.digest,"ACTOR.REVIEWER",b.builder_id,True)
+ with pytest.raises(AcceptanceError,match="failed criterion"):verify_signoff(b,forged)
+
+def test_governed_mirror_rejects_forged_failed_approval():
+ from skeleton.ai.evaluation import functional_acceptance as governed
+ ev=tuple(governed.AcceptanceEvidence("EVID."+c.name,c,S(c.value),c is not governed.Criterion.SECURITY,("observed-negative",) if c is governed.Criterion.SECURITY else ()) for c in governed.Criterion)
+ b=governed.FunctionalAIAcceptance("ACCEPT.VOL104",S("source"),S("config"),S("model"),S("env"),ev,"ACTOR.BUILDER")
+ forged=governed.AcceptanceSignoff(b.digest,"ACTOR.REVIEWER",b.builder_id,True)
+ with pytest.raises(governed.AcceptanceError,match="failed criterion"):governed.verify_signoff(b,forged)
