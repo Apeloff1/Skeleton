@@ -9,7 +9,10 @@ from scripts.verify_vol026_security_closure import (
     CAPABILITY_MIRROR,
     CAPABILITY_TEST,
     EXPECTED_GAP,
+    OUTBOUND_HTTP_TEST,
     REQUIRED_ASSETS,
+    ROOTED_FS_TEST,
+    SAST_SCRIPT,
     SECURITY_CONTRACTS,
     THREAT_MODEL,
     THREAT_MODEL_MIRROR,
@@ -116,8 +119,15 @@ def _valid_root(tmp_path: Path) -> Path:
 
     _write(tmp_path / SECURITY_CONTRACTS, "class SecretRef: pass\n")
     _write(tmp_path / CAPABILITY_CONTRACTS, "class SecretRef: pass\n")
-    for relative in (CAPABILITY_TEST, THREAT_TEST, TOOL_AUTH_TEST):
-        _write(tmp_path / relative, "# focused security test\n")
+    for relative in (
+        CAPABILITY_TEST,
+        THREAT_TEST,
+        TOOL_AUTH_TEST,
+        ROOTED_FS_TEST,
+        OUTBOUND_HTTP_TEST,
+        SAST_SCRIPT,
+    ):
+        _write(tmp_path / relative, "# focused security validation\n")
 
     _write(
         tmp_path / WORKFLOW,
