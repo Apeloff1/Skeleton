@@ -118,6 +118,7 @@
       "source_disposition": "retain_until_import_inversion_and_regression_gates",
       "volume_refs": [
         "VOL-000",
+        "VOL-003",
         "VOL-010",
         "VOL-025",
         "VOL-034",
@@ -7190,6 +7191,15 @@
       "completed_volume_count": 201,
       "unclassified_completed_implementation_paths": 0,
       "policy": "Restore staged-mirror parity for completed governed work without source retirement, import cutover, product/backend ownership expansion, or fabricated completion authority."
+    },
+    "completed_work_volume_ref_backfill_2026_10_05": {
+      "mapping_id": "AIFT-CONTRACTS",
+      "added_volume_refs": [
+        "VOL-003"
+      ],
+      "mature_volume_count": 201,
+      "remaining_missing_mature_volume_mapping_links": 0,
+      "policy": "Bind already-completed canonical contract work to its governed AI-tree mapping without changing implementation ownership, maturity, or completion authority."
     }
   }
 }
