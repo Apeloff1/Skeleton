@@ -52,6 +52,12 @@ class BuildOrder:
    for x in graph[n]:visit(x)
    state[n]=2
   for n in self.nodes:visit(n)
+ def _completed(self,completed):
+  if not isinstance(completed,(tuple,list,set,frozenset)):raise BuildOrderError("completed must be a bounded collection")
+  if len(completed)>len(self.nodes):raise BuildOrderError("completed exceeds construction graph bound")
+  done=set(_id(x,"completed_node_id") for x in completed)
+  if not done.issubset(set(self.nodes)):raise BuildOrderError("completed contains unknown node")
+  return done
  def blocked_reasons(self,node_id,completed):
   _id(node_id,"node_id");done=set(completed);out=[]
   for d in self.dependencies:
