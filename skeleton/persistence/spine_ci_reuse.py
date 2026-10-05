@@ -8,6 +8,7 @@ from typing import Any, Mapping
 
 _DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+_REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")
 
 
 class SpineCiReuseError(RuntimeError):
@@ -34,15 +35,23 @@ def can_reuse_verified_qualification(
             raise SpineCiReuseError(f"{label} qualification is not green")
         if card.get("merge_authority") is not False:
             raise SpineCiReuseError(f"{label} qualification overclaims merge authority")
+        repository = card.get("repository")
         head_sha = card.get("head_sha")
+        policy_digest = card.get("required_check_policy_digest")
         identity = card.get("qualification_identity")
+        if not isinstance(repository, str) or _REPOSITORY_RE.fullmatch(repository) is None:
+            raise SpineCiReuseError(f"{label} repository is invalid")
         if not isinstance(head_sha, str) or _SHA_RE.fullmatch(head_sha) is None:
             raise SpineCiReuseError(f"{label} head SHA is invalid")
+        if not isinstance(policy_digest, str) or _DIGEST_RE.fullmatch(policy_digest) is None:
+            raise SpineCiReuseError(f"{label} policy digest is invalid")
         if not isinstance(identity, str) or _DIGEST_RE.fullmatch(identity) is None:
             raise SpineCiReuseError(f"{label} qualification identity is invalid")
 
     return (
-        prior["head_sha"] == current["head_sha"]
+        prior["repository"] == current["repository"]
+        and prior["head_sha"] == current["head_sha"]
+        and prior["required_check_policy_digest"] == current["required_check_policy_digest"]
         and prior["qualification_identity"] == current["qualification_identity"]
     )
 
