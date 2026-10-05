@@ -21,7 +21,7 @@ SAFETY_HAZARD_SCHEMA_VERSION = 1
 DEFAULT_SAFETY_POLICY_ID = "skeleton.safety.p1"
 DEFAULT_SAFETY_POLICY_VERSION = 1
 MAX_SAFETY_HAZARDS = 64
-_TOKEN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/+-]{0,255}$")
+_TOKEN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/+_-]{0,255}$")
 
 
 class SafetyHazardError(ValueError):
