@@ -1,11 +1,7 @@
-"""Service-level objectives, SLI evidence, and legacy tracker compatibility.
+"""Typed SLO/SLI evidence plus the legacy mutable SLO tracker.
 
-VOL-180 needs two surfaces:
-* immutable SLO/SLI evidence used by exact error-budget policy; and
-* the historical mutable SLOTracker API retained for existing callers.
-
-The immutable contracts are authoritative only as evidence. They do not change
-release, routing, alerting, or capacity state.
+The typed contracts are immutable evidence surfaces consumed by error-budget
+policy. They do not grant release, routing, or promotion authority.
 """
 from __future__ import annotations
 
@@ -13,7 +9,7 @@ from dataclasses import dataclass
 import hashlib
 import json
 import math
-from typing import Dict
+from typing import Dict, Iterable
 
 from skeleton.kernel.errors import KernelError
 
@@ -22,35 +18,39 @@ class SLOError(KernelError):
     code = "OBS.SLO"
 
 
-class SLOContractError(ValueError):
-    """An immutable SLO/SLI evidence invariant failed."""
+def _fail(message: str, **context: object) -> None:
+    raise SLOError(message, context=context or None)
 
 
 def _token(name: str, value: object) -> str:
     if not isinstance(value, str) or not value or value != value.strip() or len(value) > 256:
-        raise SLOContractError(f"{name} must be non-empty normalized text")
-    return value
-
-
-def _ns(name: str, value: object) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-        raise SLOContractError(f"{name} must be a non-negative integer")
+        _fail(f"invalid {name}", field=name)
     return value
 
 
 def _count(name: str, value: object) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-        raise SLOContractError(f"{name} must be a non-negative integer")
+        _fail(f"{name} must be a non-negative integer", field=name)
     return value
 
 
-def _target(value: object) -> float:
+def _ns(name: str, value: object) -> int:
+    return _count(name, value)
+
+
+def _ratio(name: str, value: object) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise SLOContractError("target must be a finite ratio in (0, 1]")
+        _fail(f"{name} must be within [0, 1]", field=name)
     result = float(value)
-    if not math.isfinite(result) or not 0.0 < result <= 1.0:
-        raise SLOContractError("target must be a finite ratio in (0, 1]")
+    if not math.isfinite(result) or not 0.0 <= result <= 1.0:
+        _fail(f"{name} must be within [0, 1]", field=name)
     return result
+
+
+def _sha256(name: str, value: object) -> str:
+    if not isinstance(value, str) or len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value):
+        _fail(f"{name} must be lowercase sha256", field=name)
+    return value
 
 
 def _digest(value: object) -> str:
@@ -63,8 +63,15 @@ def _digest(value: object) -> str:
             allow_nan=False,
         )
     except (TypeError, ValueError) as exc:
-        raise SLOContractError("SLO evidence must be canonical JSON") from exc
+        raise SLOError("SLO evidence must be canonical JSON") from exc
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _tokens(name: str, values: Iterable[str]) -> tuple[str, ...]:
+    if isinstance(values, (str, bytes)):
+        _fail(f"{name} must be a collection", field=name)
+    result = tuple(sorted({_token(name, value) for value in values}))
+    return result
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,13 +79,19 @@ class SLOWindow:
     window_id: str
     start_ns: int
     end_ns: int
+    excluded_conditions: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "window_id", _token("window_id", self.window_id))
         object.__setattr__(self, "start_ns", _ns("start_ns", self.start_ns))
         object.__setattr__(self, "end_ns", _ns("end_ns", self.end_ns))
         if self.end_ns <= self.start_ns:
-            raise SLOContractError("SLO window end must be after start")
+            _fail("SLO window end must be after start")
+        object.__setattr__(
+            self,
+            "excluded_conditions",
+            _tokens("excluded_condition", self.excluded_conditions),
+        )
 
     @property
     def digest(self) -> str:
@@ -86,6 +99,7 @@ class SLOWindow:
             "window_id": self.window_id,
             "start_ns": self.start_ns,
             "end_ns": self.end_ns,
+            "excluded_conditions": list(self.excluded_conditions),
         })
 
 
@@ -100,9 +114,9 @@ class SLO:
     def __post_init__(self) -> None:
         for name in ("slo_id", "service_id", "sli_name"):
             object.__setattr__(self, name, _token(name, getattr(self, name)))
-        object.__setattr__(self, "target", _target(self.target))
+        object.__setattr__(self, "target", _ratio("target", self.target))
         if not isinstance(self.window, SLOWindow):
-            raise SLOContractError("window must be SLOWindow")
+            _fail("window must be SLOWindow")
 
     @property
     def digest(self) -> str:
@@ -121,9 +135,9 @@ class SLI:
     slo_id: str
     good_events: int
     total_events: int
-    excluded_events: int
-    observed_start_ns: int
-    observed_end_ns: int
+    excluded_events: int = 0
+    observed_start_ns: int = 0
+    observed_end_ns: int = 0
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "observation_id", _token("observation_id", self.observation_id))
@@ -133,18 +147,18 @@ class SLI:
         object.__setattr__(self, "observed_start_ns", _ns("observed_start_ns", self.observed_start_ns))
         object.__setattr__(self, "observed_end_ns", _ns("observed_end_ns", self.observed_end_ns))
         if self.observed_end_ns < self.observed_start_ns:
-            raise SLOContractError("SLI observation end cannot predate start")
+            _fail("SLI observation end cannot predate start")
         if self.excluded_events > self.total_events:
-            raise SLOContractError("excluded_events cannot exceed total_events")
+            _fail("excluded_events cannot exceed total_events")
         if self.good_events > self.eligible_events:
-            raise SLOContractError("good_events cannot exceed eligible events")
+            _fail("good_events cannot exceed eligible events")
 
     @property
     def eligible_events(self) -> int:
         return self.total_events - self.excluded_events
 
     @property
-    def observed_ratio(self) -> float:
+    def value(self) -> float:
         if self.eligible_events == 0:
             return 1.0
         return self.good_events / self.eligible_events
@@ -166,36 +180,23 @@ class SLI:
 class SLOAssessment:
     slo_digest: str
     sli_digest: str
-    eligible_events: int
-    observed_ratio: float
-    target_met: bool
-    excluded_events: int
+    value: float
+    met: bool
 
     def __post_init__(self) -> None:
-        for name in ("slo_digest", "sli_digest"):
-            value = getattr(self, name)
-            if not isinstance(value, str) or len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value):
-                raise SLOContractError(f"{name} must be lowercase sha256")
-        object.__setattr__(self, "eligible_events", _count("eligible_events", self.eligible_events))
-        object.__setattr__(self, "excluded_events", _count("excluded_events", self.excluded_events))
-        if isinstance(self.observed_ratio, bool) or not isinstance(self.observed_ratio, (int, float)):
-            raise SLOContractError("observed_ratio must be finite within [0, 1]")
-        ratio = float(self.observed_ratio)
-        if not math.isfinite(ratio) or not 0.0 <= ratio <= 1.0:
-            raise SLOContractError("observed_ratio must be finite within [0, 1]")
-        object.__setattr__(self, "observed_ratio", ratio)
-        if not isinstance(self.target_met, bool):
-            raise SLOContractError("target_met must be boolean")
+        object.__setattr__(self, "slo_digest", _sha256("slo_digest", self.slo_digest))
+        object.__setattr__(self, "sli_digest", _sha256("sli_digest", self.sli_digest))
+        object.__setattr__(self, "value", _ratio("value", self.value))
+        if not isinstance(self.met, bool):
+            _fail("met must be boolean")
 
     @property
     def digest(self) -> str:
         return _digest({
             "slo_digest": self.slo_digest,
             "sli_digest": self.sli_digest,
-            "eligible_events": self.eligible_events,
-            "observed_ratio": self.observed_ratio,
-            "target_met": self.target_met,
-            "excluded_events": self.excluded_events,
+            "value": self.value,
+            "met": self.met,
         })
 
 
@@ -203,24 +204,21 @@ def assess_slo(*, slo: SLO, sli: SLI) -> SLOAssessment:
     if not isinstance(slo, SLO) or not isinstance(sli, SLI):
         raise TypeError("slo and sli must be typed SLO/SLI contracts")
     if sli.slo_id != slo.slo_id:
-        raise SLOContractError("SLI must reference the exact SLO identity")
-    if sli.observed_start_ns < slo.window.start_ns or sli.observed_end_ns > slo.window.end_ns:
-        raise SLOContractError("SLI observation must remain inside the SLO window")
-    ratio = sli.observed_ratio
+        _fail("SLI belongs to a different SLO")
+    if (
+        sli.observed_start_ns < slo.window.start_ns
+        or sli.observed_end_ns > slo.window.end_ns
+    ):
+        _fail("SLI observation must be contained in declared SLO window")
     return SLOAssessment(
         slo_digest=slo.digest,
         sli_digest=sli.digest,
-        eligible_events=sli.eligible_events,
-        observed_ratio=ratio,
-        target_met=ratio >= slo.target,
-        excluded_events=sli.excluded_events,
+        value=sli.value,
+        met=sli.value >= slo.target,
     )
 
 
-# ---------------------------------------------------------------------------
-# Legacy mutable tracker API retained for compatibility.
-# ---------------------------------------------------------------------------
-
+# Legacy compatibility surface.
 @dataclass(frozen=True)
 class ServiceLevelObjective:
     name: str
@@ -244,8 +242,6 @@ class ErrorBudget:
 
 
 class SLOTracker:
-    """Registers legacy SLOs and records outcomes per SLO."""
-
     def __init__(self) -> None:
         self._slos: Dict[str, ServiceLevelObjective] = {}
         self._budgets: Dict[str, ErrorBudget] = {}
@@ -288,7 +284,6 @@ __all__ = [
     "SLI",
     "SLO",
     "SLOAssessment",
-    "SLOContractError",
     "SLOError",
     "SLOTracker",
     "SLOWindow",
