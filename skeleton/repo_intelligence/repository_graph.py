@@ -2,9 +2,10 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
-import json,re
+import re
 from types import MappingProxyType
 from typing import Mapping
+from skeleton.contracts.canonical import canonical_json_bytes
 MAX_FILES=100000;MAX_EDGES=500000
 class RepositoryGraphError(ValueError):pass
 _EXT={".py":"python",".ts":"typescript",".tsx":"typescript",".js":"javascript",".java":"java",".rs":"rust",".go":"go"}
@@ -38,7 +39,7 @@ class RepositoryGraph:
   self.nodes=MappingProxyType(dict(sorted(by.items())))
   self.edges=tuple(sorted(set((e.source,e.target,e.kind) for e in edges)))
  @property
- def digest(self):return sha256(json.dumps({"nodes":[{"path":n.path,"language":n.language,"digest":n.content_digest,"owner":n.owner,"tests":n.tests} for n in self.nodes.values()],"edges":self.edges},sort_keys=True,separators=(",",":")).encode()).hexdigest()
+ def digest(self):return sha256(canonical_json_bytes({"nodes":[{"path":n.path,"language":n.language,"digest":n.content_digest,"owner":n.owner,"tests":n.tests} for n in self.nodes.values()],"edges":self.edges})).hexdigest()
  def impact(self,paths:tuple[str,...])->tuple[str,...]:
   if any(p not in self.nodes for p in paths):raise RepositoryGraphError("unknown changed path")
   impacted=set(paths);changed=True
