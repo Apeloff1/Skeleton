@@ -350,3 +350,21 @@ def test_matrix_rejects_non_contract_objects() -> None:
             (TraceNode("REQ.1", NodeKind.REQUIREMENT, "plan"),),
             ("REQ.1",),  # type: ignore[arg-type]
         )
+
+def test_requirement_projection_does_not_leak_across_dependency_edges() -> None:
+    nodes = (
+        TraceNode("REQ.A", NodeKind.REQUIREMENT, "plan:a"),
+        TraceNode("REQ.B", NodeKind.REQUIREMENT, "plan:b"),
+        TraceNode("IMPL.A", NodeKind.IMPLEMENTATION, "a.py"),
+        TraceNode("TEST.A", NodeKind.TEST, "test_a.py"),
+        TraceNode("EVID.A", NodeKind.EVIDENCE, "receipt:a"),
+    )
+    subject = TraceabilityMatrix(nodes, (
+        TraceEdge("IMPL.A", "REQ.A", EdgeKind.IMPLEMENTS),
+        TraceEdge("TEST.A", "IMPL.A", EdgeKind.VERIFIES),
+        TraceEdge("EVID.A", "TEST.A", EdgeKind.EVIDENCES),
+        TraceEdge("REQ.A", "REQ.B", EdgeKind.DEPENDS_ON),
+    ))
+    assert subject.requirements_for("EVID.A") == ("REQ.A",)
+    assert subject.evidence_for("REQ.B") == ()
+    assert "REQ.B" in subject.impact("EVID.A")
