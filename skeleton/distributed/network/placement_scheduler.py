@@ -37,7 +37,10 @@ from skeleton.distributed.network.model_placement import (
 )
 from skeleton.shells.worker_capacity import WorkerCapacityCatalog
 from skeleton.shells.worker_heartbeat import LivenessView
-from skeleton.shells.worker_identity import WorkerRegistration
+from skeleton.shells.worker_identity import (
+    WorkerIdentityError,
+    WorkerRegistration,
+)
 from skeleton.shells.worker_reservations import (
     CapacityReservation,
     ReservationConflict,
@@ -480,7 +483,7 @@ def schedule_model_placement(
             ttl_seconds=ttl,
         )
         reservations.require(reservation)
-    except ReservationConflict as exc:
+    except (ReservationConflict, WorkerIdentityError) as exc:
         return (
             _rejected_receipt(
                 reasons=(f"reservation-conflict:{type(exc).__name__}",),
@@ -540,7 +543,8 @@ def schedule_model_placement(
         )
     try:
         reservations.require(reservation)
-    except ReservationConflict:
+    except (ReservationConflict, WorkerIdentityError):
+        reservations.release(reservation)
         return (
             _rejected_receipt(
                 reasons=("reservation-lost-before-schedule-receipt",),
