@@ -107,3 +107,29 @@ def test_evidence_timestamp_normalizes_to_utc_and_rejects_fractional_seconds():
  assert e.observed_at==NOW
  with pytest.raises(WorkPackageError,match="whole-second precision"):
   WorkPackageEvidence("EVID.SUB",p.package_id,p.digest,EvidenceRole.IMPLEMENTATION,"ACTOR.I",SHA,NOW.replace(microsecond=1))
+
+def test_failed_dependency_cycle_is_transactional():
+ r=WorkPackageRegistry();r.add(pkg("PKG.A"));r.add(pkg("PKG.B"))
+ r.depend(WorkPackageDependency("DEP.AB","PKG.A","PKG.B"))
+ with pytest.raises(WorkPackageError,match="cycle"):r.depend(WorkPackageDependency("DEP.BA","PKG.B","PKG.A"))
+ assert "DEP.BA" not in r.dependencies
+ assert r.state("PKG.A") is PackageState.BLOCKED
+ assert r.state("PKG.B") is PackageState.READY
+
+def test_duplicate_dependency_edge_is_rejected():
+ r=WorkPackageRegistry();r.add(pkg("PKG.A"));r.add(pkg("PKG.B"))
+ r.depend(WorkPackageDependency("DEP.1","PKG.B","PKG.A"))
+ with pytest.raises(WorkPackageError,match="duplicate dependency edge"):
+  r.depend(WorkPackageDependency("DEP.2","PKG.B","PKG.A"))
+
+def test_structural_collections_are_canonical_and_do_not_silently_deduplicate():
+ p=WorkPackage("PKG.CAN","VOL.095"," x ",(" non-goal ",),(" API.X ",),(" OWNER.X ",),(" RISK.X ",),(" TEST.X ",)," rb ",("REQ.1",),("AIQ.1",))
+ assert p.objective=="x"
+ assert p.non_goals==("non-goal",)
+ assert p.interfaces==("API.X",)
+ with pytest.raises(WorkPackageError,match="duplicate values"):
+  WorkPackage("PKG.DUP","VOL.095","x",("same"," same "),("I",),("O",),("R",),("T",),"rb",("REQ.1",),("AIQ.1",))
+
+def test_requirement_and_aiq_references_require_stable_ids():
+ with pytest.raises(WorkPackageError,match="stable identifier"):
+  WorkPackage("PKG.BAD","VOL.095","x",("n",),("i",),("o",),("r",),("t",),"rb",("free text",),("AIQ.1",))
