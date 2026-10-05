@@ -19,7 +19,7 @@
   "implementation": {
     "canonical": "skeleton/jeeves/evidence_response.py",
     "governed_mirror": "skeleton/ai/agents/jeeves/evidence_response.py",
-    "tests": "skeleton/testing/test_vol072_jeeves_domain.py",
+    "tests": "tests/test_vol072_jeeves_domain.py",
     "verifier": "scripts/check_vol072_jeeves_domain.py",
     "workflow": ".github/workflows/vol072-jeeves-domain.yml"
   }
