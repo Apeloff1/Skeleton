@@ -12,3 +12,6 @@ def test_invalid_label_fails_closed():
  with pytest.raises(ValueError):classify_task("")
 def test_profile_cannot_be_forged_to_grant_privilege():
  with pytest.raises(ValueError):TaskProfile(TaskType.GENERIC,1,(),(),True)
+
+def test_security_fix_stays_security_not_generic():assert classify_task("fix security vulnerability").task_type is TaskType.SECURITY
+def test_bare_fix_is_conservative_generic():assert classify_task("fix typo").task_type is TaskType.GENERIC
