@@ -7,14 +7,24 @@ import argparse
 import json
 import sys
 
-from p3t2_candidate_common import (
-    LEARNING,
-    MULTIMODAL,
-    ROOT,
-    TRAINING,
-    P3T2CandidateError,
-    validate_candidate,
-)
+try:
+    from scripts.p3t2_candidate_common import (
+        LEARNING,
+        MULTIMODAL,
+        ROOT,
+        TRAINING,
+        P3T2CandidateError,
+        validate_candidate,
+    )
+except ModuleNotFoundError:  # direct script execution
+    from p3t2_candidate_common import (
+        LEARNING,
+        MULTIMODAL,
+        ROOT,
+        TRAINING,
+        P3T2CandidateError,
+        validate_candidate,
+    )
 
 
 EXPECTED_UNION = tuple(f"VOL-{value:03d}" for value in range(143, 160))
