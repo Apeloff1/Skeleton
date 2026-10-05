@@ -173,6 +173,11 @@ from skeleton.intelligence.shared_pressure import (
     SharedQueueTicket,
     SqliteSharedPressureLedger,
 )
+from skeleton.intelligence.router_registry import (
+    REGISTRY_SCHEMA_VERSION,
+    RouterRegistry,
+    RouterRegistrySnapshot,
+)
 from skeleton.intelligence.quests import (
     QuestObjective,
     QuestProgress,
@@ -323,4 +328,7 @@ __all__ = [
     "SharedPressureSnapshot",
     "SharedQueueTicket",
     "SqliteSharedPressureLedger",
+    "REGISTRY_SCHEMA_VERSION",
+    "RouterRegistry",
+    "RouterRegistrySnapshot",
 ]
