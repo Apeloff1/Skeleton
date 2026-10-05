@@ -43,6 +43,7 @@ class DesktopUpdateTransaction:
   if current.release_id!=receipt.release_id or current.schema_version!=receipt.schema_version:raise DesktopReleaseError("release/receipt mismatch")
   self.current=current;self.receipt=receipt;self.target=None;self.state=None;self.preupdate_digest=None;self.preupdate_receipt=receipt
  def stage(self,target:SignedDesktopRelease):
+  if self.state in (UpdateState.STAGED,UpdateState.MIGRATED):raise DesktopReleaseError("update already in progress")
   if target.release_id==self.current.release_id:raise DesktopReleaseError("target release must differ")
   self.target=target;self.preupdate_digest=self.receipt.authoritative_state_digest;self.preupdate_receipt=self.receipt;self.state=UpdateState.STAGED
  def migrate(self,migrated_state_digest:str):
