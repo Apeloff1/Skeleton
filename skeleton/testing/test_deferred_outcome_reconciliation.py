@@ -59,7 +59,16 @@ def test_reconciles_success_without_redispatch(tmp_path):
     assert terminal.terminal["result"] == result
     assert terminal.terminal["reconciliation"]["evidence_digest"] == evidence.evidence_digest
     assert receipt.terminal_record_digest == terminal.record_digest
-    assert verified and verified[0][0] == "provider.example/v1"\n\n    restarted = DeferredExecutor(build_registry(), journal=SqliteDeferredExecutionJournal(tmp_path / "reconcile.sqlite3"))\n    restarted_record = restarted.registry.get("VOL-160")\n    restarted_record.transition("verified")\n    restarted_record.transition("enabled")\n    restarted.register_handler("VOL-160", lambda payload: pytest.fail("reconciled effect must never redispatch"), handler_identity=restarted_record.spec.handler)\n    restarted.set_budget("VOL-160", Budget(max_attempts=1, max_cost_units=4, max_latency_ms=20))\n    replay = restarted.execute(invocation, {"value": 1})\n    assert replay.result == result
+    assert verified and verified[0][0] == "provider.example/v1"
+
+    restarted = DeferredExecutor(build_registry(), journal=SqliteDeferredExecutionJournal(tmp_path / "reconcile.sqlite3"))
+    restarted_record = restarted.registry.get("VOL-160")
+    restarted_record.transition("verified")
+    restarted_record.transition("enabled")
+    restarted.register_handler("VOL-160", lambda payload: pytest.fail("reconciled effect must never redispatch"), handler_identity=restarted_record.spec.handler)
+    restarted.set_budget("VOL-160", Budget(max_attempts=1, max_cost_units=4, max_latency_ms=20))
+    replay = restarted.execute(invocation, {"value": 1})
+    assert replay.result == result
 
 
 def test_reconciliation_rejects_bad_signature_and_leaves_started(tmp_path):
