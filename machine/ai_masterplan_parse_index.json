@@ -3,10 +3,10 @@
   "kind": "ai-masterplan-parse-index",
   "sources": {
     "machine/ai_master_plan.json": {
-      "git_blob_sha": "983ad88a15a1e3a0edbb799c2ce675dce0aa989e"
+      "git_blob_sha": "0219eab4636ab31e1a6ab1e6fc22a321d70cafca"
     },
     "machine/ai_build_accountability.json": {
-      "git_blob_sha": "859f86fd9f047f5aa753dc07c8beb63d7e1665cb"
+      "git_blob_sha": "a7637f4cf595da5bbc255b91417e9f52712ed05c"
     }
   },
   "policy": {
@@ -17,12 +17,12 @@
   },
   "volume_summary": {
     "total": 421,
-    "implementation_signed": 193,
+    "implementation_signed": 196,
     "verification_signed": 20,
     "complete": 20,
-    "implementation_signed_open": 173,
-    "gap_free_waiting_verification": 19,
-    "implementation_unsigned": 228
+    "implementation_signed_open": 176,
+    "gap_free_waiting_verification": 20,
+    "implementation_unsigned": 225
   },
   "fast_sets": {
     "fully_complete": [
@@ -49,6 +49,7 @@
     ],
     "gap_free_waiting_verification": [
       "VOL-019",
+      "VOL-020",
       "VOL-022",
       "VOL-027",
       "VOL-073",
@@ -71,15 +72,12 @@
     "implementation_unsigned": [
       "VOL-001",
       "VOL-003",
-      "VOL-020",
-      "VOL-021",
       "VOL-032",
       "VOL-033",
       "VOL-039",
       "VOL-051",
       "VOL-052",
       "VOL-053",
-      "VOL-054",
       "VOL-055",
       "VOL-058",
       "VOL-122",
@@ -302,13 +300,13 @@
   "by_depth_pass": {
     "DP-000-040": {
       "total": 41,
-      "implementation_signed": 34,
+      "implementation_signed": 36,
       "complete": 11,
-      "gap_free_waiting_verification": 3
+      "gap_free_waiting_verification": 4
     },
     "DP-041-080": {
       "total": 40,
-      "implementation_signed": 34,
+      "implementation_signed": 35,
       "complete": 6,
       "gap_free_waiting_verification": 2
     },
@@ -370,13 +368,13 @@
   "accountability_summary": {
     "volume": {
       "total": 421,
-      "implementation_signed": 193,
+      "implementation_signed": 196,
       "verification_signed": 20,
       "complete": 20,
       "status_counts": {
         "verified": 13,
-        "unverified": 228,
-        "implemented": 173,
+        "unverified": 225,
+        "implemented": 176,
         "hardened": 7
       }
     },
