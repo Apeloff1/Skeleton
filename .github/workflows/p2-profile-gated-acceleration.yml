@@ -123,3 +123,10 @@ jobs:
           --candidate ACCEL-NATIVE-VECTOR
           --repeat 5
           --evidence-id vol032-native-vector-exact-head
+          --output /tmp/vol032-native-vector.json
+
+      - name: Validate measured VOL-032 receipt ingestion without activation
+        run: >-
+          python scripts/record_p2_acceleration_profile.py
+          --receipt /tmp/vol032-native-vector.json
+          --output /tmp/vol032-policy-evaluated.json
