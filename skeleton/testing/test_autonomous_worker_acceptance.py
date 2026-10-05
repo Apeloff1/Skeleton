@@ -34,3 +34,10 @@ def test_checkpoint_cannot_replay_under_different_objective():
 def test_checkpoint_cannot_replay_after_authority_identity_changes():
  changed=AutonomyControlEvidence(S("new-auth"),("READ",),("READ","WRITE"),ControlState.ACTIVE,None)
  with pytest.raises(AutonomyAcceptanceError,match="checkpoint identity mismatch"):acc(control=changed)
+
+def test_signoff_binds_exact_long_horizon_evidence():
+ a=acc();s=sign_acceptance(a,"ACTOR.REVIEWER");verify_acceptance(a,s)
+ changed=acc(current_tick=7)
+ with pytest.raises(AutonomyAcceptanceError,match="stale or rejected"):verify_acceptance(changed,s)
+def test_ineligible_worker_cannot_be_signed():
+ with pytest.raises(AutonomyAcceptanceError,match="ineligible"):sign_acceptance(acc(control=control(ControlState.REVOKED)),"ACTOR.REVIEWER")
