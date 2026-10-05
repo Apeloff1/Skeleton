@@ -7,7 +7,8 @@ from skeleton.documentation.runtime import (
     CheckStatus, DocumentationError, DocumentationSource, GeneratedDocument,
     GeneratedSection, GeneratorIdentity, SourceDigestSet, SourceKind,
     assert_clean_regeneration, generated_manifest, markers,
-    replace_generated_section, validate_owned_sections, validate_references,
+    replace_generated_section, validate_links, validate_owned_sections, validate_references,
+    validate_version_relationships,
 )
 
 
@@ -140,3 +141,40 @@ def test_manifest_changes_when_source_changes():
     first = GeneratedDocument("docs/generated/capabilities.md", gen, first_sources, (section(sources=first_sources, gen=gen),))
     second = GeneratedDocument("docs/generated/capabilities.md", gen, second_sources, (section(sources=second_sources, gen=gen),))
     assert first.manifest_digest != second.manifest_digest
+
+
+def test_reference_validation_rejects_malformed_reference_syntax():
+    checks = validate_references("See [[ref:../escape]] and [[ref:VOL-089]].", {"VOL-089"})
+    assert [check.status for check in checks] == [CheckStatus.PASS, CheckStatus.FAIL]
+    assert any(check.check_id.startswith("reference-invalid:") for check in checks)
+
+
+def test_markdown_link_validation_covers_local_external_and_unsafe_paths():
+    document = (
+        "[plan](machine/ai_master_plan.json) "
+        "[missing](docs/missing.md) "
+        "[escape](../secret.md) "
+        "[secure](https://example.invalid/docs) "
+        "[unsafe](http://example.invalid/docs) "
+        "[anchor](#scope)"
+    )
+    checks = validate_links(document, {"machine/ai_master_plan.json"})
+    statuses = [check.status for check in checks]
+    assert statuses.count(CheckStatus.PASS) == 3
+    assert statuses.count(CheckStatus.FAIL) == 3
+
+
+def test_image_targets_are_not_misclassified_as_document_links():
+    assert validate_links("![diagram](docs/generated/diagram.svg)", set()) == ()
+
+
+def test_version_relationship_validation_detects_stale_missing_and_extra_values():
+    checks = validate_version_relationships(
+        {"schema": "2", "generator": "1.0.0", "extra": "1"},
+        {"schema": "2", "generator": "1.0.1", "required": "7"},
+    )
+    by_id = {check.check_id: check.status for check in checks}
+    assert by_id["version:schema"] is CheckStatus.PASS
+    assert by_id["version:generator"] is CheckStatus.FAIL
+    assert by_id["version:required"] is CheckStatus.FAIL
+    assert by_id["version:extra"] is CheckStatus.FAIL
