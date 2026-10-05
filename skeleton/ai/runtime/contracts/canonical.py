@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import asdict, dataclass
-from typing import Any
+from typing import Any, Mapping
 
 
 SUPPORTED_SCHEMA_VERSIONS = frozenset({1})
@@ -21,8 +21,20 @@ class CanonicalContractError(ValueError):
     """Raised when a canonical envelope violates its contract."""
 
 
+def _validate_mapping_keys(value: Any) -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if type(key) is not str:
+                raise CanonicalContractError("canonical mappings require string keys")
+            _validate_mapping_keys(child)
+    elif isinstance(value, (list, tuple)):
+        for child in value:
+            _validate_mapping_keys(child)
+
+
 def canonical_json_bytes(value: Any) -> bytes:
     """Return one strict deterministic JSON byte representation."""
+    _validate_mapping_keys(value)
     try:
         return json.dumps(
             value,
@@ -102,3 +114,21 @@ class CanonicalEnvelope:
     @property
     def digest(self) -> str:
         return hashlib.sha256(self.canonical_bytes).hexdigest()
+
+
+
+def canonical_conformance_vector(envelope: CanonicalEnvelope) -> Mapping[str, object]:
+    """Materialize a deterministic conformance vector without granting authority."""
+    if not isinstance(envelope, CanonicalEnvelope):
+        raise CanonicalContractError("envelope must be CanonicalEnvelope")
+    payload = envelope.canonical_payload()
+    return {
+        "schema_version": envelope.schema_version,
+        "kind": envelope.kind,
+        "canonical_hex": envelope.canonical_bytes.hex(),
+        "digest": envelope.digest,
+        "payload_bytes": len(canonical_json_bytes(envelope.payload)),
+        "evidence_identities": tuple(item.identity for item in envelope.evidence),
+        "constraints": tuple(payload["constraints"]),
+        "authority_scope": "contract-conformance-only",
+    }

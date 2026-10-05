@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -244,6 +245,26 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
             )
         executed += 1
 
+    source_paths = {
+        "catalog": CATALOG,
+        "schema_catalog": Path(sources["schema_catalog"]),
+        "interface_registry": Path(sources["interface_registry"]),
+    }
+    source_digests = {
+        key: hashlib.sha256((root / relative).read_bytes()).hexdigest()
+        for key, relative in source_paths.items()
+    }
+    qualification_payload = {
+        "contracts": sorted(by_name),
+        "source_digests": source_digests,
+        "vector_ids": sorted(vector_ids),
+        "override_count": override_count,
+        "authority_scope": "contract-conformance-only",
+    }
+    qualification_digest = hashlib.sha256(
+        json.dumps(qualification_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
     return {
         "status": "valid",
         "contract_count": len(records),
@@ -251,6 +272,9 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         "vector_count": len(vectors),
         "executed_vector_count": executed,
         "masterplan_binding": "VOL-003",
+        "source_digests": source_digests,
+        "qualification_digest": qualification_digest,
+        "authority_scope": "contract-conformance-only",
     }
 
 
