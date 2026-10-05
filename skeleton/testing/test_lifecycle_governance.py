@@ -31,3 +31,20 @@ def test_research_merge_cannot_bypass_production_gates():
 def test_technique_retirement_preserves_reason_replacement_archive():
  r=TechniqueRetirement(Technique("t","1"),RetirementEvidence("obsolete","t2",("c",),"archive/t/1"))
  assert retirement_complete(r)
+
+
+def test_lifecycle_governance_invalid_inputs_fail_closed():
+ import pytest
+ rights=DataRights("d",(UsageGrant("research",frozenset({"NO"}),-1,False,True),),True)
+ assert not rights_decision(rights,"research","NO",evaluation=True).allowed
+ assert not ethics_decision(EthicsReview("",ResearchRisk(False,False,False),True,None)).approved
+ ev=ModelGovernanceEvidence("e","owner","rollback","retain")
+ with pytest.raises(ValueError): transition_model(ModelLifecycle("m",ModelState.INTAKE),ModelTransition(ModelState.INTAKE,ModelState.DEPLOYED,ev))
+ with pytest.raises(ValueError): retire_model(ModelDeprecation("m","replacement",-1,()))
+ parity=ProviderParity(True,True,True,True,True)
+ assert not provider_cutover(ProviderMigration("p","p",parity,True,True)).allowed
+ assert not experiment_allowed(ExperimentExposure(ExperimentalFeature("",True),True,ExperimentKillSwitch(True)))
+ policy=ResearchBranchPolicy(frozenset({"owner"}))
+ assert not research_merge(ResearchMergeCandidate(ResearchBranch("","main","owner"),True,True),policy)
+ evidence=RetirementEvidence("reason","replacement",("",),"archive")
+ assert not retirement_complete(TechniqueRetirement(Technique("t","v1"),evidence))
