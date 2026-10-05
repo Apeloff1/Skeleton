@@ -291,7 +291,7 @@ def evaluate_federated_session(
     observed=_integer("observed_revocation_epoch",observed_revocation_epoch)
     active=(
         issued<=now<expires
-        and observed>=revoked
+        and observed==revoked
     )
     return FederationSession(
         _text("session_id",session_id),principal.principal_id,
@@ -665,7 +665,9 @@ def qualify_model_rollback(
         raise DeploymentOperationsAssuranceError("rollback active artifact fence mismatch")
     if target_revision.version!=fence.target_version:
         raise DeploymentOperationsAssuranceError("rollback target version fence mismatch")
-    registry.register(target_revision)
+    # Qualification is evidence-only. Do not mutate registry activation/history here.
+    # The deployment-registry digest on the fence is the external membership proof.
+    del registry
     eligible=target_revision.status in {"qualified","active"}
     return ModelRollbackEvidence(
         sha256_json({
