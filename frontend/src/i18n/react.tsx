@@ -4,9 +4,9 @@ import {
   interpolateTranslation,
   LocalizationError,
   normalizeLocale,
-  TranslationKey,
   TranslationRegistry,
 } from './runtime';
+import type { TranslationKey } from './runtime';
 import { enCatalog } from './catalogs/en';
 import { nbCatalog } from './catalogs/nb';
 
