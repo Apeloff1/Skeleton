@@ -24,3 +24,23 @@ def test_valid_independent_promotion_binds_canary():
  d=decide(candidate(),evaluation(),"ACTOR.VERIFIER",canary_digest=S("canary"));assert d.status is PromotionStatus.PROMOTE and d.canary_digest==S("canary")
 def test_rollback_receipt_restores_distinct_champion():
  r=RollbackReceipt("DECISION.CANDIDATE.101",S("challenger"),S("champion"),S("rollback"));assert r.restored_digest==S("champion")
+
+def test_evaluation_rejects_duplicate_nonfinite_and_boolean_metrics():
+ with pytest.raises(ImprovementError,match="duplicate"):evaluation(metric_values=(("METRIC.QUALITY",.9),("METRIC.QUALITY",.8)))
+ with pytest.raises(ImprovementError,match="finite numeric"):evaluation(metric_values=(("METRIC.QUALITY",float("nan")),))
+ with pytest.raises(ImprovementError,match="finite numeric"):evaluation(metric_values=(("METRIC.QUALITY",True),))
+def test_promotion_gates_are_strict_booleans():
+ with pytest.raises(ImprovementError,match="safety_passed must be bool"):evaluation(safety_passed=1)
+ with pytest.raises(ImprovementError,match="cost_passed must be bool"):evaluation(cost_passed="yes")
+def test_metric_preregistration_collection_is_bounded_tuple():
+ c=candidate()
+ with pytest.raises(ImprovementError,match="bounded tuple"):ImprovementCandidate("CANDIDATE.X",c.champion_digest,c.challenger_digest,"scope",["METRIC.X"],"ACTOR.B")
+def test_rollback_must_restore_exact_champion_for_exact_promotion():
+ c=candidate();d=decide(c,evaluation(),"ACTOR.VERIFIER",canary_digest=S("canary"))
+ good=RollbackReceipt(d.decision_id,c.challenger_digest,c.champion_digest,S("rollback"));validate_rollback(c,d,good)
+ wrong=RollbackReceipt(d.decision_id,c.challenger_digest,S("other"),S("rollback"))
+ with pytest.raises(ImprovementError,match="exact champion"):validate_rollback(c,d,wrong)
+def test_rejected_candidate_cannot_claim_promotion_rollback():
+ c=candidate();d=decide(c,evaluation(safety_passed=False),"ACTOR.VERIFIER",canary_digest=None)
+ r=RollbackReceipt(d.decision_id,c.challenger_digest,c.champion_digest,S("rollback"))
+ with pytest.raises(ImprovementError,match="promoted candidate"):validate_rollback(c,d,r)
