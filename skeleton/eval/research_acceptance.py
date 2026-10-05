@@ -16,7 +16,7 @@ class ClaimEvidenceCoverage:
  claim_id:str;evidence_digests:tuple[str,...];contradiction_digests:tuple[str,...];uncertainty_recorded:bool;negative_results_preserved:bool
  def __post_init__(self):
   object.__setattr__(self,"claim_id",_id(self.claim_id,"claim_id"))
-  for d in self.evidence_digests+self.contradiction_digests:_sha(d,"evidence_digest")
+  if not isinstance(self.evidence_digests,tuple) or not isinstance(self.contradiction_digests,tuple):raise ResearchAcceptanceError("evidence collections must be tuples")\n  if len(self.evidence_digests)>256 or len(self.contradiction_digests)>256:raise ResearchAcceptanceError("evidence collection too large")\n  for d in self.evidence_digests+self.contradiction_digests:_sha(d,"evidence_digest")
   if not self.evidence_digests:raise ResearchAcceptanceError("claim requires supporting evidence")
  @property
  def complete(self):return self.uncertainty_recorded and self.negative_results_preserved
