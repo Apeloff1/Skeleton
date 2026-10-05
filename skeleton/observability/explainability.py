@@ -746,6 +746,10 @@ class ExplanationBuilder:
                 raise TypeError("factors must contain DecisionFactor")
             if factor.operation_id != operation.operation_id:
                 raise ExplanationError("factor belongs to another operation")
+            if factor.observed_at > generated:
+                raise ExplanationError(
+                    "factor observation cannot occur after explanation generation"
+                )
             if factor.factor_id in by_id:
                 raise ExplanationError("duplicate factor identity")
             by_id[factor.factor_id] = factor
