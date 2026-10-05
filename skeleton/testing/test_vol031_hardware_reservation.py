@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import hashlib
 
 import pytest
@@ -336,11 +337,9 @@ def test_hardware_snapshot_identity_uses_shared_canonical_bytes() -> None:
 
 def test_hardware_collector_rejects_stale_generation() -> None:
     fixture = _fixture()
-    stale = WorkerHardwareObservation(
-        **{
-            **fixture["hardware"]["worker-a"].__dict__,
-            "generation": 2,
-        }
+    stale = replace(
+        fixture["hardware"]["worker-a"],
+        generation=2,
     )
 
     snapshot = collect_hardware_topology(
