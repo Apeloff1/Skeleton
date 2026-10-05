@@ -551,6 +551,7 @@ class DefinitionOfDoneEvaluator:
 
         evaluations: list[DoDRequirementEvaluation] = []
         accepted_digests: list[str] = []
+        accepted_evidence: list[CompletionEvidence] = []
 
         for requirement in active:
             candidates = [
@@ -601,6 +602,7 @@ class DefinitionOfDoneEvaluator:
                 status = RequirementStatus.SATISFIED
                 reason = "fresh exact evidence satisfies requirement"
                 accepted_digests.append(latest.digest)
+                accepted_evidence.append(latest)
 
             evaluations.append(
                 DoDRequirementEvaluation(
@@ -638,6 +640,10 @@ class DefinitionOfDoneEvaluator:
                     now - signoff.observed_at
                 ).total_seconds() > policy.signoff_max_age_seconds:
                     blockers.append("independent_signoff:stale")
+                if accepted_evidence and signoff.observed_at < max(
+                    item.observed_at for item in accepted_evidence
+                ):
+                    blockers.append("independent_signoff:predates_evidence")
                 if not signoff.approved:
                     blockers.append("independent_signoff:rejected")
                 if signoff.signer_id in {
@@ -676,6 +682,7 @@ def default_definition_of_done() -> DefinitionOfDone:
         ChangeImpact.SCHEMA,
         ChangeImpact.DATA_MIGRATION,
         ChangeImpact.DEPENDENCY,
+        ChangeImpact.EXTERNAL_EFFECT,
         ChangeImpact.RELEASE,
     )
     recovery_impacts = (
