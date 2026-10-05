@@ -211,6 +211,18 @@ class AccelerationReceiptTests(unittest.TestCase):
                         activate=ambiguous,
                     )
 
+    def test_receipt_identity_fields_require_canonical_text(self) -> None:
+        policy = self._policy()
+        for field in ("evidence_id", "candidate_id", "source_identity", "environment_id"):
+            receipt = self._receipt(policy, "receipt-canonical")
+            receipt[field] = " " + str(receipt[field])
+            with self.subTest(field=field):
+                with self.assertRaisesRegex(
+                    MODULE.ReceiptIngestionError,
+                    "canonical text",
+                ):
+                    MODULE.apply_receipt(policy, receipt, root=ROOT)
+
 
 if __name__ == "__main__":
     unittest.main()
