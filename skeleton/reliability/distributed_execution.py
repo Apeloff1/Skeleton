@@ -17,7 +17,7 @@ def _dig(v):return hashlib.sha256(json.dumps(v,sort_keys=True,separators=(",",":
 class DistributedTask:
  task_id:str;payload_digest:str;idempotency_key:str;external_effect:bool
  def __post_init__(self):
-  object.__setattr__(self,"task_id",_id(self.task_id,"task_id"));object.__setattr__(self,"idempotency_key",_id(self.idempotency_key,"idempotency_key"));_sha(self.payload_digest,"payload_digest")
+  object.__setattr__(self,"task_id",_id(self.task_id,"task_id"));object.__setattr__(self,"idempotency_key",_id(self.idempotency_key,"idempotency_key"));_sha(self.payload_digest,"payload_digest")\n  if not isinstance(self.external_effect,bool):raise DistributedError("external_effect must be bool")
  @property
  def digest(self):return _dig({"task_id":self.task_id,"payload":self.payload_digest,"idempotency":self.idempotency_key,"external_effect":self.external_effect})
 @dataclass(frozen=True,slots=True)
@@ -31,7 +31,7 @@ class WorkerLease:
 class DistributedReceipt:
  task_digest:str;lease_id:str;fence_token:int;state:OutcomeState;result_digest:str|None;provider_evidence_digest:str|None
  def __post_init__(self):
-  _sha(self.task_digest,"task_digest");object.__setattr__(self,"lease_id",_id(self.lease_id,"lease_id"))
+  _sha(self.task_digest,"task_digest");object.__setattr__(self,"lease_id",_id(self.lease_id,"lease_id"))\n  if not isinstance(self.fence_token,int) or isinstance(self.fence_token,bool) or self.fence_token<1:raise DistributedError("receipt fence token invalid")\n  if not isinstance(self.state,OutcomeState):raise DistributedError("state must be OutcomeState")
   if self.result_digest is not None:_sha(self.result_digest,"result_digest")
   if self.provider_evidence_digest is not None:_sha(self.provider_evidence_digest,"provider_evidence_digest")
   if self.state is OutcomeState.SUCCEEDED and self.result_digest is None:raise DistributedError("success requires result")
