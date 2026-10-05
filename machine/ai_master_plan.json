@@ -11429,7 +11429,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Provide fast local validation aligned with CI.",
         "Surface ownership/contracts/gaps at edit time where practical."
@@ -11446,15 +11446,20 @@
       ],
       "implementation_paths": [
         "scripts",
-        "docs"
+        "docs",
+        "skeleton/ai/runtime/deferred/developer_experience.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_developer_experience.py"
+        "skeleton/testing/test_vol194_developer_experience.py"
       ],
       "evaluations": [
-        "planned:local-vs-CI parity evaluation"
+        "skeleton/testing/test_vol194_developer_experience.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/eee9492203589ad8e4fd13f0fe63ce62daf6d750",
+        "skeleton/ai/runtime/deferred/developer_experience.py",
+        "skeleton/testing/test_vol194_developer_experience.py"
+      ],
       "risks": [
         "slow feedback encourages bypass",
         "tooling drifts from CI"
@@ -11582,7 +11587,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Simulation must never silently invoke production effects.",
         "Mark simulated receipts/data so they cannot satisfy production evidence gates."
@@ -11599,15 +11604,24 @@
       ],
       "implementation_paths": [
         "skeleton/simulation",
-        "skeleton/ai"
+        "skeleton/ai",
+        "skeleton/ai/runtime/deferred/simulation_mode.py",
+        "skeleton/ai/runtime/deferred/catalog.py",
+        "skeleton/ai/runtime/deferred/__init__.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_simulation_mode.py"
+        "skeleton/testing/test_vol197_simulation_mode.py"
       ],
       "evaluations": [
-        "planned:simulation/real boundary evaluation"
+        "skeleton/testing/test_vol197_simulation_mode.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/cace4b16170d8c4321be10d5e39fa716e25d48ef",
+        "skeleton/ai/runtime/deferred/simulation_mode.py",
+        "skeleton/ai/runtime/deferred/catalog.py",
+        "skeleton/ai/runtime/deferred/__init__.py",
+        "skeleton/testing/test_vol197_simulation_mode.py"
+      ],
       "risks": [
         "simulation leakage",
         "simulated proof accepted as production"
@@ -11629,7 +11643,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Fuzz parsers/validators before privileged execution boundaries.",
         "Persist minimal reproducer cases for every confirmed failure."
@@ -11646,15 +11660,24 @@
       ],
       "implementation_paths": [
         "skeleton/testing",
-        "scripts"
+        "scripts",
+        "skeleton/ai/runtime/deferred/contract_fuzzing.py",
+        "skeleton/ai/runtime/deferred/catalog.py",
+        "skeleton/ai/runtime/deferred/__init__.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_contract_fuzzing.py"
+        "skeleton/testing/test_vol198_contract_fuzzing.py"
       ],
       "evaluations": [
-        "planned:serialization/parser campaigns"
+        "skeleton/testing/test_vol198_contract_fuzzing.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/f0bc9c5e1c08074556cd7b86f051b560aaf93c1f",
+        "skeleton/ai/runtime/deferred/contract_fuzzing.py",
+        "skeleton/ai/runtime/deferred/catalog.py",
+        "skeleton/ai/runtime/deferred/__init__.py",
+        "skeleton/testing/test_vol198_contract_fuzzing.py"
+      ],
       "risks": [
         "resource-exhausting fuzz run",
         "non-reproducible crash"
@@ -11676,7 +11699,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Map properties to named invariants/state machines.",
         "Persist failing seeds and shrink to stable regression cases."
@@ -11693,15 +11716,20 @@
       ],
       "implementation_paths": [
         "skeleton/testing",
-        "machine"
+        "machine",
+        "skeleton/testing/property_invariants.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_property_invariants.py"
+        "skeleton/testing/test_property_invariants.py"
       ],
       "evaluations": [
-        "planned:state-machine property campaigns"
+        "skeleton/testing/test_property_invariants.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/f5d41e10e229e8ae9a0a9b8bb80a005b1f42a2d4",
+        "skeleton/testing/property_invariants.py",
+        "skeleton/testing/test_property_invariants.py"
+      ],
       "risks": [
         "weak property passes bad behavior",
         "flaky randomness"
@@ -11890,7 +11918,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Score completion, correctness, recovery, cost and human intervention separately.",
         "Bind observations to exact agent/task/config/model identity."
@@ -11907,15 +11935,20 @@
       ],
       "implementation_paths": [
         "skeleton/eval",
-        "skeleton/ai/agents"
+        "skeleton/ai/agents",
+        "skeleton/ai/agents/performance_evidence.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_agent_performance_evidence.py"
+        "skeleton/testing/test_agent_performance_evidence.py"
       ],
       "evaluations": [
-        "planned:agent baseline comparison"
+        "skeleton/testing/test_agent_performance_evidence.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/d47eeb44feb4e1846d15657cefe92dd6eb725d40",
+        "skeleton/ai/agents/performance_evidence.py",
+        "skeleton/testing/test_agent_performance_evidence.py"
+      ],
       "risks": [
         "self-reported success",
         "Goodhart behavior"
@@ -11937,7 +11970,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Attribute costs per agent/task/delegation chain.",
         "Do not optimize cost by silently weakening authority, quality or verification."
@@ -11954,15 +11987,20 @@
       ],
       "implementation_paths": [
         "skeleton/observability",
-        "skeleton/ai/agents"
+        "skeleton/ai/agents",
+        "skeleton/ai/agents/economics.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_agent_economics.py"
+        "skeleton/testing/test_agent_economics.py"
       ],
       "evaluations": [
-        "planned:cost-quality tradeoff evaluation"
+        "skeleton/testing/test_agent_economics.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/35170cf6cabe5bbe04cf3def3c99d0bd5a74cddc",
+        "skeleton/ai/agents/economics.py",
+        "skeleton/testing/test_agent_economics.py"
+      ],
       "risks": [
         "runaway delegation spend",
         "cheap low-quality routing"
