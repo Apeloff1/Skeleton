@@ -23,6 +23,7 @@ GRANT = InternalGrant(
     "GRANT.1",
     "WORKLOAD.API",
     "INSTANCE.1",
+    IDENTITY.attestation_digest,
     frozenset({"read", "write"}),
     "tenant/a/",
     0,
@@ -78,6 +79,7 @@ def test_revalidation_fails_closed_when_grant_scope_changes() -> None:
         "GRANT.1",
         "WORKLOAD.API",
         "INSTANCE.1",
+        IDENTITY.attestation_digest,
         frozenset({"read"}),
         "tenant/a/",
         0,
@@ -96,6 +98,7 @@ def test_revalidation_rejects_different_grant_identity() -> None:
         "GRANT.2",
         "WORKLOAD.API",
         "INSTANCE.1",
+        IDENTITY.attestation_digest,
         frozenset({"read"}),
         "tenant/a/",
         0,
@@ -107,7 +110,7 @@ def test_revalidation_rejects_different_grant_identity() -> None:
 
 def test_denied_decision_cannot_smuggle_authority() -> None:
     with pytest.raises(TrustError, match="denied decision cannot carry authority"):
-        TrustDecision(False, "denied", "GRANT.1", "read", "tenant/a/item", 20)
+        TrustDecision(False, "denied", "GRANT.1", IDENTITY.attestation_digest, "read", "tenant/a/item", 20)
 
 
 def test_boolean_ticks_and_unbounded_actions_are_rejected() -> None:
@@ -130,6 +133,7 @@ def test_resource_prefix_requires_path_boundary() -> None:
         "GRANT.PATH",
         "WORKLOAD.API",
         "INSTANCE.1",
+        IDENTITY.attestation_digest,
         frozenset({"read"}),
         "tenant/a",
         0,
@@ -140,3 +144,19 @@ def test_resource_prefix_requires_path_boundary() -> None:
     denied = authorize(IDENTITY, scoped, "read", "tenant/a-evil/item", 10)
     assert not denied.allowed
     assert denied.reason == "least_privilege_denied"
+
+
+def test_rotated_attestation_cannot_reuse_existing_grant() -> None:
+    rotated = WorkloadIdentity("WORKLOAD.API", "INSTANCE.1", sha("rotated-attestation"))
+    denied = authorize(rotated, GRANT, "read", "tenant/a/item", 10)
+    assert not denied.allowed
+    assert denied.reason == "attestation_mismatch"
+
+
+def test_revalidation_detects_attestation_rotation() -> None:
+    original = authorize(IDENTITY, GRANT, "read", "tenant/a/item", 10)
+    rotated = WorkloadIdentity("WORKLOAD.API", "INSTANCE.1", sha("rotated-attestation"))
+    denied = revalidate(rotated, GRANT, original, 15)
+    assert not denied.allowed
+    assert denied.reason == "attestation_mismatch"
+    assert denied.grant_id is None
