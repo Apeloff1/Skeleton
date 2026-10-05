@@ -103,8 +103,22 @@ def _digest(value: object) -> str:
     return sha256(raw).hexdigest()
 
 
+def technology_evidence_set_digest(
+    items: Iterable["TechnologyEvidence"],
+) -> str:
+    """Return deterministic identity for an exact technology evidence set."""
+
+    materialized = tuple(items)
+    if any(not isinstance(item, TechnologyEvidence) for item in materialized):
+        raise TypeError("items must contain TechnologyEvidence")
+    evidence_ids = [item.evidence_id for item in materialized]
+    if len(evidence_ids) != len(set(evidence_ids)):
+        raise RadarError("duplicate technology evidence id in evidence set")
+    return _digest(sorted(item.digest for item in materialized))
+
+
 def _evidence_set_digest(items: Iterable["TechnologyEvidence"]) -> str:
-    return _digest(sorted(item.digest for item in items))
+    return technology_evidence_set_digest(items)
 
 
 @dataclass(frozen=True, slots=True)
@@ -732,4 +746,5 @@ __all__ = [
     "TechnologyEvidence",
     "TechnologyExitCriteria",
     "TechnologyRadar",
+    "technology_evidence_set_digest",
 ]
