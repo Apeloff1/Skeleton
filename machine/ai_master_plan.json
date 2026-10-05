@@ -4826,7 +4826,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Define task-relevant dimensions such as correctness, groundedness, safety, latency, cost and robustness.",
         "Keep raw measurements and uncertainty visible behind any aggregate view.",
@@ -4839,21 +4839,26 @@
       ],
       "contracts": [
         "QualityVector",
-        "QualityDimension",
-        "QualityThreshold"
+        "QualityMeasurement",
+        "QualityDimensionPolicy",
+        "QualityDimensionResult",
+        "QualityPolicy"
       ],
       "implementation_paths": [
-        "skeleton/evaluation",
-        "machine",
-        "benchmarks"
+        "skeleton/eval/quality_vector.py",
+        "skeleton/eval/__init__.py",
+        "skeleton/ai/evaluation/quality_vector.py",
+        "skeleton/ai/evaluation/__init__.py",
+        "machine/ai_quality_vector.json",
+        "scripts/check_vol070_quality_vector.py",
+        ".github/workflows/vol070-quality-vector.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_quality_vector.py",
-        "planned:skeleton/testing/test_quality_thresholds.py"
+        "tests/test_vol070_quality_vector.py"
       ],
       "evaluations": [
-        "planned:metric-gaming evaluation",
-        "planned:hard-failure masking test"
+        "tests/test_vol070_quality_vector.py",
+        "scripts/check_vol070_quality_vector.py"
       ],
       "evidence": [],
       "risks": [
@@ -4861,10 +4866,7 @@
         "metric correlation bias",
         "threshold drift"
       ],
-      "gaps": [
-        "bind dimensions to eval suites",
-        "define non-compensable failure rules"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-070",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
@@ -4878,7 +4880,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Declare domain scope, required sources/tools and forbidden assumptions.",
         "Use domain-specific evaluation and calibration before promotion.",
@@ -4891,21 +4893,24 @@
       ],
       "contracts": [
         "DomainProfile",
-        "SpecializedCapability",
-        "DomainFallbackPolicy"
+        "DomainRegistry",
+        "EvaluationOwnership",
+        "SpecialistCandidate",
+        "SpecialistEvaluation",
+        "RoutingDecision",
+        "SpecializedRoute"
       ],
       "implementation_paths": [
-        "skeleton/ai",
-        "skeleton/evaluation",
-        "machine"
+        "skeleton/ai/specialization/domain_registry.py",
+        "machine/ai_domain_registry.json",
+        "scripts/check_vol071_specialized_intelligence.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_domain_profiles.py",
-        "planned:skeleton/testing/test_specialized_routing.py"
+        "tests/test_vol071_specialized_intelligence.py"
       ],
       "evaluations": [
-        "planned:out-of-domain abstention evaluation",
-        "planned:specialist-vs-general baseline"
+        "tests/test_vol071_specialized_intelligence.py",
+        "scripts/check_vol071_specialized_intelligence.py"
       ],
       "evidence": [],
       "risks": [
@@ -4913,10 +4918,7 @@
         "overconfidence out of domain",
         "specialist data drift"
       ],
-      "gaps": [
-        "define domain registry",
-        "bind specialization to explicit eval ownership"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-071",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
@@ -4930,7 +4932,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Keep Jeeves orchestration under canonical runtime, memory, retrieval, tool and evidence contracts.",
         "Separate factual market data from analysis/prediction and preserve source/timestamp provenance.",
@@ -4942,22 +4944,26 @@
         "legacy-to-canonical migration"
       ],
       "contracts": [
-        "JeevesRequest",
-        "MarketEvidence",
-        "JeevesAnalysis"
+        "JeevesEvidence",
+        "JeevesFact",
+        "JeevesAnalysis",
+        "JeevesPrediction",
+        "JeevesResponse",
+        "JeevesCustody"
       ],
       "implementation_paths": [
-        "skeleton/jeeves/ai",
-        "skeleton/ai",
-        "machine/ai_file_tree.json"
+        "skeleton/jeeves/evidence_response.py",
+        "skeleton/ai/agents/jeeves/evidence_response.py",
+        "machine/jeeves_custody.json",
+        "scripts/check_vol072_jeeves_domain.py",
+        ".github/workflows/vol072-jeeves-domain.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_jeeves_contracts.py",
-        "planned:skeleton/testing/test_jeeves_provenance.py"
+        "tests/test_vol072_jeeves_domain.py"
       ],
       "evaluations": [
-        "planned:stale-market-data evaluation",
-        "planned:legacy/canonical parity test"
+        "tests/test_vol072_jeeves_domain.py",
+        "scripts/check_vol072_jeeves_domain.py"
       ],
       "evidence": [],
       "risks": [
@@ -4965,10 +4971,7 @@
         "stale/unsourced market data",
         "migration drift"
       ],
-      "gaps": [
-        "finish Jeeves custody map",
-        "bind data freshness/provenance into responses"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-072",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
