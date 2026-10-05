@@ -33,3 +33,10 @@ def test_threat_model_source_and_ai_mirror_are_byte_identical():
  from pathlib import Path
  root=Path(__file__).resolve().parents[2]
  assert (root/"skeleton/security/threat_model.py").read_bytes()==(root/"skeleton/ai/runtime/security/threat_model.py").read_bytes()
+
+
+
+def test_threat_model_version_must_be_normalized():
+ m=canonical_vol026_threat_model()
+ with pytest.raises(SecurityContractError,match="model_version"):
+  ThreatModel(m.threats,model_version=" vol026-v1")
