@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from enum import Enum
 import hashlib, json, re
 from typing import Iterable
+from datetime import datetime, timezone
 
 _ID=re.compile(r"^[A-Z][A-Z0-9_.:-]{2,127}$")
 _SHA=re.compile(r"^[0-9a-f]{64}$")
@@ -88,10 +89,17 @@ class Runbook:
 @dataclass(frozen=True,slots=True)
 class RunbookValidation:
     validation_id:str; runbook_id:str; runbook_digest:str; drill_id:str; status:ValidationStatus; evidence_digest:str
+    observed_at:datetime|None=None
     def __post_init__(self):
         for f in ("validation_id","runbook_id","drill_id"):object.__setattr__(self,f,_id(getattr(self,f),f))
         for f in ("runbook_digest","evidence_digest"):
             if not isinstance(getattr(self,f),str) or not _SHA.fullmatch(getattr(self,f)):raise RunbookError(f"{f} must be lowercase sha256")
+        if not isinstance(self.status,ValidationStatus): raise RunbookError("status must be ValidationStatus")
+        if self.observed_at is not None:
+            if not isinstance(self.observed_at,datetime) or self.observed_at.tzinfo is None: raise RunbookError("observed_at must be timezone-aware")
+            normalized=self.observed_at.astimezone(timezone.utc)
+            if normalized.microsecond: raise RunbookError("observed_at must use whole-second precision")
+            object.__setattr__(self,"observed_at",normalized)
 
 
 class RunbookRegistry:
@@ -103,6 +111,8 @@ class RunbookRegistry:
     def record_validation(self,item:RunbookValidation):
         matches=[b for b in self._books.values() if b.runbook_id==item.runbook_id and b.digest==item.runbook_digest]
         if not matches: raise RunbookError("validation is not bound to a registered exact runbook")
+        if any(v.drill_id==item.drill_id and v.runbook_id==item.runbook_id and v.runbook_digest==item.runbook_digest and v.validation_id!=item.validation_id for v in self._validations.values()):
+            raise RunbookError("drill identity already has a receipt for exact runbook")
         prior=self._validations.get(item.validation_id)
         if prior is not None and prior!=item: raise RunbookError("validation identity is immutable")
         self._validations[item.validation_id]=item
