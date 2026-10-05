@@ -14,6 +14,14 @@ from .lifecycle_safety import (
     MigrationReceipt, MigrationState, MigrationStep, ParityEvidence,
     RetirementDecision, can_remove_adapter, decide_retirement,
 )
+from .retrieval_lifecycle import (
+    DataSLO, DataServiceHealth, EmbeddingMigration, EmbeddingRecord,
+    EmbeddingVersion, FreshnessDecision, FreshnessRequirement, FreshnessSLI,
+    FreshnessState, IndexLifecycle, IndexMigration, IndexValidation,
+    IndexWatermark, SearchIndex, SourceIdentity, SourceTrust, StaleAction,
+    TrustEvidence, VectorIndexVersion, comparable, content_role, data_health,
+    freshness, promote_index, retire_index, trust_for,
+)
 from .contract_fuzzing import ContractFuzzer, FuzzBudget, FuzzFailure, FuzzReport
 from .simulation_mode import SimulationAuthority, SimulationEvidence, SimulationRequest, SimulationResult, SimulationRuntime
 from .journal import DeferredExecutionJournal, DeferredJournalConflict, DeferredJournalError, DeferredJournalRecord, SqliteDeferredExecutionJournal
