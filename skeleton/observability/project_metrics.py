@@ -32,9 +32,9 @@ class ProjectMetric:
  def __post_init__(self):
   if self.definition.metric_id!=self.observation.metric_id:raise MetricError("definition/observation mismatch")
 class MetricRegistry:
- def __init__(self,definitions):self.definitions={d.metric_id:d for d in definitions}
+ def __init__(self,definitions):\n  if not isinstance(definitions,tuple) or not definitions or any(not isinstance(d,MetricDefinition) for d in definitions):raise MetricError("definitions must be non-empty typed tuple")\n  if len({d.metric_id for d in definitions})!=len(definitions):raise MetricError("duplicate metric definition")\n  self.definitions={d.metric_id:d for d in definitions}
  def observe(self,observation):
   d=self.definitions.get(observation.metric_id)
   if d is None:raise MetricError("unknown metric")
   return ProjectMetric(d,observation)
- def stale(self,metric,current_tick,max_age):return current_tick-metric.observation.observed_tick>max_age
+ def stale(self,metric,current_tick,max_age):\n  if not isinstance(metric,ProjectMetric):raise MetricError("metric must be ProjectMetric")\n  for name,value in (("current_tick",current_tick),("max_age",max_age)):\n   if not isinstance(value,int) or isinstance(value,bool) or value<0:raise MetricError(f"{name} must be nonnegative integer")\n  if current_tick<metric.observation.observed_tick:raise MetricError("current_tick predates observation")\n  return current_tick-metric.observation.observed_tick>max_age
