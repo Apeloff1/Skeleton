@@ -552,3 +552,31 @@ def test_snapshot_replay_rejects_non_boolean_health() -> None:
     payload["healthy"] = 1
     with pytest.raises(CapabilityError, match="health must be boolean"):
         CapabilitySnapshot.from_dict(payload)
+
+
+def test_snapshot_replay_rejects_unbounded_nested_payloads() -> None:
+    root = descriptor("CAP.ROOT")
+    payload = CapabilityMap((root,), (evidence(root),)).resolve_all().to_dict()
+    payload["capabilities"][0]["guarantees"] = ["deterministic"] * 257
+    with pytest.raises(CapabilityError, match="guarantees exceed safety bound"):
+        CapabilitySnapshot.from_dict(payload)
+
+    payload = CapabilityMap((root,), (evidence(root),)).resolve_all().to_dict()
+    payload["capabilities"][0]["dependency_states"] = [
+        ["CAP.DEP", "available"]
+    ] * 257
+    with pytest.raises(CapabilityError, match="dependency states exceed safety bound"):
+        CapabilitySnapshot.from_dict(payload)
+
+
+def test_snapshot_replay_requires_json_array_shapes() -> None:
+    root = descriptor("CAP.ROOT")
+    payload = CapabilityMap((root,), (evidence(root),)).resolve_all().to_dict()
+    payload["capabilities"][0]["guarantees"] = "deterministic"
+    with pytest.raises(CapabilityError, match="guarantees must be list"):
+        CapabilitySnapshot.from_dict(payload)
+
+    payload = CapabilityMap((root,), (evidence(root),)).resolve_all().to_dict()
+    payload["capabilities"][0]["dependency_states"] = {}
+    with pytest.raises(CapabilityError, match="dependency states must be list"):
+        CapabilitySnapshot.from_dict(payload)
