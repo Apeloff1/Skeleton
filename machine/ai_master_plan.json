@@ -313,7 +313,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Preserve scientific claims with source, method, result, limitation and correction/retraction lineage.",
         "Track historical techniques by problem/mechanism/failure mode/modern analogue instead of citation popularity.",
@@ -331,27 +331,30 @@
         "RetractionRecord"
       ],
       "implementation_paths": [
-        "planned:skeleton/research",
-        "docs/plan/EDGE_CASES_HISTORICAL.md",
-        "machine/ai_edge_case_catalog.json"
+        "skeleton/research/source_lineage.py",
+        "skeleton/ai/research/source_lineage.py",
+        "skeleton/research/__init__.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_research_lineage.py",
+        "skeleton/testing/test_research_lineage.py",
+        "skeleton/testing/test_research_system_acceptance.py",
         "scripts/check_ai_edge_case_catalog.py"
       ],
       "evaluations": [
         "planned:source-quality calibration",
         "planned:replication-status consistency evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "PR #2721 merged research ingestion/citation lineage implementation",
+        "PR #2950 head 6052b313b9fceacecf06ea4d6f12492c50241325 adds deterministic reconciliation qualification; independent workflow pending"
+      ],
       "risks": [
         "cargo-culting historically famous techniques",
         "source selection bias",
         "retracted/corrected findings surviving as current truth"
       ],
       "gaps": [
-        "research ingestion implementation is incomplete",
-        "cross-source citation graph needs executable reconciliation"
+        "independent exact-head AI Research Lineage Closure qualification for reconciliation receipt remains pending"
       ],
       "accountability_id": "ACC-VOL-001",
       "completion_checkbox": false,
