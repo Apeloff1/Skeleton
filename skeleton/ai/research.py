@@ -73,3 +73,12 @@ def validate_reproduction(evidence:EvidenceNode,plan:ExperimentPlan,record:Repro
  if record.evidence_digest!=evidence.digest or record.experiment_digest!=plan.digest: raise ResearchError("reproduction is stale or bound to different evidence/experiment")
  if record.trial_count>plan.max_trials: raise ResearchError("reproduction exceeds preregistered trial budget")
  if tuple(k for k,_ in record.metric_values)!=plan.metric_ids: raise ResearchError("reproduction metrics differ from preregistration")
+
+def synthesize(question:ResearchQuestion,claim_id:str,graph:EvidenceGraph,statement:str,limitations:tuple[str,...])->ResearchConclusion:
+ if not isinstance(question,ResearchQuestion) or not isinstance(graph,EvidenceGraph): raise ResearchError("synthesis inputs must be typed")
+ claim_id=_id(claim_id,"claim_id");nodes=graph.for_claim(claim_id)
+ if not nodes: raise ResearchError("cannot synthesize unsupported claim")
+ limitations=tuple(sorted(set(limitations)))
+ if any(n.outcome in (Outcome.CONTRADICTS,Outcome.AMBIGUOUS,Outcome.NEGATIVE) for n in nodes) and "conflicting_or_negative_evidence" not in limitations:
+  limitations=tuple(sorted(limitations+("conflicting_or_negative_evidence",)))
+ return ResearchConclusion("CONCLUSION."+question.question_id,question.question_id,claim_id,tuple(n.digest for n in nodes),tuple(n.outcome for n in nodes),statement,limitations)
