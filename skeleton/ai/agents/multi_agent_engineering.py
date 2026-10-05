@@ -18,9 +18,12 @@ class MultiAgentTask:
  task_id:str;objective:str;authority_ids:tuple[str,...];scope_paths:tuple[str,...];max_agents:int
  def __post_init__(self):
   object.__setattr__(self,"task_id",_id(self.task_id,"task_id"))
-  if not isinstance(self.objective,str) or not self.objective.strip():raise CoordinationError("objective required")\n  object.__setattr__(self,"objective",self.objective.strip())
+  if not isinstance(self.objective,str) or not self.objective.strip():raise CoordinationError("objective required")
+  object.__setattr__(self,"objective",self.objective.strip())
   for f in ("authority_ids","scope_paths"):
-   raw=getattr(self,f)\n   if not isinstance(raw,tuple) or len(raw)>256:raise CoordinationError(f"{f} must be bounded tuple")\n   vals=tuple(sorted(set(raw)))
+   raw=getattr(self,f)
+   if not isinstance(raw,tuple) or len(raw)>256:raise CoordinationError(f"{f} must be bounded tuple")
+   vals=tuple(sorted(set(raw)))
    if not vals:raise CoordinationError(f"{f} required")
    object.__setattr__(self,f,vals)
   if isinstance(self.max_agents,bool) or not isinstance(self.max_agents,int) or not 1<=self.max_agents<=32:raise CoordinationError("max_agents out of bounds")
@@ -32,7 +35,10 @@ class AgentAssignment:
  def __post_init__(self):
   for f in ("assignment_id","agent_id","lease_id"):object.__setattr__(self,f,_id(getattr(self,f),f))
   _sha(self.task_digest,"task_digest")
-  for f in ("authority_ids","scope_paths"):\n   raw=getattr(self,f)\n   if not isinstance(raw,tuple) or not raw or len(raw)>256:raise CoordinationError(f"{f} must be non-empty bounded tuple")\n   object.__setattr__(self,f,tuple(sorted(set(raw))))
+  for f in ("authority_ids","scope_paths"):
+   raw=getattr(self,f)
+   if not isinstance(raw,tuple) or not raw or len(raw)>256:raise CoordinationError(f"{f} must be non-empty bounded tuple")
+   object.__setattr__(self,f,tuple(sorted(set(raw))))
 @dataclass(frozen=True,slots=True)
 class HandoffPacket:
  handoff_id:str;assignment_id:str;producer_id:str;artifact_digest:str;state_digest:str;test_digest:str;rollback_ref:str
@@ -47,7 +53,8 @@ class HandoffVerification:
  handoff_digest:str;verifier_id:str;producer_id:str;passed:bool
  def __post_init__(self):
   _sha(self.handoff_digest,"handoff_digest");object.__setattr__(self,"verifier_id",_id(self.verifier_id,"verifier_id"));object.__setattr__(self,"producer_id",_id(self.producer_id,"producer_id"))
-  if not isinstance(self.passed,bool):raise CoordinationError("passed must be bool")\n  if self.verifier_id==self.producer_id:raise CoordinationError("handoff verifier must be independent")
+  if not isinstance(self.passed,bool):raise CoordinationError("passed must be bool")
+  if self.verifier_id==self.producer_id:raise CoordinationError("handoff verifier must be independent")
 class Coordinator:
  def __init__(self,task):
   if not isinstance(task,MultiAgentTask):raise CoordinationError("task must be MultiAgentTask")
