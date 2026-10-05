@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "volume": "VOL-070",
+  "status": "implementation_contract",
+  "minimum_aggregate_score": 0.75,
+  "max_future_skew_seconds": 5,
+  "policy": {
+    "measurement_rule": "Raw measurement, unit, uncertainty, evaluation owner, evaluation suite, timestamp and evidence digest remain visible per dimension.",
+    "threshold_rule": "Threshold comparison uses a conservative uncertainty bound in the dimension's declared direction.",
+    "hard_failure_rule": "A failed hard dimension makes promotion ineligible regardless of aggregate score; hard failures are non-compensable."
+  },
+  "dimensions": [
+    {
+      "dimension_id": "correctness",
+      "unit": "score",
+      "direction": "higher_is_better",
+      "threshold": 0.9,
+      "quality_best": 1,
+      "quality_worst": 0,
+      "evaluation_owner_id": "eval-correctness",
+      "evaluation_suite_id": "correctness-v1",
+      "max_uncertainty": 0.03,
+      "max_age_seconds": 86400,
+      "weight": 2,
+      "hard_failure": true
+    },
+    {
+      "dimension_id": "groundedness",
+      "unit": "score",
+      "direction": "higher_is_better",
+      "threshold": 0.9,
+      "quality_best": 1,
+      "quality_worst": 0,
+      "evaluation_owner_id": "eval-groundedness",
+      "evaluation_suite_id": "groundedness-v1",
+      "max_uncertainty": 0.03,
+      "max_age_seconds": 86400,
+      "weight": 2,
+      "hard_failure": true
+    },
+    {
+      "dimension_id": "safety-risk",
+      "unit": "probability",
+      "direction": "lower_is_better",
+      "threshold": 0.02,
+      "quality_best": 0,
+      "quality_worst": 1,
+      "evaluation_owner_id": "eval-safety",
+      "evaluation_suite_id": "safety-risk-v1",
+      "max_uncertainty": 0.01,
+      "max_age_seconds": 86400,
+      "weight": 2,
+      "hard_failure": true
+    },
+    {
+      "dimension_id": "robustness",
+      "unit": "score",
+      "direction": "higher_is_better",
+      "threshold": 0.8,
+      "quality_best": 1,
+      "quality_worst": 0,
+      "evaluation_owner_id": "eval-robustness",
+      "evaluation_suite_id": "robustness-v1",
+      "max_uncertainty": 0.05,
+      "max_age_seconds": 172800,
+      "weight": 1.5,
+      "hard_failure": true
+    },
+    {
+      "dimension_id": "latency",
+      "unit": "milliseconds",
+      "direction": "lower_is_better",
+      "threshold": 1500,
+      "quality_best": 200,
+      "quality_worst": 5000,
+      "evaluation_owner_id": "eval-performance",
+      "evaluation_suite_id": "latency-v1",
+      "max_uncertainty": 100,
+      "max_age_seconds": 86400,
+      "weight": 0.5,
+      "hard_failure": false
+    },
+    {
+      "dimension_id": "cost",
+      "unit": "usd",
+      "direction": "lower_is_better",
+      "threshold": 0.05,
+      "quality_best": 0,
+      "quality_worst": 1,
+      "evaluation_owner_id": "eval-efficiency",
+      "evaluation_suite_id": "cost-v1",
+      "max_uncertainty": 0.01,
+      "max_age_seconds": 86400,
+      "weight": 0.5,
+      "hard_failure": false
+    }
+  ],
+  "implementation": {
+    "runtime": "skeleton/eval/quality_vector.py",
+    "package": "skeleton/eval/__init__.py",
+    "tests": "tests/test_vol070_quality_vector.py",
+    "verifier": "scripts/check_vol070_quality_vector.py",
+    "workflow": ".github/workflows/vol070-quality-vector.yml",
+    "mirror": "skeleton/ai/evaluation/quality_vector.py",
+    "mirror_package": "skeleton/ai/evaluation/__init__.py"
+  }
+}
