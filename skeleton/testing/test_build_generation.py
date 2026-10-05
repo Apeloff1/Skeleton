@@ -26,3 +26,10 @@ def test_client_sdk_binds_exact_contract_version_and_digest():
 def test_build_generation_slice_imports_cleanly():
     import skeleton.ai.runtime.deferred.build_generation as module
     assert module.RebuildPlan is not None
+
+
+def test_rebuild_fail_closed_on_empty_or_unidentified_inputs():
+ assert not rebuild_admissible(RebuildPlan(()))
+ assert not rebuild_admissible(RebuildPlan((RebuildStep("",("x",),"v",True),)))
+ assert not rebuild_admissible(RebuildPlan((RebuildStep("a",(),"v",True),)))
+ assert not rebuild_verified(RebuildEvidence("","d","d",True))
