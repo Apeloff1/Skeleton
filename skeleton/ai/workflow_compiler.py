@@ -16,17 +16,19 @@ class CompileResult:
  @property
  def ok(self):return self.workflow is not None and not self.diagnostics
 def compile_workflow(workflow_id,nodes,links,required_capabilities,available_capabilities,compensations):
- ids=tuple(sorted(set(nodes))); diags=[]
- if len(ids)!=len(tuple(nodes)):diags.append("duplicate-node")
- missing=sorted(set(required_capabilities)-set(available_capabilities))
+ node_items=tuple(nodes); link_items=tuple(links); required=tuple(required_capabilities); available=tuple(available_capabilities)
+ ids=tuple(sorted(set(node_items))); diags=[]
+ if not workflow_id:diags.append("missing-workflow-id")
+ if len(ids)!=len(node_items):diags.append("duplicate-node")
+ missing=sorted(set(required)-set(available))
  if missing:diags.extend("missing-capability:"+x for x in missing)
  known=set(ids)
- for link in links:
+ for link in link_items:
   if link.source not in known or link.target not in known:diags.append("invalid-link")
  for node,target in compensations.items():
   if node not in known or target not in known or node==target:diags.append("invalid-compensation:"+node)
  graph={n:[] for n in ids}
- for e in links:
+ for e in link_items:
   if e.source in known and e.target in known:graph[e.source].append(e.target)
  visiting=set();done=set()
  def visit(n):
@@ -39,4 +41,4 @@ def compile_workflow(workflow_id,nodes,links,required_capabilities,available_cap
   for n in ids:visit(n)
  except ValueError:diags.append("cycle")
  if diags:return CompileResult(None,tuple(sorted(set(diags))))
- return CompileResult(CompiledWorkflow(workflow_id,ids,tuple(sorted(links)),tuple(sorted(set(required_capabilities)))),())
+ return CompileResult(CompiledWorkflow(workflow_id,ids,tuple(sorted(link_items)),tuple(sorted(set(required)))),())
