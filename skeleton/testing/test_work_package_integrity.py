@@ -1,5 +1,6 @@
 from __future__ import annotations
 import hashlib,pytest
+from datetime import datetime,timezone
 from skeleton.automation.work_packages import *
 SHA=hashlib.sha256(b"x").hexdigest()
 def pkg(i="PKG.095"):return WorkPackage(i,"VOL.095","Build exact package",("Do not merge",),("API.X",),("OWNER.X",),("RISK.X",),("TEST.X",),"Rollback commit",("REQ.1",),("AIQ.1",))
@@ -60,3 +61,23 @@ def test_actor_cannot_contradict_same_role_evidence():
  r.attest(ev("EVID.I1",EvidenceRole.IMPLEMENTATION,"ACTOR.I",package=p))
  with pytest.raises(WorkPackageError,match="contradict evidence"):
   r.attest(WorkPackageEvidence("EVID.I2",p.package_id,p.digest,EvidenceRole.IMPLEMENTATION,"ACTOR.I",hashlib.sha256(b"other").hexdigest()))
+
+def test_stale_package_evidence_is_rejected():
+ r=WorkPackageRegistry();p=pkg();r.add(p)
+ stale=WorkPackage("PKG.095","VOL.095","old objective",p.non_goals,p.interfaces,p.state_owners,p.risks,p.tests,p.rollback,p.requirement_ids,p.aiq_task_ids)
+ with pytest.raises(WorkPackageError,match="stale or bound"):r.attest(ev("EVID.STALE",EvidenceRole.IMPLEMENTATION,"ACTOR.X",package=stale))
+
+def test_evidence_role_and_timestamp_are_typed():
+ p=pkg()
+ with pytest.raises(WorkPackageError,match="EvidenceRole"):WorkPackageEvidence("EVID.X",p.package_id,p.digest,"implementation","ACTOR.X",SHA,NOW)
+ with pytest.raises(WorkPackageError,match="timezone-aware"):WorkPackageEvidence("EVID.X",p.package_id,p.digest,EvidenceRole.IMPLEMENTATION,"ACTOR.X",SHA,datetime(2026,10,5))
+
+def test_package_collections_are_typed_and_bounded():
+ p=pkg()
+ with pytest.raises(WorkPackageError,match="must be tuple"):WorkPackage(p.package_id,p.volume_id,p.objective,list(p.non_goals),p.interfaces,p.state_owners,p.risks,p.tests,p.rollback,p.requirement_ids,p.aiq_task_ids)
+ with pytest.raises(WorkPackageError,match="exceeds policy bound"):WorkPackage("PKG.BIG","VOL.095","x",tuple(f"NG.{i}" for i in range(257)),("I",),("O",),("R",),("T",),"rb",("Q",),("A",))
+
+def test_dependency_identity_is_immutable():
+ r=WorkPackageRegistry();r.add(pkg("PKG.A"));r.add(pkg("PKG.B"));r.add(pkg("PKG.C"))
+ r.depend(WorkPackageDependency("DEP.X","PKG.B","PKG.A"))
+ with pytest.raises(WorkPackageError,match="dependency identity"):r.depend(WorkPackageDependency("DEP.X","PKG.C","PKG.A"))
