@@ -28,3 +28,20 @@ def test_control_plane_state_is_durable_revision_chain():
  w=WorkflowIR("1",(WorkflowNode("n","x",(),0,1,None),),()); c=ControlPlaneCommand("c",w,"o","p","a")
  s=ControlPlaneState(1,None,None,"seed"); ns,r=apply_command(s,c,policy_valid=True,authority_valid=True)
  assert r.accepted and ns.revision==2 and ns.durable_state_digest!="seed"
+
+
+def test_control_plane_depth_invariants_fail_closed():
+ import pytest
+ con=Constraint("c",ConstraintStrength.HARD,"p","src")
+ with pytest.raises(ValueError):evaluate_constraints(ConstraintSet((con,con)),{"c":True})
+ cr=ConstraintResult(True,(),())
+ opts=(DecisionOption("b",True,1,("e",),0.1),DecisionOption("a",True,1,("e",),0.1))
+ assert decide(DecisionContext("o",cr,opts)).option_id=="a"
+ n=WorkflowNode("n","cap",(),0,1,None)
+ bad=WorkflowIR("1",(n,),(WorkflowEdge("n","missing"),))
+ with pytest.raises(ValueError):_=bad.identity
+ state=ControlPlaneState(0,None,"cmd","digest")
+ good=WorkflowIR("1",(n,),())
+ cmd=ControlPlaneCommand("cmd",good,"o","p","a")
+ ns,r=apply_command(state,cmd,policy_valid=True,authority_valid=True);assert ns==state and not r.accepted
+ with pytest.raises(ValueError):apply_command(ControlPlaneState(-1,None,None,"digest"),ControlPlaneCommand("x",good,"o","p","a"),policy_valid=True,authority_valid=True)
