@@ -17,7 +17,7 @@ class ClaimEvidenceCoverage:
  def __post_init__(self):
   object.__setattr__(self,"claim_id",_id(self.claim_id,"claim_id"))
   if not isinstance(self.evidence_digests,tuple) or not isinstance(self.contradiction_digests,tuple):raise ResearchAcceptanceError("evidence collections must be tuples")\n  if len(self.evidence_digests)>256 or len(self.contradiction_digests)>256:raise ResearchAcceptanceError("evidence collection too large")\n  for d in self.evidence_digests+self.contradiction_digests:_sha(d,"evidence_digest")
-  if not self.evidence_digests:raise ResearchAcceptanceError("claim requires supporting evidence")
+  if len(set(self.evidence_digests))!=len(self.evidence_digests) or len(set(self.contradiction_digests))!=len(self.contradiction_digests):raise ResearchAcceptanceError("duplicate evidence digest")\n  if set(self.evidence_digests)&set(self.contradiction_digests):raise ResearchAcceptanceError("evidence cannot be both support and contradiction")\n  if not isinstance(self.uncertainty_recorded,bool) or not isinstance(self.negative_results_preserved,bool):raise ResearchAcceptanceError("coverage flags must be bool")\n  if not self.evidence_digests:raise ResearchAcceptanceError("claim requires supporting evidence")
  @property
  def complete(self):return self.uncertainty_recorded and self.negative_results_preserved
 @dataclass(frozen=True,slots=True)
