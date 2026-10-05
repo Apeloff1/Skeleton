@@ -714,6 +714,24 @@ class ResearchSourceRegistry:
             return True
         return claim.claim_id not in graph.affected_claim_ids
 
+    def qualification_snapshot(self) -> Mapping[str, object]:
+        """Return deterministic, authority-neutral reconciliation evidence."""
+        graph = self.reconcile_citation_graph()
+        claims = tuple(sorted(self._claims))
+        replications = tuple(sorted(self._replications))
+        techniques = tuple(sorted(self._historical_techniques))
+        payload = {
+            "snapshot_digest": self.snapshot_digest(),
+            "citation_report_digest": graph.report_digest,
+            "citation_graph_healthy": graph.healthy,
+            "claim_results": {key: self.reconcile_claim_with_graph(key) for key in claims},
+            "replication_results": {key: self.reconcile_replication(key) for key in replications},
+            "historical_results": {key: self.reconcile_historical_technique(key) for key in techniques},
+            "authority_scope": "research-evidence-only",
+        }
+        payload["qualification_digest"] = _digest(payload)
+        return MappingProxyType(payload)
+
     def affected_claims(self, source_id: str) -> tuple[str, ...]:
         self.source(source_id)
         return tuple(sorted(self._source_claims.get(source_id, ())))
