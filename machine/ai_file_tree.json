@@ -955,7 +955,7 @@
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
       "source_git_object_sha": "ccbbaae31345e87ec74e2d10cc22e28b2365a9aa",
-      "role": "world-model and simulation plane kept separate from real-world authority",
+      "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
         "WP-W12"
@@ -964,7 +964,8 @@
         "AIQ-S7-E2E-01"
       ],
       "volume_refs": [
-        "VOL-019"
+        "VOL-019",
+        "VOL-073"
       ],
       "move_tags": [
         "ai-tree:mapped",
