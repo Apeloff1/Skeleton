@@ -6260,7 +6260,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Give backlog items stable IDs, source rationale, owner, dependency and closure rule.",
         "Deduplicate overlapping work while preserving provenance from issues/gaps/risks.",
@@ -6277,17 +6277,13 @@
         "BacklogDisposition"
       ],
       "implementation_paths": [
-        "machine",
-        "skeleton/automation",
-        "docs/plan"
+        "skeleton/automation/backlog_control.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_backlog_control.py",
-        "planned:skeleton/testing/test_backlog_dedup.py"
+        "skeleton/testing/test_backlog_control.py"
       ],
       "evaluations": [
-        "planned:stale-task reconciliation",
-        "planned:duplicate-task pressure evaluation"
+        "skeleton/testing/test_backlog_control.py"
       ],
       "evidence": [],
       "risks": [
@@ -6295,10 +6291,7 @@
         "orphan tasks",
         "status inflation"
       ],
-      "gaps": [
-        "establish canonical backlog IDs",
-        "bind backlog to gap/risk closure"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-093",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
