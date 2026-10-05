@@ -25,3 +25,15 @@ def test_research_queue_enforces_quota_and_stable_priority_order():
  q=ResearchQueue((ResearchComputeJob("b",ResearchPriority.NORMAL,1,"p"),ResearchComputeJob("a",ResearchPriority.NORMAL,1,"p")),False)
  assert allocate_research(q).job_id=="a"
  assert not allocate_research(ResearchQueue((ResearchComputeJob("x",ResearchPriority.URGENT,0,"p"),),False)).admitted
+
+
+def test_compute_fabric_invalid_inputs_fail_closed():
+ import pytest
+ move=TierMove("a",StorageTier.HOT,StorageTier.HOT,"d","d",True,1)
+ assert not tier_move_valid(move,TieringPolicy(1,(StorageTier.HOT,)))
+ with pytest.raises(ValueError): plan_transfer(DataLocation("a","z",-1),"z2",LocalityConstraint(frozenset({"z2"}),True,True),1)
+ with pytest.raises(ValueError): plan_transfer(DataLocation("a","z",1),"z2",LocalityConstraint(frozenset({"z2"}),True,True),-1)
+ with pytest.raises(ValueError): build_artifact(BuildFarmJob("","src","input"),BuildWorker("w","env",True),"artifact","log")
+ with pytest.raises(ValueError): aggregate_results((EvaluationFarmResult("j","","env","s","m",1.0),))
+ q=ResearchQueue((ResearchComputeJob("",ResearchPriority.URGENT,1,"receipt"),ResearchComputeJob("valid",ResearchPriority.NORMAL,1,"")),False)
+ assert not allocate_research(q).admitted
