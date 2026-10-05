@@ -424,7 +424,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Give every serialized contract stable identity, owner, version, compatibility rule and migration semantics.",
         "Fail closed on ambiguous security-sensitive serialization including duplicate keys/non-finite values.",
@@ -444,27 +444,35 @@
       "implementation_paths": [
         "skeleton/contracts",
         "machine/ai_runtime_schemas.json",
-        "machine/capability_interfaces.json"
+        "machine/capability_interfaces.json",
+        "skeleton/contracts/canonical.py",
+        "skeleton/ai/runtime/contracts/canonical.py",
+        "scripts/check_architecture_contract_conformance.py",
+        "machine/contract_conformance.json"
       ],
       "tests": [
-        "planned:skeleton/testing/test_contract_serialization_edges.py",
-        "planned:skeleton/testing/test_contract_compatibility.py",
-        "planned:skeleton/testing/test_contract_unicode_edges.py"
+        "skeleton/testing/test_contract_serialization_edges.py",
+        "skeleton/testing/test_contract_compatibility.py",
+        "skeleton/testing/test_contract_unicode_edges.py",
+        "tests/test_architecture_contract_conformance.py"
       ],
       "evaluations": [
-        "planned:cross-runtime conformance corpus",
-        "planned:schema evolution compatibility matrix"
+        "scripts/check_architecture_contract_conformance.py --json",
+        "tests/test_architecture_contract_conformance.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/3118f3d4c5fcbd421c590b7724289abe8c411e11",
+        "scripts/check_architecture_contract_conformance.py",
+        "machine/contract_conformance.json",
+        "skeleton/testing/test_contract_compatibility.py",
+        "tests/test_architecture_contract_conformance.py"
+      ],
       "risks": [
         "schema drift",
         "privileged defaults from unknown values",
         "cross-language round-trip divergence"
       ],
-      "gaps": [
-        "materialize shared conformance vectors",
-        "complete producer/consumer inventory for every canonical contract"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-003",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
