@@ -44,7 +44,7 @@ def test_model_eval_binds_quality_policy_and_clean_contamination() -> None:
 def test_model_eval_blocks_low_tail_or_contamination() -> None:
     evidence = evaluate_model(
         harness(),
-        outcomes(0.95, 0.5),
+        outcomes(0.95, 0.65),
         model_digest=C,
         policy=ModelEvaluationPolicy("policy", 0.8, 0.7),
         contamination_status="suspected",
