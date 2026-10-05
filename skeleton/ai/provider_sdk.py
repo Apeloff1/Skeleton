@@ -11,7 +11,8 @@ def _native_leak(x):
  return False
 def check_provider(spec,adapter):
  failures=[]
- if not spec.provider or not spec.contract_version or not spec.capabilities or len(set(spec.capabilities))!=len(spec.capabilities):failures.append("invalid-spec")
+ if not spec.provider or not spec.contract_version or not spec.capabilities or len(set(spec.capabilities))!=len(spec.capabilities) or any(not isinstance(x,str) or not x for x in spec.capabilities):failures.append("invalid-spec")
+ if failures:return ProviderConformance(spec.provider,False,tuple(sorted(set(failures))))
  try:
   for cap in spec.capabilities:
    if not adapter.supports(cap):failures.append("missing:"+cap)
