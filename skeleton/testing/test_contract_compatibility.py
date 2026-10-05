@@ -35,6 +35,9 @@ def test_machine_validator_executes_complete_inventory_and_vectors():
  assert result["status"]=="valid"
  assert result["contract_count"]==36
  assert result["executed_vector_count"]==result["vector_count"]
+ assert result["authority_scope"]=="contract-conformance-only"
+ assert len(result["qualification_digest"])==64
+ assert set(result["source_digests"])=={"catalog","schema_catalog","interface_registry"}
 
 def test_governed_canonical_conformance_surface_matches_canonical():
  from skeleton.contracts.canonical import CanonicalEnvelope,EvidenceRef,Identity,canonical_conformance_vector
