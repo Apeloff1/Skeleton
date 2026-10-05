@@ -8,6 +8,12 @@ from .catalog import DEFERRED_165_SPECS, build_registry, volume_ids
 from .contracts import CapabilityRegistry, CapabilitySpec, EvidenceReceipt
 from .card_systems import AgentCard, CardClaim, CardRegistry, ClaimKind, DatasetCard, EvidenceRef, ModelCard, ToolCard
 from .executor import DeferredEffectAuthority, DeferredExecutionError, DeferredExecutionPendingError, DeferredExecutor, DeferredInvocation, ExecutionOutcome, ExecutionReceipt, FailureReceipt
+from .machine_governance import (
+    ArchitectureDiff, ArchitectureSnapshot, ArtifactComparison, BuildVariance,
+    CodeownersManifest, CodeownersRule, DiagramArtifact, DiagramSource,
+    DiagramSpec, DocCheck, DocReference, DocumentationRule, ReproBuild,
+    ReviewOwner, SensitiveOwnership, compare_builds, diff_architecture,
+)
 from .contract_fuzzing import ContractFuzzer, FuzzBudget, FuzzFailure, FuzzReport
 from .simulation_mode import SimulationAuthority, SimulationEvidence, SimulationRequest, SimulationResult, SimulationRuntime
 from .journal import DeferredExecutionJournal, DeferredJournalConflict, DeferredJournalError, DeferredJournalRecord, SqliteDeferredExecutionJournal
