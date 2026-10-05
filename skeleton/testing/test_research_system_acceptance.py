@@ -17,3 +17,17 @@ def test_self_reproduction_rejected():
  with pytest.raises(ResearchAcceptanceError,match="independent"):ReproductionEvidence("REPRO.1","CLAIM.1",S("m"),S("r"),"ACTOR.X","ACTOR.X",True)
 def test_claim_without_supporting_evidence_rejected():
  with pytest.raises(ResearchAcceptanceError,match="supporting"):coverage(evidence_digests=())
+
+def test_support_and_contradiction_cannot_share_artifact():
+ d=S("same")
+ with pytest.raises(ResearchAcceptanceError,match="both support and contradiction"):coverage(evidence_digests=(d,),contradiction_digests=(d,))
+def test_coverage_and_reproduction_flags_are_strict_booleans():
+ with pytest.raises(ResearchAcceptanceError,match="coverage flags"):coverage(uncertainty_recorded=1)
+ with pytest.raises(ResearchAcceptanceError,match="reproduced must be bool"):ReproductionEvidence("REPRO.X","CLAIM.1",S("m"),S("r"),"ACTOR.A","ACTOR.B",1)
+def test_uncovered_reproduction_blocks_acceptance():
+ extra=ReproductionEvidence("REPRO.2","CLAIM.OTHER",S("m2"),S("r2"),"ACTOR.REPRO","ACTOR.RESEARCH",True)
+ assert not acceptance(reproductions=(repro(),extra)).eligible
+def test_research_signoff_invalidates_on_evidence_drift():
+ a=acceptance();s=sign_acceptance(a);verify_acceptance(a,s)
+ changed=acceptance(conclusion_digest=S("changed"))
+ with pytest.raises(ResearchAcceptanceError,match="stale or mismatched"):verify_acceptance(changed,s)
