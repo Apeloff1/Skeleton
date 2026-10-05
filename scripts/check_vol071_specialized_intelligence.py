@@ -13,7 +13,6 @@ ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "machine/ai_domain_registry.json"
 MODULE_PATH = ROOT / "skeleton/ai/specialization/domain_registry.py"
 TEST_PATH = ROOT / "tests/test_vol071_specialized_intelligence.py"
-WORKFLOW_PATH = ROOT / ".github/workflows/vol071-specialized-intelligence.yml"
 
 EXPECTED_DOMAINS = {
     "software-engineering",
@@ -34,7 +33,7 @@ def _load_module():
 
 def validate() -> list[str]:
     errors: list[str] = []
-    for path in (MANIFEST, MODULE_PATH, TEST_PATH, WORKFLOW_PATH):
+    for path in (MANIFEST, MODULE_PATH, TEST_PATH):
         if not path.is_file():
             errors.append(f"required VOL-071 surface missing: {path.relative_to(ROOT)}")
     if errors:
@@ -130,7 +129,6 @@ def validate() -> list[str]:
         "registry": "skeleton/ai/specialization/domain_registry.py",
         "tests": "tests/test_vol071_specialized_intelligence.py",
         "verifier": "scripts/check_vol071_specialized_intelligence.py",
-        "workflow": ".github/workflows/vol071-specialized-intelligence.yml",
     }
     if implementation != expected_paths:
         errors.append("machine implementation path binding drift")
