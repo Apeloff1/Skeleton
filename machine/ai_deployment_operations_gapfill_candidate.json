@@ -1,0 +1,53 @@
+{
+  "schema_version": "skeleton.ai.deployment_operations_gapfill_candidate.v1",
+  "candidate_id": "P3-DEFERRED-DEPLOYMENT-OPERATIONS-01",
+  "status": "implementation_candidate",
+  "source_frontier": "machine/ai_masterplan_continuation_frontier.json",
+  "master_plan": "machine/ai_master_plan.json",
+  "ai_file_tree": "machine/ai_file_tree.json",
+  "source_queue_state": "queued_unmodified",
+  "volume_refs": [
+    "VOL-231","VOL-232","VOL-233","VOL-234","VOL-235",
+    "VOL-236","VOL-237","VOL-238","VOL-239","VOL-240"
+  ],
+  "shared_implementation": "skeleton/ai/runtime/deferred/operations_experience.py",
+  "assurance_implementation": "skeleton/ai/runtime/deferred/deployment_operations_assurance.py",
+  "primary_test_by_volume": {
+    "VOL-231": "skeleton/testing/test_edge_deployment.py",
+    "VOL-232": "skeleton/testing/test_enterprise_deployment.py",
+    "VOL-233": "skeleton/testing/test_identity_federation.py",
+    "VOL-234": "skeleton/testing/test_administration_plane.py",
+    "VOL-235": "skeleton/testing/test_audit_ui.py",
+    "VOL-236": "skeleton/testing/test_operations_dashboard.py",
+    "VOL-237": "skeleton/testing/test_agent_operations_dashboard.py",
+    "VOL-238": "skeleton/testing/test_research_dashboard.py",
+    "VOL-239": "skeleton/testing/test_model_operations.py",
+    "VOL-240": "skeleton/testing/test_model_rollback.py"
+  },
+  "mapping_requirements": {
+    "VOL-231": "AIFT-INVENTORY",
+    "VOL-232": "AIFT-SECURITY",
+    "VOL-233": "AIFT-SECURITY",
+    "VOL-234": "AIFT-SECURITY",
+    "VOL-235": "AIFT-OBSERVABILITY",
+    "VOL-236": "AIFT-OBSERVABILITY",
+    "VOL-237": "AIFT-AGENTS",
+    "VOL-238": "AIFT-RESEARCH",
+    "VOL-239": "AIFT-PROVIDER-RUNTIME",
+    "VOL-240": "AIFT-RELIABILITY"
+  },
+  "evidence_policy": {
+    "exact_head_ci_required": true,
+    "queued_frontier_must_remain_unchanged": true,
+    "independent_closure_required": true,
+    "completion_may_not_be_self_granted": true,
+    "production_authority_must_remain_false": true
+  },
+  "promotion_state": {
+    "completion_checkbox": false,
+    "implementation_signed": false,
+    "verification_signed": false,
+    "may_self_close": false,
+    "production_authority": false
+  }
+}
