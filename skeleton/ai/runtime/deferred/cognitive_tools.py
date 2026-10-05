@@ -38,10 +38,24 @@ class PlanDiagnostic: rule_id:str; location:str; severity:Severity; remediation:
 @dataclass(frozen=True,slots=True)
 class PlanAnalysis: ir_version:str; diagnostics:tuple[PlanDiagnostic,...]
 def analyze_plan(ir_version,nodes,edges,rules):
+ if not ir_version or not nodes:raise ValueError("plan identity and nodes required")
+ if any(not r.rule_id or not r.version for r in rules):raise ValueError("lint rule identity required")
+ if len({(r.rule_id,r.version) for r in rules})!=len(rules):raise ValueError("duplicate lint rule")
  ids=set(nodes);d=[]
  for a,b in edges:
   if a not in ids or b not in ids:d.append(PlanDiagnostic("edge-endpoint","edges",Severity.ERROR,"declare both endpoints"))
  if len(ids)!=len(nodes):d.append(PlanDiagnostic("duplicate-node","nodes",Severity.ERROR,"use unique node ids"))
+ graph={n:[] for n in ids}
+ for a,b in edges:
+  if a in ids and b in ids:graph[a].append(b)
+ visiting=set();visited=set()
+ def visit(n):
+  if n in visiting:return True
+  if n in visited:return False
+  visiting.add(n)
+  if any(visit(x) for x in graph[n]):return True
+  visiting.remove(n);visited.add(n);return False
+ if any(visit(n) for n in sorted(ids) if n not in visited):d.append(PlanDiagnostic("cycle","edges",Severity.ERROR,"remove dependency cycle"))
  return PlanAnalysis(ir_version,tuple(sorted(d,key=lambda x:(x.location,x.rule_id))))
 @dataclass(frozen=True,slots=True)
 class SimulatedStep: step_id:str; scenario:str; outcome:str
@@ -53,8 +67,11 @@ class PlanSimulation: steps:tuple[SimulatedStep,...]; findings:tuple[SimulationF
 def _production_evidence(self): return False
 PlanSimulation.production_evidence=property(_production_evidence)
 def simulate_plan(step_ids):
+ if not step_ids or any(not s for s in step_ids) or len(set(step_ids))!=len(step_ids):raise ValueError("unique simulation steps required")
  scenarios=("success","failure","timeout","resource_exhaustion")
- return PlanSimulation(tuple(SimulatedStep(s,x,"simulated") for s in step_ids for x in scenarios),tuple())
+ steps=tuple(SimulatedStep(s,x,"simulated") for s in step_ids for x in scenarios)
+ findings=tuple(SimulationFinding(x,"simulated adverse outcome") for x in scenarios if x!="success")
+ return PlanSimulation(steps,findings)
 @dataclass(frozen=True,slots=True)
 class ToolBinding: tool_id:str; version:str; authority:frozenset[str]; input_schema:str; output_schema:str; trust_class:str
 @dataclass(frozen=True,slots=True)
