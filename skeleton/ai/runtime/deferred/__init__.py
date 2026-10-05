@@ -14,6 +14,15 @@ from .lifecycle_safety import (
     MigrationReceipt, MigrationState, MigrationStep, ParityEvidence,
     RetirementDecision, can_remove_adapter, decide_retirement,
 )
+from .sdk_data import (
+    BenchmarkExecution, BenchmarkManifest, BenchmarkPlugin, Consistency,
+    DataConsumer, DataContract, DataField, EvaluationResult, EvaluationSDK,
+    EventConsumer, EventPublisher, EventSDK, InternalSDK, ProviderAdapterSpec,
+    ProviderConformance, ProviderSDK, SDKCompatibility, SDKExport, Scorer,
+    StateClass, StorageSDK, StoreHandle, TransactionHandle, admit_benchmark,
+    breaking_change, event_compatible, provider_conformant, record_evaluation,
+    select_store, supported_export,
+)
 from .contract_fuzzing import ContractFuzzer, FuzzBudget, FuzzFailure, FuzzReport
 from .simulation_mode import SimulationAuthority, SimulationEvidence, SimulationRequest, SimulationResult, SimulationRuntime
 from .journal import DeferredExecutionJournal, DeferredJournalConflict, DeferredJournalError, DeferredJournalRecord, SqliteDeferredExecutionJournal
