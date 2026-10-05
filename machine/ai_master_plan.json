@@ -1721,12 +1721,14 @@
       ],
       "implementation_paths": [
         "skeleton/automation",
-        "skeleton/automation/transactional_workspace.py"
+        "skeleton/automation/transactional_workspace.py",
+        "skeleton/automation/independent_review.py"
       ],
       "tests": [
         "planned:skeleton/testing/test_repo_edit_leases.py",
         "planned:skeleton/testing/test_autonomous_repair_flow.py",
-        "skeleton/testing/test_vol022_transactional_workspace.py"
+        "skeleton/testing/test_vol022_transactional_workspace.py",
+        "skeleton/testing/test_vol022_independent_review.py"
       ],
       "evaluations": [
         "planned:repair success without regression benchmark",
@@ -1739,9 +1741,7 @@
         "merge races",
         "self-review bias"
       ],
-      "gaps": [
-        "independent reviewer/verifier routing needs full integration"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-022",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
