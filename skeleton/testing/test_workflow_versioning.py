@@ -15,3 +15,8 @@ def test_major_migration_requires_bound_evidence():
 def test_invalid_versions_fail_closed():
  with pytest.raises(ValueError):V(-1)
  with pytest.raises(ValueError):WorkflowVersion(True,0,0)
+
+def test_migration_cannot_roll_back_version():
+ import pytest
+ b=WorkflowBinding("o","w",WorkflowVersion(2,0,0));m=WorkflowMigration("o",WorkflowVersion(2,0,0),WorkflowVersion(1,9,9),"e")
+ with pytest.raises(ValueError):m.apply(b)
