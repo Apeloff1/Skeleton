@@ -40,6 +40,83 @@ class ScenarioStopReason(str, Enum):
     NO_ACTIONS = "no_actions"
 
 
+@dataclass(frozen=True, slots=True)
+class SimulationRule:
+    """Content-bound declarative rule metadata for one simulation."""
+
+    rule_id: str
+    description: str
+    parameters: Mapping[str, object]
+    version: int = 1
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "rule_id", _token(self.rule_id, "rule_id"))
+        object.__setattr__(
+            self,
+            "description",
+            _token(self.description, "description", maximum=_MAX_TEXT),
+        )
+        object.__setattr__(
+            self,
+            "parameters",
+            _state_payload(self.parameters, "rule parameters"),
+        )
+        object.__setattr__(
+            self,
+            "version",
+            _positive_int(self.version, "rule version", maximum=1_000_000),
+        )
+
+    @property
+    def digest(self) -> str:
+        return _digest(
+            {
+                "schema": SCENARIO_SCHEMA,
+                "kind": "rule",
+                "rule_id": self.rule_id,
+                "description": self.description,
+                "parameters": dict(self.parameters),
+                "version": self.version,
+            }
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class SimulationRuleSet:
+    """Canonical non-empty rule set bound into every scenario tree."""
+
+    rules: tuple[SimulationRule, ...]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.rules, tuple) or not self.rules:
+            raise ScenarioRuntimeError("rules must be a non-empty tuple")
+        by_id: dict[str, SimulationRule] = {}
+        for rule in self.rules:
+            if not isinstance(rule, SimulationRule):
+                raise ScenarioRuntimeError("rules must contain SimulationRule")
+            if rule.rule_id in by_id:
+                raise ScenarioRuntimeError("duplicate simulation rule_id")
+            by_id[rule.rule_id] = rule
+        object.__setattr__(
+            self,
+            "rules",
+            tuple(by_id[key] for key in sorted(by_id)),
+        )
+
+    @property
+    def digest(self) -> str:
+        return _digest(
+            {
+                "schema": SCENARIO_SCHEMA,
+                "kind": "rule-set",
+                "rules": [
+                    {"rule_id": rule.rule_id, "digest": rule.digest}
+                    for rule in self.rules
+                ],
+            }
+        )
+
+
 def _token(value: object, field: str, *, maximum: int = 128) -> str:
     if not isinstance(value, str):
         raise ScenarioRuntimeError(f"{field} must be text")
@@ -571,6 +648,7 @@ class ScenarioTree:
     simulation_id: str
     authority_digest: str
     budget_digest: str
+    rule_set_digest: str
     root_id: str
     nodes: tuple[ScenarioNode, ...]
     edges: tuple[ScenarioEdge, ...]
@@ -592,6 +670,11 @@ class ScenarioTree:
             self,
             "budget_digest",
             _sha256(self.budget_digest, "budget_digest"),
+        )
+        object.__setattr__(
+            self,
+            "rule_set_digest",
+            _sha256(self.rule_set_digest, "rule_set_digest"),
         )
         object.__setattr__(self, "root_id", _token(self.root_id, "root_id"))
         if not isinstance(self.nodes, tuple) or not self.nodes:
@@ -666,6 +749,7 @@ class ScenarioTree:
                 "simulation_id": self.simulation_id,
                 "authority_digest": self.authority_digest,
                 "budget_digest": self.budget_digest,
+                "rule_set_digest": self.rule_set_digest,
                 "root_id": self.root_id,
                 "nodes": [node.digest for node in self.nodes],
                 "edges": [edge.digest for edge in self.edges],
@@ -695,18 +779,22 @@ class ScenarioRuntime:
         simulation_id: str,
         authority: SimulationAuthority,
         budget: SimulationBudget,
+        rules: SimulationRuleSet,
     ) -> None:
         self.simulation_id = _token(simulation_id, "simulation_id")
         if not isinstance(authority, SimulationAuthority):
             raise TypeError("authority must be SimulationAuthority")
         if not isinstance(budget, SimulationBudget):
             raise TypeError("budget must be SimulationBudget")
+        if not isinstance(rules, SimulationRuleSet):
+            raise TypeError("rules must be SimulationRuleSet")
         if authority.simulation_id != self.simulation_id:
             raise ScenarioRuntimeError(
                 "runtime/authority simulation identity mismatch"
             )
         self.authority = authority
         self.budget = budget
+        self.rules = rules
 
     @staticmethod
     def _root_id(
@@ -715,6 +803,7 @@ class ScenarioRuntime:
         initial_state_digest: str,
         authority_digest: str,
         budget_digest: str,
+        rule_set_digest: str,
     ) -> str:
         return "root-" + _digest(
             {
@@ -723,6 +812,7 @@ class ScenarioRuntime:
                 "initial_state_digest": initial_state_digest,
                 "authority_digest": authority_digest,
                 "budget_digest": budget_digest,
+                "rule_set_digest": rule_set_digest,
             }
         )[:32]
 
@@ -767,6 +857,7 @@ class ScenarioRuntime:
             initial_state_digest=root_state_digest,
             authority_digest=self.authority.digest,
             budget_digest=self.budget.digest,
+            rule_set_digest=self.rules.digest,
         )
         root = ScenarioNode(
             node_id=root_id,
@@ -945,6 +1036,7 @@ class ScenarioRuntime:
             simulation_id=self.simulation_id,
             authority_digest=self.authority.digest,
             budget_digest=self.budget.digest,
+            rule_set_digest=self.rules.digest,
             root_id=root.node_id,
             nodes=canonical_nodes,
             edges=canonical_edges,
@@ -987,6 +1079,8 @@ class ScenarioRuntime:
             raise ScenarioRuntimeError("tree authority identity mismatch")
         if tree.budget_digest != self.budget.digest:
             raise ScenarioRuntimeError("tree budget identity mismatch")
+        if tree.rule_set_digest != self.rules.digest:
+            raise ScenarioRuntimeError("tree rule-set identity mismatch")
         if tree.usage.nodes > self.budget.max_nodes:
             raise ScenarioRuntimeError("tree exceeds max_nodes")
         if tree.usage.actions > self.budget.max_total_actions:
@@ -1034,4 +1128,6 @@ __all__ = [
     "SimulationAction",
     "SimulationAuthority",
     "SimulationBudget",
+    "SimulationRule",
+    "SimulationRuleSet",
 ]
