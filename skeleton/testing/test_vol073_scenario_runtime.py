@@ -26,6 +26,21 @@ ScenarioTree = MODULE.ScenarioTree
 SimulationAction = MODULE.SimulationAction
 SimulationAuthority = MODULE.SimulationAuthority
 SimulationBudget = MODULE.SimulationBudget
+SimulationRule = MODULE.SimulationRule
+SimulationRuleSet = MODULE.SimulationRuleSet
+
+
+def rules(*items: SimulationRule) -> SimulationRuleSet:
+    return SimulationRuleSet(
+        items
+        or (
+            SimulationRule(
+                rule_id="movement",
+                description="Movement changes the simulated position only.",
+                parameters={"max_delta": 1},
+            ),
+        )
+    )
 
 
 def authority(*capabilities: str) -> SimulationAuthority:
@@ -101,6 +116,7 @@ def runtime(**budget_overrides: int) -> ScenarioRuntime:
         simulation_id="game:test",
         authority=authority(),
         budget=budget(**budget_overrides),
+        rules=rules(),
     )
 
 
@@ -156,6 +172,7 @@ def test_action_requires_explicit_simulation_capability() -> None:
         simulation_id="game:test",
         authority=authority("move"),
         budget=budget(),
+        rules=rules(),
     )
 
     def expand(state, node):
@@ -540,3 +557,93 @@ def test_runtime_verify_rejects_child_cost_chain_tampering() -> None:
     forged = replace(tree, nodes=forged_nodes)
     with pytest.raises(ScenarioRuntimeError, match="cumulative cost"):
         rt.verify(forged)
+
+
+def test_rule_set_is_canonical_and_content_bound() -> None:
+    left = SimulationRule(
+        rule_id="a-rule",
+        description="First deterministic rule.",
+        parameters={"value": 1},
+    )
+    right = SimulationRule(
+        rule_id="b-rule",
+        description="Second deterministic rule.",
+        parameters={"value": 2},
+    )
+    first = SimulationRuleSet((right, left))
+    second = SimulationRuleSet((left, right))
+
+    assert first.rules == second.rules
+    assert first.digest == second.digest
+
+
+def test_duplicate_rule_identity_fails_closed() -> None:
+    first = SimulationRule(
+        rule_id="same-rule",
+        description="First rule.",
+        parameters={"value": 1},
+    )
+    second = SimulationRule(
+        rule_id="same-rule",
+        description="Conflicting rule.",
+        parameters={"value": 2},
+    )
+
+    with pytest.raises(ScenarioRuntimeError, match="duplicate simulation rule_id"):
+        SimulationRuleSet((first, second))
+
+
+def test_rule_parameters_must_be_deterministic_json() -> None:
+    with pytest.raises(ScenarioRuntimeError, match="deterministic JSON"):
+        SimulationRule(
+            rule_id="bad-rule",
+            description="Invalid rule payload.",
+            parameters={"value": object()},
+        )
+
+
+def test_tree_identity_binds_exact_rule_set() -> None:
+    rt = runtime()
+    tree = rt.explore({"position": 0}, lambda state, node: ())
+    assert tree.rule_set_digest == rt.rules.digest
+
+    altered_rules = SimulationRuleSet(
+        (
+            SimulationRule(
+                rule_id="movement",
+                description="Movement changes the simulated position only.",
+                parameters={"max_delta": 2},
+            ),
+        )
+    )
+    altered_runtime = ScenarioRuntime(
+        simulation_id="game:test",
+        authority=authority(),
+        budget=budget(),
+        rules=altered_rules,
+    )
+    with pytest.raises(ScenarioRuntimeError, match="rule-set identity mismatch"):
+        altered_runtime.verify(tree)
+
+
+def test_root_identity_changes_when_rule_contract_changes() -> None:
+    first = runtime()
+    second = ScenarioRuntime(
+        simulation_id="game:test",
+        authority=authority(),
+        budget=budget(),
+        rules=SimulationRuleSet(
+            (
+                SimulationRule(
+                    rule_id="movement",
+                    description="Movement changes the simulated position only.",
+                    parameters={"max_delta": 9},
+                ),
+            )
+        ),
+    )
+    first_tree = first.explore({"position": 0}, lambda state, node: ())
+    second_tree = second.explore({"position": 0}, lambda state, node: ())
+
+    assert first_tree.root_id != second_tree.root_id
+    assert first_tree.digest != second_tree.digest
