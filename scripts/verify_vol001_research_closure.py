@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Independent exact-head evidence generator for VOL-001."""
 from __future__ import annotations
-import argparse, hashlib, json, os
+import argparse, hashlib, json, os, subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,10 +17,18 @@ TESTS = (
 def digest(path: str) -> str:
     return hashlib.sha256((ROOT / path).read_bytes()).hexdigest()
 
-def build_receipt(head_sha: str) -> dict[str, object]:
+def repository_head() -> str:
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+def build_receipt(head_sha: str, *, actual_head_sha: str | None = None) -> dict[str, object]:
     errors: list[str] = []
     if len(head_sha) != 40 or any(ch not in "0123456789abcdef" for ch in head_sha):
         errors.append("head_sha must be a lowercase 40-character git sha")
+    actual = actual_head_sha if actual_head_sha is not None else repository_head()
+    if head_sha != actual:
+        errors.append("declared head_sha does not match checked-out repository HEAD")
     mirrors: dict[str, object] = {}
     for canonical, mirror in PAIRS:
         canonical_digest, mirror_digest = digest(canonical), digest(mirror)
@@ -30,6 +38,7 @@ def build_receipt(head_sha: str) -> dict[str, object]:
     payload: dict[str, object] = {
         "kind": "vol001-independent-research-verification-v1",
         "head_sha": head_sha,
+        "repository_head_sha": actual,
         "verifier": "independent-vol001-research-v1",
         "authority_scope": "verification-evidence-only",
         "production_authority": False,
