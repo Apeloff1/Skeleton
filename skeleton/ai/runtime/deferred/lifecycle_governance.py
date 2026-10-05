@@ -41,7 +41,8 @@ class ModelTransition: source:ModelState; target:ModelState; evidence:ModelGover
 @dataclass(frozen=True,slots=True)
 class ModelLifecycle: model_id:str; state:ModelState
 def transition_model(m,t):
- if m.state!=t.source or not all((t.evidence.evidence_id,t.evidence.owner,t.evidence.rollback,t.evidence.retention)):raise ValueError("invalid transition evidence")
+ allowed={ModelState.INTAKE:{ModelState.EVALUATED},ModelState.EVALUATED:{ModelState.DEPLOYED,ModelState.RETIRED},ModelState.DEPLOYED:{ModelState.RETIRED},ModelState.RETIRED:{ModelState.ARCHIVED},ModelState.ARCHIVED:set()}
+ if not m.model_id or m.state!=t.source or t.target not in allowed[t.source] or not all((t.evidence.evidence_id,t.evidence.owner,t.evidence.rollback,t.evidence.retention)):raise ValueError("invalid transition evidence")
  return ModelLifecycle(m.model_id,t.target)
 @dataclass(frozen=True,slots=True)
 class ModelConsumer: consumer_id:str; migrated:bool
@@ -49,7 +50,9 @@ class ModelConsumer: consumer_id:str; migrated:bool
 class ModelDeprecation: model_id:str; replacement:str; deadline:int; consumers:tuple[ModelConsumer,...]
 @dataclass(frozen=True,slots=True)
 class ModelRetirement: model_id:str; allowed:bool; exception_receipt:str|None=None
-def retire_model(d,exception=None):return ModelRetirement(d.model_id,all(c.migrated for c in d.consumers) or bool(exception),exception)
+def retire_model(d,exception=None):
+ if not d.model_id or not d.replacement or d.deadline<0 or any(not c.consumer_id for c in d.consumers):raise ValueError("invalid deprecation identity")
+ return ModelRetirement(d.model_id,all(c.migrated for c in d.consumers) or bool(exception),exception)
 @dataclass(frozen=True,slots=True)
 class ProviderParity: capability:bool; policy:bool; quality:bool; cost:bool; data_boundary:bool
 @dataclass(frozen=True,slots=True)
