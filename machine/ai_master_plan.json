@@ -6156,7 +6156,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Write runbooks against named signals, commands, authority and rollback points.",
         "Test high-risk runbooks in drills and update them from incident evidence.",
@@ -6173,17 +6173,13 @@
         "RunbookValidation"
       ],
       "implementation_paths": [
-        "docs",
-        "scripts",
-        "skeleton/observability"
+        "skeleton/observability/runbooks.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_runbook_references.py",
-        "planned:runbook command validation tests"
+        "skeleton/testing/test_vol091_runbooks.py"
       ],
       "evaluations": [
-        "planned:operator recovery drill",
-        "planned:runbook dependency-loss evaluation"
+        "skeleton/testing/test_vol091_runbooks.py"
       ],
       "evidence": [],
       "risks": [
@@ -6191,10 +6187,7 @@
         "missing escalation",
         "circular recovery dependency"
       ],
-      "gaps": [
-        "establish runbook registry",
-        "bind drills to runbook versions"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-091",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
