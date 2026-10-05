@@ -8,12 +8,13 @@ def test_machine_inventory_covers_every_runtime_schema_exactly_once():
  schemas=json.loads((ROOT/"machine/ai_runtime_schemas.json").read_text())
  conformance=json.loads((ROOT/"machine/contract_conformance.json").read_text())
  records=schemas["records"]
- names=[r["name"] for r in records]
+ assert isinstance(records,dict)
+ names=set(records)
  entries=conformance["entries"]
  inventory=[e["contract"] for e in entries]
  assert len(inventory)==len(set(inventory))
- assert set(inventory)==set(names)
- owners={r["name"]:r["owner_plane"] for r in records}
+ assert set(inventory)==names
+ owners={name:record["owner_plane"] for name,record in records.items()}
  assert all(e["producer_plane"]==owners[e["contract"]] for e in entries)
  assert all(e["consumer_planes"] for e in entries)
 
