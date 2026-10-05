@@ -38,7 +38,7 @@ class ChangeStep: step_id:str; reversible:bool; rollback:str|None
 @dataclass(frozen=True,slots=True)
 class SafeChangePlan: steps:tuple[ChangeStep,...]; gates:tuple[ChangeGate,...]; budget_ok:bool
 def change_admissible(p):
- return p.budget_ok and not any(g.hard and not g.passed for g in p.gates) and all(s.reversible or s.rollback is not None for s in p.steps)
+ return bool(p.steps) and bool(p.gates) and p.budget_ok and not any(g.hard and not g.passed for g in p.gates) and all(bool(s.step_id) and (s.reversible or bool(s.rollback)) for s in p.steps)
 @dataclass(frozen=True,slots=True)
 class SystemSource: contract_version:str; content:str; authority:frozenset[str]
 @dataclass(frozen=True,slots=True)
