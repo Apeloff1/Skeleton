@@ -26,7 +26,7 @@ class ReproductionEvidence:
  def __post_init__(self):
   for f in ("reproduction_id","claim_id","reproducer_id","original_researcher_id"):object.__setattr__(self,f,_id(getattr(self,f),f))
   _sha(self.method_digest,"method_digest");_sha(self.result_digest,"result_digest")
-  if self.reproducer_id==self.original_researcher_id:raise ResearchAcceptanceError("reproduction must be independent")
+  if not isinstance(self.reproduced,bool):raise ResearchAcceptanceError("reproduced must be bool")\n  if self.reproducer_id==self.original_researcher_id:raise ResearchAcceptanceError("reproduction must be independent")
 @dataclass(frozen=True,slots=True)
 class ResearchAcceptance:
  acceptance_id:str;conclusion_digest:str;coverage:tuple[ClaimEvidenceCoverage,...];reproductions:tuple[ReproductionEvidence,...];high_impact:bool;reviewer_id:str;researcher_id:str
@@ -34,7 +34,7 @@ class ResearchAcceptance:
   object.__setattr__(self,"acceptance_id",_id(self.acceptance_id,"acceptance_id"));_sha(self.conclusion_digest,"conclusion_digest")
   object.__setattr__(self,"reviewer_id",_id(self.reviewer_id,"reviewer_id"));object.__setattr__(self,"researcher_id",_id(self.researcher_id,"researcher_id"))
   if self.high_impact and self.reviewer_id==self.researcher_id:raise ResearchAcceptanceError("high-impact conclusion requires independent review")
-  claims=[c.claim_id for c in self.coverage]
+  if not isinstance(self.high_impact,bool):raise ResearchAcceptanceError("high_impact must be bool")\n  if not isinstance(self.coverage,tuple) or not isinstance(self.reproductions,tuple):raise ResearchAcceptanceError("acceptance collections must be tuples")\n  if any(not isinstance(x,ClaimEvidenceCoverage) for x in self.coverage) or any(not isinstance(x,ReproductionEvidence) for x in self.reproductions):raise ResearchAcceptanceError("acceptance evidence must be typed")\n  claims=[c.claim_id for c in self.coverage]
   if not claims or len(set(claims))!=len(claims):raise ResearchAcceptanceError("claim coverage must be nonempty and unique")
  @property
  def eligible(self):
