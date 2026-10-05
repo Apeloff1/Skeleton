@@ -94,3 +94,11 @@ def authorize(task:MaintenanceTask, ownership:RepositoryOwnership, evidence:Reso
         if ownership.active_refs: reasons.append("active_references")
     decision=MaintenanceDecision.BLOCK if reasons else MaintenanceDecision.ALLOW
     return MaintenanceReceipt(task.digest,ownership.digest,evidence.digest if evidence else None,decision,tuple(reasons))
+
+
+def enforce_mutation_budget(task:MaintenanceTask, receipt:MaintenanceReceipt, mutation_count:int)->None:
+    """Fail closed before applying a bounded maintenance mutation batch."""
+    if receipt.task_digest!=task.digest: raise MaintenanceError("receipt is not bound to exact task")
+    if receipt.decision is not MaintenanceDecision.ALLOW: raise MaintenanceError("blocked maintenance task cannot mutate")
+    if isinstance(mutation_count,bool) or not isinstance(mutation_count,int) or mutation_count<1: raise MaintenanceError("mutation_count must be positive integer")
+    if mutation_count>task.mutation_limit: raise MaintenanceError("mutation batch exceeds task limit")
