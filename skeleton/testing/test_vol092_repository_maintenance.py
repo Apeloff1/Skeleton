@@ -578,3 +578,80 @@ def test_canonical_and_governed_maintenance_runtime_are_byte_identical():
     ).read_bytes() == (
         ROOT / "skeleton/ai/build/repo_machine/maintenance.py"
     ).read_bytes()
+
+
+def test_registry_rejects_duplicate_repository_path_ownership():
+    first = ownership(
+        resource_id="RESOURCE.FILE.ONE",
+        kind=ResourceKind.FILE,
+        repository_path="tmp/shared.txt",
+    )
+    second = ownership(
+        resource_id="RESOURCE.FILE.TWO",
+        kind=ResourceKind.FILE,
+        repository_path="tmp/shared.txt",
+    )
+    with pytest.raises(MaintenanceError, match="duplicate repository path"):
+        MaintenanceRegistry((first, second))
+
+
+def test_plan_rejects_multiple_tasks_for_one_resource():
+    registry = MaintenanceRegistry((ownership(),))
+    one = task(task_id="TASK.ONE")
+    two = task(
+        task_id="TASK.TWO",
+        action=MaintenanceAction.UPDATE,
+        risk=MaintenanceRisk.MEDIUM,
+    )
+    with pytest.raises(MaintenanceError, match="one resource"):
+        registry.plan((one, two), (evidence(),), at=NOW)
+
+
+def test_plan_rejects_overlapping_repository_delete_paths():
+    parent = ownership(
+        resource_id="RESOURCE.DIR.PARENT",
+        kind=ResourceKind.ARTIFACT,
+        repository_path="tmp/generated",
+    )
+    child = ownership(
+        resource_id="RESOURCE.FILE.CHILD",
+        kind=ResourceKind.FILE,
+        repository_path="tmp/generated/child.txt",
+    )
+    registry = MaintenanceRegistry((parent, child))
+    parent_task = task(
+        task_id="TASK.DELETE.PARENT",
+        resource_id=parent.resource_id,
+    )
+    child_task = task(
+        task_id="TASK.DELETE.CHILD",
+        resource_id=child.resource_id,
+    )
+    with pytest.raises(MaintenanceError, match="overlapping repository"):
+        registry.plan((parent_task, child_task), (), at=NOW)
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        ResourceKind.BRANCH,
+        ResourceKind.DEPENDENCY,
+        ResourceKind.ARTIFACT,
+    ],
+)
+def test_non_file_resource_kinds_can_use_evidence_bound_cleanup(kind):
+    target_owner = ownership(kind=kind)
+    target_task = task()
+    target_evidence = evidence()
+    assert (
+        authorize(target_task, target_owner, target_evidence, at=NOW).decision
+        is MaintenanceVerdict.ALLOW
+    )
+
+
+def test_repository_machine_package_exports_remain_byte_identical():
+    assert (
+        ROOT / "skeleton/repo_machine/__init__.py"
+    ).read_bytes() == (
+        ROOT / "skeleton/ai/build/repo_machine/__init__.py"
+    ).read_bytes()
