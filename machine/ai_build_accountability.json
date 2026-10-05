@@ -13923,22 +13923,29 @@
       "id": "ACC-VOL-097",
       "type": "volume",
       "title": "VOL-097 VS-001 Functional AI",
-      "status": "unverified",
+      "status": "implemented",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-10-05T17:13:51Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-10-05T17:13:51Z",
+        "git_sha": "21cc015099f55749e18d7e204d4e55f0488adb46",
+        "evidence_refs": [
+          "backend",
+          "frontend",
+          "https://github.com/Apeloff1/Skeleton/commit/21cc015099f55749e18d7e204d4e55f0488adb46",
+          "skeleton/ai",
+          "skeleton/ai/functional_transaction.py",
+          "skeleton/testing/test_vs001_transaction_contract.py"
+        ],
+        "statement": "Implementation-signed after provider-neutral functional-AI transaction identity, explicit tool authorization, verified side-effect result binding, immutable terminal outcome, and reconnect-safe authoritative stream replay landed on main. Existing maturity gaps and independent verification remain open.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/21cc015099f55749e18d7e204d4e55f0488adb46"
       },
       "verification_signoff": {
         "signed": false,
@@ -13954,31 +13961,86 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-10-05T17:13:51Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T17:13:51Z",
+          "git_sha": "21cc015099f55749e18d7e204d4e55f0488adb46",
+          "statement": "Begin accountability reconciliation for landed VOL-097 implementation.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/21cc015099f55749e18d7e204d4e55f0488adb46",
+          "from_status": "unverified",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/21cc015099f55749e18d7e204d4e55f0488adb46"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T17:13:51Z",
+          "git_sha": "21cc015099f55749e18d7e204d4e55f0488adb46",
+          "statement": "Implementation-signed after provider-neutral functional-AI transaction identity, explicit tool authorization, verified side-effect result binding, immutable terminal outcome, and reconnect-safe authoritative stream replay landed on main. Existing maturity gaps and independent verification remain open.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/21cc015099f55749e18d7e204d4e55f0488adb46",
+          "from_status": "in_progress",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "backend",
+            "frontend",
+            "https://github.com/Apeloff1/Skeleton/commit/21cc015099f55749e18d7e204d4e55f0488adb46",
+            "skeleton/ai",
+            "skeleton/ai/functional_transaction.py",
+            "skeleton/testing/test_vs001_transaction_contract.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "backend",
+        "frontend",
+        "https://github.com/Apeloff1/Skeleton/commit/21cc015099f55749e18d7e204d4e55f0488adb46",
+        "skeleton/ai",
+        "skeleton/ai/functional_transaction.py",
+        "skeleton/testing/test_vs001_transaction_contract.py"
+      ],
       "baseline_status": "unverified"
     },
     {
       "id": "ACC-VOL-098",
       "type": "volume",
       "title": "VOL-098 VS-002 Engineering Agent",
-      "status": "unverified",
+      "status": "implemented",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-10-05T17:17:08Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-10-05T17:17:08Z",
+        "git_sha": "980f186591f795524ab7535ff34e6d68176cc582",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/361b68ec3f5cfc60aafb01561828afa9688c3f7a",
+          "https://github.com/Apeloff1/Skeleton/commit/980f186591f795524ab7535ff34e6d68176cc582",
+          "scripts",
+          "skeleton/ai/build",
+          "skeleton/ai/build/engineering_agent.py",
+          "skeleton/repo_intelligence",
+          "skeleton/testing/test_vs002_mutation_custody.py"
+        ],
+        "statement": "Implementation-signed after bounded engineering tasks, mutation lease/fencing custody, scoped change records, independent verification evidence, rollback-gated acceptance, and reconstruction-syntax repair landed on main. Existing maturity gaps and independent verification remain open.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/980f186591f795524ab7535ff34e6d68176cc582"
       },
       "verification_signoff": {
         "signed": false,
@@ -13994,9 +14056,58 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-10-05T17:17:08Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T17:17:08Z",
+          "git_sha": "980f186591f795524ab7535ff34e6d68176cc582",
+          "statement": "Begin accountability reconciliation for landed VOL-098 implementation.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/980f186591f795524ab7535ff34e6d68176cc582",
+          "from_status": "unverified",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/980f186591f795524ab7535ff34e6d68176cc582"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T17:17:08Z",
+          "git_sha": "980f186591f795524ab7535ff34e6d68176cc582",
+          "statement": "Implementation-signed after bounded engineering tasks, mutation lease/fencing custody, scoped change records, independent verification evidence, rollback-gated acceptance, and reconstruction-syntax repair landed on main. Existing maturity gaps and independent verification remain open.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/980f186591f795524ab7535ff34e6d68176cc582",
+          "from_status": "in_progress",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/361b68ec3f5cfc60aafb01561828afa9688c3f7a",
+            "https://github.com/Apeloff1/Skeleton/commit/980f186591f795524ab7535ff34e6d68176cc582",
+            "scripts",
+            "skeleton/ai/build",
+            "skeleton/ai/build/engineering_agent.py",
+            "skeleton/repo_intelligence",
+            "skeleton/testing/test_vs002_mutation_custody.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/361b68ec3f5cfc60aafb01561828afa9688c3f7a",
+        "https://github.com/Apeloff1/Skeleton/commit/980f186591f795524ab7535ff34e6d68176cc582",
+        "scripts",
+        "skeleton/ai/build",
+        "skeleton/ai/build/engineering_agent.py",
+        "skeleton/repo_intelligence",
+        "skeleton/testing/test_vs002_mutation_custody.py"
+      ],
       "baseline_status": "unverified"
     },
     {
