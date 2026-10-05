@@ -1,0 +1,142 @@
+from __future__ import annotations
+
+import hashlib
+import pytest
+
+from skeleton.documentation.runtime import (
+    CheckStatus, DocumentationError, DocumentationSource, GeneratedDocument,
+    GeneratedSection, GeneratorIdentity, SourceDigestSet, SourceKind,
+    assert_clean_regeneration, generated_manifest, markers,
+    replace_generated_section, validate_owned_sections, validate_references,
+)
+
+
+def sha(text: str) -> str:
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def source_set(reverse=False):
+    items = (
+        DocumentationSource("source.plan", SourceKind.MACHINE, "machine/ai_master_plan.json", sha("plan")),
+        DocumentationSource("source.rationale", SourceKind.HUMAN, "docs/plan/MASTER_PLAN.md", sha("rationale")),
+    )
+    return SourceDigestSet(tuple(reversed(items)) if reverse else items)
+
+
+def generator(version="1.0.0"):
+    return GeneratorIdentity("skeleton.docs", version, sha("generator-code"))
+
+
+def section(body="generated content", *, sources=None, gen=None):
+    sources = sources or source_set()
+    gen = gen or generator()
+    return GeneratedSection("capabilities", sources.digest, gen.digest, body)
+
+
+def test_source_digest_set_is_deterministic():
+    assert source_set().digest == source_set(reverse=True).digest
+
+
+def test_duplicate_source_identity_rejected():
+    item = DocumentationSource("source.plan", SourceKind.MACHINE, "machine/plan.json", sha("x"))
+    with pytest.raises(DocumentationError, match="duplicate source"):
+        SourceDigestSet((item, item))
+
+
+def test_generated_document_rejects_stale_source_digest():
+    sources = source_set()
+    stale = GeneratedSection("capabilities", sha("old"), generator().digest, "body")
+    with pytest.raises(DocumentationError, match="source digest is stale"):
+        GeneratedDocument("docs/generated/capabilities.md", generator(), sources, (stale,))
+
+
+def test_generated_document_rejects_stale_generator():
+    sources = source_set()
+    stale = GeneratedSection("capabilities", sources.digest, generator("0.9.0").digest, "body")
+    with pytest.raises(DocumentationError, match="generator identity is stale"):
+        GeneratedDocument("docs/generated/capabilities.md", generator(), sources, (stale,))
+
+
+def test_replacement_preserves_human_authored_bytes():
+    begin, end = markers("capabilities")
+    original = "# Human rationale\nDO NOT CHANGE\n\n" + begin + "\nold\n" + end + "\n\n## Warning\nkeep me\n"
+    updated = replace_generated_section(original, section("new\nordered"))
+    assert updated.startswith("# Human rationale\nDO NOT CHANGE\n\n")
+    assert updated.endswith("\n\n## Warning\nkeep me\n")
+    assert "old" not in updated
+    assert "new\nordered" in updated
+
+
+def test_missing_marker_fails_closed_instead_of_appending():
+    with pytest.raises(DocumentationError, match="exactly once"):
+        replace_generated_section("# human only\n", section())
+
+
+def test_duplicate_markers_fail_closed():
+    begin, end = markers("capabilities")
+    doc = f"{begin}\na\n{end}\n{begin}\nb\n{end}"
+    with pytest.raises(DocumentationError, match="exactly once"):
+        replace_generated_section(doc, section())
+
+
+def test_reversed_markers_fail_closed():
+    begin, end = markers("capabilities")
+    with pytest.raises(DocumentationError, match="malformed"):
+        replace_generated_section(end + "\nbody\n" + begin, section())
+
+
+def test_generated_body_cannot_inject_ownership_markers():
+    begin, _ = markers("capabilities")
+    with pytest.raises(DocumentationError, match="ownership markers"):
+        section("payload\n" + begin)
+
+
+def test_owned_section_validation_reports_failure_not_silent_success():
+    checks = validate_owned_sections("# docs", ["capabilities"])
+    assert checks[0].status is CheckStatus.FAIL
+
+
+def test_reference_validation_is_explicit_and_deterministic():
+    doc = "See [[ref:VOL-088]] and [[ref:CTRL.MISSING]]."
+    checks = validate_references(doc, {"VOL-088"})
+    by_id = {c.check_id: c.status for c in checks}
+    assert by_id["reference:VOL-088"] is CheckStatus.PASS
+    assert by_id["reference:CTRL.MISSING"] is CheckStatus.FAIL
+
+
+def test_clean_regeneration_rejects_any_drift():
+    assert_clean_regeneration("same\n", "same\n")
+    with pytest.raises(DocumentationError, match="drift"):
+        assert_clean_regeneration("old\n", "new\n")
+
+
+def test_manifest_binds_generator_sources_sections_and_policy():
+    sources = source_set()
+    gen = generator()
+    doc = GeneratedDocument("docs/generated/capabilities.md", gen, sources, (section(sources=sources, gen=gen),))
+    manifest = generated_manifest(doc)
+    assert manifest["source_digest_set"] == sources.digest
+    assert manifest["generator"]["digest"] == gen.digest
+    assert manifest["manifest_digest"] == doc.manifest_digest
+    assert manifest["editing_policy"] == "regenerate-derived-sections-do-not-hand-edit"
+
+
+def test_manifest_changes_when_generator_version_changes():
+    sources = source_set()
+    first_gen = generator("1.0.0")
+    second_gen = generator("1.0.1")
+    first = GeneratedDocument("docs/generated/capabilities.md", first_gen, sources, (section(sources=sources, gen=first_gen),))
+    second = GeneratedDocument("docs/generated/capabilities.md", second_gen, sources, (section(sources=sources, gen=second_gen),))
+    assert first.manifest_digest != second.manifest_digest
+
+
+def test_manifest_changes_when_source_changes():
+    gen = generator()
+    first_sources = source_set()
+    second_sources = SourceDigestSet((
+        DocumentationSource("source.plan", SourceKind.MACHINE, "machine/ai_master_plan.json", sha("changed")),
+        DocumentationSource("source.rationale", SourceKind.HUMAN, "docs/plan/MASTER_PLAN.md", sha("rationale")),
+    ))
+    first = GeneratedDocument("docs/generated/capabilities.md", gen, first_sources, (section(sources=first_sources, gen=gen),))
+    second = GeneratedDocument("docs/generated/capabilities.md", gen, second_sources, (section(sources=second_sources, gen=gen),))
+    assert first.manifest_digest != second.manifest_digest
