@@ -84,7 +84,10 @@ class LearningSignalRetentionPolicy:
         if not isinstance(self.region, str) or not self.region.strip():
             raise LearningRetentionError("region is required")
         normalized_region = self.region.strip().upper()
-        policy_for_region(normalized_region)
+        try:
+            policy_for_region(normalized_region)
+        except Exception as exc:
+            raise LearningRetentionError("region is not governed") from exc
         object.__setattr__(self, "region", normalized_region)
         if not isinstance(self.exportable, bool):
             raise LearningRetentionError("exportable must be boolean")
