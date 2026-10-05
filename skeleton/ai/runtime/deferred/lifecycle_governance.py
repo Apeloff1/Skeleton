@@ -18,6 +18,8 @@ class DataRights: dataset_id:str; grants:tuple[UsageGrant,...]; consent:bool
 @dataclass(frozen=True,slots=True)
 class RightsDecision: allowed:bool; reason:str
 def rights_decision(r,purpose,geography,training=False,evaluation=False):
+ if not r.dataset_id or not purpose or not geography:return RightsDecision(False,"identity absent")
+ if any(g.retention_days<0 or not g.purpose or not g.geography for g in r.grants):return RightsDecision(False,"invalid grant")
  if not r.consent:return RightsDecision(False,"consent absent")
  ok=any(g.purpose==purpose and geography in g.geography and (not training or g.training) and (not evaluation or g.evaluation) for g in r.grants)
  return RightsDecision(ok,"granted" if ok else "purpose/geography/use denied")
@@ -28,6 +30,7 @@ class EthicsReview: review_id:str; risk:ResearchRisk; consent_verified:bool; ove
 @dataclass(frozen=True,slots=True)
 class EthicsDecision: approved:bool; reason:str
 def ethics_decision(r):
+ if not r.review_id:return EthicsDecision(False,"review identity absent")
  sensitive=any((r.risk.sensitive_human,r.risk.sensitive_data,r.risk.dual_use))
  return EthicsDecision((not sensitive) or (r.consent_verified and bool(r.oversight_receipt)),"review criteria")
 class ModelState(str,Enum): INTAKE="intake"; EVALUATED="evaluated"; DEPLOYED="deployed"; RETIRED="retired"; ARCHIVED="archived"
