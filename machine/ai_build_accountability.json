@@ -3256,7 +3256,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-10-05T16:21:00Z",
+      "last_event_at_utc": "2026-10-05T17:47:16Z",
       "history": [
         {
           "sequence": 1,
@@ -3299,6 +3299,26 @@
             "skeleton/simulation/scenario_runtime.py",
             "skeleton/testing/test_vol019_world_model_contract.py"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "evidence_refreshed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "evidence-steward",
+          "at_utc": "2026-10-05T17:47:16Z",
+          "git_sha": "9482455089eabb2c5086a0286977bc880f34d846",
+          "statement": "Bind adversarial reducer-output hardening that rejects boolean/string coercion, invalid uncertainty, and preserves state atomically on malformed reducer output. This strengthens implementation evidence only; independent verification and completion remain unsigned.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/9482455089eabb2c5086a0286977bc880f34d846",
+          "from_status": "implemented",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2927",
+            "https://github.com/Apeloff1/Skeleton/commit/9482455089eabb2c5086a0286977bc880f34d846",
+            "skeleton/simulation/environment.py",
+            "skeleton/testing/test_vol019_world_model_contract.py"
+          ]
         }
       ],
       "evidence": [
@@ -3308,7 +3328,9 @@
         "skeleton/simulation/environment.py",
         "skeleton/simulation/world_model.py",
         "skeleton/simulation/scenario_runtime.py",
-        "skeleton/testing/test_vol019_world_model_contract.py"
+        "skeleton/testing/test_vol019_world_model_contract.py",
+        "https://github.com/Apeloff1/Skeleton/pull/2927",
+        "https://github.com/Apeloff1/Skeleton/commit/9482455089eabb2c5086a0286977bc880f34d846"
       ],
       "baseline_status": "unverified"
     },
@@ -3495,7 +3517,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-10-05T16:21:00Z",
+      "last_event_at_utc": "2026-10-05T17:47:16Z",
       "history": [
         {
           "sequence": 1,
@@ -3536,6 +3558,26 @@
             "skeleton/testing/test_vol022_transactional_workspace.py",
             "skeleton/testing/test_vol022_independent_review.py"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "evidence_refreshed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "evidence-steward",
+          "at_utc": "2026-10-05T17:47:16Z",
+          "git_sha": "a6dbd8fd9d8f9299badff158cec540f5bedbff22",
+          "statement": "Bind fail-closed independent-review hardening so rejected or blocking reviews cannot satisfy the acceptance predicate. This strengthens implementation evidence only; independent verification and completion remain unsigned.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/a6dbd8fd9d8f9299badff158cec540f5bedbff22",
+          "from_status": "implemented",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2925",
+            "https://github.com/Apeloff1/Skeleton/commit/a6dbd8fd9d8f9299badff158cec540f5bedbff22",
+            "skeleton/automation/independent_review.py",
+            "skeleton/testing/test_vol022_independent_review.py"
+          ]
         }
       ],
       "evidence": [
@@ -3544,7 +3586,9 @@
         "skeleton/automation/transactional_workspace.py",
         "skeleton/automation/independent_review.py",
         "skeleton/testing/test_vol022_transactional_workspace.py",
-        "skeleton/testing/test_vol022_independent_review.py"
+        "skeleton/testing/test_vol022_independent_review.py",
+        "https://github.com/Apeloff1/Skeleton/pull/2925",
+        "https://github.com/Apeloff1/Skeleton/commit/a6dbd8fd9d8f9299badff158cec540f5bedbff22"
       ],
       "baseline_status": "unverified"
     },
@@ -13756,7 +13800,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-10-05T16:10:31Z",
+      "last_event_at_utc": "2026-10-05T17:47:16Z",
       "history": [
         {
           "sequence": 1,
@@ -13794,13 +13838,35 @@
             "skeleton/automation/priority_engine.py",
             "skeleton/testing/test_priority_engine.py"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "evidence_refreshed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "evidence-steward",
+          "at_utc": "2026-10-05T17:47:16Z",
+          "git_sha": "0f1a76f115b78f97dc5abb2b9a9d694682a23f7f",
+          "statement": "Bind post-signoff priority-engine hardening that rejects forged priority decisions with focused regression coverage. This strengthens implementation evidence only; independent verification and completion remain unsigned.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/0f1a76f115b78f97dc5abb2b9a9d694682a23f7f",
+          "from_status": "implemented",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2935",
+            "https://github.com/Apeloff1/Skeleton/commit/0f1a76f115b78f97dc5abb2b9a9d694682a23f7f",
+            "skeleton/automation/priority_engine.py",
+            "skeleton/testing/test_priority_engine.py"
+          ]
         }
       ],
       "evidence": [
         "git-head:01fdbe23d420ebba1a0a1aad49e8727e8013b097",
         "https://github.com/Apeloff1/Skeleton/commit/01fdbe23d420ebba1a0a1aad49e8727e8013b097",
         "skeleton/automation/priority_engine.py",
-        "skeleton/testing/test_priority_engine.py"
+        "skeleton/testing/test_priority_engine.py",
+        "https://github.com/Apeloff1/Skeleton/pull/2935",
+        "https://github.com/Apeloff1/Skeleton/commit/0f1a76f115b78f97dc5abb2b9a9d694682a23f7f"
       ],
       "baseline_status": "unverified"
     },
@@ -13844,7 +13910,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-10-05T16:10:31Z",
+      "last_event_at_utc": "2026-10-05T17:47:16Z",
       "history": [
         {
           "sequence": 1,
@@ -13882,13 +13948,35 @@
             "skeleton/automation/work_packages.py",
             "skeleton/testing/test_work_package_integrity.py"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "evidence_refreshed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "evidence-steward",
+          "at_utc": "2026-10-05T17:47:16Z",
+          "git_sha": "f3979966bc733c16d190b12fc2568750c7552fb4",
+          "statement": "Bind post-signoff work-package hardening that invalidates stale attestations and preserves integrity checks. This strengthens implementation evidence only; independent verification and completion remain unsigned.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/f3979966bc733c16d190b12fc2568750c7552fb4",
+          "from_status": "implemented",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2931",
+            "https://github.com/Apeloff1/Skeleton/commit/f3979966bc733c16d190b12fc2568750c7552fb4",
+            "skeleton/automation/work_packages.py",
+            "skeleton/testing/test_work_package_integrity.py"
+          ]
         }
       ],
       "evidence": [
         "git-head:db9c3e7f495893253a488b0b0a6a4046df8bd4a6",
         "https://github.com/Apeloff1/Skeleton/commit/db9c3e7f495893253a488b0b0a6a4046df8bd4a6",
         "skeleton/automation/work_packages.py",
-        "skeleton/testing/test_work_package_integrity.py"
+        "skeleton/testing/test_work_package_integrity.py",
+        "https://github.com/Apeloff1/Skeleton/pull/2931",
+        "https://github.com/Apeloff1/Skeleton/commit/f3979966bc733c16d190b12fc2568750c7552fb4"
       ],
       "baseline_status": "unverified"
     },
@@ -14692,7 +14780,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-10-05T16:57:30Z",
+      "last_event_at_utc": "2026-10-05T17:47:16Z",
       "history": [
         {
           "sequence": 1,
@@ -14734,6 +14822,25 @@
             "skeleton/eval/functional_acceptance.py",
             "skeleton/testing/test_functional_ai_acceptance.py"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "evidence_refreshed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "evidence-steward",
+          "at_utc": "2026-10-05T17:47:16Z",
+          "git_sha": "a0cb5a4bc2a082b66de0dbd21a20ee7ad4eee325",
+          "statement": "Bind replay-integrity hardening for the functional-AI acceptance evidence path. This strengthens implementation evidence only; independent verification and completion remain unsigned.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/a0cb5a4bc2a082b66de0dbd21a20ee7ad4eee325",
+          "from_status": "implemented",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2923",
+            "https://github.com/Apeloff1/Skeleton/commit/a0cb5a4bc2a082b66de0dbd21a20ee7ad4eee325",
+            "skeleton/testing/test_functional_ai_acceptance.py"
+          ]
         }
       ],
       "evidence": [
@@ -14744,7 +14851,9 @@
         "machine",
         "skeleton/eval",
         "skeleton/eval/functional_acceptance.py",
-        "skeleton/testing/test_functional_ai_acceptance.py"
+        "skeleton/testing/test_functional_ai_acceptance.py",
+        "https://github.com/Apeloff1/Skeleton/pull/2923",
+        "https://github.com/Apeloff1/Skeleton/commit/a0cb5a4bc2a082b66de0dbd21a20ee7ad4eee325"
       ],
       "baseline_status": "unverified"
     },
@@ -14788,7 +14897,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-10-05T16:21:00Z",
+      "last_event_at_utc": "2026-10-05T17:47:16Z",
       "history": [
         {
           "sequence": 1,
@@ -14827,13 +14936,37 @@
             "skeleton/eval/autonomy_acceptance.py",
             "skeleton/testing/test_autonomous_worker_acceptance.py"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "evidence_refreshed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "evidence-steward",
+          "at_utc": "2026-10-05T17:47:16Z",
+          "git_sha": "66328235d5fdd513dc3228e43152ddc9cf35b6e7",
+          "statement": "Bind autonomy-acceptance integrity hardening for objective/authority checkpoint identity, governed mirror parity, and forged-digest rejection. This strengthens implementation evidence only; independent verification and completion remain unsigned.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/66328235d5fdd513dc3228e43152ddc9cf35b6e7",
+          "from_status": "implemented",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2907",
+            "https://github.com/Apeloff1/Skeleton/commit/66328235d5fdd513dc3228e43152ddc9cf35b6e7",
+            "skeleton/eval/autonomy_acceptance.py",
+            "skeleton/ai/evaluation/autonomy_acceptance.py",
+            "skeleton/testing/test_autonomous_worker_acceptance.py"
+          ]
         }
       ],
       "evidence": [
         "https://github.com/Apeloff1/Skeleton/pull/2815",
         "https://github.com/Apeloff1/Skeleton/commit/40aae667b1cf1c51b860597a93b409663f548e99",
         "skeleton/eval/autonomy_acceptance.py",
-        "skeleton/testing/test_autonomous_worker_acceptance.py"
+        "skeleton/testing/test_autonomous_worker_acceptance.py",
+        "https://github.com/Apeloff1/Skeleton/pull/2907",
+        "https://github.com/Apeloff1/Skeleton/commit/66328235d5fdd513dc3228e43152ddc9cf35b6e7",
+        "skeleton/ai/evaluation/autonomy_acceptance.py"
       ],
       "baseline_status": "unverified"
     },

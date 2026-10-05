@@ -1599,7 +1599,11 @@
       ],
       "evidence": [
         "https://github.com/Apeloff1/Skeleton/commit/b27612b2e4377362cc745af2fd8ebe4e8968ea8a",
-        "https://github.com/Apeloff1/Skeleton/commit/c315ad85b405e2d110843ac63a539a2386ecc050"
+        "https://github.com/Apeloff1/Skeleton/commit/c315ad85b405e2d110843ac63a539a2386ecc050",
+        "https://github.com/Apeloff1/Skeleton/pull/2927",
+        "https://github.com/Apeloff1/Skeleton/commit/9482455089eabb2c5086a0286977bc880f34d846",
+        "skeleton/simulation/environment.py",
+        "skeleton/testing/test_vol019_world_model_contract.py"
       ],
       "risks": [
         "simulation treated as real evidence",
@@ -1758,7 +1762,11 @@
         "planned:concurrent-edit collision suite"
       ],
       "evidence": [
-        "https://github.com/Apeloff1/Skeleton/commit/e66c7965173978916c6973de76858430b8e44cb1"
+        "https://github.com/Apeloff1/Skeleton/commit/e66c7965173978916c6973de76858430b8e44cb1",
+        "https://github.com/Apeloff1/Skeleton/pull/2925",
+        "https://github.com/Apeloff1/Skeleton/commit/a6dbd8fd9d8f9299badff158cec540f5bedbff22",
+        "skeleton/automation/independent_review.py",
+        "skeleton/testing/test_vol022_independent_review.py"
       ],
       "risks": [
         "destructive edits",
@@ -6362,7 +6370,12 @@
       "evaluations": [
         "skeleton/testing/test_priority_engine.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/pull/2935",
+        "https://github.com/Apeloff1/Skeleton/commit/0f1a76f115b78f97dc5abb2b9a9d694682a23f7f",
+        "skeleton/automation/priority_engine.py",
+        "skeleton/testing/test_priority_engine.py"
+      ],
       "risks": [
         "critical blocker starvation",
         "metric gaming",
@@ -6407,7 +6420,12 @@
       "evaluations": [
         "skeleton/testing/test_work_package_integrity.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/pull/2931",
+        "https://github.com/Apeloff1/Skeleton/commit/f3979966bc733c16d190b12fc2568750c7552fb4",
+        "skeleton/automation/work_packages.py",
+        "skeleton/testing/test_work_package_integrity.py"
+      ],
       "risks": [
         "oversized package",
         "hidden dependency",
@@ -6898,7 +6916,9 @@
         "https://github.com/Apeloff1/Skeleton/commit/0b6e84a423f2e8c92dc88869b531e25e9b6bacd7",
         "https://github.com/Apeloff1/Skeleton/commit/3a74fad27e74047723d2fda750b73adb77649db3",
         "skeleton/eval/functional_acceptance.py",
-        "skeleton/testing/test_functional_ai_acceptance.py"
+        "skeleton/testing/test_functional_ai_acceptance.py",
+        "https://github.com/Apeloff1/Skeleton/pull/2923",
+        "https://github.com/Apeloff1/Skeleton/commit/a0cb5a4bc2a082b66de0dbd21a20ee7ad4eee325"
       ],
       "risks": [
         "demo-only acceptance",
@@ -6946,7 +6966,12 @@
         "planned:authority revocation campaign"
       ],
       "evidence": [
-        "https://github.com/Apeloff1/Skeleton/commit/40aae667b1cf1c51b860597a93b409663f548e99"
+        "https://github.com/Apeloff1/Skeleton/commit/40aae667b1cf1c51b860597a93b409663f548e99",
+        "https://github.com/Apeloff1/Skeleton/pull/2907",
+        "https://github.com/Apeloff1/Skeleton/commit/66328235d5fdd513dc3228e43152ddc9cf35b6e7",
+        "skeleton/eval/autonomy_acceptance.py",
+        "skeleton/ai/evaluation/autonomy_acceptance.py",
+        "skeleton/testing/test_autonomous_worker_acceptance.py"
       ],
       "risks": [
         "zombie work",
