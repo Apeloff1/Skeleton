@@ -299,11 +299,53 @@ function patchWorkletsStaticRendering() {
   console.log(`[patch-node-modules] ✓ static-render ${rel}`);
 }
 
+
+function patchReactNativeRnGetPolyfillsExport() {
+  const pkgPath = path.join(ROOT, 'node_modules/react-native/package.json');
+  if (!fs.existsSync(pkgPath)) {
+    return;
+  }
+
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+  const version = String(pkg.version || '');
+  if (version !== '0.81.5') {
+    throw new Error(
+      `[patch-node-modules] react-native ${version} requires rn-get-polyfills export review`,
+    );
+  }
+
+  const rel = 'node_modules/react-native/rn-get-polyfills.js';
+  const targetPath = path.join(ROOT, rel);
+  if (!fs.existsSync(targetPath)) {
+    throw new Error(`[patch-node-modules] React Native polyfills target missing: ${rel}`);
+  }
+
+  if (!pkg.exports || typeof pkg.exports !== 'object' || Array.isArray(pkg.exports)) {
+    throw new Error('[patch-node-modules] React Native exports map changed shape');
+  }
+
+  const exportKey = './rn-get-polyfills';
+  const expectedTarget = './rn-get-polyfills.js';
+  if (Object.prototype.hasOwnProperty.call(pkg.exports, exportKey)) {
+    if (pkg.exports[exportKey] !== expectedTarget) {
+      throw new Error('[patch-node-modules] React Native rn-get-polyfills export changed shape');
+    }
+    skipped++;
+    return;
+  }
+
+  pkg.exports[exportKey] = expectedTarget;
+  fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8');
+  patched++;
+  console.log('[patch-node-modules] ✓ react-native rn-get-polyfills export');
+}
+
 patchImageSizeDoS();
 patchBracesDepthDoS();
 patchHttpCacheSemanticsMaxStale();
 patchNodeForgeNestedDigestAlgorithm();
 patchWorkletsStaticRendering();
+patchReactNativeRnGetPolyfillsExport();
 
 console.log(
   `[patch-node-modules] done: ${patched} patched, ${skipped} already-clean, ${missing} missing`,
