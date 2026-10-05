@@ -495,6 +495,13 @@ class FormalSpecification:
             "variables",
             tuple(sorted(self.variables, key=lambda item: item.name)),
         )
+        theoretical_state_count = 1
+        for variable in self.variables:
+            theoretical_state_count *= len(variable.domain)
+            if theoretical_state_count > _MAX_STATES_HARD:
+                raise FormalMethodError(
+                    "declared Cartesian state space exceeds hard enumeration bound"
+                )
 
         if not isinstance(self.assumptions, tuple):
             raise FormalMethodError("assumptions must be a tuple")
