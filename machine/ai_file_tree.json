@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "tree_version": "1.7.1",
+  "tree_version": "1.7.2",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
-  "baseline_git_sha": "a37b0bbf7d21c1d0e37ee2f8131fe53b0b43466c",
+  "baseline_git_sha": "0f1a76f115b78f97dc5abb2b9a9d694682a23f7f",
   "canonical_root": "skeleton/ai",
   "migration_mode": "strangler_mirror_then_explicit_cutover",
   "purpose": "Consolidate build-plan-relevant AI engine, governance, shell/control-plane, agent, evaluation, reliability, build-control code, historical research lineage, Jeeves, and selected legacy backend/GameForge AI recovery surfaces into one governed file tree without breaking existing imports or fabricating completion.",
@@ -466,7 +466,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "242cece6995aaff4d49d3b79d372f21585aabe32",
+      "source_git_object_sha": "719d3f40841100f547293b22e14c8904425c77a3",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -551,6 +551,9 @@
         "swarm"
       ],
       "volume_refs": [
+        "VOL-022",
+        "VOL-094",
+        "VOL-095",
         "VOL-112",
         "VOL-114",
         "VOL-115",
@@ -951,7 +954,7 @@
       "source": "skeleton/repo_intelligence",
       "destination": "skeleton/ai/build/repo_intelligence",
       "kind": "tree",
-      "source_git_object_sha": "5efce02a638abdb6e7749781a2c9ab1b52ee080d",
+      "source_git_object_sha": "ff374e8c0ced7394c92873847ab670c1a5fbfae2",
       "role": "repository intelligence for build/control workflows",
       "work_package_refs": [
         "WP-W00",
@@ -976,14 +979,17 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B2-domain-build",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-098"
+      ]
     },
     {
       "id": "AIFT-SIMULATION",
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "d6570aa8e540bcbf100d3340dafc8b4e2a7170ed",
+      "source_git_object_sha": "a8a894cf954768b8effdad4f39f3e7a07c6ef69a",
       "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -5405,6 +5411,86 @@
     "policy": "Every concrete masterplan skeleton/* implementation root must be migrated, intentionally external with an architecture owner, covered by a migrated alias, or absent. A planned-but-absent engine root appearing later fails validation until classified.",
     "intentionally_external": [
       {
+        "path": "backend/core",
+        "owner": "product/backend core namespace",
+        "reason": "backend core remains product integration authority; only explicitly named legacy AI recovery files are governed by AIFT-V2 compatibility mappings"
+      },
+      {
+        "path": "backend/core/api_contract_registry.py",
+        "owner": "product/backend API contracts",
+        "reason": "backend API registry describes product routes and does not own canonical AI runtime contracts"
+      },
+      {
+        "path": "backend/core/operation_projection.py",
+        "owner": "product/backend projection",
+        "reason": "product projection remains backend/application authority"
+      },
+      {
+        "path": "backend/core/operation_stream_transport.py",
+        "owner": "product/backend transport",
+        "reason": "backend operation-stream transport remains product transport integration"
+      },
+      {
+        "path": "backend/core/operator_control_projection.py",
+        "owner": "product/backend projection",
+        "reason": "operator-control projection is a product-facing view over governed control authority"
+      },
+      {
+        "path": "backend/core/product_shell_projection.py",
+        "owner": "product/backend projection",
+        "reason": "product-shell projection is application-facing and remains outside engine ownership"
+      },
+      {
+        "path": "backend/core/routes_registry.py",
+        "owner": "product/backend API contracts",
+        "reason": "backend route registry remains product/API assembly authority"
+      },
+      {
+        "path": "backend/core/tenant_storage_boundary.py",
+        "owner": "product/backend tenant boundary",
+        "reason": "tenant product storage boundary remains backend integration authority"
+      },
+      {
+        "path": "backend/core/workspace_projection.py",
+        "owner": "product/backend projection",
+        "reason": "workspace projection remains product/application authority"
+      },
+      {
+        "path": "backend/routes",
+        "owner": "product/backend API namespace",
+        "reason": "backend route namespace is product-facing; AI-owned implementations are mirrored only through explicit governed mappings"
+      },
+      {
+        "path": "backend/routes/governance.py",
+        "owner": "product/backend API",
+        "reason": "HTTP governance route is a product API adapter; governance engine ownership remains in governed runtime planes"
+      },
+      {
+        "path": "backend/routes/operation_stream.py",
+        "owner": "product/backend API",
+        "reason": "HTTP operation-stream route remains product transport authority"
+      },
+      {
+        "path": "backend/services/ai_service.py",
+        "owner": "product/backend AI adapter",
+        "reason": "product-facing inference service adapts canonical AI runtime and must not become a second engine owner"
+      },
+      {
+        "path": "backend/services/database.py",
+        "owner": "product/backend persistence adapter",
+        "reason": "product database adapter remains outside canonical AI engine ownership"
+      },
+      {
+        "path": "backend/services/rag_service.py",
+        "owner": "product/backend retrieval adapter",
+        "reason": "product-facing RAG service remains an adapter over governed retrieval/runtime ownership"
+      },
+      {
+        "path": "backend/services/rag_state_repository.py",
+        "owner": "product/backend retrieval state adapter",
+        "reason": "backend RAG state integration remains product persistence authority rather than canonical AI engine ownership"
+      },
+      {
         "path": "skeleton/app",
         "owner": "product/application assembly",
         "reason": "application manifest and product runtime assembly remain outside engine implementation ownership"
@@ -5425,24 +5511,24 @@
         "reason": "release/deployment ownership validates the AI engine but must not be nested inside it"
       },
       {
-        "path": "skeleton/release",
-        "owner": "deployment-release plane",
-        "reason": "release SLO and promotion policy are deployment-release authority and remain intentionally outside canonical AI engine ownership"
-      },
-      {
         "path": "skeleton/deployment",
         "owner": "deployment-release plane",
         "reason": "deployment support remains release infrastructure"
       },
       {
-        "path": "skeleton/testing",
-        "owner": "evidence/test plane",
-        "reason": "test evidence remains repository-level and must exercise both legacy compatibility paths and canonical AI destinations"
+        "path": "skeleton/release",
+        "owner": "deployment-release plane",
+        "reason": "release SLO and promotion policy are deployment-release authority and remain intentionally outside canonical AI engine ownership"
       },
       {
         "path": "skeleton/shells",
         "owner": "shell/product compatibility surfaces",
         "reason": "shell/UI adapters remain product-facing compatibility surfaces rather than canonical AI engine ownership"
+      },
+      {
+        "path": "skeleton/testing",
+        "owner": "evidence/test plane",
+        "reason": "test evidence remains repository-level and must exercise both legacy compatibility paths and canonical AI destinations"
       }
     ],
     "covered_aliases": [
@@ -6619,6 +6705,91 @@
         "VOL-102"
       ],
       "policy": "Exact Git-object staged mirror refresh after the post-#2899 VOL-102 rebuild; no cutover, source retirement, completion promotion, or independent-verification authority."
+    },
+    "completed_work_fill_followup_2026_10_05": {
+      "base_main_sha": "0f1a76f115b78f97dc5abb2b9a9d694682a23f7f",
+      "repaired_file_count": 8,
+      "repaired_mappings": [
+        "AIFT-AUTOMATION",
+        "AIFT-REPO-INTELLIGENCE",
+        "AIFT-SIMULATION"
+      ],
+      "volume_refs": [
+        "VOL-019",
+        "VOL-022",
+        "VOL-073",
+        "VOL-094",
+        "VOL-095",
+        "VOL-098"
+      ],
+      "policy": "Mirror exact current-main Git objects for governed completed-work sources while preserving legacy owners, compatibility facades, source exclusions, and staged-mirror cutover rules. No completion signature or source retirement authority is granted.",
+      "external_authority_confirmations": [
+        {
+          "path": "backend/services/database.py",
+          "owner": "product/backend persistence adapter"
+        },
+        {
+          "path": "backend/services/ai_service.py",
+          "owner": "product/backend AI adapter"
+        },
+        {
+          "path": "backend/services/rag_service.py",
+          "owner": "product/backend retrieval adapter"
+        },
+        {
+          "path": "backend/services/rag_state_repository.py",
+          "owner": "product/backend retrieval state adapter"
+        },
+        {
+          "path": "backend/routes/governance.py",
+          "owner": "product/backend API"
+        },
+        {
+          "path": "backend/routes/operation_stream.py",
+          "owner": "product/backend API"
+        },
+        {
+          "path": "backend/routes",
+          "owner": "product/backend API namespace"
+        },
+        {
+          "path": "backend/core/operation_stream_transport.py",
+          "owner": "product/backend transport"
+        },
+        {
+          "path": "backend/core/operation_projection.py",
+          "owner": "product/backend projection"
+        },
+        {
+          "path": "backend/core/api_contract_registry.py",
+          "owner": "product/backend API contracts"
+        },
+        {
+          "path": "backend/core/routes_registry.py",
+          "owner": "product/backend API contracts"
+        },
+        {
+          "path": "backend/core/product_shell_projection.py",
+          "owner": "product/backend projection"
+        },
+        {
+          "path": "backend/core/tenant_storage_boundary.py",
+          "owner": "product/backend tenant boundary"
+        },
+        {
+          "path": "backend/core/operator_control_projection.py",
+          "owner": "product/backend projection"
+        },
+        {
+          "path": "backend/core/workspace_projection.py",
+          "owner": "product/backend projection"
+        },
+        {
+          "path": "backend/core",
+          "owner": "product/backend core namespace"
+        }
+      ],
+      "completed_work_external_policy": "Backend product/API adapters remain external to canonical AI engine ownership; explicit AIFT-V2 compatibility mappings remain narrower exceptions for legacy AI recovery surfaces."
     }
   }
 }

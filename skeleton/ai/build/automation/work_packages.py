@@ -98,12 +98,20 @@ class WorkPackageRegistry:
   ev=[e for e in self.evidence.values() if e.package_id==pid];roles={e.role for e in ev}
   if EvidenceRole.IMPLEMENTATION not in roles:return PackageState.READY
   if EvidenceRole.VERIFICATION not in roles:return PackageState.IMPLEMENTED
-  impl={e.actor_id for e in ev if e.role is EvidenceRole.IMPLEMENTATION};verify={e.actor_id for e in ev if e.role is EvidenceRole.VERIFICATION}
+  implementation=[e for e in ev if e.role is EvidenceRole.IMPLEMENTATION]
+  verification=[e for e in ev if e.role is EvidenceRole.VERIFICATION]
+  impl={e.actor_id for e in implementation};verify={e.actor_id for e in verification}
   if impl & verify:raise WorkPackageError("verification must be independent from implementation")
+  latest_implementation=max(e.observed_at for e in implementation)
+  latest_verification=max(e.observed_at for e in verification)
+  if latest_verification < latest_implementation:return PackageState.IMPLEMENTED
   if EvidenceRole.COMPLETION not in roles:return PackageState.VERIFIED
-  complete={e.actor_id for e in ev if e.role is EvidenceRole.COMPLETION}
+  completion=[e for e in ev if e.role is EvidenceRole.COMPLETION]
+  complete={e.actor_id for e in completion}
   if complete & impl:raise WorkPackageError("completion signer cannot be implementation actor")
   if complete & verify:raise WorkPackageError("completion signer cannot be verification actor")
+  latest_completion=max(e.observed_at for e in completion)
+  if latest_completion < latest_verification:return PackageState.VERIFIED
   return PackageState.COMPLETE
 
  def evidence_rollup(self,pid):
