@@ -56,10 +56,10 @@ class ExtensionPoint: name:str; manual_path:str
 @dataclass(frozen=True,slots=True)
 class GenerationSpec: contract_version:str; generator_version:str; extension_points:tuple[ExtensionPoint,...]
 @dataclass(frozen=True,slots=True)
-class GeneratedCode: content:str; generated_marker:str; spec_digest:str
+class GeneratedCode: content:str; generated_marker:str; spec_digest:str; output_digest:str
 def generate_code(spec,body):
  d=sha256_json({"contract":spec.contract_version,"generator":spec.generator_version,"extensions":[(x.name,x.manual_path) for x in spec.extension_points]})
- return GeneratedCode(body,"GENERATED - DO NOT EDIT",d)
+ return GeneratedCode(body,"GENERATED - DO NOT EDIT",d,sha256_json({"spec":d,"content":body}))
 @dataclass(frozen=True,slots=True)
 class SDKMethod: name:str; request_type:str; response_type:str
 @dataclass(frozen=True,slots=True)
