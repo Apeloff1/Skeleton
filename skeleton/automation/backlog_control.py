@@ -78,15 +78,21 @@ class ClosureEvidence:
 class BacklogRegistry:
  def __init__(self):self._items={};self._deps={};self._dispositions={};self._closures={}
  def add(self,item:BacklogItem):
+  if not isinstance(item,BacklogItem):raise BacklogError("item must be BacklogItem")
   prior=self._items.get(item.item_id)
   if prior is not None and prior!=item:raise BacklogError("backlog identity is immutable")
   self._items[item.item_id]=item
  def add_dependency(self,dep:BacklogDependency):
+  if not isinstance(dep,BacklogDependency):raise BacklogError("dependency must be BacklogDependency")
   if dep.item_id not in self._items or dep.depends_on not in self._items:raise BacklogError("dependency references unknown item")
   prior=self._deps.get(dep.dependency_id)
   if prior is not None and prior!=dep:raise BacklogError("dependency identity is immutable")
   self._deps[dep.dependency_id]=dep
-  self._assert_acyclic()
+  try:self._assert_acyclic()
+  except Exception:
+   if prior is None:self._deps.pop(dep.dependency_id,None)
+   else:self._deps[dep.dependency_id]=prior
+   raise
  def _assert_acyclic(self):
   graph={i:set() for i in self._items}
   for d in self._deps.values():graph[d.item_id].add(d.depends_on)
@@ -98,38 +104,44 @@ class BacklogRegistry:
    for x in graph[n]:visit(x)
    visiting.remove(n);done.add(n)
   for n in graph:visit(n)
+ def _item(self,item_id:str)->BacklogItem:
+  key=_id(item_id,"item_id")
+  item=self._items.get(key)
+  if item is None:raise BacklogError("unknown backlog item")
+  return item
  def duplicates(self,item_id:str)->tuple[str,...]:
-  item=self._items[item_id]
-  return tuple(sorted(x.item_id for x in self._items.values() if x.item_id!=item_id and x.fingerprint==item.fingerprint))
+  item=self._item(item_id)
+  return tuple(sorted(x.item_id for x in self._items.values() if x.item_id!=item.item_id and x.fingerprint==item.fingerprint))
  def deduplicate(self,canonical_id:str,duplicate_id:str,disposition_id:str,reason:str):
-  canonical=self._items[canonical_id];duplicate=self._items[duplicate_id]
+  canonical=self._item(canonical_id);duplicate=self._item(duplicate_id)
   if canonical_id==duplicate_id:raise BacklogError("item cannot duplicate itself")
   if canonical.state in (BacklogState.CLOSED,BacklogState.RETIRED) or duplicate.state in (BacklogState.CLOSED,BacklogState.RETIRED):raise BacklogError("terminal item cannot participate in deduplication")
   if canonical.fingerprint!=duplicate.fingerprint:raise BacklogError("items are not deterministic duplicates")
   merged={(s.kind,s.source_id):s for s in canonical.sources}
   merged.update({(s.kind,s.source_id):s for s in duplicate.sources})
-  self._items[canonical_id]=replace(canonical,sources=tuple(merged.values()))
-  self._items[duplicate_id]=replace(duplicate,state=BacklogState.RETIRED)
-  disp=BacklogDisposition(disposition_id,duplicate_id,DispositionKind.DUPLICATE,reason,canonical_id)
+  disp=BacklogDisposition(disposition_id,duplicate.item_id,DispositionKind.DUPLICATE,reason,canonical.item_id)
   prior=self._dispositions.get(disposition_id)
   if prior is not None and prior!=disp:raise BacklogError("disposition identity is immutable")
+  self._items[canonical.item_id]=replace(canonical,sources=tuple(merged.values()))
+  self._items[duplicate.item_id]=replace(duplicate,state=BacklogState.RETIRED)
   self._dispositions[disposition_id]=disp
   return disp
  def reconcile(self,item_id:str)->BacklogItem:
-  item=self._items[item_id]
+  item=self._item(item_id)
   if item.state in (BacklogState.CLOSED,BacklogState.RETIRED):return item
   deps=[d for d in self._deps.values() if d.item_id==item_id]
   desired=BacklogState.READY if all(self._items[d.depends_on].state is d.required_state for d in deps) else BacklogState.BLOCKED
   updated=replace(item,state=desired);self._items[item_id]=updated;return updated
  def close(self,item_id:str,evidence:ClosureEvidence)->BacklogItem:
+  if not isinstance(evidence,ClosureEvidence):raise BacklogError("closure rule requires typed evidence")
   item=self.reconcile(item_id)
   if item.state is not BacklogState.READY:raise BacklogError("blocked item cannot close")
-  if not isinstance(evidence,ClosureEvidence):raise BacklogError("closure rule requires typed evidence")
   if evidence.item_id!=item_id or evidence.item_digest!=item.digest:raise BacklogError("closure evidence is stale or bound to another item")
   prior=self._closures.get(evidence.evidence_id)
   if prior is not None and prior!=evidence:raise BacklogError("closure evidence identity is immutable")
   self._closures[evidence.evidence_id]=evidence
   item=replace(item,state=BacklogState.CLOSED);self._items[item_id]=item;return item
  def revalidate_dependents(self,upstream_id:str)->tuple[BacklogItem,...]:
-  affected=sorted({d.item_id for d in self._deps.values() if d.depends_on==upstream_id})
+  upstream=self._item(upstream_id)
+  affected=sorted({d.item_id for d in self._deps.values() if d.depends_on==upstream.item_id})
   return tuple(self.reconcile(i) for i in affected)
