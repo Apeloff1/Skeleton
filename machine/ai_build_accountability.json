@@ -12967,22 +12967,31 @@
       "id": "ACC-VOL-107",
       "type": "volume",
       "title": "VOL-107 Acceptance: SOTA Candidate",
-      "status": "unverified",
+      "status": "implemented",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-10-05T13:57:45Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-10-05T13:57:45Z",
+        "git_sha": "60d73b4dc0a44d47fec274de95bea3e7f6787c92",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/60d73b4dc0a44d47fec274de95bea3e7f6787c92",
+          "skeleton/eval/sota_candidate.py",
+          "skeleton/eval/__init__.py",
+          "skeleton/eval/p3_acceptance.py",
+          "machine/sota_candidate_policy.json",
+          "scripts/check_vol107_sota_candidate.py",
+          "skeleton/testing/test_vol107_sota_candidate.py",
+          "machine/ai_master_plan.json"
+        ],
+        "statement": "Implementation-signed after auditing the bounded SOTA-candidate claim, per-metric non-compensation rules, immutable benchmark/dataset/revision bindings, independent replay contract, policy manifest, verifier, and adversarial tests. This grants no independent verification or completion.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/60d73b4dc0a44d47fec274de95bea3e7f6787c92"
       },
       "verification_signoff": {
         "signed": false,
@@ -12998,9 +13007,60 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-10-05T13:57:45Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T13:57:45Z",
+          "git_sha": "60d73b4dc0a44d47fec274de95bea3e7f6787c92",
+          "statement": "Begin evidence reconciliation for the VOL-107 bounded SOTA-candidate implementation.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/60d73b4dc0a44d47fec274de95bea3e7f6787c92",
+          "from_status": "unverified",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/60d73b4dc0a44d47fec274de95bea3e7f6787c92"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T13:57:45Z",
+          "git_sha": "60d73b4dc0a44d47fec274de95bea3e7f6787c92",
+          "statement": "Implementation-signed after auditing the bounded SOTA-candidate claim, per-metric non-compensation rules, immutable benchmark/dataset/revision bindings, independent replay contract, policy manifest, verifier, and adversarial tests. This grants no independent verification or completion.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/60d73b4dc0a44d47fec274de95bea3e7f6787c92",
+          "from_status": "in_progress",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/60d73b4dc0a44d47fec274de95bea3e7f6787c92",
+            "skeleton/eval/sota_candidate.py",
+            "skeleton/eval/__init__.py",
+            "skeleton/eval/p3_acceptance.py",
+            "machine/sota_candidate_policy.json",
+            "scripts/check_vol107_sota_candidate.py",
+            "skeleton/testing/test_vol107_sota_candidate.py",
+            "machine/ai_master_plan.json"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/60d73b4dc0a44d47fec274de95bea3e7f6787c92",
+        "skeleton/eval/sota_candidate.py",
+        "skeleton/eval/__init__.py",
+        "skeleton/eval/p3_acceptance.py",
+        "machine/sota_candidate_policy.json",
+        "scripts/check_vol107_sota_candidate.py",
+        "skeleton/testing/test_vol107_sota_candidate.py",
+        "machine/ai_master_plan.json"
+      ],
       "baseline_status": "unverified"
     },
     {
