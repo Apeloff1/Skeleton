@@ -36,3 +36,20 @@ def test_cross_resource_evidence_rejected():
  with pytest.raises(MaintenanceError,match="resource evidence mismatch"):authorize(task(),owner(),evidence(resource_id="RESOURCE.OTHER.1"))
 def test_receipt_binds_task_ownership_and_evidence():
  r=authorize(task(),owner(),evidence());assert r.task_digest==task().digest;assert r.ownership_digest==owner().digest;assert r.evidence_digest==evidence().digest
+
+def test_update_requires_current_resource_evidence():
+ t=task(action=MaintenanceAction.UPDATE,risk=MaintenanceRisk.MEDIUM)
+ r=authorize(t,owner())
+ assert r.decision is MaintenanceDecision.BLOCK
+ assert "missing_resource_evidence" in r.reasons
+
+def test_update_rejects_changed_resource_since_observation():
+ t=task(action=MaintenanceAction.UPDATE,risk=MaintenanceRisk.MEDIUM)
+ other=hashlib.sha256(b"changed").hexdigest()
+ r=authorize(t,owner(),evidence(observed_digest=other))
+ assert r.decision is MaintenanceDecision.BLOCK
+ assert "resource_changed_since_observation" in r.reasons
+
+def test_update_with_exact_resource_evidence_can_be_authorized():
+ t=task(action=MaintenanceAction.UPDATE,risk=MaintenanceRisk.MEDIUM)
+ assert authorize(t,owner(),evidence()).decision is MaintenanceDecision.ALLOW
