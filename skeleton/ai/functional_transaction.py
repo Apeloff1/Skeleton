@@ -39,9 +39,11 @@ class ToolAuthorization:
   if not isinstance(self.allowed,bool):raise FunctionalAIError("allowed must be bool")
 @dataclass(frozen=True,slots=True)
 class VS001Execution:
- execution_id:str;request:VS001Request;inference:InferenceOutcome;authorization:ToolAuthorization|None;tool_result_digest:str|None
+ execution_id:str;request:VS001Request;inference:InferenceOutcome;authorization:ToolAuthorization|None;tool_result_digest:str|None;verified:bool=True
  def __post_init__(self):
   object.__setattr__(self,"execution_id",_id(self.execution_id,"execution_id"))
+  if not isinstance(self.request,VS001Request) or not isinstance(self.inference,InferenceOutcome):raise FunctionalAIError("execution inputs must be typed")
+  if not isinstance(self.verified,bool):raise FunctionalAIError("verified must be bool")
   if self.inference.request_digest!=self.request.digest:raise FunctionalAIError("inference/request mismatch")
   if self.inference.tool_intent_digest is None:
    if self.authorization is not None or self.tool_result_digest is not None:raise FunctionalAIError("tool material without tool intent")
@@ -52,7 +54,7 @@ class VS001Execution:
    if self.authorization.allowed and self.tool_result_digest is None:raise FunctionalAIError("authorized tool requires verified result")
    if self.tool_result_digest is not None:_sha(self.tool_result_digest,"tool_result_digest")
  @property
- def digest(self):return _dig({"execution_id":self.execution_id,"request":self.request.digest,"provider":self.inference.provider_id,"response":self.inference.response_digest,"tool_intent":self.inference.tool_intent_digest,"authorization":None if self.authorization is None else {"id":self.authorization.authorization_id,"authority":self.authorization.authority_id,"allowed":self.authorization.allowed},"tool_result":self.tool_result_digest})
+ def digest(self):return _dig({"execution_id":self.execution_id,"request":self.request.digest,"provider":self.inference.provider_id,"response":self.inference.response_digest,"tool_intent":self.inference.tool_intent_digest,"authorization":None if self.authorization is None else {"id":self.authorization.authorization_id,"authority":self.authorization.authority_id,"allowed":self.authorization.allowed},"tool_result":self.tool_result_digest,"verified":self.verified})
 @dataclass(frozen=True,slots=True)
 class VS001Evidence:
  execution_digest:str;terminal_state_digest:str;stream_digest:str;frame_count:int
@@ -63,6 +65,7 @@ class FunctionalAIJournal:
  def __init__(self):self._terminal={};self._frames={}
  def commit(self,execution:VS001Execution,terminal_state:dict,stream_frames:tuple[dict,...])->VS001Evidence:
   if not isinstance(execution,VS001Execution):raise FunctionalAIError("execution must be VS001Execution")
+  if not execution.verified:raise FunctionalAIError("unverified execution cannot commit terminal state")
   if not isinstance(terminal_state,dict):raise FunctionalAIError("terminal_state must be dict")
   if not isinstance(stream_frames,tuple) or not stream_frames or any(not isinstance(x,dict) for x in stream_frames):raise FunctionalAIError("stream_frames must be non-empty typed tuple")
   if len(stream_frames)>100000:raise FunctionalAIError("stream frame count exceeds policy bound")
