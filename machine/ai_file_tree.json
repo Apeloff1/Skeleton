@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "tree_version": "1.7.5",
+  "tree_version": "1.7.6",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
-  "baseline_git_sha": "8a71027899f99f58068ec8ca1fc8d82b1254116b",
+  "baseline_git_sha": "0e38037c096059b12bd6447fe5e502f81218f870",
   "canonical_root": "skeleton/ai",
   "migration_mode": "strangler_mirror_then_explicit_cutover",
   "purpose": "Consolidate build-plan-relevant AI engine, governance, shell/control-plane, agent, evaluation, reliability, build-control code, historical research lineage, Jeeves, and selected legacy backend/GameForge AI recovery surfaces into one governed file tree without breaking existing imports or fabricating completion.",
@@ -306,7 +306,7 @@
       "source": "skeleton/intelligence",
       "destination": "skeleton/ai/runtime/intelligence",
       "kind": "tree",
-      "source_git_object_sha": "9ca062b9e62e2a8c6a9b9bad90d73cd7337347b9",
+      "source_git_object_sha": "8fd118c100b8a2cb411bdfe707694de28999f323",
       "role": "admission verification and execution",
       "work_package_refs": [
         "WP-W06",
@@ -759,7 +759,7 @@
       "source": "skeleton/observability",
       "destination": "skeleton/ai/runtime/observability",
       "kind": "tree",
-      "source_git_object_sha": "28384c9869b660594db07cb2bd762b93bd4aa8c7",
+      "source_git_object_sha": "07ddbe9451126bbb5c500b89c45663022a600347",
       "role": "AI runtime observability, telemetry, audit, provenance-bound explainability, and executable operations runbook plane",
       "work_package_refs": [
         "WP-W00",
@@ -1262,7 +1262,7 @@
       "source": "skeleton/native",
       "destination": "skeleton/ai/runtime/native",
       "kind": "tree",
-      "source_git_object_sha": "8ae0e4662c86187ab326d264f918dfbac99ea74d",
+      "source_git_object_sha": "8c6a214853800c1be14884becffd7a13bab17803",
       "role": "high-performance native capability registry, ABI boundary and accelerated kernels",
       "volume_refs": [
         "VOL-032"
@@ -1540,7 +1540,7 @@
       "source": "skeleton/developer",
       "destination": "skeleton/ai/build/developer",
       "kind": "tree",
-      "source_git_object_sha": "62bf1024adc351ba847630fbc3e208d591226987",
+      "source_git_object_sha": "b38bc7d22d1de5e1417c32bf79a4392927a99a98",
       "role": "Developer CLI, doctor, scaffold, health, and gate tooling support the AI build/repair plane rather than core inference.",
       "work_package_refs": [
         "WP-W27",
@@ -5998,7 +5998,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "177_mapping_current_main_parity_and_completed_volume_traceability_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "177_mapping_current_main_parity_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -7167,6 +7167,29 @@
         "skeleton/frontier/runtime/operation_stream_store.py -> skeleton/ai/runtime/frontier/runtime/operation_stream_store.py"
       ],
       "policy": "Restore exact current-main staged-mirror parity and require every mature masterplan volume whose implementation path resolves to a governed AI-tree source or destination to be referenced by the most-specific owning mapping. This grants no completion, cutover, source-retirement, or independent-verification authority."
+    },
+    "completed_work_ai_tree_refresh_2026_10_05": {
+      "base_main_sha": "0e38037c096059b12bd6447fe5e502f81218f870",
+      "refreshed_mapping_count": 3,
+      "refreshed_mappings": [
+        {
+          "id": "AIFT-INTELLIGENCE",
+          "files": [
+            "__init__.py",
+            "router_registry.py"
+          ]
+        },
+        {
+          "id": "AIFT-DEVELOPER",
+          "files": [
+            "bootstrap.py"
+          ]
+        }
+      ],
+      "refreshed_source_identity_count": 177,
+      "completed_volume_count": 201,
+      "unclassified_completed_implementation_paths": 0,
+      "policy": "Restore staged-mirror parity for completed governed work without source retirement, import cutover, product/backend ownership expansion, or fabricated completion authority."
     }
   }
 }
