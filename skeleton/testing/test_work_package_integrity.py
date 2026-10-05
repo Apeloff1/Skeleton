@@ -47,3 +47,16 @@ def test_dependency_identity_is_immutable():
 def test_structural_collections_are_typed_and_bounded():
  with pytest.raises(WorkPackageError,match="non_goals must be tuple"):
   WorkPackage("PKG.X","VOL.095","x",["n"],("i",),("o",),("r",),("t",),"rb",("q",),("a",))
+
+def test_completion_signer_cannot_be_verification_actor():
+ r=WorkPackageRegistry();p=pkg();r.add(p)
+ r.attest(ev("EVID.I",EvidenceRole.IMPLEMENTATION,"ACTOR.I",package=p))
+ r.attest(ev("EVID.V",EvidenceRole.VERIFICATION,"ACTOR.V",package=p))
+ r.attest(ev("EVID.C",EvidenceRole.COMPLETION,"ACTOR.V",package=p))
+ with pytest.raises(WorkPackageError,match="verification actor"):r.state(p.package_id)
+
+def test_actor_cannot_contradict_same_role_evidence():
+ r=WorkPackageRegistry();p=pkg();r.add(p)
+ r.attest(ev("EVID.I1",EvidenceRole.IMPLEMENTATION,"ACTOR.I",package=p))
+ with pytest.raises(WorkPackageError,match="contradict evidence"):
+  r.attest(WorkPackageEvidence("EVID.I2",p.package_id,p.digest,EvidenceRole.IMPLEMENTATION,"ACTOR.I",hashlib.sha256(b"other").hexdigest()))
