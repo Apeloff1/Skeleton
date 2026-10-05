@@ -1,0 +1,146 @@
+{
+  "expansion_phase": "51_to_70",
+  "description": "Continuing expansion to 100 total categories. Focus on specialized systems, creative, and operational domains.",
+  "new_categories": [
+    {
+      "category_id": 51,
+      "name": "Destruction, Debris & Interactive Physics",
+      "description": "Advanced destruction systems, debris simulation, and highly interactive physics objects.",
+      "focus": "Satisfying, performant destruction that creates meaningful gameplay moments.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 52,
+      "name": "Fluid, Water & Environmental Simulation",
+      "description": "Water, fire, smoke, wind, and complex environmental simulation systems.",
+      "focus": "Believable environmental systems that players can meaningfully interact with.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 53,
+      "name": "Group AI, Flocking & Emergent Behavior",
+      "description": "Large-scale group AI, flocking, swarm behavior, and emergent group dynamics.",
+      "focus": "Believable group behavior that feels intelligent and reactive at scale.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 54,
+      "name": "Stealth, Detection & Awareness Systems",
+      "description": "Advanced stealth mechanics, AI detection, line of sight, sound propagation, and awareness.",
+      "focus": "Deep, fair, and satisfying stealth and detection gameplay.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 55,
+      "name": "Combat Systems, Hit Reactions & Feedback",
+      "description": "Core combat feel, hit reactions, impact feedback, and combat readability.",
+      "focus": "Combat that feels weighty, responsive, and highly readable.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 56,
+      "name": "Magic, Ability & Power System Design",
+      "description": "Complex magic systems, ability synergies, cooldowns, resources, and power fantasy delivery.",
+      "focus": "Abilities that feel powerful, fair, and deeply satisfying to use.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 57,
+      "name": "Crafting, Gathering & Resource Systems",
+      "description": "Deep crafting loops, gathering systems, item creation, and resource management.",
+      "focus": "Crafting and gathering that feel meaningful and integrated with progression.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 58,
+      "name": "Exploration, Discovery & Reward Systems",
+      "description": "Exploration design, hidden content, discovery rewards, and curiosity loops.",
+      "focus": "Worlds that reward curiosity and make exploration feel deeply satisfying.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 59,
+      "name": "Social Systems, Guilds & Player Interaction",
+      "description": "Guild systems, social features, player interaction, and community tools.",
+      "focus": "Social systems that foster genuine connection and long-term group identity.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 60,
+      "name": "PvP, PvE & Hybrid Combat Balance",
+      "description": "Balancing systems for PvP, PvE, and hybrid play modes.",
+      "focus": "Fair, engaging combat across different play styles and group sizes.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 61,
+      "name": "Narrative Delivery & Environmental Storytelling",
+      "description": "Environmental storytelling, narrative through gameplay, and world-as-story.",
+      "focus": "Stories told through the world, objects, and player discovery rather than exposition.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 62,
+      "name": "Difficulty, Challenge & Flow Design",
+      "description": "Dynamic difficulty, challenge curves, flow states, and player frustration management.",
+      "focus": "Difficulty that feels fair, engaging, and keeps players in flow.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 63,
+      "name": "Tutorial, Onboarding & Early Experience Design",
+      "description": "Advanced tutorial systems, contextual help, and first-hour experience design.",
+      "focus": "Onboarding that teaches without frustration and creates early investment.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 64,
+      "name": "Live Service Operations & Content Cadence",
+      "description": "Long-term live service planning, content cadence, and operational systems.",
+      "focus": "Sustainable live operations that keep the game fresh without burning out teams or players.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 65,
+      "name": "Community Management & Moderation Systems",
+      "description": "Community tools, moderation systems, positive behavior incentives, and toxicity reduction.",
+      "focus": "Healthy, positive community culture at scale.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 66,
+      "name": "Data Visualization & Decision Support Tools",
+      "description": "Advanced dashboards, data visualization, and tools for data-driven decision making.",
+      "focus": "Clear, actionable data that helps teams make better decisions faster.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 67,
+      "name": "Version Control, Branching & Collaboration Workflows",
+      "description": "Advanced version control strategies, branching models, and team collaboration systems.",
+      "focus": "Smooth collaboration at scale with minimal conflicts and fast iteration.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 68,
+      "name": "Quality Assurance Automation & Test Systems",
+      "description": "Automated testing, regression systems, and QA pipeline design.",
+      "focus": "High coverage, fast feedback, and reliable quality gates.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 69,
+      "name": "Player Retention, Churn Prediction & Re-engagement",
+      "description": "Retention systems, churn analysis, and re-engagement mechanics.",
+      "focus": "Keeping players engaged long-term through smart, respectful systems.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 70,
+      "name": "Cross-Platform Parity & Device Optimization",
+      "description": "Ensuring consistent experience and performance across platforms and devices.",
+      "focus": "Games that feel excellent on every supported platform.",
+      "target_roles_per_category": 100
+    }
+  ]
+}
