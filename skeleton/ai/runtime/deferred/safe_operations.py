@@ -14,15 +14,15 @@ def _d(v:object,n:str)->str:
 
 @dataclass(frozen=True,slots=True)
 class SafeRepairPlan:
- repair_id:str; affected_state_digest:str; mutation_digest:str; rollback_digest:str; target_invariant:str
- def __post_init__(self):
-  object.__setattr__(self,"repair_id",_t(self.repair_id,"repair_id"));object.__setattr__(self,"target_invariant",_t(self.target_invariant,"target_invariant"))
-  for n in ("affected_state_digest","mutation_digest","rollback_digest"): object.__setattr__(self,n,_d(getattr(self,n),n))
+    repair_id:str; affected_state_digest:str; mutation_digest:str; rollback_digest:str; target_invariant:str
+    def __post_init__(self):
+    object.__setattr__(self,"repair_id",_t(self.repair_id,"repair_id"));object.__setattr__(self,"target_invariant",_t(self.target_invariant,"target_invariant"))
+    for n in ("affected_state_digest","mutation_digest","rollback_digest"): object.__setattr__(self,n,_d(getattr(self,n),n))
 @dataclass(frozen=True,slots=True)
 class RepairCheckpoint: repair_id:str; pre_state_digest:str; mutation_applied:bool
 @dataclass(frozen=True,slots=True)
 class RepairEvidence:
- repair_id:str; post_state_digest:str; invariant_restored:bool; verification_digest:str
+    repair_id:str; post_state_digest:str; invariant_restored:bool; verification_digest:str
 def admit_repair_completion(plan:SafeRepairPlan,checkpoint:RepairCheckpoint,evidence:RepairEvidence)->bool:
  if not all((checkpoint.repair_id,evidence.repair_id,evidence.verification_digest)):return False
  try:_d(checkpoint.pre_state_digest,"pre_state_digest");_d(evidence.post_state_digest,"post_state_digest");_d(evidence.verification_digest,"verification_digest")
@@ -31,30 +31,30 @@ def admit_repair_completion(plan:SafeRepairPlan,checkpoint:RepairCheckpoint,evid
 
 @dataclass(frozen=True,slots=True)
 class TwinObservation:
- component:str; observed_state_digest:str; observed_at:str; uncertainty:float; governed:bool
- def __post_init__(self):
-  _t(self.component,"component");_d(self.observed_state_digest,"observed_state_digest");_t(self.observed_at,"observed_at")
-  if not 0<=self.uncertainty<=1: raise ValueError("uncertainty must be in [0,1]")
+    component:str; observed_state_digest:str; observed_at:str; uncertainty:float; governed:bool
+    def __post_init__(self):
+    _t(self.component,"component");_d(self.observed_state_digest,"observed_state_digest");_t(self.observed_at,"observed_at")
+    if not 0<=self.uncertainty<=1: raise ValueError("uncertainty must be in [0,1]")
 @dataclass(frozen=True,slots=True)
 class DigitalTwin:
- twin_id:str; observations:tuple[TwinObservation,...]
- @property
- def authoritative(self)->bool: return False
- @property
- def current(self)->bool: return bool(self.observations) and all(o.governed for o in self.observations)
+    twin_id:str; observations:tuple[TwinObservation,...]
+    @property
+    def authoritative(self)->bool: return False
+    @property
+    def current(self)->bool: return bool(self.observations) and all(o.governed for o in self.observations)
 @dataclass(frozen=True,slots=True)
 class TwinScenario: scenario_id:str; twin_id:str; proposed_effects:tuple[str,...]; simulation_only:bool=True
- def __post_init__(self):
-  if not self.simulation_only: raise ValueError("digital twin cannot authorize real effects")
+    def __post_init__(self):
+    if not self.simulation_only: raise ValueError("digital twin cannot authorize real effects")
 
 @dataclass(frozen=True,slots=True)
 class DeploymentConstraint:
- max_blast_radius:int; min_slo:float; available_resources:int
+    max_blast_radius:int; min_slo:float; available_resources:int
 @dataclass(frozen=True,slots=True)
 class DeploymentProposal:
- proposal_id:str; compatibility_verified:bool; required_resources:int; estimated_blast_radius:int; expected_slo:float; authorized:bool=False
- def __post_init__(self):
-  if self.authorized: raise ValueError("planner output cannot self-authorize deployment")
+    proposal_id:str; compatibility_verified:bool; required_resources:int; estimated_blast_radius:int; expected_slo:float; authorized:bool=False
+    def __post_init__(self):
+    if self.authorized: raise ValueError("planner output cannot self-authorize deployment")
 @dataclass(frozen=True,slots=True)
 class DeploymentSequence: proposal_id:str; steps:tuple[str,...]; rollback_steps:tuple[str,...]
 def plan_deployment(p:DeploymentProposal,c:DeploymentConstraint)->DeploymentSequence|None:
@@ -64,16 +64,16 @@ def plan_deployment(p:DeploymentProposal,c:DeploymentConstraint)->DeploymentSequ
 
 @dataclass(frozen=True,slots=True)
 class ResourceRequest:
- request_id:str; owner:str; cpu:int; memory:int; priority:int
- def __post_init__(self):
-  _t(self.request_id,"request_id");_t(self.owner,"owner")
-  if self.cpu<=0 or self.memory<=0: raise ValueError("resource request must be positive")
+    request_id:str; owner:str; cpu:int; memory:int; priority:int
+    def __post_init__(self):
+    _t(self.request_id,"request_id");_t(self.owner,"owner")
+    if self.cpu<=0 or self.memory<=0: raise ValueError("resource request must be positive")
 @dataclass(frozen=True,slots=True)
 class ResourceLease:
- lease_id:str; request_id:str; owner:str; cpu:int; memory:int; expires_at:str
+    lease_id:str; request_id:str; owner:str; cpu:int; memory:int; expires_at:str
 @dataclass(frozen=True,slots=True)
 class PlacementDecision:
- request_id:str; admitted:bool; lease:ResourceLease|None; reason:str
+    request_id:str; admitted:bool; lease:ResourceLease|None; reason:str
 def place(r:ResourceRequest,available_cpu:int,available_memory:int,lease_id:str,expires_at:str)->PlacementDecision:
  if available_cpu<0 or available_memory<0 or not lease_id or not expires_at:return PlacementDecision(r.request_id,False,None,"invalid lease capacity/identity")
  if r.cpu>available_cpu or r.memory>available_memory:return PlacementDecision(r.request_id,False,None,"insufficient reserved resources")

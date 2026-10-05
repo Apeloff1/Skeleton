@@ -60,7 +60,7 @@ def member_authorized(w,principal,permission):
  return any(m.principal_id==principal and m.active and permission in m.permissions for m in w.members)
 @dataclass(frozen=True,slots=True)
 class ResourceName:
- tenant:str; project:str; name:str; version:str
+    tenant:str; project:str; name:str; version:str
     def __post_init__(self):
         if not all((self.tenant, self.project, self.name, self.version)):
             raise ValueError("resource scope required")
