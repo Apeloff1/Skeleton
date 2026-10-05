@@ -175,17 +175,17 @@ Completion requires implementation sign-off plus independent verification sign-o
 - [ ] `ACC-VOL-140` — VOL-140 Data Quality Engine — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-141` — VOL-141 Dataset Registry — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-142` — VOL-142 Synthetic Data Factory — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-143` — VOL-143 Training Control Plane — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-144` — VOL-144 Distributed Training — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-143` — VOL-143 Training Control Plane — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-144` — VOL-144 Distributed Training — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-145` — VOL-145 Training Checkpointing — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-146` — VOL-146 Elastic Training Recovery — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-147` — VOL-147 Training Observability — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-148` — VOL-148 Training Evaluation Gates — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-149` — VOL-149 Post-Training Lab — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-147` — VOL-147 Training Observability — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-148` — VOL-148 Training Evaluation Gates — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-149` — VOL-149 Post-Training Lab — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-150` — VOL-150 Reinforcement Learning Environments — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-151` — VOL-151 Curriculum Engine — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-152` — VOL-152 Verifier Model Program — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-153` — VOL-153 Multimodal Ingestion Core — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-153` — VOL-153 Multimodal Ingestion Core — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-154` — VOL-154 Vision Pipeline — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-155` — VOL-155 Document Vision — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-156` — VOL-156 Audio Pipeline — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
@@ -194,7 +194,7 @@ Completion requires implementation sign-off plus independent verification sign-o
 - [ ] `ACC-VOL-159` — VOL-159 Multimodal Retrieval — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-160` — VOL-160 Tool SDK — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-161` — VOL-161 Connector Framework — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-162` — VOL-162 Plugin Ecosystem — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-162` — VOL-162 Plugin Ecosystem — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-163` — VOL-163 Tool Marketplace Security — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-164` — VOL-164 Sandbox Runtime — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-165` — VOL-165 Policy Language — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
