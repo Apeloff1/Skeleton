@@ -1,7 +1,8 @@
 """Exact-match runtime authorization over capability contracts."""
 from dataclasses import dataclass
 from hashlib import sha256
-import json,re
+import re
+from skeleton.contracts.canonical import canonical_json_bytes
 from .capability_contracts import CapabilityGrant,SecurityContractError
 _SHA=re.compile(r"^[0-9a-f]{64}$")
 @dataclass(frozen=True,slots=True)
@@ -33,7 +34,7 @@ class AuthorizationReceipt:
  def __post_init__(self):
   if self.scope!="single-tool-request":raise SecurityContractError("invalid authorization scope")
 def _grant_digest(g):
- return sha256(json.dumps({"principal_id":g.principal_id,"capability":g.capability,"resource":g.resource,"operation":g.operation},sort_keys=True,separators=(",",":")).encode()).hexdigest()
+ return sha256(canonical_json_bytes({"principal_id":g.principal_id,"capability":g.capability,"resource":g.resource,"operation":g.operation})).hexdigest()
 def authorize_tool_request(context:SecurityContext,request:ToolRequest)->AuthorizationReceipt:
  if not isinstance(context,SecurityContext) or not isinstance(request,ToolRequest):raise SecurityContractError("typed inputs required")
  matches=[g for g in context.grants if (g.capability,g.resource,g.operation)==(request.capability,request.resource,request.operation)]
