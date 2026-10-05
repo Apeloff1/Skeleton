@@ -71,7 +71,7 @@ Completion requires implementation sign-off plus independent verification sign-o
 - [x] `ACC-VOL-036` — VOL-036 Adversarial Evaluation — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:P1 Evidence Identity Gate** — completed_at_utc: `2026-10-04T04:35:02Z`
 - [x] `ACC-VOL-037` — VOL-037 Verification Plane — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:P1 Evidence Identity Gate** — completed_at_utc: `2026-10-04T04:35:02Z`
 - [x] `ACC-VOL-038` — VOL-038 Provenance — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:P1 Evidence Identity Gate** — completed_at_utc: `2026-10-04T04:35:02Z`
-- [ ] `ACC-VOL-039` — VOL-039 Event Architecture — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-VOL-039` — VOL-039 Event Architecture — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-040` — VOL-040 Streaming — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-041` — VOL-041 API Architecture — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-042` — VOL-042 Product Shell — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
