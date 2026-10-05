@@ -43,3 +43,16 @@ class ResearchAcceptance:
   return all(c.claim_id in by_claim for c in self.coverage)
  @property
  def digest(self):return _dig({"id":self.acceptance_id,"conclusion":self.conclusion_digest,"coverage":[[c.claim_id,c.evidence_digests,c.contradiction_digests,c.uncertainty_recorded,c.negative_results_preserved] for c in self.coverage],"reproductions":[[r.reproduction_id,r.claim_id,r.method_digest,r.result_digest,r.reproducer_id,r.reproduced] for r in self.reproductions],"high_impact":self.high_impact,"reviewer":self.reviewer_id,"researcher":self.researcher_id})
+
+@dataclass(frozen=True,slots=True)
+class ResearchAcceptanceSignoff:
+ acceptance_digest:str;reviewer_id:str;approved:bool
+ def __post_init__(self):
+  _sha(self.acceptance_digest,"acceptance_digest");object.__setattr__(self,"reviewer_id",_id(self.reviewer_id,"reviewer_id"))
+  if not isinstance(self.approved,bool):raise ResearchAcceptanceError("approved must be bool")
+def sign_acceptance(bundle:ResearchAcceptance)->ResearchAcceptanceSignoff:
+ if not isinstance(bundle,ResearchAcceptance) or not bundle.eligible:raise ResearchAcceptanceError("research acceptance is not eligible")
+ return ResearchAcceptanceSignoff(bundle.digest,bundle.reviewer_id,True)
+def verify_acceptance(bundle:ResearchAcceptance,signoff:ResearchAcceptanceSignoff)->None:
+ if not isinstance(bundle,ResearchAcceptance) or not isinstance(signoff,ResearchAcceptanceSignoff):raise ResearchAcceptanceError("signoff inputs must be typed")
+ if not signoff.approved or signoff.reviewer_id!=bundle.reviewer_id or signoff.acceptance_digest!=bundle.digest:raise ResearchAcceptanceError("stale or mismatched research signoff")
