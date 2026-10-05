@@ -74,4 +74,14 @@ def collective_path(edges,devices):
  relevant=[e for e in edges if e.measured and e.source in devices and e.target in devices]
  if len(devices)<2:return CollectivePlacement(GPUPath(tuple(devices),float("inf")),True)
  if not relevant:return CollectivePlacement(None,False)
- return CollectivePlacement(GPUPath(tuple(devices),min(e.bandwidth for e in relevant)),True)
+ graph={d:set() for d in devices}
+ for e in relevant:
+  if e.bandwidth<=0:continue
+  graph[e.source].add(e.target);graph[e.target].add(e.source)
+ seen={devices[0]};front=[devices[0]]
+ while front:
+  n=front.pop()
+  for x in graph[n]:
+   if x not in seen:seen.add(x);front.append(x)
+ if seen!=set(devices):return CollectivePlacement(None,False)
+ return CollectivePlacement(GPUPath(tuple(devices),min(e.bandwidth for e in relevant if e.bandwidth>0)),True)
