@@ -4945,6 +4945,23 @@
       ],
       "move_batch": "B1-core-runtime",
       "source_disposition": "canonical_governed_storage_tree_with_exact_ai_runtime_mirror"
+    },
+    {
+      "id": "AIFT-MODEL-REGISTRY",
+      "source": "skeleton/modeling/registry.py",
+      "destination": "skeleton/ai/modeling/registry.py",
+      "kind": "file",
+      "source_git_object_sha": "30a7538bf2ad4e5b17288c0b9ed605fea7f551c4",
+      "role": "Canonical content-addressed model-development lineage registry; governed AI destination is a byte-identical non-owning mirror.",
+      "work_package_refs": [],
+      "aiq_refs": [],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror"
+      ],
+      "move_batch": "B3-owner-sensitive",
+      "source_disposition": "canonical_model_development_owner",
+      "parity_mode": "byte_identical"
     }
   ],
   "ci_enforcement": {
@@ -5186,7 +5203,6 @@
       "skeleton/experiments",
       "skeleton/hardware",
       "skeleton/inference",
-      "skeleton/modeling",
       "skeleton/multimodal",
       "skeleton/planning",
       "skeleton/plugins",

@@ -599,18 +599,23 @@
         "DatasetManifest",
         "TrainingRun",
         "ModelArtifact",
-        "TrainingLineage"
+        "TrainingLineage",
+        "ModelDevelopmentRegistry"
       ],
       "implementation_paths": [
-        "planned:skeleton/modeling",
+        "skeleton/modeling/registry.py",
+        "skeleton/modeling/__init__.py",
+        "skeleton/ai/modeling/registry.py",
+        "skeleton/ai/modeling/__init__.py",
         "planned:skeleton/training",
         "planned:machine/model_registry.json"
       ],
       "tests": [
-        "planned:skeleton/testing/test_dataset_manifest.py",
-        "planned:skeleton/testing/test_training_lineage.py"
+        "skeleton/testing/test_vol006_model_registry.py",
+        "planned:reproducible small-model training baseline"
       ],
       "evaluations": [
+        "model lineage tamper/collision/authority regression suite",
         "planned:contamination audit",
         "planned:reproducible small-model training baseline"
       ],
@@ -622,7 +627,7 @@
       ],
       "gaps": [
         "native training infrastructure remains a target capability",
-        "model registry contract needs implementation"
+        "materialized machine model-registry snapshot/export remains a target capability"
       ],
       "accountability_id": "ACC-VOL-006",
       "completion_checkbox": false,
