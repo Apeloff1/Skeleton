@@ -27,3 +27,17 @@ def test_sequence_does_not_infer_causality_across_domains():
  assert compare_sequence(SequenceNumber("a",1),SequenceNumber("b",2)) is CausalRelation.UNKNOWN
 def test_sequence_orders_only_within_domain():
  assert compare_sequence(SequenceNumber("a",1),SequenceNumber("a",2)) is CausalRelation.BEFORE
+
+
+def test_replay_foundation_depth_invariants_fail_closed():
+ import pytest
+ b=Bulkhead("b","d",BulkheadLimit(1,1),1)
+ with pytest.raises(ValueError):overflow(b,b,authority_compatible=True)
+ d=DeadLetter("","digest",1,"failure",None);a=ReplayAuthorization("",True,True,True)
+ assert dead_letter_disposition(d,a) is DeadLetterDisposition.HOLD
+ assert not replay(ReplayRequest("",ReplayMode.RECONSTRUCT)).allowed
+ with pytest.raises(ValueError):DeterminismEnvelope(DeterminismClass.EXACT,None,VariancePolicy(0,0),("clock",))
+ with pytest.raises(ValueError):DeterminismEnvelope(DeterminismClass.TOLERANT,None,VariancePolicy(-1,0),())
+ with pytest.raises(ValueError):Deadline(-1,Duration(1))
+ with pytest.raises(ValueError):SequenceNumber("",0)
+ with pytest.raises(ValueError):LogicalClock("n",-1)
