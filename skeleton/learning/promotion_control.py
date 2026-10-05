@@ -67,3 +67,17 @@ def validate_rollback(candidate:ImprovementCandidate,decision:PromotionDecision,
  if decision.status is not PromotionStatus.PROMOTE:raise ImprovementError("rollback applies only to promoted candidate")
  if decision.candidate_digest!=candidate.digest or receipt.decision_id!=decision.decision_id:raise ImprovementError("rollback identity mismatch")
  if receipt.promoted_digest!=candidate.challenger_digest or receipt.restored_digest!=candidate.champion_digest:raise ImprovementError("rollback does not restore exact champion")
+
+@dataclass(frozen=True,slots=True)
+class CanaryEvidence:
+ candidate_digest:str;canary_digest:str;safety_passed:bool;quality_passed:bool;rollback_ready:bool
+ def __post_init__(self):
+  _sha(self.candidate_digest,"candidate_digest");_sha(self.canary_digest,"canary_digest")
+  for f in ("safety_passed","quality_passed","rollback_ready"):
+   if not isinstance(getattr(self,f),bool):raise ImprovementError(f"{f} must be bool")
+ @property
+ def digest(self):return _dig({"candidate":self.candidate_digest,"canary":self.canary_digest,"safety":self.safety_passed,"quality":self.quality_passed,"rollback_ready":self.rollback_ready})
+def promote_with_canary(candidate:ImprovementCandidate,evaluation:EvaluationBundle,verifier_id:str,canary:CanaryEvidence)->PromotionDecision:
+ if not isinstance(canary,CanaryEvidence) or canary.candidate_digest!=candidate.digest:raise ImprovementError("canary/candidate mismatch")
+ if not (canary.safety_passed and canary.quality_passed and canary.rollback_ready):raise ImprovementError("canary gates must pass before promotion")
+ return decide(candidate,evaluation,verifier_id,canary_digest=canary.digest)
