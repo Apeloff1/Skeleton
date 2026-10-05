@@ -168,9 +168,13 @@ class TechnologyCandidate:
         )
         if not isinstance(self.exit, TechnologyExitCriteria):
             raise RadarError("exit must be TechnologyExitCriteria")
-        if self.exit.decision_tick > self.decision_tick:
+        if self.exit.decision_tick != self.decision_tick:
             raise RadarError(
-                "exit decision tick cannot exceed candidate decision horizon"
+                "candidate and exit decision horizons must match"
+            )
+        if self.budget > self.exit.max_cost:
+            raise RadarError(
+                "candidate budget exceeds exit cost criterion"
             )
 
     @property
@@ -626,14 +630,12 @@ class TechnologyRadar:
         prior: RadarState,
         selected: tuple[TechnologyEvidence, ...],
     ) -> None:
-        if prior is not RadarState.ADOPTED:
-            return
         retirement = [
             item for item in selected if item.kind is EvidenceKind.RETIREMENT
         ]
         if not retirement:
             raise RadarError(
-                "adopted technology retirement requires retirement evidence"
+                "retirement requires explicit retirement evidence"
             )
 
     @property
