@@ -6204,7 +6204,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Classify maintenance actions by risk and require bounded automated mutation.",
         "Preserve active migration, generated, release and evidence artifacts through explicit ownership rules.",
@@ -6218,20 +6218,25 @@
       "contracts": [
         "MaintenanceTask",
         "RepositoryOwnership",
-        "MaintenanceReceipt"
+        "ResourceEvidence",
+        "MaintenanceReceipt",
+        "MaintenancePlan",
+        "MaintenanceRegistry"
       ],
       "implementation_paths": [
-        "scripts",
-        ".github/workflows",
-        "machine"
+        "skeleton/repo_machine/maintenance.py",
+        "skeleton/repo_machine/__init__.py",
+        "skeleton/ai/build/repo_machine/maintenance.py",
+        "skeleton/ai/build/repo_machine/__init__.py",
+        "scripts/plan_repository_maintenance.py",
+        "machine/ai_file_tree.json"
       ],
       "tests": [
-        "planned:tests/test_repository_maintenance_contract.py",
-        "planned:tests/test_safe_cleanup.py"
+        "skeleton/testing/test_vol092_repository_maintenance.py"
       ],
       "evaluations": [
-        "planned:stale-resource cleanup simulation",
-        "planned:maintenance-churn evaluation"
+        "skeleton/testing/test_vol092_repository_maintenance.py",
+        "scripts/plan_repository_maintenance.py"
       ],
       "evidence": [],
       "risks": [
@@ -6239,10 +6244,7 @@
         "bot churn",
         "orphan ownership"
       ],
-      "gaps": [
-        "define maintenance ownership registry",
-        "bind deletion to reachability/retention checks"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-092",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
