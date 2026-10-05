@@ -15,17 +15,22 @@ def _d(v:object,n:str)->str:
 @dataclass(frozen=True,slots=True)
 class RecoveryArtifact:
  artifact_id:str; expected_digest:str; observed_digest:str; signature_verified:bool
+ def __post_init__(self):
+  _t(self.artifact_id,"artifact_id");_d(self.expected_digest,"expected_digest");_d(self.observed_digest,"observed_digest")
  @property
  def valid(self)->bool: return self.signature_verified and self.expected_digest==self.observed_digest
 @dataclass(frozen=True,slots=True)
 class BootstrapRecovery:
  recovery_id:str; artifacts:tuple[RecoveryArtifact,...]; dependency_count:int
  def __post_init__(self):
+  _t(self.recovery_id,"recovery_id")
   if self.dependency_count<0: raise ValueError("dependency_count must be non-negative")
+  if len({a.artifact_id for a in self.artifacts})!=len(self.artifacts):raise ValueError("duplicate recovery artifact")
   if not self.artifacts: raise ValueError("recovery requires artifacts")
 @dataclass(frozen=True,slots=True)
 class BootstrapReceipt: recovery_id:str; validated:bool; handoff_allowed:bool
 def validate_recovery(r:BootstrapRecovery,normal_dependency_count:int)->BootstrapReceipt:
+ if normal_dependency_count<0:raise ValueError("normal_dependency_count must be non-negative")
  valid=r.dependency_count<normal_dependency_count and all(a.valid for a in r.artifacts)
  return BootstrapReceipt(r.recovery_id,valid,valid)
 
