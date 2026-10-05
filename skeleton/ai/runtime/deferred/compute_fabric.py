@@ -6,7 +6,7 @@ class StorageTier(str,Enum): HOT="hot"; WARM="warm"; COLD="cold"
 class TieringPolicy: critical_replicas:int; allowed:tuple[StorageTier,...]
 @dataclass(frozen=True,slots=True)
 class TierMove: artifact_id:str; source:StorageTier; target:StorageTier; digest_before:str; digest_after:str; metadata_preserved:bool; replicas_after:int
-def tier_move_valid(m,p):return m.target in p.allowed and m.digest_before==m.digest_after and m.metadata_preserved and m.replicas_after>=p.critical_replicas
+def tier_move_valid(m,p):return bool(m.artifact_id) and p.critical_replicas>=0 and bool(p.allowed) and m.source!=m.target and m.target in p.allowed and bool(m.digest_before) and m.digest_before==m.digest_after and m.metadata_preserved and m.replicas_after>=p.critical_replicas
 @dataclass(frozen=True,slots=True)
 class DataLocation: artifact_id:str; zone:str; freshness_watermark:int
 @dataclass(frozen=True,slots=True)
@@ -14,6 +14,7 @@ class LocalityConstraint: allowed_zones:frozenset[str]; authority_ok:bool; secur
 @dataclass(frozen=True,slots=True)
 class TransferPlan: source:DataLocation; target_zone:str; transfer_cost:float; admitted:bool
 def plan_transfer(source,target_zone,constraint,cost):
+ if not source.artifact_id or not source.zone or source.freshness_watermark<0 or not target_zone or cost<0:raise ValueError("invalid locality transfer identity")
  ok=constraint.authority_ok and constraint.security_ok and target_zone in constraint.allowed_zones
  return TransferPlan(source,target_zone,cost,ok)
 @dataclass(frozen=True,slots=True)
