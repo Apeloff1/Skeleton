@@ -9,12 +9,20 @@ class SourceCluster: cluster_id:str; members:tuple[EvidenceIndependence,...]
 @dataclass(frozen=True,slots=True)
 class DiversityScore: independent_clusters:int; quality_floor:float; admissible:bool
 def diversity(evidence,quality_floor):
+ if not 0<=quality_floor<=1:raise ValueError("quality floor must be within [0,1]")
+ if any(not all((e.source_id,e.lineage,e.owner)) or not 0<=e.quality<=1 for e in evidence):raise ValueError("invalid evidence identity or quality")
+ if len({e.source_id for e in evidence})!=len(evidence):raise ValueError("duplicate evidence source")
  groups={(e.lineage,e.owner,tuple(sorted(e.citations))) for e in evidence}
  return DiversityScore(len(groups),quality_floor,bool(evidence) and all(e.quality>=quality_floor for e in evidence))
 @dataclass(frozen=True,slots=True)
 class ScopeDimension: name:str; value:str
 @dataclass(frozen=True,slots=True)
-class ClaimScope: dimensions:tuple[ScopeDimension,...]; valid_from:int; valid_to:int|None
+class ClaimScope:
+ dimensions:tuple[ScopeDimension,...]; valid_from:int; valid_to:int|None
+ def __post_init__(self):
+  if not self.dimensions or any(not d.name or not d.value for d in self.dimensions):raise ValueError("scope dimensions required")
+  if len({d.name for d in self.dimensions})!=len(self.dimensions):raise ValueError("duplicate scope dimension")
+  if self.valid_to is not None and self.valid_to<self.valid_from:raise ValueError("invalid scope interval")
 @dataclass(frozen=True,slots=True)
 class ScopeCompatibility: compatible:bool; qualification:str|None=None
 def scope_compatibility(a,b):
@@ -31,7 +39,9 @@ def merge_claims(items):
  if not items:raise ValueError("claims required")
  base=items[0][1]
  if any(x[1].normalized_text!=base.normalized_text or not scope_compatibility(base.scope,x[1].scope).compatible for x in items[1:]):raise ValueError("incompatible claims")
- ids=tuple(x[0] for x in items);return ClaimMerge(ClaimCluster(base,ids),ids)
+ ids=tuple(x[0] for x in items)
+ if any(not x for x in ids) or len(set(ids))!=len(ids):raise ValueError("unique claim identity required")
+ return ClaimMerge(ClaimCluster(base,ids),ids)
 class ClaimValidity(str,Enum): CURRENT="current"; STALE="stale"
 @dataclass(frozen=True,slots=True)
 class ExpirationPolicy:
@@ -67,4 +77,7 @@ class KnowledgeSnapshot:
 class KnowledgeSnapshotDigest: digest:str
 @dataclass(frozen=True,slots=True)
 class KnowledgeDiff: changed:tuple[str,...]
-def restore_allowed(snapshot,current_source_watermark):return snapshot.source_watermark==current_source_watermark
+def restore_allowed(snapshot,current_source_watermark,current_index_watermark=None,current_model_version=None,current_schema_version=None):
+ if not current_source_watermark:return False
+ checks=(snapshot.source_watermark==current_source_watermark,current_index_watermark is None or snapshot.index_watermark==current_index_watermark,current_model_version is None or snapshot.model_version==current_model_version,current_schema_version is None or snapshot.schema_version==current_schema_version)
+ return all(checks)
