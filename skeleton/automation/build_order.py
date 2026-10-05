@@ -50,4 +50,8 @@ class BuildOrder:
   return tuple(sorted(out))
  def ready(self,completed):
   done=set(completed);return tuple(n for n in self.nodes if n not in done and not self.blocked_reasons(n,done))
- def maturity_allowed(self,node_id,completed):return not self.blocked_reasons(node_id,completed)
+ def maturity_allowed(self,node_id,completed):\n  done=self._completed(completed)\n  if node_id in done:raise BuildOrderError("completed node cannot request new maturity promotion")\n  return not self.blocked_reasons(node_id,tuple(sorted(done)))
+
+ def snapshot(self,completed):
+  done=self._completed(completed)
+  return tuple((n,n in done,self.blocked_reasons(n,tuple(sorted(done)))) for n in self.nodes)
