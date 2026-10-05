@@ -266,14 +266,68 @@ class RecoveryDrill:
 class ReleaseRequirement:
     gate_id: str
     required: bool = True
+    release_classes: tuple[str, ...] = ("default",)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "gate_id", _text(self.gate_id, "gate_id"))
         if not isinstance(self.required, bool):
             raise TypeError("required must be boolean")
+        normalized = tuple(_text(item, "release_class") for item in self.release_classes)
+        if not normalized or len(normalized) != len(set(normalized)):
+            raise ValueError("release_classes must be unique and non-empty")
+        object.__setattr__(self, "release_classes", normalized)
+
+
+@dataclass(frozen=True, slots=True)
+class ReleaseWaiver:
+    gate_id: str
+    release_class: str
+    evidence_digest: str
+    approver: str
+    expires_at: int
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "gate_id", _text(self.gate_id, "gate_id"))
+        object.__setattr__(self, "release_class", _text(self.release_class, "release_class"))
+        object.__setattr__(self, "approver", _text(self.approver, "approver"))
+        if not isinstance(self.evidence_digest, str) or len(self.evidence_digest) != 64:
+            raise ValueError("evidence_digest must be sha256")
+        if isinstance(self.expires_at, bool) or not isinstance(self.expires_at, int) or self.expires_at < 1:
+            raise ValueError("expires_at must be positive integer")
+
+    def applies(self, gate_id: str, release_class: str, now: int) -> bool:
+        return (
+            self.gate_id == gate_id
+            and self.release_class == release_class
+            and now < self.expires_at
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class QualificationDecision:
+    release_id: str
+    release_class: str
+    qualified: bool
+    blockers: tuple[str, ...]
+    waived_gates: tuple[str, ...]
+    input_digest: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "release_id", _text(self.release_id, "release_id"))
+        object.__setattr__(self, "release_class", _text(self.release_class, "release_class"))
+        if not isinstance(self.qualified, bool):
+            raise TypeError("qualified must be boolean")
+        if len(self.blockers) != len(set(self.blockers)):
+            raise ValueError("blockers must be unique")
+        if len(self.waived_gates) != len(set(self.waived_gates)):
+            raise ValueError("waived_gates must be unique")
+        if not isinstance(self.input_digest, str) or len(self.input_digest) != 64:
+            raise ValueError("input_digest must be sha256")
 
 
 class ReleaseQualification:
+    _TERMINAL_SUCCESS = "success"
+
     def __init__(self, requirements: Iterable[ReleaseRequirement]) -> None:
         reqs = tuple(requirements)
         ids = [item.gate_id for item in reqs]
@@ -281,13 +335,96 @@ class ReleaseQualification:
             raise ValueError("release gate ids must be unique and non-empty")
         self.requirements = reqs
 
+    def _required_for(self, release_class: str) -> tuple[ReleaseRequirement, ...]:
+        release_class = _text(release_class, "release_class")
+        return tuple(
+            req for req in self.requirements
+            if req.required and release_class in req.release_classes
+        )
+
     def qualify(self, conclusions: Mapping[str, str]) -> tuple[bool, tuple[str, ...]]:
         blockers = []
         for req in self.requirements:
             conclusion = conclusions.get(req.gate_id)
-            if req.required and conclusion != "success":
+            if req.required and conclusion != self._TERMINAL_SUCCESS:
                 blockers.append(f"{req.gate_id}:{conclusion or 'missing'}")
         return (not blockers, tuple(sorted(blockers)))
+
+    def decide(
+        self,
+        *,
+        release_id: str,
+        release_class: str,
+        conclusions: Mapping[str, str],
+        now: int,
+        waivers: Iterable[ReleaseWaiver] = (),
+    ) -> QualificationDecision:
+        release_id = _text(release_id, "release_id")
+        release_class = _text(release_class, "release_class")
+        if isinstance(now, bool) or not isinstance(now, int) or now < 0:
+            raise ValueError("now must be non-negative integer")
+        if not isinstance(conclusions, Mapping):
+            raise TypeError("conclusions must be a mapping")
+
+        required = self._required_for(release_class)
+        if not required:
+            raise ValueError(f"no release requirements declared for class {release_class}")
+
+        waiver_rows = tuple(waivers)
+        waiver_by_gate: dict[str, ReleaseWaiver] = {}
+        for waiver in waiver_rows:
+            if not isinstance(waiver, ReleaseWaiver):
+                raise TypeError("waivers must contain ReleaseWaiver")
+            if waiver.release_class != release_class:
+                raise ValueError("cross-class release waiver is forbidden")
+            if waiver.gate_id in waiver_by_gate:
+                raise ValueError("duplicate release waiver")
+            waiver_by_gate[waiver.gate_id] = waiver
+
+        blockers: list[str] = []
+        waived: list[str] = []
+        normalized: dict[str, str] = {}
+        for req in required:
+            raw = conclusions.get(req.gate_id)
+            conclusion = raw.strip().lower() if isinstance(raw, str) and raw.strip() else "missing"
+            normalized[req.gate_id] = conclusion
+            if conclusion == self._TERMINAL_SUCCESS:
+                continue
+            waiver = waiver_by_gate.get(req.gate_id)
+            if waiver is not None and waiver.applies(req.gate_id, release_class, now):
+                waived.append(req.gate_id)
+                continue
+            blockers.append(f"{req.gate_id}:{conclusion}")
+
+        unknown_waivers = sorted(set(waiver_by_gate) - {req.gate_id for req in required})
+        if unknown_waivers:
+            raise ValueError("waiver targets non-required gate: " + ",".join(unknown_waivers))
+
+        input_digest = sha256_json({
+            "release_id": release_id,
+            "release_class": release_class,
+            "required_gates": [req.gate_id for req in required],
+            "conclusions": normalized,
+            "waivers": [
+                {
+                    "gate_id": waiver.gate_id,
+                    "release_class": waiver.release_class,
+                    "evidence_digest": waiver.evidence_digest,
+                    "approver": waiver.approver,
+                    "expires_at": waiver.expires_at,
+                }
+                for waiver in sorted(waiver_rows, key=lambda item: item.gate_id)
+            ],
+            "now": now,
+        })
+        return QualificationDecision(
+            release_id=release_id,
+            release_class=release_class,
+            qualified=not blockers,
+            blockers=tuple(sorted(blockers)),
+            waived_gates=tuple(sorted(waived)),
+            input_digest=input_digest,
+        )
 
 
 @dataclass(frozen=True, slots=True)
