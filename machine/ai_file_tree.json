@@ -7458,6 +7458,108 @@
       "volume_refs": [
         "VOL-209"
       ]
+    },
+    {
+      "id": "AIFT-NATIVE-AI-README",
+      "path": "skeleton/ai/README.md",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical documentation for the governed AI assembly tree and its ownership rules.",
+      "volume_refs": [
+        "VOL-000"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-ASSISTANT-ROOT",
+      "path": "skeleton/ai/assistant",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI-native assistant control-plane, context, tooling, routing, provenance, memory, automation, and handoff surfaces.",
+      "volume_refs": [
+        "VOL-097"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-COMPAT-ROOT",
+      "path": "skeleton/ai/compat",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": true,
+      "role": "Residual compatibility package surfaces not claimed by more-specific convergence mappings; compatibility never creates independent production authority.",
+      "volume_refs": [
+        "VOL-003",
+        "VOL-060",
+        "VOL-261"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-INTEGRATIONS-ROOT",
+      "path": "skeleton/ai/integrations",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI-native bounded integration adapters and open-source interoperability surfaces.",
+      "volume_refs": [
+        "VOL-007",
+        "VOL-162",
+        "VOL-343"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-PLANNING-ROOT",
+      "path": "skeleton/ai/planning",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI-native construction/planning authority support distinct from mirrored runtime planning implementations.",
+      "volume_refs": [
+        "VOL-014",
+        "VOL-095"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-PROVIDERS-ROOT",
+      "path": "skeleton/ai/providers",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": true,
+      "role": "Residual provider package/export surfaces around more-specific governed provider contract and runtime mappings.",
+      "volume_refs": [
+        "VOL-007"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-RESEARCH-ROOT",
+      "path": "skeleton/ai/research",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": true,
+      "role": "Residual AI-native research and quarantined external reference material not claimed by more-specific historical/acquired/legacy mappings.",
+      "volume_refs": [
+        "VOL-001",
+        "VOL-099",
+        "VOL-106",
+        "VOL-409"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-RUNTIME-ROOT",
+      "path": "skeleton/ai/runtime",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": true,
+      "role": "Residual canonical AI-native runtime surfaces—including autonomous engineering, effects, local inference, learning foundation, training, functional AI, provider runtime, and system completion—not claimed by more-specific mappings or native owners.",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-007",
+        "VOL-015",
+        "VOL-022",
+        "VOL-097",
+        "VOL-119",
+        "VOL-143"
+      ]
     }
   ]
 }

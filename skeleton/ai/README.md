@@ -57,6 +57,11 @@ source to mirror. They are governed by `machine/ai_file_tree.json` under
 A residual tree owner governs only AI-native files not already claimed by a
 more-specific migration destination.
 
+Every tracked file under `skeleton/ai` must resolve to either a governed migration
+destination or a canonical native owner. The validator fails closed on unowned
+tracked files, so newly landed completed work cannot silently bypass file-tree
+governance.
+
 ## Completed-volume traceability
 
 A mature masterplan volume (`implemented`, `hardened`, or `verified`) that resolves to a governed AI-tree source or destination must be listed in the most-specific owning mapping's `volume_refs`. The AI file-tree validator enforces this ledger so newly completed work cannot silently bypass canonical AI ownership. Traceability does not authorize source deletion, import cutover, completion signing, or independent verification.
