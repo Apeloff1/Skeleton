@@ -188,3 +188,30 @@ __all__ += [
     "QualityPolicy",
     "QualityVector",
 ]
+
+
+from skeleton.eval.sota_candidate import (
+    PROHIBITED_SHORTCUTS,
+    SOTA_CANDIDATE_CLAIM,
+    SOTA_CANDIDATE_SCHEMA,
+    SOTACandidateClaim,
+    SOTACandidateError,
+    SOTACandidateGate,
+    SOTAMetricDirection,
+    SOTAMetricRequirement,
+    SOTAQualificationReceipt,
+    SOTAReplayRecord,
+)
+
+__all__ += [
+    "PROHIBITED_SHORTCUTS",
+    "SOTA_CANDIDATE_CLAIM",
+    "SOTA_CANDIDATE_SCHEMA",
+    "SOTACandidateClaim",
+    "SOTACandidateError",
+    "SOTACandidateGate",
+    "SOTAMetricDirection",
+    "SOTAMetricRequirement",
+    "SOTAQualificationReceipt",
+    "SOTAReplayRecord",
+]
