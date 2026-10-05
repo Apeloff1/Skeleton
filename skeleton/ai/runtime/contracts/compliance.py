@@ -472,20 +472,22 @@ class ComplianceRegistry:
                 )
                 continue
 
-            latest = max(
-                identity_bound,
-                key=lambda item: (item.observed_at, item.digest),
+            latest_at = max(item.observed_at for item in identity_bound)
+            latest_cohort = tuple(
+                item for item in identity_bound
+                if item.observed_at == latest_at
             )
-            age = (now - latest.observed_at).total_seconds()
+            latest = max(latest_cohort, key=lambda item: item.digest)
+            age = (now - latest_at).total_seconds()
             if age > control.evidence_ttl_seconds:
                 status = ControlStatus.EVIDENCE_STALE
                 reason = "evidence exceeded freshness policy"
-            elif latest.result is EvidenceResult.FAIL:
+            elif any(item.result is EvidenceResult.FAIL for item in latest_cohort):
                 status = ControlStatus.FAILED
-                reason = "latest identity-bound evidence reports failure"
+                reason = "latest identity-bound evidence cohort contains failure"
             else:
                 status = ControlStatus.SATISFIED
-                reason = "fresh identity-bound evidence passed"
+                reason = "fresh identity-bound evidence cohort passed"
 
             assessments.append(
                 ControlAssessment(
