@@ -5186,7 +5186,6 @@
       "skeleton/education",
       "skeleton/experiments",
       "skeleton/hardware",
-      "skeleton/inference",
       "skeleton/modeling",
       "skeleton/multimodal",
       "skeleton/planning",
@@ -5327,6 +5326,11 @@
     "external_rule": "Product, packaging, deployment, architecture-authority, and accelerator roots stay outside skeleton/ai unless separately reclassified."
   },
   "retained_outside_ai_tree": [
+    {
+      "path": "skeleton/inference",
+      "owner": "provider-neutral inference runtime",
+      "reason": "Canonical bounded inference runtime remains at skeleton/inference; provider authority remains at skeleton/provider_runtime.py pending explicit ownership cutover."
+    },
     {
       "path": "skeleton/README.py",
       "owner": "package documentation",
