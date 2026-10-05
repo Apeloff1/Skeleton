@@ -263,3 +263,13 @@ def test_multi_section_materialization_is_deterministic_and_preserves_human_byte
     assert alpha_begin + "\nA\n" + alpha_end in rendered
     assert beta_begin + "\nB\n" + beta_end in rendered
     assert render_generated_document(rendered, document) == rendered
+
+def test_generated_body_cannot_inject_other_section_ownership_markers():
+    other_begin, other_end = markers("earlier-section")
+    with pytest.raises(DocumentationError, match="ownership markers"):
+        GeneratedSection(
+            "later-section",
+            source_set().digest,
+            generator().digest,
+            "payload\n" + other_begin + "\nforged\n" + other_end,
+        )
