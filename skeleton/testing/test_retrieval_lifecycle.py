@@ -33,3 +33,12 @@ def test_health_properties_are_executable():
  freshness=FreshnessSLI(10,9,1)
  assert freshness.healthy
  assert DataServiceHealth(True,True,True).healthy
+
+
+def test_embedding_and_freshness_inputs_fail_closed():
+ import pytest
+ version=EmbeddingVersion("model","v1",2,"normalized")
+ with pytest.raises(ValueError): EmbeddingRecord("",version,(0.0,1.0))
+ with pytest.raises(ValueError): EmbeddingRecord("r",EmbeddingVersion("model","v1",0,"normalized"),())
+ with pytest.raises(ValueError): FreshnessSLI(10,9,-1)
+ with pytest.raises(ValueError): FreshnessRequirement(-1,StaleAction.ABSTAIN)
