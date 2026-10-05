@@ -18,7 +18,7 @@ class SignedDesktopRelease:
  def __post_init__(self):
   for f in ("release_id","signer_id"):object.__setattr__(self,f,_id(getattr(self,f),f))
   _sha(self.artifact_digest,"artifact_digest");_sha(self.signature_digest,"signature_digest")
-  if self.schema_version<1:raise DesktopReleaseError("schema_version invalid")
+  if not isinstance(self.schema_version,int) or isinstance(self.schema_version,bool) or self.schema_version<1:raise DesktopReleaseError("schema_version invalid")
 @dataclass(frozen=True,slots=True)
 class DesktopAcceptanceRun:
  run_id:str;release_id:str;environment_digest:str;vs001_evidence_digest:str;governed_artifact_digest:str
@@ -29,7 +29,7 @@ class DesktopAcceptanceRun:
 class DesktopArtifactReceipt:
  release_id:str;authoritative_state_digest:str;artifact_digest:str;schema_version:int
  def __post_init__(self):
-  object.__setattr__(self,"release_id",_id(self.release_id,"release_id"));_sha(self.authoritative_state_digest,"authoritative_state_digest");_sha(self.artifact_digest,"artifact_digest")
+  object.__setattr__(self,"release_id",_id(self.release_id,"release_id"));_sha(self.authoritative_state_digest,"authoritative_state_digest");_sha(self.artifact_digest,"artifact_digest")\n  if not isinstance(self.schema_version,int) or isinstance(self.schema_version,bool) or self.schema_version<1:raise DesktopReleaseError("schema_version invalid")
 @dataclass(frozen=True,slots=True)
 class DesktopRollbackEvidence:
  from_release_id:str;to_release_id:str;preupdate_state_digest:str;restored_state_digest:str;rollback_artifact_digest:str
