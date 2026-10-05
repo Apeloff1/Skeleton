@@ -43,3 +43,13 @@ def test_cognitive_controls_fail_closed_on_invalid_identity():
  assert not compose_tools(ToolComposition((incomplete,),frozenset({"read"}))).admissible
  binding=ToolBinding("tool","v",frozenset({"read"}),"in","out","trusted")
  assert not compose_tools(ToolComposition((binding,binding),frozenset({"read"}))).admissible
+
+
+def test_plan_analysis_and_simulation_require_deterministic_identity():
+ import pytest
+ with pytest.raises(ValueError): analyze_plan("",("a",),(),())
+ with pytest.raises(ValueError): analyze_plan("ir",(),(),())
+ with pytest.raises(ValueError): analyze_plan("ir",("a",),(),(PlanLintRule("","v1"),))
+ with pytest.raises(ValueError): analyze_plan("ir",("a",),(),(PlanLintRule("r","v1"),PlanLintRule("r","v1")))
+ with pytest.raises(ValueError): simulate_plan(())
+ with pytest.raises(ValueError): simulate_plan(("a","a"))
