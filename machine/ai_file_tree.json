@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "tree_version": "1.6.9",
+  "tree_version": "1.7.0",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
-  "baseline_git_sha": "4bba10289d27060ff4f78ec487634c815cd114a0",
+  "baseline_git_sha": "6f2cc7d07feba38ec2be19e9a8082981306f98e8",
   "canonical_root": "skeleton/ai",
   "migration_mode": "strangler_mirror_then_explicit_cutover",
   "purpose": "Consolidate build-plan-relevant AI engine, governance, shell/control-plane, agent, evaluation, reliability, build-control code, historical research lineage, Jeeves, and selected legacy backend/GameForge AI recovery surfaces into one governed file tree without breaking existing imports or fabricating completion.",
@@ -398,7 +398,7 @@
       "source": "skeleton/vault",
       "destination": "skeleton/ai/runtime/vault",
       "kind": "tree",
-      "source_git_object_sha": "c64aba5a0befc84a82606e95c1031ec0823cf30f",
+      "source_git_object_sha": "1ed25a02256e6c4a19c1b43ee7a09f416f09be12",
       "role": "data governance lifecycle and audit authority",
       "work_package_refs": [
         "WP-W00",
@@ -669,7 +669,7 @@
       "source": "skeleton/security",
       "destination": "skeleton/ai/runtime/security",
       "kind": "tree",
-      "source_git_object_sha": "e0aacacba8cbf3c61576df67405fa206fda2c1fb",
+      "source_git_object_sha": "10801de024d81f8d6670fcd2b5c63538f1c26eb1",
       "role": "AI runtime security and activation controls",
       "work_package_refs": [
         "WP-W00",
@@ -715,7 +715,7 @@
       "source": "skeleton/eval",
       "destination": "skeleton/ai/evaluation",
       "kind": "tree",
-      "source_git_object_sha": "afe29ecc0bbc248ef71070cc274959210b917631",
+      "source_git_object_sha": "38072c19a87b4ae7cc4e9dbc2933abbd4d8e2d1e",
       "role": "evaluation and evidence support",
       "work_package_refs": [
         "WP-W00",
@@ -4965,6 +4965,393 @@
       ],
       "move_batch": "B1-core-runtime",
       "source_disposition": "canonical_governed_storage_tree_with_exact_ai_runtime_mirror"
+    },
+    {
+      "id": "AIFT-MODELING-CORE",
+      "source": "skeleton/modeling",
+      "destination": "skeleton/ai/modeling",
+      "role": "model registry, training lineage, evaluation, and publication contracts for the controlled model-development program",
+      "work_package_refs": [
+        "WP-W28"
+      ],
+      "volume_refs": [
+        "VOL-006"
+      ],
+      "kind": "tree",
+      "source_git_object_sha": "1bcb7a49b30c8176993615924d8eae3676f70277",
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve canonical source ownership until import inversion is validated",
+        "prove exact source/destination parity on the affected domain",
+        "retain rollback and compatibility paths until independent verification"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-TRAINING",
+      "source": "skeleton/training",
+      "destination": "skeleton/ai/training",
+      "role": "durable, distributed, recoverable, observable, evaluation-gated training and post-training runtime",
+      "work_package_refs": [
+        "WP-W28"
+      ],
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ],
+      "kind": "tree",
+      "source_git_object_sha": "3a8e30f9fd6cdd74379e3b0050534db0154f77c0",
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve canonical source ownership until import inversion is validated",
+        "prove exact source/destination parity on the affected domain",
+        "retain rollback and compatibility paths until independent verification"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-DOCUMENTATION-RUNTIME",
+      "source": "skeleton/documentation",
+      "destination": "skeleton/ai/build/documentation",
+      "role": "deterministic human/generated documentation build runtime and reference validation",
+      "work_package_refs": [
+        "WP-W27",
+        "WP-W30"
+      ],
+      "volume_refs": [
+        "VOL-089",
+        "VOL-090"
+      ],
+      "kind": "tree",
+      "source_git_object_sha": "7993ac6369243ff0086bb0aa41fbeb63007a5e81",
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve canonical source ownership until import inversion is validated",
+        "prove exact source/destination parity on the affected domain",
+        "retain rollback and compatibility paths until independent verification"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-MULTIMODAL-ARTIFACTS",
+      "source": "skeleton/artifacts",
+      "destination": "skeleton/ai/runtime/multimodal/artifacts",
+      "role": "multimodal artifact ingestion and normalized artifact contracts",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06",
+        "WP-W28"
+      ],
+      "volume_refs": [
+        "VOL-153"
+      ],
+      "kind": "tree",
+      "source_git_object_sha": "eaaf487f9aae5300ac1e30e51016f8e8eff15a0c",
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve canonical source ownership until import inversion is validated",
+        "prove exact source/destination parity on the affected domain",
+        "retain rollback and compatibility paths until independent verification"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-MULTIMODAL-VISION",
+      "source": "skeleton/vision",
+      "destination": "skeleton/ai/runtime/multimodal/vision",
+      "role": "vision ingestion and processing pipeline",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06",
+        "WP-W28"
+      ],
+      "volume_refs": [
+        "VOL-154"
+      ],
+      "kind": "tree",
+      "source_git_object_sha": "c43edb466e54e474bdecfc5ca679f131e04bfcf0",
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve canonical source ownership until import inversion is validated",
+        "prove exact source/destination parity on the affected domain",
+        "retain rollback and compatibility paths until independent verification"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-MULTIMODAL-DOCUMENT-VISION",
+      "source": "skeleton/document_vision",
+      "destination": "skeleton/ai/runtime/multimodal/document_vision",
+      "role": "document-vision fusion runtime",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06",
+        "WP-W28"
+      ],
+      "volume_refs": [
+        "VOL-155"
+      ],
+      "kind": "tree",
+      "source_git_object_sha": "d2fa1a00f1ceea4e65d72663bd11eebc46c4ebb0",
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve canonical source ownership until import inversion is validated",
+        "prove exact source/destination parity on the affected domain",
+        "retain rollback and compatibility paths until independent verification"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-MULTIMODAL-AUDIO",
+      "source": "skeleton/audio",
+      "destination": "skeleton/ai/runtime/multimodal/audio",
+      "role": "audio ingestion and processing pipeline",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06",
+        "WP-W28"
+      ],
+      "volume_refs": [
+        "VOL-156"
+      ],
+      "kind": "tree",
+      "source_git_object_sha": "f2ad8147ee93559713bcabff91ee54ce221f76f6",
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve canonical source ownership until import inversion is validated",
+        "prove exact source/destination parity on the affected domain",
+        "retain rollback and compatibility paths until independent verification"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-MULTIMODAL-SPEECH",
+      "source": "skeleton/speech",
+      "destination": "skeleton/ai/runtime/multimodal/speech",
+      "role": "speech runtime and speech-model boundary",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06",
+        "WP-W28"
+      ],
+      "volume_refs": [
+        "VOL-157"
+      ],
+      "kind": "tree",
+      "source_git_object_sha": "d3a506a872c278bb43b973864e721ad9e0a90baa",
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve canonical source ownership until import inversion is validated",
+        "prove exact source/destination parity on the affected domain",
+        "retain rollback and compatibility paths until independent verification"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-MULTIMODAL-VIDEO",
+      "source": "skeleton/video",
+      "destination": "skeleton/ai/runtime/multimodal/video",
+      "role": "video ingestion and processing pipeline",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06",
+        "WP-W28"
+      ],
+      "volume_refs": [
+        "VOL-158"
+      ],
+      "kind": "tree",
+      "source_git_object_sha": "9ba1af3fedd4f293369326f67c3cb67efdffe290",
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve canonical source ownership until import inversion is validated",
+        "prove exact source/destination parity on the affected domain",
+        "retain rollback and compatibility paths until independent verification"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-CONNECTORS",
+      "source": "skeleton/connectors",
+      "destination": "skeleton/ai/integrations/connectors",
+      "role": "bounded external connector framework for AI tool and data integrations",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14"
+      ],
+      "volume_refs": [
+        "VOL-161"
+      ],
+      "kind": "tree",
+      "source_git_object_sha": "77c88748d04c4ed58739dc3569be0d148e5fa766",
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve canonical source ownership until import inversion is validated",
+        "prove exact source/destination parity on the affected domain",
+        "retain rollback and compatibility paths until independent verification"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-PLUGINS",
+      "source": "skeleton/plugins",
+      "destination": "skeleton/ai/integrations/plugins",
+      "role": "plugin lifecycle and extension governance runtime",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14"
+      ],
+      "volume_refs": [
+        "VOL-162"
+      ],
+      "kind": "tree",
+      "source_git_object_sha": "95ee1473526944558cff5b921a2de74690d73651",
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve canonical source ownership until import inversion is validated",
+        "prove exact source/destination parity on the affected domain",
+        "retain rollback and compatibility paths until independent verification"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-MODEL-SUPPLY-CHAIN",
+      "source": "skeleton/supply_chain",
+      "destination": "skeleton/ai/runtime/supply_chain",
+      "role": "model bill-of-materials and AI supply-chain provenance controls",
+      "work_package_refs": [
+        "WP-W20",
+        "WP-W30"
+      ],
+      "volume_refs": [
+        "VOL-179"
+      ],
+      "kind": "tree",
+      "source_git_object_sha": "40d5a42a079246818e4fea2f2002f52ad6058858",
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve canonical source ownership until import inversion is validated",
+        "prove exact source/destination parity on the affected domain",
+        "retain rollback and compatibility paths until independent verification"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     }
   ],
   "ci_enforcement": {
@@ -5239,7 +5626,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "164_mapping_current_main_parity_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "176_mapping_completed_work_expansion_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -5799,7 +6186,7 @@
   "classification_coverage": {
     "status": "closed_after_all_preclassified_moves",
     "rule": "Every first-level skeleton/* path is either a governed mapping source, a pending assignment source, an architecture-approved external path, an explicit exclusion, or retained_outside_ai_tree.",
-    "source_head": "0c867cca9131f14532b31fce627f176f9119ba17"
+    "source_head": "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
   },
   "priority_one_migration": {
     "status": "mirrored_governed_cutover_pending",
@@ -5875,8 +6262,8 @@
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
     "note": "TREE-030 canonicalized School under skeleton/learning/school, retained skeleton/school as an explicitly classified compatibility boundary, preserved exact AI School parity, and left acquired.py as the only AIFT-LEARNING overlay.",
-    "current_mapping_count": 154,
-    "audit_scope_status": "validated_134_mapping_line_extended_to_154_requires_full_refresh",
+    "current_mapping_count": 176,
+    "audit_scope_status": "validated_134_mapping_line_extended_to_176_requires_full_refresh",
     "pending_mapping_ids": [
       "AIFT-V2B-GAMEFORGE-AGENTS",
       "AIFT-V2B-GAMEFORGE-JEEVES",
@@ -6025,13 +6412,13 @@
   },
   "pre_move_readiness": {
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
-    "governed_mapping_count": 164,
+    "governed_mapping_count": 176,
     "pending_assignment_count": 0,
     "retained_outside_ai_tree_count": 86,
     "batch_counts": {
       "B3-owner-sensitive": 8,
-      "B1-core-runtime": 60,
-      "B2-domain-build": 13,
+      "B1-core-runtime": 71,
+      "B2-domain-build": 14,
       "B4-research-quarantine": 55,
       "B3-compat-convergence": 28
     },
@@ -6186,6 +6573,62 @@
           "classification": "intentionally_external",
           "owner": "product/application assembly"
         }
+      ]
+    },
+    "completed_work_ai_tree_expansion_2026_10_05": {
+      "base_main_sha": "6f2cc7d07feba38ec2be19e9a8082981306f98e8",
+      "added_mapping_count": 12,
+      "governed_mapping_count": 176,
+      "mapping_ids": [
+        "AIFT-MODELING-CORE",
+        "AIFT-TRAINING",
+        "AIFT-DOCUMENTATION-RUNTIME",
+        "AIFT-MULTIMODAL-ARTIFACTS",
+        "AIFT-MULTIMODAL-VISION",
+        "AIFT-MULTIMODAL-DOCUMENT-VISION",
+        "AIFT-MULTIMODAL-AUDIO",
+        "AIFT-MULTIMODAL-SPEECH",
+        "AIFT-MULTIMODAL-VIDEO",
+        "AIFT-CONNECTORS",
+        "AIFT-PLUGINS",
+        "AIFT-MODEL-SUPPLY-CHAIN"
+      ],
+      "volume_refs": [
+        "VOL-006",
+        "VOL-089",
+        "VOL-090",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152",
+        "VOL-153",
+        "VOL-154",
+        "VOL-155",
+        "VOL-156",
+        "VOL-157",
+        "VOL-158",
+        "VOL-161",
+        "VOL-162",
+        "VOL-179"
+      ],
+      "refreshed_existing_parity_mappings": [
+        "AIFT-VAULT",
+        "AIFT-SECURITY",
+        "AIFT-EVALUATION"
+      ],
+      "policy": "Mirror completed canonical AI/model/training/multimodal/integration/documentation/supply-chain work into governed skeleton/ai assembly ownership without deleting canonical sources or granting cutover/completion authority.",
+      "intentionally_external_product_surfaces": [
+        "backend/services/ai_service.py",
+        "backend/services/rag_service.py",
+        "backend/services/rag_state_repository.py",
+        "backend/routes",
+        "backend/core"
       ]
     }
   }
