@@ -20,6 +20,8 @@ from .scenario_runtime import (
     SimulationAction,
     SimulationAuthority,
     SimulationBudget,
+    SimulationRule,
+    SimulationRuleSet,
 )
 from .world_model import (
     Assumption,
@@ -53,6 +55,8 @@ __all__ = [
     "SimulationAction",
     "SimulationAuthority",
     "SimulationBudget",
+    "SimulationRule",
+    "SimulationRuleSet",
     "Assumption",
     "AssumptionSet",
     "CounterfactualResult",
