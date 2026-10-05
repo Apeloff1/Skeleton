@@ -13,6 +13,9 @@ on:
       - "backend/tests/test_operation_projection.py"
       - "backend/tests/test_operation_stream_transport.py"
       - "backend/tests/test_operation_stream_route.py"
+      - "frontend/services/operationStreamReducer.ts"
+      - "frontend/scripts/test-operation-stream-reducer.mjs"
+      - "frontend/package.json"
       - "skeleton/frontier/operation_stream.py"
       - "skeleton/frontier/runtime/operation_stream.py"
       - ".github/workflows/p1-streaming-projection-authority.yml"
@@ -28,6 +31,9 @@ on:
       - "backend/tests/test_operation_projection.py"
       - "backend/tests/test_operation_stream_transport.py"
       - "backend/tests/test_operation_stream_route.py"
+      - "frontend/services/operationStreamReducer.ts"
+      - "frontend/scripts/test-operation-stream-reducer.mjs"
+      - "frontend/package.json"
       - "skeleton/frontier/operation_stream.py"
       - "skeleton/frontier/runtime/operation_stream.py"
       - ".github/workflows/p1-streaming-projection-authority.yml"
@@ -64,6 +70,11 @@ jobs:
         with:
           python-version: "3.11.16"
 
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+
       - name: Install focused stream runtime
         run: >-
           python -m pip install --disable-pip-version-check
@@ -83,12 +94,17 @@ jobs:
           backend/tests/test_operation_stream_route.py
           backend/tests/test_operation_projection.py
 
+      - name: Run frontend operation-stream reducer regressions
+        run: node --test frontend/scripts/test-operation-stream-reducer.mjs
+
       - name: Build accepted PROD-02 projection receipt
         run: |
           set -euo pipefail
           mkdir -p .p1-prod-02
           python - <<'PY'
+          import hashlib
           import json
+          import os
           import tempfile
           from datetime import datetime, timedelta, timezone
           from pathlib import Path
@@ -156,17 +172,37 @@ jobs:
                   f"PROD-02 projection fixture rejected: {decision.reasons}"
               )
           evidence = decision.accepted_evidence_ref()
+          frontend_hasher = hashlib.sha256()
+          for frontend_path in (
+              "frontend/services/operationStreamReducer.ts",
+              "frontend/scripts/test-operation-stream-reducer.mjs",
+          ):
+              frontend_hasher.update(frontend_path.encode("utf-8"))
+              frontend_hasher.update(b"\0")
+              frontend_hasher.update(Path(frontend_path).read_bytes())
+              frontend_hasher.update(b"\0")
+          frontend_digest = frontend_hasher.hexdigest()
           Path(".p1-prod-02/decision.json").write_text(
               json.dumps(decision.payload(), indent=2, sort_keys=True) + "\n",
               encoding="utf-8",
           )
           Path(".p1-prod-02/refs.json").write_text(
               json.dumps(
-                  [{
-                      "source": evidence.source,
-                      "digest": evidence.digest,
-                      "category": evidence.category,
-                  }],
+                  [
+                      {
+                          "source": evidence.source,
+                          "digest": evidence.digest,
+                          "category": evidence.category,
+                      },
+                      {
+                          "source": (
+                              "frontend:operation-stream-reducer:"
+                              + os.environ["EXPECTED_SHA"]
+                          ),
+                          "digest": frontend_digest,
+                          "category": "frontend_stream_reducer_verification",
+                      },
+                  ],
                   indent=2,
                   sort_keys=True,
               ) + "\n",
@@ -181,6 +217,7 @@ jobs:
           set -euo pipefail
           python - <<'PY'
           import hashlib
+          import subprocess
           from pathlib import Path
 
           def digest(paths):
@@ -198,9 +235,17 @@ jobs:
               ).hexdigest(),
               encoding="utf-8",
           )
+          node_version = subprocess.check_output(
+              ["node", "--version"],
+              text=True,
+          ).strip()
           Path(".p1-prod-02/environment.digest").write_text(
               hashlib.sha256(
-                  b"ubuntu-24.04|python-3.11.16|prod-02"
+                  (
+                      "ubuntu-24.04|python-3.11.16|"
+                      + node_version
+                      + "|prod-02"
+                  ).encode("utf-8")
               ).hexdigest(),
               encoding="utf-8",
           )
@@ -209,6 +254,7 @@ jobs:
                   "backend/core/operation_projection.py",
                   "backend/core/operation_stream_transport.py",
                   "backend/routes/operation_stream.py",
+                  "frontend/services/operationStreamReducer.ts",
                   "skeleton/frontier/runtime/operation_stream.py",
                   ".github/workflows/p1-streaming-projection-authority.yml",
               ]),
@@ -220,6 +266,7 @@ jobs:
                   "backend/tests/test_operation_stream_transport.py",
                   "backend/tests/test_operation_stream_route.py",
                   "backend/tests/test_operation_projection.py",
+                  "frontend/scripts/test-operation-stream-reducer.mjs",
               ]),
               encoding="utf-8",
           )
@@ -253,6 +300,9 @@ jobs:
           receipt = json.loads(
               Path(".p1-prod-02/receipt.json").read_text(encoding="utf-8")
           )
+          refs = json.loads(
+              Path(".p1-prod-02/refs.json").read_text(encoding="utf-8")
+          )
           if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
               raise SystemExit("PROD-02 receipt head mismatch")
           if receipt["task_id"] != "P1-PROD-02":
@@ -262,5 +312,18 @@ jobs:
           for field in ("subject_digest", "evidence_digest", "receipt_digest"):
               if len(receipt.get(field, "")) != 64:
                   raise SystemExit(f"invalid {field}")
+          frontend = [
+              item
+              for item in refs
+              if item.get("category") == "frontend_stream_reducer_verification"
+          ]
+          if len(frontend) != 1:
+              raise SystemExit("frontend reducer evidence ref missing")
+          if frontend[0]["source"] != (
+              "frontend:operation-stream-reducer:" + os.environ["EXPECTED_SHA"]
+          ):
+              raise SystemExit("frontend reducer evidence head mismatch")
+          if len(frontend[0].get("digest", "")) != 64:
+              raise SystemExit("frontend reducer evidence digest invalid")
           print("PROD-02 exact-head receipt OK", receipt["receipt_digest"])
           PY
