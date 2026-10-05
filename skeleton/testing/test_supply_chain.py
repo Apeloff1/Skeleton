@@ -31,3 +31,18 @@ def test_update_blocks_downgrade_unless_explicitly_authorized():
  assert admit_update(UpdateMetadata(1,D,D,sig,True),VersionFloor(2),("s",))
 def test_update_rejects_untrusted_signer_even_for_newer_version():
  assert not admit_update(UpdateMetadata(3,D,D,UpdateSignature(D,"evil")),VersionFloor(2),("trusted",))
+
+
+def test_supply_chain_depth_invariants_fail_closed():
+ import pytest
+ d="a"*64
+ bi=BuildInput("x",d,"src")
+ with pytest.raises(ValueError):HermeticBuild(d,d,(bi,bi),HermeticPolicy(False,()))
+ with pytest.raises(ValueError):HermeticBuild(d,d,(BuildInput("x","bad","src"),),HermeticPolicy(False,()))
+ sig=ArtifactSignature(d,"signer",d)
+ with pytest.raises(ValueError):BinaryAttestation(d,BuildIdentity("bad",d,d),sig)
+ a=BinaryAttestation(d,BuildIdentity(d,d,d),sig);assert not verify_attestation(a,("signer","signer"))
+ with pytest.raises(ValueError):InstallPath("","x")
+ with pytest.raises(ValueError):VersionFloor(-1)
+ with pytest.raises(ValueError):UpdateMetadata(-1,d,d,UpdateSignature(d,"s"))
+ m=UpdateMetadata(1,d,d,UpdateSignature(d,"s"));assert not admit_update(m,VersionFloor(0),("s","s"))
