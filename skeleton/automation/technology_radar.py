@@ -29,7 +29,7 @@ class RadarDecision:
   if self.architecture_decision_id is not None:object.__setattr__(self,"architecture_decision_id",_id(self.architecture_decision_id,"architecture_decision_id"))
   if self.state is RadarState.ADOPTED and (not self.evidence_ids or self.architecture_decision_id is None):raise RadarError("adoption requires evidence and architecture decision")
 class TechnologyRadar:
- def __init__(self,candidates):self.candidates={x.technology_id:x for x in candidates};self.states={x.technology_id:RadarState.CANDIDATE for x in candidates}
+ def __init__(self,candidates):\n  if not isinstance(candidates,tuple) or not candidates or any(not isinstance(x,TechnologyCandidate) for x in candidates):raise RadarError("candidates must be non-empty typed tuple")\n  if len({x.technology_id for x in candidates})!=len(candidates):raise RadarError("duplicate technology candidate")\n  self.candidates={x.technology_id:x for x in candidates};self.states={x.technology_id:RadarState.CANDIDATE for x in candidates}
  def decide(self,decision,current_tick):
   c=self.candidates.get(decision.technology_id)
   if c is None:raise RadarError("unknown technology")
