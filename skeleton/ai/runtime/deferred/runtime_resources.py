@@ -7,6 +7,8 @@ class GPUMemoryReservation: reservation_id:str; gpu_id:str; offset:int; size:int
 @dataclass(frozen=True,slots=True)
 class GPUAllocation: pool:GPUMemoryPool; reservation:GPUMemoryReservation|None
 def reserve_gpu(p,reservation_id,size):
+ if not p.gpu_id or p.capacity<=0 or not reservation_id or size<=0:raise ValueError("valid GPU reservation identity and capacity required")
+ if any(off<0 or length<=0 or off+length>p.capacity for off,length in p.free_segments):raise ValueError("invalid GPU free segment")
  candidates=sorted((length,start) for start,length in p.free_segments if length>=size)
  if not candidates:return GPUAllocation(p,None)
  _,start=candidates[0];segs=[]
@@ -22,6 +24,7 @@ class DrainState: model_id:str; pinned:bool; in_flight:int
 @dataclass(frozen=True,slots=True)
 class ModelEviction: model_id:str; allowed:bool; reason:str; reloadable:bool=True
 def evict_model(s,p=EvictionPolicy()):
+ if not s.model_id or s.in_flight<0:raise ValueError("invalid drain state")
  if s.pinned:return ModelEviction(s.model_id,False,"pinned")
  if p.require_idle and s.in_flight:return ModelEviction(s.model_id,False,"in-flight")
  return ModelEviction(s.model_id,True,"safe boundary")
@@ -48,7 +51,10 @@ class DraftToken: token_id:int; accepted:bool=False
 class VerificationStep: token_id:int; target_accepted:bool
 @dataclass(frozen=True,slots=True)
 class SpeculativePlan: draft_model:str; target_model:str; fallback:bool=True
-def verify_draft(tokens,checks):return tuple(t.token_id for t,c in zip(tokens,checks) if t.token_id==c.token_id and c.target_accepted)
+def verify_draft(tokens,checks):
+ if len(tokens)!=len(checks):raise ValueError("draft verification length mismatch")
+ if any(t.token_id!=c.token_id for t,c in zip(tokens,checks)):raise ValueError("draft verification identity mismatch")
+ return tuple(t.token_id for t,c in zip(tokens,checks) if c.target_accepted)
 @dataclass(frozen=True,slots=True)
 class NUMANode: node_id:str; cpu_ids:tuple[int,...]; memory_bytes:int
 @dataclass(frozen=True,slots=True)
