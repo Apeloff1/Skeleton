@@ -9531,7 +9531,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Normalize cross-modal evidence into comparable provenance-bearing results.",
         "Apply tenant, time, classification and trust filters before ranking."
@@ -9547,23 +9547,24 @@
         "CrossModalEvidence"
       ],
       "implementation_paths": [
-        "skeleton/ai",
-        "skeleton/retrieval"
+        "skeleton/ai/runtime/extensions/multimodal.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_multimodal_retrieval.py"
+        "skeleton/testing/test_p3_deferred_multimodal_tools.py"
       ],
       "evaluations": [
         "planned:cross-modal relevance evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+        "machine/ai_p3_deferred_batch_01.json"
+      ],
       "risks": [
         "modality score mismatch",
         "filter-after-ranking leakage"
       ],
       "gaps": [
-        "define cross-modal scoring contract",
-        "bind modality indexes"
+        "independent cross-modal retrieval trust-filtering, scoring, and evidence-fusion verification remains pending"
       ],
       "accountability_id": "ACC-VOL-159",
       "completion_checkbox": false,
@@ -9578,7 +9579,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Require schemas, authority scope, side-effect class, idempotency and timeout metadata.",
         "Separate tool implementation from authorization and admission decisions."
@@ -9594,23 +9595,24 @@
         "ToolResult"
       ],
       "implementation_paths": [
-        "skeleton/ai",
-        "planned:skeleton/tools"
+        "skeleton/ai/runtime/extensions/ecosystem.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_tool_sdk.py"
+        "skeleton/testing/test_p3_deferred_multimodal_tools.py"
       ],
       "evaluations": [
         "planned:malformed/tool-timeout evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+        "machine/ai_p3_deferred_batch_01.json"
+      ],
       "risks": [
         "tool self-authorizes",
         "schema drift"
       ],
       "gaps": [
-        "materialize SDK package",
-        "bind tools to policy/receipt contracts"
+        "independent Tool SDK schema, authority-scope, idempotency, and invocation verification remains pending"
       ],
       "accountability_id": "ACC-VOL-160",
       "completion_checkbox": false,
@@ -9719,7 +9721,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Verify provenance/signatures and permission declarations.",
         "Quarantine/revoke packages on security or policy failure."
@@ -9735,23 +9737,24 @@
         "RevocationRecord"
       ],
       "implementation_paths": [
-        "skeleton/security",
-        "planned:skeleton/plugins"
+        "skeleton/ai/runtime/extensions/ecosystem.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_tool_marketplace_security.py"
+        "skeleton/testing/test_p3_deferred_multimodal_tools.py"
       ],
       "evaluations": [
         "planned:malicious plugin corpus"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+        "machine/ai_p3_deferred_batch_01.json"
+      ],
       "risks": [
         "supply-chain compromise",
         "confused-deputy permissions"
       ],
       "gaps": [
-        "define trust tiers",
-        "materialize quarantine/revocation path"
+        "independent marketplace attestation, quarantine, and revocation verification remains pending"
       ],
       "accountability_id": "ACC-VOL-163",
       "completion_checkbox": false,

@@ -18726,22 +18726,28 @@
       "id": "ACC-VOL-159",
       "type": "volume",
       "title": "VOL-159 Multimodal Retrieval",
-      "status": "unverified",
+      "status": "implemented",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-10-05T17:03:00Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-10-05T17:03:00Z",
+        "git_sha": "f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/pull/2493",
+          "https://github.com/Apeloff1/Skeleton/commit/f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+          "machine/ai_p3_deferred_batch_01.json",
+          "skeleton/ai/runtime/extensions/multimodal.py",
+          "skeleton/testing/test_p3_deferred_multimodal_tools.py"
+        ],
+        "statement": "Retroactively implementation-signed from the merged P3 deferred batch after current-main reconciliation of full-volume ownership, implementation surfaces, and focused regressions. Independent verification remains pending; this does not grant completion.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/f0f3159e5b5f990cc6898d924241d2f80d92b7eb"
       },
       "verification_signoff": {
         "signed": false,
@@ -18757,31 +18763,84 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-10-05T17:03:00Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T17:03:00Z",
+          "git_sha": "f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+          "statement": "Begin current-main reconciliation for VOL-159 from P3-DEFERRED-BATCH-01.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+          "from_status": "unverified",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2493",
+            "https://github.com/Apeloff1/Skeleton/commit/f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+            "machine/ai_p3_deferred_batch_01.json"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T17:03:00Z",
+          "git_sha": "f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+          "statement": "Retroactively implementation-signed from the merged P3 deferred batch after current-main reconciliation of full-volume ownership, implementation surfaces, and focused regressions. Independent verification remains pending; this does not grant completion.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+          "from_status": "in_progress",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2493",
+            "https://github.com/Apeloff1/Skeleton/commit/f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+            "machine/ai_p3_deferred_batch_01.json",
+            "skeleton/ai/runtime/extensions/multimodal.py",
+            "skeleton/testing/test_p3_deferred_multimodal_tools.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/pull/2493",
+        "https://github.com/Apeloff1/Skeleton/commit/f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+        "machine/ai_p3_deferred_batch_01.json",
+        "skeleton/ai/runtime/extensions/multimodal.py",
+        "skeleton/testing/test_p3_deferred_multimodal_tools.py"
+      ],
       "baseline_status": "unverified"
     },
     {
       "id": "ACC-VOL-160",
       "type": "volume",
       "title": "VOL-160 Tool SDK",
-      "status": "unverified",
+      "status": "implemented",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-10-05T17:03:00Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-10-05T17:03:00Z",
+        "git_sha": "f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/pull/2493",
+          "https://github.com/Apeloff1/Skeleton/commit/f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+          "machine/ai_p3_deferred_batch_01.json",
+          "skeleton/ai/runtime/extensions/ecosystem.py",
+          "skeleton/testing/test_p3_deferred_multimodal_tools.py"
+        ],
+        "statement": "Retroactively implementation-signed from the merged P3 deferred batch after current-main reconciliation of full-volume ownership, implementation surfaces, and focused regressions. Independent verification remains pending; this does not grant completion.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/f0f3159e5b5f990cc6898d924241d2f80d92b7eb"
       },
       "verification_signoff": {
         "signed": false,
@@ -18797,9 +18856,56 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-10-05T17:03:00Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T17:03:00Z",
+          "git_sha": "f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+          "statement": "Begin current-main reconciliation for VOL-160 from P3-DEFERRED-BATCH-01.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+          "from_status": "unverified",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2493",
+            "https://github.com/Apeloff1/Skeleton/commit/f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+            "machine/ai_p3_deferred_batch_01.json"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T17:03:00Z",
+          "git_sha": "f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+          "statement": "Retroactively implementation-signed from the merged P3 deferred batch after current-main reconciliation of full-volume ownership, implementation surfaces, and focused regressions. Independent verification remains pending; this does not grant completion.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+          "from_status": "in_progress",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2493",
+            "https://github.com/Apeloff1/Skeleton/commit/f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+            "machine/ai_p3_deferred_batch_01.json",
+            "skeleton/ai/runtime/extensions/ecosystem.py",
+            "skeleton/testing/test_p3_deferred_multimodal_tools.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/pull/2493",
+        "https://github.com/Apeloff1/Skeleton/commit/f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+        "machine/ai_p3_deferred_batch_01.json",
+        "skeleton/ai/runtime/extensions/ecosystem.py",
+        "skeleton/testing/test_p3_deferred_multimodal_tools.py"
+      ],
       "baseline_status": "unverified"
     },
     {
@@ -18984,22 +19090,28 @@
       "id": "ACC-VOL-163",
       "type": "volume",
       "title": "VOL-163 Tool Marketplace Security",
-      "status": "unverified",
+      "status": "implemented",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-10-05T17:03:00Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-10-05T17:03:00Z",
+        "git_sha": "f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/pull/2493",
+          "https://github.com/Apeloff1/Skeleton/commit/f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+          "machine/ai_p3_deferred_batch_01.json",
+          "skeleton/ai/runtime/extensions/ecosystem.py",
+          "skeleton/testing/test_p3_deferred_multimodal_tools.py"
+        ],
+        "statement": "Retroactively implementation-signed from the merged P3 deferred batch after current-main reconciliation of full-volume ownership, implementation surfaces, and focused regressions. Independent verification remains pending; this does not grant completion.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/f0f3159e5b5f990cc6898d924241d2f80d92b7eb"
       },
       "verification_signoff": {
         "signed": false,
@@ -19015,9 +19127,56 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-10-05T17:03:00Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T17:03:00Z",
+          "git_sha": "f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+          "statement": "Begin current-main reconciliation for VOL-163 from P3-DEFERRED-BATCH-01.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+          "from_status": "unverified",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2493",
+            "https://github.com/Apeloff1/Skeleton/commit/f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+            "machine/ai_p3_deferred_batch_01.json"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-05T17:03:00Z",
+          "git_sha": "f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+          "statement": "Retroactively implementation-signed from the merged P3 deferred batch after current-main reconciliation of full-volume ownership, implementation surfaces, and focused regressions. Independent verification remains pending; this does not grant completion.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+          "from_status": "in_progress",
+          "to_status": "implemented",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/pull/2493",
+            "https://github.com/Apeloff1/Skeleton/commit/f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+            "machine/ai_p3_deferred_batch_01.json",
+            "skeleton/ai/runtime/extensions/ecosystem.py",
+            "skeleton/testing/test_p3_deferred_multimodal_tools.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/pull/2493",
+        "https://github.com/Apeloff1/Skeleton/commit/f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+        "machine/ai_p3_deferred_batch_01.json",
+        "skeleton/ai/runtime/extensions/ecosystem.py",
+        "skeleton/testing/test_p3_deferred_multimodal_tools.py"
+      ],
       "baseline_status": "unverified"
     },
     {
