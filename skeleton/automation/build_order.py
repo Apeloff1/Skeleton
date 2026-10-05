@@ -14,16 +14,16 @@ class BuildDependency:
  upstream_id:str;downstream_id:str;kind:DependencyKind
  def __post_init__(self):
   object.__setattr__(self,"upstream_id",_id(self.upstream_id,"upstream_id"));object.__setattr__(self,"downstream_id",_id(self.downstream_id,"downstream_id"))
-  if self.upstream_id==self.downstream_id:raise BuildOrderError("self dependency")
+  if not isinstance(self.kind,DependencyKind):raise BuildOrderError("dependency kind must be DependencyKind")\n  if self.upstream_id==self.downstream_id:raise BuildOrderError("self dependency")
 @dataclass(frozen=True,slots=True)
 class BuildStopCondition:
  node_id:str;condition_id:str;active:bool;reason:str
  def __post_init__(self):
   object.__setattr__(self,"node_id",_id(self.node_id,"node_id"));object.__setattr__(self,"condition_id",_id(self.condition_id,"condition_id"))
-  if self.active and not self.reason.strip():raise BuildOrderError("active stop requires reason")
+  if not isinstance(self.active,bool):raise BuildOrderError("stop active must be bool")\n  if not isinstance(self.reason,str):raise BuildOrderError("stop reason must be str")\n  if self.active and not self.reason.strip():raise BuildOrderError("active stop requires reason")
 class BuildOrder:
  def __init__(self,node_ids,dependencies=(),stops=()):
-  self.nodes=tuple(sorted(set(_id(x,"node_id") for x in node_ids)));self.dependencies=tuple(dependencies);self.stops=tuple(stops)
+  if not isinstance(node_ids,tuple) or not node_ids:raise BuildOrderError("node_ids must be non-empty tuple")\n  if not isinstance(dependencies,tuple) or any(not isinstance(x,BuildDependency) for x in dependencies):raise BuildOrderError("dependencies must be typed tuple")\n  if not isinstance(stops,tuple) or any(not isinstance(x,BuildStopCondition) for x in stops):raise BuildOrderError("stops must be typed tuple")\n  self.nodes=tuple(sorted(set(_id(x,"node_id") for x in node_ids)));self.dependencies=dependencies;self.stops=stops
   known=set(self.nodes)
   for d in self.dependencies:
    if d.upstream_id not in known or d.downstream_id not in known:raise BuildOrderError("dangling dependency")
