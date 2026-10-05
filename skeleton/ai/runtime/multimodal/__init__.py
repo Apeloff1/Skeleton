@@ -1,17 +1,5 @@
-"""Provider-independent multimodal intake and sanitization contracts."""
-
-from .intake import (
-    Modality,
-    MultimodalAsset,
-    MultimodalIntake,
-    MultimodalPolicy,
-    MultimodalSanitizationError,
-)
-
-__all__ = [
-    "Modality",
-    "MultimodalAsset",
-    "MultimodalIntake",
-    "MultimodalPolicy",
-    "MultimodalSanitizationError",
-]
+"""Multimodal intelligence contracts."""
+from .contracts import CrossModalReference, MediaArtifact, MediaError, MediaProvenance, Modality, ModalitySegment
+__all__=["CrossModalReference","MediaArtifact","MediaError","MediaProvenance","Modality","ModalitySegment"]
+from .sanitize import MAX_PAYLOAD_BYTES, SanitizationReceipt, sanitize_payload
+from .ingest import IngestionReceipt, MAX_INPUTS, MediaInput, ingest_media
