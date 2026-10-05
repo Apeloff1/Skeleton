@@ -7,7 +7,10 @@ import argparse
 import json
 import sys
 
-from p3t2_candidate_common import MULTIMODAL, P3T2CandidateError, ROOT, validate_candidate
+try:
+    from scripts.p3t2_candidate_common import MULTIMODAL, P3T2CandidateError, ROOT, validate_candidate
+except ModuleNotFoundError:  # direct script execution
+    from p3t2_candidate_common import MULTIMODAL, P3T2CandidateError, ROOT, validate_candidate
 
 
 def validate(root=ROOT, *, head=None):
