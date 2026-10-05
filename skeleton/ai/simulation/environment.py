@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
-import json
 import math
 from typing import Callable, Mapping
+
+from skeleton.contracts.canonical import CanonicalContractError, canonical_json_bytes
 
 
 class SimulationBoundaryError(RuntimeError):
@@ -15,10 +16,10 @@ class SimulationBoundaryError(RuntimeError):
 
 def _digest(value: object) -> str:
     try:
-        raw = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
-    except (TypeError, ValueError) as exc:
+        raw = canonical_json_bytes(value)
+    except CanonicalContractError as exc:
         raise SimulationBoundaryError("simulation value is not deterministic JSON") from exc
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    return hashlib.sha256(raw).hexdigest()
 
 
 def _state(value: Mapping[str, object]) -> dict[str, object]:
