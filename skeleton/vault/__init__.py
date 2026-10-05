@@ -135,3 +135,36 @@ __all__ = [
     "MongoCollectionLifecycleAdapter",
     "RetrievalIndexDeletionAdapter",
 ]
+
+
+from skeleton.vault.authority_policy import (
+    AUTHORITY_POLICY_ACCOUNTABILITY_ID,
+    AUTHORITY_POLICY_SCHEMA_VERSION,
+    AUTHORITY_POLICY_TASK_ID,
+    AuthorityPolicyError,
+    AuthorityPolicyRule,
+    AuthorityPrincipal,
+    AuthorityRequest,
+    CompiledAuthorityPolicy,
+    PolicyDecision,
+    PolicyEffect,
+    PrincipalKind,
+    compile_authority_policy,
+    evaluate_authority,
+)
+
+__all__ += [
+    "AUTHORITY_POLICY_ACCOUNTABILITY_ID",
+    "AUTHORITY_POLICY_SCHEMA_VERSION",
+    "AUTHORITY_POLICY_TASK_ID",
+    "AuthorityPolicyError",
+    "AuthorityPolicyRule",
+    "AuthorityPrincipal",
+    "AuthorityRequest",
+    "CompiledAuthorityPolicy",
+    "PolicyDecision",
+    "PolicyEffect",
+    "PrincipalKind",
+    "compile_authority_policy",
+    "evaluate_authority",
+]
