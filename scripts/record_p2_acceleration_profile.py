@@ -136,6 +136,8 @@ def apply_receipt(
     root: Path = ROOT,
     activate: bool = False,
 ) -> tuple[dict[str, Any], SelectionDecision]:
+    if not isinstance(activate, bool):
+        raise ReceiptIngestionError("activate must be boolean")
     updated = deepcopy(dict(policy))
     evidence = _evidence_from_mapping(receipt)
     candidate = _candidate(updated, evidence.candidate_id)
