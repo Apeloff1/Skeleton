@@ -16,6 +16,7 @@ on:
       - "frontend/services/operationStreamReducer.ts"
       - "frontend/scripts/test-operation-stream-reducer.mjs"
       - "frontend/package.json"
+      - "tests/test_vol040_streaming_release_evidence.py"
       - "skeleton/frontier/operation_stream.py"
       - "skeleton/frontier/runtime/operation_stream.py"
       - ".github/workflows/p1-streaming-projection-authority.yml"
@@ -34,6 +35,7 @@ on:
       - "frontend/services/operationStreamReducer.ts"
       - "frontend/scripts/test-operation-stream-reducer.mjs"
       - "frontend/package.json"
+      - "tests/test_vol040_streaming_release_evidence.py"
       - "skeleton/frontier/operation_stream.py"
       - "skeleton/frontier/runtime/operation_stream.py"
       - ".github/workflows/p1-streaming-projection-authority.yml"
@@ -93,6 +95,7 @@ jobs:
           backend/tests/test_operation_stream_transport.py
           backend/tests/test_operation_stream_route.py
           backend/tests/test_operation_projection.py
+          tests/test_vol040_streaming_release_evidence.py
 
       - name: Run frontend operation-stream reducer regressions
         run: node --test frontend/scripts/test-operation-stream-reducer.mjs
@@ -267,6 +270,7 @@ jobs:
                   "backend/tests/test_operation_stream_route.py",
                   "backend/tests/test_operation_projection.py",
                   "frontend/scripts/test-operation-stream-reducer.mjs",
+                  "tests/test_vol040_streaming_release_evidence.py",
               ]),
               encoding="utf-8",
           )
