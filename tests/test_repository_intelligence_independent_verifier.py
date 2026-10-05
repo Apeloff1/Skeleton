@@ -242,3 +242,24 @@ def test_verifier_rejects_noncanonical_graph_identity(tmp_path: Path) -> None:
 
     assert receipt["valid"] is False
     assert any("shared-canonical identity" in error for error in receipt["errors"])
+
+
+def test_verifier_rejects_workflow_coverage_loss(tmp_path: Path) -> None:
+    root = _valid_repo(tmp_path)
+    workflow = root / WORKFLOW
+    workflow.write_text(
+        workflow.read_text(encoding="utf-8").replace(
+            GIT_INDEX_TEST + "\n",
+            "",
+        ),
+        encoding="utf-8",
+    )
+
+    receipt = verify_repository(root, behavior=_behavior())
+
+    assert receipt["valid"] is False
+    assert any(
+        "lost repository-intelligence coverage" in error
+        and GIT_INDEX_TEST in error
+        for error in receipt["errors"]
+    )
