@@ -14,6 +14,12 @@ from .lifecycle_safety import (
     MigrationReceipt, MigrationState, MigrationStep, ParityEvidence,
     RetirementDecision, can_remove_adapter, decide_retirement,
 )
+from .supply_chain import (
+    ArtifactSignature, BinaryAttestation, BuildCacheKey, BuildIdentity, BuildInput,
+    CachePolicy, CachedArtifact, HermeticBuild, HermeticPolicy, InstallPath,
+    InstallVerification, InstallerSecurityPolicy, UpdateMetadata, UpdateSignature,
+    VersionFloor, admit_update, verify_attestation,
+)
 from .contract_fuzzing import ContractFuzzer, FuzzBudget, FuzzFailure, FuzzReport
 from .simulation_mode import SimulationAuthority, SimulationEvidence, SimulationRequest, SimulationResult, SimulationRuntime
 from .journal import DeferredExecutionJournal, DeferredJournalConflict, DeferredJournalError, DeferredJournalRecord, SqliteDeferredExecutionJournal
