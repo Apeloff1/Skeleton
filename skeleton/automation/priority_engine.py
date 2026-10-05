@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from enum import Enum
 import hashlib,json,re,math
 _ID=re.compile(r"^[A-Z][A-Z0-9_.:-]{2,127}$")
+_SHA=re.compile(r"^[0-9a-f]{64}$")
 class PriorityError(ValueError):pass
 class ConstraintKind(str,Enum): HARD_BLOCKER="hard_blocker"; SOFT_SIGNAL="soft_signal"
 def _id(v,f):
@@ -36,6 +37,21 @@ class PriorityConstraint:
 @dataclass(frozen=True,slots=True)
 class PriorityDecision:
  item_id:str;blocked:bool;score:float;effective_score:float;factor_ids:tuple[str,...];blocker_ids:tuple[str,...];age_boost:float;input_digest:str
+ def __post_init__(self):
+  object.__setattr__(self,"item_id",_id(self.item_id,"item_id"))
+  if not isinstance(self.blocked,bool):raise PriorityError("blocked must be bool")
+  for f in ("score","effective_score","age_boost"):
+   v=getattr(self,f)
+   if not isinstance(v,(int,float)) or isinstance(v,bool) or not math.isfinite(v):raise PriorityError(f"{f} must be finite numeric")
+  if not 0<=self.age_boost<=10:raise PriorityError("age_boost must be bounded 0..10")
+  for f in ("factor_ids","blocker_ids"):
+   raw=getattr(self,f)
+   if not isinstance(raw,tuple):raise PriorityError(f"{f} must be typed tuple")
+   vals=tuple(sorted(_id(v,f) for v in raw))
+   if len(vals)!=len(set(vals)):raise PriorityError(f"{f} contains duplicate identities")
+   object.__setattr__(self,f,vals)
+  if self.blocked is not bool(self.blocker_ids):raise PriorityError("blocked must match blocker_ids")
+  if not isinstance(self.input_digest,str) or not _SHA.fullmatch(self.input_digest):raise PriorityError("input_digest must be lowercase sha256")
  @property
  def digest(self):return _digest({"item_id":self.item_id,"blocked":self.blocked,"score":self.score,"effective_score":self.effective_score,"factor_ids":self.factor_ids,"blocker_ids":self.blocker_ids,"age_boost":self.age_boost,"input_digest":self.input_digest})
 
@@ -65,6 +81,8 @@ class PriorityEngine:
   input_digest=_digest({"item_id":item_id,"factors":[{"factor_id":f.factor_id,"provenance_ref":f.provenance_ref,"value":f.value,"weight":f.weight} for f in factors],"constraints":[{"constraint_id":x.constraint_id,"kind":x.kind.value,"active":x.active,"provenance_ref":x.provenance_ref,"reason":x.reason.strip()} for x in constraint_set],"age_epochs":age_epochs,"previous_score":previous_score,"engine":{"max_age_boost":self.max_age_boost,"age_step":self.age_step,"hysteresis":self.hysteresis}})
   return PriorityDecision(item_id,bool(blockers),round(raw,8),round(effective,8),tuple(f.factor_id for f in factors),blockers,round(age,8),input_digest)
  def rank(self,decisions):
-  items=tuple(decisions)
+  if not isinstance(decisions,tuple) or any(not isinstance(d,PriorityDecision) for d in decisions):raise PriorityError("decisions must be typed tuple")
+  if len(decisions)>4096:raise PriorityError("decision set exceeds policy bound")
+  items=decisions
   if len({d.item_id for d in items})!=len(items):raise PriorityError("duplicate decision item")
   return tuple(sorted(items,key=lambda d:(d.blocked,-d.effective_score,d.item_id)))
