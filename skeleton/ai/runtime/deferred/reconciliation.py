@@ -11,7 +11,8 @@ import json
 import re
 from typing import Any, Callable, Mapping
 from .contracts import canonical_json, sha256_json
-from .executor import ExecutionReceipt, FailureReceipt\nfrom .journal import DeferredExecutionJournal, DeferredJournalConflict
+from .executor import ExecutionReceipt, FailureReceipt
+from .journal import DeferredExecutionJournal, DeferredJournalConflict
 
 _HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 
