@@ -964,3 +964,32 @@ def test_canonical_and_ai_contract_exports_are_byte_identical() -> None:
     ).read_bytes() == (
         ROOT / "skeleton/ai/runtime/contracts/__init__.py"
     ).read_bytes()
+
+
+def test_spec_rejects_cartesian_state_space_above_hard_bound() -> None:
+    with pytest.raises(
+        FormalMethodError,
+        match="Cartesian state space exceeds hard enumeration bound",
+    ):
+        FormalSpecification(
+            spec_id="SPEC.TOO.LARGE",
+            title="State explosion",
+            consequence_rank=5,
+            ambiguity_rank=5,
+            variables=(
+                StateVariable("a", tuple(range(1001))),
+                StateVariable("b", tuple(range(1001))),
+            ),
+            assumptions=(assumption(),),
+            implementation_bindings=(binding(),),
+            obligations=(
+                ProofObligation(
+                    obligation_id="safe",
+                    kind=ObligationKind.INVARIANT,
+                    statement="Safe.",
+                    predicate_name="safe",
+                ),
+            ),
+            initial_predicate_name="initial",
+            transition_relation_name="transition",
+        )
