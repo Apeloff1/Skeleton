@@ -59,3 +59,17 @@ def test_sdk_generation_rejects_duplicate_method_identity():
  version=SDKVersion("api-v7","g1")
  methods=(SDKMethod("get","Req","Res"),SDKMethod("get","OtherReq","OtherRes"))
  with pytest.raises(ValueError): generate_client(version,methods,"schema")
+
+
+def test_build_generation_depth_invariants_fail_closed():
+ import pytest
+ step=RebuildStep("a",("d",),"v",True)
+ assert not rebuild_admissible(RebuildPlan((step,step)))
+ with pytest.raises(ValueError): impact(ImpactQuery(("a","a")),{}, {},ImpactEvidence(True,True,True,()))
+ with pytest.raises(ValueError): estimate_risk((RiskFactor("x",1,0.5),RiskFactor("x",1,0.5)),"cal")
+ cs=ChangeStep("s",True,None);gate=ChangeGate("g",True)
+ assert not change_admissible(SafeChangePlan((cs,cs),(gate,),True))
+ assert not change_admissible(SafeChangePlan((cs,),(gate,gate),True))
+ with pytest.raises(ValueError): compile_system(SystemSource("","body",frozenset()),SystemCompilePlan("g"))
+ with pytest.raises(ValueError): generate_code(GenerationSpec("c","g",(ExtensionPoint("x","p"),ExtensionPoint("x","q"))),"body")
+ with pytest.raises(ValueError): generate_client(SDKVersion("c","g"),(SDKMethod("m","","R"),),"contract")
