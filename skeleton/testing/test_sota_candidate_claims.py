@@ -18,3 +18,16 @@ def test_comparison_must_bind_exact_claim():
  with pytest.raises(QualificationError,match="wrong claim"):evidence(comparison=bad)
 def test_claim_requires_exact_task_and_population_scope():
  with pytest.raises(QualificationError,match="scope"):SOTACandidateClaim("CLAIM.X",S("c"),"BENCH.X","","population","METRIC.X","ACTOR.X")
+
+def test_comparison_statistics_reject_nan_and_boolean_aliases():
+ with pytest.raises(QualificationError,match="finite numeric"):comparison(candidate_score=float("nan"))
+ with pytest.raises(QualificationError,match="finite numeric"):comparison(effect_size=True)
+ with pytest.raises(QualificationError,match="contamination_checked must be bool"):comparison(contamination_checked=1)
+def test_qualification_receipt_binds_exact_claim_and_evidence():
+ c=claim();e=evidence();r=qualify(c,e);verify_qualification(c,e,r)
+ other=SOTACandidateClaim("CLAIM.OTHER",S("other"),"BENCH.1","code-generation","held-out-population","METRIC.PASSRATE","ACTOR.RESEARCH")
+ with pytest.raises(QualificationError,match="identity mismatch"):qualify(other,e)
+def test_qualification_receipt_tampering_is_detected():
+ from dataclasses import replace
+ c=claim();e=evidence();r=qualify(c,e)
+ with pytest.raises(QualificationError,match="drift or tampering"):verify_qualification(c,e,replace(r,evidence_digest=S("forged")))
