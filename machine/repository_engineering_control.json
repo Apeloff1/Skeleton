@@ -284,10 +284,10 @@
   ],
   "backlog": {
     "summary": {
-      "item_count": 1772,
-      "gap_count": 792,
+      "item_count": 1770,
+      "gap_count": 790,
       "risk_count": 980,
-      "open_count": 1772,
+      "open_count": 1770,
       "closed_count": 0
     },
     "items": [
@@ -3010,38 +3010,6 @@
         "state": "open",
         "closure_evidence_refs": [],
         "deduplication_key": "gap:bind conclusions to evidence graph"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-107-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-107:gap:001",
-        "volume_ref": "VOL-107",
-        "statement": "define claim template and prohibited shortcuts",
-        "accountability_id": "ACC-VOL-107",
-        "requirement_refs": [
-          "REQ:VOL-107:001",
-          "REQ:VOL-107:002",
-          "REQ:VOL-107:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define claim template and prohibited shortcuts"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-107-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-107:gap:002",
-        "volume_ref": "VOL-107",
-        "statement": "materialize independent replay path",
-        "accountability_id": "ACC-VOL-107",
-        "requirement_refs": [
-          "REQ:VOL-107:001",
-          "REQ:VOL-107:002",
-          "REQ:VOL-107:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize independent replay path"
       },
       {
         "backlog_id": "BL-GAP-VOL-108-001",
