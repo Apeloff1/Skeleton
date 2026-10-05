@@ -21,3 +21,8 @@ def test_verifier_must_be_independent_from_assembly_authority():
  with pytest.raises(FinalAssemblyError,match="independent from assembly authority"):qualify(plan(),evidence(independent_verifier_id="AUTHORITY.RELEASE"))
 def test_run_cannot_substitute_release_authority():
  with pytest.raises(FinalAssemblyError,match="exact plan"):qualify(plan(),evidence(run=run(authority_id="AUTHORITY.OTHER")))
+
+def test_authoritative_collections_are_bounded():
+ with pytest.raises(FinalAssemblyError,match="gate count exceeds"):FinalAssemblyPlan("ASSEMBLY.120","AUTHORITY.RELEASE",S("head"),S("env"),S("artifact"),tuple(f"GATE.{i}" for i in range(513)))
+ with pytest.raises(FinalAssemblyError,match="passed gate count exceeds"):run(passed_gate_ids=tuple(f"GATE.{i}" for i in range(513)))
+ with pytest.raises(FinalAssemblyError,match="risk count exceeds"):evidence(unresolved_risk_ids=tuple(f"RISK.{i}" for i in range(4097)))
