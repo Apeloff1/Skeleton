@@ -49,7 +49,7 @@ class DesktopUpdateTransaction:
   _sha(migrated_state_digest,"migrated_state_digest");self.receipt=DesktopArtifactReceipt(self.target.release_id,migrated_state_digest,self.receipt.artifact_digest,self.target.schema_version);self.state=UpdateState.MIGRATED
  def commit(self,acceptance:DesktopAcceptanceRun):
   if self.state is not UpdateState.MIGRATED:raise DesktopReleaseError("migration not complete")
-  if acceptance.release_id!=self.target.release_id:raise DesktopReleaseError("acceptance targets wrong release")
+  if not isinstance(acceptance,DesktopAcceptanceRun):raise DesktopReleaseError("acceptance must be DesktopAcceptanceRun")\n  if acceptance.release_id!=self.target.release_id:raise DesktopReleaseError("acceptance targets wrong release")\n  if acceptance.governed_artifact_digest!=self.target.artifact_digest:raise DesktopReleaseError("acceptance artifact does not match signed target")
   self.current=self.target;self.state=UpdateState.COMMITTED;return self.receipt
  def interrupt(self):
   if self.state not in (UpdateState.STAGED,UpdateState.MIGRATED):raise DesktopReleaseError("no interruptible update")
