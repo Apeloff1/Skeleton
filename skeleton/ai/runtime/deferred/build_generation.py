@@ -45,8 +45,8 @@ class SystemCompilePlan: generator_version:str
 @dataclass(frozen=True,slots=True)
 class SystemArtifact:
  digest:str; source_digest:str; generator_version:str
- @property
- def authority(self):return frozenset()
+    @property
+    def authority(self):return frozenset()
 def compile_system(s,p):
  sd=sha256_json({"contract_version":s.contract_version,"content":s.content})
  return SystemArtifact(sha256_json({"source":sd,"generator":p.generator_version}),sd,p.generator_version)
