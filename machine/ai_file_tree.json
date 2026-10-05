@@ -95,7 +95,7 @@
       "destination": "skeleton/ai/runtime/contracts",
       "kind": "tree",
       "source_git_object_sha": "e2abcdcc7b6d578433eb2a1670c3b6eab48a221e",
-      "role": "canonical operation/conversation/context/formal/localization contracts with governed AI runtime mirror and locale-neutral persistence boundaries",
+      "role": "canonical operation/conversation/context/formal/localization/compliance contracts with governed AI runtime mirrors, deterministic identity, and fail-closed evidence/applicability boundaries",
       "work_package_refs": [
         "WP-W00",
         "WP-W01",
@@ -115,7 +115,8 @@
       "source_disposition": "retain_until_import_inversion_and_regression_gates",
       "volume_refs": [
         "VOL-081",
-        "VOL-087"
+        "VOL-087",
+        "VOL-088"
       ]
     },
     {
