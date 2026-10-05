@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "status": "recovery_evidence_only",
+  "authority_boundary": "This manifest records repository-history evidence anchors only. It does not itself sign, complete, verify, or mutate canonical accountability records.",
+  "anchors": [
+    {
+      "record_ids": [
+        "ACC-AIQ-S0-STATE-01",
+        "ACC-AIQ-S0-STATE-02",
+        "ACC-AIQ-S0-GOV-01",
+        "ACC-AIQ-S0-GOV-02",
+        "ACC-AIQ-S0-GOV-03",
+        "ACC-AIQ-S0-COST-01"
+      ],
+      "source_commit": "669b1398d00c9d37ae95ee2022181579098bd265",
+      "claim": "independent verification and completion explicitly recorded by repository history",
+      "verification": [
+        {
+          "run_id": 36284789226,
+          "job_id": 108523369309,
+          "name": "State Recovery Drill"
+        },
+        {
+          "run_id": 36284789145,
+          "job_id": 108523368586,
+          "name": "Governance Closure Gate"
+        },
+        {
+          "run_id": 36284789200,
+          "job_id": 108523367880,
+          "name": "Cost Admission Closure Gate"
+        }
+      ],
+      "exact_head": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-248"
+      ],
+      "source_commit": "d06925c181862f46cd6c87bdfa5401efe8f2e472",
+      "claim": "independent verification and completion explicitly recorded by repository history",
+      "verification": [
+        {
+          "run_id": 37167919250,
+          "job_id": 111334677962,
+          "name": "P1 Reasoning Search Stop Policy Gate"
+        },
+        {
+          "run_id": 37167919351,
+          "job_id": 111334676216,
+          "name": "P1 Evidence Identity"
+        },
+        {
+          "run_id": 37167919282,
+          "job_id": 111334676231,
+          "name": "P1 Required Gate Authority"
+        },
+        {
+          "run_id": 37167919357,
+          "job_id": 111334676388,
+          "name": "P1 Reproducibility Bundle"
+        }
+      ],
+      "exact_head": "31d7ea22706a83a4c46e9aa95e5700a68a69f902"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-013",
+        "ACC-VOL-014"
+      ],
+      "source_commit": "58b5868e083646e0dbbc6326d0dca3f3e4e9e7b6",
+      "claim": "independent CI signoff to hardened maturity explicitly recorded; completion remains separate",
+      "verification": [
+        {
+          "run_id": 36356867896,
+          "name": "P1 Reasoning Search Stop Policy Gate",
+          "record_id": "ACC-VOL-013"
+        },
+        {
+          "run_id": 36365420651,
+          "name": "P1 Plan Verification Gate",
+          "record_id": "ACC-VOL-014"
+        }
+      ]
+    },
+    {
+      "record_ids": [
+        "ACC-P1-EVID-01",
+        "ACC-P1-EVID-02",
+        "ACC-P1-EVID-03",
+        "ACC-P1-EVID-04",
+        "ACC-P1-EVID-05",
+        "ACC-P1-EVID-06"
+      ],
+      "source_commit": "08874cbc93a8014d53a95ee2022181579098bd265",
+      "artifact": "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+      "claim": "implementation signoff only; verification explicitly unsigned"
+    }
+  ]
+}
