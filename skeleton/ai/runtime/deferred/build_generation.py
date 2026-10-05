@@ -30,7 +30,7 @@ class RiskFactor: name:str; weight:float; observed:float
 class RiskCalibration: calibration_id:str; predicted:float; observed_incident:bool
 @dataclass(frozen=True,slots=True)
 class ChangeRisk: score:float; factors:tuple[RiskFactor,...]; calibration_id:str
-def estimate_risk(factors,calibration_id):return ChangeRisk(sum(x.weight*x.observed for x in factors),tuple(factors),calibration_id)
+def estimate_risk(factors,calibration_id):\n if not calibration_id or not factors:raise ValueError("risk evidence required")\n if any(x.weight<0 or x.observed<0 or x.observed>1 for x in factors):raise ValueError("invalid risk factor")\n return ChangeRisk(sum(x.weight*x.observed for x in factors),tuple(factors),calibration_id)
 @dataclass(frozen=True,slots=True)
 class ChangeGate: name:str; passed:bool; hard:bool=True
 @dataclass(frozen=True,slots=True)
