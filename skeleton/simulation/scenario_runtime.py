@@ -18,6 +18,7 @@ from hashlib import sha256
 import json
 import math
 import re
+from types import MappingProxyType
 from typing import Callable, Iterable, Mapping, Sequence
 
 SCENARIO_SCHEMA = "skeleton.simulation.scenario-runtime.v1"
@@ -166,10 +167,44 @@ def _finite(value: object, field: str) -> float:
     return result
 
 
+def _jsonable(value: object) -> object:
+    if isinstance(value, Mapping):
+        return {
+            str(key): _jsonable(child)
+            for key, child in value.items()
+        }
+    if isinstance(value, tuple):
+        return [_jsonable(child) for child in value]
+    return value
+
+
+def _freeze_json(value: object, field: str) -> object:
+    if isinstance(value, Mapping):
+        frozen: dict[str, object] = {}
+        for key, child in value.items():
+            canonical_key = _token(key, f"{field} key", maximum=128)
+            if canonical_key in frozen:
+                raise ScenarioRuntimeError(f"{field} contains duplicate key")
+            frozen[canonical_key] = _freeze_json(child, field)
+        return MappingProxyType(frozen)
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze_json(child, field) for child in value)
+    if value is None or isinstance(value, (str, bool, int)):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ScenarioRuntimeError(f"{field} contains non-finite numeric value")
+        return value
+    raise ScenarioRuntimeError(
+        f"{field} contains unsupported deterministic JSON value "
+        f"{type(value).__name__}"
+    )
+
+
 def _canonical_json(value: object, field: str) -> bytes:
     try:
         return json.dumps(
-            value,
+            _jsonable(value),
             sort_keys=True,
             separators=(",", ":"),
             ensure_ascii=False,
@@ -189,30 +224,33 @@ def _sha256(value: object, field: str) -> str:
     return value
 
 
-def _state_payload(value: Mapping[str, object], field: str = "state") -> dict[str, object]:
+def _state_payload(
+    value: Mapping[str, object],
+    field: str = "state",
+) -> Mapping[str, object]:
     if not isinstance(value, Mapping):
         raise ScenarioRuntimeError(f"{field} must be a mapping")
-    result = dict(value)
-    if len(result) > _MAX_STATE_FIELDS:
+    if len(value) > _MAX_STATE_FIELDS:
         raise ScenarioRuntimeError(f"{field} exceeds {_MAX_STATE_FIELDS} fields")
-    for key in result:
-        _token(key, f"{field} key", maximum=128)
-    _canonical_json(result, field)
-    return result
+    frozen = _freeze_json(value, field)
+    if not isinstance(frozen, Mapping):
+        raise ScenarioRuntimeError(f"{field} must freeze to a mapping")
+    _canonical_json(frozen, field)
+    return frozen
 
 
-def _parameters(value: Mapping[str, object]) -> dict[str, object]:
+def _parameters(value: Mapping[str, object]) -> Mapping[str, object]:
     if not isinstance(value, Mapping):
         raise ScenarioRuntimeError("action parameters must be a mapping")
-    result = dict(value)
-    if len(result) > _MAX_ACTION_PARAMETER_FIELDS:
+    if len(value) > _MAX_ACTION_PARAMETER_FIELDS:
         raise ScenarioRuntimeError(
             f"action parameters exceed {_MAX_ACTION_PARAMETER_FIELDS} fields"
         )
-    for key in result:
-        _token(key, "action parameter key", maximum=128)
-    _canonical_json(result, "action parameters")
-    return result
+    frozen = _freeze_json(value, "action parameters")
+    if not isinstance(frozen, Mapping):
+        raise ScenarioRuntimeError("action parameters must freeze to a mapping")
+    _canonical_json(frozen, "action parameters")
+    return frozen
 
 
 def _conservative_union(prior: float, local: float) -> float:
