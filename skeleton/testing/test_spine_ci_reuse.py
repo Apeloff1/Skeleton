@@ -67,3 +67,15 @@ def test_reuse_rejects_unverified_card_kind() -> None:
     candidate["kind"] = "spine_ci_qualification"
     with pytest.raises(SpineCiReuseError, match="not verified"):
         can_reuse_verified_qualification(verified(), candidate)
+
+
+def test_reuse_primitive_is_available_from_canonical_persistence_surface() -> None:
+    from skeleton import persistence
+
+    assert persistence.SpineCiReuseError is SpineCiReuseError
+    assert (
+        persistence.can_reuse_verified_qualification
+        is can_reuse_verified_qualification
+    )
+    assert "SpineCiReuseError" in persistence.__all__
+    assert "can_reuse_verified_qualification" in persistence.__all__
