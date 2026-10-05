@@ -10050,7 +10050,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Simulation cannot grant real authority or execute external side effects.",
         "Compare allow/deny/abstain deltas and affected populations/workloads."
@@ -10066,11 +10066,11 @@
         "PolicyDelta"
       ],
       "implementation_paths": [
-        "skeleton/security",
-        "experiments"
+        "skeleton/security/policy_simulation.py",
+        "skeleton/ai/runtime/security/policy_simulation.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_policy_simulation.py"
+        "skeleton/testing/test_policy_simulation.py"
       ],
       "evaluations": [
         "planned:policy regression replay"
@@ -10081,8 +10081,7 @@
         "biased trace corpus"
       ],
       "gaps": [
-        "share evaluator with runtime",
-        "establish trace corpus governance"
+        "independent exact-head policy-simulation reconciliation remains pending"
       ],
       "accountability_id": "ACC-VOL-166",
       "completion_checkbox": false,
@@ -10097,7 +10096,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Map threats to concrete components and controls.",
         "Review threat model when authority/data/network boundaries change."
@@ -10113,11 +10112,11 @@
         "Mitigation"
       ],
       "implementation_paths": [
-        "docs/security",
-        "machine"
+        "skeleton/security/threat_model.py",
+        "skeleton/ai/runtime/security/threat_model.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_threat_model.py"
+        "skeleton/testing/test_threat_model.py"
       ],
       "evaluations": [
         "planned:threat-control coverage audit"
@@ -10128,8 +10127,7 @@
         "unowned mitigation"
       ],
       "gaps": [
-        "materialize threat IDs",
-        "bind PR impact triggers"
+        "independent exact-head threat-model impact-trigger verification remains pending"
       ],
       "accountability_id": "ACC-VOL-167",
       "completion_checkbox": false,
@@ -10207,7 +10205,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Every privileged crossing needs authenticated identity and explicit authorization.",
         "Boundary failures must degrade closed without widening access."
@@ -10223,11 +10221,11 @@
         "BoundaryDecision"
       ],
       "implementation_paths": [
-        "skeleton/security",
-        "machine"
+        "skeleton/security/boundaries.py",
+        "skeleton/ai/runtime/security/boundaries.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_security_boundaries.py"
+        "skeleton/testing/test_security_boundaries.py"
       ],
       "evaluations": [
         "planned:boundary-bypass evaluation"
@@ -10238,8 +10236,7 @@
         "fallback privilege widening"
       ],
       "gaps": [
-        "map all trust boundaries",
-        "bind crossings to trace model"
+        "independent exact-head boundary-crossing verification remains pending"
       ],
       "accountability_id": "ACC-VOL-169",
       "completion_checkbox": false,
@@ -10364,7 +10361,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Default deny unapproved destinations for privileged sandboxes/tools.",
         "Resolve DNS/rebinding and redirect behavior within policy."
@@ -10380,11 +10377,15 @@
         "EgressDecision"
       ],
       "implementation_paths": [
-        "skeleton/security",
-        "skeleton/network"
+        "skeleton/security/egress_control.py",
+        "skeleton/ai/runtime/security/egress_control.py",
+        "skeleton/security/outbound_url.py",
+        "skeleton/security/outbound_http.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_egress_control.py"
+        "skeleton/testing/test_egress_control.py",
+        "skeleton/testing/test_outbound_url_resolution_security.py",
+        "skeleton/testing/test_security_outbound_http.py"
       ],
       "evaluations": [
         "planned:SSRF/DNS-rebinding campaign"
@@ -10395,8 +10396,7 @@
         "policy bypass via redirects"
       ],
       "gaps": [
-        "implement destination canonicalization",
-        "bind network tools to egress policy"
+        "independent exact-head egress-policy and connected-peer verification remains pending"
       ],
       "accountability_id": "ACC-VOL-172",
       "completion_checkbox": false,
@@ -10411,7 +10411,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Secrets are referenced by handles/scopes rather than copied into general state.",
         "Detect and redact accidental secret propagation."
@@ -10427,11 +10427,14 @@
         "SecretUseReceipt"
       ],
       "implementation_paths": [
-        "skeleton/security",
-        "skeleton/vault"
+        "skeleton/security/secret_handles.py",
+        "skeleton/ai/runtime/security/secret_handles.py",
+        "skeleton/security/secret_lifecycle.py",
+        "skeleton/ai/runtime/security/secret_lifecycle.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_secret_security.py"
+        "skeleton/testing/test_secret_security.py",
+        "skeleton/testing/test_secret_lifecycle_taint.py"
       ],
       "evaluations": [
         "planned:secret exfiltration evaluation"
@@ -10442,8 +10445,7 @@
         "long-lived credentials"
       ],
       "gaps": [
-        "unify secret access path",
-        "bind detectors to CI/runtime"
+        "independent exact-head secret-handle/lifecycle verification remains pending"
       ],
       "accountability_id": "ACC-VOL-173",
       "completion_checkbox": false,
@@ -10458,7 +10460,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Separate key material from metadata/identifiers.",
         "Design rotation and restore so old data/evidence remains verifiable where required."
@@ -10474,11 +10476,13 @@
         "KeyRotation"
       ],
       "implementation_paths": [
-        "skeleton/security",
-        "skeleton/vault"
+        "skeleton/security/key_management.py",
+        "skeleton/ai/runtime/security/key_management.py",
+        "skeleton/vault/kms.py",
+        "skeleton/vault/rotation.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_key_management.py"
+        "skeleton/testing/test_key_management.py"
       ],
       "evaluations": [
         "planned:key-rotation/restore drill"
@@ -10489,8 +10493,7 @@
         "revoked key remains trusted"
       ],
       "gaps": [
-        "define KMS abstraction",
-        "bind signatures/encryption to versions"
+        "independent exact-head key-version/rotation/restore verification remains pending"
       ],
       "accountability_id": "ACC-VOL-174",
       "completion_checkbox": false,
@@ -10505,7 +10508,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Attach tenant scope before lookup/ranking/execution.",
         "Test cross-tenant negative access paths continuously."
@@ -10521,11 +10524,11 @@
         "TenantAccessDecision"
       ],
       "implementation_paths": [
-        "skeleton/security",
-        "skeleton/persistence"
+        "skeleton/security/tenant_isolation.py",
+        "skeleton/ai/runtime/security/tenant_isolation.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_tenant_isolation_deep.py"
+        "skeleton/testing/test_tenant_isolation_deep.py"
       ],
       "evaluations": [
         "planned:cross-tenant red-team campaign"
@@ -10536,8 +10539,7 @@
         "shared cache leak"
       ],
       "gaps": [
-        "propagate tenant identity universally",
-        "bind isolation to trace/evidence"
+        "independent exact-head cross-tenant negative-path verification remains pending"
       ],
       "accountability_id": "ACC-VOL-175",
       "completion_checkbox": false,
@@ -10552,7 +10554,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Propagate privacy labels into derived data and artifacts.",
         "Block incompatible processing/export based on policy and jurisdictional scope."
@@ -10568,11 +10570,11 @@
         "PrivacyDecision"
       ],
       "implementation_paths": [
-        "skeleton/vault",
-        "skeleton/security"
+        "skeleton/security/privacy_engine.py",
+        "skeleton/ai/runtime/security/privacy_engine.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_privacy_engine.py"
+        "skeleton/testing/test_privacy_engine.py"
       ],
       "evaluations": [
         "planned:purpose/derivation leakage evaluation"
@@ -10583,8 +10585,7 @@
         "secondary-use violation"
       ],
       "gaps": [
-        "define privacy label lattice",
-        "bind to ingestion/retrieval/tools"
+        "independent exact-head privacy-label propagation and purpose-boundary verification remains pending"
       ],
       "accountability_id": "ACC-VOL-176",
       "completion_checkbox": false,
@@ -10599,7 +10600,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Track deletion scope through replicas, indexes, caches, artifacts and backups.",
         "Prevent restore/rebuild from resurrecting deleted data."
@@ -10615,11 +10616,16 @@
         "DeletionEvidence"
       ],
       "implementation_paths": [
-        "skeleton/vault",
-        "skeleton/persistence"
+        "skeleton/security/data_deletion.py",
+        "skeleton/ai/runtime/security/data_deletion.py",
+        "skeleton/security/deletion_propagation.py",
+        "skeleton/ai/runtime/security/deletion_propagation.py",
+        "skeleton/persistence/privacy_deletion.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_data_deletion.py"
+        "skeleton/testing/test_data_deletion.py",
+        "skeleton/testing/test_deletion_propagation.py",
+        "skeleton/testing/test_privacy_deletion_authority.py"
       ],
       "evaluations": [
         "planned:restore-after-delete drill"
@@ -10630,8 +10636,7 @@
         "orphan derivatives"
       ],
       "gaps": [
-        "materialize deletion graph",
-        "bind backup/restore reconciliation"
+        "independent exact-head deletion/restore-resurrection verification remains pending"
       ],
       "accountability_id": "ACC-VOL-177",
       "completion_checkbox": false,
@@ -10646,7 +10651,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Bind SBOM to exact build artifact digest.",
         "Include direct/transitive/native/container components."
@@ -10662,11 +10667,11 @@
         "VulnerabilityFinding"
       ],
       "implementation_paths": [
-        "scripts",
-        "release"
+        "skeleton/supply_chain/sbom.py",
+        "skeleton/ai/runtime/extensions/supply_chain/sbom.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_sbom.py"
+        "skeleton/testing/test_sbom.py"
       ],
       "evaluations": [
         "planned:artifact/SBOM consistency audit"
@@ -10677,8 +10682,7 @@
         "stale vulnerability data"
       ],
       "gaps": [
-        "select SBOM format",
-        "bind generation to release pipeline"
+        "independent exact-head SBOM artifact-binding and coverage verification remains pending"
       ],
       "accountability_id": "ACC-VOL-178",
       "completion_checkbox": false,
