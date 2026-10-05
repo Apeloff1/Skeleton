@@ -11751,7 +11751,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Select candidates where concurrency/authority/recovery ambiguity justifies cost.",
         "Bind formal assumptions and checked properties to executable implementation tests."
@@ -11764,26 +11764,40 @@
       "contracts": [
         "FormalCandidate",
         "FormalModelRef",
-        "VerifiedProperty"
+        "VerifiedProperty",
+        "ProofToTestHandoff"
       ],
       "implementation_paths": [
-        "formal",
-        "machine"
+        "skeleton/contracts/formal_candidates.py",
+        "skeleton/ai/runtime/contracts/formal_candidates.py",
+        "skeleton/contracts/formal_methods.py",
+        "skeleton/contracts/formal_targets.py",
+        "skeleton/contracts/__init__.py",
+        "skeleton/ai/runtime/contracts/__init__.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_formal_candidates.py"
+        "skeleton/testing/test_vol200_formal_candidates.py"
       ],
       "evaluations": [
-        "planned:candidate selection review"
+        "skeleton/testing/test_vol200_formal_candidates.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/63967f841f83aa7a8a51146cc9fb0d774ea03c82",
+        "https://github.com/Apeloff1/Skeleton/commit/174897cf919274c91560a4ff11db1f729dbb268f",
+        "https://github.com/Apeloff1/Skeleton/commit/7be00889e195075ab5a08714776c55a2c574e13c",
+        "https://github.com/Apeloff1/Skeleton/commit/1d04b69fe892c4e19e7d97be2320ff0aa3290898",
+        "https://github.com/Apeloff1/Skeleton/commit/9388fb1001100a55eeed6d235d3f33c5762aa053",
+        "skeleton/contracts/formal_candidates.py",
+        "skeleton/ai/runtime/contracts/formal_candidates.py",
+        "skeleton/testing/test_vol200_formal_candidates.py"
+      ],
       "risks": [
         "formal effort on low-value target",
         "model/code divergence"
       ],
       "gaps": [
-        "rank first candidate set",
-        "establish conformance workflow"
+        "materialize the first ranked candidate set from concrete high-consequence runtime targets",
+        "wire proof-to-test handoff validation into exact-head conformance CI"
       ],
       "accountability_id": "ACC-VOL-200",
       "completion_checkbox": false,
