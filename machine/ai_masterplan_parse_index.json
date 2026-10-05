@@ -3,10 +3,10 @@
   "kind": "ai-masterplan-parse-index",
   "sources": {
     "machine/ai_master_plan.json": {
-      "git_blob_sha": "d918324a0a19059fe7a243628e466bd40c1110ee"
+      "git_blob_sha": "ede33c1bd707669a5208c30732ce5a13d09ec45f"
     },
     "machine/ai_build_accountability.json": {
-      "git_blob_sha": "924f67317ac305929ed423f2160c5b2bb45fc087"
+      "git_blob_sha": "c30fa31f87cc025c94e76636ba5d01f4a4ed44c3"
     }
   },
   "policy": {
@@ -17,12 +17,12 @@
   },
   "volume_summary": {
     "total": 421,
-    "implementation_signed": 196,
+    "implementation_signed": 198,
     "verification_signed": 20,
     "complete": 20,
-    "implementation_signed_open": 176,
-    "gap_free_waiting_verification": 20,
-    "implementation_unsigned": 225
+    "implementation_signed_open": 178,
+    "gap_free_waiting_verification": 21,
+    "implementation_unsigned": 223
   },
   "fast_sets": {
     "fully_complete": [
@@ -52,6 +52,7 @@
       "VOL-020",
       "VOL-022",
       "VOL-027",
+      "VOL-039",
       "VOL-073",
       "VOL-074",
       "VOL-081",
@@ -70,11 +71,9 @@
       "VOL-110"
     ],
     "implementation_unsigned": [
-      "VOL-001",
       "VOL-003",
       "VOL-032",
       "VOL-033",
-      "VOL-039",
       "VOL-051",
       "VOL-052",
       "VOL-053",
@@ -300,9 +299,9 @@
   "by_depth_pass": {
     "DP-000-040": {
       "total": 41,
-      "implementation_signed": 36,
+      "implementation_signed": 38,
       "complete": 11,
-      "gap_free_waiting_verification": 4
+      "gap_free_waiting_verification": 5
     },
     "DP-041-080": {
       "total": 40,
@@ -368,13 +367,13 @@
   "accountability_summary": {
     "volume": {
       "total": 421,
-      "implementation_signed": 196,
+      "implementation_signed": 198,
       "verification_signed": 20,
       "complete": 20,
       "status_counts": {
         "verified": 13,
-        "unverified": 225,
-        "implemented": 176,
+        "implemented": 178,
+        "unverified": 223,
         "hardened": 7
       }
     },
