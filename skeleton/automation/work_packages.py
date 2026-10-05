@@ -23,10 +23,12 @@ class WorkPackageDependency:
   if self.package_id==self.depends_on:raise WorkPackageError("self dependency")
 @dataclass(frozen=True,slots=True)
 class WorkPackageEvidence:
- evidence_id:str;package_id:str;role:EvidenceRole;actor_id:str;artifact_digest:str
+ evidence_id:str;package_id:str;package_digest:str;role:EvidenceRole;actor_id:str;artifact_digest:str
  def __post_init__(self):
   for f in ("evidence_id","package_id","actor_id"):object.__setattr__(self,f,_id(getattr(self,f),f))
-  if not isinstance(self.artifact_digest,str) or not _SHA.fullmatch(self.artifact_digest):raise WorkPackageError("artifact_digest must be sha256")
+  if not isinstance(self.role,EvidenceRole):raise WorkPackageError("role must be EvidenceRole")
+  for f in ("package_digest","artifact_digest"):
+   if not isinstance(getattr(self,f),str) or not _SHA.fullmatch(getattr(self,f)):raise WorkPackageError(f"{f} must be sha256")
 @dataclass(frozen=True,slots=True)
 class WorkPackage:
  package_id:str;volume_id:str;objective:str;non_goals:tuple[str,...];interfaces:tuple[str,...];state_owners:tuple[str,...];risks:tuple[str,...];tests:tuple[str,...];rollback:str;requirement_ids:tuple[str,...];aiq_task_ids:tuple[str,...]
@@ -34,7 +36,10 @@ class WorkPackage:
   for f in ("package_id","volume_id"):object.__setattr__(self,f,_id(getattr(self,f),f))
   object.__setattr__(self,"objective",_txt(self.objective,"objective"));object.__setattr__(self,"rollback",_txt(self.rollback,"rollback"))
   for f in ("non_goals","interfaces","state_owners","risks","tests","requirement_ids","aiq_task_ids"):
-   vals=tuple(sorted(set(getattr(self,f))))
+   raw=getattr(self,f)
+   if not isinstance(raw,tuple):raise WorkPackageError(f"{f} must be tuple")
+   if len(raw)>256:raise WorkPackageError(f"{f} exceeds policy bound")
+   vals=tuple(sorted(set(raw)))
    if not vals:raise WorkPackageError(f"{f} cannot be empty")
    for v in vals:_txt(v,f)
    object.__setattr__(self,f,vals)
@@ -43,11 +48,15 @@ class WorkPackage:
 class WorkPackageRegistry:
  def __init__(self):self.packages={};self.dependencies={};self.evidence={}
  def add(self,p):
+  if not isinstance(p,WorkPackage):raise WorkPackageError("package must be WorkPackage")
   prior=self.packages.get(p.package_id)
   if prior is not None and prior!=p:raise WorkPackageError("package identity immutable")
   self.packages[p.package_id]=p
  def depend(self,d):
+  if not isinstance(d,WorkPackageDependency):raise WorkPackageError("dependency must be WorkPackageDependency")
   if d.package_id not in self.packages or d.depends_on not in self.packages:raise WorkPackageError("unknown package dependency")
+  prior=self.dependencies.get(d.dependency_id)
+  if prior is not None and prior!=d:raise WorkPackageError("dependency identity immutable")
   self.dependencies[d.dependency_id]=d;self._acyclic()
  def _acyclic(self):
   g={k:set() for k in self.packages}
@@ -61,7 +70,9 @@ class WorkPackageRegistry:
    stack.remove(n);seen.add(n)
   for n in g:visit(n)
  def attest(self,e):
+  if not isinstance(e,WorkPackageEvidence):raise WorkPackageError("evidence must be WorkPackageEvidence")
   if e.package_id not in self.packages:raise WorkPackageError("evidence references unknown package")
+  if e.package_digest!=self.packages[e.package_id].digest:raise WorkPackageError("evidence is stale or bound to another package version")
   prior=self.evidence.get(e.evidence_id)
   if prior is not None and prior!=e:raise WorkPackageError("evidence identity immutable")
   self.evidence[e.evidence_id]=e
