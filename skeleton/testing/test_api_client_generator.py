@@ -6,3 +6,11 @@ def test_version_drift_and_missing_auth_fail_closed():
  with pytest.raises(ValueError):generate_client("v2",OPS)
  with pytest.raises(ValueError):generate_client("v1",({"api_version":"v1","name":"x","method":"GET","path":"/x"},))
 def test_stub_drift_detected():assert not check_compatibility(generate_client("v1",OPS),({"api_version":"v1","name":"get","method":"POST","path":"/x","auth_required":True},))
+
+def test_duplicate_operations_rejected():
+ import pytest
+ op={"api_version":"v1","name":"x","method":"GET","path":"/x","auth_required":True}
+ with pytest.raises(ValueError):generate_client("v1",(op,op))
+def test_auth_must_be_boolean():
+ import pytest
+ with pytest.raises(ValueError):generate_client("v1",({"api_version":"v1","name":"x","method":"GET","path":"/x","auth_required":1},))
