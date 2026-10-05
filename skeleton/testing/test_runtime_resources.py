@@ -24,3 +24,14 @@ def test_numa_falls_back_when_unknown_and_uses_measured_affinity():
 def test_collective_requires_measured_interconnect():
  assert not collective_path((GPUInterconnect("a","b",10,False),),("a","b")).admitted
  r=collective_path((GPUInterconnect("a","b",10,True),),("a","b"));assert r.admitted and r.path.bottleneck_bandwidth==10
+
+
+def test_runtime_resource_invalid_inputs_fail_closed():
+ import pytest
+ with pytest.raises(ValueError): reserve_gpu(GPUMemoryPool("g",10,((0,10),)),"",1)
+ with pytest.raises(ValueError): reserve_gpu(GPUMemoryPool("g",10,((9,2),)),"r",1)
+ with pytest.raises(ValueError): evict_model(DrainState("m",False,-1))
+ with pytest.raises(ValueError): verify_draft((DraftToken(1),),(VerificationStep(2,True),))
+ with pytest.raises(ValueError): verify_draft((DraftToken(1),),())
+ edges=(GPUInterconnect("a","b",10,True),GPUInterconnect("c","d",10,True))
+ assert not collective_path(edges,("a","b","c","d")).admitted
