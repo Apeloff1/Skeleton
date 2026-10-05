@@ -188,3 +188,22 @@ __all__ += [
     "QualityPolicy",
     "QualityVector",
 ]
+
+
+from skeleton.eval.learning_retention import (
+    LEARNING_RETENTION_MAX_SECONDS,
+    LEARNING_RETENTION_SCHEMA_VERSION,
+    LearningRetentionError,
+    LearningSignalLifecycleBinding,
+    LearningSignalRetentionPolicy,
+    register_learning_signal_lifecycle,
+)
+
+__all__ += [
+    "LEARNING_RETENTION_MAX_SECONDS",
+    "LEARNING_RETENTION_SCHEMA_VERSION",
+    "LearningRetentionError",
+    "LearningSignalLifecycleBinding",
+    "LearningSignalRetentionPolicy",
+    "register_learning_signal_lifecycle",
+]
