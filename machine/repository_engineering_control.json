@@ -284,10 +284,10 @@
   ],
   "backlog": {
     "summary": {
-      "item_count": 1782,
-      "gap_count": 802,
+      "item_count": 1772,
+      "gap_count": 792,
       "risk_count": 980,
-      "open_count": 1782,
+      "open_count": 1772,
       "closed_count": 0
     },
     "items": [
@@ -2180,70 +2180,6 @@
         "deduplication_key": "gap:bind data freshness/provenance into responses"
       },
       {
-        "backlog_id": "BL-GAP-VOL-073-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-073:gap:001",
-        "volume_ref": "VOL-073",
-        "statement": "define simulation state contract",
-        "accountability_id": "ACC-VOL-073",
-        "requirement_refs": [
-          "REQ:VOL-073:001",
-          "REQ:VOL-073:002",
-          "REQ:VOL-073:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define simulation state contract"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-073-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-073:gap:002",
-        "volume_ref": "VOL-073",
-        "statement": "materialize resource/authority guards",
-        "accountability_id": "ACC-VOL-073",
-        "requirement_refs": [
-          "REQ:VOL-073:001",
-          "REQ:VOL-073:002",
-          "REQ:VOL-073:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize resource/authority guards"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-074-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-074:gap:001",
-        "volume_ref": "VOL-074",
-        "statement": "define learner-state uncertainty model",
-        "accountability_id": "ACC-VOL-074",
-        "requirement_refs": [
-          "REQ:VOL-074:001",
-          "REQ:VOL-074:002",
-          "REQ:VOL-074:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define learner-state uncertainty model"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-074-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-074:gap:002",
-        "volume_ref": "VOL-074",
-        "statement": "bind pedagogy to outcome evaluations",
-        "accountability_id": "ACC-VOL-074",
-        "requirement_refs": [
-          "REQ:VOL-074:001",
-          "REQ:VOL-074:002",
-          "REQ:VOL-074:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind pedagogy to outcome evaluations"
-      },
-      {
         "backlog_id": "BL-GAP-VOL-075-001",
         "source_kind": "gap",
         "source_ref": "VOL-075:gap:001",
@@ -2340,38 +2276,6 @@
         "deduplication_key": "gap:bind experiments to reproducibility/provenance"
       },
       {
-        "backlog_id": "BL-GAP-VOL-081-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-081:gap:001",
-        "volume_ref": "VOL-081",
-        "statement": "select P0 formal targets",
-        "accountability_id": "ACC-VOL-081",
-        "requirement_refs": [
-          "REQ:VOL-081:001",
-          "REQ:VOL-081:002",
-          "REQ:VOL-081:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:select p0 formal targets"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-081-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-081:gap:002",
-        "volume_ref": "VOL-081",
-        "statement": "establish model-to-code traceability",
-        "accountability_id": "ACC-VOL-081",
-        "requirement_refs": [
-          "REQ:VOL-081:001",
-          "REQ:VOL-081:002",
-          "REQ:VOL-081:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:establish model-to-code traceability"
-      },
-      {
         "backlog_id": "BL-GAP-VOL-082-001",
         "source_kind": "gap",
         "source_ref": "VOL-082:gap:001",
@@ -2466,70 +2370,6 @@
         "state": "open",
         "closure_evidence_refs": [],
         "deduplication_key": "gap:materialize revocation propagation proof"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-085-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-085:gap:001",
-        "volume_ref": "VOL-085",
-        "statement": "define explanation evidence contract",
-        "accountability_id": "ACC-VOL-085",
-        "requirement_refs": [
-          "REQ:VOL-085:001",
-          "REQ:VOL-085:002",
-          "REQ:VOL-085:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define explanation evidence contract"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-085-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-085:gap:002",
-        "volume_ref": "VOL-085",
-        "statement": "bind explanations to operation provenance",
-        "accountability_id": "ACC-VOL-085",
-        "requirement_refs": [
-          "REQ:VOL-085:001",
-          "REQ:VOL-085:002",
-          "REQ:VOL-085:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind explanations to operation provenance"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-086-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-086:gap:001",
-        "volume_ref": "VOL-086",
-        "statement": "define accessibility acceptance matrix",
-        "accountability_id": "ACC-VOL-086",
-        "requirement_refs": [
-          "REQ:VOL-086:001",
-          "REQ:VOL-086:002",
-          "REQ:VOL-086:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define accessibility acceptance matrix"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-086-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-086:gap:002",
-        "volume_ref": "VOL-086",
-        "statement": "automate critical semantic checks",
-        "accountability_id": "ACC-VOL-086",
-        "requirement_refs": [
-          "REQ:VOL-086:001",
-          "REQ:VOL-086:002",
-          "REQ:VOL-086:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:automate critical semantic checks"
       },
       {
         "backlog_id": "BL-GAP-VOL-087-001",
