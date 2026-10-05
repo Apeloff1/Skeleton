@@ -55,6 +55,8 @@ class DocumentationSource:
 
     def __post_init__(self):
         object.__setattr__(self, "source_id", _id(self.source_id, "source_id"))
+        if not isinstance(self.kind, SourceKind):
+            raise DocumentationError("kind must be a SourceKind")
         object.__setattr__(self, "path", _id(self.path, "path"))
         object.__setattr__(self, "digest", _sha(self.digest, "digest"))
 
@@ -84,6 +86,12 @@ class SourceDigestSet:
     sources: tuple[DocumentationSource, ...]
 
     def __post_init__(self):
+        if not isinstance(self.sources, tuple) or not self.sources:
+            raise DocumentationError("source set must be a non-empty tuple")
+        if len(self.sources) > 4096:
+            raise DocumentationError("source set exceeds policy bound")
+        if any(not isinstance(source, DocumentationSource) for source in self.sources):
+            raise DocumentationError("source set contains invalid source")
         ordered = tuple(sorted(self.sources, key=lambda s: s.source_id))
         if len({s.source_id for s in ordered}) != len(ordered):
             raise DocumentationError("duplicate source identity")
@@ -133,6 +141,12 @@ class GeneratedDocument:
 
     def __post_init__(self):
         object.__setattr__(self, "path", _id(self.path, "path"))
+        if not isinstance(self.generator, GeneratorIdentity) or not isinstance(self.source_set, SourceDigestSet):
+            raise DocumentationError("generated document identities are invalid")
+        if not isinstance(self.sections, tuple) or not self.sections:
+            raise DocumentationError("generated document requires sections")
+        if len(self.sections) > 4096 or any(not isinstance(section, GeneratedSection) for section in self.sections):
+            raise DocumentationError("generated section set is invalid or exceeds policy bound")
         ordered = tuple(sorted(self.sections, key=lambda s: s.section_id))
         if len({s.section_id for s in ordered}) != len(ordered):
             raise DocumentationError("duplicate generated section identity")
