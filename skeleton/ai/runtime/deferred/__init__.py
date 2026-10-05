@@ -16,6 +16,7 @@ from .executor import (
     ExecutionReceipt,
     FailureReceipt,
 )
+from .contract_fuzzing import ContractFuzzer, FuzzBudget, FuzzFailure, FuzzReport
 from .journal import (
     DeferredExecutionJournal,
     DeferredJournalConflict,
@@ -27,6 +28,10 @@ from .journal import (
 __all__ = [
     "CapabilityRegistry",
     "CapabilitySpec",
+    "ContractFuzzer",
+    "FuzzBudget",
+    "FuzzFailure",
+    "FuzzReport",
     "DEFERRED_165_SPECS",
     "DeferredEffectAuthority",
     "DeferredExecutionError",
