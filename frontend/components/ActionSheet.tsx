@@ -40,6 +40,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useReduceMotion } from '../src/hooks/useReduceMotion';
 import { accessibleButtonProps } from '../src/accessibility/runtime';
+import { useI18n } from '../src/i18n';
 
 // ────────────────────────────────────────────────────────────────────
 // SHARED TYPES
@@ -139,6 +140,7 @@ export function ActionSheetHost() {
   const [entry, setEntry] = useState<SheetEntry | null>(null);
   const [draft, setDraft] = useState('');
   const reduceMotion = useReduceMotion();
+  const { t } = useI18n();
 
   // Animation values
   const backdrop = useSharedValue(0);
@@ -290,20 +292,20 @@ export function ActionSheetHost() {
                   onPress={handleDismiss}
                   style={({ pressed }) => [styles.optBtn, styles.optCancel, { flex: 1, opacity: pressed ? 0.85 : 1 }]}
                   testID="promptsheet-cancel"
-                  {...accessibleButtonProps(entry.spec.cancelLabel || 'Cancel')}
+                  {...accessibleButtonProps(entry.spec.cancelLabel || t('prompt.cancel'))}
                 >
                   <Text style={[styles.optText, { color: '#94a3b8', fontWeight: '700' }]}>
-                    {entry.spec.cancelLabel || 'Cancel'}
+                    {entry.spec.cancelLabel || t('prompt.cancel')}
                   </Text>
                 </Pressable>
                 <Pressable
                   onPress={handleSubmitPrompt}
                   style={({ pressed }) => [styles.optBtn, { backgroundColor: '#a78bfa', flex: 1, opacity: pressed ? 0.85 : 1 }]}
                   testID="promptsheet-submit"
-                  {...accessibleButtonProps(entry.spec.submitLabel || 'Submit')}
+                  {...accessibleButtonProps(entry.spec.submitLabel || t('prompt.submit'))}
                 >
                   <Text style={[styles.optText, { color: '#0a0f1f', fontWeight: '800' }]}>
-                    {entry.spec.submitLabel || 'Submit'}
+                    {entry.spec.submitLabel || t('prompt.submit')}
                   </Text>
                 </Pressable>
               </View>
