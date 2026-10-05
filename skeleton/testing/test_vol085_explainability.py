@@ -942,3 +942,17 @@ def test_private_uncertainty_taints_otherwise_safe_model_output() -> None:
     rendered = json_text(record.to_public_dict())
     assert "Safe model-output summary." not in rendered
     assert "private calibration details" not in rendered
+
+def test_future_observation_cannot_masquerade_as_decision_provenance() -> None:
+    future = factor(
+        "input.future",
+        observed_at="2026-10-05T00:00:01Z",
+    )
+
+    with pytest.raises(
+        ExplanationError,
+        match="cannot occur after explanation generation",
+    ):
+        build((future,), chosen_policy=policy(
+            require_uncertainty_for_model_output=False,
+        ))
