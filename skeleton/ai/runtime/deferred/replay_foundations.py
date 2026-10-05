@@ -10,6 +10,9 @@ class Bulkhead: bulkhead_id:str; domain:str; limit:BulkheadLimit; active:int
 @dataclass(frozen=True,slots=True)
 class OverflowDecision: admitted:bool; target_bulkhead:str|None; reason:str
 def overflow(source:Bulkhead,target:Bulkhead|None,*,authority_compatible:bool)->OverflowDecision:
+ for b in (source,)+( (target,) if target else () ):
+  if not b.bulkhead_id or not b.domain or b.limit.concurrency<1 or b.limit.capacity<1 or b.active<0 or b.active>b.limit.capacity:raise ValueError("invalid bulkhead state")
+ if target and target.bulkhead_id==source.bulkhead_id:raise ValueError("overflow target must be distinct")
  if source.active<source.limit.concurrency:return OverflowDecision(True,source.bulkhead_id,"source capacity")
  if target and authority_compatible and target.active<target.limit.concurrency:return OverflowDecision(True,target.bulkhead_id,"explicit overflow")
  return OverflowDecision(False,None,"isolated capacity exhausted")
@@ -22,6 +25,7 @@ class ReplayAuthorization:
  operation_id:str; current_authorization:bool; compatibility_verified:bool; idempotency_verified:bool
 class DeadLetterDisposition(str,Enum): HOLD="hold"; REPLAY="replay"; DISCARD="discard"
 def dead_letter_disposition(d:DeadLetter,a:ReplayAuthorization)->DeadLetterDisposition:
+ if not all((d.operation_id,d.payload_digest,d.failure_cause,a.operation_id)) or d.attempts<0:return DeadLetterDisposition.HOLD
  if d.operation_id!=a.operation_id:return DeadLetterDisposition.HOLD
  if a.current_authorization and a.compatibility_verified and a.idempotency_verified:return DeadLetterDisposition.REPLAY
  return DeadLetterDisposition.HOLD
@@ -32,6 +36,7 @@ class ReplayRequest: operation_id:str; mode:ReplayMode; reconciled:bool=False; i
 @dataclass(frozen=True,slots=True)
 class ReplayResult: operation_id:str; allowed:bool; external_effects:bool; reason:str
 def replay(r:ReplayRequest)->ReplayResult:
+ if not r.operation_id:return ReplayResult(r.operation_id,False,False,"operation identity required")
  if r.mode is not ReplayMode.REAL_EFFECT:return ReplayResult(r.operation_id,True,False,r.mode.value)
  ok=r.reconciled and r.idempotent
  return ReplayResult(r.operation_id,ok,ok,"effect replay admitted" if ok else "effect replay requires reconciliation and idempotency")
@@ -42,6 +47,10 @@ class VariancePolicy: absolute_tolerance:float; relative_tolerance:float
 @dataclass(frozen=True,slots=True)
 class DeterminismEnvelope:
  classification:DeterminismClass; seed:int|None; variance:VariancePolicy; nondeterminism_sources:tuple[str,...]
+ def __post_init__(self):
+  if self.variance.absolute_tolerance<0 or self.variance.relative_tolerance<0:raise ValueError("variance tolerance must be nonnegative")
+  if any(not x for x in self.nondeterminism_sources) or len(set(self.nondeterminism_sources))!=len(self.nondeterminism_sources):raise ValueError("unique nondeterminism sources required")
+  if self.classification is DeterminismClass.EXACT and self.nondeterminism_sources:raise ValueError("exact envelope cannot declare nondeterminism")
  def equivalent(self,a:float,b:float)->bool:
   if self.classification is DeterminismClass.EXACT:return a==b
   if self.classification is DeterminismClass.NONDETERMINISTIC:return False
@@ -56,7 +65,11 @@ class Duration: monotonic_ns:int
 @dataclass(frozen=True,slots=True)
 class Deadline:
  start_monotonic_ns:int; duration:Duration
- def expired(self,now_monotonic_ns:int)->bool:return now_monotonic_ns-self.start_monotonic_ns>=self.duration.monotonic_ns
+ def __post_init__(self):
+  if self.start_monotonic_ns<0:raise ValueError("deadline start must be nonnegative")
+ def expired(self,now_monotonic_ns:int)->bool:
+  if now_monotonic_ns<0:raise ValueError("monotonic clock must be nonnegative")
+  return now_monotonic_ns-self.start_monotonic_ns>=self.duration.monotonic_ns
 
 class IdentifierKind(str,Enum): OPERATION="operation"; PRINCIPAL="principal"; RESOURCE="resource"
 @dataclass(frozen=True,slots=True)
@@ -73,10 +86,15 @@ class IdentifierCodec:
  def render(i:Identifier)->str:return f"{i.kind.value}:{i.value}"
 
 @dataclass(frozen=True,slots=True)
-class SequenceNumber: domain:str; value:int
+class SequenceNumber:
+ domain:str; value:int
+ def __post_init__(self):
+  if not self.domain or self.value<0:raise ValueError("valid sequence identity required")
 @dataclass(frozen=True,slots=True)
 class LogicalClock:
  node_id:str; counter:int
+ def __post_init__(self):
+  if not self.node_id or self.counter<0:raise ValueError("valid logical clock required")
  def tick(self)->"LogicalClock": return LogicalClock(self.node_id,self.counter+1)
 class CausalRelation(str,Enum): BEFORE="before"; AFTER="after"; CONCURRENT="concurrent"; UNKNOWN="unknown"
 def compare_sequence(a:SequenceNumber,b:SequenceNumber)->CausalRelation:
