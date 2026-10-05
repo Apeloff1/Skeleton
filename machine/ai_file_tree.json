@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "tree_version": "1.7.2",
+  "tree_version": "1.7.3",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
-  "baseline_git_sha": "0f1a76f115b78f97dc5abb2b9a9d694682a23f7f",
+  "baseline_git_sha": "909ebf8b316c75cc345c46b9ca1d6d190faf28ee",
   "canonical_root": "skeleton/ai",
   "migration_mode": "strangler_mirror_then_explicit_cutover",
   "purpose": "Consolidate build-plan-relevant AI engine, governance, shell/control-plane, agent, evaluation, reliability, build-control code, historical research lineage, Jeeves, and selected legacy backend/GameForge AI recovery surfaces into one governed file tree without breaking existing imports or fabricating completion.",
@@ -94,7 +94,7 @@
       "source": "skeleton/contracts",
       "destination": "skeleton/ai/runtime/contracts",
       "kind": "tree",
-      "source_git_object_sha": "dd09077ec78cdf3a795a8fe50b631eedc4f32efa",
+      "source_git_object_sha": "8befff343496a1e55c3e37957a1388e346c5e065",
       "role": "canonical operation/conversation/context/formal/localization/compliance/Definition-of-Done contracts with governed AI runtime mirrors, deterministic identity, and fail-closed evidence/maturity boundaries",
       "work_package_refs": [
         "WP-W00",
@@ -131,7 +131,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "fe6794c1288410d5be3aac3566a7fc96c1fc4704",
+      "source_git_object_sha": "39b560ccd2c95a9cf068a65384458026b13dfcf5",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -398,7 +398,7 @@
       "source": "skeleton/vault",
       "destination": "skeleton/ai/runtime/vault",
       "kind": "tree",
-      "source_git_object_sha": "1ed25a02256e6c4a19c1b43ee7a09f416f09be12",
+      "source_git_object_sha": "64635758baba1e322aaed82dda43632c18e45350",
       "role": "data governance lifecycle and audit authority",
       "work_package_refs": [
         "WP-W00",
@@ -602,7 +602,7 @@
       "source": "skeleton/observability",
       "destination": "skeleton/ai/runtime/observability",
       "kind": "tree",
-      "source_git_object_sha": "79627520c9f446bdfa0a3169e6367dd62bc8a5e5",
+      "source_git_object_sha": "28384c9869b660594db07cb2bd762b93bd4aa8c7",
       "role": "AI runtime observability, telemetry, audit, provenance-bound explainability, and executable operations runbook plane",
       "work_package_refs": [
         "WP-W00",
@@ -718,7 +718,7 @@
       "source": "skeleton/eval",
       "destination": "skeleton/ai/evaluation",
       "kind": "tree",
-      "source_git_object_sha": "1ce72e207406970f5b9aebf4594f8c7b36bbb18b",
+      "source_git_object_sha": "875741e3b77ff9e85eac0d653da1a78938c5e0bb",
       "role": "evaluation and evidence support",
       "work_package_refs": [
         "WP-W00",
@@ -989,7 +989,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "a8a894cf954768b8effdad4f39f3e7a07c6ef69a",
+      "source_git_object_sha": "3c3fdaceb4ded0a4a7394ac56d588dab4956ddb6",
       "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -5369,6 +5369,38 @@
       ],
       "move_batch": "B1-core-runtime",
       "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-MULTIMODAL",
+      "source": "skeleton/multimodal",
+      "destination": "skeleton/ai/runtime/multimodal",
+      "kind": "tree",
+      "source_git_object_sha": "749fcccb8e312baf5b50b7bb006984e806bb3e04",
+      "role": "Typed multimodal ingestion, provenance, sanitization, and cross-modal artifact contracts for completed VOL-020 runtime behavior.",
+      "work_package_refs": [
+        "WP-W28",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-020"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve modality provenance and source identity",
+        "treat embedded instructions and metadata as untrusted evidence",
+        "preserve bounded sanitization and ingestion semantics",
+        "prove canonical and governed mirror parity before import inversion"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     }
   ],
   "ci_enforcement": {
@@ -5723,7 +5755,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "176_mapping_current_main_parity_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "177_mapping_current_main_parity_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -6359,8 +6391,8 @@
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
     "note": "TREE-030 canonicalized School under skeleton/learning/school, retained skeleton/school as an explicitly classified compatibility boundary, preserved exact AI School parity, and left acquired.py as the only AIFT-LEARNING overlay.",
-    "current_mapping_count": 176,
-    "audit_scope_status": "validated historical line extended_to_176_requires_full_exact_head_refresh",
+    "current_mapping_count": 177,
+    "audit_scope_status": "validated historical line extended_to_177_requires_full_exact_head_refresh",
     "pending_mapping_ids": [
       "AIFT-V2B-GAMEFORGE-AGENTS",
       "AIFT-V2B-GAMEFORGE-JEEVES",
@@ -6509,12 +6541,12 @@
   },
   "pre_move_readiness": {
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
-    "governed_mapping_count": 176,
+    "governed_mapping_count": 177,
     "pending_assignment_count": 0,
     "retained_outside_ai_tree_count": 86,
     "batch_counts": {
       "B3-owner-sensitive": 8,
-      "B1-core-runtime": 71,
+      "B1-core-runtime": 72,
       "B2-domain-build": 14,
       "B4-research-quarantine": 55,
       "B3-compat-convergence": 28
@@ -6790,6 +6822,46 @@
         }
       ],
       "completed_work_external_policy": "Backend product/API adapters remain external to canonical AI engine ownership; explicit AIFT-V2 compatibility mappings remain narrower exceptions for legacy AI recovery surfaces."
+    },
+    "completed_work_ai_tree_fill_2026_10_05": {
+      "base_main_sha": "909ebf8b316c75cc345c46b9ca1d6d190faf28ee",
+      "refreshed_source_identity_count": 177,
+      "added_mappings": [
+        {
+          "id": "AIFT-MULTIMODAL",
+          "source": "skeleton/multimodal",
+          "destination": "skeleton/ai/runtime/multimodal",
+          "source_tree_sha": "749fcccb8e312baf5b50b7bb006984e806bb3e04",
+          "volume_refs": [
+            "VOL-020"
+          ]
+        }
+      ],
+      "repaired_mappings": [
+        {
+          "id": "AIFT-PERSISTENCE",
+          "files": [
+            "foundation_recovery.py"
+          ]
+        },
+        {
+          "id": "AIFT-VAULT",
+          "files": [
+            "deletion_proof.py"
+          ]
+        }
+      ],
+      "preserved_completed_ownership": [
+        {
+          "id": "AIFT-DOCUMENTATION",
+          "volume_refs": [
+            "VOL-089",
+            "VOL-090"
+          ],
+          "destination": "skeleton/ai/build/documentation"
+        }
+      ],
+      "policy": "Fill completed AI implementation ownership and restore exact staged-mirror parity without source retirement, import inversion, backend/product ownership capture, or completion-signature authority."
     }
   }
 }
