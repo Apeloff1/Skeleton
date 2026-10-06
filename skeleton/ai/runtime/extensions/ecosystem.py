@@ -13,6 +13,7 @@ import hmac
 import json
 import math
 import time
+import threading
 from typing import Any, Callable, Mapping, Protocol, Sequence
 
 
@@ -193,7 +194,8 @@ class ToolRegistry:
         self._definitions: dict[str, ToolDefinition] = {}
         self._executors: dict[str, ToolExecutor] = {}
         self._max_idempotency_records = max_idempotency_records
-        self._idempotency: dict[tuple[str, str], tuple[str, ToolResult]] = {}
+        self._idempotency_lock = threading.RLock()
+        self._idempotency: dict[tuple[str, str], tuple[str, ToolResult | None]] = {}
 
     def register(self, definition: ToolDefinition, executor: ToolExecutor) -> str:
         if definition.digest in self._definitions:
@@ -219,26 +221,44 @@ class ToolRegistry:
             raise ValueError("non-idempotent tool invocation requires idempotency_key")
 
         replay_key: tuple[str, str] | None = None
-        prior: tuple[str, ToolResult] | None = None
         if invocation.idempotency_key is not None:
             replay_key = (invocation.tool_digest, invocation.idempotency_key)
-            prior = self._idempotency.get(replay_key)
-            if prior is not None and prior[0] != invocation.semantic_digest:
-                raise ValueError("idempotency_key is already bound to a different semantic invocation")
-            if prior is None and len(self._idempotency) >= self._max_idempotency_records:
-                raise BufferError("idempotency ledger capacity exhausted")
+            with self._idempotency_lock:
+                prior = self._idempotency.get(replay_key)
+                if prior is not None and prior[0] != invocation.semantic_digest:
+                    raise ValueError("idempotency_key is already bound to a different semantic invocation")
+                if prior is None and len(self._idempotency) >= self._max_idempotency_records:
+                    raise BufferError("idempotency ledger capacity exhausted")
 
         # Authorization is intentionally checked on every replay so an old
         # receipt cannot bypass newly revoked or narrowed authority.
         if not authorize(definition, invocation):
             raise PermissionError("tool invocation denied by external authority")
-        if prior is not None:
-            return prior[1]
+
+        if replay_key is not None:
+            # Claim the effect before execution. If execution later raises or
+            # times out after starting, the None receipt deliberately remains:
+            # a retry is fenced because the external side effect is unknown.
+            with self._idempotency_lock:
+                prior = self._idempotency.get(replay_key)
+                if prior is not None:
+                    if prior[0] != invocation.semantic_digest:
+                        raise ValueError("idempotency_key is already bound to a different semantic invocation")
+                    if prior[1] is None:
+                        raise RuntimeError(
+                            "idempotency_key has an in-flight or indeterminate prior effect"
+                        )
+                    return prior[1]
+                if len(self._idempotency) >= self._max_idempotency_records:
+                    raise BufferError("idempotency ledger capacity exhausted")
+                self._idempotency[replay_key] = (invocation.semantic_digest, None)
 
         started = now()
         output = dict(self._executors[invocation.tool_digest](invocation.arguments))
         finished = now()
         if finished - started > definition.timeout_seconds:
+            # Do not clear a keyed claim here. The executor already ran, so its
+            # external effect cannot safely be assumed absent.
             raise TimeoutError("tool execution exceeded declared timeout")
         result = ToolResult(
             invocation_id=invocation.invocation_id,
@@ -249,7 +269,8 @@ class ToolRegistry:
             finished_at=finished,
         )
         if replay_key is not None:
-            self._idempotency[replay_key] = (invocation.semantic_digest, result)
+            with self._idempotency_lock:
+                self._idempotency[replay_key] = (invocation.semantic_digest, result)
         return result
 
     @property
