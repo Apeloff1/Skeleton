@@ -766,6 +766,7 @@ class ModelDevelopmentRegistry:
         evaluation_refs: Sequence[str],
         governance_candidate: object | None = None,
         governance_decision: object | None = None,
+        governance_ledger: object | None = None,
     ) -> ModelPromotionReceipt:
         receipt = self._receipts.get(_text("run_id", run_id))
         if receipt is None:
@@ -784,10 +785,15 @@ class ModelDevelopmentRegistry:
             raise ModelProgramError("promotion artifact binding is inconsistent")
 
         governance_digest: str | None = None
-        if governance_candidate is not None or governance_decision is not None:
+        if (
+            governance_candidate is not None
+            or governance_decision is not None
+            or governance_ledger is not None
+        ):
             from skeleton.ai.learning.promotion_control import (
                 ImprovementCandidate,
                 PromotionDecision,
+                PromotionLedger,
                 PromotionStatus,
             )
 
@@ -799,9 +805,25 @@ class ModelDevelopmentRegistry:
                 raise TypeError(
                     "governance_decision must be PromotionDecision"
                 )
+            if not isinstance(governance_ledger, PromotionLedger):
+                raise TypeError(
+                    "governance_ledger must be PromotionLedger"
+                )
             if governance_decision.status is not PromotionStatus.PROMOTE:
                 raise ModelProgramError(
                     "governance decision does not authorize promotion"
+                )
+            try:
+                verified = governance_ledger.decision(
+                    governance_decision.decision_id
+                )
+            except Exception as exc:
+                raise ModelProgramError(
+                    "governance decision is not verified by promotion ledger"
+                ) from exc
+            if verified != governance_decision:
+                raise ModelProgramError(
+                    "governance ledger decision mismatch"
                 )
             if governance_decision.candidate_digest != governance_candidate.digest:
                 raise ModelProgramError(
