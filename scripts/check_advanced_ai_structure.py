@@ -378,6 +378,228 @@ def validate_payloads(
         if band.get("band") != f"A{index}":
             errors.append(f"maturity band {index} identity drifted")
 
+    dimensions = _objects(
+        contract.get("maturity_dimensions"),
+        label="maturity_dimensions",
+        errors=errors,
+        minimum=15,
+    )
+    dimension_map = _ids(
+        dimensions,
+        label="maturity_dimensions",
+        errors=errors,
+    )
+    expected_dimensions = {
+        "correctness",
+        "calibration",
+        "safety",
+        "security",
+        "authority_integrity",
+        "provenance",
+        "reliability",
+        "recoverability",
+        "efficiency",
+        "adaptation",
+        "autonomy_control",
+        "human_control",
+        "observability",
+        "governance",
+        "generalization",
+    }
+    if set(dimension_map) != expected_dimensions:
+        errors.append("advanced AI maturity dimension set drifted")
+    for dimension_id, dimension in dimension_map.items():
+        for field in ("description", "measurement"):
+            value = dimension.get(field)
+            if not isinstance(value, str) or not value.strip():
+                errors.append(
+                    f"maturity_dimensions[{dimension_id}].{field} must be non-empty"
+                )
+
+    maturity_requirements = _objects(
+        contract.get("stratum_maturity_requirements"),
+        label="stratum_maturity_requirements",
+        errors=errors,
+        minimum=10,
+    )
+    if len(maturity_requirements) != 10:
+        errors.append("exactly 10 stratum maturity requirement entries are required")
+    seen_maturity_strata: set[str] = set()
+    for index, requirement in enumerate(maturity_requirements, start=1):
+        expected_stratum = f"S{index:02d}"
+        expected_gate = f"L{index * 10:03d}"
+        if requirement.get("stratum") != expected_stratum:
+            errors.append(
+                f"stratum_maturity_requirements[{index - 1}].stratum "
+                f"must be {expected_stratum}"
+            )
+        else:
+            seen_maturity_strata.add(expected_stratum)
+        if requirement.get("gate_level") != expected_gate:
+            errors.append(
+                f"{expected_stratum} maturity gate must be {expected_gate}"
+            )
+        required_dimensions = set(
+            _strings(
+                requirement.get("required_dimensions"),
+                label=f"{expected_stratum}.required_dimensions",
+                errors=errors,
+                minimum=10,
+            )
+        )
+        if required_dimensions - expected_dimensions:
+            errors.append(
+                f"{expected_stratum} references unknown maturity dimensions"
+            )
+        for mandatory in (
+            "correctness",
+            "safety",
+            "security",
+            "authority_integrity",
+            "provenance",
+            "reliability",
+            "recoverability",
+            "efficiency",
+            "observability",
+            "governance",
+        ):
+            if mandatory not in required_dimensions:
+                errors.append(
+                    f"{expected_stratum} missing mandatory maturity dimension {mandatory}"
+                )
+        for field in ("promotion_evidence_rule", "aggregation_rule"):
+            value = requirement.get(field)
+            if not isinstance(value, str) or not value.strip():
+                errors.append(
+                    f"{expected_stratum}.{field} must be non-empty"
+                )
+        _strings(
+            requirement.get("critical_zero_tolerance"),
+            label=f"{expected_stratum}.critical_zero_tolerance",
+            errors=errors,
+            minimum=5,
+        )
+    if seen_maturity_strata != EXPECTED_STRATA:
+        errors.append("stratum maturity coverage must be S01 through S10")
+
+    inheritance = contract.get("evidence_inheritance")
+    if not isinstance(inheritance, dict):
+        errors.append("evidence_inheritance must be an object")
+        inheritance = {}
+    for field in ("rule", "reuse_rule"):
+        value = inheritance.get(field)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(f"evidence_inheritance.{field} must be non-empty")
+    _strings(
+        inheritance.get("immutable_links"),
+        label="evidence_inheritance.immutable_links",
+        errors=errors,
+        minimum=7,
+    )
+    _strings(
+        inheritance.get("invalidators"),
+        label="evidence_inheritance.invalidators",
+        errors=errors,
+        minimum=6,
+    )
+
+    ceiling = contract.get("capability_ceiling_control")
+    if not isinstance(ceiling, dict):
+        errors.append("capability_ceiling_control must be an object")
+        ceiling = {}
+    _strings(
+        ceiling.get("sources"),
+        label="capability_ceiling_control.sources",
+        errors=errors,
+        minimum=6,
+    )
+    _strings(
+        ceiling.get("enforcement_points"),
+        label="capability_ceiling_control.enforcement_points",
+        errors=errors,
+        minimum=6,
+    )
+    for field in ("effective_ceiling", "downgrade_rule", "reporting_rule"):
+        value = ceiling.get(field)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(f"capability_ceiling_control.{field} must be non-empty")
+
+    kill_controls = contract.get("kill_and_suspend_controls")
+    if not isinstance(kill_controls, dict):
+        errors.append("kill_and_suspend_controls must be an object")
+        kill_controls = {}
+    control_levels = _objects(
+        kill_controls.get("levels"),
+        label="kill_and_suspend_controls.levels",
+        errors=errors,
+        minimum=6,
+    )
+    expected_scopes = {
+        "operation",
+        "tenant",
+        "capability",
+        "provider-or-tool",
+        "release",
+        "global-frontier",
+    }
+    observed_scopes = {
+        item.get("scope")
+        for item in control_levels
+        if isinstance(item.get("scope"), str)
+    }
+    if observed_scopes != expected_scopes:
+        errors.append("kill/suspend scope set drifted")
+    for index, item in enumerate(control_levels):
+        value = item.get("effect")
+        if not isinstance(value, str) or not value.strip():
+            errors.append(
+                f"kill_and_suspend_controls.levels[{index}].effect must be non-empty"
+            )
+    _strings(
+        kill_controls.get("invariants"),
+        label="kill_and_suspend_controls.invariants",
+        errors=errors,
+        minimum=5,
+    )
+
+    _strings(
+        contract.get("anti_gaming_rules"),
+        label="anti_gaming_rules",
+        errors=errors,
+        minimum=8,
+    )
+
+    experiment = contract.get("frontier_experiment_boundary")
+    if not isinstance(experiment, dict):
+        errors.append("frontier_experiment_boundary must be an object")
+        experiment = {}
+    for field in ("isolation", "recursion_rule"):
+        value = experiment.get(field)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(f"frontier_experiment_boundary.{field} must be non-empty")
+    _strings(
+        experiment.get("allowed"),
+        label="frontier_experiment_boundary.allowed",
+        errors=errors,
+        minimum=5,
+    )
+    _strings(
+        experiment.get("prohibited_without_external_authority"),
+        label="frontier_experiment_boundary.prohibited_without_external_authority",
+        errors=errors,
+        minimum=6,
+    )
+    promotion_chain = _strings(
+        experiment.get("promotion_chain"),
+        label="frontier_experiment_boundary.promotion_chain",
+        errors=errors,
+        minimum=6,
+    )
+    if promotion_chain and promotion_chain[-1] != "rollback-ready deployment":
+        errors.append(
+            "frontier experiment promotion chain must end in rollback-ready deployment"
+        )
+
     state_machine = contract.get("promotion_state_machine")
     if not isinstance(state_machine, dict):
         errors.append("promotion_state_machine must be an object")
