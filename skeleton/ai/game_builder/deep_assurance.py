@@ -315,10 +315,37 @@ class TransformReceipt:
     config_digest: str
     output_digest: str
     environment_digest: str
+    executor_provenance: EvaluatorProvenance
+    execution_evidence_digest: str
 
     def __post_init__(self) -> None:
         for name in ("tool_digest", "input_digest", "config_digest", "output_digest", "environment_digest"):
             object.__setattr__(self, name, _digest(getattr(self, name), name))
+        if not isinstance(self.executor_provenance, EvaluatorProvenance):
+            raise TypeError("transform executor_provenance must be EvaluatorProvenance")
+        object.__setattr__(
+            self,
+            "execution_evidence_digest",
+            _digest(self.execution_evidence_digest, "execution_evidence_digest"),
+        )
+        if self.execution_evidence_digest not in self.executor_provenance.output_evidence_refs:
+            raise DeepAssuranceError(
+                "transform execution evidence must be referenced by executor authority"
+            )
+
+    @property
+    def authority_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "config_digest": self.config_digest,
+                "environment_digest": self.environment_digest,
+                "execution_evidence_digest": self.execution_evidence_digest,
+                "executor_provenance_digest": self.executor_provenance.digest,
+                "input_digest": self.input_digest,
+                "output_digest": self.output_digest,
+                "tool_digest": self.tool_digest,
+            }
+        )
 
     @property
     def digest(self) -> str:
@@ -328,6 +355,7 @@ class TransformReceipt:
             "config": self.config_digest,
             "output": self.output_digest,
             "environment": self.environment_digest,
+            "authority_binding_digest": self.authority_binding_digest,
         })
 
 
@@ -581,6 +609,8 @@ class ResurrectionPoint:
     artifact_graph_digest: str
     event_chain_digest: str
     rights_snapshot_digest: str
+    checkpoint_authority: EvaluatorProvenance
+    checkpoint_evidence_digest: str
 
     def __post_init__(self) -> None:
         for name in (
@@ -591,6 +621,17 @@ class ResurrectionPoint:
             "rights_snapshot_digest",
         ):
             object.__setattr__(self, name, _digest(getattr(self, name), name))
+        if not isinstance(self.checkpoint_authority, EvaluatorProvenance):
+            raise TypeError("resurrection checkpoint_authority must be EvaluatorProvenance")
+        object.__setattr__(
+            self,
+            "checkpoint_evidence_digest",
+            _digest(self.checkpoint_evidence_digest, "checkpoint_evidence_digest"),
+        )
+        if self.checkpoint_evidence_digest not in self.checkpoint_authority.output_evidence_refs:
+            raise DeepAssuranceError(
+                "resurrection checkpoint evidence must be referenced by checkpoint authority"
+            )
 
     @property
     def digest(self) -> str:
@@ -600,7 +641,48 @@ class ResurrectionPoint:
             "artifacts": self.artifact_graph_digest,
             "events": self.event_chain_digest,
             "rights": self.rights_snapshot_digest,
+            "checkpoint_authority_digest": self.checkpoint_authority.digest,
+            "checkpoint_evidence_digest": self.checkpoint_evidence_digest,
         })
+
+
+@dataclass(frozen=True, slots=True)
+class ResurrectionVerification:
+    checkpoint_digest: str
+    reconstructed_digest: str
+    passed: bool
+    verifier_provenance: EvaluatorProvenance
+    verification_evidence_digest: str
+    proof_digest: str
+
+    def __post_init__(self) -> None:
+        for name in ("checkpoint_digest", "reconstructed_digest", "proof_digest"):
+            object.__setattr__(self, name, _digest(getattr(self, name), name))
+        if not isinstance(self.passed, bool):
+            raise TypeError("resurrection verification passed state must be boolean")
+        if not isinstance(self.verifier_provenance, EvaluatorProvenance):
+            raise TypeError("resurrection verifier_provenance must be EvaluatorProvenance")
+        object.__setattr__(
+            self,
+            "verification_evidence_digest",
+            _digest(self.verification_evidence_digest, "verification_evidence_digest"),
+        )
+        if self.verification_evidence_digest not in self.verifier_provenance.output_evidence_refs:
+            raise DeepAssuranceError(
+                "resurrection verification evidence must be referenced by verifier authority"
+            )
+        expected = canonical_digest(self.proof_payload())
+        if self.proof_digest != expected:
+            raise DeepAssuranceError("resurrection proof digest mismatch")
+
+    def proof_payload(self) -> dict[str, object]:
+        return {
+            "checkpoint_digest": self.checkpoint_digest,
+            "passed": self.passed,
+            "reconstructed_digest": self.reconstructed_digest,
+            "verification_evidence_digest": self.verification_evidence_digest,
+            "verifier_provenance_digest": self.verifier_provenance.digest,
+        }
 
 
 class ProjectResurrectionRegistry:
@@ -613,9 +695,34 @@ class ProjectResurrectionRegistry:
         self._points[point.digest] = point
         return point.digest
 
-    def verify(self, digest: str, reconstructed: ResurrectionPoint) -> bool:
-        original = self._points.get(_text(digest, "digest"))
-        return original == reconstructed
+    def verify(
+        self,
+        digest: str,
+        reconstructed: ResurrectionPoint,
+        *,
+        verifier_provenance: EvaluatorProvenance,
+        verification_evidence_digest: str,
+    ) -> ResurrectionVerification:
+        checkpoint_digest = _text(digest, "digest")
+        original = self._points.get(checkpoint_digest)
+        if original is None:
+            raise DeepAssuranceError("unknown resurrection checkpoint")
+        passed = original == reconstructed
+        payload = {
+            "checkpoint_digest": checkpoint_digest,
+            "passed": passed,
+            "reconstructed_digest": reconstructed.digest,
+            "verification_evidence_digest": verification_evidence_digest,
+            "verifier_provenance_digest": verifier_provenance.digest,
+        }
+        return ResurrectionVerification(
+            checkpoint_digest=checkpoint_digest,
+            reconstructed_digest=reconstructed.digest,
+            passed=passed,
+            verifier_provenance=verifier_provenance,
+            verification_evidence_digest=verification_evidence_digest,
+            proof_digest=canonical_digest(payload),
+        )
 
 
 class EvidenceMerkleLedger:
