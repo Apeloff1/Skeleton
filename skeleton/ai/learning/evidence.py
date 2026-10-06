@@ -267,6 +267,21 @@ class EvidenceProvenance:
         if self.uri is not None:
             object.__setattr__(self, "uri", _text("uri", self.uri, MAX_SOURCE_CHARS))
 
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "source_id": self.source_id,
+            "source_kind": self.source_kind,
+            "observed_at": self.observed_at,
+            "clock_version": self.clock_version,
+            "fingerprint": self.fingerprint,
+            "parent_ids": list(self.parent_ids),
+            "uri": self.uri,
+        }
+
+    @property
+    def digest(self) -> str:
+        return canonical_fingerprint(self.as_dict())
+
 
 @dataclass(frozen=True, slots=True)
 class Observation:
@@ -288,6 +303,18 @@ class Observation:
                 "observations are root facts and must not declare parents",
                 context={"reason": "invalid_parent", "observation_id": self.observation_id},
             )
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "observation_id": self.observation_id,
+            "subject_id": self.subject_id,
+            "payload": dict(self.payload),
+            "provenance": self.provenance.as_dict(),
+        }
+
+    @property
+    def digest(self) -> str:
+        return canonical_fingerprint(self.as_dict())
 
 
 @dataclass(frozen=True, slots=True)
@@ -319,6 +346,20 @@ class Feature:
             ),
         )
         _require_parents(self.provenance, self.observation_ids, record_id=self.feature_id)
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "feature_id": self.feature_id,
+            "subject_id": self.subject_id,
+            "name": self.name,
+            "value": self.value,
+            "observation_ids": list(self.observation_ids),
+            "provenance": self.provenance.as_dict(),
+        }
+
+    @property
+    def digest(self) -> str:
+        return canonical_fingerprint(self.as_dict())
 
 
 @dataclass(frozen=True, slots=True)
@@ -363,6 +404,21 @@ class Hypothesis:
         )
         _require_parents(self.provenance, self.feature_ids, record_id=self.hypothesis_id)
 
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "hypothesis_id": self.hypothesis_id,
+            "subject_id": self.subject_id,
+            "claim": self.claim,
+            "feature_ids": list(self.feature_ids),
+            "confidence": self.confidence,
+            "polarity": self.polarity,
+            "provenance": self.provenance.as_dict(),
+        }
+
+    @property
+    def digest(self) -> str:
+        return canonical_fingerprint(self.as_dict())
+
 
 @dataclass(frozen=True, slots=True)
 class Calibration:
@@ -395,6 +451,20 @@ class Calibration:
                 "last_outcome_id",
                 _text("last_outcome_id", self.last_outcome_id, MAX_ID_CHARS),
             )
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "channel": self.channel,
+            "stated_confidence": self.stated_confidence,
+            "empirical_rate": self.empirical_rate,
+            "sample_count": self.sample_count,
+            "expected_calibration_error": self.expected_calibration_error,
+            "last_outcome_id": self.last_outcome_id,
+        }
+
+    @property
+    def digest(self) -> str:
+        return canonical_fingerprint(self.as_dict())
 
 
 @dataclass(frozen=True, slots=True)
@@ -433,6 +503,21 @@ class Prediction:
         )
         _require_parents(self.provenance, (self.hypothesis_id,), record_id=self.prediction_id)
 
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "prediction_id": self.prediction_id,
+            "hypothesis_id": self.hypothesis_id,
+            "expected": self.expected,
+            "confidence": self.confidence,
+            "channel": self.channel,
+            "calibration": self.calibration.as_dict(),
+            "provenance": self.provenance.as_dict(),
+        }
+
+    @property
+    def digest(self) -> str:
+        return canonical_fingerprint(self.as_dict())
+
 
 @dataclass(frozen=True, slots=True)
 class Outcome:
@@ -460,6 +545,19 @@ class Outcome:
             ),
         )
         _require_parents(self.provenance, (self.prediction_id,), record_id=self.outcome_id)
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "outcome_id": self.outcome_id,
+            "prediction_id": self.prediction_id,
+            "actual": self.actual,
+            "correct": self.correct,
+            "provenance": self.provenance.as_dict(),
+        }
+
+    @property
+    def digest(self) -> str:
+        return canonical_fingerprint(self.as_dict())
 
 
 @dataclass(frozen=True, slots=True)
