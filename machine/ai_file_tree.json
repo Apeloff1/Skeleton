@@ -852,7 +852,7 @@
       "source": "skeleton/security",
       "destination": "skeleton/ai/runtime/security",
       "kind": "tree",
-      "source_git_object_sha": "f09d2f5a4d92eb5ded0f9ddc0014048c55096125",
+      "source_git_object_sha": "44cecc1c1f9b291e053b8c3d1cf48af7f27be628",
       "role": "AI runtime security and activation controls",
       "work_package_refs": [
         "WP-W00",
@@ -911,6 +911,8 @@
         "VOL-176",
         "VOL-177",
         "VOL-205",
+        "VOL-230",
+        "VOL-233",
         "VOL-256",
         "VOL-257",
         "VOL-318",
@@ -7545,7 +7547,10 @@
       "residual_only": true,
       "role": "Residual provider package/export surfaces around more-specific governed provider contract and runtime mappings.",
       "volume_refs": [
-        "VOL-007"
+        "VOL-007",
+        "VOL-227",
+        "VOL-228",
+        "VOL-229"
       ]
     },
     {
@@ -7576,7 +7581,26 @@
         "VOL-022",
         "VOL-097",
         "VOL-119",
-        "VOL-143"
+        "VOL-143",
+        "VOL-231",
+        "VOL-232"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-GOVERNANCE-ROOT",
+      "path": "skeleton/ai/governance",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI-native October 2026 governance cards, health, administration, and engineering-standards evidence surfaces.",
+      "volume_refs": [
+        "VOL-221",
+        "VOL-222",
+        "VOL-223",
+        "VOL-224",
+        "VOL-225",
+        "VOL-226",
+        "VOL-234"
       ]
     }
   ]
