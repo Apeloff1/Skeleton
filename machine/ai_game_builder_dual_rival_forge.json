@@ -289,9 +289,19 @@
     "skeleton/ai/runtime/intelligence/narrative.py",
     "skeleton/ai/simulation/world/scene.py",
     "skeleton/ai/simulation/game/replay.py",
-    "planned:skeleton/ai/game_builder/dual_rival_forge.py",
-    "planned:skeleton/ai/game_builder/canon.py",
-    "planned:skeleton/ai/game_builder/rights.py",
-    "planned:skeleton/ai/game_builder/atomizer.py"
+    "skeleton/ai/game_builder/dual_rival_forge.py",
+    "skeleton/ai/game_builder/canon.py",
+    "skeleton/ai/game_builder/rights.py",
+    "skeleton/ai/game_builder/atomizer.py",
+    "skeleton/ai/game_builder/contracts.py",
+    "skeleton/ai/game_builder/control_plane.py",
+    "skeleton/ai/game_builder/evaluation.py",
+    "skeleton/ai/game_builder/experience_eval.py",
+    "skeleton/ai/game_builder/quality_debt.py",
+    "skeleton/ai/game_builder/resource_governor.py",
+    "skeleton/ai/game_builder/resilience.py",
+    "skeleton/ai/game_builder/deep_assurance.py",
+    "skeleton/ai/game_builder/frontier_assurance.py",
+    "skeleton/ai/game_builder/release.py"
   ]
 }
