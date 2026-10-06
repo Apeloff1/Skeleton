@@ -18,6 +18,7 @@ from skeleton.jeeves.curriculum import Curriculum, CurriculumError, Lesson
 from .evidence import (
     Calibration,
     EvidenceProvenance,
+    EvidenceStateReceipt,
     Feature,
     Hypothesis,
     LearningEvidenceError,
@@ -91,6 +92,7 @@ __all__ = [
     "Curriculum",
     "CurriculumError",
     "EvidenceProvenance",
+    "EvidenceStateReceipt",
     "Feature",
     "Hypothesis",
     "InteractionEvidence",
