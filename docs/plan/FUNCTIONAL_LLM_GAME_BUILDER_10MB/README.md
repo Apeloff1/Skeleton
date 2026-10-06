@@ -4,7 +4,7 @@ This depth overlay expands the canonical Skeleton AI masterplan without adding t
 
 ## Size and authority
 
-- Requested minimum: at least 20,000,000 bytes of implementation-grade masterplan depth (Pass 2 doubles the original floor).
+- Requested minimum: at least 22,953,806 bytes of implementation-grade masterplan depth (Pass 2 doubles the original floor).
 - Shard bytes committed by this overlay: **55,500,299 bytes** across 18 shards.
 - Runtime completion is **not** claimed.
 - Implementation signoff is **false**.
@@ -57,7 +57,7 @@ Provider-native objects, engine-native objects, model confidence, chat history, 
 
 ## Pass-2 doubled deep closure
 
-The original 10 MB path/name is retained for compatibility, but the enforced specification floor is now **20,000,000 bytes** and the current 18-shard payload is **55,500,299 bytes**. Each FLGB plane contains exactly **1,296** Pass-2 deep-closure atoms: 12 registered subsystems × 12 lifecycle stages × 9 adversarial stress profiles. Across 18 planes this is **23,328** additional machine-validated atoms.
+The original 10 MB path/name is retained for compatibility, but the enforced specification floor is now **22,953,806 bytes** and the current 18-shard payload is **55,500,299 bytes**. Each FLGB plane contains exactly **1,296** Pass-2 deep-closure atoms: 12 registered subsystems × 12 lifecycle stages × 9 adversarial stress profiles. Across 18 planes this is **23,328** additional machine-validated atoms.
 
 Every Pass-2 atom binds canonical identity, bounded authority, typed failure, cross-plane evidence, recovery/replay, rollback and independent-verification obligations. This increases specification depth only; implementation_signed, independent_verification_signed, and runtime_completion_claim remain false until exact-head executable evidence exists.
 
