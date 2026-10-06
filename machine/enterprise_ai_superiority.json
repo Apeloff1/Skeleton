@@ -8,7 +8,8 @@
     "construction_manual": "docs/AI_APP_CONSTRUCTION_MANUAL.md",
     "validator": "scripts/check_enterprise_ai_superiority.py",
     "tests": "tests/test_enterprise_ai_superiority.py",
-    "workflow": ".github/workflows/enterprise-ai-superiority.yml"
+    "workflow": ".github/workflows/enterprise-ai-superiority.yml",
+    "enterprise_ai_implementation_notes": "machine/enterprise_ai_implementation_notes_index.json"
   },
   "laws": [
     "implemented is not enterprise-qualified",
@@ -121,7 +122,9 @@
       "all_421_volumes_minimum_grade": "enterprise_qualified",
       "dedicated_profile_minimum_grade": "superior",
       "rule": "The complete enterprise AI claim is valid only when every VOL-000..VOL-420 has current enterprise qualification evidence and every dedicated critical profile additionally proves comparator-backed superiority."
-    }
+    },
+    "implementation_dossier_authority": "machine/enterprise_ai_implementation_notes_index.json",
+    "implementation_dossier_required_for_all_volumes": true
   },
   "grade_model": {
     "states": [
