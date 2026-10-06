@@ -5,7 +5,7 @@ execution remains outside the authority boundary and must enter through governed
 candidate, canon, rights, atom-lineage, and evidence contracts.
 """
 
-from .atomizer import ArtifactAtom, AtomGraph, AtomGraphError
+from .atomizer import ArtifactAtom, AtomGraph, AtomGraphError, AtomSourceBinding
 from .canon import CanonAssertion, CanonError, CanonLedger, CharacterKnowledge
 from .contracts import (
     ArtifactIdentity,
@@ -55,6 +55,7 @@ from .resource_governor import (
 )
 from .resilience import (
     DissentLedger,
+    ImpactCalibrationReceipt,
     ImpactGraph,
     Invariant,
     InvariantRegistry,
@@ -96,6 +97,7 @@ from .deep_assurance import (
     RequirementClosureLedger,
     RequirementProof,
     ResurrectionPoint,
+    ResurrectionVerification,
     TailRiskLab,
     TelemetryAggregate,
     TelemetryFeedbackGate,
@@ -128,6 +130,7 @@ __all__ = [
     "ArtifactIdentity",
     "AtomGraph",
     "AtomGraphError",
+    "AtomSourceBinding",
     "Candidate",
     "CanonAssertion",
     "CanonError",
@@ -186,6 +189,7 @@ __all__ = [
     "ResourceSnapshot",
     "blind_candidate_token",
     "DissentLedger",
+    "ImpactCalibrationReceipt",
     "ImpactGraph",
     "Invariant",
     "InvariantRegistry",
@@ -223,6 +227,7 @@ __all__ = [
     "RequirementClosureLedger",
     "RequirementProof",
     "ResurrectionPoint",
+    "ResurrectionVerification",
     "TailRiskLab",
     "TelemetryAggregate",
     "TelemetryFeedbackGate",
