@@ -275,6 +275,8 @@ def validate(data: dict) -> list[str]:
                     "resource_governor": "skeleton/ai/game_builder/resource_governor.py",
                     "quality_debt": "skeleton/ai/game_builder/quality_debt.py",
                     "integrated_control_plane": "skeleton/ai/game_builder/control_plane.py",
+                    "resilience": "skeleton/ai/game_builder/resilience.py",
+                    "gold_master": "skeleton/ai/game_builder/release.py",
                     "tests": [
                         "tests/test_ai_game_builder_runtime.py",
                         "tests/test_ai_game_builder_overengineering_runtime.py",
