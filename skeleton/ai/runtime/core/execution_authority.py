@@ -426,6 +426,15 @@ class ExecutionAuthorityGuard:
                 existing_receipt,
             )
 
+        if not usage_delta.has_monotonic_charge:
+            return AuthorizationDecision(
+                AuthorizationDisposition.DENY,
+                "authorization requires a non-zero metered resource charge",
+                authority.digest,
+                state.usage,
+                replay_key,
+            )
+
         projected = state.usage.add(usage_delta)
         aggregate_projected = self._aggregate_usage(state).add(usage_delta)
         if not authority.permits(
