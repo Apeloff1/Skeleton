@@ -15,6 +15,41 @@ class FunctionalLLMGameBuilderMasterplanTest(unittest.TestCase):
         self.assertEqual(proc.returncode,0,proc.stdout+"\n"+proc.stderr)
         self.assertIn("runtime completion remains unsigned",proc.stdout)
 
+    def test_frontier_competition_contract_is_fail_closed_and_complete(self):
+        data=json.loads((ROOT/"machine/functional_llm_game_builder_10mb_manifest.json").read_text(encoding="utf-8"))
+        frontier=data["frontier_competition"]
+        self.assertEqual(frontier["status"],"specification-registered-evidence-pending")
+        self.assertFalse(frontier["completion_claim"])
+        self.assertFalse(frontier["implementation_signed"])
+        self.assertFalse(frontier["independent_verification_signed"])
+        self.assertGreaterEqual(frontier["comparator_policy"]["minimum_frontier_comparators"],3)
+        self.assertLessEqual(frontier["comparator_policy"]["maximum_comparator_age_days"],90)
+        self.assertTrue(frontier["comparator_policy"]["strongest_available_comparator_required"])
+        self.assertTrue(frontier["comparator_policy"]["contamination_controls_required"])
+        self.assertEqual(
+            [item["id"] for item in frontier["required_domains"]],
+            [f"FC-{index:02d}" for index in range(1,13)],
+        )
+        self.assertGreaterEqual(sum(1 for item in frontier["required_domains"] if item["critical"]),9)
+        rules=frontier["promotion_rules"]
+        for key in (
+            "no_critical_domain_may_be_hidden_by_aggregate_score",
+            "safety_privacy_authority_rights_and_recovery_are_non_compensable",
+            "game_builder_target_requires_frontier_parity_or_better",
+            "long_horizon_consistency_target_requires_frontier_parity_or_better",
+            "coding_repository_engineering_target_requires_frontier_parity_or_better",
+            "dual_rival_gain_must_be_measured_against_single_pass_baseline",
+            "exact_head_evidence_required",
+            "independent_verification_required",
+        ):
+            self.assertTrue(rules[key])
+        self.assertGreaterEqual(len(frontier["required_evidence"]),10)
+        self.assertGreaterEqual(len(frontier["evaluation_modes"]),8)
+        readme=(ROOT/"docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/README.md").read_text(encoding="utf-8")
+        self.assertIn("## Frontier competition finish line",readme)
+        self.assertIn("at least three fresh frontier comparators",readme)
+        self.assertIn("frontier parity or better",readme)
+
     def test_doubled_byte_ledger_and_pass2_contract(self):
         data=json.loads((ROOT/"machine/functional_llm_game_builder_10mb_manifest.json").read_text(encoding="utf-8"))
         byte_meta=data["bytes"]
