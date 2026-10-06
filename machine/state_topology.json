@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "topology_version": "1.8.0",
+  "topology_version": "1.9.0",
   "architecture_tag": "arch-map/v3.7",
   "status": "active",
   "title": "Skeleton State Authority and Persistence Topology",
-  "purpose": "Define which physical stores exist, which logical state domains they host, which state is authoritative versus derived/scratch/recovery-only, and the migration/backup/rebuild rules for each.",
+  "purpose": "Define exactly one materialized authority for every logical state domain, prohibit ghost/partial authorities, classify derived/scratch/recovery state explicitly, and bind durable state to migration, backup, restore, retention, consistency and release-rehearsal evidence.",
   "architecture_contract": "machine/architecture.json",
   "construction_contract": "machine/ai_app_construction.json",
   "human_manual": "docs/AI_APP_CONSTRUCTION_MANUAL.md",
@@ -17,7 +17,10 @@
     "authoritative durable state has an explicit migration, backup, restore, retention, and consistency contract",
     "recovery snapshots are evidence or recovery aids unless explicitly promoted by contract",
     "one logical state domain has one canonical authority at a time",
-    "mixed-authority stores are transitional and require an explicit open construction gap"
+    "mixed-authority stores are transitional and require an explicit open construction gap",
+    "every declared physical store must host at least one logical state domain; speculative future stores are not architecture",
+    "source-of-truth domains may not use partial, planned, future, unbound or placeholder status",
+    "release qualification for persistence changes requires executable migration compatibility plus rollback/restore evidence"
   ],
   "physical_stores": [
     {
@@ -247,25 +250,6 @@
         "machine/state_backup_policy.json",
         "scripts/state_backup_bundle.py"
       ]
-    },
-    {
-      "id": "verification-evidence-unbound",
-      "technology": "planned durable verification claim/postcondition repository; production binding not yet materialized",
-      "runtime_service": null,
-      "compose_file": null,
-      "volumes": [],
-      "durability": "unbound",
-      "production_role": "future authoritative storage boundary for standalone verification claim/evidence/postcondition records not already embedded in terminal execution results",
-      "network": "in-process repository contract until production adapter is selected",
-      "authentication": "inherits orchestration/tool authority and tenant binding",
-      "backup": "unimplemented until standalone verification repository binding",
-      "restore": "unimplemented until standalone verification repository binding; terminal result verification payloads already remain inside the durable execution result",
-      "migration": "future verification repository schema must preserve verification identity, execution/turn/candidate lineage, evidence references, outcome/reason codes and repair lineage",
-      "evidence": [
-        "machine/ai_app_construction.json",
-        "skeleton/intelligence/verification.py",
-        "skeleton/intelligence/verifier.py"
-      ]
     }
   ],
   "state_domains": [
@@ -344,30 +328,6 @@
       "rebuildable": true,
       "evidence": [
         "backend/core/databases.py"
-      ]
-    },
-    {
-      "id": "engine-mongo-state",
-      "owner_plane": "data-persistence",
-      "physical_store": "mongo",
-      "logical_location": "SKL_MONGO_DATABASE / skeleton",
-      "authority": "authoritative",
-      "source_of_truth": true,
-      "status": "declared-partial",
-      "data_classes": [
-        "internal",
-        "confidential"
-      ],
-      "transaction_scope": "engine repository/document boundary",
-      "consistency": "engine durable writes require Mongo acknowledgement",
-      "retention": "governance controlled",
-      "backup_restore": "required before relying on engine Mongo state in production",
-      "migration": "explicit engine schema/repository migrations",
-      "derived_from": [],
-      "rebuildable": false,
-      "evidence": [
-        "docker-compose.yml",
-        "skeleton/config/settings.py"
       ]
     },
     {
@@ -1122,5 +1082,34 @@
     "tool": "scripts/state_backup_bundle.py",
     "recovery_drill": "scripts/state_recovery_drill.py",
     "workflow": ".github/workflows/state-recovery-drill.yml"
+  },
+  "authority_convergence": {
+    "policy_version": 1,
+    "unreferenced_physical_store_policy": "forbid",
+    "source_of_truth_placeholder_status_policy": "forbid",
+    "forbidden_source_of_truth_status_tokens": [
+      "declared-partial",
+      "partial",
+      "planned",
+      "future",
+      "unbound",
+      "placeholder",
+      "transitional"
+    ],
+    "legacy_owner_rule": "legacy or umbrella state owners must be retired once concrete canonical domains are materialized",
+    "retired_declarations": [
+      {
+        "id": "verification-evidence-unbound",
+        "reason": "standalone future verification store became obsolete after verification-receipt-ledger was bound to engine-cognitive-sqlite",
+        "replacement_domain": "verification-receipt-ledger"
+      },
+      {
+        "id": "engine-mongo-state",
+        "reason": "generic partial engine Mongo umbrella was superseded by concrete Mongo authorities, including canonical-ai-memory-records, without owning an independent logical state domain",
+        "replacement_domain": "canonical-ai-memory-records"
+      }
+    ],
+    "migration_qualification_contract": "machine/state_migration_qualification.json",
+    "migration_qualification_validator": "scripts/check_state_migration_qualification.py"
   }
 }
