@@ -967,8 +967,12 @@ def _gate_body_limits() -> tuple[tuple[str, int], ...]:
 
 
 def create_app() -> Any:
+    from skeleton.kernel.runtime_supervision import RuntimeServiceLifecycle
+
     fastapi = _get_fastapi()
     app = fastapi.FastAPI(title="Skeleton API", version="16.0.0", description="AI game engine / agent orchestration framework")
+    runtime_lifecycle = RuntimeServiceLifecycle("skeleton")
+    app.state.runtime_lifecycle = runtime_lifecycle
     install_error_handlers(app)
 
     from skeleton.api.routes import router
@@ -1024,14 +1028,17 @@ def create_app() -> Any:
         if _canonical_memory_mongo_configured():
             await state.bind_canonical_memory_writer()
         await state.recover_engine_executions()
+        runtime_lifecycle.mark_ready(reason="engine-recovery-complete")
 
     @app.on_event("shutdown")
     async def shutdown():
+        runtime_lifecycle.begin_drain(reason="engine-fastapi-shutdown")
         state = get_state()
         await state.close_canonical_memory_writer()
         await state.close_engine_execution_service()
         state.close_governance_registry()
         state.close_operation_runtime()
+        runtime_lifecycle.mark_stopped(reason="engine-durable-runtimes-drained")
 
     @app.get("/")
     async def root():
