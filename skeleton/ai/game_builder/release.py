@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, Mapping
 
-from .contracts import EffortMode, PromotionReceipt, canonical_digest
+from .contracts import EvaluatorProvenance, EffortMode, PromotionReceipt, canonical_digest
 
 
 class ReleaseArbitrationError(RuntimeError):
@@ -16,14 +16,32 @@ class FamilyQualification:
     family_id: str
     passed: bool
     evidence_digest: str
+    evaluator_provenance: EvaluatorProvenance
 
     def __post_init__(self) -> None:
         if self.family_id not in {f"GB{i:02d}" for i in range(1, 51)}:
             raise ValueError("family_id must be GB01..GB50")
         if not isinstance(self.passed, bool):
             raise TypeError("family qualification passed state must be boolean")
+        if not isinstance(self.evaluator_provenance, EvaluatorProvenance):
+            raise TypeError("family qualification evaluator_provenance must be EvaluatorProvenance")
         if not isinstance(self.evidence_digest, str) or len(self.evidence_digest) < 16:
             raise ValueError("family evidence digest must be stable")
+        if self.evidence_digest not in self.evaluator_provenance.output_evidence_refs:
+            raise ValueError(
+                "family qualification evidence must be referenced by evaluator authority"
+            )
+
+    @property
+    def evidence_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "evaluator_provenance_digest": self.evaluator_provenance.digest,
+                "evidence_digest": self.evidence_digest,
+                "family_id": self.family_id,
+                "passed": self.passed,
+            }
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,14 +49,32 @@ class CriticalGateQualification:
     gate_id: str
     passed: bool
     evidence_digest: str
+    evaluator_provenance: EvaluatorProvenance
 
     def __post_init__(self) -> None:
         if not isinstance(self.gate_id, str) or not self.gate_id.strip():
             raise ValueError("critical gate id must be non-empty")
         if not isinstance(self.passed, bool):
             raise TypeError("critical gate passed state must be boolean")
+        if not isinstance(self.evaluator_provenance, EvaluatorProvenance):
+            raise TypeError("critical gate evaluator_provenance must be EvaluatorProvenance")
         if not isinstance(self.evidence_digest, str) or len(self.evidence_digest) < 16:
             raise ValueError("critical gate evidence digest must be stable")
+        if self.evidence_digest not in self.evaluator_provenance.output_evidence_refs:
+            raise ValueError(
+                "critical gate evidence must be referenced by evaluator authority"
+            )
+
+    @property
+    def evidence_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "evaluator_provenance_digest": self.evaluator_provenance.digest,
+                "evidence_digest": self.evidence_digest,
+                "gate_id": self.gate_id,
+                "passed": self.passed,
+            }
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -374,7 +410,10 @@ class GoldMasterBundle:
         red_team_digest: str,
         forge_binding: ForgeReleaseBinding,
         family_qualifications: Iterable[FamilyQualification],
-        critical_gate_results: Mapping[str, tuple[bool, str]],
+        critical_gate_results: Mapping[
+            str,
+            tuple[bool, str, EvaluatorProvenance],
+        ],
     ) -> "GoldMasterBundle":
         for value in (
             artifact_digest,
@@ -396,18 +435,20 @@ class GoldMasterBundle:
             raw = critical_gate_results[gate_id]
             if (
                 not isinstance(raw, tuple)
-                or len(raw) != 2
+                or len(raw) != 3
                 or not isinstance(raw[0], bool)
                 or not isinstance(raw[1], str)
+                or not isinstance(raw[2], EvaluatorProvenance)
             ):
                 raise ValueError(
-                    "critical gate result must be a (passed, evidence_digest) tuple"
+                    "critical gate result must be a (passed, evidence_digest, evaluator_provenance) tuple"
                 )
             gates.append(
                 CriticalGateQualification(
                     gate_id=str(gate_id),
                     passed=raw[0],
                     evidence_digest=raw[1],
+                    evaluator_provenance=raw[2],
                 )
             )
         if not gates:
@@ -442,6 +483,8 @@ class GoldMasterBundle:
                 "critical_gate_qualifications": [
                     {
                         "evidence_digest": row.evidence_digest,
+                        "evidence_binding_digest": row.evidence_binding_digest,
+                        "evaluator_provenance_digest": row.evaluator_provenance.digest,
                         "gate_id": row.gate_id,
                         "passed": row.passed,
                     }
@@ -451,6 +494,8 @@ class GoldMasterBundle:
                 "family_qualifications": [
                     {
                         "evidence_digest": row.evidence_digest,
+                        "evidence_binding_digest": row.evidence_binding_digest,
+                        "evaluator_provenance_digest": row.evaluator_provenance.digest,
                         "family_id": row.family_id,
                         "passed": row.passed,
                     }
@@ -471,15 +516,42 @@ class TribunalVote:
     accept: bool
     evidence_digest: str
     rationale_digest: str
+    authority_provenance: EvaluatorProvenance
 
     def __post_init__(self) -> None:
         if not isinstance(self.authority_id, str) or not self.authority_id.strip():
             raise ValueError("authority_id must be non-empty")
         if not isinstance(self.accept, bool):
             raise TypeError("tribunal vote accept state must be boolean")
+        if not isinstance(self.authority_provenance, EvaluatorProvenance):
+            raise TypeError("tribunal vote authority_provenance must be EvaluatorProvenance")
+        if self.authority_provenance.evaluator_id != self.authority_id:
+            raise ValueError("tribunal vote authority identity does not match provenance")
         for value in (self.bundle_digest, self.evidence_digest, self.rationale_digest):
             if not isinstance(value, str) or len(value) < 16:
                 raise ValueError("tribunal vote identities must be stable digests")
+        output_evidence = set(self.authority_provenance.output_evidence_refs)
+        if self.evidence_digest not in output_evidence:
+            raise ValueError(
+                "tribunal evidence must be referenced by authority output"
+            )
+        if self.rationale_digest not in output_evidence:
+            raise ValueError(
+                "tribunal rationale must be referenced by authority output"
+            )
+
+    @property
+    def vote_digest(self) -> str:
+        return canonical_digest(
+            {
+                "accept": self.accept,
+                "authority_id": self.authority_id,
+                "authority_provenance_digest": self.authority_provenance.digest,
+                "bundle_digest": self.bundle_digest,
+                "evidence_digest": self.evidence_digest,
+                "rationale_digest": self.rationale_digest,
+            }
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -489,6 +561,25 @@ class GoldMasterVerdict:
     authority_ids: tuple[str, ...]
     vote_digests: tuple[str, ...]
     verdict_digest: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.accepted, bool):
+            raise TypeError("gold-master verdict accepted state must be boolean")
+        if len(self.authority_ids) != len(self.vote_digests):
+            raise ValueError("gold-master verdict votes must cover every authority")
+        if len(self.authority_ids) != len(set(self.authority_ids)):
+            raise ValueError("gold-master verdict authority ids must be unique")
+        expected = canonical_digest(self.decision_payload())
+        if self.verdict_digest != expected:
+            raise ValueError("gold-master verdict digest mismatch")
+
+    def decision_payload(self) -> dict[str, object]:
+        return {
+            "accepted": self.accepted,
+            "authority_ids": list(self.authority_ids),
+            "bundle_digest": self.bundle_digest,
+            "vote_digests": list(self.vote_digests),
+        }
 
 
 class GoldMasterTribunal:
@@ -540,18 +631,7 @@ class GoldMasterTribunal:
         # Terminal release is conservative: quorum is necessary but any dissent
         # within the participating independent panel blocks acceptance.
         accepted = all(vote.accept for vote in votes)
-        vote_digests = tuple(
-            canonical_digest(
-                {
-                    "accept": vote.accept,
-                    "authority_id": vote.authority_id,
-                    "bundle_digest": vote.bundle_digest,
-                    "evidence_digest": vote.evidence_digest,
-                    "rationale_digest": vote.rationale_digest,
-                }
-            )
-            for vote in votes
-        )
+        vote_digests = tuple(vote.vote_digest for vote in votes)
         payload = {
             "accepted": accepted,
             "authority_ids": [vote.authority_id for vote in votes],
