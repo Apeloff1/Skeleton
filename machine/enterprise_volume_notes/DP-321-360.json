@@ -55,12 +55,7 @@
         "evaluations": [
           ".github/workflows/p1-human-control.yml"
         ],
-        "existing_evidence": [
-          "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
-          "github-actions-job:109064006960",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36462413272",
-          "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -290,12 +285,7 @@
         "evaluations": [
           ".github/workflows/p1-human-control.yml"
         ],
-        "existing_evidence": [
-          "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
-          "github-actions-job:109064006960",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36462413272",
-          "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -526,12 +516,7 @@
         "evaluations": [
           ".github/workflows/p1-blast-radius-alignment.yml"
         ],
-        "existing_evidence": [
-          "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
-          "github-actions-job:109064006200",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36462412966",
-          "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -765,16 +750,7 @@
           ".github/workflows/p1-blast-radius-alignment.yml",
           ".github/workflows/p1-regression-corpus.yml"
         ],
-        "existing_evidence": [
-          "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
-          "github-actions-job:109064006200",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36462412966",
-          "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
-          "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
-          "github-actions-job:109096147873",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36471954790",
-          "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -1005,12 +981,7 @@
         "evaluations": [
           ".github/workflows/p1-blast-radius-alignment.yml"
         ],
-        "existing_evidence": [
-          "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
-          "github-actions-job:109064006200",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36462412966",
-          "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {

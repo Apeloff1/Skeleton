@@ -47,9 +47,7 @@
         "evaluations": [
           "planned:appendix reference integrity audit"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/107efcf61a3962ecaa718efbe09c9c02c5478a0d"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -2712,9 +2710,7 @@
         "evaluations": [
           "planned:partial-commit recovery campaign"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/ed7035334243bb60c2b4d231cab4b86ee648ec0c"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -3157,9 +3153,7 @@
         "evaluations": [
           "planned:stale/poisoned cache evaluation"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/ed7035334243bb60c2b4d231cab4b86ee648ec0c"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -3380,9 +3374,7 @@
         "evaluations": [
           "planned:digest migration evaluation"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/ed7035334243bb60c2b4d231cab4b86ee648ec0c"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -3603,9 +3595,7 @@
         "evaluations": [
           "planned:malformed/replayed ingestion corpus"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/573658f64efc0ae8a52e08ddec256f98ce963617"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -3826,9 +3816,7 @@
         "evaluations": [
           "planned:layout/OCR adversarial corpus"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/573658f64efc0ae8a52e08ddec256f98ce963617"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -4049,9 +4037,7 @@
         "evaluations": [
           "planned:deletion propagation evaluation"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/573658f64efc0ae8a52e08ddec256f98ce963617"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -4272,9 +4258,7 @@
         "evaluations": [
           "planned:drift/anomaly benchmark"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/573658f64efc0ae8a52e08ddec256f98ce963617"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -4495,9 +4479,7 @@
         "evaluations": [
           "planned:dataset fingerprint reproducibility"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/573658f64efc0ae8a52e08ddec256f98ce963617"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -4718,9 +4700,7 @@
         "evaluations": [
           "planned:memorization/leakage evaluation"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/573658f64efc0ae8a52e08ddec256f98ce963617"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -4940,9 +4920,7 @@
         "evaluations": [
           "planned:training run replay"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/6e0533d9ec6f12c58035050ca4b4985eef178980"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -5162,9 +5140,7 @@
         "evaluations": [
           "planned:worker-loss/straggler evaluation"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/7ffc19a4597918a344415784ba6327b4d47eff35"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -5384,9 +5360,7 @@
         "evaluations": [
           "planned:resume equivalence evaluation"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/c6ba7e0a5bcf287af3f9e24b080db2a45f647223"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -5606,9 +5580,7 @@
         "evaluations": [
           "planned:scale-up/down recovery campaign"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/f7b7bd5a7b6e7149c472ea6ae4d14a570e1570ed"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -5828,9 +5800,7 @@
         "evaluations": [
           "planned:divergence/stall injection"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/73463dda21f269449db3cdf0fcd340fa682e784d"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -6050,9 +6020,7 @@
         "evaluations": [
           "planned:champion/challenger evaluation"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/59acbe8469b79a5e75a7020c6eeeab36ce583c17"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -6272,9 +6240,7 @@
         "evaluations": [
           "planned:post-training ablation suite"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/4bba10289d27060ff4f78ec487634c815cd114a0"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -6494,9 +6460,7 @@
         "evaluations": [
           "planned:reward-hacking challenge suite"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/03a5ff12967a0d597784112a1208c73718098d5b"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -6716,9 +6680,7 @@
         "evaluations": [
           "planned:curriculum ablation evaluation"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/3be8bb959d510d40fc2b15903e76ac0d087feba1"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -6938,9 +6900,7 @@
         "evaluations": [
           "planned:correlated-error evaluation"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/9c73d6043fc429f3c97bb3b606c2b0984233bd3f"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -7161,10 +7121,7 @@
         "evaluations": [
           "planned:media bomb/adversarial ingest suite"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/445e5f69770dfc21de4a70fc0fdc38ead0dfbb35",
-          "https://github.com/Apeloff1/Skeleton/commit/3c8d9c5c40c243349b183cb2a165b48772eb632e"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -7384,9 +7341,7 @@
         "evaluations": [
           "planned:corrupt/huge image evaluation"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/b6313d50455bc257aaed34e1bc4a667cd2072d47"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -7606,9 +7561,7 @@
         "evaluations": [
           "planned:scan/layout corpus evaluation"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/cdd5d6a03dce3bc58bf9de3190d072142b9be629"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -7828,9 +7781,7 @@
         "evaluations": [
           "planned:codec/corruption evaluation"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/0baa48a61444daf07e5a25b6522ea78b6fd79308"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -8050,9 +8001,7 @@
         "evaluations": [
           "planned:reconnect/barge-in evaluation"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/a13bffae51d00de9bc6c488455d1098e28618e6d"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -8272,9 +8221,7 @@
         "evaluations": [
           "planned:long/corrupt video evaluation"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/ef63f7860d48801a63c3eeb82af83feb0f24b114"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -8494,10 +8441,7 @@
         "evaluations": [
           "planned:cross-modal relevance evaluation"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
-          "machine/ai_p3_deferred_batch_01.json"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -8717,10 +8661,7 @@
         "evaluations": [
           "planned:malformed/tool-timeout evaluation"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
-          "machine/ai_p3_deferred_batch_01.json"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
