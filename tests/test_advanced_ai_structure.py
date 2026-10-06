@@ -166,3 +166,39 @@ def test_independent_verifier_rejects_tampered_receipt(tmp_path: Path) -> None:
     assert result["valid"] is False
     assert "advanced AI independent file digest map mismatch" in result["errors"]
     assert "advanced AI evidence digest mismatch" in result["errors"]
+
+
+
+def test_promotion_state_machine_is_fail_closed() -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_state_machine")
+    payloads = _payloads()
+    payloads["contract"] = copy.deepcopy(payloads["contract"])
+    payloads["contract"]["promotion_state_machine"]["initial"] = "PROMOTED"
+    errors = _validate(checker, payloads)
+    assert "advanced AI promotion initial state must be PLANNED" in errors
+
+
+def test_cross_stratum_bridge_cannot_skip_forward() -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_bridge")
+    payloads = _payloads()
+    payloads["contract"] = copy.deepcopy(payloads["contract"])
+    payloads["contract"]["cross_stratum_bridges"][3]["to"] = "S09"
+    errors = _validate(checker, payloads)
+    assert "B04.to must be S05" in errors
+
+
+def test_frontier_activation_profile_cannot_lower_acceptance_ceiling() -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_profile")
+    payloads = _payloads()
+    payloads["contract"] = copy.deepcopy(payloads["contract"])
+    profile = next(
+        item
+        for item in payloads["contract"]["activation_profiles"]
+        if item["id"] == "frontier-governed-system"
+    )
+    profile["target_ceiling"] = "L099"
+    errors = _validate(checker, payloads)
+    assert (
+        "activation profile frontier-governed-system target ceiling must be L100"
+        in errors
+    )
