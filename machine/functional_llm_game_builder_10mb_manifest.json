@@ -673,11 +673,6 @@
   ],
   "deep_closure": {
     "pass_id": "FLGB-DEEP-CLOSURE-PASS-2",
-    "status": "active-specification",
-    "semantics": "depth-only normative closure; does not imply runtime implementation or verification completion",
-    "required_subsystems_per_plane": 12,
-    "required_lifecycle_stages_per_plane": 12,
-    "required_stress_profiles_per_pair": 9,
     "required_atoms_per_plane": 1296,
     "required_atoms_total": 23328,
     "stress_profiles": [
@@ -691,9 +686,7 @@
       "provider or engine failover with identity preservation",
       "reconnect replay attempting duplicate execution"
     ],
-    "atom_heading_pattern": "FLGBX-<plane>-<ordinal>",
     "exact_cartesian_product_required": true,
-    "independent_verification_required": true,
     "runtime_signoff_forbidden_from_specification_alone": true
   },
   "expansion": {
