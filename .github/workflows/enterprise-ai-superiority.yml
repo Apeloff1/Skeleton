@@ -54,6 +54,9 @@ jobs:
       - name: Validate machine authority
         run: python scripts/check_enterprise_ai_superiority.py --json
 
+      - name: Validate canonical AI construction integration
+        run: python scripts/check_ai_app_construction.py --json
+
       - name: Validate October 2026 implementation dossiers
         run: python scripts/check_enterprise_ai_implementation_notes.py --json
 
