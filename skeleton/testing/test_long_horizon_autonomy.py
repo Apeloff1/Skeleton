@@ -463,3 +463,61 @@ def test_source_and_ai_long_horizon_mirror_are_byte_identical() -> None:
     mirror = root / "skeleton/ai/agents/core/long_horizon.py"
 
     assert source.read_bytes() == mirror.read_bytes()
+
+
+def test_restart_does_not_reclaim_paused_operation_without_control_receipt(tmp_path) -> None:
+    scheduler = _scheduler(tmp_path)
+    scheduler.claim_due(now=NOW)
+    scheduler.apply_human_control(
+        _decision(HumanControlAction.PAUSE, next_paused=True),
+        now=NOW + 2.0,
+    )
+
+    restarted = PersistentLongHorizonScheduler(
+        SqliteLongHorizonStore(tmp_path / "long-horizon.sqlite3")
+    )
+    assert restarted.claim_due(now=NOW + 100.0) == ()
+    assert restarted.store.get("op-1").state is LongRunningState.PAUSED
+
+
+def test_restart_preserves_terminal_interrupt_and_never_requeues(tmp_path) -> None:
+    scheduler = _scheduler(tmp_path)
+    scheduler.claim_due(now=NOW)
+    scheduler.apply_human_control(
+        _decision(
+            HumanControlAction.INTERRUPT,
+            observed_at=NOW + 2.0,
+            next_interrupted=True,
+        ),
+        now=NOW + 2.0,
+    )
+
+    restarted = PersistentLongHorizonScheduler(
+        SqliteLongHorizonStore(tmp_path / "long-horizon.sqlite3")
+    )
+    assert restarted.claim_due(now=NOW + 100.0) == ()
+    persisted = restarted.store.get("op-1")
+    assert persisted.state is LongRunningState.INTERRUPTED
+    assert persisted.terminal is True
+
+
+def test_tampered_checkpoint_remains_rejected_after_process_restart(tmp_path) -> None:
+    scheduler = _scheduler(tmp_path)
+    scheduler.claim_due(now=NOW)
+    checkpoint = scheduler.checkpoint(
+        "op-1",
+        {"phase": "durable", "cursor": 9},
+        now=NOW + 1.0,
+    )
+    with sqlite3.connect(tmp_path / "long-horizon.sqlite3") as conn:
+        conn.execute(
+            "UPDATE long_horizon_checkpoint SET payload_json = ? "
+            "WHERE operation_id = ? AND sequence = ?",
+            ('{"phase":"forged","cursor":9}', "op-1", checkpoint.sequence),
+        )
+
+    restarted = PersistentLongHorizonScheduler(
+        SqliteLongHorizonStore(tmp_path / "long-horizon.sqlite3")
+    )
+    with pytest.raises(LongHorizonError, match="digest mismatch"):
+        restarted.store.load_checkpoint("op-1", checkpoint.sequence)
