@@ -1,7 +1,18 @@
 {
   "schema_version": 1,
-  "plan_version": "1.7.0",
+  "plan_version": "1.8.0",
   "status": "active",
+  "competitive_engineering_ladder": {
+    "authority": "machine/competitive_ai_engineering_ladder.json",
+    "human_spec": "docs/architecture/COMPETITIVE_AI_ENGINEERING_LADDER.md",
+    "schema_version": "skeleton.competitive_ai_engineering_ladder.v1",
+    "family_count": 20,
+    "levels_per_family": 10,
+    "total_levels": 200,
+    "scope": "overlay-only; binds to existing VOL-000..VOL-420 ownership",
+    "completion_rule": "Exact-head implementation, tests, adversarial evidence and exit criteria are required; prose alone never completes a level.",
+    "superiority_rule": "Each family level 10 requires Pareto-safe reproducible comparator evidence and independent promotion authority."
+  },
   "architecture_lane": "PR-1904",
   "architecture_branch": "integration/architecture-map-v1",
   "breadth_freeze": {
