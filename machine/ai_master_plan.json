@@ -12854,7 +12854,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Cards reference immutable model/eval versions.",
         "Separate measured facts from qualitative claims."
@@ -12870,11 +12870,11 @@
         "ModelCardEvidence"
       ],
       "implementation_paths": [
-        "docs",
-        "machine"
+        "skeleton/ai/governance/cards.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_model_cards.py"
+        "skeleton/testing/test_model_cards.py",
+        "skeleton/testing/test_engineering_standards_review.py"
       ],
       "evaluations": [
         "planned:model-card evidence audit"
@@ -12885,8 +12885,7 @@
         "missing limitation"
       ],
       "gaps": [
-        "define card schema",
-        "generate from MBOM/evals"
+        "independent exact-head model-card MBOM/evaluation generation validation remains pending"
       ],
       "accountability_id": "ACC-VOL-221",
       "completion_checkbox": false,
@@ -12901,7 +12900,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Cards bind to immutable dataset version/fingerprint.",
         "Document excluded/unknown provenance and sensitive attributes."
@@ -12917,11 +12916,11 @@
         "DatasetCardEvidence"
       ],
       "implementation_paths": [
-        "docs",
-        "datasets"
+        "skeleton/ai/governance/cards.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_dataset_cards.py"
+        "skeleton/testing/test_dataset_cards.py",
+        "skeleton/testing/test_engineering_standards_review.py"
       ],
       "evaluations": [
         "planned:dataset-card completeness audit"
@@ -12932,8 +12931,7 @@
         "card/version mismatch"
       ],
       "gaps": [
-        "define card schema",
-        "generate from dataset registry"
+        "independent exact-head dataset-card registry/lineage validation remains pending"
       ],
       "accountability_id": "ACC-VOL-222",
       "completion_checkbox": false,
@@ -12948,7 +12946,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Cards cannot grant authority; they document governed contracts.",
         "Bind to exact tool version/implementation owner."
@@ -12964,11 +12962,11 @@
         "ToolCardEvidence"
       ],
       "implementation_paths": [
-        "docs",
-        "skeleton/ai"
+        "skeleton/ai/governance/cards.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_tool_cards.py"
+        "skeleton/testing/test_tool_cards.py",
+        "skeleton/testing/test_engineering_standards_review.py"
       ],
       "evaluations": [
         "planned:tool-card contract parity"
@@ -12979,8 +12977,7 @@
         "stale authority claim"
       ],
       "gaps": [
-        "generate from ToolDefinition",
-        "bind security review"
+        "independent exact-head tool-card definition/security-review validation remains pending"
       ],
       "accountability_id": "ACC-VOL-223",
       "completion_checkbox": false,
@@ -12995,7 +12992,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Bind card to agent definition/version and evaluation evidence.",
         "Clearly distinguish default authority from optional delegated grants."
@@ -13011,11 +13008,11 @@
         "AgentCardEvidence"
       ],
       "implementation_paths": [
-        "docs",
-        "skeleton/ai/agents"
+        "skeleton/ai/governance/cards.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_agent_cards.py"
+        "skeleton/testing/test_agent_cards.py",
+        "skeleton/testing/test_engineering_standards_review.py"
       ],
       "evaluations": [
         "planned:card/agent authority parity"
@@ -13026,8 +13023,7 @@
         "grant ambiguity"
       ],
       "gaps": [
-        "generate from agent registry",
-        "bind performance evidence"
+        "independent exact-head agent-card registry/performance/control validation remains pending"
       ],
       "accountability_id": "ACC-VOL-224",
       "completion_checkbox": false,
@@ -13042,7 +13038,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Show dimensions and raw blocker states, not only aggregate score.",
         "Bind observations to time/version/environment."
@@ -13058,11 +13054,11 @@
         "HealthBlocker"
       ],
       "implementation_paths": [
-        "skeleton/observability",
-        "machine"
+        "skeleton/ai/governance/health.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_component_health_scorecard.py"
+        "skeleton/testing/test_component_health_scorecard.py",
+        "skeleton/testing/test_engineering_standards_review.py"
       ],
       "evaluations": [
         "planned:blocker masking test"
@@ -13073,8 +13069,7 @@
         "stale health"
       ],
       "gaps": [
-        "define dimensions",
-        "bind dashboard to evidence sources"
+        "independent exact-head component-health evidence-source validation remains pending"
       ],
       "accountability_id": "ACC-VOL-225",
       "completion_checkbox": false,
@@ -13089,7 +13084,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Differentiate direct/transitive/build/runtime dependencies.",
         "Require risk disposition for unmaintained or vulnerable critical packages."
@@ -13105,11 +13100,11 @@
         "UpgradePlan"
       ],
       "implementation_paths": [
-        "scripts",
-        "machine"
+        "skeleton/ai/governance/health.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_dependency_health.py"
+        "skeleton/testing/test_dependency_health.py",
+        "skeleton/testing/test_engineering_standards_review.py"
       ],
       "evaluations": [
         "planned:stale/vulnerable dependency audit"
@@ -13120,8 +13115,7 @@
         "upgrade breaks compatibility"
       ],
       "gaps": [
-        "connect SBOM to health",
-        "bind findings to backlog"
+        "independent exact-head SBOM/dependency-backlog validation remains pending"
       ],
       "accountability_id": "ACC-VOL-226",
       "completion_checkbox": false,
@@ -13136,7 +13130,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Record provider-specific dependency and criticality.",
         "Maintain tested fallback or explicit no-fallback disposition."
@@ -13152,11 +13146,11 @@
         "ProviderExitPlan"
       ],
       "implementation_paths": [
-        "machine",
-        "skeleton/ai/providers"
+        "skeleton/ai/providers/provider_risk.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_provider_risk.py"
+        "skeleton/testing/test_provider_risk.py",
+        "skeleton/testing/test_engineering_standards_review.py"
       ],
       "evaluations": [
         "planned:provider-loss scenario"
@@ -13167,8 +13161,7 @@
         "fallback violates privacy"
       ],
       "gaps": [
-        "map provider dependencies",
-        "bind to failover"
+        "independent exact-head provider dependency/risk validation remains pending"
       ],
       "accountability_id": "ACC-VOL-227",
       "completion_checkbox": false,
@@ -13183,7 +13176,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Failover requires compatible capability/data-boundary profile.",
         "Unknown external outcome must reconcile before retry to alternate provider."
@@ -13199,11 +13192,11 @@
         "ProviderOutcome"
       ],
       "implementation_paths": [
-        "skeleton/ai/providers",
-        "skeleton/reliability"
+        "skeleton/ai/providers/failover.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_provider_failover.py"
+        "skeleton/testing/test_provider_failover.py",
+        "skeleton/testing/test_engineering_standards_review.py"
       ],
       "evaluations": [
         "planned:provider outage/privacy fallback evaluation"
@@ -13214,8 +13207,7 @@
         "weaker privacy fallback"
       ],
       "gaps": [
-        "define compatibility classes",
-        "bind health to router"
+        "independent exact-head compatibility-safe provider failover validation remains pending"
       ],
       "accountability_id": "ACC-VOL-228",
       "completion_checkbox": false,
@@ -13230,7 +13222,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Never imply remote freshness or capabilities while offline.",
         "Queue/reconcile permitted deferred work with idempotency."
@@ -13246,11 +13238,11 @@
         "SyncReceipt"
       ],
       "implementation_paths": [
-        "skeleton/ai",
-        "desktop"
+        "skeleton/ai/providers/offline_mode.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_offline_mode.py"
+        "skeleton/testing/test_offline_mode.py",
+        "skeleton/testing/test_engineering_standards_review.py"
       ],
       "evaluations": [
         "planned:disconnect/reconnect evaluation"
@@ -13261,8 +13253,7 @@
         "sync conflict"
       ],
       "gaps": [
-        "define offline capability map",
-        "bind local model/storage"
+        "independent exact-head offline capability/model/storage validation remains pending"
       ],
       "accountability_id": "ACC-VOL-229",
       "completion_checkbox": false,
@@ -13277,7 +13268,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Disable external connectors/egress by construction.",
         "Provide signed import/export workflow for packages, updates and audit evidence."
@@ -13293,11 +13284,11 @@
         "TransferBundle"
       ],
       "implementation_paths": [
-        "deploy",
-        "skeleton/security"
+        "skeleton/security/air_gap.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_air_gapped_profile.py"
+        "skeleton/testing/test_air_gapped_profile.py",
+        "skeleton/testing/test_engineering_standards_review.py"
       ],
       "evaluations": [
         "planned:network-denial acceptance"
@@ -13308,8 +13299,7 @@
         "unsigned media import"
       ],
       "gaps": [
-        "define package trust workflow",
-        "materialize air-gap install test"
+        "independent exact-head air-gap package trust/install validation remains pending"
       ],
       "accountability_id": "ACC-VOL-230",
       "completion_checkbox": false,
@@ -13324,7 +13314,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Adapt capability to measured edge resources without changing security guarantees.",
         "Handle intermittent connectivity and local persistence/reconciliation."
@@ -13340,11 +13330,11 @@
         "EdgeSync"
       ],
       "implementation_paths": [
-        "deploy",
-        "skeleton/runtime"
+        "skeleton/ai/runtime/deployment_profiles.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_edge_deployment.py"
+        "skeleton/testing/test_edge_deployment.py",
+        "skeleton/testing/test_engineering_standards_review.py"
       ],
       "evaluations": [
         "planned:low-resource/intermittent network evaluation"
@@ -13355,8 +13345,7 @@
         "stale edge state"
       ],
       "gaps": [
-        "define edge resource tiers",
-        "bind model/router constraints"
+        "independent exact-head edge resource-tier/router validation remains pending"
       ],
       "accountability_id": "ACC-VOL-231",
       "completion_checkbox": false,
@@ -13371,7 +13360,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Separate organization/tenant administration from model authority.",
         "Define supported topologies and operational responsibilities."
@@ -13387,11 +13376,11 @@
         "EnterpriseTopology"
       ],
       "implementation_paths": [
-        "deploy",
-        "skeleton/security"
+        "skeleton/ai/runtime/deployment_profiles.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_enterprise_deployment.py"
+        "skeleton/testing/test_enterprise_deployment.py",
+        "skeleton/testing/test_engineering_standards_review.py"
       ],
       "evaluations": [
         "planned:HA/upgrade enterprise drill"
@@ -13402,8 +13391,7 @@
         "unsupported topology drift"
       ],
       "gaps": [
-        "define reference topologies",
-        "bind enterprise acceptance"
+        "independent exact-head enterprise topology/security acceptance validation remains pending"
       ],
       "accountability_id": "ACC-VOL-232",
       "completion_checkbox": false,
@@ -13418,7 +13406,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Validate issuer/audience/signature and claim mapping fail closed.",
         "Avoid using mutable email/display names as sole durable identity."
@@ -13434,11 +13422,11 @@
         "FederationConfig"
       ],
       "implementation_paths": [
-        "skeleton/security",
-        "backend"
+        "skeleton/security/identity_federation.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_identity_federation.py"
+        "skeleton/testing/test_identity_federation.py",
+        "skeleton/testing/test_engineering_standards_review.py"
       ],
       "evaluations": [
         "planned:issuer/claim confusion evaluation"
@@ -13449,8 +13437,7 @@
         "stale group grant"
       ],
       "gaps": [
-        "define principal mapping",
-        "bind revocation/sessions"
+        "independent exact-head federated principal/session/revocation validation remains pending"
       ],
       "accountability_id": "ACC-VOL-233",
       "completion_checkbox": false,
@@ -13465,7 +13452,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Admin actions require explicit identity/authorization and durable receipts.",
         "Separate operational admin from model-generated actions."
@@ -13481,11 +13468,11 @@
         "AdminReceipt"
       ],
       "implementation_paths": [
-        "backend",
-        "frontend"
+        "skeleton/ai/governance/administration.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_administration_plane.py"
+        "skeleton/testing/test_administration_plane.py",
+        "skeleton/testing/test_engineering_standards_review.py"
       ],
       "evaluations": [
         "planned:privilege escalation evaluation"
@@ -13496,8 +13483,7 @@
         "unaudited change"
       ],
       "gaps": [
-        "define admin capability scopes",
-        "bind break-glass/approval"
+        "independent exact-head admin scope/approval/break-glass validation remains pending"
       ],
       "accountability_id": "ACC-VOL-234",
       "completion_checkbox": false,
