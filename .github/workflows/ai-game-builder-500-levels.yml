@@ -13,6 +13,7 @@ on:
       - "skeleton/ai/game_builder/**"
       - "tests/test_ai_game_builder_runtime.py"
       - "tests/test_ai_game_builder_governance.py"
+      - "tests/test_ai_game_builder_overengineering_runtime.py"
       - "docs/plan/MASTER_PLAN.md"
       - "machine/ai_master_plan.json"
       - "scripts/check_ai_game_builder_500_levels.py"
@@ -30,6 +31,7 @@ on:
       - "skeleton/ai/game_builder/**"
       - "tests/test_ai_game_builder_runtime.py"
       - "tests/test_ai_game_builder_governance.py"
+      - "tests/test_ai_game_builder_overengineering_runtime.py"
       - "docs/plan/MASTER_PLAN.md"
       - "machine/ai_master_plan.json"
       - "scripts/check_ai_game_builder_500_levels.py"
@@ -79,6 +81,10 @@ jobs:
           skeleton/ai/game_builder/canon.py
           skeleton/ai/game_builder/rights.py
           skeleton/ai/game_builder/atomizer.py
+          skeleton/ai/game_builder/evaluation.py
+          skeleton/ai/game_builder/resource_governor.py
+          skeleton/ai/game_builder/quality_debt.py
+          skeleton/ai/game_builder/control_plane.py
           tests/test_ai_game_builder_500_levels.py
           tests/test_ai_game_builder_runtime.py
           tests/test_ai_game_builder_governance.py
@@ -95,6 +101,7 @@ jobs:
           tests/test_ai_game_builder_500_levels.py
           tests/test_ai_game_builder_runtime.py
           tests/test_ai_game_builder_governance.py
+          tests/test_ai_game_builder_overengineering_runtime.py
 
       - name: Validate masterplan JSON
         run: python -m json.tool machine/ai_master_plan.json >/dev/null
