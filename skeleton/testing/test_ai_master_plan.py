@@ -406,10 +406,16 @@ def test_master_plan_binds_500_level_ai_game_builder_overlay() -> None:
     overlay = data["ai_game_builder_500_levels"]
     authority = json.loads(checker.GAME_BUILDER.read_text(encoding="utf-8"))
     duel = json.loads(checker.GAME_BUILDER_DUEL.read_text(encoding="utf-8"))
+    over = json.loads(checker.GAME_BUILDER_OVERENGINEERING.read_text(encoding="utf-8"))
 
     assert overlay["authority"] == "machine/ai_game_builder_500_levels.json"
     assert overlay["dual_rival_authority"] == "machine/ai_game_builder_dual_rival_forge.json"
     assert overlay["human_spec"] == "docs/architecture/AI_GAME_BUILDER_500_LEVELS.md"
+    assert overlay["overengineering_authority"] == "machine/ai_game_builder_overengineering.json"
+    assert overlay["overengineering_human_spec"] == "docs/architecture/AI_GAME_BUILDER_OVERENGINEERING.md"
+    assert overlay["overengineering_planes"] == 24
+    assert overlay["runtime_contracts"]["contracts"] == "skeleton/ai/game_builder/contracts.py"
+    assert overlay["runtime_contracts"]["dual_rival_state_machine"] == "skeleton/ai/game_builder/dual_rival_forge.py"
     assert overlay["family_count"] == 50
     assert overlay["levels_per_family"] == 10
     assert overlay["total_levels"] == 500
@@ -425,6 +431,9 @@ def test_master_plan_binds_500_level_ai_game_builder_overlay() -> None:
     assert duel["effort_modes"]["forge_100"]["rounds"] == 100
     assert duel["effort_modes"]["forge_1000"]["rounds"] == 1000
     assert duel["effort_modes"]["forge_10000"]["rounds"] == 10000
+    assert duel["overengineering_authority"] == "machine/ai_game_builder_overengineering.json"
+    assert len(over["planes"]) == 24
+    assert len(over["family_bindings"]) == 50
 
 
 def test_master_plan_rejects_ai_game_builder_topology_drift() -> None:
@@ -432,8 +441,12 @@ def test_master_plan_rejects_ai_game_builder_topology_drift() -> None:
     mutated = json.loads(json.dumps(data))
     mutated["ai_game_builder_500_levels"]["total_levels"] = 499
     mutated["ai_game_builder_500_levels"]["effort_modes"]["forge_10000"] = 9999
+    mutated["ai_game_builder_500_levels"]["overengineering_planes"] = 23
+    mutated["ai_game_builder_500_levels"]["runtime_contracts"]["contracts"] = "wrong.py"
 
     errors = checker.validate(mutated)
 
     assert "AI game builder total_levels must equal 500" in errors
     assert "AI game builder effort modes must equal 100/1000/10000" in errors
+    assert "AI game builder overengineering_planes must equal 24" in errors
+    assert "AI game builder runtime contract binding drifted" in errors
