@@ -159,6 +159,20 @@ class CodeSearchIndexTests(unittest.TestCase):
             with self.assertRaisesRegex(CodeSearchError, "changed since repository model"):
                 CodeSearchIndex.build(root, model)
 
+    def test_malformed_python_retains_lexical_search(self) -> None:
+        temp, root = self.fixture()
+        with temp:
+            (root / "alpha" / "broken.py").write_text(
+                "def broken(:\nRECOVERY_TOKEN = candidate\n",
+                encoding="utf-8",
+            )
+            model = RepositoryModelBuilder(root).build()
+            index = CodeSearchIndex.build(root, model)
+            hits = index.search("RECOVERY_TOKEN")
+            self.assertTrue(hits)
+            self.assertEqual(hits[0].path, "alpha/broken.py")
+            self.assertEqual(hits[0].match_kind, "reference")
+
     def test_oversized_source_is_explicitly_skipped(self) -> None:
         temp, root = self.fixture()
         with temp:
