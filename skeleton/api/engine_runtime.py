@@ -13,6 +13,11 @@ from skeleton.api.engine_service import (
 )
 from skeleton.contracts.ai_execution import AIExecutionResult
 from skeleton.intelligence.admission_runtime import AdmissionRuntime
+from skeleton.kernel.runtime_supervision import (
+    RuntimeServiceLifecycle,
+    RuntimeSupervisionError,
+    WorkLease,
+)
 from skeleton.intelligence.execution_runtime import (
     CognitiveExecutionRuntime,
     FinalizationBindingHook,
@@ -65,6 +70,7 @@ class EngineExecutionCoordinator:
         tool_runtime: AsyncToolRuntime | None = None,
         verification_hook: VerificationHook | None = None,
         finalization_binding_hook: FinalizationBindingHook | None = None,
+        lifecycle: RuntimeServiceLifecycle | None = None,
     ) -> None:
         if not isinstance(service, EngineExecutionService):
             raise TypeError("service must be EngineExecutionService")
@@ -73,13 +79,22 @@ class EngineExecutionCoordinator:
         self.tool_runtime = tool_runtime or AsyncToolRuntime()
         self.verification_hook = verification_hook
         self.finalization_binding_hook = finalization_binding_hook
+        if lifecycle is not None and not isinstance(
+            lifecycle,
+            RuntimeServiceLifecycle,
+        ):
+            raise TypeError("lifecycle must be RuntimeServiceLifecycle")
+        self.lifecycle = lifecycle
         self._lock = asyncio.Lock()
         self._tasks: dict[str, asyncio.Task[None]] = {}
+        self._lifecycle_leases: dict[asyncio.Task[None], WorkLease] = {}
         self._closed = False
 
     async def ensure_started(
         self,
         command: EngineExecutionCommand,
+        *,
+        allow_starting: bool = False,
     ) -> None:
         if not isinstance(command, EngineExecutionCommand):
             raise TypeError("command must be EngineExecutionCommand")
@@ -95,11 +110,34 @@ class EngineExecutionCoordinator:
             existing = self._tasks.get(execution_id)
             if existing is not None and not existing.done():
                 return
-            task = asyncio.create_task(
-                self._drive(command),
-                name="engine-execution:" + execution_id,
-            )
+            if existing is not None and existing.done():
+                self._task_done(execution_id, existing)
+
+            lease = None
+            if self.lifecycle is not None:
+                try:
+                    lease = self.lifecycle.acquire_work(
+                        "engine-execution:" + execution_id,
+                        allow_starting=allow_starting,
+                    )
+                except RuntimeSupervisionError as exc:
+                    raise EngineExecutionCoordinatorError(
+                        "engine lifecycle denied execution admission"
+                    ) from exc
+
+            try:
+                task = asyncio.create_task(
+                    self._drive(command),
+                    name="engine-execution:" + execution_id,
+                )
+            except BaseException:
+                if lease is not None:
+                    self.lifecycle.release_work(lease)
+                raise
+
             self._tasks[execution_id] = task
+            if lease is not None:
+                self._lifecycle_leases[task] = lease
             task.add_done_callback(
                 lambda completed, eid=execution_id: self._task_done(
                     eid,
@@ -115,6 +153,9 @@ class EngineExecutionCoordinator:
         current = self._tasks.get(execution_id)
         if current is task:
             self._tasks.pop(execution_id, None)
+        lease = self._lifecycle_leases.pop(task, None)
+        if lease is not None and self.lifecycle is not None:
+            self.lifecycle.release_work(lease)
         if task.cancelled():
             return
         # Retrieve the exception so the event loop never reports an unobserved
@@ -194,7 +235,10 @@ class EngineExecutionCoordinator:
                     "submission_command_missing",
                 )
                 continue
-            await self.ensure_started(stored.command)
+            await self.ensure_started(
+                stored.command,
+                allow_starting=True,
+            )
             recovered.append(execution.execution_id)
         return tuple(recovered)
 
