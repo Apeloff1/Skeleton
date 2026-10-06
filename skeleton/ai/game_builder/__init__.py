@@ -19,6 +19,27 @@ from .contracts import (
     canonical_digest,
 )
 from .dual_rival_forge import DualRivalForge, ForgeStateError
+from .control_plane import ControlPlaneError, ControlledStatus, ForgeControlPlane
+from .evaluation import (
+    EvaluationError,
+    EvaluationPanel,
+    JudgeVerdict,
+    PanelDecision,
+    blind_candidate_token,
+)
+from .quality_debt import (
+    DebtItem,
+    DebtSeverity,
+    QualityDebtError,
+    QualityDebtLedger,
+)
+from .resource_governor import (
+    ResourceDelta,
+    ResourceEnvelope,
+    ResourceGovernor,
+    ResourceLimitError,
+    ResourceSnapshot,
+)
 from .rights import (
     IncorporationDecision,
     RightsError,
@@ -57,4 +78,21 @@ __all__ = [
     "Stage",
     "UseKind",
     "canonical_digest",
+    "ControlPlaneError",
+    "ControlledStatus",
+    "DebtItem",
+    "DebtSeverity",
+    "EvaluationError",
+    "EvaluationPanel",
+    "ForgeControlPlane",
+    "JudgeVerdict",
+    "PanelDecision",
+    "QualityDebtError",
+    "QualityDebtLedger",
+    "ResourceDelta",
+    "ResourceEnvelope",
+    "ResourceGovernor",
+    "ResourceLimitError",
+    "ResourceSnapshot",
+    "blind_candidate_token",
 ]
