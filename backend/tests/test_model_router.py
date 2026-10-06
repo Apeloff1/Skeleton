@@ -588,3 +588,35 @@ def test_invalid_routing_evidence_constraints_are_rejected():
 
     with pytest.raises(ValueError, match="receipt_capable"):
         _endpoint("bad-receipt", receipt_capable="yes")
+
+
+def test_governance_and_turn_budget_compose_as_hard_constraints():
+    context = _governance_context("confidential")
+    budget = ExecutionBudget(
+        max_wall_seconds=2.5,
+        max_input_tokens=8000,
+        max_output_tokens=400,
+        max_model_calls=3,
+        max_tool_calls=4,
+        max_agent_depth=1,
+        max_parallel_workers=1,
+        max_retrieval_queries=2,
+        max_external_writes=0,
+        max_cost_usd=0.02,
+    )
+
+    request = RouteRequest.from_governance_context(
+        "analysis",
+        context,
+        budget=budget,
+        context_tokens=1200,
+        expected_output_tokens=1000,
+        require_provider_receipt=True,
+    )
+
+    assert request.privacy is PrivacyLevel.SENSITIVE
+    assert request.expected_output_tokens == 400
+    assert request.cost_budget == 0.02
+    assert request.latency_budget_ms == 2500.0
+    assert request.require_provider_receipt is True
+    assert request.governance_record_ids == ("context-record",)
