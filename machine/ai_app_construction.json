@@ -11,7 +11,7 @@
   "provider_bootstrap": {
     "mandatory": true,
     "mode": "fail_closed",
-    "rule": "Every AI development agent and every credential-bearing AI provider activation must load the active architecture, construction, capability-interface, state-topology, typed-schema, concrete-capability, implementation-handoff, closure-evidence, and human-manual contracts before changing or serving the system.",
+    "rule": "Every AI development agent and credential-bearing AI provider activation must load the active architecture, construction, capability-interface, state-topology, typed-schema, concrete-capability, implementation-handoff, closure-evidence, October-2026 enterprise-superiority, enterprise-implementation-dossier, and human-manual authorities before changing or serving the system.",
     "must_read": [
       "machine/manifest.json",
       "machine/architecture.json",
@@ -22,6 +22,8 @@
       "machine/ai_capabilities.json",
       "machine/ai_implementation_handoff.json",
       "machine/ai_closure_evidence.json",
+      "machine/enterprise_ai_superiority.json",
+      "machine/enterprise_ai_implementation_notes_index.json",
       "docs/AI_APP_CONSTRUCTION_MANUAL.md"
     ],
     "development_provider_entrypoints": [
