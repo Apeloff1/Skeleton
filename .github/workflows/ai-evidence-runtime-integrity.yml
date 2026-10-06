@@ -13,12 +13,16 @@ on:
       - "skeleton/learning/__init__.py"
       - "skeleton/ai/learning/school/decision_ledger.py"
       - "skeleton/learning/school/decision_ledger.py"
+      - "skeleton/school/decision_ledger.py"
       - "skeleton/ai/learning/school/runtime_replay.py"
       - "skeleton/learning/school/runtime_replay.py"
+      - "skeleton/school/runtime_replay.py"
       - "skeleton/ai/learning/school/runtime_capsule.py"
       - "skeleton/learning/school/runtime_capsule.py"
+      - "skeleton/school/runtime_capsule.py"
       - "skeleton/ai/learning/school/runtime_attestation.py"
       - "skeleton/learning/school/runtime_attestation.py"
+      - "skeleton/school/runtime_attestation.py"
       - "skeleton/testing/test_learning_audit_chain.py"
       - "skeleton/testing/test_learning_evidence.py"
       - "tests/test_runtime_replay.py"
@@ -41,12 +45,16 @@ on:
       - "skeleton/learning/__init__.py"
       - "skeleton/ai/learning/school/decision_ledger.py"
       - "skeleton/learning/school/decision_ledger.py"
+      - "skeleton/school/decision_ledger.py"
       - "skeleton/ai/learning/school/runtime_replay.py"
       - "skeleton/learning/school/runtime_replay.py"
+      - "skeleton/school/runtime_replay.py"
       - "skeleton/ai/learning/school/runtime_capsule.py"
       - "skeleton/learning/school/runtime_capsule.py"
+      - "skeleton/school/runtime_capsule.py"
       - "skeleton/ai/learning/school/runtime_attestation.py"
       - "skeleton/learning/school/runtime_attestation.py"
+      - "skeleton/school/runtime_attestation.py"
       - "skeleton/testing/test_learning_audit_chain.py"
       - "skeleton/testing/test_learning_evidence.py"
       - "tests/test_runtime_replay.py"
@@ -114,12 +122,16 @@ jobs:
           skeleton/learning/evidence.py
           skeleton/ai/learning/school/decision_ledger.py
           skeleton/learning/school/decision_ledger.py
+          skeleton/school/decision_ledger.py
           skeleton/ai/learning/school/runtime_replay.py
           skeleton/learning/school/runtime_replay.py
+          skeleton/school/runtime_replay.py
           skeleton/ai/learning/school/runtime_capsule.py
           skeleton/learning/school/runtime_capsule.py
+          skeleton/school/runtime_capsule.py
           skeleton/ai/learning/school/runtime_attestation.py
           skeleton/learning/school/runtime_attestation.py
+          skeleton/school/runtime_attestation.py
           tests/test_ai_evidence_runtime_attestation_integrity.py
 
       - name: Verify canonical AI namespace parity
@@ -127,19 +139,58 @@ jobs:
           python - <<'PY'
           from pathlib import Path
 
-          pairs = (
+          exact_pairs = (
               ("skeleton/ai/learning/audit_chain.py", "skeleton/learning/audit_chain.py"),
               ("skeleton/ai/learning/evidence.py", "skeleton/learning/evidence.py"),
-              ("skeleton/ai/learning/school/decision_ledger.py", "skeleton/learning/school/decision_ledger.py"),
-              ("skeleton/ai/learning/school/runtime_replay.py", "skeleton/learning/school/runtime_replay.py"),
-              ("skeleton/ai/learning/school/runtime_capsule.py", "skeleton/learning/school/runtime_capsule.py"),
-              ("skeleton/ai/learning/school/runtime_attestation.py", "skeleton/learning/school/runtime_attestation.py"),
           )
-          for canonical, compatibility in pairs:
+          for canonical, compatibility in exact_pairs:
               left = Path(canonical).read_bytes()
               right = Path(compatibility).read_bytes()
               assert left == right, f"namespace drift: {canonical} != {compatibility}"
-              print("namespace parity", canonical, len(left), "bytes")
+              print("exact namespace parity", canonical, len(left), "bytes")
+
+          school_groups = (
+              (
+                  "skeleton/ai/learning/school/decision_ledger.py",
+                  "skeleton/learning/school/decision_ledger.py",
+                  "skeleton/school/decision_ledger.py",
+              ),
+              (
+                  "skeleton/ai/learning/school/runtime_replay.py",
+                  "skeleton/learning/school/runtime_replay.py",
+                  "skeleton/school/runtime_replay.py",
+              ),
+              (
+                  "skeleton/ai/learning/school/runtime_capsule.py",
+                  "skeleton/learning/school/runtime_capsule.py",
+                  "skeleton/school/runtime_capsule.py",
+              ),
+              (
+                  "skeleton/ai/learning/school/runtime_attestation.py",
+                  "skeleton/learning/school/runtime_attestation.py",
+                  "skeleton/school/runtime_attestation.py",
+              ),
+          )
+
+          prefixes = (
+              "skeleton.ai.learning.school.",
+              "skeleton.learning.school.",
+              "skeleton.school.",
+          )
+
+          def normalized(path: str) -> str:
+              text = Path(path).read_text()
+              for prefix in prefixes:
+                  text = text.replace(prefix, "SKELETON_SCHOOL_NAMESPACE.")
+              return text
+
+          for group in school_groups:
+              baseline = normalized(group[0])
+              for candidate in group[1:]:
+                  assert normalized(candidate) == baseline, (
+                      f"normalized namespace drift: {group[0]} != {candidate}"
+                  )
+              print("normalized school namespace parity", group[0])
           PY
 
       - name: Run existing and adversarial evidence-runtime regressions
