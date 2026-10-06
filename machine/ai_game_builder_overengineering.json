@@ -1263,8 +1263,8 @@
     "rights_clean_room": "skeleton/ai/game_builder/rights.py",
     "pixel_to_project_lineage": "skeleton/ai/game_builder/atomizer.py",
     "regression_tests": [
-      "skeleton/testing/test_ai_game_builder_contracts.py",
-      "skeleton/testing/test_ai_game_builder_governance.py"
+      "tests/test_ai_game_builder_runtime.py",
+      "tests/test_ai_game_builder_governance.py"
     ]
   }
 }
