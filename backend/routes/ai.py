@@ -43,6 +43,10 @@ from skeleton.contracts.conversation import ConversationAuthorType, Conversation
 from skeleton.context.compiler import ContextCompiler
 from skeleton.context.instruction_policy import InstructionPolicy
 from skeleton.context.sources import artifact_segment, conversation_message_segment
+from skeleton.ai.assistant.response_acceptance import (
+    LiveResponseAcceptancePolicy,
+    evaluate_live_response_acceptance,
+)
 from skeleton.ai.assistant.streaming import (
     ChatStreamError,
     project_turn_page,
@@ -203,6 +207,13 @@ CHAT_CONTEXT_BUDGET = ContextBudget(
     max_segment_tokens=40_000,
     max_artifact_tokens=16_000,
     max_tool_result_tokens=16_000,
+)
+
+CHAT_LIVE_RESPONSE_ACCEPTANCE_POLICY = LiveResponseAcceptancePolicy(
+    policy_id="backend.ai.chat.live-response/v1",
+    require_provider_receipt=True,
+    max_output_utf8_bytes=2_000_000,
+    max_receipt_refs=64,
 )
 
 
@@ -1314,6 +1325,7 @@ async def ai_chat(
         await _release_chat_turn_execution(turn_lease)
         raise _chat_error(exc) from exc
 
+    response_acceptance = None
     if engine_client is not None:
         engine_started = time.monotonic()
         try:
@@ -1511,6 +1523,7 @@ async def ai_chat(
             "model": "engine-routed",
             "provider_request_id": None,
             "latency_ms": (time.monotonic() - engine_started) * 1000.0,
+            "engine_operation_id": engine_result.operation_id,
             "engine_execution_id": engine_result.execution_id,
             "engine_verification": engine_result.verification,
             "engine_evidence_refs": list(
@@ -1572,6 +1585,99 @@ async def ai_chat(
             "timestamp": _utcnow(),
         }
 
+    if engine_client is not None:
+        response_acceptance = evaluate_live_response_acceptance(
+            operation_id=operation_id,
+            observed_operation_id=result.get("engine_operation_id"),
+            expected_execution_id=execution_id,
+            observed_execution_id=result.get("engine_execution_id"),
+            context_digest=context_envelope.context_digest,
+            final_output=result.get("response"),
+            verification=result.get("engine_verification"),
+            provider_receipts=tuple(
+                result.get("engine_provider_receipts") or ()
+            ),
+            tool_receipts=tuple(
+                result.get("engine_tool_receipts") or ()
+            ),
+            evidence_refs=tuple(
+                result.get("engine_evidence_refs") or ()
+            ),
+            policy=CHAT_LIVE_RESPONSE_ACCEPTANCE_POLICY,
+        )
+        if not response_acceptance.accepted:
+            logger.error(
+                "live response acceptance rejected operation=%s execution=%s reasons=%s receipt=%s",
+                operation_id,
+                execution_id,
+                ",".join(response_acceptance.reasons),
+                response_acceptance.digest,
+            )
+            try:
+                chat_turn = await chat_turn_lifecycle.fail(
+                    chat_turn,
+                    tenant_id=tenant_id,
+                    owner_id=owner_id,
+                    reason_code=(
+                        "response-acceptance-rejected:"
+                        + response_acceptance.digest
+                    ),
+                    lease=turn_lease,
+                )
+            except Exception as turn_exc:
+                await _release_chat_turn_execution(turn_lease)
+                raise _chat_error(turn_exc) from turn_exc
+            try:
+                current_thread = await conversation_authority.get_thread(
+                    request.thread_id,
+                    tenant_id=tenant_id,
+                    owner_id=owner_id,
+                )
+                await _commit_chat_terminal_marker(
+                    thread=current_thread,
+                    user_message=user_message,
+                    tenant_id=tenant_id,
+                    owner_id=owner_id,
+                    operation_id=operation_id,
+                    execution_id=execution_id,
+                    terminal_state="failed",
+                    failure_code="response_acceptance_rejected",
+                )
+            except ConversationConflict:
+                pass
+            except Exception:
+                logger.exception(
+                    "failed to close response-rejected chat turn operation=%s execution=%s",
+                    operation_id,
+                    execution_id,
+                )
+            await _release_chat_turn_execution(turn_lease)
+            return {
+                "success": False,
+                "response": (
+                    "The AI response did not satisfy the canonical "
+                    "acceptance policy and was not committed."
+                ),
+                "ai_generated": False,
+                "provider": "skeleton-engine",
+                "model": "engine-routed",
+                "error": "AI response acceptance rejected",
+                "error_code": "response_acceptance_rejected",
+                "operation_id": operation_id,
+                "turn_state": chat_turn.snapshot.state.value,
+                "engine_execution_id": execution_id,
+                "response_acceptance_receipt": (
+                    response_acceptance.artifact_ref
+                ),
+                "response_acceptance_reasons": list(
+                    response_acceptance.reasons
+                ),
+                "thread": thread.as_dict(),
+                "user_message": user_message.as_dict(),
+                "context": context_envelope.binding_dict(),
+                "timestamp": _utcnow(),
+            }
+
     try:
         turn_lease = await chat_turn_lifecycle.renew_execution(
             turn_lease,
@@ -1583,7 +1689,11 @@ async def ai_chat(
             TurnState.FINALIZING,
             tenant_id=tenant_id,
             owner_id=owner_id,
-            reason_code="model-result-verified",
+            reason_code=(
+                "model-result-verified"
+                if response_acceptance is None
+                else "response-accepted:" + response_acceptance.digest
+            ),
             provider_receipt_ref=(
                 provider_receipts[0]
                 if len(provider_receipts) == 1
@@ -1639,8 +1749,13 @@ async def ai_chat(
                 citation_refs=tuple(
                     result.get("engine_evidence_refs") or ()
                 ),
-                artifact_refs=tuple(
-                    result.get("engine_artifact_refs") or ()
+                artifact_refs=(
+                    tuple(result.get("engine_artifact_refs") or ())
+                    + (
+                        ()
+                        if response_acceptance is None
+                        else (response_acceptance.artifact_ref,)
+                    )
                 ),
                 data_class=thread.data_class,
             )
@@ -1670,6 +1785,7 @@ async def ai_chat(
         "provider": result["provider"],
         "model": result["model"],
         "provider_request_id": result.get("provider_request_id"),
+        "engine_operation_id": result.get("engine_operation_id"),
         "engine_execution_id": result.get("engine_execution_id"),
         "engine_verification": result.get("engine_verification"),
         "engine_evidence_refs": result.get("engine_evidence_refs", []),
@@ -1683,6 +1799,11 @@ async def ai_chat(
         "engine_tool_receipts": result.get("engine_tool_receipts", []),
         "engine_memory_refs": result.get("engine_memory_refs", []),
         "engine_artifact_refs": result.get("engine_artifact_refs", []),
+        "response_acceptance_receipt": (
+            None
+            if response_acceptance is None
+            else response_acceptance.artifact_ref
+        ),
         "latency_ms": result.get("latency_ms"),
         "replayed": False,
         "operation_id": operation_id,
@@ -2013,6 +2134,20 @@ async def get_ai_chat_turn(
             detail="AI engine handoff identity mismatch",
         ) from exc
 
+    deferred_response_acceptance = evaluate_live_response_acceptance(
+        operation_id=operation_id,
+        observed_operation_id=engine_result.operation_id,
+        expected_execution_id=execution_id,
+        observed_execution_id=engine_result.execution_id,
+        context_digest=binding.context_digest,
+        final_output=engine_result.final_output,
+        verification=engine_result.verification,
+        provider_receipts=engine_result.provider_receipts,
+        tool_receipts=engine_result.tool_receipts,
+        evidence_refs=engine_result.evidence_refs,
+        policy=CHAT_LIVE_RESPONSE_ACCEPTANCE_POLICY,
+    )
+
     poll_lease = None
     if chat_turn is not None:
         try:
@@ -2039,13 +2174,108 @@ async def get_ai_chat_turn(
                 "engine_execution_id": execution_id,
                 "timestamp": _utcnow(),
             }
+    if not deferred_response_acceptance.accepted:
+        logger.error(
+            "deferred response acceptance rejected operation=%s execution=%s reasons=%s receipt=%s",
+            operation_id,
+            execution_id,
+            ",".join(deferred_response_acceptance.reasons),
+            deferred_response_acceptance.digest,
+        )
+        if chat_turn is not None and not chat_turn.snapshot.terminal:
+            try:
+                chat_turn = await chat_turn_lifecycle.fail(
+                    chat_turn,
+                    tenant_id=tenant_id,
+                    owner_id=owner_id,
+                    reason_code=(
+                        "response-acceptance-rejected:"
+                        + deferred_response_acceptance.digest
+                    ),
+                    lease=poll_lease,
+                )
+            except Exception as exc:
+                await _release_chat_turn_execution(poll_lease)
+                raise _chat_error(exc) from exc
+        try:
+            latest_thread = await conversation_authority.get_thread(
+                thread_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+            )
+            transcript = await conversation_authority.active_transcript(
+                thread_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+            )
+            existing_marker = _chat_terminal_marker(
+                transcript,
+                user_message.message_id,
+            )
+            if existing_marker is None:
+                latest_thread, existing_marker = (
+                    await _commit_chat_terminal_marker(
+                        thread=latest_thread,
+                        user_message=user_message,
+                        tenant_id=tenant_id,
+                        owner_id=owner_id,
+                        operation_id=operation_id,
+                        execution_id=execution_id,
+                        terminal_state="failed",
+                        failure_code="response_acceptance_rejected",
+                    )
+                )
+        except ConversationConflict:
+            await _release_chat_turn_execution(poll_lease)
+            return await get_ai_chat_turn(
+                thread_id,
+                idempotency_key,
+                user=user,
+            )
+        except Exception as exc:
+            await _release_chat_turn_execution(poll_lease)
+            raise _chat_error(exc) from exc
+
+        await _release_chat_turn_execution(poll_lease)
+        return {
+            "success": False,
+            "accepted": True,
+            "terminal": True,
+            "state": "failed",
+            "failure_code": "response_acceptance_rejected",
+            "response": None,
+            "ai_generated": False,
+            "provider": "skeleton-engine",
+            "model": "engine-routed",
+            "replayed": False,
+            "operation_id": operation_id,
+            "turn_state": (
+                None if chat_turn is None else chat_turn.snapshot.state.value
+            ),
+            "engine_execution_id": execution_id,
+            "response_acceptance_receipt": (
+                deferred_response_acceptance.artifact_ref
+            ),
+            "response_acceptance_reasons": list(
+                deferred_response_acceptance.reasons
+            ),
+            "thread": latest_thread.as_dict(),
+            "user_message": user_message.as_dict(),
+            "terminal_message": existing_marker.as_dict(),
+            "timestamp": _utcnow(),
+        }
+
+    if chat_turn is not None:
         try:
             chat_turn = await chat_turn_lifecycle.advance(
                 chat_turn,
                 TurnState.FINALIZING,
                 tenant_id=tenant_id,
                 owner_id=owner_id,
-                reason_code="deferred-engine-result-verified",
+                reason_code=(
+                    "response-accepted:"
+                    + deferred_response_acceptance.digest
+                ),
                 provider_receipt_ref=(
                     engine_result.provider_receipts[0]
                     if len(engine_result.provider_receipts) == 1
@@ -2054,6 +2284,7 @@ async def get_ai_chat_turn(
                 lease=poll_lease,
             )
         except Exception as exc:
+            await _release_chat_turn_execution(poll_lease)
             raise _chat_error(exc) from exc
 
     ai_result_id = "engine-result:" + execution_id
@@ -2088,7 +2319,10 @@ async def get_ai_chat_turn(
                 provider_receipt_refs=engine_result.provider_receipts,
                 memory_refs=engine_result.memory_refs,
                 citation_refs=engine_result.evidence_refs,
-                artifact_refs=engine_result.artifact_refs,
+                artifact_refs=(
+                    tuple(engine_result.artifact_refs)
+                    + (deferred_response_acceptance.artifact_ref,)
+                ),
                 data_class=latest_thread.data_class,
             )
         )
@@ -2143,6 +2377,7 @@ async def get_ai_chat_turn(
         "turn_state": (
             None if chat_turn is None else chat_turn.snapshot.state.value
         ),
+        "engine_operation_id": engine_result.operation_id,
         "engine_execution_id": execution_id,
         "ai_result_id": ai_result_id,
         "engine_verification": engine_result.verification,
@@ -2154,6 +2389,9 @@ async def get_ai_chat_turn(
         "engine_tool_receipts": list(engine_result.tool_receipts),
         "engine_memory_refs": list(engine_result.memory_refs),
         "engine_artifact_refs": list(engine_result.artifact_refs),
+        "response_acceptance_receipt": (
+            deferred_response_acceptance.artifact_ref
+        ),
         "thread": committed_thread.as_dict(),
         "user_message": user_message.as_dict(),
         "assistant_message": assistant_message.as_dict(),

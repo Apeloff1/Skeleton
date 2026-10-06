@@ -131,10 +131,12 @@ async def test_chat_commits_assistant_only_from_successful_engine_result(
     async def execute(command):
         captured_commands.append(command)
         return SimpleNamespace(
+            operation_id=command.operation.operation_id,
             final_output="Verified terminal answer.",
             execution_id=command.execution_request.execution_id,
             verification="verification:terminal",
             evidence_refs=("evidence:terminal",),
+            provider_receipts=("provider:test:terminal",),
         )
 
     fake_client.wait_for_terminal = wait_for_terminal
@@ -301,10 +303,12 @@ async def test_chat_retry_after_assistant_commit_failure_preserves_engine_identi
         nonlocal terminal_result
         captured_commands.append(command)
         terminal_result = SimpleNamespace(
+            operation_id=command.operation.operation_id,
             final_output="Verified terminal answer.",
             execution_id=command.execution_request.execution_id,
             verification="verification:terminal",
             evidence_refs=("evidence:terminal",),
+            provider_receipts=("provider:test:terminal",),
             tool_receipts=(),
             memory_refs=(),
             artifact_refs=(),

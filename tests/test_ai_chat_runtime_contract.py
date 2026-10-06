@@ -44,7 +44,7 @@ def test_exact_head_evidence_is_independently_rehashed(tmp_path: Path) -> None:
     assert len(result["contract_digest"]) == 64
     assert len(result["receipt_digest"]) == 64
     assert len(result["verifier_digest"]) == 64
-    assert len(result["file_digests"]) == 19
+    assert len(result["file_digests"]) == 21
 
 
 def test_independent_rehasher_rejects_wrong_head(tmp_path: Path) -> None:

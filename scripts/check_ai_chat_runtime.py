@@ -52,6 +52,11 @@ REQUIRED_INVARIANTS = (
     "lease-bound durable event append validates holder epoch digest and expiry at the atomic write boundary",
     "Mongo crash recovery discards a prepared event when its authorizing lease is stale expired or superseded",
     "ownership acquire renew release and takeover mutations produce a digest-chained audit receipt",
+    "live engine output cannot enter canonical transcript state without a response-acceptance receipt bound to exact operation execution context and output",
+    "live response-acceptance receipts hash output and evidence references instead of storing response prose or provider receipt contents",
+    "engine-backed live chat requires an accepted verification identity and at least one canonical provider receipt before transcript commit",
+    "synchronous and deferred engine results must pass the same canonical response-acceptance policy before transcript commit",
+    "live response acceptance binds both engine operation identity and execution identity before transcript promotion",
 )
 
 
@@ -120,6 +125,8 @@ def validate() -> list[str]:
         "ownership",
         "ownership_tests",
         "ownership_repository_tests",
+        "response_acceptance",
+        "response_acceptance_tests",
     }
     if set(files) != expected_roles:
         errors.append("AI chat runtime contract file roles drifted")
@@ -242,6 +249,44 @@ def validate() -> list[str]:
                     + ", ".join(missing_ownership)
                 )
 
+    response_acceptance_path = files.get("response_acceptance")
+    if (
+        isinstance(response_acceptance_path, str)
+        and (ROOT / response_acceptance_path).is_file()
+    ):
+        try:
+            response_acceptance_source = (
+                ROOT / response_acceptance_path
+            ).read_text(encoding="utf-8")
+            ast.parse(response_acceptance_source)
+        except (OSError, UnicodeDecodeError, SyntaxError) as exc:
+            errors.append(
+                f"AI chat response acceptance module is invalid: {exc}"
+            )
+        else:
+            required_response_acceptance = (
+                "LiveResponseAcceptancePolicy",
+                "LiveResponseAcceptanceReceipt",
+                "evaluate_live_response_acceptance",
+                "operation_identity_mismatch",
+                "execution_identity_mismatch",
+                "provider_receipt_missing",
+                "verification_not_accepted",
+                "output_size_exceeded",
+                "response-acceptance-sha256:",
+                "production_authority: bool = False",
+            )
+            missing_response_acceptance = [
+                marker
+                for marker in required_response_acceptance
+                if marker not in response_acceptance_source
+            ]
+            if missing_response_acceptance:
+                errors.append(
+                    "AI chat response acceptance lost fail-closed markers: "
+                    + ", ".join(missing_response_acceptance)
+                )
+
     streaming_path = files.get("streaming")
     if isinstance(streaming_path, str) and (ROOT / streaming_path).is_file():
         try:
@@ -287,6 +332,9 @@ def validate() -> list[str]:
             "require_resume_cursor",
             "terminal_engine_state",
             "\"cancellation_requested\"",
+            "evaluate_live_response_acceptance",
+            "response_acceptance_rejected",
+            "response_acceptance.artifact_ref",
         ),
     }
     for role, markers in live_checks.items():
@@ -316,6 +364,14 @@ def validate() -> list[str]:
         if "retryable=True" in live_route_source:
             errors.append(
                 "live AI chat route must not terminalize transient failures as FAILED_RETRYABLE"
+            )
+        if live_route_source.count("evaluate_live_response_acceptance(") < 2:
+            errors.append(
+                "live AI chat route must gate both synchronous and deferred finalization"
+            )
+        if "deferred_response_acceptance" not in live_route_source:
+            errors.append(
+                "live AI chat deferred response acceptance binding is missing"
             )
 
     required_states = contract.get("required_states")

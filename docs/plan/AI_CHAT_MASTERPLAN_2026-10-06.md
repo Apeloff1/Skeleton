@@ -764,3 +764,42 @@ independent verification pass.
 
 No runtime, manifest, document, or agent may fabricate completion, signatures,
 evidence, or verification status.
+
+
+## Volume — live response acceptance authority
+
+Status: **implemented candidate; exact-head qualification pending**.
+
+This slice closes the gap between "the engine returned a payload" and "the
+payload may become canonical conversation state."
+
+Implemented:
+
+- deterministic live response-acceptance policy and receipt;
+- exact expected/observed execution-identity binding;
+- canonical context-digest binding;
+- non-empty and hard-bounded UTF-8 output;
+- accepted verification identity requirement;
+- canonical provider-receipt requirement for engine-backed product chat;
+- malformed, duplicate, or wrong-prefix provider receipt rejection;
+- content-minimized receipts that retain only hashes of response/evidence refs;
+- transcript binding via \`response-acceptance-sha256:<digest>\`;
+- durable terminalization of rejected output before assistant-message commit;
+- route-level proof that rejected engine output never reaches transcript
+  authority;
+- exact-head structural and independent digest coverage.
+
+The response-acceptance object remains a decision authority only. It cannot
+write transcript state, execute tools, or promote itself to production
+completion evidence. The live route consumes the decision and the canonical
+conversation authority remains the sole message writer.
+
+Remaining integration:
+
+- bind structured claim/evidence receipts from the evidence plane into the live
+  acceptance decision for factual and action-outcome claims;
+- qualify exact-head CI and independent rehashing on this stacked branch;
+- independently verify provider-receipt completeness under real engine
+  backends before signing this volume complete.
+
+No completion signature is asserted by this implementation commit.
