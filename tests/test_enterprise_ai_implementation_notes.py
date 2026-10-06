@@ -81,6 +81,9 @@ def test_current_october_2026_implementation_dossiers_are_complete() -> None:
     assert result["dossier_count"] == 421
     assert result["depth_pass_count"] == 11
     assert result["required_level_count"] == 14
+    assert result["required_section_count"] == 6
+    assert result["deep_level_contract_count"] == 421 * 14
+    assert result["deep_section_instance_count"] == 421 * 14 * 6
     assert result["all_421_volumes_have_deep_implementation_notes"] is True
 
 
