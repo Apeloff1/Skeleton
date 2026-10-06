@@ -9,6 +9,16 @@ on:
       - "skeleton/ai/runtime/native/jvm_protocol.py"
       - "skeleton/native/jvm_registry.py"
       - "skeleton/ai/runtime/native/jvm_registry.py"
+      - "machine/acceleration_policy.json"
+      - "skeleton/native/selection.py"
+      - "skeleton/native/profiling.py"
+      - "scripts/profile_p2_acceleration.py"
+      - "scripts/record_p2_acceleration_profile.py"
+      - "skeleton/memory/jvm_vector_accelerator.py"
+      - "skeleton/ai/runtime/memory/jvm_vector_accelerator.py"
+      - "skeleton/observability/jvm_accelerator.py"
+      - "skeleton/ai/runtime/observability/jvm_accelerator.py"
+      - "skeleton/simulation/physics/jvm_broadphase_accelerator.py"
       - "java-accelerators/observability/AcceleratorMain.java"
       - "java-accelerators/vector/VectorSearchMain.java"
       - "java-accelerators/physics/BroadPhaseMain.java"
@@ -21,6 +31,11 @@ on:
       - "skeleton/ai/runtime/native/jvm_protocol.py"
       - "skeleton/native/jvm_registry.py"
       - "skeleton/ai/runtime/native/jvm_registry.py"
+      - "machine/acceleration_policy.json"
+      - "skeleton/native/selection.py"
+      - "skeleton/native/profiling.py"
+      - "scripts/profile_p2_acceleration.py"
+      - "scripts/record_p2_acceleration_profile.py"
       - "java-accelerators/observability/AcceleratorMain.java"
       - "java-accelerators/vector/VectorSearchMain.java"
       - "java-accelerators/physics/BroadPhaseMain.java"
@@ -57,6 +72,12 @@ jobs:
         with:
           python-version: "3.11.16"
 
+      - name: Set up Java 21
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: "21"
+
       - name: Install focused dependency
         run: >-
           python -m pip install --disable-pip-version-check
@@ -69,12 +90,90 @@ jobs:
           skeleton/ai/runtime/native/jvm_protocol.py
           skeleton/native/jvm_registry.py
           skeleton/ai/runtime/native/jvm_registry.py
+          skeleton/native/selection.py
+          skeleton/native/profiling.py
+          skeleton/memory/jvm_vector_accelerator.py
+          skeleton/ai/runtime/memory/jvm_vector_accelerator.py
+          skeleton/observability/jvm_accelerator.py
+          skeleton/ai/runtime/observability/jvm_accelerator.py
+          skeleton/simulation/physics/jvm_broadphase_accelerator.py
+          skeleton/testing/test_jvm_accelerator_registry.py
           skeleton/testing/test_vol033_jvm_protocol.py
 
       - name: Run JVM qualification regressions
         run: >-
           python -m pytest -q --noconftest
           skeleton/testing/test_vol033_jvm_protocol.py
+          skeleton/testing/test_jvm_accelerator_registry.py
+
+      - name: Profile JVM candidates against reference paths
+        run: |
+          set -euo pipefail
+          mkdir -p .vol033-profile
+          for candidate in ACCEL-JVM-VECTOR ACCEL-JVM-PHYSICS ACCEL-JVM-OBSERVABILITY; do
+            slug="$(printf '%s' "$candidate" | tr '[:upper:]' '[:lower:]')"
+            for run in 1 2; do
+              python scripts/profile_p2_acceleration.py                 --candidate "$candidate"                 --repeat 5                 --evidence-id "vol033-${slug}-run-${run}-${EXPECTED_SHA:0:12}"                 --output ".vol033-profile/${slug}-${run}.json"
+            done
+          done
+
+      - name: Evaluate JVM profile receipts without activation
+        run: |
+          set -euo pipefail
+          cp machine/acceleration_policy.json .vol033-profile/policy.json
+          for receipt in .vol033-profile/accel-jvm-*.json; do
+            python scripts/record_p2_acceleration_profile.py               --receipt "$receipt"               --policy ".vol033-profile/policy.json"               --output ".vol033-profile/policy-next.json"
+            mv .vol033-profile/policy-next.json .vol033-profile/policy.json
+          done
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path(".vol033-profile")
+          for receipt in sorted(root.glob("accel-jvm-*.json")):
+              payload = json.loads(receipt.read_text(encoding="utf-8"))
+              print(
+                  "VOL-033 profile",
+                  payload["candidate_id"],
+                  payload["evidence_id"],
+                  "speedup=",
+                  round(
+                      payload["reference_median_ns"]
+                      / payload["candidate_median_ns"],
+                      4,
+                  ),
+                  "correct=",
+                  payload["correctness_passed"],
+                  "crashes=",
+                  payload["crash_count"],
+                  "timeouts=",
+                  payload["timeout_count"],
+              )
+
+          policy = json.loads(
+              (root / "policy.json").read_text(encoding="utf-8")
+          )
+          for candidate in policy["candidates"]:
+              if candidate.get("plane") != "jvm":
+                  continue
+              decision = candidate.get("selection_decision") or {}
+              print(
+                  "VOL-033 evaluated",
+                  candidate["id"],
+                  "state=",
+                  candidate["state"],
+                  "qualified=",
+                  decision.get("qualified"),
+                  "effective_route=",
+                  decision.get("effective_route"),
+                  "reasons=",
+                  decision.get("reason_codes"),
+              )
+              if candidate.get("automatic_selection") is not False:
+                  raise SystemExit(
+                      f"CI profiling must not activate {candidate['id']}"
+                  )
+          PY
 
       - name: Audit Java headers against canonical protocol registry
         run: |
@@ -125,6 +224,14 @@ jobs:
                   root / "skeleton/native/jvm_registry.py",
                   root / "skeleton/ai/runtime/native/jvm_registry.py",
               ),
+              (
+                  root / "skeleton/memory/jvm_vector_accelerator.py",
+                  root / "skeleton/ai/runtime/memory/jvm_vector_accelerator.py",
+              ),
+              (
+                  root / "skeleton/observability/jvm_accelerator.py",
+                  root / "skeleton/ai/runtime/observability/jvm_accelerator.py",
+              ),
           )
           for source, mirror in pairs:
               if source.read_bytes() != mirror.read_bytes():
@@ -142,6 +249,9 @@ jobs:
               '"request-negotiated-protocol-mismatch"',
               '"jvm-admission-only"',
               "production_authority: bool = False",
+              "get_selected",
+              "profile_selected_unpromoted",
+              "automatic-selection-disabled",
           )
           for token in required:
               if token not in contract:
