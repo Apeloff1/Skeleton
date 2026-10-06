@@ -125,6 +125,8 @@ model authority boundaries.
 - `design_sampling.py` — deterministic Latin-hypercube designs, centered L2 discrepancy and bounded rescaling.
 - `sde.py` — seeded Euler-Maruyama/Milstein scalar SDE paths plus closed-form geometric-Brownian moments.
 - `matrix_frechet.py` — block-exponential Fréchet derivatives with centered finite-difference evidence and condition proxies.
+- `robust_regression.py` — Huber IRLS and Theil-Sen linear-regression references with robust residual evidence.
+- `multiple_testing.py` — Bonferroni, Holm, Benjamini-Hochberg and Benjamini-Yekutieli corrections.
 - `validation.py` — parity evidence against existing optimized runtime kernels.
 
 ## Guarantees
@@ -227,6 +229,8 @@ model authority boundaries.
 - Latin-hypercube design complements canonical Halton sampling and reports spacing/discrepancy evidence deterministically.
 - SDE references use the canonical seeded generator and expose every Brownian increment; no stochastic runtime authority is introduced.
 - Matrix-exponential Fréchet derivatives use the exact block identity and carry an independent centered-difference residual.
+- Robust regression exposes coefficients, weights, robust scale and convergence rather than silently hiding outlier influence.
+- Multiple-testing corrections return adjusted p-values and rejections only; experiment/promotion authority remains outside this layer.
 - `audit_runtime_kernels()` compares optimized runtime softmax, matmul and attention against
   this reference substrate without replacing those kernels.
 

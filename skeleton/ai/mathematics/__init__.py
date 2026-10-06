@@ -414,6 +414,12 @@ from .rank_statistics import (
     rankdata,
     spearman_correlation,
 )
+from .robust_regression import (
+    HuberRegressionReport,
+    TheilSenReport,
+    huber_regression,
+    theil_sen_regression,
+)
 from .robust import (
     HuberLocationReport,
     huber_location,
@@ -518,6 +524,13 @@ from .markov_diagnostics import (
     dobrushin_coefficient,
     mixing_profile,
     total_variation_distance as markov_total_variation_distance,
+)
+from .multiple_testing import (
+    MultipleTestingReport,
+    benjamini_hochberg,
+    benjamini_yekutieli,
+    bonferroni,
+    holm,
 )
 from .matching import AssignmentReport, minimum_cost_assignment
 from .solvers import (
@@ -976,6 +989,10 @@ __all__ = [
     "rank_biserial_correlation",
     "rankdata",
     "spearman_correlation",
+    "HuberRegressionReport",
+    "TheilSenReport",
+    "huber_regression",
+    "theil_sen_regression",
     "HuberLocationReport",
     "huber_location",
     "modified_z_scores",
@@ -1057,6 +1074,11 @@ __all__ = [
     "dobrushin_coefficient",
     "mixing_profile",
     "markov_total_variation_distance",
+    "MultipleTestingReport",
+    "benjamini_hochberg",
+    "benjamini_yekutieli",
+    "bonferroni",
+    "holm",
     "AssignmentReport",
     "minimum_cost_assignment",
     "ConjugateGradientReport",
