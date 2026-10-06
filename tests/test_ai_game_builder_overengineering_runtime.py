@@ -41,6 +41,7 @@ from skeleton.ai.game_builder.contracts import (  # noqa: E402
     ArtifactIdentity,
     Candidate,
     Challenge,
+    EvaluatorProvenance,
     GateResult,
     ProducerProvenance,
     QUALITY_AXES,
@@ -339,6 +340,28 @@ def test_panel_decision_rejects_digest_tampering() -> None:
             max_axis_disagreement_limit=decision.max_axis_disagreement_limit,
             minimum_method_diversity=decision.minimum_method_diversity,
             decision_digest="0" * 64,
+        )
+
+
+def test_direct_judge_verdict_construction_cannot_bypass_provenance() -> None:
+    candidate = _candidate(Rival.A.value, "direct-verdict", 0.5)
+    provenance = _evaluator_provenance(
+        "direct-judge",
+        method_id="sim",
+        evidence_refs=("direct-produced-evidence-0000000000000",),
+    )
+    with pytest.raises(
+        ValueError,
+        match="verdict evidence must be referenced by evaluator execution output",
+    ):
+        JudgeVerdict(
+            evaluator_id="direct-judge",
+            evaluator_provenance=provenance,
+            candidate_digest=candidate.digest,
+            quality=tuple((axis, 0.5) for axis in QUALITY_AXES),
+            confidence=0.9,
+            evidence_digest="direct-substituted-evidence-000000000",
+            method_id="sim",
         )
 
 
