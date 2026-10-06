@@ -150,6 +150,11 @@ on:
       - "skeleton/testing/test_cost_governor_admission_intent_recovery.py"
       - "skeleton/config/settings.py"
       - "machine/state_topology.json"
+      - "machine/state_migration_qualification.json"
+      - "scripts/check_state_migration_qualification.py"
+      - "skeleton/persistence/migration_compatibility.py"
+      - "skeleton/ai/runtime/persistence/migration_compatibility.py"
+      - "skeleton/testing/test_migration_compatibility.py"
       - "machine/ai_app_construction.json"
       - "docker-compose.yml"
       - ".github/workflows/state-recovery-drill.yml"
@@ -209,6 +214,13 @@ jobs:
           python -m pytest -q --noconftest
           skeleton/testing/test_state_recovery_drill.py
           skeleton/testing/test_state_backup_bundle.py
+          skeleton/testing/test_migration_compatibility.py
+
+      - name: Validate topology and migration release qualification
+        run: |
+          python scripts/check_state_topology.py --json
+          python scripts/check_state_migration_qualification.py --json
+          cmp skeleton/persistence/migration_compatibility.py skeleton/ai/runtime/persistence/migration_compatibility.py
 
       - name: Verify durable AI admission recovery contracts
         env:
