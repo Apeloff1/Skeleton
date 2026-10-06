@@ -441,6 +441,18 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
                     raise ImplementationNotesError(
                         f"{human_path} missing {heading}"
                     )
+            for section_heading in (
+                "**Implementation**",
+                "**Acceptance**",
+                "**Design invariants**",
+                "**Failure modes**",
+                "**Telemetry & SLOs**",
+                "**Required evidence**",
+            ):
+                if section_heading not in human_text:
+                    raise ImplementationNotesError(
+                        f"{human_path} missing deep section {section_heading}"
+                    )
             seen_volumes.add(ref)
             dossiers += 1
 
@@ -490,6 +502,11 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         "dossier_count": dossiers,
         "depth_pass_count": len(seen_depth),
         "required_level_count": len(required_levels),
+        "required_section_count": len(required_sections),
+        "deep_level_contract_count": dossiers * len(required_levels),
+        "deep_section_instance_count": (
+            dossiers * len(required_levels) * len(required_sections)
+        ),
         "all_421_volumes_have_deep_implementation_notes": True,
     }
 
