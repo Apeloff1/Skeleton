@@ -1,0 +1,86 @@
+name: ESS-1000 Essential Authority
+
+on:
+  pull_request:
+    branches: [main, codex/masterplan-project-self-improvement-1000]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main, codex/masterplan-essentials-1000]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: essentials-1000-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate ESS-1000 non-compensable essentials
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install focused test dependency
+        run: python -m pip install --disable-pip-version-check --no-input "pytest>=8,<9"
+      - name: Parse machine authorities
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for p in ["machine/essentials_1000.json","machine/essentials_1000_closure_protocol.json","machine/essentials_1000_gap_ledger.json","machine/essentials_1000_priority_policy.json","machine/essentials_1000_execution_frontier.json","machine/project_self_improvement_idle_scheduler.json","machine/ai_master_plan.json"]:
+              d=json.loads(Path(p).read_text(encoding="utf-8"))
+              print(p, d.get("schema_version"), d.get("plan_version",""))
+          PY
+      - name: Compile
+        run: python -m py_compile scripts/check_essentials_1000.py tests/test_essentials_1000.py
+      - name: Validate ESS-1000
+        run: python scripts/check_essentials_1000.py
+      - name: Run ESS-1000 regressions
+        run: python -m pytest -q --noconftest tests/test_essentials_1000.py
+      - name: Validate masterplan registration and parse-index freshness
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, subprocess
+          from pathlib import Path
+          p=Path("machine/ai_master_plan.json")
+          master=json.loads(p.read_text(encoding="utf-8"))
+          idx=json.loads(Path("machine/ai_masterplan_parse_index.json").read_text(encoding="utf-8"))
+          assert master["plan_version"]=="2.4.0"
+          assert master["authority"]["essentials_1000"]=="machine/essentials_1000.json"
+          assert master["authority"]["essentials_1000_validator"]=="scripts/check_essentials_1000.py"
+          assert master["authority"]["essentials_1000_workflow"]==".github/workflows/essentials-1000.yml"
+          assert master["authority"]["essentials_1000_closure_protocol"]=="machine/essentials_1000_closure_protocol.json"
+          assert master["authority"]["essentials_1000_gap_ledger"]=="machine/essentials_1000_gap_ledger.json"
+          assert master["authority"]["essentials_1000_priority_policy"]=="machine/essentials_1000_priority_policy.json"
+          assert master["authority"]["essentials_1000_execution_frontier"]=="machine/essentials_1000_execution_frontier.json"
+          actual=subprocess.check_output(["git","hash-object",str(p)],text=True).strip()
+          assert idx["sources"]["machine/ai_master_plan.json"]["git_blob_sha"]==actual
+          print("masterplan fresh",actual)
+          PY
+      - name: Confirm exact-head identity
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          d=json.loads(Path("machine/essentials_1000.json").read_text(encoding="utf-8"))
+          ledger=json.loads(Path("machine/essentials_1000_gap_ledger.json").read_text(encoding="utf-8"))
+          frontier=json.loads(Path("machine/essentials_1000_execution_frontier.json").read_text(encoding="utf-8"))
+          print("ess-1000","levels=",len(d["levels"]),"strata=",len(d["strata"]),"signed=",d["completion"]["signed_complete"],"ledger_open=",ledger["summary"]["open"],"parallel_lanes=",len(frontier["lanes"]),"head=",os.environ["EXPECTED_SHA"])
+          PY

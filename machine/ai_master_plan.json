@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plan_version": "2.1.0",
+  "plan_version": "2.4.0",
   "status": "active",
   "architecture_lane": "PR-1904",
   "architecture_branch": "integration/architecture-map-v1",
@@ -62,7 +62,15 @@
     "project_self_improvement_epoch_contract": "machine/project_self_improvement_epoch_contract.json",
     "project_self_improvement_idle_scheduler": "machine/project_self_improvement_idle_scheduler.json",
     "project_self_improvement_1000_validator": "scripts/check_project_self_improvement_1000.py",
-    "project_self_improvement_1000_workflow": ".github/workflows/project-self-improvement-1000.yml"
+    "project_self_improvement_1000_workflow": ".github/workflows/project-self-improvement-1000.yml",
+    "essentials_1000": "machine/essentials_1000.json",
+    "essentials_1000_human": "docs/plan/ESSENTIALS_1000.md",
+    "essentials_1000_validator": "scripts/check_essentials_1000.py",
+    "essentials_1000_workflow": ".github/workflows/essentials-1000.yml",
+    "essentials_1000_closure_protocol": "machine/essentials_1000_closure_protocol.json",
+    "essentials_1000_gap_ledger": "machine/essentials_1000_gap_ledger.json",
+    "essentials_1000_priority_policy": "machine/essentials_1000_priority_policy.json",
+    "essentials_1000_execution_frontier": "machine/essentials_1000_execution_frontier.json"
   },
   "laws": [
     "durable governed state is authoritative",
@@ -82,7 +90,14 @@
     "every project instantiates its own PSI-1000 self-improvement state; evidence, maturity and candidates are project-scoped and cannot silently qualify another project",
     "foreground-idle immediately makes bounded mirror-room improvement eligible; new foreground work preempts mirror work and protected foreground resources have absolute priority",
     "mirror-room proposer, challenger and verifier roles may generate and evaluate candidates but cannot self-promote production changes",
-    "self-improvement epochs are finite, budgeted, receipt-backed and rollback-capable; repeated no-gain hypotheses back off instead of forming unbounded loops"
+    "self-improvement epochs are finite, budgeted, receipt-backed and rollback-capable; repeated no-gain hypotheses back off instead of forming unbounded loops",
+    "ESS-1000 defines 1000 non-compensable platform essentials; advanced capability, benchmark gains, model quality or PSI completion cannot erase an unresolved essential",
+    "unresolved or regressed ESS-1000 levels outrank optional PSI polish in the affected domain unless a more severe non-compensable incident elsewhere overrides them",
+    "ESS-1000 completion requires exact implementation evidence and independent verification; documentation, plans and unrelated passing tests are never sufficient",
+    "ESS-1000 closure is revocable: implementation, contract, dependency, configuration, environment, regression, incident, recovery or evidence changes can stale, regress or revoke a previously signed essential and invalidate dependent closure",
+    "ESS-1000 waivers and not-applicable labels cannot mark an essential complete; bounded exceptions remain explicitly incomplete and expire fail-closed",
+    "ESS-1000 execution uses severity hard-ordering before scores; E0 is reserved for active existential incidents/regressions and cannot be assigned merely because an essential is open",
+    "ESS-1000 closure work runs across 99 independent domain lanes with same-lane stage order and a 99-way whole-system finality fan-in"
   ],
   "thematic_parts": [
     {
