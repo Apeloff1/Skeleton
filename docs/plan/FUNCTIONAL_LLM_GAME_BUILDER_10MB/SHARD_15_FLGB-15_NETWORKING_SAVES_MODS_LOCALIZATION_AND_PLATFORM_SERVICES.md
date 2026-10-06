@@ -5023,4 +5023,3 @@ Convert Networking Saves Mods Localization and Platform Services from an archite
 **Cross-plane checks.** Verify editor/runtime/export agreement, deterministic IDs, no orphan resources, bounded resource use, project-scoped authority and stable serialization. Networked or asynchronous paths additionally prove ordering/idempotency semantics.
 
 **Closure.** This atom is planned only. Runtime completion cannot be inferred from plan coverage; it requires implementation_signed plus independent verification on exact head.
-
