@@ -55,6 +55,7 @@ REQUIRED_INVARIANTS = (
     "live engine output cannot enter canonical transcript state without a response-acceptance receipt bound to exact operation execution context and output",
     "live response-acceptance receipts hash output and evidence references instead of storing response prose or provider receipt contents",
     "engine-backed live chat requires an accepted verification identity and at least one canonical provider receipt before transcript commit",
+    "synchronous and deferred engine results must pass the same canonical response-acceptance policy before transcript commit",
 )
 
 
@@ -361,6 +362,14 @@ def validate() -> list[str]:
         if "retryable=True" in live_route_source:
             errors.append(
                 "live AI chat route must not terminalize transient failures as FAILED_RETRYABLE"
+            )
+        if live_route_source.count("evaluate_live_response_acceptance(") < 2:
+            errors.append(
+                "live AI chat route must gate both synchronous and deferred finalization"
+            )
+        if "deferred_response_acceptance" not in live_route_source:
+            errors.append(
+                "live AI chat deferred response acceptance binding is missing"
             )
 
     required_states = contract.get("required_states")
