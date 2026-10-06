@@ -435,11 +435,14 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
             "VOL-004 cannot clear qualification gap before completion signoff"
         )
     implementation_state = binding.get("implementation_state")
-    if implementation_state not in {
-        "implemented_verification_pending",
-        "verified",
-    }:
-        raise RuntimeSupervisionError("VOL-004 implementation_state drifted")
+    expected_implementation_state = (
+        "implemented_verification_pending" if live_gaps else "verified"
+    )
+    if implementation_state != expected_implementation_state:
+        raise RuntimeSupervisionError(
+            "VOL-004 machine implementation_state must match "
+            f"masterplan closure state: expected {expected_implementation_state}"
+        )
     if not live_gaps and volume.get("implementation_status") != "verified":
         raise RuntimeSupervisionError(
             "signed VOL-004 must have verified implementation status"
