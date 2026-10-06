@@ -190,6 +190,22 @@ class ResourceUsage:
         ):
             _finite_non_negative_int(getattr(self, name), name)
 
+    @property
+    def has_monotonic_charge(self) -> bool:
+        """Return whether this usage consumes at least one finite cumulative budget."""
+
+        return any(
+            value > 0
+            for value in (
+                self.provider_calls,
+                self.tool_calls,
+                self.input_tokens,
+                self.output_tokens,
+                self.artifact_bytes,
+                self.wall_time_ms,
+            )
+        )
+
     def add(self, delta: "ResourceUsage") -> "ResourceUsage":
         if not isinstance(delta, ResourceUsage):
             raise ExecutionAuthorityError("delta must be ResourceUsage")
