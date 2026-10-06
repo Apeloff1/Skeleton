@@ -101,10 +101,10 @@ def _definition_pattern(language: str, name: str) -> re.Pattern[str]:
     elif language == "kotlin":
         prefix = r"(?:(?:public|private|internal|protected|data|sealed|open|abstract)\s+)*(?:class|interface|object|fun|typealias)"
     elif language in {"c", "cpp"}:
-        return re.compile(rf"\b{escaped}\s*\(")
+        return re.compile(rf"\b{escaped}\s*\(", re.IGNORECASE)
     else:
         return re.compile(r"(?!x)x")
-    return re.compile(rf"^\s*{prefix}\s+{escaped}\b")
+    return re.compile(rf"^\s*{prefix}\s+{escaped}\b", re.IGNORECASE)
 
 
 def _safe_read(root: Path, record: FileRecord, max_source_bytes: int) -> bytes:
