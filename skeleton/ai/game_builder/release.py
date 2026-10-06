@@ -218,12 +218,28 @@ class GoldMasterBundle:
             raise ValueError("gold-master canon must match forge champion canon")
         if self.provenance_digest != self.forge_binding.champion_provenance_digest:
             raise ValueError("gold-master provenance must match forge champion provenance")
+        if any(
+            not isinstance(row, FamilyQualification)
+            for row in self.family_qualifications
+        ):
+            raise TypeError(
+                "gold-master family qualifications must contain FamilyQualification values"
+            )
         expected_families = [f"GB{i:02d}" for i in range(1, 51)]
         if [row.family_id for row in self.family_qualifications] != expected_families:
             raise ValueError("gold-master bundle requires exactly GB01..GB50")
+        if any(
+            not isinstance(row, CriticalGateQualification)
+            for row in self.critical_gate_qualifications
+        ):
+            raise TypeError(
+                "gold-master critical gates must contain CriticalGateQualification values"
+            )
         if not self.critical_gate_qualifications:
             raise ValueError("gold-master bundle requires critical gates")
         gate_ids = [row.gate_id for row in self.critical_gate_qualifications]
+        if gate_ids != sorted(gate_ids):
+            raise ValueError("gold-master critical gates must use canonical order")
         if len(gate_ids) != len(set(gate_ids)):
             raise ValueError("gold-master critical gate ids must be unique")
 
