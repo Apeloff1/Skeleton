@@ -49,8 +49,11 @@ class ResearchAcceptance:
  @property
  def eligible(self):
   if not all(c.complete for c in self.coverage):return False
-  by_claim={r.claim_id for r in self.reproductions if r.reproduced}
-  return all(c.claim_id in by_claim for c in self.coverage)
+  covered_claims={c.claim_id for c in self.coverage}
+  reproduction_claims={r.claim_id for r in self.reproductions}
+  if not reproduction_claims.issubset(covered_claims):return False
+  reproduced_claims={r.claim_id for r in self.reproductions if r.reproduced}
+  return covered_claims.issubset(reproduced_claims)
  @property
  def digest(self):return _dig({"id":self.acceptance_id,"conclusion":self.conclusion_digest,"coverage":[[c.claim_id,c.evidence_digests,c.contradiction_digests,c.uncertainty_recorded,c.negative_results_preserved] for c in self.coverage],"reproductions":[[r.reproduction_id,r.claim_id,r.method_digest,r.result_digest,r.reproducer_id,r.reproduced] for r in self.reproductions],"high_impact":self.high_impact,"reviewer":self.reviewer_id,"researcher":self.researcher_id,"lineage_qualification":self.lineage_qualification_digest})
 
