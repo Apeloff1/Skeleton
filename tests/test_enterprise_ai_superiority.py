@@ -80,6 +80,22 @@ def test_every_profile_declares_real_comparator_and_dominance_targets() -> None:
             assert target["comparison"].strip()
 
 
+def test_every_masterplan_volume_has_enterprise_grade_and_target() -> None:
+    policy = _load(ROOT, "machine/enterprise_ai_superiority.json")
+    master = _load(ROOT, "machine/ai_master_plan.json")
+    dedicated = set(policy["coverage"]["dedicated_profiles_required_for"])
+
+    assert len(master["volumes"]) == 421
+    for volume in master["volumes"]:
+        assert volume["enterprise_grade_state"] == "designed"
+        expected_target = (
+            "superior"
+            if volume["key"] in dedicated
+            else "enterprise_qualified"
+        )
+        assert volume["enterprise_grade_target"] == expected_target
+
+
 def test_masterplan_binds_each_dedicated_volume_to_superiority_profile() -> None:
     policy = _load(ROOT, "machine/enterprise_ai_superiority.json")
     master = _load(ROOT, "machine/ai_master_plan.json")
@@ -181,6 +197,27 @@ def test_rejects_master_profile_binding_drift(tmp_path: Path) -> None:
     with pytest.raises(
         MODULE.EnterpriseSuperiorityError,
         match="master binding",
+    ):
+        MODULE.validate(root)
+
+
+def test_rejects_non_dedicated_volume_claiming_superior_target(
+    tmp_path: Path,
+) -> None:
+    root = _fixture(tmp_path)
+    policy = _load(root, "machine/enterprise_ai_superiority.json")
+    master = _load(root, "machine/ai_master_plan.json")
+    dedicated = set(policy["coverage"]["dedicated_profiles_required_for"])
+    volume = next(
+        row for row in master["volumes"]
+        if row["key"] not in dedicated
+    )
+    volume["enterprise_grade_target"] = "superior"
+    _write(root, "machine/ai_master_plan.json", master)
+
+    with pytest.raises(
+        MODULE.EnterpriseSuperiorityError,
+        match="non-dedicated enterprise target",
     ):
         MODULE.validate(root)
 
