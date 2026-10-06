@@ -570,6 +570,9 @@ class UpdateRecord:
     timestamp: float
     previous_version: int | None = None
     reversible: bool = True
+    state_digest: str | None = None
+    previous_state_digest: str | None = None
+    rollback_target_digest: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "version", _positive_int("version", self.version))
@@ -586,6 +589,44 @@ class UpdateRecord:
                 "previous_version",
                 _positive_int("previous_version", self.previous_version),
             )
+        if not isinstance(self.reversible, bool):
+            raise LearningEvidenceError(
+                "reversible must be boolean",
+                context={"reason": "invalid_update"},
+            )
+        for field_name in (
+            "state_digest",
+            "previous_state_digest",
+            "rollback_target_digest",
+        ):
+            value = getattr(self, field_name)
+            if value is not None:
+                if (
+                    not isinstance(value, str)
+                    or len(value) != 64
+                    or any(ch not in "0123456789abcdef" for ch in value)
+                ):
+                    raise LearningEvidenceError(
+                        f"{field_name} must be lowercase sha256",
+                        context={"reason": "invalid_update", "field": field_name},
+                    )
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "version": self.version,
+            "kind": self.kind.value,
+            "target_id": self.target_id,
+            "timestamp": self.timestamp,
+            "previous_version": self.previous_version,
+            "reversible": self.reversible,
+            "state_digest": self.state_digest,
+            "previous_state_digest": self.previous_state_digest,
+            "rollback_target_digest": self.rollback_target_digest,
+        }
+
+    @property
+    def digest(self) -> str:
+        return canonical_fingerprint(self.as_dict())
 
 
 @dataclass(frozen=True, slots=True)
@@ -598,6 +639,84 @@ class _Snapshot:
     calibrations: dict[str, Calibration]
     samples: dict[str, tuple[tuple[float, bool], ...]]
     clock_version: int
+    state_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class EvidenceStateReceipt:
+    version: int
+    clock_version: int
+    state_digest: str
+    history_digest: str
+    observation_digests: tuple[str, ...]
+    feature_digests: tuple[str, ...]
+    hypothesis_digests: tuple[str, ...]
+    prediction_digests: tuple[str, ...]
+    outcome_digests: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if (
+            isinstance(self.version, bool)
+            or not isinstance(self.version, int)
+            or self.version < 0
+        ):
+            raise LearningEvidenceError(
+                "state receipt version must be non-negative integer",
+                context={"reason": "invalid_state_receipt"},
+            )
+        object.__setattr__(
+            self,
+            "clock_version",
+            _positive_int("clock_version", self.clock_version),
+        )
+        for field_name in ("state_digest", "history_digest"):
+            value = getattr(self, field_name)
+            if (
+                not isinstance(value, str)
+                or len(value) != 64
+                or any(ch not in "0123456789abcdef" for ch in value)
+            ):
+                raise LearningEvidenceError(
+                    f"{field_name} must be lowercase sha256",
+                    context={"reason": "invalid_state_receipt"},
+                )
+        for field_name in (
+            "observation_digests",
+            "feature_digests",
+            "hypothesis_digests",
+            "prediction_digests",
+            "outcome_digests",
+        ):
+            values = tuple(getattr(self, field_name))
+            if any(
+                not isinstance(value, str)
+                or len(value) != 64
+                or any(ch not in "0123456789abcdef" for ch in value)
+                for value in values
+            ):
+                raise LearningEvidenceError(
+                    f"{field_name} contains invalid digest",
+                    context={"reason": "invalid_state_receipt"},
+                )
+            object.__setattr__(self, field_name, values)
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "schema_version": "skeleton.learning_evidence_state.v1",
+            "version": self.version,
+            "clock_version": self.clock_version,
+            "state_digest": self.state_digest,
+            "history_digest": self.history_digest,
+            "observation_digests": list(self.observation_digests),
+            "feature_digests": list(self.feature_digests),
+            "hypothesis_digests": list(self.hypothesis_digests),
+            "prediction_digests": list(self.prediction_digests),
+            "outcome_digests": list(self.outcome_digests),
+        }
+
+    @property
+    def receipt_digest(self) -> str:
+        return canonical_fingerprint(self.as_dict())
 
 
 def _require_provenance(
@@ -720,6 +839,7 @@ class LearningEvidenceStore:
         self._history: list[UpdateRecord] = []
         self._snapshots: dict[int, _Snapshot] = {}
         self._version = 0
+        self._lock = threading.RLock()
 
     @property
     def version(self) -> int:
@@ -764,7 +884,55 @@ class LearningEvidenceStore:
         return tuple(self._outcomes[key] for key in sorted(self._outcomes))
 
     def history(self) -> tuple[UpdateRecord, ...]:
-        return tuple(self._history)
+        with self._lock:
+            return tuple(self._history)
+
+    def state_digest(self) -> str:
+        with self._lock:
+            return self._state_digest()
+
+    def state_receipt(self) -> EvidenceStateReceipt:
+        with self._lock:
+            observations = tuple(
+                self._observations[key].digest
+                for key in sorted(self._observations)
+            )
+            features = tuple(
+                self._features[key].digest
+                for key in sorted(self._features)
+            )
+            hypotheses = tuple(
+                self._hypotheses[key].digest
+                for key in sorted(self._hypotheses)
+            )
+            predictions = tuple(
+                self._predictions[key].digest
+                for key in sorted(self._predictions)
+            )
+            outcomes = tuple(
+                self._outcomes[key].digest
+                for key in sorted(self._outcomes)
+            )
+            history_digest = canonical_fingerprint(
+                [record.as_dict() for record in self._history]
+            )
+            return EvidenceStateReceipt(
+                version=self._version,
+                clock_version=self._clock_version,
+                state_digest=self._state_digest(),
+                history_digest=history_digest,
+                observation_digests=observations,
+                feature_digests=features,
+                hypothesis_digests=hypotheses,
+                prediction_digests=predictions,
+                outcome_digests=outcomes,
+            )
+
+    def verify_state_receipt(self, receipt: EvidenceStateReceipt) -> bool:
+        if not isinstance(receipt, EvidenceStateReceipt):
+            raise TypeError("receipt must be EvidenceStateReceipt")
+        with self._lock:
+            return receipt == self.state_receipt()
 
     def calibration(self, channel: str) -> Calibration | None:
         return self._calibrations.get(_text("channel", channel, MAX_ID_CHARS))
@@ -897,18 +1065,44 @@ class LearningEvidenceStore:
             timestamp=commit_time,
         )
 
-    def rollback(self, version: int) -> UpdateRecord:
-        snapshot = self._snapshots.get(version)
-        if snapshot is None:
-            raise LearningEvidenceError(
-                "rollback target is outside bounded history",
-                context={"reason": "rollback_unavailable", "version": version, "retained": sorted(self._snapshots)},
+    def rollback(
+        self,
+        version: int,
+        *,
+        expected_state_digest: str | None = None,
+    ) -> UpdateRecord:
+        with self._lock:
+            snapshot = self._snapshots.get(version)
+            if snapshot is None:
+                raise LearningEvidenceError(
+                    "rollback target is outside bounded history",
+                    context={
+                        "reason": "rollback_unavailable",
+                        "version": version,
+                        "retained": sorted(self._snapshots),
+                    },
+                )
+            if (
+                expected_state_digest is not None
+                and expected_state_digest != snapshot.state_digest
+            ):
+                raise LearningEvidenceError(
+                    "rollback target state digest mismatch",
+                    context={
+                        "reason": "rollback_identity_mismatch",
+                        "version": version,
+                    },
+                )
+            commit_time = _non_negative("clock", self._clock())
+            previous_state = self._state_digest()
+            self._restore(snapshot)
+            return self._commit(
+                UpdateKind.ROLLBACK,
+                f"v{version}",
+                timestamp=commit_time,
+                previous_state_digest=previous_state,
+                rollback_target_digest=snapshot.state_digest,
             )
-        # Validate the journal timestamp before restoring any snapshot. A failed
-        # clock must leave the current store, version, and history untouched.
-        commit_time = _non_negative("clock", self._clock())
-        self._restore(snapshot)
-        return self._commit(UpdateKind.ROLLBACK, f"v{version}", timestamp=commit_time)
 
     def lineage(self, record_id: str) -> tuple[str, ...]:
         """Walk provenance parents from roots to ``record_id``."""
@@ -1063,6 +1257,8 @@ class LearningEvidenceStore:
         target_id: str,
         *,
         timestamp: float,
+        previous_state_digest: str | None = None,
+        rollback_target_digest: str | None = None,
     ) -> UpdateRecord:
         """Append one already-validated mutation to the bounded journal.
 
@@ -1072,6 +1268,13 @@ class LearningEvidenceStore:
         """
         previous = self._version if self._version > 0 else None
         new_version = self._version + 1
+        before_digest = (
+            previous_state_digest
+            if previous_state_digest is not None
+            else self._state_digest()
+        )
+        self._version = new_version
+        after_digest = self._state_digest()
         record = UpdateRecord(
             version=new_version,
             kind=kind,
@@ -1079,12 +1282,58 @@ class LearningEvidenceStore:
             timestamp=timestamp,
             previous_version=previous,
             reversible=True,
+            state_digest=after_digest,
+            previous_state_digest=before_digest,
+            rollback_target_digest=rollback_target_digest,
         )
-        self._version = new_version
         self._history.append(record)
         self._snapshots[new_version] = self._capture()
         self._prune()
         return record
+
+    def _state_payload(self) -> dict[str, object]:
+        return {
+            "schema_version": "skeleton.learning_evidence_store_state.v1",
+            "version": self._version,
+            "clock_version": self._clock_version,
+            "observations": [
+                [key, self._observations[key].digest]
+                for key in sorted(self._observations)
+            ],
+            "features": [
+                [key, self._features[key].digest]
+                for key in sorted(self._features)
+            ],
+            "hypotheses": [
+                [key, self._hypotheses[key].digest]
+                for key in sorted(self._hypotheses)
+            ],
+            "predictions": [
+                [key, self._predictions[key].digest]
+                for key in sorted(self._predictions)
+            ],
+            "outcomes": [
+                [key, self._outcomes[key].digest]
+                for key in sorted(self._outcomes)
+            ],
+            "calibrations": [
+                [key, self._calibrations[key].digest]
+                for key in sorted(self._calibrations)
+            ],
+            "samples": [
+                [
+                    key,
+                    [
+                        [confidence, correct]
+                        for confidence, correct in self._samples[key]
+                    ],
+                ]
+                for key in sorted(self._samples)
+            ],
+        }
+
+    def _state_digest(self) -> str:
+        return canonical_fingerprint(self._state_payload())
 
     def _capture(self) -> _Snapshot:
         return _Snapshot(
@@ -1096,6 +1345,7 @@ class LearningEvidenceStore:
             calibrations=dict(self._calibrations),
             samples=dict(self._samples),
             clock_version=self._clock_version,
+            state_digest=self._state_digest(),
         )
 
     def _restore(self, snapshot: _Snapshot) -> None:
