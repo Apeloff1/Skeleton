@@ -290,6 +290,43 @@ Let the system inspect its architecture, discover gaps, benchmark itself, explor
 | 099 | **Bounded Self-Evolution Governance** | Govern iterative self-improvement with independent approval, immutable baselines, capability ceilings, rollback, audit, and anti-self-approval rules. | `L098` |
 | 100 | **Frontier System Acceptance** — closure gate | Integrate all 100 levels under exact-head evidence, adversarial evaluation, safety/security/governance, performance, recovery, and independent promotion authority. | `L099` |
 
+## Maturity ledger
+
+The architecture contract and the maturity state are separate machine surfaces.
+
+`machine/advanced_ai_structure_100.json` defines what the 100 levels mean.
+`machine/advanced_ai_maturity_ledger.json` records the current state of every
+level.
+
+Each ledger row carries:
+
+- level and stratum identity;
+- canonical primary owner;
+- risk class;
+- lifecycle state;
+- evidence state;
+- current evidence receipts;
+- last-qualified exact head and timestamp;
+- promoted release identity;
+- suspension reason;
+- rollback target.
+
+The planning baseline intentionally starts at:
+
+```text
+production_maturity_level = 0
+production_maturity_id    = ENTERPRISE-BASELINE
+
+L001-L100 state           = PLANNED
+L001-L100 evidence        = MISSING
+```
+
+That is not a weakness in the plan; it is the anti-fabrication rule. Architecture
+can define the ladder without pretending the runtime has already climbed it.
+
+A future promotion changes the ledger through evidence-bearing control changes,
+not prose or inferred completion percentages.
+
 ## Promotion lifecycle
 
 A level does not jump directly from "planned" to "done."
