@@ -436,6 +436,7 @@ class ModelPromotionReceipt:
     training_receipt_digest: str
     evaluation_refs: tuple[str, ...]
     verifier_id: str
+    governance_decision_digest: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "model_id", _text("model_id", self.model_id))
@@ -447,16 +448,30 @@ class ModelPromotionReceipt:
             tuple(sorted(_unique("evaluation_ref", self.evaluation_refs, minimum=2))),
         )
         object.__setattr__(self, "verifier_id", _text("verifier_id", self.verifier_id))
+        if self.governance_decision_digest is not None:
+            object.__setattr__(
+                self,
+                "governance_decision_digest",
+                _sha(
+                    "governance_decision_digest",
+                    self.governance_decision_digest,
+                ),
+            )
 
-    @property
-    def digest(self) -> str:
-        return _digest({
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "schema_version": "skeleton.model_program_promotion.v2",
             "model_id": self.model_id,
             "model_digest": self.model_digest,
             "training_receipt_digest": self.training_receipt_digest,
             "evaluation_refs": list(self.evaluation_refs),
             "verifier_id": self.verifier_id,
-        })
+            "governance_decision_digest": self.governance_decision_digest,
+        }
+
+    @property
+    def digest(self) -> str:
+        return _digest(self.as_dict())
 
 
 class LocalTrainer(Protocol):
@@ -506,10 +521,18 @@ class ModelDevelopmentRegistry:
         *,
         require_integrity_receipts: bool = False,
         allowed_integrity_policy_digests: Sequence[str] = (),
+        require_governed_promotion_decisions: bool = False,
     ) -> None:
         if not isinstance(require_integrity_receipts, bool):
             raise TypeError("require_integrity_receipts must be boolean")
+        if not isinstance(require_governed_promotion_decisions, bool):
+            raise TypeError(
+                "require_governed_promotion_decisions must be boolean"
+            )
         self._require_integrity_receipts = require_integrity_receipts
+        self._require_governed_promotion_decisions = (
+            require_governed_promotion_decisions
+        )
         policies = tuple(
             sorted(
                 _sha("allowed_integrity_policy_digest", value)
@@ -541,6 +564,7 @@ class ModelDevelopmentRegistry:
         receipt: object,
     ) -> TrainingAdmissionBinding:
         from skeleton.ai.learning.training_integrity import (
+            TrainingIntegrityError,
             TrainingIntegrityGate,
             TrainingIntegrityReceipt,
         )
@@ -557,8 +581,10 @@ class ModelDevelopmentRegistry:
             raise ModelProgramError("integrity receipt dataset digest mismatch")
         try:
             TrainingIntegrityGate.require_admitted(receipt)
-        except Exception as exc:
-            raise ModelProgramError("training integrity receipt is not admitted") from exc
+        except TrainingIntegrityError as exc:
+            raise ModelProgramError(
+                "training integrity receipt is not admitted"
+            ) from exc
         if (
             self._allowed_integrity_policy_digests
             and receipt.policy_digest not in self._allowed_integrity_policy_digests
@@ -738,6 +764,8 @@ class ModelDevelopmentRegistry:
         run_id: str,
         verifier_id: str,
         evaluation_refs: Sequence[str],
+        governance_candidate: object | None = None,
+        governance_decision: object | None = None,
     ) -> ModelPromotionReceipt:
         receipt = self._receipts.get(_text("run_id", run_id))
         if receipt is None:
@@ -754,12 +782,60 @@ class ModelDevelopmentRegistry:
             or artifact.artifact_digest != receipt.artifact_digest
         ):
             raise ModelProgramError("promotion artifact binding is inconsistent")
+
+        governance_digest: str | None = None
+        if governance_candidate is not None or governance_decision is not None:
+            from skeleton.ai.learning.promotion_control import (
+                ImprovementCandidate,
+                PromotionDecision,
+                PromotionStatus,
+            )
+
+            if not isinstance(governance_candidate, ImprovementCandidate):
+                raise TypeError(
+                    "governance_candidate must be ImprovementCandidate"
+                )
+            if not isinstance(governance_decision, PromotionDecision):
+                raise TypeError(
+                    "governance_decision must be PromotionDecision"
+                )
+            if governance_decision.status is not PromotionStatus.PROMOTE:
+                raise ModelProgramError(
+                    "governance decision does not authorize promotion"
+                )
+            if governance_decision.candidate_digest != governance_candidate.digest:
+                raise ModelProgramError(
+                    "governance decision/candidate identity mismatch"
+                )
+            if governance_candidate.challenger_digest != receipt.model_digest:
+                raise ModelProgramError(
+                    "governance challenger does not match trained model"
+                )
+            if governance_decision.verifier_id != verifier:
+                raise ModelProgramError(
+                    "model-program verifier must match governance verifier"
+                )
+            if governance_decision.verifier_id == receipt.trainer_id:
+                raise ModelProgramError(
+                    "training actor cannot serve as governance verifier"
+                )
+            if governance_decision.canary_verifier_id == receipt.trainer_id:
+                raise ModelProgramError(
+                    "training actor cannot serve as canary verifier"
+                )
+            governance_digest = governance_decision.digest
+        elif self._require_governed_promotion_decisions:
+            raise ModelProgramError(
+                "governed promotion decision is required"
+            )
+
         result = ModelPromotionReceipt(
             model_id=receipt.model_id,
             model_digest=receipt.model_digest,
             training_receipt_digest=receipt.digest,
             evaluation_refs=tuple(evaluation_refs),
             verifier_id=verifier,
+            governance_decision_digest=governance_digest,
         )
         prior = self._promotions.get(result.model_id)
         if prior is not None:
