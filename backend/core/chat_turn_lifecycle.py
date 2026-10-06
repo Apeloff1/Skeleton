@@ -9,13 +9,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Iterable
 
 from skeleton.ai.assistant.turn_runtime import (
     FailureClass,
     TERMINAL_STATES,
     TurnState,
     make_event,
+    provider_receipt_set_ref,
 )
 from skeleton.persistence.chat_turn_repository import (
     ChatTurnBinding,
@@ -108,6 +109,37 @@ class ChatTurnLifecycle:
         except ChatTurnNotFound:
             return None
 
+    @staticmethod
+    def _provider_binding_matches(
+        actual: str | None,
+        receipt_refs: tuple[str, ...],
+    ) -> bool:
+        expected = provider_receipt_set_ref(receipt_refs)
+        if actual == expected:
+            return True
+        normalized = tuple(
+            dict.fromkeys(ref.strip() for ref in receipt_refs)
+        )
+        return len(normalized) == 1 and actual == normalized[0]
+
+    @classmethod
+    def assert_provider_receipts(
+        cls,
+        turn: PersistedChatTurn,
+        provider_receipt_refs: Iterable[str],
+    ) -> str | None:
+        refs = tuple(provider_receipt_refs)
+        expected = provider_receipt_set_ref(refs)
+        if not cls._provider_binding_matches(
+            turn.snapshot.provider_receipt_ref,
+            refs,
+        ):
+            raise ValueError(
+                "durable provider receipt binding does not match "
+                "canonical assistant message"
+            )
+        return expected
+
     async def advance(
         self,
         turn: PersistedChatTurn,
@@ -117,7 +149,50 @@ class ChatTurnLifecycle:
         owner_id: str,
         reason_code: str,
         provider_receipt_ref: str | None = None,
+        provider_receipt_refs: Iterable[str] | None = None,
     ) -> PersistedChatTurn:
+        refs = (
+            None
+            if provider_receipt_refs is None
+            else tuple(provider_receipt_refs)
+        )
+        canonical_receipt_ref = (
+            None
+            if refs is None
+            else provider_receipt_set_ref(refs)
+        )
+        if (
+            provider_receipt_ref is not None
+            and canonical_receipt_ref is not None
+            and provider_receipt_ref != canonical_receipt_ref
+        ):
+            raise ValueError(
+                "provider receipt ref conflicts with canonical receipt-set binding"
+            )
+        effective_receipt_ref = (
+            canonical_receipt_ref
+            if refs is not None
+            else provider_receipt_ref
+        )
+        if (
+            refs is not None
+            and turn.snapshot.provider_receipt_ref is not None
+            and not self._provider_binding_matches(
+                turn.snapshot.provider_receipt_ref,
+                refs,
+            )
+        ):
+            raise ValueError("provider receipt binding drifted across turn stages")
+        if (
+            refs is None
+            and effective_receipt_ref is not None
+            and turn.snapshot.provider_receipt_ref not in {
+                None,
+                effective_receipt_ref,
+            }
+        ):
+            raise ValueError("provider receipt binding drifted across turn stages")
+
         current = turn.snapshot.state
         if current in TERMINAL_STATES:
             return turn
@@ -134,16 +209,18 @@ class ChatTurnLifecycle:
 
         result = turn
         for state in _ROUTE_STAGES[current_index + 1 : target_index + 1]:
+            bind_receipt = (
+                effective_receipt_ref
+                if effective_receipt_ref is not None
+                and result.snapshot.provider_receipt_ref is None
+                else None
+            )
             event = make_event(
                 result.snapshot,
                 state,
                 observed_at=_now(),
                 reason_code=reason_code,
-                provider_receipt_ref=(
-                    provider_receipt_ref
-                    if state is TurnState.VERIFYING
-                    else None
-                ),
+                provider_receipt_ref=bind_receipt,
             )
             result = await self.authority.append_event(
                 event,
@@ -192,6 +269,7 @@ class ChatTurnLifecycle:
         *,
         tenant_id: str,
         owner_id: str,
+        provider_receipt_refs: Iterable[str] = (),
     ) -> PersistedChatTurn | None:
         turn = await self.get_if_present(
             operation_id,
@@ -200,13 +278,17 @@ class ChatTurnLifecycle:
         )
         if turn is None or turn.snapshot.state in TERMINAL_STATES:
             return turn
-        return await self.advance(
+        refs = tuple(provider_receipt_refs)
+        turn = await self.advance(
             turn,
             TurnState.COMPLETE,
             tenant_id=tenant_id,
             owner_id=owner_id,
             reason_code="conversation-assistant-already-committed",
+            provider_receipt_refs=refs,
         )
+        self.assert_provider_receipts(turn, refs)
+        return turn
 
 
 __all__ = ["ChatTurnLifecycle"]
