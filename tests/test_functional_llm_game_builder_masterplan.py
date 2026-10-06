@@ -1,4 +1,5 @@
 from __future__ import annotations
+import json
 import subprocess, sys
 from pathlib import Path
 import unittest
@@ -13,6 +14,37 @@ class FunctionalLLMGameBuilderMasterplanTest(unittest.TestCase):
         )
         self.assertEqual(proc.returncode,0,proc.stdout+"\n"+proc.stderr)
         self.assertIn("runtime completion remains unsigned",proc.stdout)
+
+    def test_doubled_byte_ledger_and_pass2_contract(self):
+        data=json.loads((ROOT/"machine/functional_llm_game_builder_10mb_manifest.json").read_text(encoding="utf-8"))
+        byte_meta=data["bytes"]
+        original=int(byte_meta["original_shard_total"])
+        previous=int(byte_meta["previous_shard_total"])
+        total=int(byte_meta["shard_total"])
+        target=int(byte_meta["double_baseline_target"])
+        self.assertEqual(previous,original)
+        self.assertEqual(target,previous*2)
+        self.assertGreaterEqual(int(byte_meta["requested_minimum"]),target)
+        self.assertGreaterEqual(total,target)
+        self.assertEqual(int(byte_meta["per_shard_minimum_total"]),int(byte_meta["per_shard_minimum"])*18)
+        self.assertEqual(int(byte_meta["pass2_net_growth"]),total-previous)
+        self.assertEqual(round(float(byte_meta["expansion_factor"]),4),round(total/previous,4))
+        self.assertEqual(int(byte_meta["human_index_shard_total"]),total)
+        self.assertEqual(int(byte_meta["expansion_generation"]),2)
+        self.assertTrue(byte_meta["threshold_met"])
+        self.assertTrue(byte_meta["doubled_target_met"])
+        self.assertTrue(byte_meta["doubled_original_surface"])
+
+        deep=data["deep_closure"]
+        self.assertEqual(int(deep["required_atoms_per_plane"]),1296)
+        self.assertEqual(int(deep["required_atoms_total"]),1296*18)
+        for shard in data["shards"]:
+            self.assertTrue(shard["deep_closure_pass2_required"])
+            self.assertEqual(int(shard["deep_closure_pass2_atoms"]),1296)
+
+        readme=(ROOT/"docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/README.md").read_text(encoding="utf-8")
+        self.assertIn(f"{target:,}",readme)
+        self.assertIn(f"{total:,}",readme)
 
 if __name__=="__main__":
     unittest.main()
