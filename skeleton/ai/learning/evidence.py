@@ -24,9 +24,11 @@ from __future__ import annotations
 
 import json
 import math
+import threading
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from enum import Enum
+from types import MappingProxyType
 from typing import Any
 
 from skeleton.kernel.errors import KernelError
@@ -152,14 +154,56 @@ def _json_scalar(name: str, value: Any) -> object:
     )
 
 
-def canonical_fingerprint(payload: Mapping[str, object] | object) -> str:
-    """Deterministic content fingerprint via retrieval provenance hashing."""
+def _canonical_json_value(value: Any) -> object:
+    if value is None or isinstance(value, (bool, str, int)):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise LearningEvidenceError(
+                "fingerprint payload contains non-finite number",
+                context={"reason": "invalid_number"},
+            )
+        return float(value)
+    if isinstance(value, Mapping):
+        normalized: dict[str, object] = {}
+        for raw_key, item in value.items():
+            key = _text("fingerprint key", raw_key, MAX_ID_CHARS)
+            if key in normalized:
+                raise LearningEvidenceError(
+                    "fingerprint keys collide after normalization",
+                    context={"reason": "duplicate_key", "key": key},
+                )
+            normalized[key] = _canonical_json_value(item)
+        return dict(sorted(normalized.items()))
+    if isinstance(value, (list, tuple)):
+        return [_canonical_json_value(item) for item in value]
+    raise LearningEvidenceError(
+        "fingerprint payload contains unsupported value",
+        context={"reason": "unsupported_value", "type": type(value).__name__},
+    )
 
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+
+def canonical_fingerprint(payload: Mapping[str, object] | object) -> str:
+    """Deterministic fingerprint that rejects unsupported runtime objects."""
+
+    canonical = _canonical_json_value(payload)
+    try:
+        encoded = json.dumps(
+            canonical,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        )
+    except (TypeError, ValueError) as exc:
+        raise LearningEvidenceError(
+            "fingerprint payload is not deterministic JSON",
+            context={"reason": "invalid_payload"},
+        ) from exc
     return ProvenanceEntry.hash_data(encoded)
 
 
-def _freeze_payload(payload: Mapping[str, object]) -> dict[str, object]:
+def _freeze_payload(payload: Mapping[str, object]) -> Mapping[str, object]:
     if not isinstance(payload, Mapping):
         raise LearningEvidenceError(
             "payload must be a mapping of factual fields",
@@ -173,8 +217,13 @@ def _freeze_payload(payload: Mapping[str, object]) -> dict[str, object]:
     frozen: dict[str, object] = {}
     for key, value in payload.items():
         name = _text("payload key", key, MAX_ID_CHARS)
+        if name in frozen:
+            raise LearningEvidenceError(
+                "payload keys collide after normalization",
+                context={"reason": "duplicate_key", "key": name},
+            )
         frozen[name] = _json_scalar(f"payload[{name}]", value)
-    return frozen
+    return MappingProxyType(dict(sorted(frozen.items())))
 
 
 def _ids(name: str, values: Iterable[str]) -> tuple[str, ...]:
