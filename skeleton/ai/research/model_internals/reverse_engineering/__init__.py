@@ -156,6 +156,9 @@ from .power_audit import PowerAuditItem, PowerAuditReport, PowerRequirement, aud
 from .protocol_integrity import ProtocolManifest, build_protocol_manifest, verify_protocol_manifest
 from .reproducibility import ReproductionRun, ReproducibilityReport, analyze_reproducibility
 
+from .certification_bundle import CertificationArtifact, CertificationBundle, build_certification_bundle, verify_certification_bundle
+from .workflow_orchestrator import WorkflowOrchestrationReport, WorkflowStageReceipt, WorkflowStageResult, orchestrate_campaign
+
 __all__ = [
     "ActivationLayerReport",
     "ActivationSample",
@@ -526,4 +529,12 @@ __all__ = [
     "verify_closure_certificate",
     "verify_experiment_replay",
     "verify_protocol_manifest",
+    "CertificationArtifact",
+    "CertificationBundle",
+    "WorkflowOrchestrationReport",
+    "WorkflowStageReceipt",
+    "WorkflowStageResult",
+    "build_certification_bundle",
+    "orchestrate_campaign",
+    "verify_certification_bundle",
 ]

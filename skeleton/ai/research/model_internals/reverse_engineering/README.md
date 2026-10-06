@@ -135,6 +135,8 @@ The lab contains bounded analyzers for:
 - **protocol integrity** — canonical protocol manifests with tamper verification;
 - **closure certificates** — tamper-evident certificates issued only after claim, campaign, bundle, and lineage closure;
 - **campaign verification** — final critical-category verification across authorization, protocol, coverage, power, replay, reproducibility, lineage, falsification, replication, freshness, and closure.
+- **end-to-end workflow orchestration** — dependency-aware propagation from authorization through protocol, design, execution, evidence, falsification, replication, lineage, and closure;
+- **exact-head certification bundles** — deterministic required-artifact bundles bound to one full Git commit identity with tamper verification.
 
 These surfaces characterize what can be observed or what is available in artifacts
 the operator is authorized to inspect. They do not assert proprietary architecture
@@ -142,5 +144,5 @@ identity, recover hidden weights from inaccessible systems, bypass access contro
 or create a right to inspect artifacts without ownership or permission.
 
 Future work can deepen nonlinear structural models, cross-modal causal transport, richer
-hierarchical uncertainty approximations, automatic experiment synthesis, and independent
-adversarial replication while preserving the same evidence/inference boundary.
+hierarchical uncertainty approximations, and independent adversarial replication while
+preserving the same evidence/inference boundary.
