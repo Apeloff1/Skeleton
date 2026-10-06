@@ -2,6 +2,7 @@ import math
 
 import pytest
 
+from skeleton.ai.assistant.turn_runtime import ExecutionBudget
 from skeleton.intelligence.admission import ResourceBudget
 from skeleton.vault.data_lifecycle import GovernedDataRecord
 from skeleton.vault.governance_registry import GovernanceRegistry
@@ -9,6 +10,7 @@ from skeleton.vault.governance_registry import GovernanceRegistry
 from core.model_router import (
     ModelEndpoint,
     ModelRouter,
+    EndpointQuarantine,
     NoRoute,
     PrivacyLevel,
     RouteRequest,
@@ -29,6 +31,8 @@ def _endpoint(
     privacy=PrivacyLevel.PUBLIC,
     local=False,
     enabled=True,
+    jurisdiction=None,
+    receipt_capable=True,
 ):
     return ModelEndpoint(
         endpoint_id=endpoint_id,
@@ -43,6 +47,8 @@ def _endpoint(
         privacy_ceiling=privacy,
         local=local,
         enabled=enabled,
+        jurisdiction=jurisdiction,
+        receipt_capable=receipt_capable,
     )
 
 
@@ -372,3 +378,213 @@ def test_restricted_governed_data_routes_local_only() -> None:
 
     assert decision.selected.endpoint_id == "local"
     assert "hosted" in decision.rejected
+
+
+def test_turn_budget_projects_into_route_constraints():
+    budget = ExecutionBudget(
+        max_wall_seconds=4.0,
+        max_input_tokens=10_000,
+        max_output_tokens=1200,
+        max_model_calls=4,
+        max_tool_calls=8,
+        max_agent_depth=2,
+        max_parallel_workers=2,
+        max_retrieval_queries=4,
+        max_external_writes=1,
+        max_cost_usd=0.15,
+    )
+    request = RouteRequest.from_turn_budget(
+        "analysis",
+        budget,
+        context_tokens=6000,
+        expected_output_tokens=2000,
+        privacy="sensitive",
+    )
+    assert request.expected_output_tokens == 1200
+    assert request.latency_budget_ms == 4000.0
+    assert request.cost_budget == 0.15
+    assert request.privacy is PrivacyLevel.SENSITIVE
+
+
+def test_turn_budget_constraints_cannot_be_overridden():
+    budget = ExecutionBudget()
+    with pytest.raises(ValueError, match="turn budget owns"):
+        RouteRequest.from_turn_budget(
+            "analysis",
+            budget,
+            cost_budget=999.0,
+        )
+
+
+def test_jurisdiction_is_a_hard_routing_constraint():
+    router = ModelRouter()
+    router.register(_endpoint("eu", jurisdiction="eu"))
+    router.register(_endpoint("us", jurisdiction="us"))
+    router.register(_endpoint("unknown", jurisdiction=None))
+
+    decision = router.route(
+        RouteRequest(
+            "chat",
+            allowed_jurisdictions=frozenset({"eu"}),
+        ),
+        routed_at=100.0,
+    )
+    assert decision.selected.endpoint_id == "eu"
+    assert "us" in decision.rejected
+    assert "unknown" in decision.rejected
+    assert any("not allowed" in reason for reason in decision.rejected["us"])
+    assert decision.rejected["unknown"] == ("jurisdiction unknown",)
+
+
+def test_provider_receipt_capability_can_be_required():
+    router = ModelRouter()
+    router.register(_endpoint("receipts", receipt_capable=True))
+    router.register(_endpoint("opaque", receipt_capable=False))
+
+    decision = router.route(
+        RouteRequest("chat", require_provider_receipt=True),
+        routed_at=100.0,
+    )
+    assert decision.selected.endpoint_id == "receipts"
+    assert decision.rejected["opaque"] == (
+        "provider receipt capability required",
+    )
+
+
+def test_minimum_observations_and_telemetry_freshness_fail_closed():
+    router = ModelRouter(telemetry_alpha=1.0)
+    router.register(_endpoint("a"))
+    router.observe(
+        "a",
+        ok=True,
+        quality=0.9,
+        latency_ms=50,
+        cost=0.001,
+        observed_at=10.0,
+    )
+
+    with pytest.raises(NoRoute, match="observations"):
+        router.route(
+            RouteRequest("chat", minimum_observations=2),
+            routed_at=20.0,
+        )
+
+    with pytest.raises(NoRoute, match="telemetry age"):
+        router.route(
+            RouteRequest("chat", max_telemetry_age_s=5.0),
+            routed_at=20.0,
+        )
+
+    fresh = router.route(
+        RouteRequest(
+            "chat",
+            minimum_observations=1,
+            max_telemetry_age_s=15.0,
+        ),
+        routed_at=20.0,
+    )
+    assert fresh.selected.endpoint_id == "a"
+
+
+def test_missing_telemetry_rejected_when_freshness_is_required():
+    router = ModelRouter()
+    router.register(_endpoint("a"))
+
+    with pytest.raises(NoRoute, match="telemetry missing"):
+        router.route(
+            RouteRequest("chat", max_telemetry_age_s=60.0),
+            routed_at=100.0,
+        )
+
+
+def test_quarantine_forces_safe_fallback_and_expiry_restores_endpoint():
+    router = ModelRouter(telemetry_alpha=1.0)
+    router.register(_endpoint("primary", provider="p1", latency=10))
+    router.register(_endpoint("fallback", provider="p2", latency=20))
+    router.observe(
+        "primary",
+        ok=True,
+        quality=1.0,
+        latency_ms=10,
+        cost=0.0,
+        observed_at=90.0,
+    )
+    router.observe(
+        "fallback",
+        ok=True,
+        quality=0.8,
+        latency_ms=20,
+        cost=0.0,
+        observed_at=90.0,
+    )
+
+    quarantine = router.quarantine(
+        "primary",
+        reason_code="provider-health",
+        observed_at=100.0,
+        expires_at=120.0,
+    )
+    assert isinstance(quarantine, EndpointQuarantine)
+
+    degraded = router.route(RouteRequest("chat"), routed_at=110.0)
+    assert degraded.selected.endpoint_id == "fallback"
+    assert degraded.rejected["primary"] == (
+        "quarantined:provider-health",
+    )
+
+    recovered = router.route(RouteRequest("chat"), routed_at=121.0)
+    assert recovered.selected.endpoint_id == "primary"
+
+
+def test_manual_quarantine_clear_restores_endpoint():
+    router = ModelRouter()
+    router.register(_endpoint("a", latency=10))
+    router.register(_endpoint("b", latency=20))
+    router.quarantine(
+        "a",
+        reason_code="manual",
+        observed_at=1.0,
+    )
+    assert router.route(RouteRequest("chat"), routed_at=2.0).selected.endpoint_id == "b"
+    assert router.clear_quarantine("a") is True
+    assert router.clear_quarantine("a") is False
+    assert router.route(RouteRequest("chat"), routed_at=3.0).selected.endpoint_id == "a"
+
+
+def test_route_decision_digest_binds_hard_constraint_request():
+    router = ModelRouter()
+    router.register(_endpoint("a", jurisdiction="eu"))
+    first = router.route(
+        RouteRequest(
+            "chat",
+            allowed_jurisdictions=frozenset({"eu"}),
+            require_provider_receipt=True,
+        ),
+        routed_at=42.0,
+    )
+    second = router.route(
+        RouteRequest(
+            "chat",
+            allowed_jurisdictions=frozenset({"eu"}),
+            require_provider_receipt=True,
+        ),
+        routed_at=42.0,
+    )
+    assert len(first.request_digest) == 64
+    assert len(first.digest) == 64
+    assert first.request_digest == second.request_digest
+    assert first.digest == second.digest
+    payload = first.as_dict()
+    assert payload["request_digest"] == first.request_digest
+    assert payload["decision_digest"] == first.digest
+
+
+def test_invalid_routing_evidence_constraints_are_rejected():
+    with pytest.raises(ValueError, match="minimum_observations"):
+        RouteRequest("chat", minimum_observations=-1)
+
+    with pytest.raises(ValueError, match="max_telemetry_age_s"):
+        RouteRequest("chat", max_telemetry_age_s=math.nan)
+
+    with pytest.raises(ValueError, match="receipt_capable"):
+        _endpoint("bad-receipt", receipt_capable="yes")
