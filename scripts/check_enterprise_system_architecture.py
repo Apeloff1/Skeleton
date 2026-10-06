@@ -757,6 +757,31 @@ def validate_payloads(
     } <= set(cadence):
         errors.append("enterprise operating review cadence is incomplete")
 
+    customer_capabilities = _object_list(
+        contract.get("enterprise_customer_capabilities"),
+        label="enterprise_customer_capabilities",
+        errors=errors,
+        minimum=10,
+    )
+    customer_map = _unique_ids(
+        customer_capabilities,
+        label="enterprise_customer_capabilities",
+        errors=errors,
+    )
+    if len(customer_map) < 10:
+        errors.append("enterprise customer capability baseline is incomplete")
+    for capability_id, capability in customer_map.items():
+        _text(
+            capability.get("requirement"),
+            f"enterprise_customer_capabilities[{capability_id}].requirement",
+            errors,
+        )
+        _text(
+            capability.get("production_evidence"),
+            f"enterprise_customer_capabilities[{capability_id}].production_evidence",
+            errors,
+        )
+
     _string_list(
         contract.get("required_journeys"),
         label="required_journeys",
