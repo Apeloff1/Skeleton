@@ -308,6 +308,15 @@ class DualRivalForge:
             self.round_index = self.effort_mode.rounds
         self._validate_state()
 
+    def release_binding(self):
+        """Build the terminal forge-to-release continuity proof."""
+
+        if not self.completed:
+            raise ForgeStateError("forge release binding requires completed effort budget")
+        from .release import ForgeReleaseBinding
+
+        return ForgeReleaseBinding.from_checkpoint(self.checkpoint())
+
     def checkpoint(self) -> dict[str, object]:
         pending_challenge: dict[str, object] | None = None
         if self.pending_challenge is not None:
