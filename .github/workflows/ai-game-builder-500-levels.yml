@@ -74,8 +74,13 @@ jobs:
           scripts/check_ai_master_plan.py
           skeleton/ai/game_builder/contracts.py
           skeleton/ai/game_builder/dual_rival_forge.py
+          skeleton/ai/game_builder/canon.py
+          skeleton/ai/game_builder/rights.py
+          skeleton/ai/game_builder/atomizer.py
           tests/test_ai_game_builder_500_levels.py
           skeleton/testing/test_ai_game_builder_contracts.py
+          skeleton/testing/test_ai_game_builder_governance.py
+          skeleton/testing/test_ai_game_builder_governance.py
 
       - name: Validate 500-level authority
         run: python scripts/check_ai_game_builder_500_levels.py --json
