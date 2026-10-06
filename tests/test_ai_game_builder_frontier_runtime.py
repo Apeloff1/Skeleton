@@ -112,6 +112,10 @@ def test_horizon_sentinel_requires_near_mid_and_far_evidence() -> None:
             distant_ids=("scene.2",),
             minimum_distance=1,
             evidence_digest="near-" + "a" * 32,
+            evaluator_provenance=_authority(
+                "probe-near-authority",
+                "near-" + "a" * 32,
+            ),
             passed=True,
         )
     )
@@ -122,6 +126,10 @@ def test_horizon_sentinel_requires_near_mid_and_far_evidence() -> None:
             distant_ids=("scene.20",),
             minimum_distance=10,
             evidence_digest="mid-" + "b" * 32,
+            evaluator_provenance=_authority(
+                "probe-mid-authority",
+                "mid-" + "b" * 32,
+            ),
             passed=True,
         )
     )
@@ -133,6 +141,10 @@ def test_horizon_sentinel_requires_near_mid_and_far_evidence() -> None:
             distant_ids=("ending",),
             minimum_distance=100,
             evidence_digest="far-" + "c" * 32,
+            evaluator_provenance=_authority(
+                "probe-far-authority",
+                "far-" + "c" * 32,
+            ),
             passed=True,
         )
     )
@@ -147,6 +159,10 @@ def test_horizon_probe_rejects_truthy_non_boolean_pass_state() -> None:
             distant_ids=("ending",),
             minimum_distance=100,
             evidence_digest="far-" + "c" * 32,
+            evaluator_provenance=_authority(
+                "probe-malformed-authority",
+                "far-" + "c" * 32,
+            ),
             passed="false",
         )
 
