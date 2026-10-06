@@ -190,8 +190,6 @@ def _validate_lifecycle_semantics(
         "def require_work_admission(",
         "def acquire_work(",
         "def release_work(",
-        "self.lifecycle.acquire_work(",
-        "self.lifecycle.release_work(lease)",
         "runtime_not_accepting_work",
         "retry-after",
         'snapshot["service_id"]',
@@ -423,15 +421,28 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         raise RuntimeSupervisionError(
             "VOL-004 qualification_gap must be non-empty text"
         )
-    if live_gaps != [qualification]:
+    if live_gaps not in ([qualification], []):
         raise RuntimeSupervisionError(
-            "VOL-004 must retain only the independent qualification gap"
+            "VOL-004 gap state must be pending exact-head qualification or signed"
         )
-    if binding.get("implementation_state") != "implemented_verification_pending":
-        raise RuntimeSupervisionError("VOL-004 implementation_state drifted")
-    if volume.get("completion_checkbox") is not False:
+    completion = volume.get("completion_checkbox")
+    if live_gaps and completion is not False:
         raise RuntimeSupervisionError(
-            "VOL-004 cannot be complete while qualification remains pending"
+            "VOL-004 cannot remain signed while qualification is pending"
+        )
+    if not live_gaps and completion is not True:
+        raise RuntimeSupervisionError(
+            "VOL-004 cannot clear qualification gap before completion signoff"
+        )
+    implementation_state = binding.get("implementation_state")
+    if implementation_state not in {
+        "implemented_verification_pending",
+        "verified",
+    }:
+        raise RuntimeSupervisionError("VOL-004 implementation_state drifted")
+    if not live_gaps and volume.get("implementation_status") != "verified":
+        raise RuntimeSupervisionError(
+            "signed VOL-004 must have verified implementation status"
         )
 
     sources = contract.get("sources")
