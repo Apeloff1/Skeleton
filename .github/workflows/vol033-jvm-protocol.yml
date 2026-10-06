@@ -9,6 +9,9 @@ on:
       - "skeleton/ai/runtime/native/jvm_protocol.py"
       - "skeleton/native/jvm_registry.py"
       - "skeleton/ai/runtime/native/jvm_registry.py"
+      - "machine/acceleration_policy.json"
+      - "skeleton/native/selection.py"
+      - "skeleton/native/profiling.py"
       - "skeleton/memory/jvm_vector_accelerator.py"
       - "skeleton/ai/runtime/memory/jvm_vector_accelerator.py"
       - "skeleton/observability/jvm_accelerator.py"
@@ -26,6 +29,9 @@ on:
       - "skeleton/ai/runtime/native/jvm_protocol.py"
       - "skeleton/native/jvm_registry.py"
       - "skeleton/ai/runtime/native/jvm_registry.py"
+      - "machine/acceleration_policy.json"
+      - "skeleton/native/selection.py"
+      - "skeleton/native/profiling.py"
       - "java-accelerators/observability/AcceleratorMain.java"
       - "java-accelerators/vector/VectorSearchMain.java"
       - "java-accelerators/physics/BroadPhaseMain.java"
@@ -74,6 +80,8 @@ jobs:
           skeleton/ai/runtime/native/jvm_protocol.py
           skeleton/native/jvm_registry.py
           skeleton/ai/runtime/native/jvm_registry.py
+          skeleton/native/selection.py
+          skeleton/native/profiling.py
           skeleton/memory/jvm_vector_accelerator.py
           skeleton/ai/runtime/memory/jvm_vector_accelerator.py
           skeleton/observability/jvm_accelerator.py
@@ -162,6 +170,9 @@ jobs:
               '"request-negotiated-protocol-mismatch"',
               '"jvm-admission-only"',
               "production_authority: bool = False",
+              "get_selected",
+              "profile_selected_unpromoted",
+              "automatic-selection-disabled",
           )
           for token in required:
               if token not in contract:
