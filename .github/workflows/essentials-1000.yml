@@ -41,7 +41,7 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-          for p in ["machine/essentials_1000.json","machine/essentials_1000_closure_protocol.json","machine/essentials_1000_gap_ledger.json","machine/project_self_improvement_idle_scheduler.json","machine/ai_master_plan.json"]:
+          for p in ["machine/essentials_1000.json","machine/essentials_1000_closure_protocol.json","machine/essentials_1000_gap_ledger.json","machine/essentials_1000_priority_policy.json","machine/essentials_1000_execution_frontier.json","machine/project_self_improvement_idle_scheduler.json","machine/ai_master_plan.json"]:
               d=json.loads(Path(p).read_text(encoding="utf-8"))
               print(p, d.get("schema_version"), d.get("plan_version",""))
           PY
@@ -60,12 +60,14 @@ jobs:
           p=Path("machine/ai_master_plan.json")
           master=json.loads(p.read_text(encoding="utf-8"))
           idx=json.loads(Path("machine/ai_masterplan_parse_index.json").read_text(encoding="utf-8"))
-          assert master["plan_version"]=="2.3.0"
+          assert master["plan_version"]=="2.4.0"
           assert master["authority"]["essentials_1000"]=="machine/essentials_1000.json"
           assert master["authority"]["essentials_1000_validator"]=="scripts/check_essentials_1000.py"
           assert master["authority"]["essentials_1000_workflow"]==".github/workflows/essentials-1000.yml"
           assert master["authority"]["essentials_1000_closure_protocol"]=="machine/essentials_1000_closure_protocol.json"
           assert master["authority"]["essentials_1000_gap_ledger"]=="machine/essentials_1000_gap_ledger.json"
+          assert master["authority"]["essentials_1000_priority_policy"]=="machine/essentials_1000_priority_policy.json"
+          assert master["authority"]["essentials_1000_execution_frontier"]=="machine/essentials_1000_execution_frontier.json"
           actual=subprocess.check_output(["git","hash-object",str(p)],text=True).strip()
           assert idx["sources"]["machine/ai_master_plan.json"]["git_blob_sha"]==actual
           print("masterplan fresh",actual)
@@ -79,5 +81,6 @@ jobs:
           from pathlib import Path
           d=json.loads(Path("machine/essentials_1000.json").read_text(encoding="utf-8"))
           ledger=json.loads(Path("machine/essentials_1000_gap_ledger.json").read_text(encoding="utf-8"))
-          print("ess-1000","levels=",len(d["levels"]),"strata=",len(d["strata"]),"signed=",d["completion"]["signed_complete"],"ledger_open=",ledger["summary"]["open"],"head=",os.environ["EXPECTED_SHA"])
+          frontier=json.loads(Path("machine/essentials_1000_execution_frontier.json").read_text(encoding="utf-8"))
+          print("ess-1000","levels=",len(d["levels"]),"strata=",len(d["strata"]),"signed=",d["completion"]["signed_complete"],"ledger_open=",ledger["summary"]["open"],"parallel_lanes=",len(frontier["lanes"]),"head=",os.environ["EXPECTED_SHA"])
           PY
