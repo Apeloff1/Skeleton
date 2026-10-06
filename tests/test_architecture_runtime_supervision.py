@@ -178,13 +178,33 @@ class RuntimeSupervisionTests(unittest.TestCase):
         ):
             MODULE.validate(root)
 
-    def test_rejects_stale_masterplan_gap(self) -> None:
+    def test_rejects_qualification_gap_drift(self) -> None:
         root = self._fixture()
         path = root / "machine/runtime_supervision.json"
         data = json.loads(path.read_text(encoding="utf-8"))
-        data["masterplan_binding"]["required_gap_texts"][0] = "not a real gap"
+        data["masterplan_binding"]["qualification_gap"] = "not a real gap"
         path.write_text(json.dumps(data), encoding="utf-8")
-        with self.assertRaisesRegex(MODULE.RuntimeSupervisionError, "masterplan gap drift"):
+        with self.assertRaisesRegex(
+            MODULE.RuntimeSupervisionError,
+            "retain only the independent qualification gap",
+        ):
+            MODULE.validate(root)
+
+    def test_rejects_reintroduced_retired_implementation_gap(self) -> None:
+        root = self._fixture()
+        contract_path = root / "machine/runtime_supervision.json"
+        contract = json.loads(contract_path.read_text(encoding="utf-8"))
+        master_path = root / "machine/ai_master_plan.json"
+        master = json.loads(master_path.read_text(encoding="utf-8"))
+        volume = next(v for v in master["volumes"] if v["key"] == "VOL-004")
+        volume["gaps"].append(
+            contract["masterplan_binding"]["retired_implementation_gaps"][0]
+        )
+        master_path.write_text(json.dumps(master), encoding="utf-8")
+        with self.assertRaisesRegex(
+            MODULE.RuntimeSupervisionError,
+            "retired VOL-004 implementation gap reappeared",
+        ):
             MODULE.validate(root)
 
 
