@@ -398,7 +398,10 @@ def test_checkpoint_round_trip_preserves_pending_attack_state() -> None:
     forge.submit_attack(challenge)
 
     checkpoint = forge.checkpoint()
-    restored = DualRivalForge.restore(checkpoint)
+    restored = DualRivalForge.restore(
+        checkpoint,
+        expected_checkpoint_digest=checkpoint["checkpoint_digest"],
+    )
 
     assert restored.status.to_payload() == forge.status.to_payload()
     assert restored.pending_construct is not None
@@ -409,7 +412,10 @@ def test_checkpoint_round_trip_preserves_pending_attack_state() -> None:
     tampered = dict(checkpoint)
     tampered["round_index"] = 999
     with pytest.raises(ForgeStateError, match="checkpoint digest mismatch"):
-        DualRivalForge.restore(tampered)
+        DualRivalForge.restore(
+            tampered,
+            expected_checkpoint_digest=checkpoint["checkpoint_digest"],
+        )
 
 
 def test_promotion_receipt_rehashes_public_decision_evidence() -> None:
@@ -498,9 +504,12 @@ def test_self_consistent_forged_checkpoint_cannot_invent_completed_rounds() -> N
 
     with pytest.raises(
         ForgeStateError,
-        match="completed_rounds must equal promotion receipt count",
+        match="trusted external anchor",
     ):
-        DualRivalForge.restore(forged)
+        DualRivalForge.restore(
+            forged,
+            expected_checkpoint_digest=checkpoint["checkpoint_digest"],
+        )
 
 
 def test_checkpoint_scope_substitution_is_rejected_even_when_rehashed() -> None:
@@ -515,8 +524,11 @@ def test_checkpoint_scope_substitution_is_rejected_even_when_rehashed() -> None:
     tampered["checkpoint_digest"] = canonical_digest(
         {key: value for key, value in tampered.items() if key != "checkpoint_digest"}
     )
-    with pytest.raises(ForgeStateError, match="project_id does not match champion provenance"):
-        DualRivalForge.restore(tampered)
+    with pytest.raises(ForgeStateError, match="trusted external anchor"):
+        DualRivalForge.restore(
+            tampered,
+            expected_checkpoint_digest=checkpoint["checkpoint_digest"],
+        )
 
 
 def test_forge_100_completes_only_after_exactly_100_three_stage_rounds() -> None:
