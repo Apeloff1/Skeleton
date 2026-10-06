@@ -1023,3 +1023,38 @@ If those answers are not explicit, the subsystem is not enterprise-ready.
 **Architecture signoff:** This document and its machine contract define the
 complete enterprise system target and implementation DAG. They do **not** claim
 that production runtime evidence has already satisfied those targets.
+
+
+## Enterprise baseline as Advanced-AI Level 0
+
+The enterprise system architecture is the operational substrate beneath the
+100-level advanced AI ladder in
+`machine/advanced_ai_structure_100.json`.
+
+Level 0 guarantees identity, tenancy, canonical authority, security, privacy,
+budgets, resilience, disaster recovery, observability, release governance, and
+operating discipline. Advanced AI levels may compose those guarantees but may
+not override them.
+
+This prevents a maturity inversion where a more sophisticated reasoning,
+learning, multi-agent, or self-improvement subsystem becomes less governable
+than the enterprise platform beneath it.
+
+The advanced ladder is therefore additive:
+
+```text
+Enterprise Level 0
+   -> L001-L010 deterministic cognitive substrate
+   -> L011-L020 context intelligence
+   -> L021-L030 memory/knowledge
+   -> L031-L040 reasoning/planning
+   -> L041-L050 governed agency
+   -> L051-L060 multi-agent organization
+   -> L061-L070 adaptive learning
+   -> L071-L080 bounded autonomy
+   -> L081-L090 advanced cognition/science
+   -> L091-L100 governed frontier evolution
+```
+
+Production readiness remains independent evidence. A high advanced-AI level can
+never compensate for a failed Level-0 enterprise control.
