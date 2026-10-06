@@ -771,7 +771,7 @@ python -m pytest -q --noconftest tests/test_competitive_ai_engineering_ladder.py
 
 ## 24.7 AI Game Builder — 500 task-specific adversarial levels
 
-The masterplan adds a game-building depth overlay governed by `machine/ai_game_builder_500_levels.json`, documented in `docs/architecture/AI_GAME_BUILDER_500_LEVELS.md`, and executed conceptually under the dual-rival contract in `machine/ai_game_builder_dual_rival_forge.json`.
+The masterplan adds a game-building depth overlay governed by `machine/ai_game_builder_500_levels.json`, documented in `docs/architecture/AI_GAME_BUILDER_500_LEVELS.md`, and governed at runtime by `machine/ai_game_builder_dual_rival_forge.json`. The cross-cutting overengineering constitution is `machine/ai_game_builder_overengineering.json` / `docs/architecture/AI_GAME_BUILDER_OVERENGINEERING.md`. A deterministic runtime kernel now exists at `skeleton/ai/game_builder/contracts.py` and `skeleton/ai/game_builder/dual_rival_forge.py`; provider/model execution must plug into that kernel rather than control it.
 
 It contains **500 explicit task/capability levels** constructed as **50 game-building families × 10 maturation/proof stages**, spanning intent compilation, creative DNA, dual-rival orchestration, atomization, canon, narrative, character/dialogue/quest systems, worldbuilding, scenes/levels/procedural generation, gameplay/mechanics/combat/traversal/input, progression/economy/items/NPCs/encounters/world simulation, physics/animation/2D/pixel/3D/rendering, camera/UI/audio/music/voice/accessibility, multiplayer/save/performance/export, playtesting/balance/repair/research/rights, per-pixel QA, long-form narrative QA, player-value evaluation, asset versioning, and whole-game release readiness.
 
@@ -783,13 +783,17 @@ The system may inspect artifacts at the smallest useful unit—including pixels/
 
 Gaming sources are broad but governed. Official engine/platform documentation, standards, academic work, public factual metadata, postmortems, tutorials, community discussion, project-owned material, public-domain work and compatible licensed/open-source material may inform development according to their rights classification. Availability never grants permission to copy protected expression. Unknown rights are quarantined; incorporated third-party material needs provenance; suspiciously similar text/code/image/audio/names/layouts/characters/world elements block promotion pending review; similarity scores are risk indicators rather than legal determinations.
 
+The **24-plane overengineering constitution** applies cross-cutting controls for rival isolation, anti-collusion, blind candidate evaluation, Pareto-safe promotion, anti-Goodhart defenses, causal canon, character epistemic state, branch/timeline integrity, pixel-to-project lineage, cross-modal coherence, rights clean-rooming, similarity-risk ensembles, source quality/freshness, deterministic replay/counterfactuals, checkpoint/event-sourcing/rollback, bounded-resource infinite-time discipline, adversarial playtest swarms, property/fuzz/metamorphic verification, independent calibration/appeal, adaptive effort escalation, project-local learning, artifact bills of materials, cross-platform reproducibility, and whole-game release arbitration.
+
+All 50 families inherit the 11 critical planes (`OP01 OP02 OP04 OP05 OP06 OP11 OP14 OP15 OP16 OP22 OP24`) and at least 11 total planes. These planes are additive hardening: they cannot weaken a family-level or `GBL`-level gate.
+
 This remains an **overlay inside the frozen `VOL-000..VOL-420` architecture**. It creates no `VOL-421+`. All `GBL-001..GBL-500` records begin `planned` and unsigned. Prose, elapsed time, iteration count, AI confidence or a demo cannot complete them. Exact-head implementation, adversarial/recovery evidence, rights/provenance evidence, whole-project consistency, declared quality metrics and independent Stage-10 promotion evidence are required.
 
 Required validation:
 
 ```bash
 python scripts/check_ai_game_builder_500_levels.py --json
-python -m pytest -q --noconftest tests/test_ai_game_builder_500_levels.py
+python -m pytest -q --noconftest tests/test_ai_game_builder_500_levels.py skeleton/testing/test_ai_game_builder_contracts.py
 ```
 
 ## 25. Scope freeze and future plan evolution
