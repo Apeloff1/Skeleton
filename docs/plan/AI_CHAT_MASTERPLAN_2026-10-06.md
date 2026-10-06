@@ -426,7 +426,7 @@ exact-head CI, and independently rehashed machine-readable evidence.
 
 ### Volume 1 — CHAT-P0 durable turn runtime
 
-Status: implementation started in this branch.
+Status: **implemented candidate; exact-head qualification pending**.
 
 Deliver:
 
@@ -441,8 +441,28 @@ Deliver:
 
 ### Volume 2 — durable persistence adapter
 
-Persist turn events beside authoritative conversation operations with
-optimistic version checks and restart reconstruction.
+Status: **implemented candidate; product-route cutover pending**.
+
+Implemented:
+
+- portable transactional SQLite conformance repository;
+- production Mongo turn authority;
+- immutable conversation/thread/causal-user binding;
+- exact-next event sequencing and digest-chain enforcement;
+- canonical runtime serialization codecs;
+- restart reconstruction from the immutable journal;
+- tenant/owner authorization boundaries;
+- recoverable Mongo prepare -> snapshot-commit -> committed-marker protocol;
+- consequential external-write ambiguity preserved across restart;
+- corruption detection for journal gaps and materialized snapshot drift.
+
+The turn repositories store operation metadata and transition evidence only.
+Canonical conversation messages remain solely owned by the conversation
+authority.
+
+The remaining Volume-2 cutover is to invoke the Mongo turn authority from the
+product chat admission/finalization path after this persistence surface passes
+exact-head qualification.
 
 ### Volume 3 — durable streaming projection
 
