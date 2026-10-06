@@ -89,6 +89,14 @@ def test_observed_critical_path_and_wave_metrics_are_deterministic() -> None:
     assert telemetry.cache_hit_ratio_ppm == 600_000
 
 
+def test_default_target_plan_replays_through_observability_binding() -> None:
+    graph = _graph()
+    plan = _plan()
+
+    assert plan.requested_targets == tuple(sorted(plan.requested_targets))
+    assert observe_build(graph, plan, _observations()).plan_fingerprint == plan.plan_fingerprint
+
+
 def test_observation_declaration_order_does_not_change_evidence() -> None:
     graph = _graph()
     plan = _plan()
