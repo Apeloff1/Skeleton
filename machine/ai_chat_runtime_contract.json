@@ -72,7 +72,8 @@
     "ownership acquire renew release and takeover mutations produce a digest-chained audit receipt",
     "live engine output cannot enter canonical transcript state without a response-acceptance receipt bound to exact operation execution context and output",
     "live response-acceptance receipts hash output and evidence references instead of storing response prose or provider receipt contents",
-    "engine-backed live chat requires an accepted verification identity and at least one canonical provider receipt before transcript commit"
+    "engine-backed live chat requires an accepted verification identity and at least one canonical provider receipt before transcript commit",
+    "synchronous and deferred engine results must pass the same canonical response-acceptance policy before transcript commit"
   ],
   "budget_dimensions": [
     "wall_seconds",
@@ -191,6 +192,10 @@
     "output_rule": "non-empty UTF-8 output is digest-bound and hard-bounded before canonical commit",
     "minimization_rule": "acceptance receipts store hashes of output and receipt references rather than response prose or provider receipt contents",
     "rejection_rule": "rejected engine output is terminalized and never committed as a canonical assistant message",
-    "transcript_binding": "accepted assistant messages carry response-acceptance-sha256:<digest> in canonical artifact references"
+    "transcript_binding": "accepted assistant messages carry response-acceptance-sha256:<digest> in canonical artifact references",
+    "finalization_paths": [
+      "POST /ai/chat synchronous terminal result",
+      "GET /ai/chat/turns/{thread_id} deferred terminal finalizer"
+    ]
   }
 }
