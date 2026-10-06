@@ -269,8 +269,19 @@
       ],
       "source_commit": "1f37192640454a439cde23c211788f185a379b81",
       "claim": "repository history explicitly records completion at verified P1-L0 target with independent CI verification and governed gap evidence",
-      "recovery_granularity": "commit_claim_anchor",
-      "limitation": "historical ledger blob is truncated through connector; do not synthesize verifier identity, timestamp, run/job, or signature fields from this anchor alone"
+      "recovery_granularity": "commit_claim_plus_verifier_identity",
+      "limitation": "historical ledger blob is truncated through connector; do not synthesize verifier identity, timestamp, run/job, or signature fields from this anchor alone",
+      "source_pr": 2693,
+      "source_pr_head": "6cf0549d70b4e11532dc3f1d80dbf347d456c4e0",
+      "verification_signer": "github-actions:P1 Evidence Identity Gate",
+      "corroborating_gate_names": [
+        "P1 Evidence Identity Gate",
+        "P1 Reproducibility Bundle Gate",
+        "P1 Scope Freeze Gate",
+        "P1 Required Gate Authority Gate"
+      ],
+      "workflow_caveat": "PR #2693 later workflow batch is cancelled/skipped and is not evidence; exact historical successful receipt IDs remain unrecovered.",
+      "automatic_signature_write_authorized": false
     },
     {
       "record_ids": [
