@@ -281,11 +281,38 @@ class ConstraintProofSet:
 class IntentInvariant:
     invariant_id: str
     semantic_digest: str
+    authority_provenance: EvaluatorProvenance
+    evidence_digest: str
     protected: bool = True
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "invariant_id", _text(self.invariant_id, "invariant_id"))
         object.__setattr__(self, "semantic_digest", _digest(self.semantic_digest, "semantic_digest"))
+        if not isinstance(self.authority_provenance, EvaluatorProvenance):
+            raise TypeError("intent invariant authority_provenance must be EvaluatorProvenance")
+        object.__setattr__(
+            self,
+            "evidence_digest",
+            _digest(self.evidence_digest, "evidence_digest"),
+        )
+        if self.evidence_digest not in self.authority_provenance.output_evidence_refs:
+            raise DeepAssuranceError(
+                "intent invariant evidence must be referenced by authoring authority"
+            )
+        if not isinstance(self.protected, bool):
+            raise TypeError("intent invariant protected state must be boolean")
+
+    @property
+    def authority_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "authority_provenance_digest": self.authority_provenance.digest,
+                "evidence_digest": self.evidence_digest,
+                "invariant_id": self.invariant_id,
+                "protected": self.protected,
+                "semantic_digest": self.semantic_digest,
+            }
+        )
 
 
 class IntentPreservationGate:
@@ -583,13 +610,48 @@ class TelemetryAggregate:
     cohort_digest: str
     sample_count: int
     value: float
+    collector_provenance: EvaluatorProvenance
+    evidence_digest: str
     contains_raw_identifier: bool = False
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "metric_id", _text(self.metric_id, "metric_id"))
         object.__setattr__(self, "cohort_digest", _digest(self.cohort_digest, "cohort_digest"))
-        if self.sample_count <= 0 or not math.isfinite(self.value):
+        if isinstance(self.sample_count, bool) or not isinstance(self.sample_count, int):
+            raise TypeError("telemetry sample_count must be an integer")
+        if isinstance(self.value, bool) or not isinstance(self.value, (int, float)):
+            raise TypeError("telemetry value must be numeric")
+        value = float(self.value)
+        if self.sample_count <= 0 or not math.isfinite(value):
             raise DeepAssuranceError("invalid telemetry aggregate")
+        if not isinstance(self.collector_provenance, EvaluatorProvenance):
+            raise TypeError("telemetry collector_provenance must be EvaluatorProvenance")
+        object.__setattr__(
+            self,
+            "evidence_digest",
+            _digest(self.evidence_digest, "evidence_digest"),
+        )
+        if self.evidence_digest not in self.collector_provenance.output_evidence_refs:
+            raise DeepAssuranceError(
+                "telemetry evidence must be referenced by collector authority"
+            )
+        if not isinstance(self.contains_raw_identifier, bool):
+            raise TypeError("telemetry raw-identifier state must be boolean")
+        object.__setattr__(self, "value", value)
+
+    @property
+    def authority_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "cohort_digest": self.cohort_digest,
+                "collector_provenance_digest": self.collector_provenance.digest,
+                "contains_raw_identifier": self.contains_raw_identifier,
+                "evidence_digest": self.evidence_digest,
+                "metric_id": self.metric_id,
+                "sample_count": self.sample_count,
+                "value": self.value,
+            }
+        )
 
 
 class TelemetryFeedbackGate:
