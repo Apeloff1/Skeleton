@@ -15,13 +15,14 @@ Design invariants:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from enum import Enum
 import hashlib
 import re
 from typing import Any, Iterable, Mapping
 
+from .ai_execution import AIExecutionResult
 from .canonical import canonical_json_bytes
 
 
@@ -529,6 +530,26 @@ class AuthorityEvidenceBundle:
         }
 
 
+def bind_authority_evidence(
+    result: AIExecutionResult,
+    evidence: AuthorityEvidenceBundle,
+) -> AIExecutionResult:
+    """Return a new execution result carrying the authority evidence reference."""
+
+    if not isinstance(result, AIExecutionResult):
+        raise ExecutionAuthorityError("result must be AIExecutionResult")
+    if not isinstance(evidence, AuthorityEvidenceBundle):
+        raise ExecutionAuthorityError("evidence must be AuthorityEvidenceBundle")
+    if result.operation_id != evidence.operation_id:
+        raise ExecutionAuthorityError("result operation_id does not match authority evidence")
+    if result.execution_id != evidence.execution_id:
+        raise ExecutionAuthorityError("result execution_id does not match authority evidence")
+    return replace(
+        result,
+        evidence_refs=result.evidence_refs + (evidence.evidence_ref,),
+    )
+
+
 def verify_authority_receipt_chain(
     authority: ExecutionAuthority,
     receipts: Iterable[AuthorityConsumptionReceipt],
@@ -626,6 +647,7 @@ __all__ = [
     "ResourceBudget",
     "ResourceUsage",
     "authority_policy_digest",
+    "bind_authority_evidence",
     "validate_authority_attenuation",
     "verify_authority_receipt_chain",
 ]
