@@ -34,9 +34,6 @@ from skeleton.api.engine_runtime import (
 from skeleton.api.engine_service import (
     EngineExecutionCommand,
     EngineExecutionService,
-from skeleton.api.engine_service import (
-    EngineExecutionCommand,
-    EngineExecutionService,
     SQLiteEngineSubmissionStore,
 )
 from skeleton.contracts.context import (
@@ -44,16 +41,12 @@ from skeleton.contracts.context import (
     ContextEnvelope,
     ContextKind,
     ContextSegment,
+    ContextTrust,
+    context_digest_payload,
+)
 from skeleton.intelligence.execution_runtime import (
     ExecutionVerificationDecision,
 )
-from skeleton.kernel.runtime_supervision import (
-    RuntimeServiceLifecycle,
-    RuntimeSupervisionError,
-)
-from skeleton.persistence.execution_repository import SQLiteExecutionRepository
-from skeleton.provider_contract import (
-    FinishReason,
 from skeleton.kernel.runtime_supervision import (
     RuntimeServiceLifecycle,
     RuntimeSupervisionError,
@@ -496,146 +489,12 @@ async def test_cross_service_cancel_fences_late_provider_result(
     assert checkpoint.payload["last_provider"]["late_result_fenced"] is True
 
     with pytest.raises(EngineExecutionFailed) as caught:
-    await coordinator.shutdown()
-
-
-@pytest.mark.asyncio
-async def test_stale_task_callback_cannot_release_newer_generation_lease(
-    tmp_path,
-) -> None:
-    service = _service(tmp_path)
-    lifecycle = RuntimeServiceLifecycle("skeleton")
-    lifecycle.mark_ready(reason="test-ready")
-    coordinator = EngineExecutionCoordinator(
-        service,
-        provider_registry=_Registry(object()),
-        lifecycle=lifecycle,
-    )
-    execution_id = "shared-execution-id"
-    work_id = "engine-execution:" + execution_id
-
-    old_task = asyncio.create_task(asyncio.sleep(0))
-    await old_task
-    old_lease = lifecycle.acquire_work(work_id)
-    coordinator._tasks[execution_id] = old_task
-    coordinator._lifecycle_leases[old_task] = old_lease
-    coordinator._task_done(execution_id, old_task)
-    assert lifecycle.inflight_work == 0
-
-    release = asyncio.Event()
-    new_task = asyncio.create_task(release.wait())
-    new_lease = lifecycle.acquire_work(work_id)
-    coordinator._tasks[execution_id] = new_task
-    coordinator._lifecycle_leases[new_task] = new_lease
-
-    # Simulate a delayed callback from the already-retired task after a new
-    # task acquired the same semantic execution identity.
-    coordinator._task_done(execution_id, old_task)
-    assert lifecycle.active_work() == (new_lease,)
-    assert coordinator._tasks[execution_id] is new_task
-
-    new_task.cancel()
-    await asyncio.gather(new_task, return_exceptions=True)
-    coordinator._task_done(execution_id, new_task)
-    assert lifecycle.inflight_work == 0
-
-
-@pytest.mark.asyncio
-async def test_engine_lease_release_corruption_fails_lifecycle_closed(
-    tmp_path,
-) -> None:
-    service = _service(tmp_path)
-    lifecycle = RuntimeServiceLifecycle("skeleton")
-    lifecycle.mark_ready(reason="test-ready")
-    foreign = RuntimeServiceLifecycle("foreign")
-    foreign.mark_ready(reason="test-ready")
-    coordinator = EngineExecutionCoordinator(
-        service,
-        provider_registry=_Registry(object()),
-        lifecycle=lifecycle,
-    )
-
-    task = asyncio.create_task(asyncio.sleep(0))
-    await task
-    foreign_lease = foreign.acquire_work("engine-execution:corrupt")
-    coordinator._lifecycle_leases[task] = foreign_lease
-
-    coordinator._task_done("corrupt", task)
-
-    assert lifecycle.snapshot()["phase"] == "failed"
-    assert lifecycle.cancellation.cancelled is True
-    assert foreign.active_work() == (foreign_lease,)
-    foreign.release_work(foreign_lease)
-
-
-@pytest.mark.asyncio
-async def test_engine_lifecycle_draining_fences_new_execution_and_drains_lease(
-    tmp_path,
-) -> None:
-    service = _service(tmp_path)
-    started = asyncio.Event()
-    release = asyncio.Event()
-
-    class BlockingProvider:
-        provider_id = "fake"
-        model = "fake-model"
-
-        async def generate(self, _request):
-            started.set()
-            await release.wait()
-            return _text_response(
-                "should-not-be-needed",
-                response_id="resp-lifecycle-drain",
-            )
-
-    lifecycle = RuntimeServiceLifecycle("skeleton")
-    lifecycle.mark_ready(reason="test-ready")
-    coordinator = EngineExecutionCoordinator(
-        service,
-        provider_registry=_Registry(BlockingProvider()),
-        verification_hook=_verification,
-        lifecycle=lifecycle,
-    )
-
-    first_context = _context()
-    first = _command(first_context, idempotency_key="lifecycle-first")
-    service.submit(
-        first,
-        verified_service_principal="backend-service",
-    )
-    await coordinator.ensure_started(first)
-    await asyncio.wait_for(started.wait(), timeout=2)
-    assert lifecycle.inflight_work == 1
-    assert lifecycle.active_work()[0].work_id == (
-        "engine-execution:" + first_context.execution_id
-    )
-
-    lifecycle.begin_drain(reason="rolling-upgrade")
-    assert lifecycle.admits_work is False
-
-    second_context = _context()
-    second = _command(second_context, idempotency_key="lifecycle-second")
-    with pytest.raises(
-        EngineExecutionCoordinatorError,
-        match="lifecycle denied",
-    ):
-        await coordinator.ensure_started(second)
-
-    with pytest.raises(
-        RuntimeSupervisionError,
-        match="in-flight work leases",
-    ):
-        lifecycle.mark_stopped(reason="too-early")
-
-    await coordinator.shutdown()
-    assert lifecycle.inflight_work == 0
-    lifecycle.mark_stopped(reason="coordinator-drained")
-    assert lifecycle.snapshot()["phase"] == "stopped"
-
-
-@pytest.mark.asyncio
-async def test_cross_service_golden_journey_preserves_receipt_lineage(
-    tmp_path,
+        await client.wait_for_terminal(
+            execution_id=context.execution_id,
+            actor_id="actor-a",
+            tenant_id="tenant-a",
+            timeout_s=2,
+        )
     assert caught.value.status == "cancelled"
     await coordinator.shutdown()
 

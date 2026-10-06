@@ -4,6 +4,9 @@
 **Machine contract:** `machine/architecture.json`
 **Runtime contract:** `skeleton/app/manifest.json`
 **Validator:** `python scripts/check_architecture_map.py`
+**Enterprise system contract:** `machine/enterprise_system_architecture.json`  
+**Enterprise system manual:** `docs/ENTERPRISE_SYSTEM_ARCHITECTURE.md`  
+**Enterprise validator:** `python scripts/check_enterprise_system_architecture.py`
 
 This map is the canonical bridge between repository structure and the assembled
 application. It deliberately optimizes structure before mass file movement:
@@ -652,3 +655,34 @@ leave consumers to infer the new behavior from runtime failures.
 Cross-zone interfaces receive extra scrutiny because they define architectural
 coupling. Prefer narrow immutable envelopes, explicit errors, bounded resource
 semantics, and IDs/references over shared mutable objects.
+
+
+## Enterprise system-of-systems layer
+
+The architecture map defines repository/runtime ownership and dependency
+direction. Production operation is governed by the additive enterprise contract
+in `machine/enterprise_system_architecture.json`.
+
+That contract does not replace any capability owner. It composes the current
+runtime manifest, 27 AI construction planes, capability-interface registry and
+state topology into one production system model with:
+
+- high-availability runtime-cell requirements;
+- tenant and privileged-access isolation;
+- service-to-service identity;
+- canonical/derived/scratch state law;
+- SLO and error-budget targets;
+- backup, PITR, RPO/RTO and restore drills;
+- capacity, fairness, backpressure and overload order;
+- security operations and vulnerability-response targets;
+- production observability and incident command;
+- progressive delivery, canary promotion and rollback;
+- mandatory runbooks and enterprise golden journeys;
+- a 16-workstream implementation DAG ending in evidence-only production
+  acceptance.
+
+The enterprise layer is deliberately fail-closed about maturity:
+`plan_complete=true` is permitted after structural and exact-head validation,
+while `production_claim=true` requires independent runtime evidence for SLO,
+DR, security, capacity, golden journeys, rollback, supply chain and the
+production topology. Documentation alone can never promote the deployment.
