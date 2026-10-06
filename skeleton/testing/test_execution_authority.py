@@ -409,3 +409,29 @@ def test_replay_key_is_bounded_and_canonical() -> None:
             replay_key=" contains spaces ",
             now=NOW,
         )
+
+
+
+def test_revoked_ancestor_invalidates_admitted_child() -> None:
+    guard = ExecutionAuthorityGuard()
+    parent = _authority()
+    _admit(guard, parent)
+    child = _child_authority(parent)
+    guard.admit(
+        authority=child,
+        request=_request(),
+        receipt_id="receipt-child",
+        replay_key="admission-child",
+        now=NOW + timedelta(seconds=2),
+    )
+
+    guard.revoke(parent)
+    decision = guard.authorize(
+        authority=child,
+        capability="repo.read",
+        replay_key="child-read-001",
+        now=NOW + timedelta(seconds=3),
+    )
+
+    assert decision.disposition is AuthorizationDisposition.DENY
+    assert decision.reason == "ancestor authority is revoked"
