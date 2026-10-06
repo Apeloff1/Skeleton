@@ -573,8 +573,31 @@ actually committed.
 
 ### Volume 7 — governed attachment plane
 
-Move PDFs/images/files from inline payload handling to governed
-content-addressed references.
+Status: **implemented candidate on stacked attachment branch; product-route
+cutover pending**.
+
+Implemented:
+
+- raw upload bytes terminate at a dedicated attachment-admission boundary;
+- byte signatures, not filenames or claimed MIME, determine supported format;
+- claimed MIME and filename-extension mismatches fail closed;
+- per-file, text, batch-byte, and attachment-count budgets are enforced before
+  parsing or model exposure;
+- admitted files receive deterministic SHA-256 content references;
+- exact duplicate attachments are deduplicated by content digest;
+- PDF structure requires a bounded EOF marker before admission;
+- PDF active-action/embed indicators are quarantined before extraction;
+- quarantined references cannot enter the context compiler;
+- sandbox-extracted text projects only through canonical artifact context and
+  is asserted to remain `UNTRUSTED_EVIDENCE`;
+- image references bind into the existing canonical
+  `MultimodalIngestionCore` only when digest, byte count, media type, format,
+  classification, and pipeline admission all agree;
+- multimodal digest or probe drift fails closed.
+
+Next integration: replace remaining chat-inline base64/file payloads with
+durable attachment references backed by the repository's governed storage
+authority and sandbox extraction receipts.
 
 ### Volume 8 — evidence and citation plane
 
