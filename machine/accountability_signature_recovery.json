@@ -2,8 +2,8 @@
   "schema_version": 1,
   "authority": "recovery_strength_classification_only",
   "record_count": 25,
-  "signature_fields_recoverable_count": 5,
-  "evidence_only_manual_review_count": 20,
+  "signature_fields_recoverable_count": 6,
+  "evidence_only_manual_review_count": 19,
   "records": [
     {
       "record_id": "ACC-AIQ-S0-COST-01",
@@ -117,11 +117,11 @@
     },
     {
       "record_id": "ACC-VOL-017",
-      "classification": "evidence_only_manual_review",
+      "classification": "signature_fields_recoverable",
       "source_commit": "23a97e9d9e73ff08d8885bfa791ac353bedd628a",
       "verifier_identity_recovered": true,
       "exact_head_recovered": true,
-      "run_or_job_evidence_recovered": false,
+      "run_or_job_evidence_recovered": true,
       "completion_semantics_recovered": true,
       "automatic_signature_write_authorized": false
     },
