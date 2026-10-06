@@ -160,7 +160,52 @@ def main() -> int:
         if plane.get("independent_verification_signed") is not False:
             fail(f"{plane_id} verification signoff must remain false")
 
-    print("FLGB execution backlog valid: 18 planes, 216 build units, zero pre-completed units")
+    frontier_gate = backlog.get("frontier_competition_gate")
+    if not isinstance(frontier_gate, dict):
+        fail("frontier competition execution gate missing")
+    if frontier_gate.get("authority") != (
+        "machine/functional_llm_game_builder_10mb_manifest.json#frontier_competition"
+    ):
+        fail("frontier competition authority drift")
+    if frontier_gate.get("status") != "planned-evidence-pending":
+        fail("frontier competition execution status drift")
+    if frontier_gate.get("completion_claim") is not False:
+        fail("frontier competition execution gate cannot be pre-completed")
+    if frontier_gate.get("required_task_ids") != ["FLGB-18-T11", "FLGB-18-T12"]:
+        fail("frontier competition task fan-in drift")
+    if not isinstance(frontier_gate.get("required_outputs"), list) or len(
+        frontier_gate["required_outputs"]
+    ) < 10:
+        fail("frontier competition output bundle incomplete")
+    if not isinstance(frontier_gate.get("non_compensable"), list) or len(
+        frontier_gate["non_compensable"]
+    ) < 5:
+        fail("frontier competition non-compensable rules incomplete")
+    if not isinstance(frontier_gate.get("core_targets"), list) or len(
+        frontier_gate["core_targets"]
+    ) != 3:
+        fail("frontier competition core-target set drift")
+    for task_id in frontier_gate["required_task_ids"]:
+        task = next((item for item in tasks if item.get("id") == task_id), None)
+        if task is None:
+            fail(f"frontier competition closure task missing: {task_id}")
+        gates = task.get("acceptance_gates", [])
+        for token in (
+            "frontier registry",
+            "12-domain frontier competition scorecard",
+            "frontier parity-or-better",
+            "blind human evaluation",
+            "independently verified frontier challenge",
+        ):
+            if not any(token in str(gate) for gate in gates):
+                fail(f"{task_id} missing frontier closure gate: {token}")
+        if "frontier-competition gate" not in str(task.get("closure_rule", "")):
+            fail(f"{task_id} closure rule is not frontier-bound")
+
+    print(
+        "FLGB execution backlog valid: 18 planes, 216 build units, "
+        "frontier competition fan-in bound, zero pre-completed units"
+    )
     return 0
 
 
