@@ -390,3 +390,49 @@ def test_independent_verifier_rejects_unexpected_gap_state(tmp_path: Path) -> No
 
     assert receipt["valid"] is False
     assert "VOL-004 gap state contains unexpected obligations" in receipt["errors"]
+
+
+def test_independent_verifier_accepts_signed_closure_state(
+    tmp_path: Path,
+) -> None:
+    root = _valid_repo(tmp_path)
+    contract_path = root / "machine/runtime_supervision.json"
+    contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    contract["masterplan_binding"]["implementation_state"] = "verified"
+    _write_json(contract_path, contract)
+
+    master_path = root / "machine/ai_master_plan.json"
+    master = json.loads(master_path.read_text(encoding="utf-8"))
+    volume = next(v for v in master["volumes"] if v["key"] == "VOL-004")
+    volume["gaps"] = []
+    volume["completion_checkbox"] = True
+    volume["completion_checkbox_mark"] = "[x]"
+    volume["implementation_status"] = "verified"
+    _write_json(master_path, master)
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is True
+    assert receipt["errors"] == []
+
+
+def test_independent_verifier_rejects_signed_pending_machine_state(
+    tmp_path: Path,
+) -> None:
+    root = _valid_repo(tmp_path)
+    master_path = root / "machine/ai_master_plan.json"
+    master = json.loads(master_path.read_text(encoding="utf-8"))
+    volume = next(v for v in master["volumes"] if v["key"] == "VOL-004")
+    volume["gaps"] = []
+    volume["completion_checkbox"] = True
+    volume["completion_checkbox_mark"] = "[x]"
+    volume["implementation_status"] = "verified"
+    _write_json(master_path, master)
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "implementation_state/masterplan drift" in error
+        for error in receipt["errors"]
+    )
