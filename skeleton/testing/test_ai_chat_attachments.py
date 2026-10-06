@@ -251,9 +251,9 @@ def _image_ingestion() -> MultimodalIngestionCore:
             limits=ResourceLimits(
                 max_bytes=1024,
                 max_pixels=1_000_000,
-                max_audio_seconds=0,
-                max_video_seconds=0,
-                max_frames=0,
+                max_audio_seconds=1,
+                max_video_seconds=1,
+                max_frames=1,
             ),
         ),
         (
