@@ -154,12 +154,61 @@ def _challenge(challenger: Rival, target: Candidate, token: str, quality: float)
     )
 
 
-def _gates() -> tuple[GateResult, ...]:
-    return (
-        GateResult("rights", True, "rights-evidence-0000000000000000"),
-        GateResult("continuity", True, "canon-evidence-00000000000000000"),
-        GateResult("state", True, "state-evidence-000000000000000000"),
+def _evaluator_provenance(
+    evaluator_id: str,
+    *,
+    method_id: str,
+    evidence_refs: tuple[str, ...],
+) -> EvaluatorProvenance:
+    return EvaluatorProvenance(
+        evaluator_id=evaluator_id,
+        operation_id=f"operation:{evaluator_id}",
+        execution_id=f"execution:{evaluator_id}",
+        execution_identity_digest=canonical_digest({"execution": evaluator_id}),
+        finalization_intent_digest=canonical_digest({"finalization": evaluator_id}),
+        authority_kind="ai_execution",
+        authority_identity_digest=canonical_digest({"model": evaluator_id}),
+        method_id=method_id,
+        source_revision=canonical_digest({"source": evaluator_id})[:40],
+        provider_receipt_refs=(f"provider-receipt:{evaluator_id}",),
+        output_evidence_refs=evidence_refs,
     )
+
+
+def _adjudicator(
+    evaluator_id: str,
+) -> tuple[EvaluatorProvenance, str]:
+    evidence = f"authority-{evaluator_id}-0000000000000000"
+    return (
+        _evaluator_provenance(
+            evaluator_id,
+            method_id="promotion-adjudication",
+            evidence_refs=(evidence,),
+        ),
+        evidence,
+    )
+
+
+def _gates() -> tuple[GateResult, ...]:
+    rows = []
+    for gate_id, evidence in (
+        ("rights", "rights-evidence-0000000000000000"),
+        ("continuity", "canon-evidence-00000000000000000"),
+        ("state", "state-evidence-000000000000000000"),
+    ):
+        rows.append(
+            GateResult(
+                gate_id,
+                True,
+                evidence,
+                evaluator_provenance=_evaluator_provenance(
+                    f"gate-{gate_id}-judge",
+                    method_id="deterministic-gate",
+                    evidence_refs=(evidence,),
+                ),
+            )
+        )
+    return tuple(rows)
 
 
 def _panel(candidate: Candidate, value: float, *, spread: float = 0.0) -> tuple[EvaluationPanel, object]:
@@ -173,6 +222,11 @@ def _panel(candidate: Candidate, value: float, *, spread: float = 0.0) -> tuple[
         panel.submit(
             JudgeVerdict.create(
                 evaluator_id=evaluator,
+                evaluator_provenance=_evaluator_provenance(
+                    evaluator,
+                    method_id="simulator" if index < 2 else "human-calibrated",
+                    evidence_refs=(f"eval-{index}-0000000000000000000000000000",),
+                ),
                 candidate_digest=candidate.digest,
                 quality=_quality(score),
                 confidence=0.9,
@@ -204,6 +258,11 @@ def test_panel_requires_three_independent_judges_and_multiple_methods() -> None:
         panel.submit(
             JudgeVerdict.create(
                 evaluator_id=evaluator,
+                evaluator_provenance=_evaluator_provenance(
+                    evaluator,
+                    method_id="sim",
+                    evidence_refs=(f"{evaluator}-evidence-000000000000",),
+                ),
                 candidate_digest=candidate.digest,
                 quality=_quality(0.5),
                 confidence=0.9,
@@ -230,6 +289,11 @@ def test_panel_disagreement_forces_appeal() -> None:
         panel.submit(
             JudgeVerdict.create(
                 evaluator_id=evaluator,
+                evaluator_provenance=_evaluator_provenance(
+                    evaluator,
+                    method_id=method,
+                    evidence_refs=(f"{evaluator}-evidence-000000000000",),
+                ),
                 candidate_digest=candidate.digest,
                 quality=_quality(score),
                 confidence=0.9,
@@ -241,6 +305,63 @@ def test_panel_disagreement_forces_appeal() -> None:
     assert decision.eligible is False
     assert decision.requires_appeal is True
     assert set(decision.disagreement_axes) == set(QUALITY_AXES)
+
+
+def test_panel_decision_rehashes_policy_and_attributed_verdict_evidence() -> None:
+    candidate = _candidate(Rival.A.value, "panel-rehash", 0.5)
+    panel, decision = _panel(candidate, 0.6)
+    assert canonical_digest(decision.decision_payload()) == decision.decision_digest
+    assert len(decision.evidence_root) == 64
+    assert len(decision.verdict_digests) == 3
+    assert len(decision.evidence_binding_digests) == 3
+
+
+def test_panel_decision_rejects_digest_tampering() -> None:
+    candidate = _candidate(Rival.A.value, "panel-tamper", 0.5)
+    _, decision = _panel(candidate, 0.6)
+    with pytest.raises(ValueError, match="panel decision digest mismatch"):
+        type(decision)(
+            candidate_digest=decision.candidate_digest,
+            evaluator_ids=decision.evaluator_ids,
+            method_ids=decision.method_ids,
+            verdict_digests=decision.verdict_digests,
+            evidence_binding_digests=decision.evidence_binding_digests,
+            aggregate_quality=decision.aggregate_quality,
+            per_axis_spread=decision.per_axis_spread,
+            median_confidence=decision.median_confidence,
+            minimum_confidence=decision.minimum_confidence,
+            max_disagreement=decision.max_disagreement,
+            disagreement_axes=decision.disagreement_axes,
+            eligible=decision.eligible,
+            requires_appeal=decision.requires_appeal,
+            minimum_quorum=decision.minimum_quorum,
+            required_minimum_confidence=decision.required_minimum_confidence,
+            max_axis_disagreement_limit=decision.max_axis_disagreement_limit,
+            minimum_method_diversity=decision.minimum_method_diversity,
+            decision_digest="0" * 64,
+        )
+
+
+def test_judge_verdict_rejects_unattributed_evidence() -> None:
+    candidate = _candidate(Rival.A.value, "verdict-substitution", 0.5)
+    provenance = _evaluator_provenance(
+        "judge-substitution",
+        method_id="sim",
+        evidence_refs=("judge-produced-evidence-000000000000",),
+    )
+    with pytest.raises(
+        ValueError,
+        match="verdict evidence must be referenced by evaluator execution output",
+    ):
+        JudgeVerdict.create(
+            evaluator_id="judge-substitution",
+            evaluator_provenance=provenance,
+            candidate_digest=candidate.digest,
+            quality=_quality(0.5),
+            confidence=0.9,
+            evidence_digest="judge-substituted-evidence-000000000",
+            method_id="sim",
+        )
 
 
 def test_blind_candidate_tokens_are_stable_but_salt_scoped() -> None:
@@ -529,6 +650,8 @@ def _forge_release_binding(
         forge.reconcile(
             submitted=None,
             evaluator_id="release-binding-judge",
+            evaluator_provenance=_adjudicator("release-binding-judge")[0],
+            authority_evidence_digest=_adjudicator("release-binding-judge")[1],
             gate_results=_gates(),
         )
     return forge.release_binding()
@@ -654,6 +777,8 @@ def test_completed_forge_release_binding_matches_terminal_champion() -> None:
         forge.reconcile(
             submitted=None,
             evaluator_id="independent-release-judge",
+            evaluator_provenance=_adjudicator("independent-release-judge")[0],
+            authority_evidence_digest=_adjudicator("independent-release-judge")[1],
             gate_results=_gates(),
         )
 
