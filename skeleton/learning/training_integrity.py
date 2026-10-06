@@ -455,10 +455,13 @@ class TrainingIntegrityGate:
                     "source ids collide after normalization"
                 )
             normalized_sources[source_id] = _sha("source_digest", raw_digest)
-        transform_rows = sorted(
+        transform_rows = [
             item.as_dict()
-            for item in transforms
-        )
+            for item in sorted(
+                transforms,
+                key=lambda item: item.identity,
+            )
+        ]
         signal_rows = sorted(
             (
                 {
