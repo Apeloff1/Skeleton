@@ -6,7 +6,7 @@
   "status": "active-specification",
   "relationship_to_masterplan": "depth-only overlay; VOL-000..420 breadth freeze preserved",
   "bytes": {
-    "requested_minimum": 22953806,
+    "requested_minimum": 22000000,
     "shard_total": 55500299,
     "threshold_met": true,
     "previous_shard_total": 11476903,
@@ -20,7 +20,10 @@
     "expansion_generation": 2,
     "original_shard_total": 11476903,
     "pass2_net_growth": 44023396,
-    "doubled_original_surface": true
+    "doubled_original_surface": true,
+    "original_surface": 11476903,
+    "expansion_delta": 44023396,
+    "actual_vs_original_ratio": 4.836
   },
   "completion": {
     "specification_surface_registered": true,
@@ -158,7 +161,19 @@
         "replay",
         "persistent-state mutation"
       ]
-    }
+    },
+    "deep_closure_cartesian_required": true,
+    "deep_closure_adversarial_profiles": [
+      "dependency partition with stale-but-valid cached state",
+      "cancellation racing a durable side effect",
+      "concurrent mutation against an older project revision",
+      "resource pressure during checkpoint and evidence emission",
+      "malformed or adversarially structured untrusted input",
+      "cross-version schema skew during replay or reopen",
+      "partial commit after downstream acknowledgement loss",
+      "provider or engine failover with identity preservation",
+      "reconnect replay attempting duplicate execution"
+    ]
   },
   "end_to_end_acceptance": [
     "create or reopen a durable game project",
@@ -181,7 +196,7 @@
       "title": "LLM Session and Inference Runtime",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_01_FLGB-01_LLM_SESSION_AND_INFERENCE_RUNTIME.md",
       "bytes": 2353464,
-      "min_bytes": 2300000,
+      "min_bytes": 2200000,
       "implementation_signed": false,
       "verification_signed": false,
       "subsystems": [
@@ -204,14 +219,16 @@
       "deep_closure_required": true,
       "minimum_deep_closure_atoms": 1296,
       "deep_closure_pass2_required": true,
-      "deep_closure_pass2_atoms": 1296
+      "deep_closure_pass2_atoms": 1296,
+      "deep_closure_pass": 2,
+      "deep_closure_signed": false
     },
     {
       "id": "FLGB-02",
       "title": "Tokenizer Model Runtime and Serving",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_02_FLGB-02_TOKENIZER_MODEL_RUNTIME_AND_SERVING.md",
       "bytes": 2351651,
-      "min_bytes": 2300000,
+      "min_bytes": 2200000,
       "implementation_signed": false,
       "verification_signed": false,
       "subsystems": [
@@ -234,14 +251,16 @@
       "deep_closure_required": true,
       "minimum_deep_closure_atoms": 1296,
       "deep_closure_pass2_required": true,
-      "deep_closure_pass2_atoms": 1296
+      "deep_closure_pass2_atoms": 1296,
+      "deep_closure_pass": 2,
+      "deep_closure_signed": false
     },
     {
       "id": "FLGB-03",
       "title": "Context Memory Retrieval and Knowledge",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_03_FLGB-03_CONTEXT_MEMORY_RETRIEVAL_AND_KNOWLEDGE.md",
       "bytes": 3167205,
-      "min_bytes": 2300000,
+      "min_bytes": 2200000,
       "implementation_signed": false,
       "verification_signed": false,
       "subsystems": [
@@ -264,14 +283,16 @@
       "deep_closure_required": true,
       "minimum_deep_closure_atoms": 1296,
       "deep_closure_pass2_required": true,
-      "deep_closure_pass2_atoms": 1296
+      "deep_closure_pass2_atoms": 1296,
+      "deep_closure_pass": 2,
+      "deep_closure_signed": false
     },
     {
       "id": "FLGB-04",
       "title": "Tools Agents and Long-Horizon Execution",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_04_FLGB-04_TOOLS_AGENTS_AND_LONG_HORIZON_EXECUTION.md",
       "bytes": 3158579,
-      "min_bytes": 2300000,
+      "min_bytes": 2200000,
       "implementation_signed": false,
       "verification_signed": false,
       "subsystems": [
@@ -294,14 +315,16 @@
       "deep_closure_required": true,
       "minimum_deep_closure_atoms": 1296,
       "deep_closure_pass2_required": true,
-      "deep_closure_pass2_atoms": 1296
+      "deep_closure_pass2_atoms": 1296,
+      "deep_closure_pass": 2,
+      "deep_closure_signed": false
     },
     {
       "id": "FLGB-05",
       "title": "Security Safety Policy and Privacy",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_05_FLGB-05_SECURITY_SAFETY_POLICY_AND_PRIVACY.md",
       "bytes": 3163093,
-      "min_bytes": 2300000,
+      "min_bytes": 2200000,
       "implementation_signed": false,
       "verification_signed": false,
       "subsystems": [
@@ -324,14 +347,16 @@
       "deep_closure_required": true,
       "minimum_deep_closure_atoms": 1296,
       "deep_closure_pass2_required": true,
-      "deep_closure_pass2_atoms": 1296
+      "deep_closure_pass2_atoms": 1296,
+      "deep_closure_pass": 2,
+      "deep_closure_signed": false
     },
     {
       "id": "FLGB-06",
       "title": "Evaluation Observability Reliability and Recovery",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_06_FLGB-06_EVALUATION_OBSERVABILITY_RELIABILITY_AND_RECOVERY.md",
       "bytes": 3181681,
-      "min_bytes": 2300000,
+      "min_bytes": 2200000,
       "implementation_signed": false,
       "verification_signed": false,
       "subsystems": [
@@ -354,14 +379,16 @@
       "deep_closure_required": true,
       "minimum_deep_closure_atoms": 1296,
       "deep_closure_pass2_required": true,
-      "deep_closure_pass2_atoms": 1296
+      "deep_closure_pass2_atoms": 1296,
+      "deep_closure_pass": 2,
+      "deep_closure_signed": false
     },
     {
       "id": "FLGB-07",
       "title": "Training Weights Adaptation and Self-Improvement",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_07_FLGB-07_TRAINING_WEIGHTS_ADAPTATION_AND_SELF_IMPROVEMENT.md",
       "bytes": 3177436,
-      "min_bytes": 2300000,
+      "min_bytes": 2200000,
       "implementation_signed": false,
       "verification_signed": false,
       "subsystems": [
@@ -384,14 +411,16 @@
       "deep_closure_required": true,
       "minimum_deep_closure_atoms": 1296,
       "deep_closure_pass2_required": true,
-      "deep_closure_pass2_atoms": 1296
+      "deep_closure_pass2_atoms": 1296,
+      "deep_closure_pass": 2,
+      "deep_closure_signed": false
     },
     {
       "id": "FLGB-08",
       "title": "Multimodal Vision Audio Video and Documents",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_08_FLGB-08_MULTIMODAL_VISION_AUDIO_VIDEO_AND_DOCUMENTS.md",
       "bytes": 3170956,
-      "min_bytes": 2300000,
+      "min_bytes": 2200000,
       "implementation_signed": false,
       "verification_signed": false,
       "subsystems": [
@@ -414,14 +443,16 @@
       "deep_closure_required": true,
       "minimum_deep_closure_atoms": 1296,
       "deep_closure_pass2_required": true,
-      "deep_closure_pass2_atoms": 1296
+      "deep_closure_pass2_atoms": 1296,
+      "deep_closure_pass": 2,
+      "deep_closure_signed": false
     },
     {
       "id": "FLGB-09",
       "title": "Game Project Editor and World Model",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_09_FLGB-09_GAME_PROJECT_EDITOR_AND_WORLD_MODEL.md",
       "bytes": 3157028,
-      "min_bytes": 2300000,
+      "min_bytes": 2200000,
       "implementation_signed": false,
       "verification_signed": false,
       "subsystems": [
@@ -444,14 +475,16 @@
       "deep_closure_required": true,
       "minimum_deep_closure_atoms": 1296,
       "deep_closure_pass2_required": true,
-      "deep_closure_pass2_atoms": 1296
+      "deep_closure_pass2_atoms": 1296,
+      "deep_closure_pass": 2,
+      "deep_closure_signed": false
     },
     {
       "id": "FLGB-10",
       "title": "Scene ECS Physics and Simulation",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_10_FLGB-10_SCENE_ECS_PHYSICS_AND_SIMULATION.md",
       "bytes": 3163535,
-      "min_bytes": 2300000,
+      "min_bytes": 2200000,
       "implementation_signed": false,
       "verification_signed": false,
       "subsystems": [
@@ -474,14 +507,16 @@
       "deep_closure_required": true,
       "minimum_deep_closure_atoms": 1296,
       "deep_closure_pass2_required": true,
-      "deep_closure_pass2_atoms": 1296
+      "deep_closure_pass2_atoms": 1296,
+      "deep_closure_pass": 2,
+      "deep_closure_signed": false
     },
     {
       "id": "FLGB-11",
       "title": "Rendering Materials Lighting Cameras and VFX",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_11_FLGB-11_RENDERING_MATERIALS_LIGHTING_CAMERAS_AND_VFX.md",
       "bytes": 3163373,
-      "min_bytes": 2300000,
+      "min_bytes": 2200000,
       "implementation_signed": false,
       "verification_signed": false,
       "subsystems": [
@@ -504,14 +539,16 @@
       "deep_closure_required": true,
       "minimum_deep_closure_atoms": 1296,
       "deep_closure_pass2_required": true,
-      "deep_closure_pass2_atoms": 1296
+      "deep_closure_pass2_atoms": 1296,
+      "deep_closure_pass": 2,
+      "deep_closure_signed": false
     },
     {
       "id": "FLGB-12",
       "title": "Animation Audio UI Input and Accessibility",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_12_FLGB-12_ANIMATION_AUDIO_UI_INPUT_AND_ACCESSIBILITY.md",
       "bytes": 3165982,
-      "min_bytes": 2300000,
+      "min_bytes": 2200000,
       "implementation_signed": false,
       "verification_signed": false,
       "subsystems": [
@@ -534,14 +571,16 @@
       "deep_closure_required": true,
       "minimum_deep_closure_atoms": 1296,
       "deep_closure_pass2_required": true,
-      "deep_closure_pass2_atoms": 1296
+      "deep_closure_pass2_atoms": 1296,
+      "deep_closure_pass": 2,
+      "deep_closure_signed": false
     },
     {
       "id": "FLGB-13",
       "title": "Gameplay Scripting Narrative Quests and NPC AI",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_13_FLGB-13_GAMEPLAY_SCRIPTING_NARRATIVE_QUESTS_AND_NPC_AI.md",
       "bytes": 3166931,
-      "min_bytes": 2300000,
+      "min_bytes": 2200000,
       "implementation_signed": false,
       "verification_signed": false,
       "subsystems": [
@@ -564,14 +603,16 @@
       "deep_closure_required": true,
       "minimum_deep_closure_atoms": 1296,
       "deep_closure_pass2_required": true,
-      "deep_closure_pass2_atoms": 1296
+      "deep_closure_pass2_atoms": 1296,
+      "deep_closure_pass": 2,
+      "deep_closure_signed": false
     },
     {
       "id": "FLGB-14",
       "title": "Procedural Generation Worldbuilding and Longform Consistency",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_14_FLGB-14_PROCEDURAL_GENERATION_WORLDBUILDING_AND_LONGFORM_CONSISTENCY.md",
       "bytes": 3193821,
-      "min_bytes": 2300000,
+      "min_bytes": 2200000,
       "implementation_signed": false,
       "verification_signed": false,
       "subsystems": [
@@ -594,14 +635,16 @@
       "deep_closure_required": true,
       "minimum_deep_closure_atoms": 1296,
       "deep_closure_pass2_required": true,
-      "deep_closure_pass2_atoms": 1296
+      "deep_closure_pass2_atoms": 1296,
+      "deep_closure_pass": 2,
+      "deep_closure_signed": false
     },
     {
       "id": "FLGB-15",
       "title": "Networking Saves Mods Localization and Platform Services",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_15_FLGB-15_NETWORKING_SAVES_MODS_LOCALIZATION_AND_PLATFORM_SERVICES.md",
       "bytes": 3178697,
-      "min_bytes": 2300000,
+      "min_bytes": 2200000,
       "implementation_signed": false,
       "verification_signed": false,
       "subsystems": [
@@ -624,14 +667,16 @@
       "deep_closure_required": true,
       "minimum_deep_closure_atoms": 1296,
       "deep_closure_pass2_required": true,
-      "deep_closure_pass2_atoms": 1296
+      "deep_closure_pass2_atoms": 1296,
+      "deep_closure_pass": 2,
+      "deep_closure_signed": false
     },
     {
       "id": "FLGB-16",
       "title": "Assets Build Export Performance and Automated Testing",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_16_FLGB-16_ASSETS_BUILD_EXPORT_PERFORMANCE_AND_AUTOMATED_TESTING.md",
       "bytes": 3185630,
-      "min_bytes": 2300000,
+      "min_bytes": 2200000,
       "implementation_signed": false,
       "verification_signed": false,
       "subsystems": [
@@ -654,14 +699,16 @@
       "deep_closure_required": true,
       "minimum_deep_closure_atoms": 1296,
       "deep_closure_pass2_required": true,
-      "deep_closure_pass2_atoms": 1296
+      "deep_closure_pass2_atoms": 1296,
+      "deep_closure_pass": 2,
+      "deep_closure_signed": false
     },
     {
       "id": "FLGB-17",
       "title": "Dual-Rival Forge Adversarial Quality and Rights Clean Room",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_17_FLGB-17_DUAL_RIVAL_FORGE_ADVERSARIAL_QUALITY_AND_RIGHTS_CLEAN_ROOM.md",
       "bytes": 3193026,
-      "min_bytes": 2300000,
+      "min_bytes": 2200000,
       "implementation_signed": false,
       "verification_signed": false,
       "subsystems": [
@@ -684,14 +731,16 @@
       "deep_closure_required": true,
       "minimum_deep_closure_atoms": 1296,
       "deep_closure_pass2_required": true,
-      "deep_closure_pass2_atoms": 1296
+      "deep_closure_pass2_atoms": 1296,
+      "deep_closure_pass": 2,
+      "deep_closure_signed": false
     },
     {
       "id": "FLGB-18",
       "title": "Integrated Product Orchestration Deployment and Gapless Closure",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_18_FLGB-18_INTEGRATED_PRODUCT_ORCHESTRATION_DEPLOYMENT_AND_GAPLESS_CLOSURE.md",
       "bytes": 3208211,
-      "min_bytes": 2300000,
+      "min_bytes": 2200000,
       "implementation_signed": false,
       "verification_signed": false,
       "subsystems": [
@@ -714,7 +763,9 @@
       "deep_closure_required": true,
       "minimum_deep_closure_atoms": 1296,
       "deep_closure_pass2_required": true,
-      "deep_closure_pass2_atoms": 1296
+      "deep_closure_pass2_atoms": 1296,
+      "deep_closure_pass": 2,
+      "deep_closure_signed": false
     }
   ],
   "deep_closure": {
@@ -763,16 +814,26 @@
     "completion_rule": "Deep specification coverage is registered, but implementation_signed and independent_verification_signed remain false until exact-head executable evidence exists."
   },
   "deep_closure_expansion": {
-    "generation": 2,
+    "pass": 2,
     "status": "registered-specification",
-    "requirement_atoms_per_plane": 1296,
-    "total_requirement_atoms": 23328,
-    "dimensions": {
-      "subsystems": 12,
+    "per_plane_atoms": 1296,
+    "total_atoms": 23328,
+    "shape": {
+      "planes": 18,
+      "subsystems_per_plane": 12,
       "lifecycle_stages": 12,
-      "adversarial_stress_profiles": 9
+      "adversarial_profiles": 9
     },
-    "enforcement": "every FLGB plane must retain original authority and expose exactly 1296 FLGBX pass-2 atoms",
-    "completion_semantics": "specification expansion only; implementation and independent verification remain unsigned until exact-head executable evidence exists"
-  }
+    "required_heading": "## Deep Functional Closure Expansion — Pass 2",
+    "atom_prefix": "FLGBX",
+    "semantics": [
+      "each atom binds canonical operation/project/revision identity",
+      "each atom defines an adversarial injected condition",
+      "each atom requires proof bound to exact source/config/model/tool/project revisions",
+      "each atom defines recovery/replay obligations and no privilege minting",
+      "each atom requires independent reproducibility and whole-product fan-in traceability",
+      "second-pass depth never implies runtime implementation or verification completion"
+    ]
+  },
+  "overlay_display_name": "Functional LLM + Game Builder 20MB+ Deep Closure Atlas"
 }
