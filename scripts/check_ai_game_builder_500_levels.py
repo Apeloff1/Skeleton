@@ -103,6 +103,25 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     if family_ids != [f"GB{i:02d}" for i in range(1, 51)]:
         raise GameBuilderAuthorityError("family ids must be GB01..GB50 in order")
 
+    family_contracts: dict[str, tuple[str, list[Any]]] = {}
+    for family_index, family in enumerate(families, 1):
+        family_id = family_ids[family_index - 1]
+        owner = _text(family.get("owner_binding"), f"{family_id}.owner_binding")
+        owner_path = Path(owner)
+        if owner_path.is_absolute() or ".." in owner_path.parts:
+            raise GameBuilderAuthorityError(f"{family_id} owner_binding must be a safe repository path")
+        if not (root / owner_path).is_file():
+            raise GameBuilderAuthorityError(f"{family_id} owner_binding is missing: {owner}")
+        batches = _list(family.get("game_creation_batches"), f"{family_id}.game_creation_batches", 1)
+        if len(batches) != len(set(batches)) or not all(
+            isinstance(item, str) and item.strip() for item in batches
+        ):
+            raise GameBuilderAuthorityError(f"{family_id} game_creation_batches must be unique non-empty strings")
+        expected_range = f"GBL-{(family_index - 1) * 10 + 1:03d}..GBL-{family_index * 10:03d}"
+        if family.get("level_range") != expected_range:
+            raise GameBuilderAuthorityError(f"{family_id} level_range must equal {expected_range}")
+        family_contracts[family_id] = (owner, batches)
+
     shards = _list(manifest.get("shards"), "shards", 1)
     if topology.get("shard_count") != len(shards):
         raise GameBuilderAuthorityError("topology.shard_count must equal manifest shard count")
@@ -137,8 +156,13 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
             raise GameBuilderAuthorityError(f"{level_id} family/stage topology mismatch")
 
         _text(row.get("task_goal"), f"{level_id}.task_goal")
-        _text(row.get("owner_binding", row.get("owner")), f"{level_id}.owner")
-        _list(row.get("batches", row.get("game_creation_batches")), f"{level_id}.batches", 1)
+        owner = _text(row.get("owner_binding", row.get("owner")), f"{level_id}.owner")
+        batches = _list(row.get("batches", row.get("game_creation_batches")), f"{level_id}.batches", 1)
+        family_owner, family_batches = family_contracts[expected_family]
+        if owner != family_owner:
+            raise GameBuilderAuthorityError(f"{level_id} owner binding drifts from {expected_family}")
+        if batches != family_batches:
+            raise GameBuilderAuthorityError(f"{level_id} batch binding drifts from {expected_family}")
         _list(row.get("metrics", row.get("required_metrics")), f"{level_id}.metrics", 4)
         _alias(row, "implementation_requirements", "requirements", f"{level_id}.requirements", 3)
         adversarial = _list(row.get("adversarial_focus", row.get("adversarial")), f"{level_id}.adversarial", 4)
