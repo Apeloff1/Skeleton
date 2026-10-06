@@ -751,12 +751,17 @@
         "skeleton/context/compiler.py",
         "skeleton/context/policy.py",
         ".github/workflows/p1-intel-routing-context.yml",
-        "skeleton/frontier/runtime/model_routing.py"
+        "skeleton/frontier/runtime/model_routing.py",
+        "skeleton/intelligence/router_registry.py",
+        "skeleton/ai/runtime/intelligence/router_registry.py",
+        "skeleton/intelligence/routing_governance.py",
+        "skeleton/ai/runtime/intelligence/routing_governance.py"
       ],
       "tests": [
         "skeleton/testing/test_routing_context_receipt.py",
         "tests/test_model_routing.py",
-        "skeleton/testing/test_context_compiler.py"
+        "skeleton/testing/test_context_compiler.py",
+        "skeleton/testing/test_routing_governance_oct2026.py"
       ],
       "evaluations": [
         ".github/workflows/p1-intel-routing-context.yml"
@@ -765,7 +770,9 @@
         "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
         "github-actions-job:109034199166",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36453604716",
-        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94",
+        "skeleton/intelligence/routing_governance.py",
+        "skeleton/testing/test_routing_governance_oct2026.py"
       ],
       "risks": [
         "fallback changes privacy boundary",
@@ -773,7 +780,7 @@
         "stale provider health"
       ],
       "gaps": [
-        "implement canonical router registry",
+        "bind evidence-qualified canonical router decisions into every live model-routing entrypoint",
         "add learned-routing experiments only behind champion/challenger evaluation"
       ],
       "accountability_id": "ACC-VOL-008",
@@ -816,12 +823,15 @@
         "skeleton/intelligence/admission.py",
         "skeleton/intelligence/quality.py",
         ".github/workflows/p1-intel-routing-context.yml",
-        "skeleton/frontier/runtime/model_routing.py"
+        "skeleton/frontier/runtime/model_routing.py",
+        "skeleton/context/semantic_compression.py",
+        "skeleton/ai/runtime/context/semantic_compression.py"
       ],
       "tests": [
         "skeleton/testing/test_context_compiler.py",
         "skeleton/testing/test_routing_context_receipt.py",
-        "tests/test_model_routing.py"
+        "tests/test_model_routing.py",
+        "skeleton/testing/test_semantic_compression_oct2026.py"
       ],
       "evaluations": [
         ".github/workflows/p1-intel-routing-context.yml"
@@ -830,7 +840,9 @@
         "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
         "github-actions-job:109034199166",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36453604716",
-        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94",
+        "skeleton/context/semantic_compression.py",
+        "skeleton/testing/test_semantic_compression_oct2026.py"
       ],
       "risks": [
         "policy trimmed from long context",
@@ -838,7 +850,7 @@
         "trust labels lost during compression"
       ],
       "gaps": [
-        "add semantic compression with invariant checks",
+        "bind verifier-qualified semantic compression into live ContextCompiler candidate selection",
         "measure context utility versus cost across task classes"
       ],
       "accountability_id": "ACC-VOL-009",
@@ -1049,13 +1061,16 @@
         "skeleton/retrieval/receipts.py",
         "skeleton/retrieval/freshness.py",
         "skeleton/intelligence/quality.py",
-        ".github/workflows/p1-memory-retrieval-knowledge-quality.yml"
+        ".github/workflows/p1-memory-retrieval-knowledge-quality.yml",
+        "skeleton/intelligence/knowledge_store.py",
+        "skeleton/ai/runtime/intelligence/knowledge_store.py"
       ],
       "tests": [
         "skeleton/testing/test_memory_retrieval_knowledge_quality.py",
         "tests/test_memory_reconciliation.py",
         "tests/test_retrieval_receipts.py",
-        "tests/test_retrieval_freshness.py"
+        "tests/test_retrieval_freshness.py",
+        "skeleton/testing/test_temporal_knowledge_store_oct2026.py"
       ],
       "evaluations": [
         ".github/workflows/p1-memory-retrieval-knowledge-quality.yml"
@@ -1065,7 +1080,9 @@
         "github-actions-job:108732888770",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36359213635",
         "https://github.com/Apeloff1/Skeleton/commit/939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
-        "https://github.com/Apeloff1/Skeleton/commit/fb6b42094c41139d866ebbbdce402f51af7dd140"
+        "https://github.com/Apeloff1/Skeleton/commit/fb6b42094c41139d866ebbbdce402f51af7dd140",
+        "skeleton/intelligence/knowledge_store.py",
+        "skeleton/testing/test_temporal_knowledge_store_oct2026.py"
       ],
       "risks": [
         "false reconciliation",
@@ -1073,8 +1090,8 @@
         "source monoculture"
       ],
       "gaps": [
-        "knowledge store implementation is incomplete",
-        "define confidence/verification interaction without collapsing them"
+        "bind the temporal claim graph to durable persistence and retrieval adapters",
+        "qualify production knowledge write/query entrypoints and recovery rehearsal"
       ],
       "accountability_id": "ACC-VOL-012",
       "completion_checkbox": false,
