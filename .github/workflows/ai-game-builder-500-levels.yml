@@ -12,6 +12,7 @@ on:
       - "docs/architecture/AI_GAME_BUILDER_OVERENGINEERING.md"
       - "skeleton/ai/game_builder/**"
       - "skeleton/testing/test_ai_game_builder_contracts.py"
+      - "skeleton/testing/test_ai_game_builder_governance.py"
       - "docs/plan/MASTER_PLAN.md"
       - "machine/ai_master_plan.json"
       - "scripts/check_ai_game_builder_500_levels.py"
@@ -28,6 +29,7 @@ on:
       - "docs/architecture/AI_GAME_BUILDER_OVERENGINEERING.md"
       - "skeleton/ai/game_builder/**"
       - "skeleton/testing/test_ai_game_builder_contracts.py"
+      - "skeleton/testing/test_ai_game_builder_governance.py"
       - "docs/plan/MASTER_PLAN.md"
       - "machine/ai_master_plan.json"
       - "scripts/check_ai_game_builder_500_levels.py"
@@ -80,7 +82,6 @@ jobs:
           tests/test_ai_game_builder_500_levels.py
           skeleton/testing/test_ai_game_builder_contracts.py
           skeleton/testing/test_ai_game_builder_governance.py
-          skeleton/testing/test_ai_game_builder_governance.py
 
       - name: Validate 500-level authority
         run: python scripts/check_ai_game_builder_500_levels.py --json
@@ -93,6 +94,7 @@ jobs:
           python -m pytest -q --noconftest
           tests/test_ai_game_builder_500_levels.py
           skeleton/testing/test_ai_game_builder_contracts.py
+          skeleton/testing/test_ai_game_builder_governance.py
 
       - name: Validate masterplan JSON
         run: python -m json.tool machine/ai_master_plan.json >/dev/null
