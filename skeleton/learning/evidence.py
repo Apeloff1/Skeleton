@@ -603,11 +603,11 @@ class UpdateRecord:
             if value is not None:
                 if (
                     not isinstance(value, str)
-                    or len(value) != 64
+                    or len(value) != 32
                     or any(ch not in "0123456789abcdef" for ch in value)
                 ):
                     raise LearningEvidenceError(
-                        f"{field_name} must be lowercase sha256",
+                        f"{field_name} must be canonical learning fingerprint",
                         context={"reason": "invalid_update", "field": field_name},
                     )
 
@@ -673,11 +673,11 @@ class EvidenceStateReceipt:
             value = getattr(self, field_name)
             if (
                 not isinstance(value, str)
-                or len(value) != 64
+                or len(value) != 32
                 or any(ch not in "0123456789abcdef" for ch in value)
             ):
                 raise LearningEvidenceError(
-                    f"{field_name} must be lowercase sha256",
+                    f"{field_name} must be canonical learning fingerprint",
                     context={"reason": "invalid_state_receipt"},
                 )
         for field_name in (
@@ -690,7 +690,7 @@ class EvidenceStateReceipt:
             values = tuple(getattr(self, field_name))
             if any(
                 not isinstance(value, str)
-                or len(value) != 64
+                or len(value) != 32
                 or any(ch not in "0123456789abcdef" for ch in value)
                 for value in values
             ):
