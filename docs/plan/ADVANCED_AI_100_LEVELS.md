@@ -351,6 +351,50 @@ claim frontier maturity:
 A profile ceiling limits what the deployment claims. It does not permit skipping
 lower levels.
 
+## Executable level blueprints
+
+Every level now has one machine-readable blueprint named `ADV-Lxxx`.
+
+The blueprint binds:
+
+- the level and stratum;
+- one primary canonical owner plane;
+- collaborating planes;
+- implementation mode;
+- entry gate;
+- build contract;
+- stratum-specific adversarial focus;
+- exit gate;
+- rollout mode;
+- rollback mode;
+- promotion result.
+
+This turns the 100-level ladder into an engineering queue rather than a
+capability wishlist.
+
+The blueprint does **not** create a new service or state owner. The primary owner
+must already be one of the canonical planes assigned to that level, and all
+collaborators remain non-owning participants unless the architecture is formally
+changed.
+
+The execution pattern is:
+
+```text
+level prerequisite current
+ -> implementation contract
+ -> canonical-owner implementation
+ -> focused tests
+ -> adversarial/failure tests
+ -> operational readiness
+ -> risk-class evidence
+ -> bounded rollout
+ -> independent qualification
+ -> promotion decision
+```
+
+Every blueprint also defines how to back out safely. No level is allowed to have
+only a forward path.
+
 ## Level implementation contract
 
 Every implemented level must publish an implementation contract with:
