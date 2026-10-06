@@ -2,7 +2,7 @@
   "schema_version": 1,
   "kind": "functional-llm-game-builder-execution-atlas",
   "overlay_id": "Functional-LLM-Game-Builder-20MB-Plus",
-  "plan_version": "2.6.0",
+  "plan_version": "2.7.0",
   "status": "active-specification",
   "relationship_to_masterplan": "depth-only overlay; VOL-000..420 breadth freeze preserved",
   "bytes": {
@@ -910,11 +910,17 @@
       "minimum_frontier_comparators": 3,
       "strongest_available_comparator_required": true,
       "exact_identity_required": true,
-      "maximum_comparator_age_days": 90,
+      "maximum_comparator_age_days": 45,
       "same_or_disclosed_budget_required": true,
       "contamination_controls_required": true,
       "public_and_heldout_mix_required": true,
-      "benchmark_cherry_picking_forbidden": true
+      "benchmark_cherry_picking_forbidden": true,
+      "minimum_independent_runs_per_scored_task": 6,
+      "hidden_challenge_rotation_required": true,
+      "scaffold_and_tooling_parity_or_disclosure_required": true,
+      "reward_hacking_review_required": true,
+      "reusable_heldout_after_exposure_forbidden": true,
+      "model_family_provider_diversity_documented": true
     },
     "required_domains": [
       {
@@ -987,7 +993,13 @@
       "adversarial and fault-injection campaigns",
       "blind human pairwise quality evaluation for subjective outputs",
       "deterministic replay and recovery evaluation",
-      "cross-platform performance and resource evaluation"
+      "cross-platform performance and resource evaluation",
+      "preregistered paired multi-seed head-to-head trials",
+      "forced context reset and checkpoint reopen long-horizon trials",
+      "equal-budget versus unconstrained-quality ceiling trials",
+      "reward-hacking and harness-tampering adversarial review",
+      "hidden challenge rotation with exposed-task retirement",
+      "dual-rival equal-budget and extra-compute ablations"
     ],
     "promotion_rules": {
       "per_domain_results_required": true,
@@ -1013,10 +1025,113 @@
       "failure recovery replay and rollback receipts",
       "security privacy authority rights and similarity-screen evidence",
       "exact-head reproducibility bundle",
-      "independent verification signoff"
+      "independent verification signoff",
+      "preregistered frontier challenge protocol and immutable task manifest",
+      "six-or-more independent run trajectories per scored task",
+      "50% and 80% long-horizon success curves plus state/canon drift curves",
+      "equal-budget head-to-head and compute-normalized Pareto frontier",
+      "reward-hacking cheating leakage and evaluator-manipulation review receipts",
+      "evaluator independence disagreement and adjudication receipts",
+      "dual-rival equal-budget ablation and extra-compute control",
+      "hidden challenge rotation and post-exposure retirement receipts"
     ],
     "target_interpretation": "Frontier-competitive means no hidden critical-domain collapse, demonstrated parity-or-better on the product's core reasoning/coding/long-horizon/game-building targets, and evidence-backed differentiation from dual-rival quality, durable project state, deterministic recovery, and rights-governed production.",
     "implementation_signed": false,
-    "independent_verification_signed": false
+    "independent_verification_signed": false,
+    "protocol_version": "2.0",
+    "measurement_constitution": {
+      "preregistration_required": true,
+      "immutable_task_manifest_before_candidate_run": true,
+      "minimum_independent_runs_per_scored_task": 6,
+      "paired_task_assignment_required": true,
+      "fixed_seed_set_or_seed_manifest_required": true,
+      "confidence_interval_level": 0.95,
+      "non_inferiority_margin_pp_max": 2,
+      "superiority_margin_pp_default": 5,
+      "minimum_parity_or_better_domains": 10,
+      "minimum_superior_core_targets": 2,
+      "critical_domain_noninferiority_required": true,
+      "equal_budget_head_to_head_required": true,
+      "unconstrained_quality_ceiling_run_required": true,
+      "compute_normalized_pareto_frontier_required": true,
+      "quality_per_cost_and_quality_per_wall_clock_required": true,
+      "raw_trajectory_retention_required": true,
+      "failed_and_aborted_runs_retained": true,
+      "selective_rerun_cherry_picking_forbidden": true
+    },
+    "long_horizon_protocol": {
+      "human_equivalent_duration_buckets_hours": [
+        0.25,
+        1,
+        4,
+        16,
+        40,
+        160
+      ],
+      "success_curves_required": [
+        "50%-success time horizon",
+        "80%-success time horizon"
+      ],
+      "multi_session_resume_required": true,
+      "forced_context_reset_trials_required": true,
+      "checkpoint_reopen_trials_required": true,
+      "state_drift_measurement_required": true,
+      "canon_and_requirement_drift_measurement_required": true,
+      "cumulative_error_growth_curve_required": true,
+      "recovery_after_interruption_required": true,
+      "multi_day_project_tasks_required": true,
+      "long_horizon_score_may_not_be_inferred_from_short_task_average": true
+    },
+    "anti_gaming_protocol": {
+      "reward_hacking_detection_required": true,
+      "benchmark_leakage_scan_required": true,
+      "test_oracle_introspection_forbidden": true,
+      "evaluator_manipulation_forbidden": true,
+      "simulator_or_harness_tampering_forbidden": true,
+      "unauthorized_external_solution_lookup_forbidden": true,
+      "hidden_test_inference_without_task_evidence_flagged": true,
+      "prompt_injection_against_evaluators_tested": true,
+      "suspicious_success_manual_review_required": true,
+      "cheating_or_policy_bypass_scores_zero": true,
+      "raw_tool_and_action_trace_review_required": true
+    },
+    "evaluator_independence": {
+      "candidate_self_score_never_decisive": true,
+      "minimum_independent_evaluator_implementations": 2,
+      "blind_human_tribunal_required_for_subjective_core_outputs": true,
+      "evaluator_identity_and_version_pinned": true,
+      "evaluator_prompt_and_rubric_version_pinned": true,
+      "evaluator_disagreement_report_required": true,
+      "collusion_and_shared_failure_mode_review_required": true,
+      "adjudication_receipt_required": true
+    },
+    "dominance_rule": {
+      "critical_domains_must_meet_preregistered_non_inferiority_margin": true,
+      "minimum_parity_or_better_domains": 10,
+      "minimum_superior_core_targets": 2,
+      "superior_target_definition": "95% confidence interval clears the preregistered superiority margin, or achieves statistically credible parity with at least 20% lower normalized resource cost",
+      "core_targets": [
+        "coding and repository engineering",
+        "long-context and long-horizon consistency",
+        "integrated game construction and gameplay quality",
+        "dual-rival quality improvement"
+      ],
+      "dual_rival_equal_budget_ablation_required": true,
+      "dual_rival_extra_compute_control_required": true,
+      "strongest_comparator_head_to_head_required": true,
+      "current_champion_regression_veto": true,
+      "aggregate_score_never_overrides_critical_gate": true
+    },
+    "game_builder_challenge": {
+      "brief_to_playable_export_required": true,
+      "reopen_and_continue_after_clean_restart_required": true,
+      "cross_scene_and_cross_session_canon_consistency_required": true,
+      "gameplay_loop_quality_and_debugging_required": true,
+      "asset_code_narrative_rights_provenance_required": true,
+      "performance_budget_and_frame_time_evidence_required": true,
+      "accessibility_localization_and_input_equivalence_required": true,
+      "save_migration_mod_sandbox_and_network_fault_trials_required": true,
+      "blind_player_or_expert_judging_required": true
+    }
   }
 }
