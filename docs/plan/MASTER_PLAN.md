@@ -1,6 +1,6 @@
 # Skeleton AI Master Plan
 
-Plan version: **2.3.0**
+Plan version: **2.4.0**
 
 Architecture lane: `PR #1904 / integration/architecture-map-v1`
 
@@ -18,7 +18,7 @@ Paired Learning-400 + Adversarial-400: [`LEARNING_400_ADVERSARIAL_400.md`](LEARN
 
 Project Self-Improvement-1000: [`PROJECT_SELF_IMPROVEMENT_1000.md`](PROJECT_SELF_IMPROVEMENT_1000.md) / [`machine/project_self_improvement_1000.json`](../../machine/project_self_improvement_1000.json) / [`machine/project_self_improvement_epoch_contract.json`](../../machine/project_self_improvement_epoch_contract.json) / [`machine/project_self_improvement_idle_scheduler.json`](../../machine/project_self_improvement_idle_scheduler.json)
 
-Essential Completeness-1000: [`ESSENTIALS_1000.md`](ESSENTIALS_1000.md) / [`machine/essentials_1000.json`](../../machine/essentials_1000.json) / [`machine/essentials_1000_closure_protocol.json`](../../machine/essentials_1000_closure_protocol.json) / [`machine/essentials_1000_gap_ledger.json`](../../machine/essentials_1000_gap_ledger.json)
+Essential Completeness-1000: [`ESSENTIALS_1000.md`](ESSENTIALS_1000.md) / [`machine/essentials_1000.json`](../../machine/essentials_1000.json) / [`machine/essentials_1000_closure_protocol.json`](../../machine/essentials_1000_closure_protocol.json) / [`machine/essentials_1000_gap_ledger.json`](../../machine/essentials_1000_gap_ledger.json) / [`machine/essentials_1000_priority_policy.json`](../../machine/essentials_1000_priority_policy.json) / [`machine/essentials_1000_execution_frontier.json`](../../machine/essentials_1000_execution_frontier.json)
 
 Existing construction manual: [`docs/AI_APP_CONSTRUCTION_MANUAL.md`](../AI_APP_CONSTRUCTION_MANUAL.md)
 
@@ -836,6 +836,10 @@ Every `ESS1000-nnnn` is paired with `PSI1000-nnnn`. The PSI idle scheduler now t
 ESS closure is governed by `machine/essentials_1000_closure_protocol.json`. A signed essential can reopen when mapped implementation, contracts, schemas, dependencies, configuration, policy, runtime environment, regressions, incidents, recovery evidence or evidence artifacts change. Reopening propagates to dependent ESS levels rather than preserving stale downstream green state.
 
 The explicit accountability surface is `machine/essentials_1000_gap_ledger.json`. It contains one record for every ESS identity and initially records all **1000/1000 as open**, with no implementation identity or closure receipt. Waivers and exceptions can authorize bounded operation only when policy permits; they cannot set an ESS level to complete. Likewise, a capability being optional or disabled never removes its safe-disabled essential control path.
+
+ESS closure ordering is governed by `machine/essentials_1000_priority_policy.json`. Non-compensable severity wins before optimization scoring: active existential E0 conditions outrank everything, followed by E1/E2/E3 work, while E0 remains a runtime incident/regression class rather than a label automatically attached to ordinary open gaps. Within the same severity class, downstream unblock value, risk reduction, recovery value and evidence staleness are balanced against time-to-verified-closure, resource cost, blast radius and rollback complexity.
+
+The implementation frontier is `machine/essentials_1000_execution_frontier.json`. ESS-S001..ESS-S099 execute as 99 parallel domain lanes with ordered stages inside each lane. ESS-S100 is blocked until the stage-10 closure gate from every one of those 99 lanes is current, after which whole-system finality proceeds. The initial frontier remains 1000 open / 0 signed; planning severity is explicitly distinct from an active incident declaration.
 
 ## 25. Scope freeze and future plan evolution
 
