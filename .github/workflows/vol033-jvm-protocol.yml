@@ -9,6 +9,11 @@ on:
       - "skeleton/ai/runtime/native/jvm_protocol.py"
       - "skeleton/native/jvm_registry.py"
       - "skeleton/ai/runtime/native/jvm_registry.py"
+      - "skeleton/memory/jvm_vector_accelerator.py"
+      - "skeleton/ai/runtime/memory/jvm_vector_accelerator.py"
+      - "skeleton/observability/jvm_accelerator.py"
+      - "skeleton/ai/runtime/observability/jvm_accelerator.py"
+      - "skeleton/simulation/physics/jvm_broadphase_accelerator.py"
       - "java-accelerators/observability/AcceleratorMain.java"
       - "java-accelerators/vector/VectorSearchMain.java"
       - "java-accelerators/physics/BroadPhaseMain.java"
@@ -69,12 +74,19 @@ jobs:
           skeleton/ai/runtime/native/jvm_protocol.py
           skeleton/native/jvm_registry.py
           skeleton/ai/runtime/native/jvm_registry.py
+          skeleton/memory/jvm_vector_accelerator.py
+          skeleton/ai/runtime/memory/jvm_vector_accelerator.py
+          skeleton/observability/jvm_accelerator.py
+          skeleton/ai/runtime/observability/jvm_accelerator.py
+          skeleton/simulation/physics/jvm_broadphase_accelerator.py
+          skeleton/testing/test_jvm_accelerator_registry.py
           skeleton/testing/test_vol033_jvm_protocol.py
 
       - name: Run JVM qualification regressions
         run: >-
           python -m pytest -q --noconftest
           skeleton/testing/test_vol033_jvm_protocol.py
+          skeleton/testing/test_jvm_accelerator_registry.py
 
       - name: Audit Java headers against canonical protocol registry
         run: |
@@ -124,6 +136,14 @@ jobs:
               (
                   root / "skeleton/native/jvm_registry.py",
                   root / "skeleton/ai/runtime/native/jvm_registry.py",
+              ),
+              (
+                  root / "skeleton/memory/jvm_vector_accelerator.py",
+                  root / "skeleton/ai/runtime/memory/jvm_vector_accelerator.py",
+              ),
+              (
+                  root / "skeleton/observability/jvm_accelerator.py",
+                  root / "skeleton/ai/runtime/observability/jvm_accelerator.py",
               ),
           )
           for source, mirror in pairs:
