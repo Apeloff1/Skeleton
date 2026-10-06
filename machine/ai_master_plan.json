@@ -1,18 +1,7 @@
 {
   "schema_version": 1,
-  "plan_version": "1.9.0",
+  "plan_version": "2.5.0",
   "status": "active",
-  "competitive_engineering_ladder": {
-    "authority": "machine/competitive_ai_engineering_ladder.json",
-    "human_spec": "docs/architecture/COMPETITIVE_AI_ENGINEERING_LADDER.md",
-    "schema_version": "skeleton.competitive_ai_engineering_ladder.v1",
-    "family_count": 20,
-    "levels_per_family": 10,
-    "total_levels": 200,
-    "scope": "overlay-only; binds to existing VOL-000..VOL-420 ownership",
-    "completion_rule": "Exact-head implementation, tests, adversarial evidence and exit criteria are required; prose alone never completes a level.",
-    "superiority_rule": "Each family level 10 requires Pareto-safe reproducible comparator evidence and independent promotion authority."
-  },
   "architecture_lane": "PR-1904",
   "architecture_branch": "integration/architecture-map-v1",
   "breadth_freeze": {
@@ -56,7 +45,36 @@
     "p1_reproducibility_contract": "skeleton/contracts/reproducibility.py",
     "p1_privileged_tool_transaction_contract": "skeleton/skills/privileged_transaction.py",
     "enterprise_ai_superiority": "machine/enterprise_ai_superiority.json",
-    "enterprise_ai_implementation_notes": "machine/enterprise_ai_implementation_notes_index.json"
+    "enterprise_ai_implementation_notes": "machine/enterprise_ai_implementation_notes_index.json",
+    "frontier_96_ladder": "machine/frontier_96_ai_ladder.json",
+    "frontier_96_ladder_human": "docs/plan/FRONTIER_96_AI_LADDER.md",
+    "frontier_96_validator": "scripts/check_frontier_96_ladder.py",
+    "cs_300_ladder": "machine/cs_300_computer_science_ladder.json",
+    "cs_300_ladder_human": "docs/plan/CS_300_COMPUTER_SCIENCE_LADDER.md",
+    "cs_300_validator": "scripts/check_cs_300_ladder.py",
+    "cs_300_workflow": ".github/workflows/cs-300-authority.yml",
+    "learning_400_adversarial_400": "machine/learning_400_adversarial_400.json",
+    "learning_400_adversarial_400_human": "docs/plan/LEARNING_400_ADVERSARIAL_400.md",
+    "learning_400_adversarial_400_validator": "scripts/check_learning_400_adversarial_400.py",
+    "learning_400_adversarial_400_workflow": ".github/workflows/learning-400-adversarial-400.yml",
+    "project_self_improvement_1000": "machine/project_self_improvement_1000.json",
+    "project_self_improvement_1000_human": "docs/plan/PROJECT_SELF_IMPROVEMENT_1000.md",
+    "project_self_improvement_epoch_contract": "machine/project_self_improvement_epoch_contract.json",
+    "project_self_improvement_idle_scheduler": "machine/project_self_improvement_idle_scheduler.json",
+    "project_self_improvement_1000_validator": "scripts/check_project_self_improvement_1000.py",
+    "project_self_improvement_1000_workflow": ".github/workflows/project-self-improvement-1000.yml",
+    "essentials_1000": "machine/essentials_1000.json",
+    "essentials_1000_human": "docs/plan/ESSENTIALS_1000.md",
+    "essentials_1000_validator": "scripts/check_essentials_1000.py",
+    "essentials_1000_workflow": ".github/workflows/essentials-1000.yml",
+    "essentials_1000_closure_protocol": "machine/essentials_1000_closure_protocol.json",
+    "essentials_1000_gap_ledger": "machine/essentials_1000_gap_ledger.json",
+    "essentials_1000_priority_policy": "machine/essentials_1000_priority_policy.json",
+    "essentials_1000_execution_frontier": "machine/essentials_1000_execution_frontier.json",
+    "advanced_ai_structure_100": "machine/advanced_ai_structure_100.json",
+    "advanced_ai_structure_100_human": "docs/plan/ADVANCED_AI_100_LEVELS.md",
+    "advanced_ai_maturity_ledger": "machine/advanced_ai_maturity_ledger.json",
+    "advanced_ai_structure_validator": "scripts/check_advanced_ai_structure.py"
   },
   "laws": [
     "durable governed state is authoritative",
@@ -67,7 +85,23 @@
     "writes require idempotency or explicit compensation semantics",
     "self-improvement produces candidates; promotion is gated",
     "SOTA status requires reproducible comparative evidence",
-    "enterprise AI qualification requires exact-head comparator-backed superiority evidence with non-compensable security, privacy, authority, tenant-isolation, recovery and rollback gates"
+    "enterprise AI qualification requires exact-head comparator-backed superiority evidence with non-compensable security, privacy, authority, tenant-isolation, recovery and rollback gates",
+    "Frontier-96 qualification sits above enterprise superiority, preserves the VOL-420 breadth freeze, and requires all 96 F96 layers to carry current independent evidence before finality",
+    "CS-300 qualification sits strictly above Frontier-96, preserves the VOL-420 breadth freeze, and requires all 300 computer-science layers to carry current independent evidence before CS300-300 finality",
+    "Learning-400 is paired one-for-one with Adversarial-400; knowledge acquisition, project learning, native weight creation and continual candidate improvement require current paired adversarial evidence before signed completion",
+    "web/video/document learning treats external content as untrusted evidence and never as instruction authority; acquisition remains rights, privacy, robots, terms and authorization governed",
+    "production model weights never silently mutate in place; learning creates versioned candidates whose promotion requires independent evaluation, adversarial qualification, canary and rollback",
+    "every project instantiates its own PSI-1000 self-improvement state; evidence, maturity and candidates are project-scoped and cannot silently qualify another project",
+    "foreground-idle immediately makes bounded mirror-room improvement eligible; new foreground work preempts mirror work and protected foreground resources have absolute priority",
+    "mirror-room proposer, challenger and verifier roles may generate and evaluate candidates but cannot self-promote production changes",
+    "self-improvement epochs are finite, budgeted, receipt-backed and rollback-capable; repeated no-gain hypotheses back off instead of forming unbounded loops",
+    "ESS-1000 defines 1000 non-compensable platform essentials; advanced capability, benchmark gains, model quality or PSI completion cannot erase an unresolved essential",
+    "unresolved or regressed ESS-1000 levels outrank optional PSI polish in the affected domain unless a more severe non-compensable incident elsewhere overrides them",
+    "ESS-1000 completion requires exact implementation evidence and independent verification; documentation, plans and unrelated passing tests are never sufficient",
+    "ESS-1000 closure is revocable: implementation, contract, dependency, configuration, environment, regression, incident, recovery or evidence changes can stale, regress or revoke a previously signed essential and invalidate dependent closure",
+    "ESS-1000 waivers and not-applicable labels cannot mark an essential complete; bounded exceptions remain explicitly incomplete and expire fail-closed",
+    "ESS-1000 execution uses severity hard-ordering before scores; E0 is reserved for active existential incidents/regressions and cannot be assigned merely because an essential is open",
+    "ESS-1000 closure work runs across 99 independent domain lanes with same-lane stage order and a 99-way whole-system finality fan-in"
   ],
   "thematic_parts": [
     {
@@ -544,12 +578,15 @@
         "scripts/check_architecture_runtime_supervision.py",
         "skeleton/kernel/runtime_supervision.py",
         "skeleton/ai/runtime/kernel/runtime_supervision.py",
-        "skeleton/api/engine_runtime.py",
-        "backend/server.py",
         "skeleton/automation/free_model.py",
-        "skeleton/automation/chatgpt_adapter.py",
         "skeleton/automation/shift_supervisor/model_gateway.py",
+        "skeleton/automation/chatgpt_adapter.py",
         ".github/workflows/vol004-runtime-supervision.yml",
+        "backend/server.py",
+        "backend/core/engine_client.py",
+        "skeleton/api/engine_runtime.py",
+        "skeleton/api/engine_service.py",
+        "skeleton/provider_runtime.py",
         "machine/ai_app_construction.json",
         "docs/architecture/RUNTIME_SUPERVISION.md"
       ],
@@ -570,10 +607,7 @@
         "skeleton/testing/test_vol004_runtime_supervision_v2.py",
         "backend/tests/test_engine_cross_service_closure.py::test_cross_service_cancel_fences_late_provider_result",
         "backend/tests/test_engine_cross_service_closure.py::test_stale_task_callback_cannot_release_newer_generation_lease",
-        "backend/tests/test_engine_cross_service_closure.py::test_engine_lifecycle_draining_fences_new_execution_and_drains_lease",
-        "adversarial lifecycle state/lease/restart race suite",
-        "cross-service durable cancellation and late-result fencing journey",
-        "network-transport connector cancellation inventory convergence"
+        "backend/tests/test_engine_cross_service_closure.py::test_engine_lifecycle_draining_fences_new_execution_and_drains_lease"
       ],
       "evidence": [
         "https://github.com/Apeloff1/Skeleton/commit/be408977891328b78522074c1fe693267b01ce5b",
@@ -24358,6 +24392,17 @@
     "implementation_dossier_authority": "machine/enterprise_ai_implementation_notes_index.json",
     "implementation_dossier_rule": "Every VOL-000..VOL-420 must carry a current 14-level October 2026 implementation dossier; enterprise qualification is invalid when dossier/masterplan drift exists."
   },
+  "competitive_engineering_ladder": {
+    "authority": "machine/competitive_ai_engineering_ladder.json",
+    "human_spec": "docs/architecture/COMPETITIVE_AI_ENGINEERING_LADDER.md",
+    "schema_version": "skeleton.competitive_ai_engineering_ladder.v1",
+    "family_count": 20,
+    "levels_per_family": 10,
+    "total_levels": 200,
+    "scope": "overlay-only; binds to existing VOL-000..VOL-420 ownership",
+    "completion_rule": "Exact-head implementation, tests, adversarial evidence and exit criteria are required; prose alone never completes a level.",
+    "superiority_rule": "Each family level 10 requires Pareto-safe reproducible comparator evidence and independent promotion authority."
+  },
   "ai_game_builder_500_levels": {
     "authority": "machine/ai_game_builder_500_levels.json",
     "dual_rival_authority": "machine/ai_game_builder_dual_rival_forge.json",
@@ -24377,5 +24422,68 @@
     "prime_directive": "Long-form consistency may veto any local improvement.",
     "completion_rule": "Exact-head implementation plus deterministic/adversarial/recovery/rights evidence is required; prose, round count, elapsed time or model confidence never completes a level.",
     "originality_rule": "Unknown incorporated rights are quarantined; reference-only sources may inform facts, techniques and abstract ideas but may not supply protected expression; ambiguous legal/similarity cases require human/legal review."
+  },
+  "frontier_overlay_stack": {
+    "status": "active",
+    "semantics": "cumulative-depth-overlays",
+    "breadth_freeze": "VOL-000..VOL-420",
+    "overlays": [
+      {
+        "id": "advanced-ai-100",
+        "authority": "machine/advanced_ai_structure_100.json",
+        "completion_claim": false
+      },
+      {
+        "id": "frontier-96",
+        "authority": "machine/frontier_96_ai_ladder.json",
+        "completion_claim": false
+      },
+      {
+        "id": "cs-300",
+        "authority": "machine/cs_300_computer_science_ladder.json",
+        "completion_claim": false
+      },
+      {
+        "id": "learning-400-adversarial-400",
+        "authority": "machine/learning_400_adversarial_400.json",
+        "completion_claim": false
+      },
+      {
+        "id": "psi-1000",
+        "authority": "machine/project_self_improvement_1000.json",
+        "completion_claim": false
+      },
+      {
+        "id": "ess-1000",
+        "authority": "machine/essentials_1000.json",
+        "completion_claim": false
+      },
+      {
+        "id": "competitive-200",
+        "authority": "machine/competitive_ai_engineering_ladder.json",
+        "completion_claim": false
+      },
+      {
+        "id": "game-builder-500",
+        "authority": "machine/ai_game_builder_500_levels.json",
+        "completion_claim": false
+      }
+    ]
+  },
+  "canonical_overlay_reconciliation": {
+    "schema_version": "skeleton.masterplan_overlay_reconciliation.v1",
+    "fail_closed": true,
+    "minimum_plan_version": "2.5.0",
+    "laws": [
+      "overlays are cumulative unless an explicit supersession record names the retired authority",
+      "reconciliation may not lower plan_version",
+      "reconciliation may not delete a live registered overlay",
+      "reconciliation may not replace a non-empty live authority with an empty blob",
+      "reconciliation may not remove the sole validator, test or workflow for a live overlay",
+      "incoming overlays are unioned with current-main authority rather than reconstructed from a stale ancestor"
+    ],
+    "validator": "scripts/check_masterplan_overlay_reconciliation.py",
+    "test": "tests/test_masterplan_overlay_reconciliation.py",
+    "workflow": ".github/workflows/masterplan-overlay-reconciliation.yml"
   }
 }
