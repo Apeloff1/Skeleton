@@ -94,5 +94,71 @@ class ContractConformanceTests(unittest.TestCase):
         self.assertNotEqual(before["source_digests"]["interface_registry"], after["source_digests"]["interface_registry"])
         self.assertNotEqual(before["qualification_digest"], after["qualification_digest"])
 
+
+    def test_pending_exact_head_qualification_state_is_valid(self) -> None:
+        root = self._fixture()
+        result = MODULE.validate(root)
+        self.assertEqual(result["masterplan_binding"], "VOL-003")
+
+    def test_rejects_retired_implementation_gap_reappearance(self) -> None:
+        root = self._fixture()
+        catalog_path = root / "machine/contract_conformance.json"
+        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+        retired = catalog["masterplan_binding"]["retired_implementation_gaps"][0]
+        path = root / "machine/ai_master_plan.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        volume = next(row for row in data["volumes"] if row["key"] == "VOL-003")
+        volume["gaps"] = [retired]
+        volume["completion_checkbox"] = False
+        volume["completion_checkbox_mark"] = "[ ]"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with self.assertRaisesRegex(
+            MODULE.ContractConformanceError,
+            "gap state must be pending exact-head qualification or signed",
+        ):
+            MODULE.validate(root)
+
+    def test_rejects_cleared_qualification_without_signoff(self) -> None:
+        root = self._fixture()
+        path = root / "machine/ai_master_plan.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        volume = next(row for row in data["volumes"] if row["key"] == "VOL-003")
+        volume["gaps"] = []
+        volume["completion_checkbox"] = False
+        volume["completion_checkbox_mark"] = "[ ]"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with self.assertRaisesRegex(
+            MODULE.ContractConformanceError,
+            "cannot clear qualification gap before completion signoff",
+        ):
+            MODULE.validate(root)
+
+    def test_signed_exact_head_closure_state_is_valid(self) -> None:
+        root = self._fixture()
+        path = root / "machine/ai_master_plan.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        volume = next(row for row in data["volumes"] if row["key"] == "VOL-003")
+        volume["gaps"] = []
+        volume["completion_checkbox"] = True
+        volume["completion_checkbox_mark"] = "[x]"
+        volume["implementation_status"] = "verified"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        result = MODULE.validate(root)
+        self.assertEqual(result["masterplan_binding"], "VOL-003")
+
+    def test_rejects_signed_state_with_pending_qualification_gap(self) -> None:
+        root = self._fixture()
+        path = root / "machine/ai_master_plan.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        volume = next(row for row in data["volumes"] if row["key"] == "VOL-003")
+        volume["completion_checkbox"] = True
+        volume["completion_checkbox_mark"] = "[x]"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with self.assertRaisesRegex(
+            MODULE.ContractConformanceError,
+            "cannot remain signed with a pending qualification gap",
+        ):
+            MODULE.validate(root)
+
 if __name__ == "__main__":
     unittest.main()
