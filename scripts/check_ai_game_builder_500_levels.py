@@ -16,11 +16,11 @@ HUMAN = Path("docs/architecture/AI_GAME_BUILDER_500_LEVELS.md")
 OVERENGINEERING_HUMAN = Path("docs/architecture/AI_GAME_BUILDER_OVERENGINEERING.md")
 RUNTIME_CONTRACTS = Path("skeleton/ai/game_builder/contracts.py")
 RUNTIME_FORGE = Path("skeleton/ai/game_builder/dual_rival_forge.py")
-RUNTIME_TESTS = Path("skeleton/testing/test_ai_game_builder_contracts.py")
+RUNTIME_TESTS = Path("tests/test_ai_game_builder_runtime.py")
 GOVERNANCE_CANON = Path("skeleton/ai/game_builder/canon.py")
 GOVERNANCE_RIGHTS = Path("skeleton/ai/game_builder/rights.py")
 GOVERNANCE_ATOMS = Path("skeleton/ai/game_builder/atomizer.py")
-GOVERNANCE_TESTS = Path("skeleton/testing/test_ai_game_builder_governance.py")
+GOVERNANCE_TESTS = Path("tests/test_ai_game_builder_governance.py")
 
 
 class GameBuilderAuthorityError(RuntimeError):
