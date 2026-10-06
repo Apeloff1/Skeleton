@@ -605,8 +605,49 @@ authority and sandbox extraction receipts.
 
 ### Volume 8 — evidence and citation plane
 
-Add freshness classification, source quality, claim mapping, and citation
-verification.
+Status: **implemented candidate; product-response cutover and exact-head qualification pending**.
+
+Implemented:
+
+- claim identity and citation integrity now have one canonical
+  `skeleton.verification` implementation with backend compatibility facades;
+- claim identity preserves polarity, relation family, quantities, units, and
+  content anchors so topic similarity cannot silently merge materially
+  different claims;
+- claim-level citation admission rebinds source identity, locator, content
+  digest, canonical claim identity, tenant, and scope before evidence can count;
+- citation laundering defenses reject polarity, relation, quantity, unit, and
+  weak-anchor mismatches;
+- governed source-quality profiles carry explicit quality, provenance,
+  locator-stability, publisher-accountability, primary-source, and policy
+  metadata instead of inferring quality from model prose;
+- freshness policy rejects future observations and, when current evidence is
+  required, evidence older than the policy's maximum age;
+- model-produced and generated-source evidence is non-authoritative;
+- correlated copies share origin identity and cannot satisfy independent-source
+  requirements;
+- high/critical-risk policies can require primary-source support plus stronger
+  independent-origin counts;
+- authoritative contradiction produces a contested publication disposition;
+- context-only and rejected evidence cannot silently become support;
+- publication eligibility is represented by a deterministic digest-bound
+  receipt that has no publication, provider, tool, or transcript authority;
+- a deterministic final-response acceptance boundary now consumes explicit
+  claim-to-receipt bindings and rejects missing, stale, future, mismatched,
+  abstained, contested, or inadmissibly-qualified required claim evidence;
+- final-response acceptance decisions are digest-bound and explicitly cannot
+  commit transcript state or publish content;
+- adversarial regressions cover laundering, stale/future evidence, provenance
+  loss, low-quality sources, correlation, contradiction, scope mismatch,
+  source-digest drift, and high-risk evidence requirements;
+- structural and independent exact-head verification rehash the contract and
+  all governed implementation/test surfaces.
+
+Remaining cutover: make the canonical engine emit structured
+`VerificationClaim` objects plus their Volume-8 evidence receipts, then require
+the live product route to consume the response-acceptance decision before
+assistant transcript commit. The acceptance boundary itself is implemented;
+the engine-to-route structured claim handoff remains pending.
 
 ### Volume 9 — verification plane
 
