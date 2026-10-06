@@ -12,6 +12,7 @@ from .contracts import (
     Candidate,
     Challenge,
     EffortMode,
+    EvaluatorProvenance,
     GateResult,
     PromotionReceipt,
     ProducerProvenance,
@@ -100,6 +101,12 @@ from .deep_assurance import (
     TelemetryFeedbackGate,
     TransformReceipt,
 )
+from .evaluator_provenance import (
+    EvaluatorProvenanceBindingError,
+    evaluator_provenance_from_canonical_execution,
+    gate_result_from_canonical_execution,
+    judge_verdict_from_canonical_execution,
+)
 from .producer_provenance import (
     ProducerProvenanceBindingError,
     candidate_from_canonical_execution,
@@ -129,6 +136,11 @@ __all__ = [
     "CharacterKnowledge",
     "DualRivalForge",
     "EffortMode",
+    "EvaluatorProvenance",
+    "EvaluatorProvenanceBindingError",
+    "evaluator_provenance_from_canonical_execution",
+    "gate_result_from_canonical_execution",
+    "judge_verdict_from_canonical_execution",
     "ForgeStateError",
     "GateResult",
     "IncorporationDecision",
