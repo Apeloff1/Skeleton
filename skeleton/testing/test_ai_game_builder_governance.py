@@ -236,3 +236,30 @@ def test_atom_graph_rejects_orphan_parent_and_dependency() -> None:
                 dependency_ids=("missing",),
             )
         )
+
+
+def test_child_branch_does_not_inherit_parent_events_after_fork() -> None:
+    ledger = CanonLedger()
+    ledger.add_assertion(CanonAssertion("pre", "door", "state", "closed", "root", 0))
+    ledger.add_branch("child", fork_tick=10)
+    ledger.add_assertion(CanonAssertion("post", "weather", "storm", True, "root", 15))
+    ledger.add_knowledge(CharacterKnowledge("parent-npc", "post", "root", 15, "radio"))
+
+    assert ledger.effective(
+        subject="door", predicate="state", branch_id="child", tick=30
+    ).value == "closed"
+    assert ledger.effective(
+        subject="weather", predicate="storm", branch_id="child", tick=30
+    ) is None
+    assert not ledger.character_knows(
+        character_id="parent-npc", assertion_id="post", branch_id="child", tick=30
+    )
+
+
+def test_branch_cannot_be_queried_before_fork() -> None:
+    ledger = CanonLedger()
+    ledger.add_branch("future-route", fork_tick=20)
+    with pytest.raises(CanonError, match="before its fork"):
+        ledger.effective(
+            subject="x", predicate="y", branch_id="future-route", tick=19
+        )
