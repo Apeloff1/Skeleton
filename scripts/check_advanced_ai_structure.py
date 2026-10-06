@@ -25,6 +25,7 @@ EVIDENCE_PATHS = {
     "independent_verifier": "scripts/verify_advanced_ai_structure.py",
     "tests": "tests/test_advanced_ai_structure.py",
     "workflow": ".github/workflows/advanced-ai-structure.yml",
+    "maturity_ledger": "machine/advanced_ai_maturity_ledger.json",
 }
 
 INTEGRATION_FILES = (
@@ -1223,6 +1224,96 @@ def validate_payloads(
             errors.append(f"ADV-S{index:02d}.priority invalid")
         if not isinstance(package.get("exit"), str) or not package.get("exit"):
             errors.append(f"ADV-S{index:02d}.exit must be non-empty")
+
+    ledger_path = repo_root / EVIDENCE_PATHS["maturity_ledger"]
+    try:
+        ledger = _load(ledger_path)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+        errors.append(f"cannot load advanced AI maturity ledger: {exc}")
+        ledger = {}
+    if ledger.get("schema_version") != "advanced-ai-maturity-ledger/v1":
+        errors.append("advanced AI maturity ledger schema drifted")
+    if ledger.get("structure_contract") != CONTRACT.as_posix():
+        errors.append("advanced AI maturity ledger structure contract drifted")
+    if ledger.get("generated_for_structure_version") != contract.get(
+        "structure_version"
+    ):
+        errors.append("advanced AI maturity ledger structure version drifted")
+    if ledger.get("production_maturity_level") != 0:
+        errors.append("planning maturity ledger must remain at level 0")
+    if ledger.get("production_maturity_id") != "ENTERPRISE-BASELINE":
+        errors.append("planning maturity ledger production id drifted")
+    ledger_levels = _objects(
+        ledger.get("levels"),
+        label="maturity_ledger.levels",
+        errors=errors,
+        minimum=100,
+    )
+    if len(ledger_levels) != 100:
+        errors.append("maturity ledger must contain exactly 100 levels")
+    ledger_ids = {
+        item.get("level_id")
+        for item in ledger_levels
+        if isinstance(item.get("level_id"), str)
+    }
+    if ledger_ids != EXPECTED_LEVEL_IDS:
+        errors.append("maturity ledger level IDs must be L001 through L100")
+    for index, row in enumerate(ledger_levels, start=1):
+        level_id = f"L{index:03d}"
+        level = level_map.get(level_id, {})
+        blueprint = blueprint_map.get(f"ADV-{level_id}", {})
+        if row.get("level_id") != level_id:
+            errors.append(f"maturity ledger row {index} level_id drifted")
+        if row.get("ordinal") != index:
+            errors.append(f"maturity ledger {level_id} ordinal drifted")
+        if row.get("stratum") != level.get("stratum"):
+            errors.append(f"maturity ledger {level_id} stratum drifted")
+        if row.get("title") != level.get("title"):
+            errors.append(f"maturity ledger {level_id} title drifted")
+        if row.get("primary_owner_plane") != blueprint.get(
+            "primary_owner_plane"
+        ):
+            errors.append(f"maturity ledger {level_id} owner drifted")
+        if row.get("risk_class") != level.get("risk_class"):
+            errors.append(f"maturity ledger {level_id} risk class drifted")
+        if row.get("state") != "PLANNED":
+            errors.append(f"planning maturity ledger {level_id} must be PLANNED")
+        if row.get("evidence_state") != "MISSING":
+            errors.append(
+                f"planning maturity ledger {level_id} evidence must be MISSING"
+            )
+        if row.get("current_evidence_receipts") != []:
+            errors.append(
+                f"planning maturity ledger {level_id} cannot have evidence receipts"
+            )
+        for nullable in (
+            "last_qualified_head",
+            "last_qualified_at_utc",
+            "promoted_release_id",
+            "suspended_reason",
+            "rollback_target",
+        ):
+            if row.get(nullable) is not None:
+                errors.append(
+                    f"planning maturity ledger {level_id}.{nullable} must be null"
+                )
+    summary = ledger.get("summary")
+    if not isinstance(summary, dict):
+        errors.append("maturity ledger summary must be an object")
+    else:
+        expected_summary = {
+            "planned": 100,
+            "contract_ready": 0,
+            "implemented_candidate": 0,
+            "qualified": 0,
+            "promoted": 0,
+            "suspended": 0,
+            "rolled_back": 0,
+            "current_evidence": 0,
+            "missing_evidence": 100,
+        }
+        if summary != expected_summary:
+            errors.append("planning maturity ledger summary drifted")
 
     evidence = contract.get("evidence")
     if not isinstance(evidence, dict):
