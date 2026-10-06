@@ -110,6 +110,14 @@ from .finite_difference import (
     second_derivative_grid,
     solve_poisson_dirichlet_1d,
 )
+from .geometry2 import (
+    convex_hull,
+    orientation,
+    point_in_polygon,
+    polygon_area,
+    polygon_centroid,
+    signed_polygon_area,
+)
 from .geometry import (
     ProjectionReport,
     angular_distance,
@@ -176,6 +184,7 @@ from .losses import (
     mean_squared_error,
     perplexity,
 )
+from .monotone import MonotoneCubicInterpolator, monotone_cubic_interpolator
 from .numerics import (
     almost_equal,
     compensated_sum,
@@ -185,6 +194,7 @@ from .numerics import (
     stable_mean,
     stable_softmax,
 )
+from .online_stats import RunningCovariance, RunningMoments
 from .optimization2 import (
     AdvancedOptimizationResult,
     AdvancedOptimizationStep,
@@ -330,6 +340,12 @@ from .transforms import (
     inverse_dft,
     inverse_fft_radix2,
 )
+from .wavelets import (
+    haar_transform,
+    hadamard_transform,
+    inverse_haar_transform,
+    inverse_hadamard_transform,
+)
 from .validation import MathAuditCase, MathAuditReport, audit_runtime_kernels
 
 __all__ = [
@@ -417,6 +433,12 @@ __all__ = [
     "first_derivative_grid",
     "second_derivative_grid",
     "solve_poisson_dirichlet_1d",
+    "convex_hull",
+    "orientation",
+    "point_in_polygon",
+    "polygon_area",
+    "polygon_centroid",
+    "signed_polygon_area",
     "ProjectionReport",
     "angular_distance",
     "barycentric_triangle",
@@ -476,6 +498,8 @@ __all__ = [
     "mean_absolute_error",
     "mean_squared_error",
     "perplexity",
+    "MonotoneCubicInterpolator",
+    "monotone_cubic_interpolator",
     "almost_equal",
     "compensated_sum",
     "logsumexp",
@@ -483,6 +507,8 @@ __all__ = [
     "relative_error",
     "stable_mean",
     "stable_softmax",
+    "RunningCovariance",
+    "RunningMoments",
     "AdvancedOptimizationResult",
     "AdvancedOptimizationStep",
     "bfgs",
@@ -602,6 +628,10 @@ __all__ = [
     "fft_radix2",
     "inverse_dft",
     "inverse_fft_radix2",
+    "haar_transform",
+    "hadamard_transform",
+    "inverse_haar_transform",
+    "inverse_hadamard_transform",
     "MathAuditCase",
     "MathAuditReport",
     "audit_runtime_kernels",

@@ -71,6 +71,10 @@ model authority boundaries.
 - `quadrature2.py` — generated Gauss-Legendre rules and composite Gaussian quadrature.
 - `finite_difference.py` — grid derivatives, Dirichlet Poisson solves and explicit-diffusion stability bounds.
 - `entropy2.py` — Rényi/Tsallis/Gini plus mutual, conditional and variation-of-information metrics.
+- `online_stats.py` — immutable mergeable streaming moment/covariance summaries.
+- `wavelets.py` — orthonormal Haar and normalized Walsh-Hadamard transforms with exact inverse semantics.
+- `monotone.py` — shape-preserving monotone cubic Hermite interpolation.
+- `geometry2.py` — planar orientation, convex hull, polygon area/centroid and containment references.
 - `validation.py` — parity evidence against existing optimized runtime kernels.
 
 ## Guarantees
@@ -119,6 +123,10 @@ model authority boundaries.
 - Gaussian quadrature derives its own Legendre nodes/weights and bounds supported order explicitly.
 - Finite-difference PDE helpers expose their sign convention, boundary conditions and residual evidence.
 - Generalized information metrics normalize joint distributions explicitly and reject contradictory support.
+- Streaming statistics are immutable/mergeable so parallel accumulation preserves deterministic summary semantics.
+- Haar and Hadamard transforms are orthonormal and expose explicit inverse operations.
+- Monotone cubic interpolation applies slope limiting so monotonic samples do not acquire overshoot.
+- Planar geometry uses deterministic hull ordering and explicit boundary-inclusion semantics.
 - `audit_runtime_kernels()` compares optimized runtime softmax, matmul and attention against
   this reference substrate without replacing those kernels.
 
