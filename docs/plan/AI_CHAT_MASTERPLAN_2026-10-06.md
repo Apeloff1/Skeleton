@@ -487,8 +487,26 @@ qualification.
 
 ### Volume 4 — context compiler v2
 
-Add budget allocation, protected control reserve, provenance-aware compaction,
-and adversarial trust tests.
+Status: **implemented candidate; exact-head qualification pending**.
+
+Implemented:
+
+- compiler identity advanced to `context-compiler-v2`;
+- required trusted controls remain non-evictable;
+- canonical current user turn is protected before optional controls/evidence;
+- current user text is never silently compacted into a derived summary;
+- configured policy reserve remains protected during current-turn admission;
+- remaining evidence receives deterministic trust-tier first-pass quotas;
+- unused quota is borrowed in trust order to retain high utilization;
+- lower-trust retrieval cannot starve authorized conversation data;
+- context digests bind the compiler version and selected evidence;
+- canonical and `skeleton/ai/runtime/context` mirror implementations remain
+  byte-identical;
+- adversarial tests cover retrieval flooding, oversized current turns, trust
+  starvation, allocation-policy validation, and compiler-version identity.
+
+Next integration: surface allocation diagnostics/pressure telemetry without
+exposing prompt or evidence contents.
 
 ### Volume 5 — routing v2
 
