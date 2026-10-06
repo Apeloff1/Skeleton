@@ -30,6 +30,7 @@ MAX_INDEX_BYTES = 90 * 1024 * 1024
 MAX_SOURCE_BYTES = 2_000_000
 MAX_TERM_LENGTH = 128
 MAX_POSTINGS = 2_000_000
+MAX_REFERENCE_TERMS_PER_DOCUMENT = 96
 
 _IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]{1,127}")
 _CAMEL = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
@@ -37,6 +38,19 @@ _PATH_SPLIT = re.compile(r"[/._:-]+")
 _SAFE_TERM = re.compile(r"^[a-z_][a-z0-9_]{1,127}$")
 
 _DEFAULT_EXCLUDED_ZONES = frozenset({"external-sources"})
+
+_LOW_SIGNAL_TERMS = frozenset({
+    "and", "as", "assert", "async", "await", "bool", "break", "case", "catch",
+    "char", "class", "cls", "const", "continue", "def", "default", "do", "double",
+    "else", "enum", "except", "export", "extends", "false", "final", "finally",
+    "float", "for", "from", "func", "function", "if", "impl", "import", "in",
+    "int", "interface", "is", "let", "match", "module", "mut", "new", "nil",
+    "none", "not", "null", "object", "of", "or", "package", "pass", "private",
+    "protected", "pub", "public", "raise", "record", "return", "self", "static",
+    "str", "string", "struct", "super", "switch", "this", "throw", "trait",
+    "true", "try", "type", "undefined", "using", "var", "void", "while", "with",
+    "yield",
+})
 
 
 class CodeSearchError(RuntimeError):
@@ -100,11 +114,39 @@ def _definition_pattern(language: str, name: str) -> re.Pattern[str]:
         prefix = r"(?:(?:public|protected|private|abstract|final|static|sealed|non-sealed)\s+)*(?:class|interface|enum|record)"
     elif language == "kotlin":
         prefix = r"(?:(?:public|private|internal|protected|data|sealed|open|abstract)\s+)*(?:class|interface|object|fun|typealias)"
-    elif language in {"c", "cpp"}:
+    elif language == "c":
         return re.compile(rf"\b{escaped}\s*\(", re.IGNORECASE)
+    elif language == "cpp":
+        return re.compile(
+            rf"(?:^\s*(?:class|struct|enum)\s+{escaped}\b|\b{escaped}\s*\()",
+            re.IGNORECASE,
+        )
     else:
         return re.compile(r"(?!x)x")
     return re.compile(rf"^\s*{prefix}\s+{escaped}\b", re.IGNORECASE)
+
+
+def _reference_priority(term: str, count: int, structural_terms: set[str]) -> int:
+    """Rank references for the bounded per-document posting budget."""
+    score = min(len(term), 32) * 3 + min(count, 8) * 2
+    if "_" in term:
+        score += 18
+    if term in structural_terms:
+        score += 80
+    if term in _LOW_SIGNAL_TERMS:
+        score -= 96
+    return score
+
+
+def _structural_terms(references: Iterable[object]) -> set[str]:
+    terms: set[str] = set()
+    for reference in references:
+        target = getattr(reference, "target", "")
+        if not isinstance(target, str):
+            continue
+        for match in _IDENTIFIER.finditer(target):
+            terms.add(match.group(0).casefold())
+    return terms
 
 
 def _safe_read(root: Path, record: FileRecord, max_source_bytes: int) -> bytes:
@@ -325,11 +367,12 @@ class CodeSearchIndex:
             if language is None:
                 continue
             try:
-                symbols, _references = extract_records(record.path, content)
+                symbols, references = extract_records(record.path, content)
             except CodeIndexError:
                 # Lexical search remains useful for broken/in-progress source.
                 # Parser certainty is withheld rather than dropping the file.
                 symbols = ()
+                references = ()
 
             document_id = len(documents)
             documents.append(IndexedDocument(
@@ -365,7 +408,26 @@ class CodeSearchIndex:
                         state[3] = line_number
                         state[4] = match.start()
 
-            for term in sorted(local):
+            # Preserve every statically extracted symbol. References are
+            # deliberately bounded per document so repository growth cannot
+            # turn common syntax/locals into an unbounded global posting set.
+            protected_terms = {term for term in symbol_names if term in local}
+            structural_terms = _structural_terms(references)
+            ranked_references = [
+                term for term in local
+                if term not in protected_terms
+            ]
+            ranked_references.sort(
+                key=lambda term: (
+                    -_reference_priority(term, local[term][0], structural_terms),
+                    term,
+                )
+            )
+            selected_terms = protected_terms | set(
+                ranked_references[:MAX_REFERENCE_TERMS_PER_DOCUMENT]
+            )
+
+            for term in sorted(selected_terms):
                 count, first_line, first_column, definition_line, definition_column = local[term]
                 is_definition = definition_line > 0
                 posting = CodePosting(
@@ -406,6 +468,7 @@ class CodeSearchIndex:
             "documents": len(self.documents),
             "terms": len(self.postings),
             "postings": self.posting_count,
+            "reference_terms_per_document": MAX_REFERENCE_TERMS_PER_DOCUMENT,
             "skipped": len(self.skipped),
             "languages": dict(sorted(languages.items())),
         }
@@ -715,6 +778,7 @@ __all__ = [
     "IndexedDocument",
     "MAX_INDEX_BYTES",
     "MAX_POSTINGS",
+    "MAX_REFERENCE_TERMS_PER_DOCUMENT",
     "MAX_SOURCE_BYTES",
     "index_envelope",
     "load_code_search_index",
