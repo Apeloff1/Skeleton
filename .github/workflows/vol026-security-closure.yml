@@ -82,6 +82,7 @@ jobs:
           python -m pip install --disable-pip-version-check
           "pytest>=8,<9"
           "pydantic>=2,<3"
+          "pydantic-settings>=2,<3"
 
       - name: Compile VOL-026 security boundaries
         run: >-
