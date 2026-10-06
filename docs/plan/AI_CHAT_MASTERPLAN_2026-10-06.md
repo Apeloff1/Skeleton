@@ -492,13 +492,49 @@ and adversarial trust tests.
 
 ### Volume 5 — routing v2
 
-Bind turn budgets, privacy, endpoint health, provider receipts, and fail-closed
-fallback into model placement.
+Status: **implemented candidate; provider-runtime cutover and exact-head qualification pending**.
+
+Implemented:
+
+- deterministic endpoint placement bound to the immutable request, remaining
+  model-call/wall-time/cost budget, privacy tier, locality, jurisdiction,
+  modality, context capacity, quality floor, and reliability floor;
+- stale or missing endpoint health fails closed;
+- open circuit breakers and saturated endpoints are excluded;
+- degraded endpoints require explicit policy admission and rank behind healthy
+  endpoints;
+- failover is limited to transient, capacity, and unavailable failure classes;
+- a failover candidate must have been admitted by the original placement
+  receipt and requalified on fresh health evidence;
+- failover may consume remaining budget but cannot amplify it;
+- placement and failover receipts are deterministic, digest-bound,
+  provider-SDK-free, and non-executing.
+
+The remaining cutover is to translate canonical provider inventory/health into
+these decision records and require the canonical provider runtime to consume an
+admitted placement receipt before dispatch.
 
 ### Volume 6 — tool recovery integration
 
-Bind the turn runtime directly to canonical tool receipt reconciliation and
-approval state.
+Status: **implemented candidate; turn-runtime cutover and exact-head qualification pending**.
+
+Implemented:
+
+- receipt-bound recovery decisions for canonical assistant tool operations;
+- unknown consequential writes reconcile before retry and quarantine when
+  reconciliation is unavailable;
+- write retry requires durable evidence of a known non-commit plus an
+  idempotency binding;
+- read-only retry remains bounded by the operation retry budget;
+- reversible writes can enter compensation after downstream failure;
+- security-sensitive retries require current explicit user authority;
+- receipt request/argument binding mismatches quarantine;
+- durable success is reused rather than replayed;
+- recovery decisions are deterministic and explicitly non-executing.
+
+The remaining cutover is to feed canonical tool receipts into this decision
+surface from the durable turn runtime and map reconcile/compensate/quarantine
+outcomes to legal turn-state transitions.
 
 ### Volume 7 — governed attachment plane
 
