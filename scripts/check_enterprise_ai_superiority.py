@@ -255,17 +255,22 @@ def _validate_common(policy: Mapping[str, Any]) -> None:
     if not REQUIRED_EVIDENCE_BINDINGS.issubset(evidence):
         raise EnterpriseSuperiorityError("evidence identity coverage incomplete")
 
-    non_comp = _text_list(
-        common.get("non_compensable_gates"),
-        "non_compensable_gates",
-        minimum=9,
-    )
-    blob = "\n".join(non_comp).lower()
+    raw_non_comp = common.get("non_compensable_gates")
+    if not isinstance(raw_non_comp, list):
+        raise EnterpriseSuperiorityError("non_compensable_gates must be a list")
+    preliminary_blob = "\n".join(
+        item for item in raw_non_comp if isinstance(item, str)
+    ).lower()
     for fragment in REQUIRED_NON_COMPENSABLE_FRAGMENTS:
-        if fragment.lower() not in blob:
+        if fragment.lower() not in preliminary_blob:
             raise EnterpriseSuperiorityError(
                 f"missing non-compensable gate fragment: {fragment}"
             )
+    non_comp = _text_list(
+        raw_non_comp,
+        "non_compensable_gates",
+        minimum=9,
+    )
 
 
 def _validate_profiles(
