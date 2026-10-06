@@ -6,7 +6,10 @@ from uuid import uuid4
 import pytest
 
 from core.chat_turn_lifecycle import ChatTurnLifecycle
-from skeleton.ai.assistant.turn_runtime import TurnState
+from skeleton.ai.assistant.turn_runtime import (
+    TurnState,
+    provider_receipt_set_ref,
+)
 from skeleton.contracts.conversation import (
     ConversationAuthorType,
     ConversationMessage,
@@ -224,3 +227,82 @@ async def test_retryable_and_cancelled_failures_are_terminal():
         cancelled=True,
     )
     assert cancelled.snapshot.state is TurnState.CANCELLED
+
+
+@pytest.mark.asyncio
+async def test_provider_receipt_set_binds_all_receipts_and_rejects_drift():
+    lifecycle = ChatTurnLifecycle(AsyncAuthority())
+    thread, user = _thread_and_user()
+    turn = await lifecycle.begin(
+        thread=thread,
+        user_message=user,
+        operation_id=str(uuid4()),
+        request_digest="6" * 64,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+    )
+    turn = await lifecycle.advance(
+        turn,
+        TurnState.MODEL_RUNNING,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+        reason_code="engine-started",
+    )
+    receipts = (
+        "provider:test:receipt-2",
+        "provider:test:receipt-1",
+    )
+    turn = await lifecycle.advance(
+        turn,
+        TurnState.FINALIZING,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+        reason_code="verified-result",
+        provider_receipt_refs=receipts,
+    )
+    assert turn.snapshot.provider_receipt_ref == provider_receipt_set_ref(
+        receipts
+    )
+    assert lifecycle.assert_provider_receipts(
+        turn,
+        tuple(reversed(receipts)),
+    ) == provider_receipt_set_ref(receipts)
+
+    with pytest.raises(ValueError, match="binding drifted"):
+        await lifecycle.advance(
+            turn,
+            TurnState.COMPLETE,
+            tenant_id=TENANT,
+            owner_id=OWNER,
+            reason_code="assistant-committed",
+            provider_receipt_refs=(
+                "provider:test:receipt-1",
+                "provider:test:receipt-3",
+            ),
+        )
+
+
+@pytest.mark.asyncio
+async def test_legacy_single_provider_receipt_remains_compatible():
+    lifecycle = ChatTurnLifecycle(AsyncAuthority())
+    thread, user = _thread_and_user()
+    turn = await lifecycle.begin(
+        thread=thread,
+        user_message=user,
+        operation_id=str(uuid4()),
+        request_digest="7" * 64,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+    )
+    turn = await lifecycle.advance(
+        turn,
+        TurnState.FINALIZING,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+        reason_code="legacy-verified-result",
+        provider_receipt_ref="provider:test:legacy-receipt",
+    )
+    assert lifecycle.assert_provider_receipts(
+        turn,
+        ("provider:test:legacy-receipt",),
+    ) == provider_receipt_set_ref(("provider:test:legacy-receipt",))
