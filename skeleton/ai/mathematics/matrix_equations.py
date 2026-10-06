@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from numbers import Real
 from typing import Sequence
 
-from .contracts import MathInvariantError, Matrix, finite_matrix
+from .contracts import MathInvariantError, Matrix, finite_matrix, positive_scalar
 from .linear import solve_linear_system, transpose
 from .numerics import compensated_sum
 
@@ -102,13 +102,7 @@ def solve_continuous_lyapunov(
             reason="dimension_mismatch",
             field="lyapunov",
         )
-    tolerance = float(symmetry_tolerance)
-    if tolerance <= 0.0:
-        raise MathInvariantError(
-            "symmetry_tolerance must be positive",
-            reason="invalid_tolerance",
-            field="symmetry_tolerance",
-        )
+    tolerance = positive_scalar("symmetry_tolerance", symmetry_tolerance)
     scale = max(1.0, max(abs(value) for row in q for value in row))
     for i in range(n):
         for j in range(i + 1, n):

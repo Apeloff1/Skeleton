@@ -8,7 +8,6 @@ from typing import Callable, Sequence
 
 from .contracts import MathInvariantError, Matrix, Vector, finite_matrix, positive_scalar
 from .eigensystems import symmetric_eigensystem
-from .linear import matmul
 from .numerics import compensated_sum
 
 

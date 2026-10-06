@@ -50,6 +50,18 @@ def test_symmetric_matrix_functions_match_diagonal_closed_forms() -> None:
     root = symmetric_matrix_sqrt(matrix)
     assert root.value[0] == pytest.approx((2.0, 0.0), abs=1e-12)
     assert root.value[1] == pytest.approx((0.0, 3.0), abs=1e-12)
+    squared = (
+        (
+            root.value[0][0] * root.value[0][0] + root.value[0][1] * root.value[1][0],
+            root.value[0][0] * root.value[0][1] + root.value[0][1] * root.value[1][1],
+        ),
+        (
+            root.value[1][0] * root.value[0][0] + root.value[1][1] * root.value[1][0],
+            root.value[1][0] * root.value[0][1] + root.value[1][1] * root.value[1][1],
+        ),
+    )
+    assert squared[0] == pytest.approx(matrix[0], abs=1e-11)
+    assert squared[1] == pytest.approx(matrix[1], abs=1e-11)
 
     inverse_root = symmetric_matrix_inverse_sqrt(matrix)
     assert inverse_root.value[0] == pytest.approx((0.5, 0.0), abs=1e-12)
