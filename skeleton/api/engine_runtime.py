@@ -87,7 +87,7 @@ class EngineExecutionCoordinator:
         self.lifecycle = lifecycle
         self._lock = asyncio.Lock()
         self._tasks: dict[str, asyncio.Task[None]] = {}
-        self._lifecycle_leases: dict[str, WorkLease] = {}
+        self._lifecycle_leases: dict[asyncio.Task[None], WorkLease] = {}
         self._closed = False
 
     async def ensure_started(
@@ -110,6 +110,8 @@ class EngineExecutionCoordinator:
             existing = self._tasks.get(execution_id)
             if existing is not None and not existing.done():
                 return
+            if existing is not None and existing.done():
+                self._task_done(execution_id, existing)
 
             lease = None
             if self.lifecycle is not None:
@@ -135,7 +137,7 @@ class EngineExecutionCoordinator:
 
             self._tasks[execution_id] = task
             if lease is not None:
-                self._lifecycle_leases[execution_id] = lease
+                self._lifecycle_leases[task] = lease
             task.add_done_callback(
                 lambda completed, eid=execution_id: self._task_done(
                     eid,
@@ -151,7 +153,7 @@ class EngineExecutionCoordinator:
         current = self._tasks.get(execution_id)
         if current is task:
             self._tasks.pop(execution_id, None)
-        lease = self._lifecycle_leases.pop(execution_id, None)
+        lease = self._lifecycle_leases.pop(task, None)
         if lease is not None and self.lifecycle is not None:
             self.lifecycle.release_work(lease)
         if task.cancelled():
