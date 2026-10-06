@@ -47,7 +47,10 @@ from skeleton.contracts.context import (
 from skeleton.intelligence.execution_runtime import (
     ExecutionVerificationDecision,
 )
-from skeleton.kernel.runtime_supervision import RuntimeServiceLifecycle
+from skeleton.kernel.runtime_supervision import (
+    RuntimeServiceLifecycle,
+    RuntimeSupervisionError,
+)
 from skeleton.persistence.execution_repository import SQLiteExecutionRepository
 from skeleton.provider_contract import (
     FinishReason,
@@ -550,7 +553,7 @@ async def test_engine_lifecycle_draining_fences_new_execution_and_drains_lease(
         await coordinator.ensure_started(second)
 
     with pytest.raises(
-        Exception,
+        RuntimeSupervisionError,
         match="in-flight work leases",
     ):
         lifecycle.mark_stopped(reason="too-early")
