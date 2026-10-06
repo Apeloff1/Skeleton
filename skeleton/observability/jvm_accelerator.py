@@ -620,9 +620,17 @@ class JvmObservabilityAccelerator:
 
 def get_default_accelerator() -> JvmObservabilityAccelerator:
     """Return the observability helper owned by the canonical JVM registry."""
-    from skeleton.native.jvm_registry import get_default_jvm_registry
+    from skeleton.native.jvm_registry import (
+        JvmAcceleratorRegistryError,
+        get_default_jvm_registry,
+    )
 
-    accelerator = get_default_jvm_registry().get("observability")
+    try:
+        accelerator = get_default_jvm_registry().get_selected("observability")
+    except JvmAcceleratorRegistryError as exc:
+        raise JvmAcceleratorUnavailable(
+            "observability JVM accelerator is not profile-selected"
+        ) from exc
     if not isinstance(accelerator, JvmObservabilityAccelerator):
         raise JvmAcceleratorUnavailable(
             "canonical JVM registry returned wrong observability type"
