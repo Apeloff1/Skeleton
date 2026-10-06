@@ -323,6 +323,23 @@ class ImpactCalibrationReceipt:
             raise TypeError("impact calibration scores must be numeric")
         if not 0.0 <= float(self.precision) <= 1.0 or not 0.0 <= float(self.recall) <= 1.0:
             raise ValueError("impact calibration scores must be within [0,1]")
+        predicted = set(self.predicted_ids)
+        observed = set(self.observed_ids)
+        true_positive = len(predicted & observed)
+        expected_precision = (
+            true_positive / len(predicted)
+            if predicted
+            else (1.0 if not observed else 0.0)
+        )
+        expected_recall = true_positive / len(observed) if observed else 1.0
+        if abs(float(self.precision) - expected_precision) > 1e-12:
+            raise ResilienceError(
+                "impact calibration precision does not match recorded sets"
+            )
+        if abs(float(self.recall) - expected_recall) > 1e-12:
+            raise ResilienceError(
+                "impact calibration recall does not match recorded sets"
+            )
         expected = canonical_digest(self.payload())
         if self.receipt_digest != expected:
             raise ResilienceError("impact calibration receipt digest mismatch")
