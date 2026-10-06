@@ -2,9 +2,12 @@
 
 Machine index: `machine/enterprise_ai_implementation_notes_index.json`
 
-These notebooks are the human-readable implementation companion to the machine dossiers. They cover every `VOL-000` through `VOL-420`. A note is a construction obligation, not completion evidence; exact-head validation and enterprise qualification remain mandatory.
+These notebooks are the human-readable implementation companion to the machine dossiers. They cover every `VOL-000` through `VOL-420`: 421 dossiers × 14 implementation levels = 5,894 level contracts, each with six mandatory deep sections, for 35,364 section obligations. A note is a construction obligation, not completion evidence; exact-head validation and enterprise qualification remain mandatory.
 
 ## Required implementation depth
+
+Every level contains six mandatory sections: **Implementation**, **Acceptance**, **Design invariants**, **Failure modes**, **Telemetry & SLOs**, and **Required evidence**.
+
 
 - **L00 Intent & ownership** — mandatory for every volume; both implementation notes and acceptance criteria are required.
 - **L01 Architecture & dependencies** — mandatory for every volume; both implementation notes and acceptance criteria are required.
