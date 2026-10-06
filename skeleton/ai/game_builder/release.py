@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, Mapping
 
-from .contracts import canonical_digest
+from .contracts import EffortMode, canonical_digest
 
 
 class ReleaseArbitrationError(RuntimeError):
@@ -42,6 +42,127 @@ class CriticalGateQualification:
 
 
 @dataclass(frozen=True, slots=True)
+class ForgeReleaseBinding:
+    """Content-addressed continuity proof from completed forge to release."""
+
+    checkpoint_digest: str
+    champion_candidate_digest: str
+    champion_artifact_digest: str
+    champion_canon_digest: str
+    champion_provenance_digest: str
+    promotion_chain_digest: str
+    effort_mode: EffortMode
+    completed_rounds: int
+    receipt_count: int
+
+    def __post_init__(self) -> None:
+        for name in (
+            "checkpoint_digest",
+            "champion_candidate_digest",
+            "champion_artifact_digest",
+            "champion_canon_digest",
+            "champion_provenance_digest",
+            "promotion_chain_digest",
+        ):
+            value = getattr(self, name)
+            if not isinstance(value, str) or len(value) < 16:
+                raise ValueError(f"{name} must be a stable digest")
+        if not isinstance(self.effort_mode, EffortMode):
+            raise TypeError("forge release effort_mode must be EffortMode")
+        if self.completed_rounds != self.effort_mode.rounds:
+            raise ValueError("forge release binding requires exact completed effort budget")
+        if self.receipt_count != self.completed_rounds:
+            raise ValueError("forge release binding requires one receipt per completed round")
+
+    @classmethod
+    def from_checkpoint(
+        cls,
+        checkpoint: Mapping[str, object],
+    ) -> "ForgeReleaseBinding":
+        if not isinstance(checkpoint, Mapping):
+            raise TypeError("forge checkpoint must be a mapping")
+        supplied_digest = checkpoint.get("checkpoint_digest")
+        core = {
+            key: value
+            for key, value in checkpoint.items()
+            if key != "checkpoint_digest"
+        }
+        if not isinstance(supplied_digest, str) or supplied_digest != canonical_digest(core):
+            raise ValueError("forge release checkpoint digest mismatch")
+        if checkpoint.get("schema") != "skeleton.ai_game_builder.dual_rival_checkpoint.v1":
+            raise ValueError("forge release checkpoint schema is unsupported")
+
+        effort_mode = EffortMode.parse(checkpoint.get("effort_mode"))
+        completed_rounds = checkpoint.get("completed_rounds")
+        round_index = checkpoint.get("round_index")
+        if isinstance(completed_rounds, bool) or not isinstance(completed_rounds, int):
+            raise TypeError("forge release completed_rounds must be an integer")
+        if isinstance(round_index, bool) or not isinstance(round_index, int):
+            raise TypeError("forge release round_index must be an integer")
+        if completed_rounds != effort_mode.rounds or round_index != effort_mode.rounds:
+            raise ValueError("forge release checkpoint is not at exact terminal round")
+        if checkpoint.get("stage") != "construct":
+            raise ValueError("forge release checkpoint must rest at construct boundary")
+        if checkpoint.get("pending_construct") is not None or checkpoint.get("pending_challenge") is not None:
+            raise ValueError("forge release checkpoint cannot contain pending round state")
+
+        receipt_digests = checkpoint.get("receipt_digests")
+        if not isinstance(receipt_digests, list):
+            raise TypeError("forge release receipt digest chain must be a list")
+        if len(receipt_digests) != completed_rounds:
+            raise ValueError("forge release receipt chain must cover every completed round")
+        if any(
+            not isinstance(item, str) or len(item) < 16
+            for item in receipt_digests
+        ):
+            raise ValueError("forge release receipt chain contains an unstable digest")
+        if len(receipt_digests) != len(set(receipt_digests)):
+            raise ValueError("forge release receipt digests must be unique")
+
+        champion = checkpoint.get("champion")
+        if not isinstance(champion, Mapping):
+            raise ValueError("forge release checkpoint champion is missing")
+        artifact = champion.get("artifact")
+        if not isinstance(artifact, Mapping):
+            raise ValueError("forge release checkpoint champion artifact is missing")
+        identities: dict[str, str] = {}
+        for key in ("artifact_digest", "canon_digest", "provenance_digest"):
+            value = artifact.get(key)
+            if not isinstance(value, str) or len(value) < 16:
+                raise ValueError(f"forge release champion {key} is invalid")
+            identities[key] = value
+
+        return cls(
+            checkpoint_digest=supplied_digest,
+            champion_candidate_digest=canonical_digest(champion),
+            champion_artifact_digest=identities["artifact_digest"],
+            champion_canon_digest=identities["canon_digest"],
+            champion_provenance_digest=identities["provenance_digest"],
+            promotion_chain_digest=canonical_digest(receipt_digests),
+            effort_mode=effort_mode,
+            completed_rounds=completed_rounds,
+            receipt_count=len(receipt_digests),
+        )
+
+    def to_payload(self) -> dict[str, object]:
+        return {
+            "checkpoint_digest": self.checkpoint_digest,
+            "champion_artifact_digest": self.champion_artifact_digest,
+            "champion_candidate_digest": self.champion_candidate_digest,
+            "champion_canon_digest": self.champion_canon_digest,
+            "champion_provenance_digest": self.champion_provenance_digest,
+            "completed_rounds": self.completed_rounds,
+            "effort_mode": int(self.effort_mode),
+            "promotion_chain_digest": self.promotion_chain_digest,
+            "receipt_count": self.receipt_count,
+        }
+
+    @property
+    def digest(self) -> str:
+        return canonical_digest(self.to_payload())
+
+
+@dataclass(frozen=True, slots=True)
 class GoldMasterBundle:
     artifact_digest: str
     build_digest: str
@@ -50,8 +171,38 @@ class GoldMasterBundle:
     replay_digest: str
     rollback_target_digest: str
     red_team_digest: str
+    forge_binding: ForgeReleaseBinding
     family_qualifications: tuple[FamilyQualification, ...]
     critical_gate_qualifications: tuple[CriticalGateQualification, ...]
+
+    def __post_init__(self) -> None:
+        for value in (
+            self.artifact_digest,
+            self.build_digest,
+            self.canon_digest,
+            self.provenance_digest,
+            self.replay_digest,
+            self.rollback_target_digest,
+            self.red_team_digest,
+        ):
+            if not isinstance(value, str) or len(value) < 16:
+                raise ValueError("gold-master identities must be stable digests")
+        if not isinstance(self.forge_binding, ForgeReleaseBinding):
+            raise TypeError("gold-master bundle requires ForgeReleaseBinding")
+        if self.artifact_digest != self.forge_binding.champion_artifact_digest:
+            raise ValueError("gold-master artifact must match forge champion artifact")
+        if self.canon_digest != self.forge_binding.champion_canon_digest:
+            raise ValueError("gold-master canon must match forge champion canon")
+        if self.provenance_digest != self.forge_binding.champion_provenance_digest:
+            raise ValueError("gold-master provenance must match forge champion provenance")
+        expected_families = [f"GB{i:02d}" for i in range(1, 51)]
+        if [row.family_id for row in self.family_qualifications] != expected_families:
+            raise ValueError("gold-master bundle requires exactly GB01..GB50")
+        if not self.critical_gate_qualifications:
+            raise ValueError("gold-master bundle requires critical gates")
+        gate_ids = [row.gate_id for row in self.critical_gate_qualifications]
+        if len(gate_ids) != len(set(gate_ids)):
+            raise ValueError("gold-master critical gate ids must be unique")
 
     @classmethod
     def create(
@@ -64,6 +215,7 @@ class GoldMasterBundle:
         replay_digest: str,
         rollback_target_digest: str,
         red_team_digest: str,
+        forge_binding: ForgeReleaseBinding,
         family_qualifications: Iterable[FamilyQualification],
         critical_gate_results: Mapping[str, tuple[bool, str]],
     ) -> "GoldMasterBundle":
@@ -112,6 +264,7 @@ class GoldMasterBundle:
             replay_digest=replay_digest,
             rollback_target_digest=rollback_target_digest,
             red_team_digest=red_team_digest,
+            forge_binding=forge_binding,
             family_qualifications=families,
             critical_gate_qualifications=tuple(gates),
         )
@@ -137,6 +290,7 @@ class GoldMasterBundle:
                     }
                     for row in self.critical_gate_qualifications
                 ],
+                "forge_binding": self.forge_binding.to_payload(),
                 "family_qualifications": [
                     {
                         "evidence_digest": row.evidence_digest,
