@@ -56,6 +56,19 @@ execution ID. This specifically fences a delayed done-callback from an old task
 from releasing a newer task's lease after the same durable execution identity is
 re-driven.
 
+Generated request leases are minted by the lifecycle authority itself. Their
+identity is `<prefix>:<generation>:<monotonic_lease_sequence>`; Python object
+identity is explicitly forbidden. This prevents process-local object-ID reuse
+from becoming part of admission authority or operational evidence.
+
+Backend startup work is governed by the same lease set. Both asyncio boot tasks
+and raw daemon threads acquire generation-bound leases before they start and
+release them in `finally`. Thread delay waits use the lifecycle cancellation
+event rather than blind sleeps, and shutdown joins tracked threads before
+closing Mongo. If an asyncio task, thread, or lease remains after the bounded
+drain window, shutdown fails closed and the service remains DRAINING instead of
+claiming STOPPED.
+
 ## HTTP admission
 
 Both backend and engine install the same framework-neutral
@@ -99,6 +112,14 @@ During shutdown:
 6. durable dependencies are closed;
 7. STOPPED is allowed only when the lease set is empty.
 
+Coordinator lease retirement is reconciled twice: normal task callbacks release
+the exact task-bound lease, and shutdown performs a deterministic post-gather
+reconciliation so correctness does not depend on event-loop callback timing.
+Missing/disappeared leases are recorded as supervision faults; once faulted the
+coordinator refuses new execution admission. Engine dependency handles are
+still closed best-effort, but cleanup faults are re-raised and lifecycle STOPPED
+is not asserted.
+
 ## Connector cancellation contract
 
 The connector inventory is derived from
@@ -123,10 +144,29 @@ Blocking urllib-based automation connectors accept a shared
 and use token-aware retry waits. A response that arrives after cancellation may
 be observed for transport cleanup but cannot become authoritative output.
 
-The canonical async provider path is deadline-bound and cancellation-aware
-through task cancellation. Durable engine cancellation remains authoritative:
-the backend delegates cancellation to the engine rather than inventing local
-terminal truth.
+The canonical provider owner is governed at operation granularity, not by one
+representative text call. The machine contract covers async text generation,
+the synchronous Jeeves-compatible text adapter, image generation, image
+variation, image editing, and speech synthesis. Expected operations are derived
+from the active OpenAI capability declaration in
+`machine/ai_app_construction.json`; the synchronous operation is additionally
+required whenever that manifest declares a sync adapter.
+
+All async provider network calls share one bounded-call primitive. An absolute
+deadline is validated before the provider-call factory is invoked, so expired
+work cannot perform network I/O. The same deadline bounds image and speech
+operations as well as text. Timeout cancels the awaited provider task, while
+external task cancellation propagates unchanged. Speech response reads are
+also bounded when the SDK exposes an awaitable reader.
+
+The synchronous provider adapter accepts a cooperative cancellation token,
+checks it before architecture/network work, between retry attempts, immediately
+after blocking response read, and before usage finalization. Cancellation wins
+over transport retry classification; a late response is quarantined and cannot
+be promoted to authoritative output.
+
+Durable engine cancellation remains authoritative: the backend delegates
+cancellation to the engine rather than inventing local terminal truth.
 
 ## Failure and race model
 
@@ -143,7 +183,14 @@ The contract explicitly defends against:
 - newly introduced network transports without cancellation declarations;
 - health-prefix confusion;
 - handler exceptions leaking work leases;
-- cancellation retry changing durable terminal truth.
+- cancellation retry changing durable terminal truth;
+- expired provider work dispatching network I/O;
+- media calls escaping the text-only deadline boundary;
+- synchronous provider retries continuing after cancellation;
+- backend daemon threads touching dependencies after STOPPED;
+- coordinator lease disappearance being silently ignored;
+- generated request identity depending on Python object IDs;
+- provider capability growth without a corresponding supervised operation.
 
 ## Verification
 
