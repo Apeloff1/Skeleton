@@ -49,7 +49,8 @@ def test_dual_jacobian_preserves_output_and_input_dimensions() -> None:
         return (x * y, x * x + y)
 
     result = jacobian(function, (2.0, 3.0))
-    assert result == pytest.approx(((3.0, 2.0), (4.0, 1.0)), abs=1e-12)
+    assert result[0] == pytest.approx((3.0, 2.0), abs=1e-12)
+    assert result[1] == pytest.approx((4.0, 1.0), abs=1e-12)
 
 
 def test_tensor_broadcast_transpose_and_reduction_contracts() -> None:

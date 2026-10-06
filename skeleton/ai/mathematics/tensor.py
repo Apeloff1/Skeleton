@@ -309,6 +309,12 @@ def reduce_sum(tensor: DenseTensor, axis: int) -> DenseTensor:
 
 
 def reduce_mean(tensor: DenseTensor, axis: int) -> DenseTensor:
+    if isinstance(axis, bool) or not isinstance(axis, int):
+        raise MathInvariantError(
+            "reduction axis must be an integer",
+            reason="invalid_axis",
+            field="axis",
+        )
     normalized_axis = axis if axis >= 0 else tensor.rank + axis
     if not 0 <= normalized_axis < tensor.rank:
         raise MathInvariantError(
