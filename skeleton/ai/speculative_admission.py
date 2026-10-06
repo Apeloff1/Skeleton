@@ -50,3 +50,49 @@ def execution_receipt(plan,admission,authorization_id,steps:Iterable[Verificatio
     accepted=sum(s.accepted for s in steps); fallback=plan.fallback and rejected>0
     rid=_digest("spec-receipt-sha256:",{"authorization_id":authorization_id,"plan_id":plan_identity(plan),"accepted_tokens":accepted,"rejected_tokens":rejected,"fallback_required":fallback,"evidence":[admission.evaluation_evidence_id,admission.budget_evidence_id,admission.resource_evidence_id]})
     return SpeculativeExecutionReceipt(rid,plan_identity(plan),True,accepted,rejected,fallback,admission.evaluation_evidence_id,admission.budget_evidence_id,admission.resource_evidence_id)
+
+
+@dataclass(frozen=True)
+class ResourceLease:
+    lease_id:str
+    generation:int
+    issued_at_ns:int
+    expires_at_ns:int
+    resource_fingerprint:str
+    def __post_init__(self):
+        if not self.lease_id.strip() or not self.resource_fingerprint.strip(): raise ValueError("lease identity is required")
+        for n in ("generation","issued_at_ns","expires_at_ns"):
+            v=getattr(self,n)
+            if isinstance(v,bool) or not isinstance(v,int) or v<0: raise ValueError(f"{n} must be a non-negative integer")
+        if self.expires_at_ns<=self.issued_at_ns: raise ValueError("lease expiry must follow issue time")
+
+@dataclass(frozen=True)
+class SpeculativeAuthorization:
+    authorization_id:str
+    plan_id:str
+    lease_id:str
+    lease_generation:int
+    expires_at_ns:int
+    resource_fingerprint:str
+
+def issue_authorization(plan,admission,lease,now_ns):
+    if isinstance(now_ns,bool) or not isinstance(now_ns,int) or now_ns<0: raise ValueError("now_ns must be a non-negative integer")
+    if now_ns<lease.issued_at_ns or now_ns>=lease.expires_at_ns: raise PermissionError("resource lease is not live")
+    if admission.resource_evidence_id!=lease.lease_id: raise PermissionError("resource evidence does not identify lease")
+    base=authorize_speculation(plan,admission)
+    aid=_digest("spec-live-auth-sha256:",{"base_authorization_id":base,"lease_id":lease.lease_id,"lease_generation":lease.generation,"expires_at_ns":lease.expires_at_ns,"resource_fingerprint":lease.resource_fingerprint})
+    return SpeculativeAuthorization(aid,plan_identity(plan),lease.lease_id,lease.generation,lease.expires_at_ns,lease.resource_fingerprint)
+
+def validate_live_authorization(plan,admission,authorization,lease,now_ns):
+    expected=issue_authorization(plan,admission,lease,now_ns)
+    if authorization!=expected: raise PermissionError("stale or substituted speculative authorization")
+    return True
+
+class AuthorizationLedger:
+    """Process-local single-use fence; durable stores can implement the same consume contract."""
+    def __init__(self): self._consumed=set()
+    def consume(self,authorization):
+        aid=authorization.authorization_id
+        if aid in self._consumed: raise PermissionError("speculative authorization already consumed")
+        self._consumed.add(aid)
+        return aid
