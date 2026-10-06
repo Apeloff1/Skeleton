@@ -14712,7 +14712,7 @@
         ">=10 of 12 domains parity-or-better and >=2 superior core targets under preregistered margins",
         "dual-rival equal-budget ablation plus extra-compute single-agent control"
       ],
-      "closure_rule": "Code, contract, tests, evidence and rollback/recovery behavior must exist on exact head; plan text alone never signs this task. Whole-product closure additionally requires frontier protocol v2: fresh exact-identity comparators, immutable hidden/public challenge manifests, >=6 independent trials, long-horizon 50%/80% curves, compute-normalized head-to-head evidence, anti-gaming review, evaluator independence, non-compensable critical gates, statistical dominance thresholds, exact-head reproducibility, and independent verification."
+      "closure_rule": "Code, contract, tests, evidence and rollback/recovery behavior must exist on exact head; plan text alone never signs this task. Whole-product closure additionally requires frontier protocol v2: fresh exact-identity comparators, immutable hidden/public challenge manifests, six independent trials, long-horizon 50%/80% curves, compute-normalized head-to-head evidence, anti-gaming review, evaluator independence, non-compensable critical gates, statistical dominance thresholds, exact-head reproducibility, and independent verification."
     },
     {
       "id": "FLGB-18-T12",
@@ -14791,7 +14791,7 @@
         ">=10 of 12 domains parity-or-better and >=2 superior core targets under preregistered margins",
         "dual-rival equal-budget ablation plus extra-compute single-agent control"
       ],
-      "closure_rule": "Code, contract, tests, evidence and rollback/recovery behavior must exist on exact head; plan text alone never signs this task. Whole-product closure additionally requires frontier protocol v2: fresh exact-identity comparators, immutable hidden/public challenge manifests, >=6 independent trials, long-horizon 50%/80% curves, compute-normalized head-to-head evidence, anti-gaming review, evaluator independence, non-compensable critical gates, statistical dominance thresholds, exact-head reproducibility, and independent verification."
+      "closure_rule": "Code, contract, tests, evidence and rollback/recovery behavior must exist on exact head; plan text alone never signs this task. Whole-product closure additionally requires frontier protocol v2: fresh exact-identity comparators, immutable hidden/public challenge manifests, six independent trials, long-horizon 50%/80% curves, compute-normalized head-to-head evidence, anti-gaming review, evaluator independence, non-compensable critical gates, statistical dominance thresholds, exact-head reproducibility, and independent verification."
     }
   ],
   "frontier_competition_gate": {

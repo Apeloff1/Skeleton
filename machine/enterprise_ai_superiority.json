@@ -171,7 +171,8 @@
       "secret material emitted to logs/prompts/artifacts outside declared boundary = 0",
       "policy/privacy/residency weakening during fallback = 0",
       "release without rollback/reference fallback for reversible production behavior = 0",
-      "enterprise claim without exact-head evidence = 0"
+      "enterprise claim without exact-head evidence = 0",
+      "process crash or partial commit without bounded recovery/reconciliation evidence = 0"
     ],
     "required_scorecards": [
       "functional correctness and task quality",
@@ -5483,7 +5484,7 @@
         "must_prove": [
           "plan and delegation authority are bounded before execution",
           "worker leases/fencing prevent stale commits",
-          "checkpoint survives injected process loss",
+          "checkpoint survives injected process crash or loss",
           "recovery resumes without duplicate privileged effects",
           "cancellation terminates descendant work within declared bound",
           "retry/fan-out/token/time budgets cannot run away"
