@@ -85,6 +85,8 @@ class _AuthorityState:
     admission_receipt_digest: str | None = None
     consumption_count: int = 0
     latest_receipt_digest: str | None = None
+    admitted_at: datetime | None = None
+    last_authorized_at: datetime | None = None
 
 
 class ExecutionAuthorityGuard:
@@ -219,6 +221,8 @@ class ExecutionAuthorityGuard:
             raise ExecutionAuthorityError("authority must be ExecutionAuthority")
         if not isinstance(request, AIExecutionRequest):
             raise ExecutionAuthorityError("request must be AIExecutionRequest")
+        if instant < authority.issued_at:
+            raise ExecutionAuthorityError("authority is not active yet")
         if authority.expired(now=instant):
             raise ExecutionAuthorityError("authority is expired")
         if request.operation_id != authority.operation_id:
@@ -277,6 +281,7 @@ class ExecutionAuthorityGuard:
         self._admission_receipts[replay_key] = receipt
         if state.admission_receipt_digest is None:
             state.admission_receipt_digest = receipt.digest
+            state.admitted_at = instant
         return receipt
 
     @_synchronized
@@ -314,6 +319,22 @@ class ExecutionAuthorityGuard:
             )
         if state.authority != authority:
             raise ExecutionAuthorityError("admitted authority content mismatch")
+        if state.admitted_at is not None and instant < state.admitted_at:
+            return AuthorizationDecision(
+                AuthorizationDisposition.DENY,
+                "authorization time predates admission",
+                authority.digest,
+                state.usage,
+                replay_key,
+            )
+        if state.last_authorized_at is not None and instant < state.last_authorized_at:
+            return AuthorizationDecision(
+                AuthorizationDisposition.DENY,
+                "authorization time regressed",
+                authority.digest,
+                state.usage,
+                replay_key,
+            )
         if state.revoked:
             return AuthorizationDecision(
                 AuthorizationDisposition.DENY,
@@ -393,6 +414,7 @@ class ExecutionAuthorityGuard:
         state.usage = projected
         state.consumption_count = receipt.sequence
         state.latest_receipt_digest = receipt.digest
+        state.last_authorized_at = instant
         return AuthorizationDecision(
             AuthorizationDisposition.ALLOW,
             "authorized",
@@ -429,6 +451,10 @@ class ExecutionAuthorityGuard:
             raise ExecutionAuthorityError("admitted authority content mismatch")
         if state.admission_receipt_digest is None:
             raise ExecutionAuthorityError("authority admission evidence is missing")
+        if state.admitted_at is not None and instant < state.admitted_at:
+            raise ExecutionAuthorityError("evidence seal time predates admission")
+        if state.last_authorized_at is not None and instant < state.last_authorized_at:
+            raise ExecutionAuthorityError("evidence seal time predates latest consumption")
         return AuthorityEvidenceBundle(
             authority_digest=authority.digest,
             operation_id=authority.operation_id,
@@ -466,6 +492,14 @@ class ExecutionAuthorityGuard:
                     "consumption_count": state.consumption_count,
                     "latest_receipt_digest": state.latest_receipt_digest,
                     "admission_receipt_digest": state.admission_receipt_digest,
+                    "admitted_at": (
+                        None if state.admitted_at is None else state.admitted_at.isoformat()
+                    ),
+                    "last_authorized_at": (
+                        None
+                        if state.last_authorized_at is None
+                        else state.last_authorized_at.isoformat()
+                    ),
                     "expires_at": state.authority.expires_at.isoformat(),
                 }
             )
