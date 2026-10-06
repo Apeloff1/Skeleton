@@ -18,6 +18,7 @@ from skeleton.intelligence.verification_acceptance import (
     AcceptanceDisposition,
     VerificationAcceptanceError,
     VerificationAcceptanceGate,
+    VerificationAcceptanceDecision,
     VerificationAcceptanceProfile,
     VerificationActorIdentity,
     build_independent_verification_proof,
@@ -583,3 +584,56 @@ def test_acceptance_decision_is_deterministic_and_non_executing() -> None:
     assert first.digest == second.digest
     assert first.authority_scope == "verification-acceptance-only"
     assert first.production_authority is False
+
+
+def test_verification_check_digest_is_deterministic_and_material() -> None:
+    item = claim(risk=VerificationRisk.HIGH)
+    first = independent_check(item)
+    replay = independent_check(item)
+    changed = independent_check(
+        item,
+        check_id="99999999-9999-4999-8999-999999999999",
+    )
+    assert first.digest == replay.digest
+    assert first.digest != changed.digest
+    assert first.as_dict()["check_id"] == first.check_id
+
+
+def test_forged_accept_with_reasons_is_rejected() -> None:
+    item = claim()
+    value = receipt(item)
+    valid = evaluate(item, value)
+    with pytest.raises(
+        VerificationAcceptanceError,
+        match="accepted decision cannot carry",
+    ):
+        VerificationAcceptanceDecision(
+            disposition=AcceptanceDisposition.ACCEPT,
+            reasons=("forged-reason",),
+            canonical_policy_level=valid.canonical_policy_level,
+            canonical_required_modes=valid.canonical_required_modes,
+            profile_digest=valid.profile_digest,
+            receipt_digest=valid.receipt_digest,
+            independence_proof_digest=None,
+            checked_at=NOW,
+        )
+
+
+def test_forged_empty_quarantine_is_rejected() -> None:
+    item = claim()
+    value = receipt(item)
+    valid = evaluate(item, value)
+    with pytest.raises(
+        VerificationAcceptanceError,
+        match="quarantine decision requires",
+    ):
+        VerificationAcceptanceDecision(
+            disposition=AcceptanceDisposition.QUARANTINE,
+            reasons=(),
+            canonical_policy_level=valid.canonical_policy_level,
+            canonical_required_modes=valid.canonical_required_modes,
+            profile_digest=valid.profile_digest,
+            receipt_digest=valid.receipt_digest,
+            independence_proof_digest=None,
+            checked_at=NOW,
+        )
