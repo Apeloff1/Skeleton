@@ -281,6 +281,135 @@ Production administration requires:
 Long-lived omnipotent administrator tokens are not part of the target
 architecture.
 
+## 6.3 Enterprise identity federation
+
+Human enterprise authentication should federate through OIDC by default. SAML
+can be supported through an identity broker when a customer requires it.
+
+Directory synchronization such as SCIM may provision users and groups, but the
+external directory does not become Skeleton's runtime authorization authority.
+Skeleton still decides resource, tenant, capability, data-class and action
+permissions.
+
+Privileged production sessions require strong authentication, bounded session
+lifetime, revocation, and re-authentication for high-impact actions.
+
+## 6.4 Consistency and transaction model
+
+Canonical writes use the strongest consistency promised by the owning
+repository. A successful acknowledgement is emitted only after the declared
+durability point.
+
+Concurrent operation progression uses monotonic state, idempotency, leases,
+fencing and compare-and-swap where appropriate.
+
+Derived projections are eventually consistent and freshness is explicit.
+
+When one ACID transaction cannot span two authority owners, cross-service
+mutation uses saga/outbox/receipt semantics. An ambiguous side effect must be
+reconciled before retry.
+
+Strong/current reads are required for authorization, governance, irreversible
+side effects, and terminal completion claims. Bounded-stale reads are permitted
+only where policy says they are safe.
+
+Audit timestamps use UTC. Local timeout/deadline correctness uses monotonic
+clocks and must not depend on wall-clock synchronization.
+
+## 6.5 Regional and residency strategy
+
+The first enterprise production target is one active region distributed across
+multiple failure domains, with encrypted recovery copies in a second region.
+
+The recovery region may be warm-standby or restore-driven as long as the
+declared region-loss RPO/RTO is met.
+
+Active-active multi-region canonical writes are **not** assumed to be safe.
+They are forbidden until conflict handling, tenant routing, global idempotency,
+provider residency, and failover semantics are independently proven.
+
+Tenant/jurisdiction residency policy constrains:
+
+- canonical storage;
+- backups;
+- retrieval/index placement;
+- model-provider egress;
+- tool/integration egress.
+
+## 6.6 Configuration and feature flags
+
+Non-secret configuration is versioned and schema-validated.
+
+Production secrets are references to external secret custody, not values
+committed to repository files.
+
+Feature flags require:
+
+- owner;
+- purpose;
+- safe default;
+- rollback behavior;
+- expiry or review date.
+
+Configuration capable of changing production behavior receives the same
+provenance and rollout discipline as code.
+
+## 6.7 External dependency registration
+
+Every production external dependency must be registered with:
+
+- owner;
+- purpose;
+- authentication;
+- data classes;
+- regions/residency;
+- timeout;
+- retry safety;
+- concurrency/rate limits;
+- health/SLO signal;
+- fallback/degraded behavior;
+- audit/provenance;
+- exit/replacement plan.
+
+An undeclared external dependency is production-ineligible.
+
+## 6.8 Architecture exception policy
+
+Exceptions are temporary risk instruments, not alternate architecture.
+
+Every exception needs:
+
+- unique ID;
+- owner;
+- scope;
+- risk;
+- compensating controls;
+- approval;
+- created and expiry timestamps;
+- remediation plan.
+
+Exceptions cannot waive tenant isolation, production secret protection,
+acknowledged canonical-write durability, privileged mutation audit, or the rule
+that model output is not authorization.
+
+Expired exceptions block architecture/release acceptance until removed or
+renewed with new evidence.
+
+## 6.9 API and contract governance
+
+Public APIs are versioned, bounded, documented and compatibility-tested.
+
+Internal APIs are schema-governed with explicit ownership and failure behavior.
+
+Breaking changes use versioning or expand/migrate/contract rollout. Silent
+wire-shape breakage is prohibited.
+
+Externally retried mutations require idempotency whenever duplicate effects are
+possible.
+
+Errors use stable machine-readable classes, sanitized public detail, and an
+internal correlation identity.
+
 ## 7. Service-to-service trust
 
 The target production model is short-lived workload identity.
