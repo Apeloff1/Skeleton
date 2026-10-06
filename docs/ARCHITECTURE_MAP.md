@@ -686,3 +686,23 @@ The enterprise layer is deliberately fail-closed about maturity:
 while `production_claim=true` requires independent runtime evidence for SLO,
 DR, security, capacity, golden journeys, rollback, supply chain and the
 production topology. Documentation alone can never promote the deployment.
+
+
+## Advanced AI promotion architecture
+
+Advanced cognitive maturity is governed by
+`machine/advanced_ai_structure_100.json` and
+`docs/plan/ADVANCED_AI_100_LEVELS.md`.
+
+The 100 levels are intentionally **not** added to `runtime_nodes`,
+`canonical_roots`, or the zone dependency DAG. They are a promotion/evidence
+structure over the existing canonical owners.
+
+This preserves the core architecture law:
+
+> More advanced cognition does not create more state authorities by default.
+
+All 100 levels resolve through the existing AI construction planes and
+capability-interface registry. If a future level truly requires a new canonical
+owner, that owner must be introduced through the ordinary architecture change
+process rather than being smuggled in through the maturity ladder.
