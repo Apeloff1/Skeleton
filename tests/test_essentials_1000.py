@@ -89,3 +89,20 @@ def test_ledger_divergence_is_detected():
     l["summary"]["open"]=999
     errors=m.validate(d,_s(),_c(),l)
     assert any("signed-current count diverges" in e for e in errors)
+
+
+def test_dependency_topology_parallelizes_domains_and_fans_in_finality():
+    d=_d()
+    levels=d["levels"]
+    for i,l in enumerate(levels,1):
+        stratum=((i-1)//10)+1
+        stage=((i-1)%10)+1
+        if stratum<100:
+            expected=[] if stage==1 else [f"ESS1000-{i-1:04d}"]
+        elif stage==1:
+            expected=[f"ESS1000-{k*10:04d}" for k in range(1,100)]
+        else:
+            expected=[f"ESS1000-{i-1:04d}"]
+        assert l["depends_on"]==expected
+    assert d["dependency_topology"]["maximum_parallel_domain_lanes"]==99
+    assert d["dependency_topology"]["finality_fan_in"]==99
