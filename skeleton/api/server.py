@@ -649,7 +649,11 @@ class ServerState:
         self.operation_runtime = None
         self.intelligence = self.intelligence_core
 
-    def bind_engine_execution_service(self) -> Any:
+    def bind_engine_execution_service(
+        self,
+        *,
+        runtime_lifecycle: Any | None = None,
+    ) -> Any:
         """Bind durable engine API authority and local execution coordinator."""
 
         if self.engine_execution_service is not None:
@@ -818,6 +822,7 @@ class ServerState:
             finalization_binding_hook=(
                 self.bind_verified_memory_finalization
             ),
+            lifecycle=runtime_lifecycle,
             tool_runtime=build_engine_tool_runtime(
                 admission_runtime=execution_admission_runtime,
                 receipt_store=receipt_store,
@@ -1024,7 +1029,9 @@ def create_app() -> Any:
         state.bind_governance_registry()
         state.bind_canonical_artifact_store()
         state.bind_canonical_retrieval_index()
-        state.bind_engine_execution_service()
+        state.bind_engine_execution_service(
+            runtime_lifecycle=runtime_lifecycle,
+        )
         if _canonical_memory_mongo_configured():
             await state.bind_canonical_memory_writer()
         await state.recover_engine_executions()
