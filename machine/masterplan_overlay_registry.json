@@ -1,0 +1,108 @@
+{
+  "schema_version": "skeleton.masterplan_overlay_registry.v1",
+  "version": "1.0.0",
+  "status": "active",
+  "minimum_plan_version": "2.5.0",
+  "canonical_plan": "machine/ai_master_plan.json",
+  "human_plan": "docs/plan/MASTER_PLAN.md",
+  "human_index": "docs/plan/MASTER_INDEX.md",
+  "law": "Overlays are cumulative unless an explicit supersession record names the retired authority. Registered authorities must remain non-empty, parseable, referenced by the canonical plan, and accompanied by their enforcement surfaces.",
+  "overlays": [
+    {
+      "id": "advanced-ai-100",
+      "authority": "machine/advanced_ai_structure_100.json",
+      "min_bytes": 1000,
+      "companions": [
+        "machine/advanced_ai_maturity_ledger.json",
+        "docs/plan/ADVANCED_AI_100_LEVELS.md",
+        "scripts/check_advanced_ai_structure.py",
+        "tests/test_advanced_ai_structure.py",
+        ".github/workflows/advanced-ai-structure.yml"
+      ]
+    },
+    {
+      "id": "frontier-96",
+      "authority": "machine/frontier_96_ai_ladder.json",
+      "min_bytes": 1000,
+      "companions": [
+        "docs/plan/FRONTIER_96_AI_LADDER.md",
+        "scripts/check_frontier_96_ladder.py",
+        "tests/test_frontier_96_ladder.py"
+      ]
+    },
+    {
+      "id": "cs-300",
+      "authority": "machine/cs_300_computer_science_ladder.json",
+      "min_bytes": 1000,
+      "companions": [
+        "docs/plan/CS_300_COMPUTER_SCIENCE_LADDER.md",
+        "scripts/check_cs_300_ladder.py",
+        "tests/test_cs_300_ladder.py",
+        ".github/workflows/cs-300-authority.yml"
+      ]
+    },
+    {
+      "id": "learning-400-adversarial-400",
+      "authority": "machine/learning_400_adversarial_400.json",
+      "min_bytes": 1000,
+      "companions": [
+        "docs/plan/LEARNING_400_ADVERSARIAL_400.md",
+        "scripts/check_learning_400_adversarial_400.py",
+        "tests/test_learning_400_adversarial_400.py",
+        ".github/workflows/learning-400-adversarial-400.yml"
+      ]
+    },
+    {
+      "id": "psi-1000",
+      "authority": "machine/project_self_improvement_1000.json",
+      "min_bytes": 1000,
+      "companions": [
+        "machine/project_self_improvement_epoch_contract.json",
+        "machine/project_self_improvement_idle_scheduler.json",
+        "docs/plan/PROJECT_SELF_IMPROVEMENT_1000.md",
+        "scripts/check_project_self_improvement_1000.py",
+        "tests/test_project_self_improvement_1000.py",
+        ".github/workflows/project-self-improvement-1000.yml"
+      ]
+    },
+    {
+      "id": "ess-1000",
+      "authority": "machine/essentials_1000.json",
+      "min_bytes": 1000,
+      "companions": [
+        "machine/essentials_1000_closure_protocol.json",
+        "machine/essentials_1000_execution_frontier.json",
+        "machine/essentials_1000_gap_ledger.json",
+        "machine/essentials_1000_priority_policy.json",
+        "docs/plan/ESSENTIALS_1000.md",
+        "scripts/check_essentials_1000.py",
+        "tests/test_essentials_1000.py",
+        ".github/workflows/essentials-1000.yml"
+      ]
+    },
+    {
+      "id": "competitive-200",
+      "authority": "machine/competitive_ai_engineering_ladder.json",
+      "min_bytes": 1000,
+      "companions": [
+        "machine/competitive_ai_benchmark_governance.json",
+        "docs/architecture/COMPETITIVE_AI_ENGINEERING_LADDER.md",
+        "docs/architecture/COMPETITIVE_AI_BENCHMARK_GOVERNANCE.md",
+        "scripts/check_competitive_ai_engineering_ladder.py",
+        "tests/test_competitive_ai_engineering_ladder.py"
+      ]
+    },
+    {
+      "id": "game-builder-500",
+      "authority": "machine/ai_game_builder_500_levels.json",
+      "min_bytes": 1000,
+      "companions": [
+        "machine/ai_game_builder_dual_rival_forge.json",
+        "docs/architecture/AI_GAME_BUILDER_500_LEVELS.md",
+        "scripts/check_ai_game_builder_500_levels.py",
+        "tests/test_ai_game_builder_500_levels.py",
+        ".github/workflows/ai-game-builder-500-levels.yml"
+      ]
+    }
+  ]
+}
