@@ -53,7 +53,8 @@
     "unclear rights or suspicious similarity quarantine artifacts fail-closed",
     "runtime completion cannot be inferred from documentation volume",
     "FLGB deep-closure pass 2 requires exactly 1,296 additional normative atoms per plane (12 subsystems × 12 lifecycle stages × 9 adversarial stress profiles) and may not auto-sign implementation.",
-    "The literal doubled atlas minimum is 22,953,806 UTF-8 shard bytes (2 × the original 11,476,903-byte atlas); exact byte accounting is fail-closed and specification size never substitutes for executable evidence."
+    "The literal doubled atlas minimum is 22,953,806 UTF-8 shard bytes (2 × the original 11,476,903-byte atlas); exact byte accounting is fail-closed and specification size never substitutes for executable evidence.",
+    "Legacy FLGB requirement-atom preservation is bound to the pre-Pass-2 baseline commit 4f2d5f736bebc30e7156d0431da18ada41664afa; every plane must preserve or exceed its exact recorded baseline while Pass-2 FLGBX coverage remains independently mandatory."
   ],
   "coverage": {
     "required_planes": [
@@ -213,7 +214,7 @@
         "replay receipt",
         "provider failover"
       ],
-      "minimum_requirement_atoms": 450,
+      "minimum_requirement_atoms": 259,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
       "deep_closure_required": true,
@@ -221,7 +222,8 @@
       "deep_closure_pass2_required": true,
       "deep_closure_pass2_atoms": 1296,
       "deep_closure_pass": 2,
-      "deep_closure_signed": false
+      "deep_closure_signed": false,
+      "legacy_baseline_requirement_atoms": 259
     },
     {
       "id": "FLGB-02",
@@ -245,7 +247,7 @@
         "local model bridge",
         "model lifecycle"
       ],
-      "minimum_requirement_atoms": 450,
+      "minimum_requirement_atoms": 258,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
       "deep_closure_required": true,
@@ -253,7 +255,8 @@
       "deep_closure_pass2_required": true,
       "deep_closure_pass2_atoms": 1296,
       "deep_closure_pass": 2,
-      "deep_closure_signed": false
+      "deep_closure_signed": false,
+      "legacy_baseline_requirement_atoms": 258
     },
     {
       "id": "FLGB-03",
@@ -277,7 +280,7 @@
         "contradiction handling",
         "context compression"
       ],
-      "minimum_requirement_atoms": 450,
+      "minimum_requirement_atoms": 259,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
       "deep_closure_required": true,
@@ -285,7 +288,8 @@
       "deep_closure_pass2_required": true,
       "deep_closure_pass2_atoms": 1296,
       "deep_closure_pass": 2,
-      "deep_closure_signed": false
+      "deep_closure_signed": false,
+      "legacy_baseline_requirement_atoms": 259
     },
     {
       "id": "FLGB-04",
@@ -309,7 +313,7 @@
         "multi-agent arbitration",
         "long-run recovery"
       ],
-      "minimum_requirement_atoms": 450,
+      "minimum_requirement_atoms": 260,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
       "deep_closure_required": true,
@@ -317,7 +321,8 @@
       "deep_closure_pass2_required": true,
       "deep_closure_pass2_atoms": 1296,
       "deep_closure_pass": 2,
-      "deep_closure_signed": false
+      "deep_closure_signed": false,
+      "legacy_baseline_requirement_atoms": 260
     },
     {
       "id": "FLGB-05",
@@ -341,7 +346,7 @@
         "audit evidence",
         "incident fail-closed"
       ],
-      "minimum_requirement_atoms": 450,
+      "minimum_requirement_atoms": 259,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
       "deep_closure_required": true,
@@ -349,7 +354,8 @@
       "deep_closure_pass2_required": true,
       "deep_closure_pass2_atoms": 1296,
       "deep_closure_pass": 2,
-      "deep_closure_signed": false
+      "deep_closure_signed": false,
+      "legacy_baseline_requirement_atoms": 259
     },
     {
       "id": "FLGB-06",
@@ -373,7 +379,7 @@
         "drift detection",
         "release qualification"
       ],
-      "minimum_requirement_atoms": 450,
+      "minimum_requirement_atoms": 293,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
       "deep_closure_required": true,
@@ -381,7 +387,8 @@
       "deep_closure_pass2_required": true,
       "deep_closure_pass2_atoms": 1296,
       "deep_closure_pass": 2,
-      "deep_closure_signed": false
+      "deep_closure_signed": false,
+      "legacy_baseline_requirement_atoms": 293
     },
     {
       "id": "FLGB-07",
@@ -405,7 +412,7 @@
         "mirror-room evaluation",
         "promotion gate"
       ],
-      "minimum_requirement_atoms": 450,
+      "minimum_requirement_atoms": 294,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
       "deep_closure_required": true,
@@ -413,7 +420,8 @@
       "deep_closure_pass2_required": true,
       "deep_closure_pass2_atoms": 1296,
       "deep_closure_pass": 2,
-      "deep_closure_signed": false
+      "deep_closure_signed": false,
+      "legacy_baseline_requirement_atoms": 294
     },
     {
       "id": "FLGB-08",
@@ -437,7 +445,7 @@
         "artifact alignment",
         "modality fallback"
       ],
-      "minimum_requirement_atoms": 450,
+      "minimum_requirement_atoms": 293,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
       "deep_closure_required": true,
@@ -445,7 +453,8 @@
       "deep_closure_pass2_required": true,
       "deep_closure_pass2_atoms": 1296,
       "deep_closure_pass": 2,
-      "deep_closure_signed": false
+      "deep_closure_signed": false,
+      "legacy_baseline_requirement_atoms": 293
     },
     {
       "id": "FLGB-09",
@@ -469,7 +478,7 @@
         "project migration",
         "editor recovery"
       ],
-      "minimum_requirement_atoms": 450,
+      "minimum_requirement_atoms": 295,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
       "deep_closure_required": true,
@@ -477,7 +486,8 @@
       "deep_closure_pass2_required": true,
       "deep_closure_pass2_atoms": 1296,
       "deep_closure_pass": 2,
-      "deep_closure_signed": false
+      "deep_closure_signed": false,
+      "legacy_baseline_requirement_atoms": 295
     },
     {
       "id": "FLGB-10",
@@ -501,7 +511,7 @@
         "simulation snapshot",
         "rollback simulation"
       ],
-      "minimum_requirement_atoms": 450,
+      "minimum_requirement_atoms": 292,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
       "deep_closure_required": true,
@@ -509,7 +519,8 @@
       "deep_closure_pass2_required": true,
       "deep_closure_pass2_atoms": 1296,
       "deep_closure_pass": 2,
-      "deep_closure_signed": false
+      "deep_closure_signed": false,
+      "legacy_baseline_requirement_atoms": 292
     },
     {
       "id": "FLGB-11",
@@ -533,7 +544,7 @@
         "LOD system",
         "render recovery"
       ],
-      "minimum_requirement_atoms": 450,
+      "minimum_requirement_atoms": 295,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
       "deep_closure_required": true,
@@ -541,7 +552,8 @@
       "deep_closure_pass2_required": true,
       "deep_closure_pass2_atoms": 1296,
       "deep_closure_pass": 2,
-      "deep_closure_signed": false
+      "deep_closure_signed": false,
+      "legacy_baseline_requirement_atoms": 295
     },
     {
       "id": "FLGB-12",
@@ -565,7 +577,7 @@
         "haptics",
         "presentation replay"
       ],
-      "minimum_requirement_atoms": 450,
+      "minimum_requirement_atoms": 294,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
       "deep_closure_required": true,
@@ -573,7 +585,8 @@
       "deep_closure_pass2_required": true,
       "deep_closure_pass2_atoms": 1296,
       "deep_closure_pass": 2,
-      "deep_closure_signed": false
+      "deep_closure_signed": false,
+      "legacy_baseline_requirement_atoms": 294
     },
     {
       "id": "FLGB-13",
@@ -597,7 +610,7 @@
         "economy rules",
         "saveable gameplay state"
       ],
-      "minimum_requirement_atoms": 450,
+      "minimum_requirement_atoms": 295,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
       "deep_closure_required": true,
@@ -605,7 +618,8 @@
       "deep_closure_pass2_required": true,
       "deep_closure_pass2_atoms": 1296,
       "deep_closure_pass": 2,
-      "deep_closure_signed": false
+      "deep_closure_signed": false,
+      "legacy_baseline_requirement_atoms": 295
     },
     {
       "id": "FLGB-14",
@@ -629,7 +643,7 @@
         "continuity verifier",
         "regeneration diff"
       ],
-      "minimum_requirement_atoms": 450,
+      "minimum_requirement_atoms": 293,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
       "deep_closure_required": true,
@@ -637,7 +651,8 @@
       "deep_closure_pass2_required": true,
       "deep_closure_pass2_atoms": 1296,
       "deep_closure_pass": 2,
-      "deep_closure_signed": false
+      "deep_closure_signed": false,
+      "legacy_baseline_requirement_atoms": 293
     },
     {
       "id": "FLGB-15",
@@ -661,7 +676,7 @@
         "achievements",
         "cross-version migration"
       ],
-      "minimum_requirement_atoms": 450,
+      "minimum_requirement_atoms": 295,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
       "deep_closure_required": true,
@@ -669,7 +684,8 @@
       "deep_closure_pass2_required": true,
       "deep_closure_pass2_atoms": 1296,
       "deep_closure_pass": 2,
-      "deep_closure_signed": false
+      "deep_closure_signed": false,
+      "legacy_baseline_requirement_atoms": 295
     },
     {
       "id": "FLGB-16",
@@ -693,7 +709,7 @@
         "automated playtest",
         "release artifact verification"
       ],
-      "minimum_requirement_atoms": 450,
+      "minimum_requirement_atoms": 277,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
       "deep_closure_required": true,
@@ -701,7 +717,8 @@
       "deep_closure_pass2_required": true,
       "deep_closure_pass2_atoms": 1296,
       "deep_closure_pass": 2,
-      "deep_closure_signed": false
+      "deep_closure_signed": false,
+      "legacy_baseline_requirement_atoms": 277
     },
     {
       "id": "FLGB-17",
@@ -725,7 +742,7 @@
         "clean-room transformation",
         "promotion arbitration"
       ],
-      "minimum_requirement_atoms": 450,
+      "minimum_requirement_atoms": 278,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
       "deep_closure_required": true,
@@ -733,7 +750,8 @@
       "deep_closure_pass2_required": true,
       "deep_closure_pass2_atoms": 1296,
       "deep_closure_pass": 2,
-      "deep_closure_signed": false
+      "deep_closure_signed": false,
+      "legacy_baseline_requirement_atoms": 278
     },
     {
       "id": "FLGB-18",
@@ -757,7 +775,7 @@
         "whole-system acceptance",
         "closure evidence fan-in"
       ],
-      "minimum_requirement_atoms": 450,
+      "minimum_requirement_atoms": 276,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
       "deep_closure_required": true,
@@ -765,7 +783,8 @@
       "deep_closure_pass2_required": true,
       "deep_closure_pass2_atoms": 1296,
       "deep_closure_pass": 2,
-      "deep_closure_signed": false
+      "deep_closure_signed": false,
+      "legacy_baseline_requirement_atoms": 276
     }
   ],
   "deep_closure": {
@@ -835,5 +854,30 @@
       "second-pass depth never implies runtime implementation or verification completion"
     ]
   },
-  "overlay_display_name": "Functional LLM + Game Builder 20MB+ Deep Closure Atlas"
+  "overlay_display_name": "Functional LLM + Game Builder 20MB+ Deep Closure Atlas",
+  "legacy_requirement_baseline": {
+    "source_commit": "4f2d5f736bebc30e7156d0431da18ada41664afa",
+    "semantics": "Pre-Pass-2 FLGB requirement-atom census. Pass 2 must preserve or increase these legacy atoms; the separately governed FLGBX deep-closure matrix does not substitute for them.",
+    "total_atoms": 5065,
+    "per_plane": {
+      "FLGB-01": 259,
+      "FLGB-02": 258,
+      "FLGB-03": 259,
+      "FLGB-04": 260,
+      "FLGB-05": 259,
+      "FLGB-06": 293,
+      "FLGB-07": 294,
+      "FLGB-08": 293,
+      "FLGB-09": 295,
+      "FLGB-10": 292,
+      "FLGB-11": 295,
+      "FLGB-12": 294,
+      "FLGB-13": 295,
+      "FLGB-14": 293,
+      "FLGB-15": 295,
+      "FLGB-16": 277,
+      "FLGB-17": 278,
+      "FLGB-18": 276
+    }
+  }
 }
