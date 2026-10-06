@@ -11,62 +11,47 @@
       "title": "Code Intelligence",
       "accountability_id": "ACC-VOL-021",
       "required_gap_texts": [
-        "complete cross-language graph extraction",
-        "connect ownership/test mapping to change planner"
+        "independent cross-language repository-graph, ownership/test impact, and change-planner verification remains pending"
       ]
     },
     {
       "volume_ref": "VOL-022",
       "title": "Autonomous Repository Engineering",
       "accountability_id": "ACC-VOL-022",
-      "required_gap_texts": [
-        "transactional workspace layer incomplete",
-        "independent reviewer/verifier routing needs full integration"
-      ]
+      "required_gap_texts": []
     },
     {
       "volume_ref": "VOL-092",
       "title": "Repository Maintenance",
       "accountability_id": "ACC-VOL-092",
-      "required_gap_texts": [
-        "define maintenance ownership registry",
-        "bind deletion to reachability/retention checks"
-      ]
+      "required_gap_texts": []
     },
     {
       "volume_ref": "VOL-093",
       "title": "Backlog Control",
       "accountability_id": "ACC-VOL-093",
       "required_gap_texts": [
-        "establish canonical backlog IDs",
-        "bind backlog to gap/risk closure"
+        "independent backlog coverage, deduplication, and stale-state verification remains pending"
       ]
     },
     {
       "volume_ref": "VOL-094",
       "title": "Priority Engine",
       "accountability_id": "ACC-VOL-094",
-      "required_gap_texts": [
-        "define priority factor schema",
-        "add anti-starvation constraints"
-      ]
+      "required_gap_texts": []
     },
     {
       "volume_ref": "VOL-095",
       "title": "Build Work Packages",
       "accountability_id": "ACC-VOL-095",
-      "required_gap_texts": [
-        "bind all packages to exact requirements",
-        "materialize package evidence rollup"
-      ]
+      "required_gap_texts": []
     },
     {
       "volume_ref": "VOL-108",
       "title": "Anti-Patterns",
       "accountability_id": "ACC-VOL-108",
       "required_gap_texts": [
-        "seed registry from historical failures",
-        "bind detectable patterns to CI"
+        "independent anti-pattern detector and exception-expiry verification remains pending"
       ]
     },
     {
@@ -74,26 +59,21 @@
       "title": "Build Order",
       "accountability_id": "ACC-VOL-109",
       "required_gap_texts": [
-        "bind every AIQ task into construction DAG",
-        "materialize cycle/blocked-state reporting"
+        "independent construction-DAG cycle and blocked-state verification remains pending"
       ]
     },
     {
       "volume_ref": "VOL-110",
       "title": "Definition of Done",
       "accountability_id": "ACC-VOL-110",
-      "required_gap_texts": [
-        "unify maturity and DoD rules",
-        "bind change-impact triggers to DoD"
-      ]
+      "required_gap_texts": []
     },
     {
       "volume_ref": "VOL-115",
       "title": "Technical Debt Ledger",
       "accountability_id": "ACC-VOL-115",
       "required_gap_texts": [
-        "establish debt IDs and ownership",
-        "bind debt to risk/backlog/ADR"
+        "independent cleanup-compatibility evaluation remains pending"
       ]
     },
     {
@@ -101,8 +81,7 @@
       "title": "Roadmap Control",
       "accountability_id": "ACC-VOL-118",
       "required_gap_texts": [
-        "bind roadmap to build DAG",
-        "materialize revision lineage"
+        "independent roadmap-control verification remains pending"
       ]
     },
     {
@@ -110,8 +89,8 @@
       "title": "Completion Model",
       "accountability_id": "ACC-VOL-119",
       "required_gap_texts": [
-        "implement canonical rollup function",
-        "bind UI progress to derived completion only"
+        "independent stale-signoff evaluation remains pending",
+        "independent critical-blocker evaluation remains pending"
       ]
     }
   ],
