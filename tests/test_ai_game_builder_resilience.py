@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from skeleton.ai.game_builder.contracts import EvaluatorProvenance, canonical_digest
 from skeleton.ai.game_builder.resilience import (
     DissentLedger,
     ImpactGraph,
@@ -12,6 +13,24 @@ from skeleton.ai.game_builder.resilience import (
     Objection,
     ResilienceError,
 )
+
+
+def _authority(
+    evaluator_id: str,
+    *evidence_refs: str,
+) -> EvaluatorProvenance:
+    return EvaluatorProvenance(
+        evaluator_id=evaluator_id,
+        operation_id=f"operation:{evaluator_id}",
+        execution_id=f"execution:{evaluator_id}",
+        execution_identity_digest=canonical_digest({"execution": evaluator_id}),
+        finalization_intent_digest=canonical_digest({"finalization": evaluator_id}),
+        authority_kind="deterministic_control",
+        authority_identity_digest=canonical_digest({"authority": evaluator_id}),
+        method_id="resilience-assurance",
+        source_revision=canonical_digest({"source": evaluator_id})[:40],
+        output_evidence_refs=tuple(evidence_refs),
+    )
 
 
 def _novelty(digest: str, quality: float, x: float, y: float) -> NoveltyRecord:
@@ -54,6 +73,7 @@ def test_dissent_ledger_preserves_blocker_until_explicit_resolution() -> None:
         evidence_digest="2" * 64,
         summary="Continuity break survives local improvement.",
         severity=8,
+        authority_provenance=_authority("dissent-authority", "2" * 64),
         dependency_ids=("canon:chapter-2",),
     )
     ledger.add(objection)
@@ -67,9 +87,69 @@ def test_dissent_ledger_preserves_blocker_until_explicit_resolution() -> None:
         )
     ] == ["OBJ-1"]
 
-    ledger.resolve("OBJ-1", resolution_digest="3" * 64)
+    ledger.resolve(
+        "OBJ-1",
+        resolution_digest="3" * 64,
+        resolution_authority=_authority("independent-resolver", "3" * 64),
+    )
     assert ledger.blockers_for(artifact_digest="1" * 64) == ()
     assert ledger.snapshot()["items"][0]["resolved_by_digest"] == "3" * 64
+
+
+def test_dissent_rejects_unattributed_objection_evidence() -> None:
+    with pytest.raises(ResilienceError, match="referenced by dissent authority"):
+        Objection(
+            objection_id="OBJ-UNBOUND",
+            artifact_digest="1" * 64,
+            evidence_digest="2" * 64,
+            summary="Unattributed evidence.",
+            severity=4,
+            authority_provenance=_authority("wrong-dissent-authority", "9" * 64),
+        )
+
+
+def test_critical_dissent_requires_independent_resolution_authority() -> None:
+    ledger = DissentLedger()
+    objection = Objection(
+        objection_id="OBJ-CRITICAL",
+        artifact_digest="1" * 64,
+        evidence_digest="2" * 64,
+        summary="Critical blocker.",
+        severity=8,
+        authority_provenance=_authority("same-authority", "2" * 64),
+    )
+    ledger.add(objection)
+    with pytest.raises(
+        ResilienceError,
+        match="critical objection resolution requires independent authority",
+    ):
+        ledger.resolve(
+            "OBJ-CRITICAL",
+            resolution_digest="3" * 64,
+            resolution_authority=_authority("same-authority", "3" * 64),
+        )
+
+
+def test_impact_calibration_receipt_binds_observed_evidence() -> None:
+    evidence = "impact-evidence-" + "e" * 32
+    authority = _authority("impact-calibrator", evidence)
+    receipt = ImpactGraph.calibration_receipt(
+        ("project", "scene"),
+        ("project", "quest"),
+        evaluator_provenance=authority,
+        evidence_digest=evidence,
+    )
+    assert receipt.precision == 0.5
+    assert receipt.recall == 0.5
+    assert canonical_digest(receipt.payload()) == receipt.receipt_digest
+
+    with pytest.raises(ResilienceError, match="referenced by evaluator authority"):
+        ImpactGraph.calibration_receipt(
+            ("project",),
+            ("project",),
+            evaluator_provenance=_authority("wrong-impact-calibrator", "other-" + "x" * 32),
+            evidence_digest=evidence,
+        )
 
 
 def test_impact_graph_computes_transitive_blast_radius_and_rejects_unknown_dependency() -> None:
