@@ -414,6 +414,162 @@ def validate_payloads(
         if band.get("band") != f"A{index}":
             errors.append(f"maturity band {index} identity drifted")
 
+    model_lifecycle = contract.get("model_and_runtime_lifecycle")
+    if not isinstance(model_lifecycle, dict):
+        errors.append("model_and_runtime_lifecycle must be an object")
+        model_lifecycle = {}
+    _strings(
+        model_lifecycle.get("identity_fields"),
+        label="model_and_runtime_lifecycle.identity_fields",
+        errors=errors,
+        minimum=10,
+    )
+    _strings(
+        model_lifecycle.get("model_fleet"),
+        label="model_and_runtime_lifecycle.model_fleet",
+        errors=errors,
+        minimum=6,
+    )
+    for field in (
+        "rule",
+        "provider_independence",
+        "compatibility_matrix",
+        "fallback_rule",
+    ):
+        value = model_lifecycle.get(field)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(f"model_and_runtime_lifecycle.{field} must be non-empty")
+
+    data_lifecycle = contract.get("data_and_evaluation_lifecycle")
+    if not isinstance(data_lifecycle, dict):
+        errors.append("data_and_evaluation_lifecycle must be an object")
+        data_lifecycle = {}
+    _strings(
+        data_lifecycle.get("dataset_identity"),
+        label="data_and_evaluation_lifecycle.dataset_identity",
+        errors=errors,
+        minimum=10,
+    )
+    _strings(
+        data_lifecycle.get("evaluation_identity"),
+        label="data_and_evaluation_lifecycle.evaluation_identity",
+        errors=errors,
+        minimum=8,
+    )
+    _strings(
+        data_lifecycle.get("partition_rules"),
+        label="data_and_evaluation_lifecycle.partition_rules",
+        errors=errors,
+        minimum=6,
+    )
+    _strings(
+        data_lifecycle.get("lifecycle"),
+        label="data_and_evaluation_lifecycle.lifecycle",
+        errors=errors,
+        minimum=10,
+    )
+
+    portability = contract.get("compatibility_and_portability")
+    if not isinstance(portability, dict):
+        errors.append("compatibility_and_portability must be an object")
+        portability = {}
+    _strings(
+        portability.get("dimensions"),
+        label="compatibility_and_portability.dimensions",
+        errors=errors,
+        minimum=8,
+    )
+    if portability.get("portability_states") != [
+        "PORTABLE",
+        "CONDITIONAL",
+        "NON_PORTABLE",
+        "UNKNOWN",
+    ]:
+        errors.append("compatibility portability state model drifted")
+    if portability.get("default") != "UNKNOWN":
+        errors.append("compatibility portability default must be UNKNOWN")
+    for field in ("rule", "hardware_rule", "os_arch_rule", "downgrade_rule"):
+        value = portability.get(field)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(f"compatibility_and_portability.{field} must be non-empty")
+
+    prompt_supply = contract.get("policy_and_prompt_supply_chain")
+    if not isinstance(prompt_supply, dict):
+        errors.append("policy_and_prompt_supply_chain must be an object")
+        prompt_supply = {}
+    _strings(
+        prompt_supply.get("governed_artifacts"),
+        label="policy_and_prompt_supply_chain.governed_artifacts",
+        errors=errors,
+        minimum=8,
+    )
+    _strings(
+        prompt_supply.get("requirements"),
+        label="policy_and_prompt_supply_chain.requirements",
+        errors=errors,
+        minimum=8,
+    )
+    for field in ("dynamic_generation_rule", "rollback_rule"):
+        value = prompt_supply.get(field)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(f"policy_and_prompt_supply_chain.{field} must be non-empty")
+
+    hardware = contract.get("hardware_aware_execution")
+    if not isinstance(hardware, dict):
+        errors.append("hardware_aware_execution must be an object")
+        hardware = {}
+    _strings(
+        hardware.get("targets"),
+        label="hardware_aware_execution.targets",
+        errors=errors,
+        minimum=4,
+    )
+    _strings(
+        hardware.get("scheduler_inputs"),
+        label="hardware_aware_execution.scheduler_inputs",
+        errors=errors,
+        minimum=8,
+    )
+    for field in (
+        "discovery_rule",
+        "memory_rule",
+        "fallback_rule",
+        "evidence_rule",
+    ):
+        value = hardware.get(field)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(f"hardware_aware_execution.{field} must be non-empty")
+
+    evaluator = contract.get("evaluator_independence")
+    if not isinstance(evaluator, dict):
+        errors.append("evaluator_independence must be an object")
+        evaluator = {}
+    evaluator_tiers = _objects(
+        evaluator.get("tiers"),
+        label="evaluator_independence.tiers",
+        errors=errors,
+        minimum=4,
+    )
+    tier_map = _ids(
+        evaluator_tiers,
+        label="evaluator_independence.tiers",
+        errors=errors,
+    )
+    if set(tier_map) != {"E0", "E1", "E2", "E3"}:
+        errors.append("evaluator independence tier set drifted")
+    for tier_id, tier in tier_map.items():
+        for field in ("meaning", "use"):
+            value = tier.get(field)
+            if not isinstance(value, str) or not value.strip():
+                errors.append(
+                    f"evaluator_independence.tiers[{tier_id}].{field} "
+                    "must be non-empty"
+                )
+    for field in ("rule", "conflict_rule", "calibration_rule"):
+        value = evaluator.get(field)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(f"evaluator_independence.{field} must be non-empty")
+
     implementation_contract = contract.get("level_implementation_contract")
     if not isinstance(implementation_contract, dict):
         errors.append("level_implementation_contract must be an object")
