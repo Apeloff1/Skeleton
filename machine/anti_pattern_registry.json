@@ -7,8 +7,7 @@
     "volume_ref": "VOL-108",
     "title": "Anti-Patterns",
     "required_gap_texts": [
-      "seed registry from historical failures",
-      "bind detectable patterns to CI"
+      "independent anti-pattern detector and exception-expiry verification remains pending"
     ]
   },
   "source": "machine/ai_edge_case_catalog.json",
