@@ -8936,6 +8936,8 @@
         "CompensationReceipt"
       ],
       "implementation_paths": [
+        "skeleton/storage/cas",
+        "skeleton/ai/runtime/storage/cas",
         "skeleton/storage/cas/__init__.py",
         "skeleton/ai/runtime/storage/cas/__init__.py"
       ],
@@ -9035,6 +9037,8 @@
         "CacheEntry"
       ],
       "implementation_paths": [
+        "skeleton/storage/cas",
+        "skeleton/ai/runtime/storage/cas",
         "skeleton/storage/cas/__init__.py",
         "skeleton/ai/runtime/storage/cas/__init__.py"
       ],
@@ -9085,6 +9089,8 @@
         "DigestPolicy"
       ],
       "implementation_paths": [
+        "skeleton/storage/cas",
+        "skeleton/ai/runtime/storage/cas",
         "skeleton/storage/cas/__init__.py",
         "skeleton/ai/runtime/storage/cas/__init__.py"
       ],
