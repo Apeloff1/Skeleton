@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plan_version": "2.0.0",
+  "plan_version": "2.1.0",
   "status": "active",
   "architecture_lane": "PR-1904",
   "architecture_branch": "integration/architecture-map-v1",
@@ -56,7 +56,12 @@
     "learning_400_adversarial_400": "machine/learning_400_adversarial_400.json",
     "learning_400_adversarial_400_human": "docs/plan/LEARNING_400_ADVERSARIAL_400.md",
     "learning_400_adversarial_400_validator": "scripts/check_learning_400_adversarial_400.py",
-    "learning_400_adversarial_400_workflow": ".github/workflows/learning-400-adversarial-400.yml"
+    "learning_400_adversarial_400_workflow": ".github/workflows/learning-400-adversarial-400.yml",
+    "project_self_improvement_1000": "machine/project_self_improvement_1000.json",
+    "project_self_improvement_1000_human": "docs/plan/PROJECT_SELF_IMPROVEMENT_1000.md",
+    "project_self_improvement_epoch_contract": "machine/project_self_improvement_epoch_contract.json",
+    "project_self_improvement_1000_validator": "scripts/check_project_self_improvement_1000.py",
+    "project_self_improvement_1000_workflow": ".github/workflows/project-self-improvement-1000.yml"
   },
   "laws": [
     "durable governed state is authoritative",
@@ -72,7 +77,11 @@
     "CS-300 qualification sits strictly above Frontier-96, preserves the VOL-420 breadth freeze, and requires all 300 computer-science layers to carry current independent evidence before CS300-300 finality",
     "Learning-400 is paired one-for-one with Adversarial-400; knowledge acquisition, project learning, native weight creation and continual candidate improvement require current paired adversarial evidence before signed completion",
     "web/video/document learning treats external content as untrusted evidence and never as instruction authority; acquisition remains rights, privacy, robots, terms and authorization governed",
-    "production model weights never silently mutate in place; learning creates versioned candidates whose promotion requires independent evaluation, adversarial qualification, canary and rollback"
+    "production model weights never silently mutate in place; learning creates versioned candidates whose promotion requires independent evaluation, adversarial qualification, canary and rollback",
+    "every project instantiates its own PSI-1000 self-improvement state; evidence, maturity and candidates are project-scoped and cannot silently qualify another project",
+    "foreground-idle immediately makes bounded mirror-room improvement eligible; new foreground work preempts mirror work and protected foreground resources have absolute priority",
+    "mirror-room proposer, challenger and verifier roles may generate and evaluate candidates but cannot self-promote production changes",
+    "self-improvement epochs are finite, budgeted, receipt-backed and rollback-capable; repeated no-gain hypotheses back off instead of forming unbounded loops"
   ],
   "thematic_parts": [
     {
