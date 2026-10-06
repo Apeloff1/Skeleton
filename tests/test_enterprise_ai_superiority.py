@@ -51,6 +51,7 @@ def test_current_enterprise_superiority_authority_is_valid() -> None:
     assert result["master_volume_count"] == 421
     assert result["dedicated_profile_count"] == 87
     assert result["archetype_count"] >= 20
+    assert result["golden_journey_count"] == 12
     assert result["enterprise_qualified_profiles"] == 0
     assert result["superior_profiles"] == 0
     assert result["all_volumes_inherit_common_contract"] is True
@@ -218,6 +219,46 @@ def test_rejects_non_dedicated_volume_claiming_superior_target(
     with pytest.raises(
         MODULE.EnterpriseSuperiorityError,
         match="non-dedicated enterprise target",
+    ):
+        MODULE.validate(root)
+
+
+def test_golden_journeys_cover_cross_plane_enterprise_failures() -> None:
+    policy = _load(ROOT, "machine/enterprise_ai_superiority.json")
+    journeys = policy["end_to_end_qualification"]["golden_journeys"]
+
+    assert [row["id"] for row in journeys] == [
+        f"ENT-E2E-{index:02d}" for index in range(1, 13)
+    ]
+    blob = "\n".join(
+        proof
+        for row in journeys
+        for proof in row["must_prove"]
+    ).lower()
+    for concept in (
+        "crash",
+        "tenant",
+        "rollback",
+        "provider",
+        "saturation",
+        "injection",
+        "duplicate",
+        "recovery",
+    ):
+        assert concept in blob
+
+
+def test_rejects_unknown_volume_in_golden_journey(tmp_path: Path) -> None:
+    root = _fixture(tmp_path)
+    policy = _load(root, "machine/enterprise_ai_superiority.json")
+    policy["end_to_end_qualification"]["golden_journeys"][0][
+        "volume_refs"
+    ][0] = "VOL-999"
+    _write(root, "machine/enterprise_ai_superiority.json", policy)
+
+    with pytest.raises(
+        MODULE.EnterpriseSuperiorityError,
+        match="unknown volume VOL-999",
     ):
         MODULE.validate(root)
 
