@@ -469,6 +469,20 @@ def test_domain_close_retires_only_its_registry_entry(
     jvm_registry_module.close_default_jvm_registry()
 
 
+def test_domain_close_does_not_materialize_default_registry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from skeleton.memory.jvm_vector_accelerator import (
+        close_default_vector_accelerator,
+    )
+
+    monkeypatch.setattr(jvm_registry_module, "_default_registry", None)
+
+    close_default_vector_accelerator()
+
+    assert jvm_registry_module._default_registry is None
+
+
 def test_default_registry_is_process_singleton_and_resettable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
