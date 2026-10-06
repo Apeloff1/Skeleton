@@ -532,6 +532,53 @@ def test_non_compensable_gate_failure_retains_incumbent() -> None:
     assert forge.champion.digest == incumbent.digest
 
 
+def test_evaluated_quality_override_requires_attributed_evaluation_decision() -> None:
+    incumbent = _candidate("seed", "override-seed", quality=_quality(0.4))
+    forge = DualRivalForge(effort_mode=100, champion=incumbent)
+    built = _candidate(Rival.A.value, "override-built", quality=_quality(0.5))
+    forge.submit_construct(built)
+    challenge = _challenge(Rival.B, built, "override-challenge")
+    forge.submit_attack(challenge)
+    provenance, authority_evidence = _adjudicator("override-judge")
+
+    with pytest.raises(
+        ValueError,
+        match="requires evaluation_decision_digest",
+    ):
+        forge.reconcile(
+            submitted=challenge.improved_candidate,
+            evaluator_id="override-judge",
+            evaluator_provenance=provenance,
+            authority_evidence_digest=authority_evidence,
+            gate_results=_gates(),
+            evaluated_quality=_quality(0.7),
+        )
+
+
+def test_evaluated_quality_override_rejects_decision_authority_mismatch() -> None:
+    incumbent = _candidate("seed", "override-mismatch-seed", quality=_quality(0.4))
+    forge = DualRivalForge(effort_mode=100, champion=incumbent)
+    built = _candidate(Rival.A.value, "override-mismatch-built", quality=_quality(0.5))
+    forge.submit_construct(built)
+    challenge = _challenge(Rival.B, built, "override-mismatch-challenge")
+    forge.submit_attack(challenge)
+    provenance, authority_evidence = _adjudicator("override-mismatch-judge")
+
+    with pytest.raises(
+        ValueError,
+        match="must equal promotion authority evidence",
+    ):
+        forge.reconcile(
+            submitted=challenge.improved_candidate,
+            evaluator_id="override-mismatch-judge",
+            evaluator_provenance=provenance,
+            authority_evidence_digest=authority_evidence,
+            gate_results=_gates(),
+            evaluated_quality=_quality(0.7),
+            evaluation_decision_digest=canonical_digest({"other": "decision"}),
+        )
+
+
 def test_pareto_safe_candidate_promotes_with_independent_judge() -> None:
     incumbent = _candidate("seed", "s", quality=_quality(0.4))
     forge = DualRivalForge(effort_mode=100, champion=incumbent)
