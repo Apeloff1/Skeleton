@@ -40,6 +40,9 @@ REQUIRED_INVARIANTS = (
     "Mongo event persistence uses prepare, atomic snapshot advance, and committed-marker recovery",
     "public stream projection excludes arbitrary model, prompt, retrieval, and tool payload content",
     "stream reconnect is bound to operation identity, exact sequence, and prior event digest",
+    "live product chat persists durable turn state around canonical conversation and engine milestones",
+    "product replay heals existing durable turn completion without synthesizing historical turn journals",
+    "public reconnect transport requires operation, sequence, and digest continuity",
 )
 
 
@@ -102,6 +105,9 @@ def validate() -> list[str]:
         "mongo_tests",
         "streaming",
         "streaming_tests",
+        "live_lifecycle",
+        "live_route",
+        "live_route_tests",
     }
     if set(files) != expected_roles:
         errors.append("AI chat runtime contract file roles drifted")
@@ -215,6 +221,44 @@ def validate() -> list[str]:
                     "AI chat streaming lost reconnect/minimization markers: "
                     + ", ".join(missing_streaming)
                 )
+
+    live_checks = {
+        "live_lifecycle": (
+            "ChatTurnLifecycle",
+            "finalize_existing_assistant",
+            "FAILED_RETRYABLE",
+            "conversation-assistant-already-committed",
+        ),
+        "live_route": (
+            "chat_turn_lifecycle.begin",
+            "TurnState.CONTEXT_COMPILING",
+            "TurnState.MODEL_RUNNING",
+            "TurnState.FINALIZING",
+            "TurnState.COMPLETE",
+            '"/chat/turns/{thread_id}/events"',
+            "require_resume_cursor",
+        ),
+    }
+    for role, markers in live_checks.items():
+        raw_path = files.get(role)
+        if not isinstance(raw_path, str):
+            errors.append(f"AI chat live route role missing: {role}")
+            continue
+        path = ROOT / raw_path
+        if not path.is_file():
+            continue
+        try:
+            live_source = path.read_text(encoding="utf-8")
+            ast.parse(live_source)
+        except (OSError, UnicodeDecodeError, SyntaxError) as exc:
+            errors.append(f"AI chat live route module is invalid: {role}: {exc}")
+            continue
+        missing_live = [item for item in markers if item not in live_source]
+        if missing_live:
+            errors.append(
+                f"AI chat live route lost durable cutover markers: {role}: "
+                + ", ".join(missing_live)
+            )
 
     required_states = contract.get("required_states")
     if not isinstance(required_states, list) or not required_states:
