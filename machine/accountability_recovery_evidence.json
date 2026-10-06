@@ -157,6 +157,24 @@
       "verification_signer": "github-actions:P1 Multi-Agent Orchestration Gate",
       "completed_at_utc": "2026-10-04T15:47:01Z",
       "evidence_head": "a506a14df1c8b03146ffb03f1956d343efc3a4b5"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-000",
+        "ACC-VOL-034",
+        "ACC-VOL-035",
+        "ACC-VOL-036",
+        "ACC-VOL-037",
+        "ACC-VOL-038",
+        "ACC-VOL-078",
+        "ACC-VOL-079",
+        "ACC-VOL-080",
+        "ACC-VOL-420"
+      ],
+      "source_commit": "1f37192640454a439cde23c211788f185a379b81",
+      "claim": "repository history explicitly records completion at verified P1-L0 target with independent CI verification and governed gap evidence",
+      "recovery_granularity": "commit_claim_anchor",
+      "limitation": "historical ledger blob is truncated through connector; do not synthesize verifier identity, timestamp, run/job, or signature fields from this anchor alone"
     }
   ]
 }
