@@ -260,6 +260,18 @@ async def test_provider_receipt_set_binds_all_receipts_and_rejects_drift():
         reason_code="verified-result",
         provider_receipt_refs=receipts,
     )
+    events = lifecycle.authority.repo.list_events(
+        turn.snapshot.operation_id,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+    )
+    bound_events = [
+        event
+        for event in events
+        if event.provider_receipt_ref is not None
+    ]
+    assert len(bound_events) == 1
+    assert bound_events[0].to_state is TurnState.VERIFYING
     assert turn.snapshot.provider_receipt_ref == provider_receipt_set_ref(
         receipts
     )
