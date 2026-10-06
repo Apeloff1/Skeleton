@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import hashlib
 import json
+from pathlib import PurePosixPath
 from typing import Mapping, Sequence
 
 
@@ -49,6 +50,25 @@ def _sha(name: str, value: object) -> str:
     if len(result) != 64 or any(ch not in "0123456789abcdef" for ch in result):
         raise ModelIdentityError(f"{name} must be lowercase sha256")
     return result
+
+
+def _artifact_path(name: str, value: object) -> str:
+    path = _text(name, value, maximum=2048)
+    if "\\x00" in path or "\\" in path:
+        raise ModelIdentityError(f"{name} must be a canonical artifact-relative path")
+    pure = PurePosixPath(path)
+    parts = pure.parts
+    if (
+        pure.is_absolute()
+        or not parts
+        or any(part in {"", ".", ".."} for part in parts)
+        or pure.as_posix() != path
+    ):
+        raise ModelIdentityError(f"{name} must be a canonical artifact-relative path")
+    first = parts[0]
+    if len(first) == 2 and first[0].isalpha() and first[1] == ":":
+        raise ModelIdentityError(f"{name} must be a canonical artifact-relative path")
+    return path
 
 
 def _unique_text(name: str, values: Sequence[str]) -> tuple[str, ...]:
@@ -100,6 +120,10 @@ class RepresentationSpec:
         ids: set[int] = set()
         for raw_name, raw_id in self.special_token_map.items():
             name = _text("special token name", raw_name)
+            if name in tokens:
+                raise ModelIdentityError(
+                    "special token names must remain unique after normalization"
+                )
             if isinstance(raw_id, bool) or not isinstance(raw_id, int) or raw_id < 0:
                 raise ModelIdentityError("special token ids must be non-negative integers")
             if raw_id in ids:
@@ -146,9 +170,7 @@ class WeightShard:
     size_bytes: int
 
     def __post_init__(self) -> None:
-        path = _text("weight shard path", self.path, maximum=2048)
-        if path.startswith("/") or "\\" in path or ".." in path.split("/"):
-            raise ModelIdentityError("weight shard path must be repository/artifact relative")
+        path = _artifact_path("weight shard path", self.path)
         object.__setattr__(self, "path", path)
         object.__setattr__(self, "digest", _sha("weight shard digest", self.digest))
         if (
@@ -270,6 +292,16 @@ class ModelArtifactManifest:
     def artifact_id(self) -> str:
         return "model:" + _digest(self.as_dict())
 
+    @property
+    def total_weight_bytes(self) -> int:
+        return sum(shard.size_bytes for shard in self.weight_shards)
+
+    @property
+    def weight_identity(self) -> str:
+        return _digest(
+            [shard.as_dict() for shard in self.weight_shards]
+        )
+
     def validate_loaded_components(
         self,
         *,
@@ -290,7 +322,11 @@ class ModelArtifactManifest:
         expected = {shard.path: shard.digest for shard in self.weight_shards}
         observed: dict[str, str] = {}
         for path, digest in weight_digests.items():
-            normalized_path = _text("loaded weight path", path, maximum=2048)
+            normalized_path = _artifact_path("loaded weight path", path)
+            if normalized_path in observed:
+                raise ModelIdentityError(
+                    "loaded weight paths collide after normalization"
+                )
             observed[normalized_path] = _sha("loaded weight digest", digest)
         if observed != expected:
             raise ModelIdentityError("loaded weight shard set/digest mismatch")
