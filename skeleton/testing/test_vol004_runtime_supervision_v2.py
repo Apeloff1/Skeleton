@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timedelta, timezone
 import json
 from types import SimpleNamespace
 import urllib.error
@@ -15,6 +16,12 @@ from skeleton.automation.chatgpt_adapter import (
 from skeleton.automation.free_model import FreeModelClient
 from skeleton.automation.shift_supervisor import model_gateway
 from skeleton.automation.shift_supervisor.model_gateway import ModelGateway
+from skeleton import provider_runtime
+from skeleton.provider_runtime import (
+    OpenAISyncProviderAdapter,
+    ProviderInvocationError,
+    ProviderRequest,
+)
 from skeleton.kernel.runtime_supervision import (
     RuntimeAdmissionMiddleware,
     RuntimeServiceLifecycle,
@@ -122,6 +129,157 @@ def test_work_leases_are_generation_bound_and_stop_requires_quiescence() -> None
     lifecycle.mark_stopped()
     restarted = lifecycle.restart()
     assert restarted.generation == 2
+
+
+def test_generated_work_ids_are_monotonic_and_generation_bound() -> None:
+    lifecycle = RuntimeServiceLifecycle("backend")
+    lifecycle.mark_ready()
+
+    first = lifecycle.acquire_generated_work("http")
+    second = lifecycle.acquire_generated_work("http")
+    assert first.work_id == "http:1:1"
+    assert second.work_id == "http:1:2"
+    assert first.generation == second.generation == 1
+
+    lifecycle.release_work(first)
+    lifecycle.release_work(second)
+    lifecycle.begin_drain(reason="restart")
+    lifecycle.mark_stopped()
+    lifecycle.restart()
+    lifecycle.mark_ready()
+
+    third = lifecycle.acquire_generated_work("http")
+    assert third.work_id == "http:2:3"
+    assert third.generation == 2
+    lifecycle.release_work(third)
+
+    with pytest.raises(ValueError, match="must not contain"):
+        lifecycle.acquire_generated_work("http:unsafe")
+
+
+@pytest.mark.asyncio
+async def test_bounded_provider_call_rejects_expired_work_before_dispatch() -> None:
+    calls: list[str] = []
+
+    async def operation():
+        calls.append("dispatched")
+        return object()
+
+    with pytest.raises(ProviderInvocationError, match="deadline exceeded"):
+        await provider_runtime._await_bounded_provider_call(
+            operation,
+            deadline=datetime.now(timezone.utc) - timedelta(seconds=1),
+            configured_timeout=10.0,
+            label="test provider",
+        )
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_bounded_provider_call_cancels_slow_operation_at_timeout() -> None:
+    finalized = asyncio.Event()
+
+    async def operation():
+        try:
+            await asyncio.sleep(60)
+        finally:
+            finalized.set()
+
+    with pytest.raises(ProviderInvocationError, match="deadline exceeded"):
+        await provider_runtime._await_bounded_provider_call(
+            operation,
+            deadline=None,
+            configured_timeout=0.01,
+            label="test provider",
+        )
+    assert finalized.is_set()
+
+
+def test_sync_provider_pre_cancelled_request_never_reaches_architecture_or_network(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = OpenAISyncProviderAdapter(api_key="secret")
+    token = CancellationToken()
+    token.cancel(CancellationReason.USER, detail="operator stop")
+
+    monkeypatch.setattr(
+        adapter,
+        "_ensure_architecture",
+        lambda: (_ for _ in ()).throw(
+            AssertionError("architecture should not be touched")
+        ),
+    )
+    monkeypatch.setattr(
+        provider_runtime.urllib.request,
+        "urlopen",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("network should not be opened")
+        ),
+    )
+
+    with pytest.raises(CancellationError):
+        adapter.generate_sync(
+            ProviderRequest(instructions="system", prompt="user"),
+            cancellation=token,
+        )
+
+
+def test_sync_provider_discards_response_cancelled_during_blocking_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = OpenAISyncProviderAdapter(api_key="secret", max_retries=2)
+    token = CancellationToken()
+
+    monkeypatch.setattr(
+        adapter,
+        "_ensure_architecture",
+        lambda: SimpleNamespace(provider_id="openai"),
+    )
+    monkeypatch.setattr(
+        provider_runtime,
+        "require_provider_transfer",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            decision_id="governance:test",
+            data_class="internal",
+        ),
+    )
+    monkeypatch.setattr(
+        provider_runtime,
+        "_admit_provider_request",
+        lambda *_args, **_kwargs: (
+            SimpleNamespace(
+                decision=SimpleNamespace(decision_id="admission:test")
+            ),
+            SimpleNamespace(),
+        ),
+    )
+    quarantined: list[str] = []
+    monkeypatch.setattr(
+        provider_runtime,
+        "_quarantine_provider_usage",
+        lambda *_args, **kwargs: quarantined.append(
+            str(kwargs.get("reason") or "")
+        ),
+    )
+
+    monkeypatch.setattr(
+        provider_runtime.urllib.request,
+        "urlopen",
+        lambda *_args, **_kwargs: _Response(
+            {"output": []},
+            on_read=lambda: token.cancel(
+                CancellationReason.SUPERSEDED,
+                detail="newer synchronous run owns authority",
+            ),
+        ),
+    )
+
+    with pytest.raises(CancellationError):
+        adapter.generate_sync(
+            ProviderRequest(instructions="system", prompt="user"),
+            cancellation=token,
+        )
+    assert quarantined == ["provider-dispatch-or-response-ambiguous"]
 
 
 def _run_asgi(middleware, *, path: str):
