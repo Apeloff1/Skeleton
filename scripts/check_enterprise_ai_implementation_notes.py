@@ -202,6 +202,26 @@ def _validate_dossier(
             f"{ref}.{level_id}.acceptance",
             minimum=2,
         )
+        invariants = _text_list(
+            level.get("design_invariants"),
+            f"{ref}.{level_id}.design_invariants",
+            minimum=2,
+        )
+        failures = _text_list(
+            level.get("failure_modes"),
+            f"{ref}.{level_id}.failure_modes",
+            minimum=2,
+        )
+        telemetry = _text_list(
+            level.get("telemetry_and_slos"),
+            f"{ref}.{level_id}.telemetry_and_slos",
+            minimum=2,
+        )
+        required_evidence = _text_list(
+            level.get("required_evidence"),
+            f"{ref}.{level_id}.required_evidence",
+            minimum=2,
+        )
         if sum(len(item) for item in notes) < 120:
             raise ImplementationNotesError(
                 f"{ref}.{level_id} implementation notes are too shallow"
@@ -210,6 +230,41 @@ def _validate_dossier(
             raise ImplementationNotesError(
                 f"{ref}.{level_id} acceptance criteria are too shallow"
             )
+        for section_name, values in (
+            ("design_invariants", invariants),
+            ("failure_modes", failures),
+            ("telemetry_and_slos", telemetry),
+            ("required_evidence", required_evidence),
+        ):
+            if sum(len(item) for item in values) < 80:
+                raise ImplementationNotesError(
+                    f"{ref}.{level_id} {section_name} is too shallow"
+                )
+        semantic_rows = semantic_requirements.get(level_id)
+        if not isinstance(semantic_rows, list) or not semantic_rows:
+            raise ImplementationNotesError(
+                f"{level_id} semantic requirements are missing"
+            )
+        semantic_blob = "\n".join(
+            notes + acceptance + invariants + failures + telemetry + required_evidence
+        ).lower()
+        for semantic_raw in semantic_rows:
+            semantic = _mapping(
+                semantic_raw,
+                f"{level_id}.semantic requirement",
+            )
+            concept = _text(
+                semantic.get("concept"),
+                f"{level_id}.semantic concept",
+            )
+            aliases = _text_list(
+                semantic.get("aliases"),
+                f"{level_id}.{concept}.aliases",
+            )
+            if not any(alias.lower() in semantic_blob for alias in aliases):
+                raise ImplementationNotesError(
+                    f"{ref}.{level_id} missing semantic concept: {concept}"
+                )
 
         semantic_blob = "\n".join((*notes, *acceptance)).lower()
         for alternatives in LEVEL_REQUIRED_CONCEPTS[level_id]:
@@ -263,6 +318,26 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     if not isinstance(required_levels_raw, list) or len(required_levels_raw) != 14:
         raise ImplementationNotesError("exactly 14 October 2026 levels are required")
     required_levels: list[Mapping[str, Any]] = []
+    required_sections = _text_list(
+        index.get("required_level_sections"),
+        "required_level_sections",
+        minimum=6,
+    )
+    expected_sections = {
+        "implementation_notes",
+        "acceptance",
+        "design_invariants",
+        "failure_modes",
+        "telemetry_and_slos",
+        "required_evidence",
+    }
+    if set(required_sections) != expected_sections:
+        raise ImplementationNotesError("required implementation-level sections drift")
+    semantic_requirements = _mapping(
+        index.get("level_semantic_requirements"),
+        "level_semantic_requirements",
+    )
+
     for position, raw in enumerate(required_levels_raw):
         level = _mapping(raw, f"required_levels[{position}]")
         expected_id = f"L{position:02d}"
