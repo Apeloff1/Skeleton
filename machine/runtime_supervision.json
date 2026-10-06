@@ -1,6 +1,6 @@
 {
   "schema_version": "skeleton.architecture.runtime_supervision.v2",
-  "contract_version": "1.1.0",
+  "contract_version": "1.2.0",
   "status": "active",
   "purpose": "One executable backend/engine lifecycle and connector-cancellation contract covering readiness, draining, recovery, deadlines, cancellation propagation, retry interruption, late-result fencing and operation identity.",
   "masterplan_binding": {
@@ -38,7 +38,9 @@
     "every admitted HTTP request and engine execution is generation-bound by a work lease",
     "DRAINING atomically revokes new-work authority while preserving accountability for already admitted work",
     "STOPPED cannot be asserted while in-flight work leases remain",
-    "shutdown cancels/drains background execution before closing durable dependencies"
+    "shutdown cancels/drains background execution before closing durable dependencies",
+    "every network transport operation owned by a declared connector has explicit cancellation, timeout, deadline and late-result semantics",
+    "engine-runtime operation coverage is derived from active provider capabilities and declared sync-adapter presence"
   ],
   "services": [
     {
@@ -55,6 +57,7 @@
           "path": "backend/server.py",
           "required_symbols": [
             "RuntimeServiceLifecycle(\"backend\")",
+            "_runtime_lifecycle.restart(",
             "_runtime_lifecycle.mark_ready(",
             "_runtime_lifecycle.begin_drain(",
             "_runtime_lifecycle.mark_stopped(",
@@ -62,6 +65,13 @@
             "app.add_middleware(",
             "lifecycle=_runtime_lifecycle",
             "exempt_prefixes=(\"/api/health\",)",
+            "def _start_lifecycle_thread(",
+            "_BOOT_THREADS",
+            "_runtime_lifecycle.acquire_work(",
+            "_runtime_lifecycle.release_work(lease)",
+            "_runtime_lifecycle.cancellation.wait(",
+            "await asyncio.to_thread(thread.join",
+            "backend shutdown failed to quiesce runtime work",
             "t.cancel()",
             "client.close()",
             "@api_router.get(\"/health/ready\")"
@@ -103,6 +113,8 @@
             "runtime_lifecycle=runtime_lifecycle",
             "async def close_engine_execution_service",
             "await coordinator.shutdown()",
+            "errors: list[BaseException]",
+            "engine runtime shutdown completed with supervision/cleanup errors",
             "def close_operation_runtime"
           ]
         },
@@ -116,7 +128,12 @@
             "self.lifecycle.acquire_work(",
             "self.lifecycle.release_work(lease)",
             "allow_starting=True",
-            "self._lifecycle_leases"
+            "self._lifecycle_leases",
+            "self._supervision_faults",
+            "def _release_lifecycle_lease(",
+            "def supervision_snapshot(",
+            "shutdown left lifecycle leases",
+            "shutdown supervision failed"
           ]
         },
         {
@@ -182,7 +199,18 @@
         "inflight_work",
         "active_work_ids",
         "last_lease_sequence"
-      ]
+      ],
+      "generated_identity": {
+        "authority": "RuntimeServiceLifecycle.acquire_generated_work",
+        "format": "<prefix>:<generation>:<monotonic_lease_sequence>",
+        "object_identity_forbidden": true
+      }
+    },
+    "background_work": {
+      "async_tasks_leased": true,
+      "threads_leased": true,
+      "thread_join_required_before_dependency_close": true,
+      "unquiesced_shutdown_policy": "fail-closed-and-remain-draining"
     }
   },
   "connector_inventory": {
@@ -200,7 +228,7 @@
       "surface_id": null,
       "owner": "backend/core/engine_client.py",
       "family": "internal-service",
-      "cancellation_mode": "delegated_durable_cancel",
+      "cancellation_mode": "composite",
       "deadline_propagation": true,
       "bounded_timeout": true,
       "retry_wait_cancellable": true,
@@ -211,6 +239,36 @@
         "execution_timeout_s",
         "request_timeout_s",
         "operation_id"
+      ],
+      "operations": [
+        {
+          "id": "execution-submit-poll",
+          "cancellation_mode": "async_task_cancellation",
+          "deadline_propagation": true,
+          "bounded_timeout": true,
+          "retry_wait_cancellable": true,
+          "late_result_fencing": true,
+          "required_symbols": [
+            "async def submit(",
+            "async def status(",
+            "async def wait_for_terminal(",
+            "request_timeout_s",
+            "execution_timeout_s"
+          ]
+        },
+        {
+          "id": "execution-cancel",
+          "cancellation_mode": "delegated_durable_cancel",
+          "deadline_propagation": true,
+          "bounded_timeout": true,
+          "retry_wait_cancellable": true,
+          "late_result_fencing": true,
+          "required_symbols": [
+            "async def cancel(",
+            "f\"/executions/{execution}/cancel\"",
+            "operation_id"
+          ]
+        }
       ]
     },
     {
@@ -218,16 +276,103 @@
       "surface_id": "engine-runtime",
       "owner": "skeleton/provider_runtime.py",
       "family": "runtime_model",
-      "cancellation_mode": "async_task_cancellation",
+      "cancellation_mode": "composite",
       "deadline_propagation": true,
       "bounded_timeout": true,
       "retry_wait_cancellable": true,
       "late_result_fencing": true,
       "required_symbols": [
-        "def _remaining_provider_timeout(",
+        "def _remaining_deadline_timeout(",
+        "async def _await_bounded_provider_call(",
         "asyncio.wait_for(",
-        "except asyncio.TimeoutError",
+        "CancellationToken",
         "ProviderInvocationError("
+      ],
+      "operations": [
+        {
+          "id": "async-text-generation",
+          "cancellation_mode": "async_task_cancellation",
+          "deadline_propagation": true,
+          "bounded_timeout": true,
+          "retry_wait_cancellable": true,
+          "late_result_fencing": true,
+          "required_symbols": [
+            "async def generate(self, request: ProviderRequest)",
+            "request_timeout = _remaining_provider_timeout(",
+            "response = await _await_bounded_provider_call(",
+            "deadline=request.deadline"
+          ]
+        },
+        {
+          "id": "sync-text-generation",
+          "cancellation_mode": "bounded_blocking_token_fence",
+          "deadline_propagation": true,
+          "bounded_timeout": true,
+          "retry_wait_cancellable": true,
+          "late_result_fencing": true,
+          "required_symbols": [
+            "def generate_sync(",
+            "cancellation: CancellationToken | None = None",
+            "cancellation.require_active()",
+            "urllib.request.urlopen(",
+            "timeout_seconds = _remaining_provider_timeout("
+          ]
+        },
+        {
+          "id": "image-generation",
+          "cancellation_mode": "async_task_cancellation",
+          "deadline_propagation": true,
+          "bounded_timeout": true,
+          "retry_wait_cancellable": true,
+          "late_result_fencing": true,
+          "required_symbols": [
+            "class ProviderImageRequest:",
+            "deadline: datetime | None = None",
+            "async def generate_image(",
+            "label=\"image provider\"",
+            "client.images.generate("
+          ]
+        },
+        {
+          "id": "image-variation",
+          "cancellation_mode": "async_task_cancellation",
+          "deadline_propagation": true,
+          "bounded_timeout": true,
+          "retry_wait_cancellable": true,
+          "late_result_fencing": true,
+          "required_symbols": [
+            "async def create_image_variation(",
+            "label=\"image variation provider\"",
+            "client.images.create_variation("
+          ]
+        },
+        {
+          "id": "image-editing",
+          "cancellation_mode": "async_task_cancellation",
+          "deadline_propagation": true,
+          "bounded_timeout": true,
+          "retry_wait_cancellable": true,
+          "late_result_fencing": true,
+          "required_symbols": [
+            "async def edit_image(",
+            "label=\"image edit provider\"",
+            "client.images.edit("
+          ]
+        },
+        {
+          "id": "speech-synthesis",
+          "cancellation_mode": "async_task_cancellation",
+          "deadline_propagation": true,
+          "bounded_timeout": true,
+          "retry_wait_cancellable": true,
+          "late_result_fencing": true,
+          "required_symbols": [
+            "class ProviderSpeechRequest:",
+            "async def synthesize_speech(",
+            "label=\"speech provider\"",
+            "client.audio.speech.create("
+          ]
+        }
       ]
     },
     {
@@ -244,6 +389,22 @@
         "CancellationToken",
         "cancellation.require_active()",
         "urllib.request.urlopen(req, timeout=self.timeout)"
+      ],
+      "operations": [
+        {
+          "id": "chat-completions",
+          "cancellation_mode": "bounded_blocking_token_fence",
+          "deadline_propagation": false,
+          "bounded_timeout": true,
+          "retry_wait_cancellable": true,
+          "late_result_fencing": true,
+          "required_symbols": [
+            "def chat(",
+            "cancellation: CancellationToken | None = None",
+            "cancellation.require_active()",
+            "urllib.request.urlopen(req, timeout=self.timeout)"
+          ]
+        }
       ]
     },
     {
@@ -261,6 +422,23 @@
         "cancellation.require_active()",
         "cancellation.wait(delay)",
         "urllib.request.urlopen(request, timeout=self.timeout_seconds)"
+      ],
+      "operations": [
+        {
+          "id": "planning-json",
+          "cancellation_mode": "bounded_blocking_token_fence",
+          "deadline_propagation": false,
+          "bounded_timeout": true,
+          "retry_wait_cancellable": true,
+          "late_result_fencing": true,
+          "required_symbols": [
+            "def call_json(",
+            "cancellation: CancellationToken | None = None",
+            "cancellation.require_active()",
+            "cancellation.wait(delay)",
+            "urllib.request.urlopen(request, timeout=self.timeout_seconds)"
+          ]
+        }
       ]
     },
     {
@@ -277,6 +455,22 @@
         "CancellationToken",
         "cancellation.require_active()",
         "request.urlopen(api_request, timeout=self.timeout)"
+      ],
+      "operations": [
+        {
+          "id": "advisory-responses",
+          "cancellation_mode": "bounded_blocking_token_fence",
+          "deadline_propagation": false,
+          "bounded_timeout": true,
+          "retry_wait_cancellable": true,
+          "late_result_fencing": true,
+          "required_symbols": [
+            "def reason(",
+            "cancellation: CancellationToken | None = None",
+            "cancellation.require_active()",
+            "request.urlopen(api_request, timeout=self.timeout)"
+          ]
+        }
       ]
     }
   ]
