@@ -274,3 +274,42 @@ def test_kill_controls_include_global_frontier_stop() -> None:
     ]
     errors = _validate(checker, payloads)
     assert "kill/suspend scope set drifted" in errors
+
+
+
+def test_risk_class_freshness_cannot_be_relaxed_silently() -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_risk")
+    payloads = _payloads()
+    payloads["contract"] = copy.deepcopy(payloads["contract"])
+    critical = next(
+        item
+        for item in payloads["contract"]["risk_and_freshness_policy"]["classes"]
+        if item["id"] == "critical"
+    )
+    critical["maximum_evidence_age_days"] = 90
+    errors = _validate(checker, payloads)
+    assert "critical maximum_evidence_age_days must be 7" in errors
+
+
+def test_level_risk_must_match_stratum_default() -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_level_risk")
+    payloads = _payloads()
+    payloads["contract"] = copy.deepcopy(payloads["contract"])
+    payloads["contract"]["levels"][40]["risk_class"] = "standard"
+    payloads["contract"]["levels"][40]["maximum_evidence_age_days"] = 30
+    errors = _validate(checker, payloads)
+    assert "L041.risk_class must equal stratum default critical" in errors
+
+
+def test_evidence_status_model_cannot_drop_invalidated_state() -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_evidence_status")
+    payloads = _payloads()
+    payloads["contract"] = copy.deepcopy(payloads["contract"])
+    payloads["contract"]["evidence_status_model"]["statuses"] = [
+        "CURRENT",
+        "STALE",
+        "MISSING",
+        "SUPERSEDED",
+    ]
+    errors = _validate(checker, payloads)
+    assert "evidence status model drifted" in errors
