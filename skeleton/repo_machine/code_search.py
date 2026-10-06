@@ -640,9 +640,9 @@ def _render_index_json(payload: object) -> str:
     in_string = False
     escaped = False
     line_bytes = 0
+    segment_start = 0
 
-    for character in compact:
-        pieces.append(character)
+    for index, character in enumerate(compact):
         line_bytes += 1  # canonical_json(..., ensure_ascii=True) is ASCII-only.
 
         if in_string:
@@ -672,16 +672,18 @@ def _render_index_json(payload: object) -> str:
             and line_bytes >= MAX_RENDERED_LINE_BYTES // 2
         )
         if normal_break or bounded_fallback:
+            if line_bytes > MAX_RENDERED_LINE_BYTES:
+                raise CodeSearchError("code-search index rendered line exceeds byte budget")
+            pieces.append(compact[segment_start : index + 1])
             pieces.append("\n")
+            segment_start = index + 1
             line_bytes = 0
 
-    rendered = "".join(pieces) + "\n"
-    if any(
-        len(line.encode("utf-8")) > MAX_RENDERED_LINE_BYTES
-        for line in rendered.splitlines()
-    ):
+    if line_bytes > MAX_RENDERED_LINE_BYTES:
         raise CodeSearchError("code-search index rendered line exceeds byte budget")
-    return rendered
+    pieces.append(compact[segment_start:])
+    pieces.append("\n")
+    return "".join(pieces)
 
 
 def save_code_search_index(index: CodeSearchIndex, path: str | Path) -> None:
