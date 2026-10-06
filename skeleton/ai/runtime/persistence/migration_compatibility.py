@@ -182,6 +182,10 @@ class MigrationPlan:
             raise MigrationCompatibilityError(
                 "migration source and target schema must differ"
             )
+        if self.source.identity_fields != self.target.identity_fields:
+            raise MigrationCompatibilityError(
+                "source and target canonical identity fields must match exactly"
+            )
         for name in ("forward", "rollback", "project"):
             if not callable(getattr(self, name)):
                 raise MigrationCompatibilityError(f"{name} must be callable")
