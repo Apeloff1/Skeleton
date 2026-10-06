@@ -107,9 +107,35 @@ def _validate_lifecycle_semantics(
         "reason",
         "at_monotonic",
         "cancellation",
+        "inflight_work",
     ]
     if lifecycle.get("receipt_fields") != expected_receipt_fields:
         raise RuntimeSupervisionError("lifecycle receipt shape drifted")
+
+    work_leases = lifecycle.get("work_leases")
+    if not isinstance(work_leases, dict):
+        raise RuntimeSupervisionError("lifecycle work_leases must be an object")
+    for key in (
+        "required",
+        "generation_bound",
+        "stop_requires_quiescence",
+    ):
+        if work_leases.get(key) is not True:
+            raise RuntimeSupervisionError(
+                f"lifecycle work_leases.{key} must be true"
+            )
+    if work_leases.get("duplicate_work_id_policy") != "deny":
+        raise RuntimeSupervisionError("duplicate work IDs must fail closed")
+    if work_leases.get("stale_generation_release_policy") != "deny":
+        raise RuntimeSupervisionError("stale work leases must fail closed")
+    if work_leases.get("startup_recovery_exception") != "engine durable recovery only":
+        raise RuntimeSupervisionError("startup recovery exception drifted")
+    if work_leases.get("snapshot_fields") != [
+        "inflight_work",
+        "active_work_ids",
+        "last_lease_sequence",
+    ]:
+        raise RuntimeSupervisionError("work lease snapshot contract drifted")
 
     shared = _repo_path(contract["sources"].get("shared_lifecycle"))
     mirror = _repo_path(contract["sources"].get("governed_lifecycle_mirror"))
@@ -123,9 +149,13 @@ def _validate_lifecycle_semantics(
     source = shared_path.read_text(encoding="utf-8")
     required = (
         "class RuntimeServiceLifecycle:",
+        "class WorkLease:",
         "ServicePhase.DRAINING",
         "self._token.cancel(",
         "def require_work_admission(",
+        "def acquire_work(",
+        "def release_work(",
+        "in-flight work leases",
         "def restart(",
         "LifecycleReceipt(",
     )
