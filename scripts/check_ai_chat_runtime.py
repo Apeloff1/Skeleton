@@ -35,6 +35,9 @@ REQUIRED_INVARIANTS = (
     "streamed client output is never authoritative completion state",
     "child budgets cannot exceed remaining parent authority",
     "ambiguous consequential tool effects require receipt reconciliation before retry or continuation",
+    "turn persistence stores operation state only and never duplicates canonical transcript authority",
+    "portable and production persistence decode the canonical runtime wire schema",
+    "Mongo event persistence uses prepare, atomic snapshot advance, and committed-marker recovery",
 )
 
 
@@ -91,6 +94,10 @@ def validate() -> list[str]:
         "independent_tests",
         "workflow",
         "plan",
+        "portable_repository",
+        "mongo_authority",
+        "persistence_tests",
+        "mongo_tests",
     }
     if set(files) != expected_roles:
         errors.append("AI chat runtime contract file roles drifted")
@@ -131,6 +138,54 @@ def validate() -> list[str]:
         errors.append(
             "AI chat runtime lost fail-closed markers: " + ", ".join(missing)
         )
+
+    persistence_checks = {
+        "portable_repository": (
+            "BEGIN IMMEDIATE",
+            "TurnJournal.verify",
+            "snapshot_digest",
+            "assert_assistant_message_binding",
+        ),
+        "mongo_authority": (
+            "_commit_state",
+            "prepared",
+            "find_one_and_update",
+            "_recover_prepared",
+            "TurnJournal.verify",
+        ),
+    }
+    for role, markers in persistence_checks.items():
+        raw_path = files.get(role)
+        if not isinstance(raw_path, str):
+            errors.append(f"AI chat persistence role missing: {role}")
+            continue
+        path = ROOT / raw_path
+        if not path.is_file():
+            continue
+        try:
+            persistence_source = path.read_text(encoding="utf-8")
+            ast.parse(persistence_source)
+        except (OSError, UnicodeDecodeError, SyntaxError) as exc:
+            errors.append(f"AI chat persistence module is invalid: {role}: {exc}")
+            continue
+        forbidden_hits = [
+            marker for marker in FORBIDDEN_MARKERS
+            if marker in persistence_source
+        ]
+        if forbidden_hits:
+            errors.append(
+                f"AI chat persistence crossed provider boundary: {role}: "
+                + ", ".join(forbidden_hits)
+            )
+        missing_persistence = [
+            marker for marker in markers
+            if marker not in persistence_source
+        ]
+        if missing_persistence:
+            errors.append(
+                f"AI chat persistence lost fail-closed markers: {role}: "
+                + ", ".join(missing_persistence)
+            )
 
     required_states = contract.get("required_states")
     if not isinstance(required_states, list) or not required_states:
