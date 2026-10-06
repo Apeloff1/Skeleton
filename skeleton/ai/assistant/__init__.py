@@ -186,3 +186,54 @@ __all__ += [
     "project_turn_page",
     "require_resume_cursor",
 ]
+
+
+from .model_placement import (
+    PLACEMENT_SCHEMA_VERSION,
+    EndpointAdmission,
+    EndpointHealth,
+    EndpointProfile,
+    EndpointState,
+    FailoverDecision,
+    ModelPlacementEngine,
+    PlacementBudget,
+    PlacementDecision,
+    PlacementError,
+    PlacementPolicy,
+    PlacementRequest,
+    PrivacyTier,
+    ProviderFailureKind,
+)
+from .tool_recovery import (
+    TOOL_RECOVERY_SCHEMA_VERSION,
+    PriorToolOutcome,
+    ToolRecoveryAction,
+    ToolRecoveryDecision,
+    ToolRecoveryError,
+    ToolRecoveryEvidence,
+    decide_tool_recovery,
+)
+
+__all__ += [
+    "PLACEMENT_SCHEMA_VERSION",
+    "EndpointAdmission",
+    "EndpointHealth",
+    "EndpointProfile",
+    "EndpointState",
+    "FailoverDecision",
+    "ModelPlacementEngine",
+    "PlacementBudget",
+    "PlacementDecision",
+    "PlacementError",
+    "PlacementPolicy",
+    "PlacementRequest",
+    "PrivacyTier",
+    "ProviderFailureKind",
+    "TOOL_RECOVERY_SCHEMA_VERSION",
+    "PriorToolOutcome",
+    "ToolRecoveryAction",
+    "ToolRecoveryDecision",
+    "ToolRecoveryError",
+    "ToolRecoveryEvidence",
+    "decide_tool_recovery",
+]
