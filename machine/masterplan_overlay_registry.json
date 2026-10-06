@@ -1,0 +1,96 @@
+{
+  "schema_version": "skeleton.masterplan_overlay_registry.v1",
+  "version": "1.0.0",
+  "status": "active",
+  "canonical_plan_version_floor": "2.5.0",
+  "laws": [
+    "registered overlays are cumulative unless explicitly superseded",
+    "no registered machine authority may be empty",
+    "reconciliation may not lower the canonical plan version",
+    "parse-index source identities must match exact-head git blobs",
+    "design completeness never implies implementation completion"
+  ],
+  "overlays": [
+    {
+      "id": "frontier-96",
+      "authority": "machine/frontier_96_ai_ladder.json",
+      "human": "docs/plan/FRONTIER_96_AI_LADDER.md",
+      "validator": "scripts/check_frontier_96_ladder.py",
+      "test": "tests/test_frontier_96_ladder.py",
+      "minimum_bytes": 80000
+    },
+    {
+      "id": "advanced-ai-100",
+      "authority": "machine/advanced_ai_structure_100.json",
+      "human": "docs/plan/ADVANCED_AI_100_LEVELS.md",
+      "validator": "scripts/check_advanced_ai_structure.py",
+      "test": "tests/test_advanced_ai_structure.py",
+      "workflow": ".github/workflows/advanced-ai-structure.yml",
+      "minimum_bytes": 400000
+    },
+    {
+      "id": "cs-300",
+      "authority": "machine/cs_300_computer_science_ladder.json",
+      "human": "docs/plan/CS_300_COMPUTER_SCIENCE_LADDER.md",
+      "validator": "scripts/check_cs_300_ladder.py",
+      "test": "tests/test_cs_300_ladder.py",
+      "workflow": ".github/workflows/cs-300-authority.yml",
+      "minimum_bytes": 400000
+    },
+    {
+      "id": "learning-adversarial-400",
+      "authority": "machine/learning_400_adversarial_400.json",
+      "human": "docs/plan/LEARNING_400_ADVERSARIAL_400.md",
+      "validator": "scripts/check_learning_400_adversarial_400.py",
+      "test": "tests/test_learning_400_adversarial_400.py",
+      "workflow": ".github/workflows/learning-400-adversarial-400.yml",
+      "minimum_bytes": 1200000
+    },
+    {
+      "id": "psi-1000",
+      "authority": "machine/project_self_improvement_1000.json",
+      "human": "docs/plan/PROJECT_SELF_IMPROVEMENT_1000.md",
+      "validator": "scripts/check_project_self_improvement_1000.py",
+      "test": "tests/test_project_self_improvement_1000.py",
+      "workflow": ".github/workflows/project-self-improvement-1000.yml",
+      "minimum_bytes": 1700000
+    },
+    {
+      "id": "ess-1000",
+      "authority": "machine/essentials_1000.json",
+      "human": "docs/plan/ESSENTIALS_1000.md",
+      "validator": "scripts/check_essentials_1000.py",
+      "test": "tests/test_essentials_1000.py",
+      "workflow": ".github/workflows/essentials-1000.yml",
+      "minimum_bytes": 1600000
+    },
+    {
+      "id": "competitive-200",
+      "authority": "machine/competitive_ai_engineering_ladder.json",
+      "human": "docs/architecture/COMPETITIVE_AI_ENGINEERING_LADDER.md",
+      "validator": "scripts/check_competitive_ai_engineering_ladder.py",
+      "test": "tests/test_competitive_ai_engineering_ladder.py",
+      "minimum_bytes": 600000
+    },
+    {
+      "id": "game-builder-500",
+      "authority": "machine/ai_game_builder_500_levels.json",
+      "human": "docs/architecture/AI_GAME_BUILDER_500_LEVELS.md",
+      "validator": "scripts/check_ai_game_builder_500_levels.py",
+      "test": "tests/test_ai_game_builder_500_levels.py",
+      "workflow": ".github/workflows/ai-game-builder-500-levels.yml",
+      "minimum_bytes": 15000
+    }
+  ],
+  "secondary_authorities": [
+    "machine/advanced_ai_maturity_ledger.json",
+    "machine/project_self_improvement_epoch_contract.json",
+    "machine/project_self_improvement_idle_scheduler.json",
+    "machine/essentials_1000_closure_protocol.json",
+    "machine/essentials_1000_gap_ledger.json",
+    "machine/essentials_1000_priority_policy.json",
+    "machine/essentials_1000_execution_frontier.json",
+    "machine/competitive_ai_benchmark_governance.json",
+    "machine/ai_game_builder_dual_rival_forge.json"
+  ]
+}

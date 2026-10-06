@@ -121,6 +121,62 @@ Exotic systems depth: [`EXOTIC_SYSTEMS_DEPTH.md`](EXOTIC_SYSTEMS_DEPTH.md)
 
 Machine exotic catalogue: [`machine/ai_exotic_systems_catalog.json`](../../machine/ai_exotic_systems_catalog.json)
 
+Frontier-96 post-enterprise ladder: [`FRONTIER_96_AI_LADDER.md`](FRONTIER_96_AI_LADDER.md)
+
+Machine Frontier-96 contract: [`machine/frontier_96_ai_ladder.json`](../../machine/frontier_96_ai_ladder.json)
+
+Frontier-96 validator: [`scripts/check_frontier_96_ladder.py`](../../scripts/check_frontier_96_ladder.py)
+
+CS-300 computer-science ladder: [`CS_300_COMPUTER_SCIENCE_LADDER.md`](CS_300_COMPUTER_SCIENCE_LADDER.md)
+
+Machine CS-300 contract: [`machine/cs_300_computer_science_ladder.json`](../../machine/cs_300_computer_science_ladder.json)
+
+CS-300 validator: [`scripts/check_cs_300_ladder.py`](../../scripts/check_cs_300_ladder.py)
+
+CS-300 exact-head workflow: [`.github/workflows/cs-300-authority.yml`](../../.github/workflows/cs-300-authority.yml)
+
+Learning-400 + Adversarial-400 plan: [`LEARNING_400_ADVERSARIAL_400.md`](LEARNING_400_ADVERSARIAL_400.md)
+
+Machine Learning-400 + Adversarial-400 authority: [`machine/learning_400_adversarial_400.json`](../../machine/learning_400_adversarial_400.json)
+
+Learning-400 validator: [`scripts/check_learning_400_adversarial_400.py`](../../scripts/check_learning_400_adversarial_400.py)
+
+Learning-400 exact-head workflow: [`.github/workflows/learning-400-adversarial-400.yml`](../../.github/workflows/learning-400-adversarial-400.yml)
+
+Project Self-Improvement-1000 plan: [`PROJECT_SELF_IMPROVEMENT_1000.md`](PROJECT_SELF_IMPROVEMENT_1000.md)
+
+Machine PSI-1000 authority: [`machine/project_self_improvement_1000.json`](../../machine/project_self_improvement_1000.json)
+
+Mirror-room epoch state machine: [`machine/project_self_improvement_epoch_contract.json`](../../machine/project_self_improvement_epoch_contract.json)
+
+PSI-1000 idle opportunity scheduler: [`machine/project_self_improvement_idle_scheduler.json`](../../machine/project_self_improvement_idle_scheduler.json)
+
+PSI-1000 validator: [`scripts/check_project_self_improvement_1000.py`](../../scripts/check_project_self_improvement_1000.py)
+
+PSI-1000 exact-head workflow: [`.github/workflows/project-self-improvement-1000.yml`](../../.github/workflows/project-self-improvement-1000.yml)
+
+ESS-1000 essential completeness plan: [`ESSENTIALS_1000.md`](ESSENTIALS_1000.md)
+
+Machine ESS-1000 authority: [`machine/essentials_1000.json`](../../machine/essentials_1000.json)
+
+ESS-1000 validator: [`scripts/check_essentials_1000.py`](../../scripts/check_essentials_1000.py)
+
+ESS-1000 exact-head workflow: [`.github/workflows/essentials-1000.yml`](../../.github/workflows/essentials-1000.yml)
+
+ESS-1000 closure protocol: [`machine/essentials_1000_closure_protocol.json`](../../machine/essentials_1000_closure_protocol.json)
+
+ESS-1000 gap ledger: [`machine/essentials_1000_gap_ledger.json`](../../machine/essentials_1000_gap_ledger.json)
+
+ESS-1000 priority policy: [`machine/essentials_1000_priority_policy.json`](../../machine/essentials_1000_priority_policy.json)
+
+ESS-1000 execution frontier: [`machine/essentials_1000_execution_frontier.json`](../../machine/essentials_1000_execution_frontier.json)
+
+Advanced AI 100-level promotion structure: [`ADVANCED_AI_100_LEVELS.md`](ADVANCED_AI_100_LEVELS.md)
+
+Machine Advanced AI authority: [`machine/advanced_ai_structure_100.json`](../../machine/advanced_ai_structure_100.json)
+
+Machine Advanced AI maturity ledger: [`machine/advanced_ai_maturity_ledger.json`](../../machine/advanced_ai_maturity_ledger.json)
+
 Competitive AI engineering ladder: [`../architecture/COMPETITIVE_AI_ENGINEERING_LADDER.md`](../architecture/COMPETITIVE_AI_ENGINEERING_LADDER.md)
 
 Machine competitive engineering authority: [`machine/competitive_ai_engineering_ladder.json`](../../machine/competitive_ai_engineering_ladder.json)
@@ -134,6 +190,8 @@ AI Game Builder 500-level authority: [`../architecture/AI_GAME_BUILDER_500_LEVEL
 Machine game-builder authority: [`machine/ai_game_builder_500_levels.json`](../../machine/ai_game_builder_500_levels.json)
 
 Machine dual-rival forge authority: [`machine/ai_game_builder_dual_rival_forge.json`](../../machine/ai_game_builder_dual_rival_forge.json)
+
+Masterplan overlay union registry: [`machine/masterplan_overlay_registry.json`](../../machine/masterplan_overlay_registry.json)
 
 ## Purpose
 
@@ -197,15 +255,33 @@ Repository work on this plan must respect the existing PR #1904 bootstrap stack:
 50. `machine/openai_oss_assimilation.json`
 51. `docs/plan/XAI_GROK_OSS_ASSIMILATION_2026-09-25.md`
 52. `machine/xai_grok_oss_assimilation.json`
-53. `docs/architecture/COMPETITIVE_AI_ENGINEERING_LADDER.md`
-54. `machine/competitive_ai_engineering_ladder.json`
-55. `docs/architecture/COMPETITIVE_AI_BENCHMARK_GOVERNANCE.md`
-56. `machine/competitive_ai_benchmark_governance.json`
-57. `docs/architecture/AI_GAME_BUILDER_500_LEVELS.md`
-58. `machine/ai_game_builder_500_levels.json`
-59. `machine/ai_game_builder_dual_rival_forge.json`
+53. `docs/plan/FRONTIER_96_AI_LADDER.md`
+54. `machine/frontier_96_ai_ladder.json`
+55. `scripts/check_frontier_96_ladder.py`
+56. `docs/plan/CS_300_COMPUTER_SCIENCE_LADDER.md`
+57. `machine/cs_300_computer_science_ladder.json`
+58. `scripts/check_cs_300_ladder.py`
+59. `.github/workflows/cs-300-authority.yml`
+60. `docs/plan/LEARNING_400_ADVERSARIAL_400.md`
+61. `machine/learning_400_adversarial_400.json`
+62. `scripts/check_learning_400_adversarial_400.py`
+63. `.github/workflows/learning-400-adversarial-400.yml`
+64. `docs/plan/PROJECT_SELF_IMPROVEMENT_1000.md`
+65. `machine/project_self_improvement_1000.json`
+66. `machine/project_self_improvement_epoch_contract.json`
+67. `scripts/check_project_self_improvement_1000.py`
+68. `.github/workflows/project-self-improvement-1000.yml`
+69. `machine/project_self_improvement_idle_scheduler.json`
+70. `docs/plan/ESSENTIALS_1000.md`
+71. `machine/essentials_1000.json`
+72. `scripts/check_essentials_1000.py`
+73. `.github/workflows/essentials-1000.yml`
+74. `machine/essentials_1000_closure_protocol.json`
+75. `machine/essentials_1000_gap_ledger.json`
+76. `machine/essentials_1000_priority_policy.json`
+77. `machine/essentials_1000_execution_frontier.json`
 
-The first ten remain the present implementation/construction authority. Items 11–40 form the frozen long-range planning, risk, sequencing, depth, adversarial-closure, exotic-research and engineering-validation stack. Items 41–42 define the historical implementation-depth frontier and its machine-checkable reconciliation contract. Items 43–45 define the bounded P1 trustworthy-production maturity frontier and its dependency-ordered 44-task execution DAG. Items 46–48 define the P2 capability-expansion boundary sourced exactly from P1's 314 deferred volumes, with explicit scheduled/queued ownership and fail-closed dependency validation. Items 49–52 deepen the frozen research/provider/runtime volumes with pinned OpenAI and xAI/Grok OSS provenance and bounded interoperability; they do not add a new architecture volume or completion authority. Items 53–54 add the 200-level competitive engineering overlay; they bind to existing frozen volumes and add no new top-level architecture volume. Items 55–56 govern preregistered competitive evaluation, anti-gaming rules, independent promotion, and cross-family qualification without creating new volume authority. Items 57–59 add the 500-level dual-rival game-builder overlay, long-form consistency authority, and rights/provenance/originality gates without creating new top-level volume authority.
+The first ten remain the present implementation/construction authority. Items 11–40 form the frozen long-range planning, risk, sequencing, depth, adversarial-closure, exotic-research and engineering-validation stack. Items 41–42 define the historical implementation-depth frontier and its machine-checkable reconciliation contract. Items 43–45 define the bounded P1 trustworthy-production maturity frontier and its dependency-ordered 44-task execution DAG. Items 46–48 define the P2 capability-expansion boundary sourced exactly from P1's 314 deferred volumes, with explicit scheduled/queued ownership and fail-closed dependency validation. Items 49–52 deepen the frozen research/provider/runtime volumes with pinned OpenAI and xAI/Grok OSS provenance and bounded interoperability. Items 53–55 define and validate the post-enterprise Frontier-96 qualification overlay. Items 56–59 define and validate the CS-300 cutting-edge computer-science overlay above Frontier-96, including its exact-head CI authority. Items 60–63 define and enforce the paired Learning-400 + Adversarial-400 program for knowledge acquisition, web/video/document learning, project-derived learning, native weight creation, continual candidate improvement and equal-size adversarial qualification. Items 64–69 define PSI-1000: a per-project 1000-level self-improvement template with immediate foreground-idle mirror-room activation, strict preemption, bounded epochs, candidate-only mutation and receipt-backed promotion. Items 70–77 define ESS-1000, the 1000-level non-compensable completeness floor paired to PSI-1000, its revocable closure protocol, explicit 1000-record gap ledger, hard-order severity policy, and 99-lane execution frontier so unresolved essentials outrank optional self-improvement and stale evidence reopens previously closed gaps. None of these overlays adds a new architecture volume; they raise depth and evidence requirements while preserving the VOL-420 breadth freeze.
 
 ## Index laws
 
@@ -757,3 +833,18 @@ The frozen volume structure also carries a machine-validated exotic-systems rese
 Exotics are depth, not breadth: each candidate must map to existing volumes and collectively cover all W00–W30 work packages, default to no production authority, preserve a canonical fallback, expose an independent kill switch, and earn promotion through reproducible comparative evidence plus ordinary maturity/accountability gates.
 
 See [`EXOTIC_SYSTEMS_DEPTH.md`](EXOTIC_SYSTEMS_DEPTH.md) and [`machine/ai_exotic_systems_catalog.json`](../../machine/ai_exotic_systems_catalog.json).
+
+
+## Cumulative frontier overlay union
+
+The canonical depth union is:
+1. Frontier-96
+2. Advanced-AI-100
+3. CS-300
+4. Learning-400 + Adversarial-400
+5. PSI-1000
+6. ESS-1000
+7. Competitive-200
+8. AI Game Builder-500
+
+These authorities are cumulative. A reconciliation must preserve all live members of the union unless an explicit supersession record exists and passes the same evidence, migration, rollback and independent-verification requirements.

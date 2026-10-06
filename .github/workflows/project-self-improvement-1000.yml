@@ -78,7 +78,7 @@ jobs:
           master = json.loads(master_path.read_text(encoding="utf-8"))
           index = json.loads(Path("machine/ai_masterplan_parse_index.json").read_text(encoding="utf-8"))
 
-          assert master["plan_version"] == "2.1.0"
+          assert tuple(int(x) for x in master["plan_version"].split(".")) >= (2, 5, 0), master["plan_version"]
           assert master["authority"]["project_self_improvement_1000"] == "machine/project_self_improvement_1000.json"
           assert master["authority"]["project_self_improvement_1000_validator"] == "scripts/check_project_self_improvement_1000.py"
           assert master["authority"]["project_self_improvement_1000_workflow"] == ".github/workflows/project-self-improvement-1000.yml"

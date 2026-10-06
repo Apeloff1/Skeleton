@@ -3,10 +3,10 @@
   "kind": "ai-masterplan-parse-index",
   "sources": {
     "machine/ai_master_plan.json": {
-      "git_blob_sha": "b49fd31d424d2466f95ff0bcf8e8db965b051e07"
+      "git_blob_sha": "acd112a85d01e8594c392889a38f9179ee592f8b"
     },
     "machine/ai_build_accountability.json": {
-      "git_blob_sha": "7ed745badd87a49a3f34cc8c7fccd434d2c804e2"
+      "git_blob_sha": "0e404b0d4d8e5035ce62cca01acaf4ba4c08bd59"
     }
   },
   "policy": {
