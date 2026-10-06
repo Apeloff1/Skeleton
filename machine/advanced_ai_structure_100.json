@@ -311,6 +311,13 @@
         "Typed Cognitive Contracts: focused runtime or simulation evidence",
         "Typed Cognitive Contracts: adversarial/failure-mode evidence",
         "Typed Cognitive Contracts: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -350,6 +357,13 @@
         "Identity and Causality Fabric: focused runtime or simulation evidence",
         "Identity and Causality Fabric: adversarial/failure-mode evidence",
         "Identity and Causality Fabric: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -389,6 +403,13 @@
         "Temporal and Sequence Semantics: focused runtime or simulation evidence",
         "Temporal and Sequence Semantics: adversarial/failure-mode evidence",
         "Temporal and Sequence Semantics: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -428,6 +449,13 @@
         "Budget and Constraint Calculus: focused runtime or simulation evidence",
         "Budget and Constraint Calculus: adversarial/failure-mode evidence",
         "Budget and Constraint Calculus: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -467,6 +495,13 @@
         "State Authority Partitioning: focused runtime or simulation evidence",
         "State Authority Partitioning: adversarial/failure-mode evidence",
         "State Authority Partitioning: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -506,6 +541,13 @@
         "Provenance and Evidence Graph: focused runtime or simulation evidence",
         "Provenance and Evidence Graph: adversarial/failure-mode evidence",
         "Provenance and Evidence Graph: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -545,6 +587,13 @@
         "Capability and Permission Lattice: focused runtime or simulation evidence",
         "Capability and Permission Lattice: adversarial/failure-mode evidence",
         "Capability and Permission Lattice: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -584,6 +633,13 @@
         "Deterministic Replay and Checkpointing: focused runtime or simulation evidence",
         "Deterministic Replay and Checkpointing: adversarial/failure-mode evidence",
         "Deterministic Replay and Checkpointing: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -623,6 +679,13 @@
         "Safety and Interlock Substrate: focused runtime or simulation evidence",
         "Safety and Interlock Substrate: adversarial/failure-mode evidence",
         "Safety and Interlock Substrate: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -662,6 +725,13 @@
         "Cognitive Substrate Closure: focused runtime or simulation evidence",
         "Cognitive Substrate Closure: adversarial/failure-mode evidence",
         "Cognitive Substrate Closure: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -699,6 +769,15 @@
         "Multimodal Ingestion Fabric: focused runtime or simulation evidence",
         "Multimodal Ingestion Fabric: adversarial/failure-mode evidence",
         "Multimodal Ingestion Fabric: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -736,6 +815,15 @@
         "Content-Type and Integrity Verification: focused runtime or simulation evidence",
         "Content-Type and Integrity Verification: adversarial/failure-mode evidence",
         "Content-Type and Integrity Verification: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -773,6 +861,15 @@
         "Semantic Segmentation: focused runtime or simulation evidence",
         "Semantic Segmentation: adversarial/failure-mode evidence",
         "Semantic Segmentation: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -810,6 +907,15 @@
         "Trust Classification: focused runtime or simulation evidence",
         "Trust Classification: adversarial/failure-mode evidence",
         "Trust Classification: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -847,6 +953,15 @@
         "Context Normalization: focused runtime or simulation evidence",
         "Context Normalization: adversarial/failure-mode evidence",
         "Context Normalization: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -884,6 +999,15 @@
         "Salience and Relevance Modeling: focused runtime or simulation evidence",
         "Salience and Relevance Modeling: adversarial/failure-mode evidence",
         "Salience and Relevance Modeling: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -921,6 +1045,15 @@
         "Context Compression and Distillation: focused runtime or simulation evidence",
         "Context Compression and Distillation: adversarial/failure-mode evidence",
         "Context Compression and Distillation: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -958,6 +1091,15 @@
         "Long-Context Paging and Recall: focused runtime or simulation evidence",
         "Long-Context Paging and Recall: adversarial/failure-mode evidence",
         "Long-Context Paging and Recall: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -995,6 +1137,15 @@
         "Cross-Modal Alignment: focused runtime or simulation evidence",
         "Cross-Modal Alignment: adversarial/failure-mode evidence",
         "Cross-Modal Alignment: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -1032,6 +1183,15 @@
         "Context Intelligence Closure: focused runtime or simulation evidence",
         "Context Intelligence Closure: adversarial/failure-mode evidence",
         "Context Intelligence Closure: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -1067,6 +1227,15 @@
         "Working Memory: focused runtime or simulation evidence",
         "Working Memory: adversarial/failure-mode evidence",
         "Working Memory: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -1102,6 +1271,15 @@
         "Episodic Memory: focused runtime or simulation evidence",
         "Episodic Memory: adversarial/failure-mode evidence",
         "Episodic Memory: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -1137,6 +1315,15 @@
         "Semantic Memory: focused runtime or simulation evidence",
         "Semantic Memory: adversarial/failure-mode evidence",
         "Semantic Memory: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -1172,6 +1359,15 @@
         "Procedural Memory: focused runtime or simulation evidence",
         "Procedural Memory: adversarial/failure-mode evidence",
         "Procedural Memory: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -1207,6 +1403,15 @@
         "Temporal Memory: focused runtime or simulation evidence",
         "Temporal Memory: adversarial/failure-mode evidence",
         "Temporal Memory: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -1242,6 +1447,15 @@
         "Knowledge Graph Intelligence: focused runtime or simulation evidence",
         "Knowledge Graph Intelligence: adversarial/failure-mode evidence",
         "Knowledge Graph Intelligence: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -1277,6 +1491,15 @@
         "Retrieval Fusion: focused runtime or simulation evidence",
         "Retrieval Fusion: adversarial/failure-mode evidence",
         "Retrieval Fusion: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -1312,6 +1535,15 @@
         "Memory Consolidation and Supersession: focused runtime or simulation evidence",
         "Memory Consolidation and Supersession: adversarial/failure-mode evidence",
         "Memory Consolidation and Supersession: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -1347,6 +1579,15 @@
         "Forgetting, Privacy, and Lifecycle: focused runtime or simulation evidence",
         "Forgetting, Privacy, and Lifecycle: adversarial/failure-mode evidence",
         "Forgetting, Privacy, and Lifecycle: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -1382,6 +1623,15 @@
         "Memory and Knowledge Closure: focused runtime or simulation evidence",
         "Memory and Knowledge Closure: adversarial/failure-mode evidence",
         "Memory and Knowledge Closure: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -1417,6 +1667,15 @@
         "Problem Framing: focused runtime or simulation evidence",
         "Problem Framing: adversarial/failure-mode evidence",
         "Problem Framing: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -1452,6 +1711,15 @@
         "Task Decomposition: focused runtime or simulation evidence",
         "Task Decomposition: adversarial/failure-mode evidence",
         "Task Decomposition: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -1487,6 +1755,15 @@
         "Hypothesis Generation: focused runtime or simulation evidence",
         "Hypothesis Generation: adversarial/failure-mode evidence",
         "Hypothesis Generation: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -1522,6 +1799,15 @@
         "Search and Branching: focused runtime or simulation evidence",
         "Search and Branching: adversarial/failure-mode evidence",
         "Search and Branching: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -1557,6 +1843,15 @@
         "Constraint Solving: focused runtime or simulation evidence",
         "Constraint Solving: adversarial/failure-mode evidence",
         "Constraint Solving: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -1592,6 +1887,15 @@
         "Quantitative and Symbolic Reasoning: focused runtime or simulation evidence",
         "Quantitative and Symbolic Reasoning: adversarial/failure-mode evidence",
         "Quantitative and Symbolic Reasoning: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -1627,6 +1931,15 @@
         "Causal Reasoning: focused runtime or simulation evidence",
         "Causal Reasoning: adversarial/failure-mode evidence",
         "Causal Reasoning: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -1662,6 +1975,15 @@
         "Uncertainty Calibration: focused runtime or simulation evidence",
         "Uncertainty Calibration: adversarial/failure-mode evidence",
         "Uncertainty Calibration: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -1697,6 +2019,15 @@
         "Independent Critique and Verification: focused runtime or simulation evidence",
         "Independent Critique and Verification: adversarial/failure-mode evidence",
         "Independent Critique and Verification: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -1732,6 +2063,15 @@
         "Deliberative Intelligence Closure: focused runtime or simulation evidence",
         "Deliberative Intelligence Closure: adversarial/failure-mode evidence",
         "Deliberative Intelligence Closure: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -1768,6 +2108,13 @@
         "Intent-to-Action Proposal: focused runtime or simulation evidence",
         "Intent-to-Action Proposal: adversarial/failure-mode evidence",
         "Intent-to-Action Proposal: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -1804,6 +2151,13 @@
         "Capability Admission: focused runtime or simulation evidence",
         "Capability Admission: adversarial/failure-mode evidence",
         "Capability Admission: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -1840,6 +2194,13 @@
         "Tool Schema Grounding: focused runtime or simulation evidence",
         "Tool Schema Grounding: adversarial/failure-mode evidence",
         "Tool Schema Grounding: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -1876,6 +2237,13 @@
         "Side-Effect Classification: focused runtime or simulation evidence",
         "Side-Effect Classification: adversarial/failure-mode evidence",
         "Side-Effect Classification: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -1912,6 +2280,13 @@
         "Approval and Consent Orchestration: focused runtime or simulation evidence",
         "Approval and Consent Orchestration: adversarial/failure-mode evidence",
         "Approval and Consent Orchestration: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -1948,6 +2323,13 @@
         "Sandboxed Execution: focused runtime or simulation evidence",
         "Sandboxed Execution: adversarial/failure-mode evidence",
         "Sandboxed Execution: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -1984,6 +2366,13 @@
         "Transactional External Integration: focused runtime or simulation evidence",
         "Transactional External Integration: adversarial/failure-mode evidence",
         "Transactional External Integration: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -2020,6 +2409,13 @@
         "Ambiguous Effect Reconciliation: focused runtime or simulation evidence",
         "Ambiguous Effect Reconciliation: adversarial/failure-mode evidence",
         "Ambiguous Effect Reconciliation: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -2056,6 +2452,13 @@
         "Action Outcome Verification: focused runtime or simulation evidence",
         "Action Outcome Verification: adversarial/failure-mode evidence",
         "Action Outcome Verification: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -2092,6 +2495,13 @@
         "Governed Agency Closure: focused runtime or simulation evidence",
         "Governed Agency Closure: adversarial/failure-mode evidence",
         "Governed Agency Closure: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -2127,6 +2537,15 @@
         "Agent Role and Responsibility Models: focused runtime or simulation evidence",
         "Agent Role and Responsibility Models: adversarial/failure-mode evidence",
         "Agent Role and Responsibility Models: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -2162,6 +2581,15 @@
         "Delegation Graph: focused runtime or simulation evidence",
         "Delegation Graph: adversarial/failure-mode evidence",
         "Delegation Graph: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -2197,6 +2625,15 @@
         "Bounded Worker Spawning: focused runtime or simulation evidence",
         "Bounded Worker Spawning: adversarial/failure-mode evidence",
         "Bounded Worker Spawning: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -2232,6 +2669,15 @@
         "Shared Workspace Coordination: focused runtime or simulation evidence",
         "Shared Workspace Coordination: adversarial/failure-mode evidence",
         "Shared Workspace Coordination: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -2267,6 +2713,15 @@
         "Negotiation and Consensus: focused runtime or simulation evidence",
         "Negotiation and Consensus: adversarial/failure-mode evidence",
         "Negotiation and Consensus: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -2302,6 +2757,15 @@
         "Conflict Detection and Resolution: focused runtime or simulation evidence",
         "Conflict Detection and Resolution: adversarial/failure-mode evidence",
         "Conflict Detection and Resolution: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -2337,6 +2801,15 @@
         "Supervisor-Secretary-Worker Hierarchy: focused runtime or simulation evidence",
         "Supervisor-Secretary-Worker Hierarchy: adversarial/failure-mode evidence",
         "Supervisor-Secretary-Worker Hierarchy: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -2372,6 +2845,15 @@
         "Swarm and Parallel Coordination: focused runtime or simulation evidence",
         "Swarm and Parallel Coordination: adversarial/failure-mode evidence",
         "Swarm and Parallel Coordination: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -2407,6 +2889,15 @@
         "Cross-Agent Provenance: focused runtime or simulation evidence",
         "Cross-Agent Provenance: adversarial/failure-mode evidence",
         "Cross-Agent Provenance: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -2442,6 +2933,15 @@
         "Organizational Intelligence Closure: focused runtime or simulation evidence",
         "Organizational Intelligence Closure: adversarial/failure-mode evidence",
         "Organizational Intelligence Closure: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -2478,6 +2978,13 @@
         "Feedback Capture: focused runtime or simulation evidence",
         "Feedback Capture: adversarial/failure-mode evidence",
         "Feedback Capture: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -2514,6 +3021,13 @@
         "Offline Evaluation: focused runtime or simulation evidence",
         "Offline Evaluation: adversarial/failure-mode evidence",
         "Offline Evaluation: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -2550,6 +3064,13 @@
         "Online Evaluation: focused runtime or simulation evidence",
         "Online Evaluation: adversarial/failure-mode evidence",
         "Online Evaluation: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -2586,6 +3107,13 @@
         "Counterfactual Analysis: focused runtime or simulation evidence",
         "Counterfactual Analysis: adversarial/failure-mode evidence",
         "Counterfactual Analysis: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -2622,6 +3150,13 @@
         "Preference and Reward Learning: focused runtime or simulation evidence",
         "Preference and Reward Learning: adversarial/failure-mode evidence",
         "Preference and Reward Learning: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -2658,6 +3193,13 @@
         "Curriculum and Self-Training: focused runtime or simulation evidence",
         "Curriculum and Self-Training: adversarial/failure-mode evidence",
         "Curriculum and Self-Training: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -2694,6 +3236,13 @@
         "Adaptive Routing: focused runtime or simulation evidence",
         "Adaptive Routing: adversarial/failure-mode evidence",
         "Adaptive Routing: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -2730,6 +3279,13 @@
         "Memory and Strategy Adaptation: focused runtime or simulation evidence",
         "Memory and Strategy Adaptation: adversarial/failure-mode evidence",
         "Memory and Strategy Adaptation: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -2766,6 +3322,13 @@
         "Safe Promotion and Rollback: focused runtime or simulation evidence",
         "Safe Promotion and Rollback: adversarial/failure-mode evidence",
         "Safe Promotion and Rollback: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -2802,6 +3365,13 @@
         "Adaptive Intelligence Closure: focused runtime or simulation evidence",
         "Adaptive Intelligence Closure: adversarial/failure-mode evidence",
         "Adaptive Intelligence Closure: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -2839,6 +3409,13 @@
         "Goal Lifecycle Management: focused runtime or simulation evidence",
         "Goal Lifecycle Management: adversarial/failure-mode evidence",
         "Goal Lifecycle Management: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -2876,6 +3453,13 @@
         "Autonomy Policy Engine: focused runtime or simulation evidence",
         "Autonomy Policy Engine: adversarial/failure-mode evidence",
         "Autonomy Policy Engine: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -2913,6 +3497,13 @@
         "Scheduled and Background Cognition: focused runtime or simulation evidence",
         "Scheduled and Background Cognition: adversarial/failure-mode evidence",
         "Scheduled and Background Cognition: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -2950,6 +3541,13 @@
         "Interruption, Resume, and Handoff: focused runtime or simulation evidence",
         "Interruption, Resume, and Handoff: adversarial/failure-mode evidence",
         "Interruption, Resume, and Handoff: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -2987,6 +3585,13 @@
         "Fault Diagnosis: focused runtime or simulation evidence",
         "Fault Diagnosis: adversarial/failure-mode evidence",
         "Fault Diagnosis: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -3024,6 +3629,13 @@
         "Self-Healing Proposal Engine: focused runtime or simulation evidence",
         "Self-Healing Proposal Engine: adversarial/failure-mode evidence",
         "Self-Healing Proposal Engine: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -3061,6 +3673,13 @@
         "Chaos and Resilience Intelligence: focused runtime or simulation evidence",
         "Chaos and Resilience Intelligence: adversarial/failure-mode evidence",
         "Chaos and Resilience Intelligence: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -3098,6 +3717,13 @@
         "Policy and Governance Reasoning: focused runtime or simulation evidence",
         "Policy and Governance Reasoning: adversarial/failure-mode evidence",
         "Policy and Governance Reasoning: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -3135,6 +3761,13 @@
         "Risk-Aware Escalation: focused runtime or simulation evidence",
         "Risk-Aware Escalation: adversarial/failure-mode evidence",
         "Risk-Aware Escalation: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -3172,6 +3805,13 @@
         "Bounded Autonomy Closure: focused runtime or simulation evidence",
         "Bounded Autonomy Closure: adversarial/failure-mode evidence",
         "Bounded Autonomy Closure: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -3209,6 +3849,15 @@
         "World Model Construction: focused runtime or simulation evidence",
         "World Model Construction: adversarial/failure-mode evidence",
         "World Model Construction: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -3246,6 +3895,15 @@
         "Simulation and Digital Twin Reasoning: focused runtime or simulation evidence",
         "Simulation and Digital Twin Reasoning: adversarial/failure-mode evidence",
         "Simulation and Digital Twin Reasoning: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -3283,6 +3941,15 @@
         "Long-Horizon Planning: focused runtime or simulation evidence",
         "Long-Horizon Planning: adversarial/failure-mode evidence",
         "Long-Horizon Planning: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -3320,6 +3987,15 @@
         "Hierarchical Planning: focused runtime or simulation evidence",
         "Hierarchical Planning: adversarial/failure-mode evidence",
         "Hierarchical Planning: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -3357,6 +4033,15 @@
         "Metacognitive Control: focused runtime or simulation evidence",
         "Metacognitive Control: adversarial/failure-mode evidence",
         "Metacognitive Control: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -3394,6 +4079,15 @@
         "Epistemic State Tracking: focused runtime or simulation evidence",
         "Epistemic State Tracking: adversarial/failure-mode evidence",
         "Epistemic State Tracking: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -3431,6 +4125,15 @@
         "Stakeholder and Theory-of-Mind Modeling: focused runtime or simulation evidence",
         "Stakeholder and Theory-of-Mind Modeling: adversarial/failure-mode evidence",
         "Stakeholder and Theory-of-Mind Modeling: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -3468,6 +4171,15 @@
         "Creative Synthesis: focused runtime or simulation evidence",
         "Creative Synthesis: adversarial/failure-mode evidence",
         "Creative Synthesis: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -3505,6 +4217,15 @@
         "Scientific Discovery Loop: focused runtime or simulation evidence",
         "Scientific Discovery Loop: adversarial/failure-mode evidence",
         "Scientific Discovery Loop: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -3542,6 +4263,15 @@
         "Advanced Cognition Closure: focused runtime or simulation evidence",
         "Advanced Cognition Closure: adversarial/failure-mode evidence",
         "Advanced Cognition Closure: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "high",
+      "maximum_evidence_age_days": 14,
+      "requalification_triggers": [
+        "contract change",
+        "owner/interface change",
+        "security/governance change",
+        "dependency/provider change",
+        "runtime topology change"
       ]
     },
     {
@@ -3580,6 +4310,13 @@
         "Architecture Introspection: focused runtime or simulation evidence",
         "Architecture Introspection: adversarial/failure-mode evidence",
         "Architecture Introspection: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -3618,6 +4355,13 @@
         "Capability Gap Discovery: focused runtime or simulation evidence",
         "Capability Gap Discovery: adversarial/failure-mode evidence",
         "Capability Gap Discovery: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -3656,6 +4400,13 @@
         "Continuous Self-Benchmarking: focused runtime or simulation evidence",
         "Continuous Self-Benchmarking: adversarial/failure-mode evidence",
         "Continuous Self-Benchmarking: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -3694,6 +4445,13 @@
         "Design-Space Exploration: focused runtime or simulation evidence",
         "Design-Space Exploration: adversarial/failure-mode evidence",
         "Design-Space Exploration: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -3732,6 +4490,13 @@
         "Automated Experiment Generation: focused runtime or simulation evidence",
         "Automated Experiment Generation: adversarial/failure-mode evidence",
         "Automated Experiment Generation: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -3770,6 +4535,13 @@
         "Verified Improvement Proposals: focused runtime or simulation evidence",
         "Verified Improvement Proposals: adversarial/failure-mode evidence",
         "Verified Improvement Proposals: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -3808,6 +4580,13 @@
         "Cross-Domain Transfer: focused runtime or simulation evidence",
         "Cross-Domain Transfer: adversarial/failure-mode evidence",
         "Cross-Domain Transfer: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -3846,6 +4625,13 @@
         "Strategic Meta-Orchestration: focused runtime or simulation evidence",
         "Strategic Meta-Orchestration: adversarial/failure-mode evidence",
         "Strategic Meta-Orchestration: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -3884,6 +4670,13 @@
         "Bounded Self-Evolution Governance: focused runtime or simulation evidence",
         "Bounded Self-Evolution Governance: adversarial/failure-mode evidence",
         "Bounded Self-Evolution Governance: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     },
     {
@@ -3922,6 +4715,13 @@
         "Frontier System Acceptance: focused runtime or simulation evidence",
         "Frontier System Acceptance: adversarial/failure-mode evidence",
         "Frontier System Acceptance: exact-head provenance-bound closure receipt"
+      ],
+      "risk_class": "critical",
+      "maximum_evidence_age_days": 7,
+      "requalification_triggers": [
+        "any material code/config/model/policy/data/evaluator/dependency/topology change",
+        "incident affecting the capability",
+        "expired evidence"
       ]
     }
   ],
@@ -4682,5 +5482,134 @@
       "rollback-ready deployment"
     ],
     "recursion_rule": "Self-improvement experiments may recursively generate proposals only within bounded depth/budget and cannot recursively increase their own experiment authority."
+  },
+  "risk_and_freshness_policy": {
+    "classes": [
+      {
+        "id": "standard",
+        "maximum_evidence_age_days": 30,
+        "required_evidence": [
+          "focused tests",
+          "integration tests",
+          "structural receipt"
+        ],
+        "change_requalification": [
+          "contract change",
+          "owner change",
+          "behavioral change"
+        ]
+      },
+      {
+        "id": "high",
+        "maximum_evidence_age_days": 14,
+        "required_evidence": [
+          "focused tests",
+          "integration tests",
+          "adversarial tests",
+          "failure injection",
+          "independent verifier",
+          "exact-head receipt"
+        ],
+        "change_requalification": [
+          "contract change",
+          "owner/interface change",
+          "security/governance change",
+          "dependency/provider change",
+          "runtime topology change"
+        ]
+      },
+      {
+        "id": "critical",
+        "maximum_evidence_age_days": 7,
+        "required_evidence": [
+          "focused tests",
+          "integration tests",
+          "adversarial tests",
+          "fault injection",
+          "independent verifier",
+          "security review",
+          "governance review",
+          "load/resource evidence",
+          "rollback proof",
+          "exact-head receipt"
+        ],
+        "change_requalification": [
+          "any material code/config/model/policy/data/evaluator/dependency/topology change",
+          "incident affecting the capability",
+          "expired evidence"
+        ]
+      }
+    ],
+    "stratum_defaults": {
+      "S01": "critical",
+      "S02": "high",
+      "S03": "high",
+      "S04": "high",
+      "S05": "critical",
+      "S06": "high",
+      "S07": "critical",
+      "S08": "critical",
+      "S09": "high",
+      "S10": "critical"
+    },
+    "gate_rule": "Stratum closure gates inherit at least critical promotion scrutiny when they aggregate privileged action, learning, autonomy, or self-improvement evidence.",
+    "freshness_rule": "Expired evidence suspends current promotion evidence for the affected level until requalification; stale evidence may remain historical but cannot support a current maturity claim.",
+    "change_rule": "Any change listed by the effective risk class invalidates promotion evidence even if the nominal age window has not expired."
+  },
+  "promotion_evidence_profiles": {
+    "standard": {
+      "requires": [
+        "contract validation",
+        "focused tests",
+        "integration tests",
+        "exact-head structural receipt"
+      ],
+      "independent_review": false,
+      "fault_injection": "as applicable"
+    },
+    "high": {
+      "requires": [
+        "contract validation",
+        "focused tests",
+        "integration tests",
+        "adversarial tests",
+        "failure injection",
+        "exact-head structural receipt",
+        "independent verifier"
+      ],
+      "independent_review": true,
+      "fault_injection": "required"
+    },
+    "critical": {
+      "requires": [
+        "contract validation",
+        "focused tests",
+        "integration tests",
+        "adversarial tests",
+        "fault injection",
+        "security review",
+        "governance review",
+        "load/resource evidence",
+        "rollback proof",
+        "exact-head structural receipt",
+        "independent verifier"
+      ],
+      "independent_review": true,
+      "fault_injection": "required with consequential-path coverage"
+    }
+  },
+  "evidence_status_model": {
+    "statuses": [
+      "CURRENT",
+      "STALE",
+      "INVALIDATED",
+      "MISSING",
+      "SUPERSEDED"
+    ],
+    "current_rule": "Evidence is CURRENT only when exact-head compatible, within freshness window, provenance-complete, and unaffected by requalification triggers.",
+    "stale_rule": "STALE evidence remains auditable historical evidence but cannot satisfy current promotion.",
+    "invalidated_rule": "INVALIDATED evidence cannot be reused for promotion even before its age window expires.",
+    "superseded_rule": "SUPERSEDED evidence points to the newer receipt/baseline that replaced it.",
+    "missing_rule": "MISSING evidence fails closed for any required promotion dimension."
   }
 }
