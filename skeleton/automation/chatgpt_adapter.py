@@ -21,6 +21,7 @@ from skeleton.provider_contract import (
     load_provider_architecture,
 )
 from skeleton.security.activation_security import enforce_bot_activation_security
+from skeleton.shells.cancellation import CancellationToken
 
 _API_URL = "https://api.openai.com/v1/responses"
 _MAX_TASK_CHARS = 20_000
@@ -207,7 +208,16 @@ class ChatGPTReasoner:
             return "evidence_too_large"
         return None
 
-    def reason(self, request_data: ReasoningRequest) -> ReasoningResult:
+    def reason(
+        self,
+        request_data: ReasoningRequest,
+        *,
+        cancellation: CancellationToken | None = None,
+    ) -> ReasoningResult:
+        if cancellation is not None:
+            if not isinstance(cancellation, CancellationToken):
+                raise TypeError("cancellation must be CancellationToken")
+            cancellation.require_active()
         validation_error = self._validate_request(request_data)
         if validation_error is not None:
             return ReasoningResult(False, error_kind=validation_error)
@@ -249,11 +259,19 @@ class ChatGPTReasoner:
         )
 
         try:
+            if cancellation is not None:
+                cancellation.require_active()
             with request.urlopen(api_request, timeout=self.timeout) as response:
                 raw = response.read(_MAX_RESPONSE_BYTES + 1)
+            if cancellation is not None:
+                cancellation.require_active()
         except error.HTTPError as exc:
+            if cancellation is not None and cancellation.cancelled:
+                cancellation.require_active()
             return ReasoningResult(False, error_kind=f"http_{exc.code}")
         except (error.URLError, TimeoutError, OSError):
+            if cancellation is not None and cancellation.cancelled:
+                cancellation.require_active()
             return ReasoningResult(False, error_kind="transport")
 
         if len(raw) > _MAX_RESPONSE_BYTES:
