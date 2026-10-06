@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "tree_version": "1.7.9",
+  "tree_version": "1.8.0",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
-  "baseline_git_sha": "43867c098e9beb4851c6dc1cc936f8e196e64720",
+  "baseline_git_sha": "6c24e3874e15b1eb8058d3ffd6c594eb7e89d4de",
   "canonical_root": "skeleton/ai",
   "migration_mode": "strangler_mirror_then_explicit_cutover",
   "purpose": "Consolidate build-plan-relevant AI engine, governance, shell/control-plane, agent, evaluation, reliability, build-control code, historical research lineage, Jeeves, and selected legacy backend/GameForge AI recovery surfaces into one governed file tree without breaking existing imports or fabricating completion.",
@@ -160,7 +160,16 @@
         "VOL-324",
         "VOL-325",
         "VOL-364"
-      ]
+      ],
+      "overlay_children": [
+        "execution_authority.py"
+      ],
+      "parity_exceptions": {
+        "__init__.py": {
+          "mode": "compatibility_facade",
+          "facade_required_import": "from .execution_authority import ("
+        }
+      }
     },
     {
       "id": "AIFT-PERSISTENCE",
@@ -201,6 +210,7 @@
         "VOL-075",
         "VOL-076",
         "VOL-096",
+        "VOL-177",
         "VOL-361",
         "VOL-364",
         "VOL-365",
@@ -552,7 +562,8 @@
       "volume_refs": [
         "VOL-010",
         "VOL-027",
-        "VOL-028"
+        "VOL-028",
+        "VOL-174"
       ]
     },
     {
@@ -1526,7 +1537,10 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "overlay_children": [
+        "execution_authority.py"
+      ]
     },
     {
       "id": "AIFT-DATA",
@@ -5697,6 +5711,40 @@
       ],
       "move_batch": "B1-core-runtime",
       "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-INFERENCE",
+      "source": "skeleton/inference",
+      "destination": "skeleton/ai/runtime/inference/core",
+      "kind": "tree",
+      "source_git_object_sha": "f96b863b26eb4e7ca3e7ddc57eaa859a3cdf1eca",
+      "role": "Core inference session, provider-bridge, replay, and async-runtime compatibility plane staged beneath the canonical inference runtime without colliding with native local/neural/KV engines.",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W19",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-007"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve deterministic session and replay semantics",
+        "preserve provider authority boundaries",
+        "keep native local/neural/KV implementations independently owned",
+        "prove canonical and governed mirror parity before import inversion"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     }
   ],
   "ci_enforcement": {
@@ -5797,11 +5845,6 @@
         "path": "backend/routes/operation_stream.py",
         "owner": "product/backend API",
         "reason": "HTTP operation-stream route remains product transport authority"
-      },
-      {
-        "path": "backend/services/ai_service.py",
-        "owner": "product/backend AI adapter",
-        "reason": "product-facing inference service adapts canonical AI runtime and must not become a second engine owner"
       },
       {
         "path": "backend/services/database.py",
@@ -6007,31 +6050,19 @@
       }
     ],
     "planned_but_absent": [
-      "skeleton/artifacts",
-      "skeleton/audio",
       "skeleton/autonomy",
       "skeleton/compute",
-      "skeleton/connectors",
       "skeleton/document",
-      "skeleton/document_vision",
       "skeleton/education",
       "skeleton/experiments",
       "skeleton/hardware",
-      "skeleton/modeling",
-      "skeleton/multimodal",
       "skeleton/planning",
-      "skeleton/plugins",
       "skeleton/policy",
       "skeleton/product",
       "skeleton/product_shell",
       "skeleton/repo_engineering",
       "skeleton/routing",
       "skeleton/safety",
-      "skeleton/speech",
-      "skeleton/training",
-      "skeleton/verification",
-      "skeleton/video",
-      "skeleton/vision",
       "skeleton/workers"
     ],
     "non_engine_root_exclusions": [
@@ -6148,7 +6179,7 @@
       }
     }
   ],
-  "assignment_basis_git_sha": "3f80b3d303aa2bdd99d70375b2ea3162f1f70921",
+  "assignment_basis_git_sha": "6c24e3874e15b1eb8058d3ffd6c594eb7e89d4de",
   "assignment_policy": {
     "version": "1.0.0",
     "source_identity": "Each pending assignment is bound to the source Git tree/blob object on assignment_basis_git_sha.",
@@ -7601,6 +7632,52 @@
         "VOL-225",
         "VOL-226",
         "VOL-234"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-AI-ROOT-RESIDUAL",
+      "path": "skeleton/ai",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": true,
+      "role": "Residual canonical AI-native top-level modules not claimed by more-specific migration mappings or native subtree owners; prevents ownership ambiguity while preserving specific descendant authorities.",
+      "volume_refs": [
+        "VOL-097",
+        "VOL-098",
+        "VOL-099",
+        "VOL-100",
+        "VOL-101",
+        "VOL-113",
+        "VOL-201",
+        "VOL-202",
+        "VOL-203",
+        "VOL-204",
+        "VOL-205",
+        "VOL-206",
+        "VOL-207",
+        "VOL-209",
+        "VOL-210",
+        "VOL-217",
+        "VOL-218",
+        "VOL-237",
+        "VOL-239",
+        "VOL-240",
+        "VOL-243",
+        "VOL-259",
+        "VOL-261",
+        "VOL-263",
+        "VOL-264",
+        "VOL-265",
+        "VOL-266",
+        "VOL-336",
+        "VOL-337",
+        "VOL-338",
+        "VOL-339",
+        "VOL-343",
+        "VOL-400",
+        "VOL-411",
+        "VOL-412",
+        "VOL-413"
       ]
     }
   ]
