@@ -285,6 +285,39 @@ def test_similarity_resolution_requires_attributed_review_evidence() -> None:
         )
 
 
+def test_high_risk_similarity_cannot_be_self_cleared_by_detector() -> None:
+    ledger = RightsLedger()
+    ledger.register_source(
+        SourceRecord(
+            "owned-self-review",
+            _digest("owned-self-review"),
+            RightsState.PROJECT_OWNED,
+            frozenset({UseKind.RELEASE_DISTRIBUTION}),
+            "project-source",
+        )
+    )
+    finding = SimilarityFinding(
+        "sim-self-review",
+        _digest("artifact-self-review"),
+        "owned-self-review",
+        "image",
+        SimilarityRisk.HIGH,
+        _digest("similarity-self-review"),
+        _authority("same-reviewer", _digest("similarity-self-review")),
+    )
+    ledger.record_similarity(finding)
+    with pytest.raises(RightsError, match="requires independent authority"):
+        ledger.resolve_similarity(
+            "sim-self-review",
+            resolution="self-cleared",
+            resolution_evidence_digest=_digest("resolution-self-review"),
+            resolution_authority=_authority(
+                "same-reviewer",
+                _digest("resolution-self-review"),
+            ),
+        )
+
+
 def test_atom_graph_preserves_pixel_to_scene_parent_context() -> None:
     graph = AtomGraph()
     graph.add(
