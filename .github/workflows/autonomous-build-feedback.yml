@@ -13,11 +13,11 @@ on:
       - "*"
       - "**"
 
-# Preserve one feedback stream per source gate while coalescing retries and
-# superseded attempts for the same immutable workflow-run + source-workflow identity.
+# Keep feedback runs isolated without trusting nested workflow_run identifiers in
+# the repository-global concurrency key. Source run identity is validated inside the job.
 concurrency:
-  group: autonomous-build-feedback-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.workflow_id }}
-  cancel-in-progress: true
+  group: autonomous-build-feedback-${{ github.run_id }}
+  cancel-in-progress: false
 
 permissions:
   actions: read
