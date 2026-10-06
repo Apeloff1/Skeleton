@@ -119,6 +119,10 @@ class RequirementProof:
     def __post_init__(self) -> None:
         object.__setattr__(self, "requirement_id", _text(self.requirement_id, "requirement_id"))
         object.__setattr__(self, "artifact_digest", _digest(self.artifact_digest, "artifact_digest"))
+        if not isinstance(self.critical, bool):
+            raise TypeError("requirement proof critical state must be boolean")
+        if not isinstance(self.passed, bool):
+            raise TypeError("requirement proof passed state must be boolean")
         if not self.evidence_digests:
             raise DeepAssuranceError("requirement proof needs evidence")
         object.__setattr__(
@@ -182,6 +186,10 @@ class ConstraintResult:
     def __post_init__(self) -> None:
         object.__setattr__(self, "constraint_id", _text(self.constraint_id, "constraint_id"))
         object.__setattr__(self, "evidence_digest", _digest(self.evidence_digest, "evidence_digest"))
+        if not isinstance(self.passed, bool):
+            raise TypeError("constraint passed state must be boolean")
+        if not isinstance(self.critical, bool):
+            raise TypeError("constraint critical state must be boolean")
         object.__setattr__(self, "conflict_ids", tuple(_text(x, "conflict_id") for x in self.conflict_ids))
 
 
@@ -597,6 +605,8 @@ class ClosureCertificate:
     def __post_init__(self) -> None:
         for name in ("artifact_digest", "canon_digest", "provenance_digest", "evidence_root"):
             object.__setattr__(self, name, _digest(getattr(self, name), name))
+        if not isinstance(self.independently_verified, bool):
+            raise TypeError("closure independent verification state must be boolean")
         object.__setattr__(self, "family_ids", tuple(_text(x, "family_id") for x in self.family_ids))
         object.__setattr__(self, "critical_plane_ids", tuple(_text(x, "critical_plane_id") for x in self.critical_plane_ids))
         object.__setattr__(self, "unresolved_critical_gaps", tuple(_text(x, "gap") for x in self.unresolved_critical_gaps))
