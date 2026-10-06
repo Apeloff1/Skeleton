@@ -501,6 +501,29 @@ class VerificationCheck:
         if self.schema_version != VERIFICATION_SCHEMA_VERSION:
             raise VerificationContractError("unsupported verification schema version")
 
+    @property
+    def digest(self) -> str:
+        return _canonical_digest(self.as_dict())
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "check_id": self.check_id,
+            "claim_id": self.claim_id,
+            "tenant_id": self.tenant_id,
+            "level": int(self.level),
+            "outcome": self.outcome.value,
+            "verifier_id": self.verifier_id,
+            "verified_at": self.verified_at.isoformat(),
+            "evidence_ids": list(self.evidence_ids),
+            "postcondition_observation_ids": list(
+                self.postcondition_observation_ids
+            ),
+            "independent": self.independent,
+            "issues": list(self.issues),
+            "confidence": self.confidence,
+        }
+
 
 @dataclass(frozen=True, slots=True)
 class VerificationReceipt:
