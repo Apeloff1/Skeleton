@@ -1,6 +1,6 @@
 # Skeleton AI Master Plan
 
-Plan version: **1.7.0**
+Plan version: **1.8.0**
 
 Architecture lane: `PR #1904 / integration/architecture-map-v1`
 
@@ -9,6 +9,8 @@ Index: [`MASTER_INDEX.md`](MASTER_INDEX.md)
 Machine mirror: [`machine/ai_master_plan.json`](../../machine/ai_master_plan.json)
 
 Exotic systems depth: [`EXOTIC_SYSTEMS_DEPTH.md`](EXOTIC_SYSTEMS_DEPTH.md) / [`machine/ai_exotic_systems_catalog.json`](../../machine/ai_exotic_systems_catalog.json)
+
+Competitive engineering ladder: [`COMPETITIVE_AI_ENGINEERING_LADDER.md`](../architecture/COMPETITIVE_AI_ENGINEERING_LADDER.md) / [`machine/competitive_ai_engineering_ladder.json`](../../machine/competitive_ai_engineering_ladder.json)
 
 Existing construction manual: [`docs/AI_APP_CONSTRUCTION_MANUAL.md`](../AI_APP_CONSTRUCTION_MANUAL.md)
 
@@ -742,6 +744,25 @@ This explicitly covers Stage-0 drift and the larger implementation/accountabilit
 After reconciliation of the landed Stage-0 through Stage-3 candidates, the next net-new build frontier is bounded cognitive execution -> engine boundary -> stream reconciliation -> full-stack evidence. Lower-stage evidence remains dependency-authoritative and can invalidate downstream promotion.
 
 The frontier validator `scripts/check_ai_execution_frontier.py` cross-checks the snapshot and candidate lifecycle states against `machine/ai_build_accountability.json`. Any subsequent ledger promotion therefore requires this frontier snapshot to be deliberately advanced rather than silently becoming stale.
+
+## 24.6 Competitive AI engineering ladder — 200 proof-bearing levels
+
+The masterplan carries a second depth axis for areas where frontier AI systems are commonly marketed as exceptional. This axis is authoritative in `machine/competitive_ai_engineering_ladder.json` and documented in `docs/architecture/COMPETITIVE_AI_ENGINEERING_LADDER.md`.
+
+It contains **200 explicit engineering levels** constructed as **20 competitive claim families × 10 escalation stages**. The families cover reasoning, long context, memory, autonomous agents, tools/computer use, coding, retrieval/research, multimodality, realtime interaction, math/science verification, long-horizon planning, routing/ensembles, learning/self-improvement, safety, security/privacy/tenancy, reliability/recovery, advanced serving, hardware/resource scale, enterprise governance, and benchmark/evaluation integrity.
+
+This is an **overlay**, not a breadth expansion. Every `ENG-001` through `ENG-200` binds to existing `VOL-000..VOL-420` ownership and therefore does not violate the Volume-420 scope freeze.
+
+Each ten-level family escalates through claim/comparator contract, architecture ownership, typed contracts, deterministic admission/control, durable state/provenance, adversarial hardening, performance/economics, recovery/migration/rollback, independent comparator evaluation, and continuous superiority qualification.
+
+No competitive level is complete because prose, a demo, a class, or a passing happy-path test exists. Completion requires exact-head implementation evidence, negative/adversarial coverage, the declared hard gates, and the level-specific exit criteria. Family level 10 additionally requires reproducible Pareto-safe evidence against the declared baseline and independent promotion authority. Material drift in source, model/provider, policy, workload, scorer, environment, or budget expires the superiority claim.
+
+Required validation:
+
+```bash
+python scripts/check_competitive_ai_engineering_ladder.py --json
+python -m pytest -q --noconftest tests/test_competitive_ai_engineering_ladder.py
+```
 
 ## 25. Scope freeze and future plan evolution
 
