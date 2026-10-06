@@ -87,10 +87,14 @@ jobs:
           skeleton/ai/game_builder/control_plane.py
           skeleton/ai/game_builder/resilience.py
           skeleton/ai/game_builder/release.py
+          skeleton/ai/game_builder/frontier_assurance.py
+          skeleton/ai/game_builder/deep_assurance.py
           tests/test_ai_game_builder_500_levels.py
           tests/test_ai_game_builder_runtime.py
           tests/test_ai_game_builder_governance.py
           tests/test_ai_game_builder_overengineering_runtime.py
+          tests/test_ai_game_builder_frontier_runtime.py
+          tests/test_ai_game_builder_deep_assurance.py
 
       - name: Validate 500-level authority
         run: python scripts/check_ai_game_builder_500_levels.py --json
@@ -105,6 +109,8 @@ jobs:
           tests/test_ai_game_builder_runtime.py
           tests/test_ai_game_builder_governance.py
           tests/test_ai_game_builder_overengineering_runtime.py
+          tests/test_ai_game_builder_frontier_runtime.py
+          tests/test_ai_game_builder_deep_assurance.py
 
       - name: Validate masterplan JSON
         run: python -m json.tool machine/ai_master_plan.json >/dev/null
