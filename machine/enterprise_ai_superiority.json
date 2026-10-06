@@ -1,6 +1,6 @@
 {
   "schema_version": "skeleton.enterprise_ai_superiority.v1",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "status": "active_design_authority",
   "purpose": "Convert the complete Skeleton AI masterplan from feature-coverage completion into enterprise-grade, comparator-backed superiority. Every volume inherits the common enterprise contract; critical production and serving volumes additionally carry dedicated dominance profiles.",
   "authority": {
@@ -10,7 +10,8 @@
     "tests": "tests/test_enterprise_ai_superiority.py",
     "workflow": ".github/workflows/enterprise-ai-superiority.yml",
     "enterprise_ai_implementation_notes": "machine/enterprise_ai_implementation_notes_index.json",
-    "competitive_engineering_ladder": "machine/competitive_ai_engineering_ladder.json"
+    "competitive_engineering_ladder": "machine/competitive_ai_engineering_ladder.json",
+    "competitive_benchmark_governance": "machine/competitive_ai_benchmark_governance.json"
   },
   "laws": [
     "implemented is not enterprise-qualified",
@@ -5742,6 +5743,8 @@
     "total_levels": 200,
     "binding_rule": "Every ENG level binds to existing masterplan volume ownership and inherits this enterprise non-compensable gate set.",
     "family_exit_rule": "Each stage-10 family exit requires exact-head reproducible Pareto-safe comparator evidence and independent promotion authority.",
-    "stale_evidence_rule": "Material source, model/provider, policy, workload, scorer, environment, or budget drift expires the competitive superiority claim."
+    "stale_evidence_rule": "Material source, model/provider, policy, workload, scorer, environment, or budget drift expires the competitive superiority claim.",
+    "benchmark_governance": "machine/competitive_ai_benchmark_governance.json",
+    "benchmark_rule": "Stage-10 competitive promotion requires preregistered comparison semantics, anti-gaming enforcement, applicable cross-family journeys, and an independent verdict."
   }
 }
