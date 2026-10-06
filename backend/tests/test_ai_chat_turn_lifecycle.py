@@ -108,8 +108,21 @@ async def test_progressed_operation_creation_is_idempotent_on_retry():
         reason_code="first-attempt",
     )
 
+    later_thread = ConversationThread(
+        thread_id=thread.thread_id,
+        tenant_id=thread.tenant_id,
+        owner_id=thread.owner_id,
+        created_at=thread.created_at,
+        updated_at=thread.updated_at,
+        version=99,
+        message_sequence=7,
+        active_branch_id=thread.active_branch_id,
+        state=thread.state,
+        title=thread.title,
+        data_class=thread.data_class,
+    )
     retried = await lifecycle.begin(
-        thread=thread,
+        thread=later_thread,
         user_message=user,
         operation_id=operation_id,
         request_digest="b" * 64,
