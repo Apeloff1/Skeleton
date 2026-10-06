@@ -420,7 +420,7 @@ def test_master_plan_binds_500_level_ai_game_builder_overlay() -> None:
         "canon": "skeleton/ai/game_builder/canon.py",
         "rights": "skeleton/ai/game_builder/rights.py",
         "atom_lineage": "skeleton/ai/game_builder/atomizer.py",
-        "tests": "skeleton/testing/test_ai_game_builder_governance.py",
+        "tests": "tests/test_ai_game_builder_governance.py",
     }
     assert overlay["family_count"] == 50
     assert overlay["levels_per_family"] == 10
