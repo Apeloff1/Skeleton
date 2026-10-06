@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plan_version": "2.5.0",
+  "plan_version": "2.6.0",
   "status": "active",
   "architecture_lane": "PR-1904",
   "architecture_branch": "integration/architecture-map-v1",
@@ -78,7 +78,8 @@
     "functional_llm_game_builder_10mb_manifest": "machine/functional_llm_game_builder_10mb_manifest.json",
     "functional_llm_game_builder_10mb_human": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/README.md",
     "functional_llm_game_builder_10mb_validator": "scripts/check_functional_llm_game_builder_10mb.py",
-    "functional_llm_game_builder_10mb_workflow": ".github/workflows/functional-llm-game-builder-masterplan.yml"
+    "functional_llm_game_builder_10mb_workflow": ".github/workflows/functional-llm-game-builder-masterplan.yml",
+    "frontier_competition_contract": "machine/functional_llm_game_builder_10mb_manifest.json#frontier_competition"
   },
   "laws": [
     "durable governed state is authoritative",
@@ -108,7 +109,8 @@
     "ESS-1000 closure work runs across 99 independent domain lanes with same-lane stage order and a 99-way whole-system finality fan-in",
     "Functional LLM + Game Builder 10MB is a depth-only execution atlas: it preserves the VOL-420 breadth freeze and cannot create completion authority.",
     "A functional game-building transaction spans governed LLM context/inference, bounded rival competition, authorized project mutation, executable scene/simulation/presentation, automated verification, rights screening, reproducible export and reopen/replay/recovery.",
-    "Plan size and specification coverage never imply runtime completion; implementation and independent verification remain separately signed exact-head evidence."
+    "Plan size and specification coverage never imply runtime completion; implementation and independent verification remain separately signed exact-head evidence.",
+    "Frontier competition is a non-compensable whole-product finish line: at least three fresh exact-identity frontier comparators, 12 per-domain scorecards, heldout contamination controls, blind human evaluation where subjective, exact-head reproducibility and independent verification are required; aggregate scores cannot hide critical capability, security, rights, authority or recovery failure."
   ],
   "thematic_parts": [
     {
