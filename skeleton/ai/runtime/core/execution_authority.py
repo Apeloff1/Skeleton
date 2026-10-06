@@ -427,7 +427,12 @@ class ExecutionAuthorityGuard:
             )
 
         projected = state.usage.add(usage_delta)
-        if not authority.permits(capability, usage=projected, now=instant):
+        aggregate_projected = self._aggregate_usage(state).add(usage_delta)
+        if not authority.permits(
+            capability,
+            usage=aggregate_projected,
+            now=instant,
+        ):
             return AuthorizationDecision(
                 AuthorizationDisposition.DENY,
                 "capability or resource budget denied",
