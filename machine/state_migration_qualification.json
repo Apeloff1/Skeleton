@@ -606,6 +606,7 @@
     "backend/tests/test_conversations_api.py",
     "skeleton/testing/test_data_lifecycle.py",
     "skeleton/testing/test_governance_runtime_binding.py",
-    "skeleton/testing/test_reference_provenance.py"
+    "skeleton/testing/test_reference_provenance.py",
+    "tests/test_state_migration_qualification.py"
   ]
 }
