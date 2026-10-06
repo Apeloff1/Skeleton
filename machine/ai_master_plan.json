@@ -2460,23 +2460,48 @@
       ],
       "contracts": [
         "JvmCapability",
+        "JvmRuntimeDescriptor",
+        "JvmBenchmarkEvidence",
+        "JvmQualificationPolicy",
+        "JvmQualificationDecision",
         "JvmRequest",
-        "JvmResult",
-        "JvmRuntimeDescriptor"
+        "JvmCallResult"
       ],
       "implementation_paths": [
         "java-accelerators",
-        "planned:jvm"
+        "skeleton/native/jvm_protocol.py",
+        "skeleton/native/jvm_registry.py",
+        "skeleton/memory/jvm_vector_accelerator.py",
+        "skeleton/observability/jvm_accelerator.py",
+        "skeleton/simulation/physics/jvm_broadphase_accelerator.py",
+        "skeleton/ai/runtime/native/jvm_protocol.py",
+        "skeleton/ai/runtime/native/jvm_registry.py",
+        "skeleton/ai/runtime/memory/jvm_vector_accelerator.py",
+        "skeleton/ai/runtime/observability/jvm_accelerator.py"
       ],
       "tests": [
-        "planned:java-accelerators/src/test",
-        "planned:skeleton/testing/test_jvm_boundary.py"
+        "skeleton/testing/test_vol033_jvm_protocol.py",
+        "skeleton/testing/test_jvm_accelerator_registry.py",
+        "skeleton/testing/test_jvm_accelerator_runtime_status.py",
+        "skeleton/testing/test_jvm_observability_accelerator.py",
+        "skeleton/testing/test_jvm_vector_accelerator.py",
+        "skeleton/testing/test_jvm_physics_broadphase_accelerator.py",
+        "tests/test_ci_java_accelerator_dependencies.py",
+        "tests/test_jvm_registry_namespace_migration.py"
       ],
       "evaluations": [
-        "planned:JVM-versus-reference benchmark",
-        "planned:GC/backpressure soak test"
+        "scripts/benchmark_java_accelerators.py",
+        ".github/workflows/vol033-jvm-protocol.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/native/jvm_protocol.py",
+        "skeleton/native/jvm_registry.py",
+        "skeleton/testing/test_vol033_jvm_protocol.py",
+        "skeleton/testing/test_jvm_accelerator_registry.py",
+        "scripts/benchmark_java_accelerators.py",
+        ".github/workflows/vol033-jvm-protocol.yml",
+        "PR #3324"
+      ],
       "risks": [
         "classpath drift",
         "GC pauses",
@@ -2484,8 +2509,7 @@
         "duplicate runtime authority"
       ],
       "gaps": [
-        "identify workloads where JVM is actually beneficial",
-        "standardize protocol/version negotiation"
+        "exact-head VOL-033 gate and independent accountability verification pending"
       ],
       "accountability_id": "ACC-VOL-033",
       "completion_checkbox": false,

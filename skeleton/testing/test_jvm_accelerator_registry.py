@@ -11,9 +11,35 @@ from types import SimpleNamespace
 import pytest
 
 from skeleton.jvm_accelerators import (
+    JvmAccelerationSelection,
     JvmAcceleratorRegistry,
     JvmAcceleratorRegistryError,
 )
+from skeleton.native import jvm_registry as jvm_registry_module
+
+
+_CANDIDATE_IDS = {
+    "observability": "ACCEL-JVM-OBSERVABILITY",
+    "vector": "ACCEL-JVM-VECTOR",
+    "physics": "ACCEL-JVM-PHYSICS",
+}
+
+
+def _selection(
+    name: str,
+    *,
+    selected: bool = True,
+    reasons: tuple[str, ...] = (),
+) -> JvmAccelerationSelection:
+    return JvmAccelerationSelection(
+        name=name,
+        candidate_id=_CANDIDATE_IDS[name],
+        selected=selected,
+        reasons=reasons,
+        evidence_ids=("profile-a", "profile-b") if selected else (),
+        source_identity="test-source" if selected else None,
+        policy_path="/tmp/test-acceleration-policy.json",
+    )
 
 
 @dataclass
@@ -405,3 +431,155 @@ def test_bad_registry_configuration_rejects_unknown_factory_name() -> None:
         JvmAcceleratorRegistry(
             factories={"unknown": lambda: object()},
         )
+
+
+def test_get_selected_rejects_before_factory_construction(tmp_path: Path) -> None:
+    factory_calls = {"vector": 0}
+    source = tmp_path / "vector.java"
+    source.write_text("// test source\n", encoding="utf-8")
+
+    def factory() -> _FakeAccelerator:
+        factory_calls["vector"] += 1
+        return _FakeAccelerator("vector")
+
+    registry = JvmAcceleratorRegistry(
+        factories={"vector": factory},
+        config_providers={
+            "vector": lambda: SimpleNamespace(
+                java_binary=sys.executable,
+                source=source,
+            )
+        },
+        selection_provider=lambda name: _selection(
+            name,
+            selected=False,
+            reasons=("insufficient_profile_runs",),
+        ),
+    )
+
+    with pytest.raises(JvmAcceleratorRegistryError, match="not profile-selected"):
+        registry.get_selected("vector")
+
+    assert factory_calls["vector"] == 0
+    assert registry.initialized("vector") is False
+
+
+def test_get_selected_constructs_lazy_helper_only_after_selection(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "vector.java"
+    source.write_text("// test source\n", encoding="utf-8")
+    instance = _FakeAccelerator("vector")
+    registry = JvmAcceleratorRegistry(
+        factories={"vector": lambda: instance},
+        config_providers={
+            "vector": lambda: SimpleNamespace(
+                java_binary=sys.executable,
+                source=source,
+            )
+        },
+        selection_provider=lambda name: _selection(name),
+    )
+
+    actual = registry.get_selected("vector")
+
+    assert actual is instance
+    assert registry.initialized("vector") is True
+    assert instance.ping_calls == 0
+    assert instance.running is False
+
+
+def test_default_domain_getters_share_one_canonical_registry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from skeleton.memory.jvm_vector_accelerator import (
+        get_default_vector_accelerator,
+    )
+    from skeleton.observability.jvm_accelerator import get_default_accelerator
+    from skeleton.simulation.physics.jvm_broadphase_accelerator import (
+        get_default_broadphase_accelerator,
+    )
+
+    registry = JvmAcceleratorRegistry(
+        selection_provider=lambda name: _selection(name),
+    )
+    monkeypatch.setattr(jvm_registry_module, "_default_registry", registry)
+
+    vector = get_default_vector_accelerator()
+    observability = get_default_accelerator()
+    physics = get_default_broadphase_accelerator()
+
+    assert registry.get("vector") is vector
+    assert registry.get("observability") is observability
+    assert registry.get("physics") is physics
+    assert registry.initialized("vector") is True
+    assert registry.initialized("observability") is True
+    assert registry.initialized("physics") is True
+
+    # Construction remains lazy: obtaining domain helpers does not start Java.
+    assert vector.status().running is False
+    assert observability.status().running is False
+    assert physics.status().running is False
+
+    jvm_registry_module.close_default_jvm_registry()
+    assert jvm_registry_module._default_registry is None
+
+
+def test_domain_close_retires_only_its_registry_entry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from skeleton.memory.jvm_vector_accelerator import (
+        close_default_vector_accelerator,
+        get_default_vector_accelerator,
+    )
+    from skeleton.observability.jvm_accelerator import get_default_accelerator
+
+    registry = JvmAcceleratorRegistry(
+        selection_provider=lambda name: _selection(name),
+    )
+    monkeypatch.setattr(jvm_registry_module, "_default_registry", registry)
+    first_vector = get_default_vector_accelerator()
+    observability = get_default_accelerator()
+
+    close_default_vector_accelerator()
+
+    assert registry.initialized("vector") is False
+    assert registry.initialized("observability") is True
+    assert registry.get("observability") is observability
+
+    replacement = get_default_vector_accelerator()
+    assert replacement is not first_vector
+    assert registry.get("vector") is replacement
+
+    jvm_registry_module.close_default_jvm_registry()
+
+
+def test_domain_close_does_not_materialize_default_registry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from skeleton.memory.jvm_vector_accelerator import (
+        close_default_vector_accelerator,
+    )
+
+    monkeypatch.setattr(jvm_registry_module, "_default_registry", None)
+
+    close_default_vector_accelerator()
+
+    assert jvm_registry_module._default_registry is None
+
+
+def test_default_registry_is_process_singleton_and_resettable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(jvm_registry_module, "_default_registry", None)
+
+    first = jvm_registry_module.get_default_jvm_registry()
+    second = jvm_registry_module.get_default_jvm_registry()
+
+    assert first is second
+
+    jvm_registry_module.close_default_jvm_registry()
+    third = jvm_registry_module.get_default_jvm_registry()
+    assert third is not first
+
+    jvm_registry_module.close_default_jvm_registry()
