@@ -263,6 +263,14 @@ class Candidate:
     assumption_digest: str
     parent_candidate_digests: tuple[str, ...] = ()
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.producer_id, str) or not self.producer_id.strip():
+            raise ValueError("producer_id must be non-empty")
+        if not isinstance(self.producer_provenance, ProducerProvenance):
+            raise TypeError("producer_provenance must be ProducerProvenance")
+        if not isinstance(self.artifact, ArtifactIdentity):
+            raise TypeError("artifact must be ArtifactIdentity")
+
     @classmethod
     def create(
         cls,
