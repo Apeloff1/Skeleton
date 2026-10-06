@@ -7,8 +7,7 @@
     "volume_ref": "VOL-021",
     "title": "Code Intelligence",
     "required_gap_texts": [
-      "complete cross-language graph extraction",
-      "connect ownership/test mapping to change planner"
+      "independent cross-language repository-graph, ownership/test impact, and change-planner verification remains pending"
     ]
   },
   "sources": [

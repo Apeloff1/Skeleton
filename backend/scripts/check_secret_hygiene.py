@@ -29,9 +29,13 @@ SKIP_DIRS = {
     ".expo",
     "__pycache__",
 }
-# Large checked-in curriculum/snapshot sources exceed 2 MiB. Keep the reader
-# bounded while scanning those tracked text corpora in full.
-MAX_FILE_BYTES = 16 * 1024 * 1024
+# Large checked-in machine indexes can exceed 16 MiB on a legacy single line.
+# Keep the reader bounded while scanning those tracked text corpora in full.
+# Producers are separately required to emit bounded physical lines; this 64 MiB
+# ceiling preserves fail-closed coverage for already-materialized legacy data.
+MAX_FILE_BYTES = 64 * 1024 * 1024
+SCAN_FRAGMENT_CHARS = 1024 * 1024
+SCAN_OVERLAP_CHARS = 1024
 TEXT_SUFFIXES = {
     ".py", ".js", ".jsx", ".ts", ".tsx", ".json", ".yml", ".yaml",
     ".toml", ".ini", ".cfg", ".conf", ".env", ".example", ".md",
@@ -237,6 +241,31 @@ def _is_placeholder(candidate: str) -> bool:
     return any(marker in lowered for marker in PLACEHOLDER_MARKERS)
 
 
+def _scan_secret_fragment(text: str, label: Path, number: int) -> list[str]:
+    """Scan one bounded text fragment without echoing candidate material."""
+
+    findings: list[str] = []
+    specific_finding = False
+    for name, pattern in PATTERNS:
+        for match in pattern.finditer(text):
+            if _is_placeholder(match.group(0)):
+                continue
+            findings.append(f"{label}:{number}: possible {name}")
+            specific_finding = True
+            break
+    if specific_finding:
+        return findings
+
+    for match in SECRET_ASSIGNMENT_RE.finditer(text):
+        candidate = match.group("value")
+        if _looks_like_high_entropy_secret(candidate):
+            findings.append(
+                f"{label}:{number}: possible high-entropy secret-like assignment"
+            )
+            break
+    return findings
+
+
 def violations(path: Path) -> list[str]:
     try:
         label = path.relative_to(REPO_ROOT)
@@ -245,54 +274,36 @@ def violations(path: Path) -> list[str]:
 
     findings: list[str] = []
     try:
-        # Stream the whole candidate while bounding each individual read. A
-        # repository can legitimately contain multi-megabyte generated/source
-        # text; rejecting it by total size creates a padding-shaped coverage
-        # failure. A single pathological line still fails closed so memory use
-        # remains bounded.
-        with path.open("rb") as handle:
-            number = 0
+        # Scan arbitrarily long logical lines in bounded character fragments.
+        # The overlap preserves credential patterns that straddle fragment
+        # boundaries without exempting generated/minified one-line artifacts.
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            number = 1
+            carry = ""
             while True:
-                raw = handle.readline(MAX_FILE_BYTES + 1)
-                if not raw:
+                fragment = handle.readline(SCAN_FRAGMENT_CHARS)
+                if not fragment:
                     break
-                number += 1
-                if len(raw) > MAX_FILE_BYTES:
-                    return [
-                        f"{label}:{number}: scan failure: exceeds "
-                        f"{MAX_FILE_BYTES}-byte secret-scan line limit"
-                    ]
-                try:
-                    line = raw.decode("utf-8")
-                except UnicodeError as exc:
-                    # Never echo raw decoder text/bytes into CI logs.
-                    return [f"{label}: read failure: {type(exc).__name__}"]
 
-                specific_finding = False
-                for name, pattern in PATTERNS:
-                    for match in pattern.finditer(line):
-                        # Suppress only an explicitly placeholder-shaped credential,
-                        # never an entire source line. Otherwise a real credential can
-                        # evade scanning simply by appending "# example" or similar.
-                        if _is_placeholder(match.group(0)):
-                            continue
-                        findings.append(f"{label}:{number}: possible {name}")
-                        specific_finding = True
-                        break
-                if specific_finding:
-                    continue
+                combined = carry + fragment
+                findings.extend(_scan_secret_fragment(combined, label, number))
 
-                for match in SECRET_ASSIGNMENT_RE.finditer(line):
-                    candidate = match.group("value")
-                    if _looks_like_high_entropy_secret(candidate):
-                        findings.append(
-                            f"{label}:{number}: possible high-entropy secret-like assignment"
-                        )
-                        break
+                continued = (
+                    len(fragment) >= SCAN_FRAGMENT_CHARS
+                    and not fragment.endswith("\n")
+                    and not fragment.endswith("\r")
+                )
+                if continued:
+                    carry = combined[-SCAN_OVERLAP_CHARS:]
+                else:
+                    carry = ""
+                    number += 1
+    except UnicodeError as exc:
+        return [f"{label}: read failure: {type(exc).__name__}"]
     except OSError as exc:
         return [f"{label}: read failure: {type(exc).__name__}"]
 
-    return findings
+    return list(dict.fromkeys(findings))
 
 
 def main() -> int:

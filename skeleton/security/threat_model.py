@@ -50,11 +50,18 @@ class ThreatImpactTrigger:
         object.__setattr__(self,"domains",domains)
 
 
+_DEFAULT_IMPACT_TRIGGERS=(
+    ThreatImpactTrigger("TR-AUTH",("authority","identity"),"authorization or identity boundary changed"),
+    ThreatImpactTrigger("TR-DATA",("data","storage"),"data classification, persistence, or lifecycle boundary changed"),
+    ThreatImpactTrigger("TR-NET",("network",),"network or egress boundary changed"),
+    ThreatImpactTrigger("TR-SUPPLY",("supply-chain",),"dependency, build, or artifact provenance changed"),
+)
+
 @dataclass(frozen=True,slots=True)
 class ThreatModel:
     threats: tuple[Threat,...]
-    model_version: str="vol167-v1"
-    impact_triggers: tuple[ThreatImpactTrigger,...]=()
+    model_version: str="vol026-v2"
+    impact_triggers: tuple[ThreatImpactTrigger,...]=_DEFAULT_IMPACT_TRIGGERS
 
     def __post_init__(self) -> None:
         if not isinstance(self.threats,tuple) or not self.threats:
@@ -116,9 +123,4 @@ def canonical_vol026_threat_model()->ThreatModel:
         Threat("T-FS-001","filesystem","input-to-rooted-filesystem","rooted path and archive sandbox enforcement","skeleton/testing/test_security_rooted_fs.py"),
         Threat("T-NET-001","network-egress","runtime-to-network","resolved destination plus connected-peer validation","skeleton/testing/test_security_outbound_http.py"),
         Threat("T-SUPPLY-001","supply-chain","dependency-to-runtime","artifact-bound SBOM and dependency integrity controls","skeleton/testing/test_sbom.py"),
-    ),model_version="vol026-v2",impact_triggers=(
-        ThreatImpactTrigger("TR-AUTH",("authority","identity"),"authorization or identity boundary changed"),
-        ThreatImpactTrigger("TR-DATA",("data","storage"),"data classification, persistence, or lifecycle boundary changed"),
-        ThreatImpactTrigger("TR-NET",("network",),"network or egress boundary changed"),
-        ThreatImpactTrigger("TR-SUPPLY",("supply-chain",),"dependency, build, or artifact provenance changed"),
     ))

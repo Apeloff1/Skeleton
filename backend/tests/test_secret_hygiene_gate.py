@@ -63,6 +63,37 @@ def test_candidate_files_fails_closed_without_git_index(
         list(checker.candidate_files())
 
 
+def test_bounded_large_line_is_scanned_instead_of_skipped(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidate = tmp_path / "machine.json"
+    candidate.write_text(
+        "x" * 80 + " sk-" + "Ab9_" * 8 + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(checker, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(checker, "MAX_FILE_BYTES", 256)
+
+    assert checker.violations(candidate) == [
+        "machine.json:1: possible OpenAI-style API key"
+    ]
+
+
+def test_line_beyond_configured_bound_still_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidate = tmp_path / "machine.json"
+    candidate.write_text("x" * 300 + "\n", encoding="utf-8")
+    monkeypatch.setattr(checker, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(checker, "MAX_FILE_BYTES", 128)
+
+    assert checker.violations(candidate) == [
+        "machine.json:1: scan failure: exceeds 128-byte secret-scan line limit"
+    ]
+
+
 def test_explicit_dummy_database_uri_is_allowed_as_fixture(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

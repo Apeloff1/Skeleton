@@ -4,13 +4,16 @@ from hashlib import sha256
 import json,re
 from .capability_contracts import CapabilityGrant,SecurityContractError
 _SHA=re.compile(r"^[0-9a-f]{64}$")
+def _text(name:str,value:object,limit:int=512)->str:
+ if not isinstance(value,str) or not value or value!=value.strip() or len(value)>limit:raise SecurityContractError("invalid "+name)
+ return value
 @dataclass(frozen=True,slots=True)
 class SecurityContext:
  principal_id:str
  context_id:str
  grants:tuple[CapabilityGrant,...]
  def __post_init__(self):
-  if not self.principal_id or not self.context_id:raise SecurityContractError("identity required")
+  object.__setattr__(self,"principal_id",_text("principal_id",self.principal_id,256)); object.__setattr__(self,"context_id",_text("context_id",self.context_id,256))
   if not isinstance(self.grants,tuple):raise SecurityContractError("grants must be tuple")
   if any(not isinstance(g,CapabilityGrant) or g.principal_id!=self.principal_id for g in self.grants):raise SecurityContractError("foreign grant")
 @dataclass(frozen=True,slots=True)
@@ -21,7 +24,7 @@ class ToolRequest:
  operation:str
  request_digest:str
  def __post_init__(self):
-  if not all(isinstance(x,str) and x for x in (self.tool_id,self.capability,self.resource,self.operation)):raise SecurityContractError("request fields required")
+  if not all(isinstance(x,str) and x and x==x.strip() for x in (self.tool_id,self.capability,self.resource,self.operation)):raise SecurityContractError("request fields required")
   if not isinstance(self.request_digest,str) or not _SHA.fullmatch(self.request_digest):raise SecurityContractError("invalid request digest")
 @dataclass(frozen=True,slots=True)
 class AuthorizationReceipt:

@@ -6,10 +6,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-022",
     "title": "Autonomous Repository Engineering",
-    "required_gap_texts": [
-      "transactional workspace layer incomplete",
-      "independent reviewer/verifier routing needs full integration"
-    ]
+    "required_gap_texts": []
   },
   "phases": [
     {

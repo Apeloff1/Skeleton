@@ -12,6 +12,8 @@ on:
       - "machine/ai_master_plan.json"
       - "scripts/check_ai_game_builder_500_levels.py"
       - "tests/test_ai_game_builder_500_levels.py"
+      - "tests/test_ai_game_builder_*.py"
+      - "skeleton/ai/game_builder/**"
       - ".github/workflows/ai-game-builder-500-levels.yml"
   push:
     branches: [main]
@@ -24,6 +26,8 @@ on:
       - "machine/ai_master_plan.json"
       - "scripts/check_ai_game_builder_500_levels.py"
       - "tests/test_ai_game_builder_500_levels.py"
+      - "tests/test_ai_game_builder_*.py"
+      - "skeleton/ai/game_builder/**"
       - ".github/workflows/ai-game-builder-500-levels.yml"
   workflow_dispatch:
 
@@ -64,7 +68,8 @@ jobs:
           python -m py_compile
           scripts/check_ai_game_builder_500_levels.py
           scripts/check_ai_master_plan.py
-          tests/test_ai_game_builder_500_levels.py
+          skeleton/ai/game_builder/*.py
+          tests/test_ai_game_builder_*.py
 
       - name: Validate 500-level authority
         run: python scripts/check_ai_game_builder_500_levels.py --json
@@ -73,7 +78,9 @@ jobs:
         run: python scripts/check_ai_master_plan.py
 
       - name: Run focused regression suite
-        run: python -m pytest -q --noconftest tests/test_ai_game_builder_500_levels.py
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_ai_game_builder_*.py
 
       - name: Validate masterplan JSON
         run: python -m json.tool machine/ai_master_plan.json >/dev/null

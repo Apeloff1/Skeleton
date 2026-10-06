@@ -27,6 +27,9 @@ from .model import FileRecord, RepositoryModel, canonical_json
 FORMAT = "skeleton-code-search-index"
 VERSION = 1
 MAX_INDEX_BYTES = 90 * 1024 * 1024
+MAX_RENDERED_LINE_BYTES = 1024 * 1024
+_RENDER_BREAK_DEPTH = 3
+_RENDER_FALLBACK_BREAK_DEPTH = 4
 MAX_SOURCE_BYTES = 2_000_000
 MAX_TERM_LENGTH = 128
 MAX_POSTINGS = 2_000_000
@@ -622,10 +625,71 @@ def index_envelope(index: CodeSearchIndex) -> dict[str, object]:
     }
 
 
+def _render_index_json(payload: object) -> str:
+    """Render deterministic JSON with bounded physical line length.
+
+    canonical_json remains the checksum authority. This renderer changes
+    whitespace only, inserting newlines after structural commas. Normal breaks
+    occur at object/list depth <= 3; a depth-4 fallback prevents an unusually
+    large posting list from producing a pathological scanner line.
+    """
+
+    compact = canonical_json(payload)
+    pieces: list[str] = []
+    depth = 0
+    in_string = False
+    escaped = False
+    line_bytes = 0
+    segment_start = 0
+
+    for index, character in enumerate(compact):
+        line_bytes += 1  # canonical_json(..., ensure_ascii=True) is ASCII-only.
+
+        if in_string:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                in_string = False
+            continue
+
+        if character == '"':
+            in_string = True
+            continue
+        if character in "{[":
+            depth += 1
+            continue
+        if character in "}]":
+            depth -= 1
+            continue
+        if character != ",":
+            continue
+
+        normal_break = depth <= _RENDER_BREAK_DEPTH
+        bounded_fallback = (
+            depth <= _RENDER_FALLBACK_BREAK_DEPTH
+            and line_bytes >= MAX_RENDERED_LINE_BYTES // 2
+        )
+        if normal_break or bounded_fallback:
+            if line_bytes > MAX_RENDERED_LINE_BYTES:
+                raise CodeSearchError("code-search index rendered line exceeds byte budget")
+            pieces.append(compact[segment_start : index + 1])
+            pieces.append("\n")
+            segment_start = index + 1
+            line_bytes = 0
+
+    if line_bytes > MAX_RENDERED_LINE_BYTES:
+        raise CodeSearchError("code-search index rendered line exceeds byte budget")
+    pieces.append(compact[segment_start:])
+    pieces.append("\n")
+    return "".join(pieces)
+
+
 def save_code_search_index(index: CodeSearchIndex, path: str | Path) -> None:
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    rendered = canonical_json(index_envelope(index)) + "\n"
+    rendered = _render_index_json(index_envelope(index))
     encoded = rendered.encode("utf-8")
     if len(encoded) > MAX_INDEX_BYTES:
         raise CodeSearchError("code-search index exceeds byte budget")
@@ -777,6 +841,7 @@ __all__ = [
     "CodeSearchIndex",
     "IndexedDocument",
     "MAX_INDEX_BYTES",
+    "MAX_RENDERED_LINE_BYTES",
     "MAX_POSTINGS",
     "MAX_REFERENCE_TERMS_PER_DOCUMENT",
     "MAX_SOURCE_BYTES",

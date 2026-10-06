@@ -6,10 +6,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-110",
     "title": "Definition of Done",
-    "required_gap_texts": [
-      "unify maturity and DoD rules",
-      "bind change-impact triggers to DoD"
-    ]
+    "required_gap_texts": []
   },
   "sources": [
     "machine/ai_build_queue.json",

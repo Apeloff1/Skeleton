@@ -7,8 +7,7 @@
     "volume_ref": "VOL-109",
     "title": "Build Order",
     "required_gap_texts": [
-      "bind every AIQ task into construction DAG",
-      "materialize cycle/blocked-state reporting"
+      "independent construction-DAG cycle and blocked-state verification remains pending"
     ]
   },
   "sources": [

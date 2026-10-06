@@ -886,3 +886,17 @@ Two internal rivals execute the exact `construct -> attack_and_improve -> reconc
 The overlay stack is cumulative. Advanced-AI-100, Frontier-96, CS-300, Learning-400/Adversarial-400, PSI-1000, ESS-1000, Competitive-200 and Game-Builder-500 remain simultaneously authoritative unless an explicit supersession record names the retired authority.
 
 A reconciliation may not lower `plan_version`, remove a live registered overlay, replace a non-empty authority with an empty blob, remove the only validator/test/workflow for a live overlay, or reconstruct canonical authority from a stale ancestor. `scripts/check_masterplan_overlay_reconciliation.py` enforces the union fail-closed.
+
+
+## Functional LLM + Game Builder 20MB+ deep-closure execution atlas
+
+The depth-only execution atlas at [FUNCTIONAL_LLM_GAME_BUILDER_10MB/README.md](FUNCTIONAL_LLM_GAME_BUILDER_10MB/README.md) now enforces a 20,000,000-byte minimum and carries 52,648,747 bytes of implementation-grade requirements across 18 primary planes while preserving the VOL-000..420 breadth freeze. Pass 2 adds exactly 23,328 deep-closure atoms (1,296 per plane) over 12 subsystems × 12 lifecycle stages × 9 adversarial stress profiles.
+
+Its machine authority is `machine/functional_llm_game_builder_10mb_manifest.json`. The atlas requires one durable end-to-end transaction from natural-language objective through governed context and provider-neutral inference, bounded dual-rival Forge competition, authorized project/world/scene mutations, simulation/presentation, automated playtest and continuity verification, rights/security/performance gates, reproducible build/export, and close/reopen/replay/recovery.
+
+This is specification depth, not a runtime-completion claim. All atoms remain implementation-unsigned and independently verification-unsigned until exact-head executable evidence exists.
+
+The FLGB validator additionally enforces 18 planes × 12 registered subsystems, complete subsystem × lifecycle coverage, all 10 evidence classes, all 12 stress scenarios, explicit coverage IDs, and fail-closed unsigned runtime status.
+
+
+The FLGB construction bridge is `machine/functional_llm_game_builder_execution_backlog.json`: **216 planned build units** (18 planes × 12 subsystems). Each unit names implementation, contract, and focused-test targets and inherits the atlas lifecycle, evidence, stress, recovery, rights, and independent-verification obligations. The backlog is deliberately 0/216 implementation-signed until exact-head executable evidence exists.

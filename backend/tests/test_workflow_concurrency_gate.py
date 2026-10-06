@@ -70,6 +70,35 @@ jobs: {}
     assert _scan(text, "pr-obsolete-run-drain.yml") == []
 
 
+def test_allows_workflow_run_head_and_source_workflow_identity() -> None:
+    text = """name: feedback
+on:
+  workflow_run:
+    workflows: [Backend Quality]
+    types: [completed]
+concurrency:
+  group: feedback-${{ github.event.workflow_run.head_sha }}-${{ github.event.workflow_run.workflow_id }}
+  cancel-in-progress: true
+jobs: {}
+"""
+    assert _scan(text, "feedback.yml") == []
+
+
+def test_rejects_workflow_run_instance_id_as_preemption_identity() -> None:
+    text = """name: feedback
+on:
+  workflow_run:
+    workflows: [Backend Quality]
+    types: [completed]
+concurrency:
+  group: feedback-${{ github.event.workflow_run.id }}
+  cancel-in-progress: true
+jobs: {}
+"""
+    findings = _scan(text, "feedback.yml")
+    assert any("unsupported concurrency group identity" in finding for finding in findings)
+
+
 def test_rejects_missing_concurrency() -> None:
     text = """name: unsafe
 on:
