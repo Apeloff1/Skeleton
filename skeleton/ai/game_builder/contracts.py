@@ -320,6 +320,29 @@ def hard_gates_pass(gates: Sequence[GateResult]) -> bool:
     return all(gate.passed for gate in gates if gate.non_compensable)
 
 
+def pareto_safe_scores(
+    current: Mapping[str, float],
+    proposed: Mapping[str, float],
+    *,
+    protected_axes: Iterable[str] = PROTECTED_AXES,
+    epsilon: float = 1e-9,
+) -> bool:
+    current_norm = dict(normalize_quality(current))
+    proposed_norm = dict(normalize_quality(proposed))
+    protected = tuple(protected_axes)
+    if any(axis not in current_norm or axis not in proposed_norm for axis in protected):
+        raise ValueError("protected axis missing from quality vector")
+    if any(
+        proposed_norm[axis] + epsilon < current_norm[axis]
+        for axis in protected
+    ):
+        return False
+    return any(
+        proposed_norm[axis] > current_norm[axis] + epsilon
+        for axis in QUALITY_AXES
+    )
+
+
 def pareto_safe(
     incumbent: Candidate,
     candidate: Candidate,
@@ -327,14 +350,12 @@ def pareto_safe(
     protected_axes: Iterable[str] = PROTECTED_AXES,
     epsilon: float = 1e-9,
 ) -> bool:
-    current = incumbent.quality_map
-    proposed = candidate.quality_map
-    protected = tuple(protected_axes)
-    if any(axis not in current or axis not in proposed for axis in protected):
-        raise ValueError("protected axis missing from quality vector")
-    if any(proposed[axis] + epsilon < current[axis] for axis in protected):
-        return False
-    return any(proposed[axis] > current[axis] + epsilon for axis in QUALITY_AXES)
+    return pareto_safe_scores(
+        incumbent.quality_map,
+        candidate.quality_map,
+        protected_axes=protected_axes,
+        epsilon=epsilon,
+    )
 
 
 def promotion_receipt(
@@ -346,6 +367,7 @@ def promotion_receipt(
     evaluator_id: str,
     gate_results: Sequence[GateResult],
     protected_axes: Iterable[str] = PROTECTED_AXES,
+    submitted_quality_override: Mapping[str, float] | None = None,
 ) -> PromotionReceipt:
     if round_index < 1 or round_index > effort_mode.rounds:
         raise ValueError("round index outside effort-mode bounds")
@@ -353,10 +375,20 @@ def promotion_receipt(
         raise ValueError("promotion evaluator must be independent from both rivals")
 
     gates = tuple(gate_results)
+    proposed_quality = (
+        submitted.quality_map
+        if submitted is not None and submitted_quality_override is None
+        else submitted_quality_override
+    )
     promote = (
         submitted is not None
+        and proposed_quality is not None
         and hard_gates_pass(gates)
-        and pareto_safe(incumbent, submitted, protected_axes=protected_axes)
+        and pareto_safe_scores(
+            incumbent.quality_map,
+            proposed_quality,
+            protected_axes=protected_axes,
+        )
     )
     promoted = submitted if promote else incumbent
     decision = "promote" if promote else "retain_incumbent"
@@ -370,6 +402,11 @@ def promotion_receipt(
         ],
         "incumbent": incumbent.digest,
         "promoted": promoted.digest,
+        "evaluated_submitted_quality": (
+            dict(normalize_quality(proposed_quality))
+            if proposed_quality is not None
+            else None
+        ),
         "round_index": round_index,
         "submitted": submitted.digest if submitted else None,
     }
