@@ -27,6 +27,8 @@ GAME_BUILDER_EVALUATION = ROOT / "skeleton" / "ai" / "game_builder" / "evaluatio
 GAME_BUILDER_RESOURCES = ROOT / "skeleton" / "ai" / "game_builder" / "resource_governor.py"
 GAME_BUILDER_QUALITY_DEBT = ROOT / "skeleton" / "ai" / "game_builder" / "quality_debt.py"
 GAME_BUILDER_CONTROL_PLANE = ROOT / "skeleton" / "ai" / "game_builder" / "control_plane.py"
+GAME_BUILDER_RESILIENCE = ROOT / "skeleton" / "ai" / "game_builder" / "resilience.py"
+GAME_BUILDER_RELEASE = ROOT / "skeleton" / "ai" / "game_builder" / "release.py"
 GAME_BUILDER_OVERENGINEERING_TESTS = ROOT / "tests" / "test_ai_game_builder_overengineering_runtime.py"
 DEPTH_000_040 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_000_040.md"
 DEPTH_041_080 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_041_080.md"
@@ -170,6 +172,8 @@ def validate(data: dict) -> list[str]:
             "resource_governor": "skeleton/ai/game_builder/resource_governor.py",
             "quality_debt": "skeleton/ai/game_builder/quality_debt.py",
             "integrated_control_plane": "skeleton/ai/game_builder/control_plane.py",
+            "resilience": "skeleton/ai/game_builder/resilience.py",
+            "gold_master": "skeleton/ai/game_builder/release.py",
             "tests": [
                 "tests/test_ai_game_builder_runtime.py",
                 "tests/test_ai_game_builder_overengineering_runtime.py",
@@ -185,6 +189,8 @@ def validate(data: dict) -> list[str]:
             ("resource governor", GAME_BUILDER_RESOURCES),
             ("quality debt", GAME_BUILDER_QUALITY_DEBT),
             ("integrated control plane", GAME_BUILDER_CONTROL_PLANE),
+            ("resilience controls", GAME_BUILDER_RESILIENCE),
+            ("gold-master tribunal", GAME_BUILDER_RELEASE),
             ("overengineering runtime tests", GAME_BUILDER_OVERENGINEERING_TESTS),
         ):
             if not path.is_file():
