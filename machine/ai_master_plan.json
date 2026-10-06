@@ -517,19 +517,45 @@
         "skeleton/app",
         "skeleton/persistence/operation_runtime.py",
         "skeleton/api/server.py",
-        "machine/manifest.json"
+        "machine/manifest.json",
+        "machine/runtime_supervision.json",
+        "scripts/check_architecture_runtime_supervision.py",
+        "skeleton/kernel/runtime_supervision.py",
+        "skeleton/ai/runtime/kernel/runtime_supervision.py",
+        "skeleton/api/engine_runtime.py",
+        "backend/server.py",
+        "skeleton/automation/free_model.py",
+        "skeleton/automation/chatgpt_adapter.py",
+        "skeleton/automation/shift_supervisor/model_gateway.py",
+        ".github/workflows/vol004-runtime-supervision.yml"
       ],
       "tests": [
         "skeleton/testing/test_app_assembly.py",
         "skeleton/testing/test_operation_runtime.py",
-        "skeleton/testing/test_operation_server_binding.py"
+        "skeleton/testing/test_operation_server_binding.py",
+        "tests/test_architecture_runtime_supervision.py",
+        "skeleton/testing/test_vol004_runtime_supervision_v2.py",
+        "skeleton/testing/test_kernel_supervisor_cancellation.py",
+        "backend/tests/test_engine_cross_service_closure.py"
       ],
       "evaluations": [
-        "planned:crash-at-every-lifecycle-boundary suite",
-        "planned:shutdown/cancellation latency evaluation"
+        "python scripts/check_architecture_runtime_supervision.py --json",
+        "VOL-004 Runtime Supervision Closure exact-head workflow",
+        "adversarial lifecycle state/lease/restart race suite",
+        "cross-service durable cancellation and late-result fencing journey",
+        "network-transport connector cancellation inventory convergence"
       ],
       "evidence": [
-        "https://github.com/Apeloff1/Skeleton/commit/be408977891328b78522074c1fe693267b01ce5b"
+        "https://github.com/Apeloff1/Skeleton/commit/be408977891328b78522074c1fe693267b01ce5b",
+        "docs/architecture/RUNTIME_SUPERVISION.md",
+        "machine/runtime_supervision.json",
+        "scripts/check_architecture_runtime_supervision.py",
+        "skeleton/kernel/runtime_supervision.py",
+        "skeleton/ai/runtime/kernel/runtime_supervision.py",
+        "skeleton/testing/test_vol004_runtime_supervision_v2.py",
+        "tests/test_architecture_runtime_supervision.py",
+        "backend/tests/test_engine_cross_service_closure.py",
+        ".github/workflows/vol004-runtime-supervision.yml"
       ],
       "risks": [
         "orphan tasks",
@@ -537,8 +563,7 @@
         "shutdown ordering data loss"
       ],
       "gaps": [
-        "unify service supervision semantics across backend and engine",
-        "expand cancellation propagation coverage into all connectors"
+        "independent exact-head VOL-004 Runtime Supervision Closure qualification remains pending"
       ],
       "accountability_id": "ACC-VOL-004",
       "completion_checkbox": false,
