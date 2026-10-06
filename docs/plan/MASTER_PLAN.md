@@ -1,6 +1,6 @@
 # Skeleton AI Master Plan
 
-Plan version: **1.8.0**
+Plan version: **1.9.0**
 
 Architecture lane: `PR #1904 / integration/architecture-map-v1`
 
@@ -11,6 +11,8 @@ Machine mirror: [`machine/ai_master_plan.json`](../../machine/ai_master_plan.jso
 Exotic systems depth: [`EXOTIC_SYSTEMS_DEPTH.md`](EXOTIC_SYSTEMS_DEPTH.md) / [`machine/ai_exotic_systems_catalog.json`](../../machine/ai_exotic_systems_catalog.json)
 
 Competitive engineering ladder: [`COMPETITIVE_AI_ENGINEERING_LADDER.md`](../architecture/COMPETITIVE_AI_ENGINEERING_LADDER.md) / [`machine/competitive_ai_engineering_ladder.json`](../../machine/competitive_ai_engineering_ladder.json)
+
+AI Game Builder 500-level authority: [`AI_GAME_BUILDER_500_LEVELS.md`](../architecture/AI_GAME_BUILDER_500_LEVELS.md) / [`machine/ai_game_builder_500_levels.json`](../../machine/ai_game_builder_500_levels.json) / [`machine/ai_game_builder_dual_rival_forge.json`](../../machine/ai_game_builder_dual_rival_forge.json)
 
 Existing construction manual: [`docs/AI_APP_CONSTRUCTION_MANUAL.md`](../AI_APP_CONSTRUCTION_MANUAL.md)
 
@@ -765,6 +767,29 @@ Required validation:
 python scripts/check_competitive_ai_engineering_ladder.py --json
 python scripts/check_competitive_ai_benchmark_governance.py --json
 python -m pytest -q --noconftest tests/test_competitive_ai_engineering_ladder.py tests/test_competitive_ai_benchmark_governance.py
+```
+
+## 24.7 AI Game Builder — 500 task-specific adversarial levels
+
+The masterplan adds a game-building depth overlay governed by `machine/ai_game_builder_500_levels.json`, documented in `docs/architecture/AI_GAME_BUILDER_500_LEVELS.md`, and executed conceptually under the dual-rival contract in `machine/ai_game_builder_dual_rival_forge.json`.
+
+It contains **500 explicit task/capability levels** constructed as **50 game-building families × 10 maturation/proof stages**, spanning intent compilation, creative DNA, dual-rival orchestration, atomization, canon, narrative, character/dialogue/quest systems, worldbuilding, scenes/levels/procedural generation, gameplay/mechanics/combat/traversal/input, progression/economy/items/NPCs/encounters/world simulation, physics/animation/2D/pixel/3D/rendering, camera/UI/audio/music/voice/accessibility, multiplayer/save/performance/export, playtesting/balance/repair/research/rights, per-pixel QA, long-form narrative QA, player-value evaluation, asset versioning, and whole-game release readiness.
+
+Every work item runs under the same exact rival cycle: **construct → attack/improve → reconcile/promote**, with Rival A and Rival B exchanging builder/challenger roles every round. Effort modes are exact: **Forge-100 = 100 rounds**, **Forge-1000 = 1,000 rounds**, and **Forge-10000 = 10,000 rounds**. Each round has three stages. These modes have **no wall-clock deadline**; time is used through checkpointed iteration, while compute, memory, storage, retries, delegation and concurrency remain bounded.
+
+**Long-form consistency is a prime directive.** A locally stronger pixel, line, scene, level, mechanic, quest, character beat, asset, audio cue, optimization, or code change cannot promote if it silently breaks project DNA, canon, chronology, character knowledge/motivation, world geography/state, quest causality, mechanics, progression, visual/audio language, save/replay identity, player-choice consequences, setup/payoff, or late-game callbacks.
+
+The system may inspect artifacts at the smallest useful unit—including pixels/regions, sprite frames, mesh/material elements, dialogue lines, story beats, scene nodes, mechanics, state transitions, audio events, code units and world entities—but every atomic finding retains provenance to its parent scene/story/system/project state.
+
+Gaming sources are broad but governed. Official engine/platform documentation, standards, academic work, public factual metadata, postmortems, tutorials, community discussion, project-owned material, public-domain work and compatible licensed/open-source material may inform development according to their rights classification. Availability never grants permission to copy protected expression. Unknown rights are quarantined; incorporated third-party material needs provenance; suspiciously similar text/code/image/audio/names/layouts/characters/world elements block promotion pending review; similarity scores are risk indicators rather than legal determinations.
+
+This remains an **overlay inside the frozen `VOL-000..VOL-420` architecture**. It creates no `VOL-421+`. All `GBL-001..GBL-500` records begin `planned` and unsigned. Prose, elapsed time, iteration count, AI confidence or a demo cannot complete them. Exact-head implementation, adversarial/recovery evidence, rights/provenance evidence, whole-project consistency, declared quality metrics and independent Stage-10 promotion evidence are required.
+
+Required validation:
+
+```bash
+python scripts/check_ai_game_builder_500_levels.py --json
+python -m pytest -q --noconftest tests/test_ai_game_builder_500_levels.py
 ```
 
 ## 25. Scope freeze and future plan evolution
