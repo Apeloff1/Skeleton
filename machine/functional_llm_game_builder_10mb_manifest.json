@@ -21,7 +21,10 @@
     "human_index": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/README.md",
     "validator": "scripts/check_functional_llm_game_builder_10mb.py",
     "test": "tests/test_functional_llm_game_builder_masterplan.py",
-    "workflow": ".github/workflows/functional-llm-game-builder-masterplan.yml"
+    "workflow": ".github/workflows/functional-llm-game-builder-masterplan.yml",
+    "execution_backlog": "machine/functional_llm_game_builder_execution_backlog.json",
+    "execution_backlog_validator": "scripts/check_functional_llm_game_builder_execution_backlog.py",
+    "execution_backlog_test": "tests/test_functional_llm_game_builder_execution_backlog.py"
   },
   "laws": [
     "models propose; deterministic control planes authorize and commit",
