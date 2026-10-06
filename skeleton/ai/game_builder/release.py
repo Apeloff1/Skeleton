@@ -444,6 +444,15 @@ class GoldMasterBundle:
         ):
             if not isinstance(value, str) or len(value) < 16:
                 raise ValueError("gold-master identities must be stable digests")
+        if not isinstance(forge_binding, ForgeReleaseBinding):
+            raise TypeError("gold-master bundle requires ForgeReleaseBinding")
+        if artifact_digest != forge_binding.champion_artifact_digest:
+            raise ValueError("gold-master artifact must match forge champion artifact")
+        if canon_digest != forge_binding.champion_canon_digest:
+            raise ValueError("gold-master canon must match forge champion canon")
+        if provenance_digest != forge_binding.champion_provenance_digest:
+            raise ValueError("gold-master provenance must match forge champion provenance")
+
         families = tuple(sorted(family_qualifications, key=lambda row: row.family_id))
         if [row.family_id for row in families] != [f"GB{i:02d}" for i in range(1, 51)]:
             raise ValueError("gold-master bundle requires exactly GB01..GB50")
