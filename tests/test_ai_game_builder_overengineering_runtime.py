@@ -464,17 +464,17 @@ def _gold_bundle(*, failed_family: str | None = None) -> GoldMasterBundle:
         rollback_target_digest="rollback-" + "f" * 32,
         red_team_digest="redteam-" + "1" * 32,
         family_qualifications=families,
-        critical_gate_digests={
-            "rights": "rights-" + "2" * 32,
-            "security": "security-" + "3" * 32,
-            "reproducibility": "repro-" + "4" * 32,
+        critical_gate_results={
+            "rights": (True, "rights-" + "2" * 32),
+            "security": (True, "security-" + "3" * 32),
+            "reproducibility": (True, "repro-" + "4" * 32),
         },
     )
 
 
 def test_gold_master_requires_all_fifty_families() -> None:
     tribunal = GoldMasterTribunal(("gm-1", "gm-2", "gm-3"))
-    with pytest.raises(ReleaseArbitrationError, match="failed family qualification"):
+    with pytest.raises(ReleaseArbitrationError, match="failed family or critical-gate qualification"):
         tribunal.decide(_gold_bundle(failed_family="GB47"))
 
 
@@ -495,3 +495,43 @@ def test_gold_master_requires_unanimous_independent_quorum() -> None:
     assert verdict.accepted is False
     assert len(verdict.authority_ids) == 3
     assert len(verdict.vote_digests) == 3
+
+
+
+def test_gold_master_failed_critical_gate_blocks_release() -> None:
+    families = [
+        FamilyQualification(
+            family_id=f"GB{i:02d}",
+            passed=True,
+            evidence_digest=f"family-{i:02d}-" + "e" * 24,
+        )
+        for i in range(1, 51)
+    ]
+    bundle = GoldMasterBundle.create(
+        artifact_digest="artifact-" + "a" * 32,
+        build_digest="build-" + "b" * 32,
+        canon_digest="canon-" + "c" * 32,
+        provenance_digest="provenance-" + "d" * 32,
+        replay_digest="replay-" + "e" * 32,
+        rollback_target_digest="rollback-" + "f" * 32,
+        red_team_digest="redteam-" + "1" * 32,
+        family_qualifications=families,
+        critical_gate_results={
+            "rights": (False, "rights-" + "2" * 32),
+            "security": (True, "security-" + "3" * 32),
+        },
+    )
+    tribunal = GoldMasterTribunal(("gm-1", "gm-2", "gm-3"))
+    with pytest.raises(
+        ReleaseArbitrationError,
+        match="failed family or critical-gate qualification",
+    ):
+        tribunal.decide(bundle)
+
+
+def test_gold_master_excludes_routine_evaluators() -> None:
+    with pytest.raises(ValueError, match="forbidden authority"):
+        GoldMasterTribunal(
+            ("gm-1", "judge-1", "gm-3"),
+            routine_evaluator_ids=("judge-1", "judge-2"),
+        )
