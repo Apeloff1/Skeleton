@@ -27,6 +27,14 @@ EVIDENCE_PATHS = {
     "workflow": ".github/workflows/advanced-ai-structure.yml",
 }
 
+INTEGRATION_FILES = (
+    "machine/architecture.json",
+    "docs/ARCHITECTURE_MAP.md",
+    "docs/AI_APP_CONSTRUCTION_MANUAL.md",
+    "docs/plan/AI_CHAT_MASTERPLAN_2026-10-06.md",
+    "docs/ENTERPRISE_SYSTEM_ARCHITECTURE.md",
+)
+
 
 def _load(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
@@ -415,6 +423,7 @@ def evidence(head_sha: str, repo_root: Path = ROOT) -> dict[str, Any]:
         CONSTRUCTION.as_posix(),
         ENTERPRISE.as_posix(),
         *sorted(EVIDENCE_PATHS.values()),
+        *INTEGRATION_FILES,
     ]
     digests = {
         path: _sha(repo_root / path)
