@@ -418,6 +418,51 @@ def test_project_resurrection_proof_rejects_unattributed_verification_evidence()
         )
 
 
+def test_resurrection_verification_rejects_self_consistent_false_pass_state() -> None:
+    checkpoint_evidence = _d("checkpoint-evidence")
+    original = ResurrectionPoint(
+        _d("project"),
+        _d("canon"),
+        _d("graph"),
+        _d("events"),
+        _d("rights"),
+        _authority("checkpoint-authority", checkpoint_evidence),
+        checkpoint_evidence,
+    )
+    different = ResurrectionPoint(
+        _d("project-other"),
+        _d("canon"),
+        _d("graph"),
+        _d("events"),
+        _d("rights"),
+        _authority("checkpoint-authority-other", _d("checkpoint-other")),
+        _d("checkpoint-other"),
+    )
+    verification_evidence = _d("recovery-verification")
+    verifier = _authority("recovery-verifier", verification_evidence)
+    payload = {
+        "checkpoint_digest": original.digest,
+        "passed": True,
+        "reconstructed_digest": different.digest,
+        "verification_evidence_digest": verification_evidence,
+        "verifier_provenance_digest": verifier.digest,
+    }
+    from skeleton.ai.game_builder.deep_assurance import ResurrectionVerification
+
+    with pytest.raises(
+        DeepAssuranceError,
+        match="passed state does not match reconstructed identity",
+    ):
+        ResurrectionVerification(
+            checkpoint_digest=original.digest,
+            reconstructed_digest=different.digest,
+            passed=True,
+            verifier_provenance=verifier,
+            verification_evidence_digest=verification_evidence,
+            proof_digest=canonical_digest(payload),
+        )
+
+
 def test_evidence_merkle_root_changes_on_append() -> None:
     ledger = EvidenceMerkleLedger()
     root0 = ledger.root
