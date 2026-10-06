@@ -229,6 +229,7 @@ class DualRivalForge:
         evaluator_id: str,
         gate_results: Sequence[GateResult],
         protected_axes: Iterable[str] | None = None,
+        evaluated_quality: Mapping[str, float] | None = None,
     ) -> PromotionReceipt:
         if self.completed:
             raise ForgeStateError("effort-mode round budget is complete")
@@ -249,6 +250,7 @@ class DualRivalForge:
             submitted=submitted,
             evaluator_id=evaluator_id,
             gate_results=gate_results,
+            submitted_quality_override=evaluated_quality,
             **kwargs,
         )
         if receipt.decision == "promote":
