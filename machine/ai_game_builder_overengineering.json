@@ -1,0 +1,1259 @@
+{
+  "schema_version": "skeleton.ai_game_builder_overengineering.v1",
+  "version": "1.0.0",
+  "status": "active_design_authority",
+  "purpose": "Cross-cutting overengineering constitution applied to the 500-level dual-rival AI game builder.",
+  "parent_authorities": [
+    "machine/ai_game_builder_500_levels.json",
+    "machine/ai_game_builder_dual_rival_forge.json"
+  ],
+  "topology": {
+    "plane_count": 24,
+    "family_count": 50,
+    "minimum_planes_per_family": 11,
+    "critical_plane_count": 11
+  },
+  "laws": [
+    "No quality score may compensate for a failed non-compensable gate.",
+    "Neither rival may see private scratch state from the other rival.",
+    "Neither rival may be the final authority for its own candidate.",
+    "Long-form consistency is veto-capable at every granularity.",
+    "Every promoted artifact must be replayable or otherwise reproducibly evidenced at its natural domain boundary.",
+    "Unknown incorporated rights fail closed to quarantine.",
+    "Similarity scores are risk signals, never legal conclusions.",
+    "No-wall-clock-deadline modes still enforce bounded compute, memory, storage, retry, branch and concurrency envelopes.",
+    "Disagreement and negative evidence are durable evidence, not disposable noise.",
+    "The last known-good champion is immutable until a replacement is transactionally promoted."
+  ],
+  "critical_planes": [
+    "OP01",
+    "OP02",
+    "OP04",
+    "OP05",
+    "OP06",
+    "OP11",
+    "OP14",
+    "OP15",
+    "OP16",
+    "OP22",
+    "OP24"
+  ],
+  "planes": [
+    {
+      "id": "OP01",
+      "title": "Rival Isolation",
+      "objective": "Prevent hidden shared scratch state, prompt leakage, or accidental collusion between Rival A and Rival B.",
+      "mandatory_controls": [
+        "separate private working contexts",
+        "share only governed canon/evidence/champion artifacts",
+        "hash every cross-rival handoff",
+        "deny undeclared side channels"
+      ],
+      "evidence_required": [
+        "cross-context leakage test",
+        "handoff digest evidence",
+        "isolation boundary audit"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP02",
+      "title": "Role Symmetry & Anti-Collusion",
+      "objective": "Keep both rivals capable of building and attacking so one cannot become a permanently privileged author or passive critic.",
+      "mandatory_controls": [
+        "alternate builder/challenger every round",
+        "equal tool/source policy per rival",
+        "track challenge acceptance/rejection asymmetry",
+        "detect suspicious convergence or rubber-stamping"
+      ],
+      "evidence_required": [
+        "role-rotation trace",
+        "asymmetry report",
+        "collusion/rubber-stamp adversarial run"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP03",
+      "title": "Blind Candidate Evaluation",
+      "objective": "Reduce evaluator anchoring and brand/model preference by evaluating anonymized candidate identities where feasible.",
+      "mandatory_controls": [
+        "strip rival identity from judge inputs",
+        "randomize candidate order",
+        "separate scoring from provenance reveal",
+        "re-score sampled rounds after unblinding"
+      ],
+      "evidence_required": [
+        "blind-score receipt",
+        "order-randomization seed",
+        "blind-vs-unblinded drift report"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP04",
+      "title": "Pareto Promotion Constitution",
+      "objective": "Promote only candidates that improve useful quality without violating protected non-compensable dimensions.",
+      "mandatory_controls": [
+        "declare protected dimensions per task",
+        "require all hard gates pass",
+        "require at least one material improvement unless repair-only",
+        "preserve incumbent on ambiguous/non-Pareto result"
+      ],
+      "evidence_required": [
+        "quality-vector delta",
+        "hard-gate matrix",
+        "promotion receipt"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP05",
+      "title": "Anti-Goodhart & Metric Gaming",
+      "objective": "Prevent rivals from optimizing the score instead of the game.",
+      "mandatory_controls": [
+        "hold out evaluation slices",
+        "rotate adversarial probes",
+        "track metric/output correlation drift",
+        "reject proxy gains contradicted by play/replay evidence"
+      ],
+      "evidence_required": [
+        "held-out slice results",
+        "metric gaming probes",
+        "proxy-vs-player-value report"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP06",
+      "title": "Longform Canon Causality",
+      "objective": "Make story/world/system causality a veto-capable graph, not a prompt reminder.",
+      "mandatory_controls": [
+        "version canon assertions",
+        "encode causal edges and temporal constraints",
+        "record setup/payoff obligations",
+        "compute blast radius before promotion"
+      ],
+      "evidence_required": [
+        "canon graph digest",
+        "causal consistency report",
+        "continuity debt delta"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP07",
+      "title": "Character Epistemic State",
+      "objective": "Track what every character knows, believes, suspects, remembers, can infer, and must not know at each point.",
+      "mandatory_controls": [
+        "knowledge timestamps",
+        "source-of-knowledge edges",
+        "belief vs fact separation",
+        "branch-local character memory"
+      ],
+      "evidence_required": [
+        "character knowledge ledger",
+        "knowledge-leak probes",
+        "branch-memory consistency report"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP08",
+      "title": "Branch Universe & Temporal Integrity",
+      "objective": "Keep choice branches, timelines, alternate worlds, save states, retcons, simulations, and unreliable narration explicitly separated.",
+      "mandatory_controls": [
+        "branch universe IDs",
+        "temporal interval constraints",
+        "merge rules for converging branches",
+        "explicit intentional-contradiction annotations"
+      ],
+      "evidence_required": [
+        "branch DAG digest",
+        "timeline solver report",
+        "branch bleed tests"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP09",
+      "title": "Pixel-to-Project Traceability",
+      "objective": "Connect the smallest visual or content defect to the asset, scene, system, source, canon, and release artifact that contains it.",
+      "mandatory_controls": [
+        "stable atom IDs",
+        "parent-chain provenance",
+        "reverse dependency lookup",
+        "changed-atom blast radius"
+      ],
+      "evidence_required": [
+        "atom lineage proof",
+        "reverse-dependency report",
+        "sampled pixel-to-release trace"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP10",
+      "title": "Cross-Modal Coherence",
+      "objective": "Keep story, visuals, animation, audio, UI, mechanics, camera, and world state mutually consistent.",
+      "mandatory_controls": [
+        "shared scene/event identity",
+        "cross-modal timing constraints",
+        "motif/leitmotif bindings",
+        "state-to-presentation assertions"
+      ],
+      "evidence_required": [
+        "cross-modal scene report",
+        "timing alignment evidence",
+        "motif consistency checks"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP11",
+      "title": "Rights Clean-Room Boundary",
+      "objective": "Keep source material from becoming copied expressive output without an explicit permission basis.",
+      "mandatory_controls": [
+        "rights-state every source",
+        "quarantine unknowns",
+        "facts/ideas reference-only transform boundary",
+        "block incorporation without compatible license/ownership"
+      ],
+      "evidence_required": [
+        "source-rights manifest",
+        "quarantine audit",
+        "incorporation decision receipts"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP12",
+      "title": "Similarity-Risk Ensemble",
+      "objective": "Use multiple modality-specific similarity screens as risk detectors while refusing to treat them as legal judgments.",
+      "mandatory_controls": [
+        "text/code/image/audio/name/layout screens",
+        "multiple independent features where practical",
+        "human/legal escalation for unresolved high risk",
+        "retain false-positive/false-negative calibration sets"
+      ],
+      "evidence_required": [
+        "similarity ensemble report",
+        "calibration evidence",
+        "escalation receipts"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP13",
+      "title": "Source Quality, Freshness & Contradiction",
+      "objective": "Rank gaming knowledge by authority, recency, corroboration, licensing, and applicability instead of ingesting everything equally.",
+      "mandatory_controls": [
+        "source-class policy",
+        "freshness timestamp",
+        "contradiction set retention",
+        "official/primary-source preference for factual claims"
+      ],
+      "evidence_required": [
+        "source scorecard",
+        "freshness report",
+        "contradiction ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP14",
+      "title": "Determinism, Replay & Counterfactuals",
+      "objective": "Make important game and forge decisions replayable from exact state, inputs, tools, seeds, and policy.",
+      "mandatory_controls": [
+        "canonical serialization",
+        "seed capture",
+        "event ordering",
+        "counterfactual replay against prior champion"
+      ],
+      "evidence_required": [
+        "replay hash match",
+        "counterfactual comparison",
+        "nondeterminism probe"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP15",
+      "title": "Checkpoint, Event-Sourcing & Rollback",
+      "objective": "Never lose the last known-good game or forge state during long 10,000-round runs.",
+      "mandatory_controls": [
+        "append-only decision receipts",
+        "champion checkpoints",
+        "atomic publication",
+        "restore and migration tests"
+      ],
+      "evidence_required": [
+        "checkpoint restore proof",
+        "event-chain digest",
+        "rollback drill"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP16",
+      "title": "Bounded-Resource Infinite-Time Discipline",
+      "objective": "Exploit unlimited wall-clock time without allowing unbounded compute, memory, storage, retries, branches, or delegation.",
+      "mandatory_controls": [
+        "per-round budgets",
+        "global storage quotas",
+        "branch pruning policy",
+        "retry and concurrency caps"
+      ],
+      "evidence_required": [
+        "resource envelope report",
+        "saturation test",
+        "quota enforcement evidence"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP17",
+      "title": "Adversarial Playtest Swarm",
+      "objective": "Use diverse player policies to attack softlocks, boredom, exploits, inaccessible paths, degenerate strategies, and emergent failure.",
+      "mandatory_controls": [
+        "goal-directed agents",
+        "novice/expert/adversarial personas",
+        "coverage diversity",
+        "replayable failure seeds"
+      ],
+      "evidence_required": [
+        "playtest corpus",
+        "state-space coverage report",
+        "minimized exploit replays"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP18",
+      "title": "Property, Fuzz & Metamorphic Verification",
+      "objective": "Test invariants beyond scripted examples across generated content and state transitions.",
+      "mandatory_controls": [
+        "property tests",
+        "schema/parser fuzzing",
+        "metamorphic transformations",
+        "mutation testing of critical rules"
+      ],
+      "evidence_required": [
+        "property/fuzz results",
+        "metamorphic equivalence report",
+        "mutation score"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP19",
+      "title": "Independent Calibration & Appeal",
+      "objective": "Give disputed promotions an evidence-based appeal path without letting either rival become final authority.",
+      "mandatory_controls": [
+        "independent evaluator identity",
+        "disagreement preservation",
+        "appeal trigger thresholds",
+        "human calibration for subjective domains"
+      ],
+      "evidence_required": [
+        "judge disagreement report",
+        "appeal receipt",
+        "human-calibration sample"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP20",
+      "title": "Adaptive Effort Escalation",
+      "objective": "Spend 100, 1,000, or 10,000 rounds where marginal value and risk justify it while preserving exact mode semantics.",
+      "mandatory_controls": [
+        "task risk classification",
+        "escalation policy",
+        "marginal quality tracking",
+        "no early success claim before selected round budget unless terminal completion policy explicitly allows"
+      ],
+      "evidence_required": [
+        "effort selection receipt",
+        "marginal-gain curve",
+        "escalation/de-escalation rationale"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP21",
+      "title": "Project-Local Learning & Skill Consolidation",
+      "objective": "Turn verified lessons from one artifact into reusable project-local skills without silently changing production authority.",
+      "mandatory_controls": [
+        "lesson candidates from failures/wins",
+        "deduplicate against existing skills",
+        "sandbox evaluation",
+        "independent promotion into project skill bank"
+      ],
+      "evidence_required": [
+        "lesson lineage",
+        "skill eval report",
+        "promotion/rollback receipt"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP22",
+      "title": "Artifact Bill of Materials & Lineage",
+      "objective": "Maintain a media/code/content BOM from sources and generation steps through every derived asset and release package.",
+      "mandatory_controls": [
+        "content-addressed identities",
+        "dependency edges",
+        "tool/model transforms",
+        "license/consent/attribution propagation"
+      ],
+      "evidence_required": [
+        "artifact BOM",
+        "lineage closure report",
+        "orphan dependency scan"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP23",
+      "title": "Cross-Platform Reproducibility",
+      "objective": "Keep behavior, assets, builds, saves, input, timing, and presentation within declared tolerances across target platforms.",
+      "mandatory_controls": [
+        "pinned toolchains",
+        "target matrices",
+        "behavioral equivalence tests",
+        "platform-specific exception registry"
+      ],
+      "evidence_required": [
+        "reproducible build evidence",
+        "target matrix",
+        "exception receipts"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP24",
+      "title": "Whole-Game Release Arbitration",
+      "objective": "Require a cross-family evidence bundle proving the integrated game remains coherent and releasable.",
+      "mandatory_controls": [
+        "all critical family gates green",
+        "no unresolved critical continuity/rights/accessibility/security/performance defects",
+        "reproduce build from recorded inputs",
+        "rollback to prior release candidate"
+      ],
+      "evidence_required": [
+        "cross-family release matrix",
+        "reproduction proof",
+        "independent release verdict"
+      ],
+      "status": "planned",
+      "signed": false
+    }
+  ],
+  "family_bindings": {
+    "GB01": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP13",
+      "OP20"
+    ],
+    "GB02": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP10",
+      "OP12"
+    ],
+    "GB03": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP03",
+      "OP19",
+      "OP20"
+    ],
+    "GB04": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP09"
+    ],
+    "GB05": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP07",
+      "OP08"
+    ],
+    "GB06": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP07",
+      "OP08",
+      "OP10"
+    ],
+    "GB07": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP07",
+      "OP08"
+    ],
+    "GB08": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP07",
+      "OP10"
+    ],
+    "GB09": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP08",
+      "OP17"
+    ],
+    "GB10": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP08"
+    ],
+    "GB11": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP08",
+      "OP10",
+      "OP13"
+    ],
+    "GB12": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP09",
+      "OP10"
+    ],
+    "GB13": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP17",
+      "OP18"
+    ],
+    "GB14": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP17",
+      "OP18"
+    ],
+    "GB15": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP09",
+      "OP10"
+    ],
+    "GB16": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP17",
+      "OP18"
+    ],
+    "GB17": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP18"
+    ],
+    "GB18": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP17",
+      "OP18"
+    ],
+    "GB19": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP18",
+      "OP23"
+    ],
+    "GB20": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP18",
+      "OP23"
+    ],
+    "GB21": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP17",
+      "OP18"
+    ],
+    "GB22": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP18"
+    ],
+    "GB23": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP07",
+      "OP17"
+    ],
+    "GB24": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP17",
+      "OP18"
+    ],
+    "GB25": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP08",
+      "OP18"
+    ],
+    "GB26": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP18",
+      "OP23"
+    ],
+    "GB27": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP09",
+      "OP10",
+      "OP23"
+    ],
+    "GB28": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP09",
+      "OP10",
+      "OP12",
+      "OP23"
+    ],
+    "GB29": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP09",
+      "OP12",
+      "OP23"
+    ],
+    "GB30": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP09",
+      "OP10",
+      "OP23"
+    ],
+    "GB31": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP10",
+      "OP17"
+    ],
+    "GB32": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP10",
+      "OP17",
+      "OP23"
+    ],
+    "GB33": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP10",
+      "OP12",
+      "OP23"
+    ],
+    "GB34": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP10",
+      "OP12"
+    ],
+    "GB35": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP07",
+      "OP10",
+      "OP12",
+      "OP23"
+    ],
+    "GB36": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP17",
+      "OP19",
+      "OP23"
+    ],
+    "GB37": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP18",
+      "OP23"
+    ],
+    "GB38": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP23"
+    ],
+    "GB39": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP18",
+      "OP23"
+    ],
+    "GB40": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP23"
+    ],
+    "GB41": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP17",
+      "OP18",
+      "OP19"
+    ],
+    "GB42": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP17",
+      "OP19"
+    ],
+    "GB43": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP18"
+    ],
+    "GB44": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP12",
+      "OP13"
+    ],
+    "GB45": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP12",
+      "OP13",
+      "OP19"
+    ],
+    "GB46": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP03",
+      "OP09",
+      "OP10",
+      "OP12",
+      "OP19"
+    ],
+    "GB47": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP07",
+      "OP08",
+      "OP19"
+    ],
+    "GB48": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP03",
+      "OP17",
+      "OP19"
+    ],
+    "GB49": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP09",
+      "OP23"
+    ],
+    "GB50": [
+      "OP01",
+      "OP02",
+      "OP04",
+      "OP05",
+      "OP06",
+      "OP11",
+      "OP14",
+      "OP15",
+      "OP16",
+      "OP22",
+      "OP24",
+      "OP19",
+      "OP23"
+    ]
+  },
+  "promotion": {
+    "protected_dimensions": [
+      "rights/provenance safety",
+      "long-form consistency",
+      "state integrity",
+      "security/privacy",
+      "accessibility critical paths",
+      "reproducibility"
+    ],
+    "decision_order": [
+      "hard gates",
+      "protected-dimension non-regression",
+      "task-specific acceptance",
+      "quality-vector dominance",
+      "independent verdict"
+    ],
+    "tie_policy": "retain incumbent as champion and preserve challenger branch when materially distinct",
+    "appeal_policy": "retain all evidence and route disputed subjective or legal-risk decisions through OP19 independent calibration/appeal"
+  }
+}
