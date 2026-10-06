@@ -60,6 +60,12 @@ def _positive_int(name: str, value: object) -> int:
     return result
 
 
+def _schema_version(value: object, *, context: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value != SCHEMA_VERSION:
+        raise FeedbackPromotionError(f"unsupported {context} schema")
+    return value
+
+
 def _sha(name: str, value: object) -> str:
     text = _text(name, value, maximum=64).lower()
     if len(text) != 64 or any(ch not in "0123456789abcdef" for ch in text):
@@ -216,8 +222,11 @@ class FeedbackEvent:
             "spec_digest",
             _sha("spec_digest", self.spec_digest),
         )
-        if self.schema_version != SCHEMA_VERSION:
-            raise FeedbackPromotionError("unsupported feedback schema")
+        object.__setattr__(
+            self,
+            "schema_version",
+            _schema_version(self.schema_version, context="feedback"),
+        )
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -357,8 +366,11 @@ class EvaluationReceipt:
             "evaluated_at",
             _non_negative_int("evaluated_at", self.evaluated_at),
         )
-        if self.schema_version != SCHEMA_VERSION:
-            raise FeedbackPromotionError("unsupported evaluation receipt schema")
+        object.__setattr__(
+            self,
+            "schema_version",
+            _schema_version(self.schema_version, context="evaluation receipt"),
+        )
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -411,8 +423,11 @@ class PromotionReceipt:
             object.__setattr__(self, "reason", _text("reason", self.reason))
         elif self.reason != "":
             raise FeedbackPromotionError("non-rollback promotion cannot carry rollback reason")
-        if self.schema_version != SCHEMA_VERSION:
-            raise FeedbackPromotionError("unsupported promotion receipt schema")
+        object.__setattr__(
+            self,
+            "schema_version",
+            _schema_version(self.schema_version, context="promotion receipt"),
+        )
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -463,6 +478,13 @@ class FeedbackPromotionPipeline:
                 "promotion requires positive evaluated improvement"
             )
 
+        if any(not isinstance(event, FeedbackEvent) for event in events):
+            raise TypeError("events must contain FeedbackEvent values")
+        event_ids = [event.event_id for event in events]
+        if len(event_ids) != len(set(event_ids)):
+            raise FeedbackPromotionError(
+                "promotion input contains duplicate feedback event ids"
+            )
         by_id = {event.event_id: event for event in events}
         selected: list[FeedbackEvent] = []
         for event_id in receipt.event_ids:
@@ -516,12 +538,6 @@ class FeedbackPromotionPipeline:
                 "evaluation does not meet minimum unique-subject variant sample count"
             )
 
-        promotion_time = _non_negative_int("promoted_at", promoted_at)
-        if promotion_time < receipt.evaluated_at:
-            raise FeedbackPromotionError(
-                "promotion timestamp cannot precede evaluation"
-            )
-
         current = self.active_version(spec)
         if current not in {spec.baseline_version, spec.candidate_version}:
             raise FeedbackPromotionError("active version is outside experiment")
@@ -531,6 +547,12 @@ class FeedbackPromotionPipeline:
                 return history[-1]
             raise FeedbackPromotionError(
                 "candidate is already active under different evaluation"
+            )
+
+        promotion_time = _non_negative_int("promoted_at", promoted_at)
+        if promotion_time < receipt.evaluated_at:
+            raise FeedbackPromotionError(
+                "promotion timestamp cannot precede evaluation"
             )
         if history and history[-1].rollback:
             rollback_receipt = history[-1]
