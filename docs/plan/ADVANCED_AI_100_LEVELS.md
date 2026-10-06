@@ -74,7 +74,7 @@ signed_levels        = []
 
 Make every higher cognitive function typed, attributable, replayable, budgeted, permission-bound, and fail-closed.
 
-**Dominant canonical planes:** `foundation`, `identity`, `data-persistence`, `governance`, `security-safety`, `observability`  
+**Dominant canonical planes:** `foundation`, `identity`, `data-persistence`, `governance`, `security-safety`, `observability`, `configuration-secrets`, `engine-api`, `application-api`  
 **Authority rule:** Deterministic contracts and canonical state outrank model inference; no learned component may redefine identity, authority, provenance, or durability.  
 **Failure policy:** Reject, quarantine, or degrade before allowing ambiguous identity, state, permission, provenance, or budget semantics.  
 **Closure gate:** `L010`
@@ -96,7 +96,7 @@ Make every higher cognitive function typed, attributable, replayable, budgeted, 
 
 Convert multimodal, heterogeneous, partially untrusted inputs into a bounded trust-aware context representation.
 
-**Dominant canonical planes:** `prompt-context`, `retrieval`, `artifact-files`, `model-provider`, `security-safety`  
+**Dominant canonical planes:** `prompt-context`, `retrieval`, `artifact-files`, `model-provider`, `security-safety`, `product-experience`, `streaming-realtime`  
 **Authority rule:** Input interpretation may classify and transform evidence but cannot promote evidence into policy or canonical authority.  
 **Failure policy:** Drop, quarantine, externalize, or mark insufficient context rather than silently trusting malformed, oversized, or low-integrity input.  
 **Closure gate:** `L020`
