@@ -6,10 +6,11 @@
   "masterplan_binding": {
     "volume_ref": "VOL-003",
     "title": "Canonical Contract System",
-    "required_gap_texts": [
+    "retired_implementation_gaps": [
       "materialize shared conformance vectors",
       "complete producer/consumer inventory for every canonical contract"
-    ]
+    ],
+    "qualification_gap": "independent exact-head VOL-003 Contract Conformance Closure qualification remains pending"
   },
   "sources": {
     "schema_catalog": "machine/ai_runtime_schemas.json",
