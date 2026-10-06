@@ -1,0 +1,140 @@
+name: Advanced AI Structure 100
+
+on:
+  pull_request:
+    branches:
+      - main
+      - feat/enterprise-system-architecture-20261006
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/advanced_ai_structure_100.json"
+      - "docs/plan/ADVANCED_AI_100_LEVELS.md"
+      - "machine/ai_app_construction.json"
+      - "machine/enterprise_system_architecture.json"
+      - "docs/AI_APP_CONSTRUCTION_MANUAL.md"
+      - "docs/plan/AI_CHAT_MASTERPLAN_2026-10-06.md"
+      - "docs/ARCHITECTURE_MAP.md"
+      - "scripts/check_advanced_ai_structure.py"
+      - "scripts/verify_advanced_ai_structure.py"
+      - "tests/test_advanced_ai_structure.py"
+      - ".github/workflows/advanced-ai-structure.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: advanced-ai-structure-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  advanced-ai-structure:
+    name: 100-level AI exact-head closure
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      PYTHONPATH: ".:backend"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install validation runtime
+        run: python -m pip install --disable-pip-version-check -e ".[dev]"
+
+      - name: Validate 100-level AI structure
+        run: python scripts/check_advanced_ai_structure.py
+
+      - name: Validate lower architecture layers
+        run: |
+          python scripts/check_enterprise_system_architecture.py
+          python scripts/check_architecture_map.py
+          python scripts/check_ai_app_construction.py
+          python scripts/check_capability_interfaces.py
+
+      - name: Run adversarial ladder tests
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_advanced_ai_structure.py
+
+      - name: Compile validators
+        run: >-
+          python -m compileall -q
+          scripts/check_advanced_ai_structure.py
+          scripts/verify_advanced_ai_structure.py
+
+      - name: Emit exact-head structural receipt
+        env:
+          ADVANCED_AI_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/check_advanced_ai_structure.py
+          --head-sha "$ADVANCED_AI_HEAD_SHA"
+          --evidence-out .advanced-ai-structure.json
+          --print-evidence
+
+      - name: Independently rehash structural receipt
+        env:
+          ADVANCED_AI_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_advanced_ai_structure.py
+          .advanced-ai-structure.json
+          --head-sha "$ADVANCED_AI_HEAD_SHA"
+          --evidence-out .advanced-ai-structure-independent.json
+          --print-evidence
+
+      - name: Assert 100-level exact-head closure
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          structural = json.loads(
+              Path(".advanced-ai-structure.json").read_text(encoding="utf-8")
+          )
+          independent = json.loads(
+              Path(".advanced-ai-structure-independent.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+
+          if structural.get("head_sha") != expected:
+              raise SystemExit("100-level structural receipt is not exact-head")
+          if structural.get("valid") is not True or structural.get("errors"):
+              raise SystemExit("100-level structural validation failed")
+          if structural.get("level_count") != 100:
+              raise SystemExit("100-level receipt does not contain 100 levels")
+          if structural.get("stratum_count") != 10:
+              raise SystemExit("100-level receipt does not contain 10 strata")
+          if structural.get("plan_complete") is not True:
+              raise SystemExit("100-level plan is not complete")
+          if structural.get("implementation_claim") is not False:
+              raise SystemExit("planning gate fabricated implementation")
+          if len(structural.get("file_digests") or {}) != 8:
+              raise SystemExit("100-level digest coverage is incomplete")
+
+          if independent.get("expected_head") != expected:
+              raise SystemExit("100-level independent receipt is not exact-head")
+          if independent.get("valid") is not True or independent.get("errors"):
+              raise SystemExit("100-level independent verification failed")
+          if independent.get("level_count") != 100:
+              raise SystemExit("independent verifier did not preserve 100 levels")
+          if (
+              independent.get("structural_evidence_digest")
+              != independent.get("recomputed_structural_evidence_digest")
+          ):
+              raise SystemExit("100-level evidence was not independently rehashed")
+          print("Advanced AI 100-level structure exact-head verified:", expected)
+          PY
