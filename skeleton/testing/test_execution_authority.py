@@ -1135,3 +1135,25 @@ def test_checkpoint_digest_is_stable_for_identical_state() -> None:
     assert left == right
     assert left.digest == right.digest
     assert left.canonical_payload() == right.canonical_payload()
+
+
+
+def test_evidence_seal_cannot_predate_revocation() -> None:
+    guard = ExecutionAuthorityGuard()
+    authority = _authority()
+    _admit(guard, authority)
+    guard.revoke(
+        authority,
+        revoked_by="supervisor",
+        reason_code="operator.cancelled",
+        now=NOW + timedelta(seconds=10),
+    )
+
+    with pytest.raises(
+        ExecutionAuthorityError,
+        match="evidence seal time predates revocation",
+    ):
+        guard.seal_evidence(
+            authority,
+            now=NOW + timedelta(seconds=9),
+        )
