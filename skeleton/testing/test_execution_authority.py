@@ -282,6 +282,7 @@ def _child_authority(
     budget: ResourceBudget | None = None,
     actor_id: str = "agent.worker",
     expires_at: datetime | None = None,
+    policy_digest: str | None = None,
 ) -> ExecutionAuthority:
     return ExecutionAuthority(
         authority_id="authority-child-001",
@@ -293,7 +294,7 @@ def _child_authority(
         expires_at=expires_at or (NOW + timedelta(minutes=20)),
         capabilities=capabilities,
         budget=budget or _budget(tool_calls=1, parallelism=1),
-        policy_digest=parent.policy_digest,
+        policy_digest=policy_digest or parent.policy_digest,
         nonce="nonce-child-001",
         parent_authority_digest=parent.digest,
     )
@@ -871,3 +872,28 @@ def test_authority_evidence_binding_rejects_cross_execution_mixup() -> None:
         match="execution_id does not match",
     ):
         bind_authority_evidence(foreign, evidence)
+
+
+
+def test_delegated_authority_cannot_change_policy_digest() -> None:
+    guard = ExecutionAuthorityGuard()
+    parent = _authority()
+    _admit(guard, parent)
+    child = _child_authority(
+        parent,
+        policy_digest=authority_policy_digest(
+            {"mode": "different-policy", "default": "allow"}
+        ),
+    )
+
+    with pytest.raises(
+        ExecutionAuthorityError,
+        match="cannot change policy without refinement evidence",
+    ):
+        guard.admit(
+            authority=child,
+            request=_request(),
+            receipt_id="receipt-child-policy-drift",
+            replay_key="admission-child-policy-drift",
+            now=NOW + timedelta(seconds=2),
+        )
