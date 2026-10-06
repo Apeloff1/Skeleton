@@ -610,8 +610,56 @@ verification.
 
 ### Volume 9 — verification plane
 
-Add acceptance profiles, deterministic validators, optional independent model
-critics, and quarantine semantics.
+Status: **implemented candidate; finalization cutover and exact-head qualification pending**.
+
+Implemented:
+
+- the existing deterministic verifier remains the canonical structural,
+  evidence, independence, and postcondition evaluator;
+- canonical risk, model-origin, tool-result, action-effect, and externally
+  observable-action policy is treated as a minimum verification floor that a
+  caller acceptance profile cannot weaken;
+- canonical `VerificationCheck` objects now expose stable dictionary and
+  SHA-256 digest identities for downstream proof binding;
+- risk-scaled acceptance profiles bound receipt/check freshness, minimum
+  verification level, and critic-separation requirements;
+- verification receipts must match the exact claim id, claim digest, and
+  tenant before they can be accepted;
+- future receipts and materially inconsistent passed receipts can quarantine
+  rather than merely downgrade confidence;
+- a passed receipt carrying authoritative contradiction is treated as
+  verification corruption and quarantined;
+- independent verification now requires a digest-bound identity proof linking
+  the exact receipt and canonical independent-check digest;
+- verifier identity records bind actor, authority domain, process, provider,
+  and model identity;
+- independent critics can be required to differ from generation in actor,
+  authority domain, process, and, for critical claims, provider;
+- independent checks cannot postdate the aggregate receipt and can be bounded
+  by an explicit freshness window;
+- irreversible and externally observable actions continue to escalate to
+  postcondition-level verification regardless of weaker caller profiles;
+- provider-backed semantic verification remains provider-neutral,
+  schema-constrained, tool-free, and bounded by rounds, repair count, and
+  output-token limits;
+- semantic-verifier outage blocks high-impact claims and abstains lower-impact
+  claims;
+- semantic repair lineage is preserved and repaired claims cannot publish
+  before evidence/citation rebinding;
+- acceptance/quarantine decisions are deterministic, digest-bound, and have no
+  provider, tool, publication, or transcript-commit authority;
+- adversarial regressions cover policy downgrade attempts, stale/future
+  receipts, receipt/proof replay, critic identity collisions, stale or
+  postdated independent checks, critical same-provider critics,
+  contradictions, and postcondition escalation;
+- structural and independent exact-head closure evidence covers the new
+  acceptance plane plus the existing deterministic and semantic verification
+  runtimes.
+
+Remaining cutover: consume the Volume-9 acceptance decision at the canonical
+engine/product finalization boundary and map `QUARANTINE`, `BLOCK`, and
+`ABSTAIN` to durable turn states without allowing a rejected result to reach
+authoritative assistant-message commit.
 
 ### Volume 10 — bounded multi-agent runtime
 
