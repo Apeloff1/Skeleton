@@ -1,6 +1,6 @@
 {
   "schema_version": "skeleton.ai_game_builder_500_levels.v1",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "status": "active_design_authority",
   "purpose": "500 task- and capability-specific engineering levels for a dual-AI adversarial game builder.",
   "topology": {
@@ -597,5 +597,36 @@
     "No level may self-sign or count prose as completion evidence."
   ],
   "completion_rule": "A GBL level completes only with exact-head implementation plus its declared deterministic/adversarial/recovery/rights evidence; plan prose, rival confidence, round count or elapsed time alone never completes or signs a level.",
-  "promotion_rule": "Stage-10 promotion requires independent evidence, all hard gates green, and exact binding to artifact/canon/source/model/tool/evaluator/effort identities."
+  "promotion_rule": "Stage-10 promotion requires independent evidence, all hard gates green, and exact binding to artifact/canon/source/model/tool/evaluator/effort identities.",
+  "overengineering_authority": "machine/ai_game_builder_overengineering.json",
+  "runtime_contracts": {
+    "package": "skeleton/ai/game_builder",
+    "contracts": "skeleton/ai/game_builder/contracts.py",
+    "dual_rival_state_machine": "skeleton/ai/game_builder/dual_rival_forge.py",
+    "evaluation_panel": "skeleton/ai/game_builder/evaluation.py",
+    "resource_governor": "skeleton/ai/game_builder/resource_governor.py",
+    "quality_debt": "skeleton/ai/game_builder/quality_debt.py",
+    "integrated_control_plane": "skeleton/ai/game_builder/control_plane.py",
+    "tests": [
+      "tests/test_ai_game_builder_runtime.py",
+      "tests/test_ai_game_builder_overengineering_runtime.py",
+      "tests/test_ai_game_builder_frontier_runtime.py",
+      "tests/test_ai_game_builder_deep_assurance.py"
+    ],
+    "resilience": "skeleton/ai/game_builder/resilience.py",
+    "gold_master": "skeleton/ai/game_builder/release.py",
+    "frontier_assurance": "skeleton/ai/game_builder/frontier_assurance.py",
+    "deep_assurance": "skeleton/ai/game_builder/deep_assurance.py"
+  },
+  "overengineering_rule": "Every family inherits all 38 critical cross-cutting planes and at least 38 total planes; current bindings carry 40+ planes. Plane evidence is additive to GBL evidence and may only tighten, never weaken, family or level hard gates.",
+  "overengineering_human_spec": "docs/architecture/AI_GAME_BUILDER_OVERENGINEERING.md",
+  "governance_runtime": {
+    "canon": "skeleton/ai/game_builder/canon.py",
+    "rights": "skeleton/ai/game_builder/rights.py",
+    "atom_lineage": "skeleton/ai/game_builder/atomizer.py",
+    "tests": "tests/test_ai_game_builder_governance.py"
+  },
+  "overengineering_schema_version": "skeleton.ai_game_builder_overengineering.v4",
+  "overengineering_plane_count": 80,
+  "overengineering_critical_plane_count": 38
 }
