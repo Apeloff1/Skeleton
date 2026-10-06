@@ -3544,6 +3544,7 @@ python -m pytest -q tests/test_enterprise_ai_superiority.py
 
 The repository-wide workflow
 `.github/workflows/enterprise-ai-superiority.yml` validates the authority at
-the exact PR head. A complete enterprise-AI claim is prohibited until every
-production-path volume satisfies the common contract and every dedicated
-critical profile reaches its required evidence-backed grade.
+the exact PR head. A complete enterprise-AI claim is prohibited until every `VOL-000` through
+`VOL-420` is enterprise-qualified, every dedicated critical profile is
+evidence-backed `superior`, and the cross-plane enterprise golden journeys
+pass on the exact head.
