@@ -690,7 +690,13 @@ class MultimodalHit:
             object.__setattr__(self, name, _require_digest(getattr(self, name), field_name=name))
         for name in ("modality", "tenant_id", "classification", "trust_label"):
             object.__setattr__(self, name, _require_nonempty(getattr(self, name), field_name=name))
-        object.__setattr__(self, "score", _require_number(self.score, field_name="score"))
+        if (
+            isinstance(self.score, bool)
+            or not isinstance(self.score, (int, float))
+            or not math.isfinite(float(self.score))
+        ):
+            raise ValueError("score must be finite")
+        object.__setattr__(self, "score", float(self.score))
         object.__setattr__(
             self,
             "indexed_epoch",
