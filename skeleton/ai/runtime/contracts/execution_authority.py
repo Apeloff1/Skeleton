@@ -516,6 +516,18 @@ class AuthorityEvidenceBundle:
     def digest(self) -> str:
         return hashlib.sha256(canonical_json_bytes(self.canonical_payload())).hexdigest()
 
+    @property
+    def evidence_ref(self) -> str:
+        return f"execution-authority-evidence:{self.digest}"
+
+    def as_execution_evidence(self) -> dict[str, Any]:
+        return {
+            "kind": "execution_authority_evidence",
+            "ref": self.evidence_ref,
+            "digest": self.digest,
+            "payload": self.canonical_payload(),
+        }
+
 
 def verify_authority_receipt_chain(
     authority: ExecutionAuthority,
@@ -539,6 +551,10 @@ def verify_authority_receipt_chain(
             )
         if receipt.authority_digest != authority.digest:
             raise ExecutionAuthorityError("receipt authority digest mismatch")
+        if not authority.active(now=receipt.authorized_at):
+            raise ExecutionAuthorityError(
+                "receipt authorization time is outside authority validity"
+            )
         for name in ("operation_id", "execution_id", "actor_id"):
             if getattr(receipt, name) != getattr(authority, name):
                 raise ExecutionAuthorityError(f"receipt {name} mismatch")
