@@ -199,6 +199,27 @@ class RightsLedger:
             raise RightsError("similarity finding identity cannot be rebound")
         self._findings[finding.finding_id] = finding
 
+    def resolve_similarity(self, finding_id: str, *, resolution: str) -> SimilarityFinding:
+        existing = self._findings.get(finding_id)
+        if existing is None:
+            raise RightsError(f"unknown similarity finding: {finding_id}")
+        if existing.resolved:
+            return existing
+        if not resolution.strip():
+            raise ValueError("similarity resolution must be non-empty")
+        resolved = SimilarityFinding(
+            finding_id=existing.finding_id,
+            artifact_digest=existing.artifact_digest,
+            source_id=existing.source_id,
+            modality=existing.modality,
+            risk=existing.risk,
+            evidence_digest=existing.evidence_digest,
+            resolved=True,
+            resolution=resolution,
+        )
+        self._findings[finding_id] = resolved
+        return resolved
+
     def unresolved_high_risk(
         self, *, artifact_digest: str | None = None
     ) -> tuple[SimilarityFinding, ...]:
