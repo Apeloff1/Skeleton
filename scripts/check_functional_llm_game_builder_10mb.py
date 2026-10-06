@@ -114,8 +114,72 @@ def main() -> int:
             if token.lower() not in text.lower():
                 fail(f"{shard_id} missing {token} semantics")
 
-    if total < 10_000_000:
-        fail(f"aggregate specification bytes below 10MB: {total}")
+        deep = data.get("deep_closure", {})
+        required_deep = int(deep.get("required_atoms_per_plane", 0))
+        if required_deep != 1296:
+            fail("deep-closure per-plane atom contract drift")
+        if shard.get("deep_closure_required") is not True:
+            fail(f"{shard_id} deep closure not required")
+        if int(shard.get("deep_closure_atoms", 0)) != required_deep:
+            fail(f"{shard_id} deep-closure manifest count drift")
+        if "## Deep Functional Closure Expansion — Pass 2" not in text:
+            fail(f"{shard_id} missing deep-closure pass marker")
+
+        plane_suffix = shard_id.split("-")[-1]
+        deep_matches = re.findall(
+            rf"^### FLGBX-{re.escape(plane_suffix)}-(\d{{5}}) — (.*?) / (.*?) / (.*?) / (.*?)$",
+            text,
+            re.MULTILINE,
+        )
+        if len(deep_matches) != required_deep:
+            fail(f"{shard_id} deep-closure atom count mismatch: {len(deep_matches)}")
+        deep_ids = [ordinal for ordinal, _, _, _, _ in deep_matches]
+        expected_deep_ids = [f"{i:05d}" for i in range(1, required_deep + 1)]
+        if deep_ids != expected_deep_ids:
+            fail(f"{shard_id} deep-closure ordinals are incomplete or out of order")
+
+        deep_subsystems = {sub.strip() for _, sub, _, _, _ in deep_matches}
+        deep_lifecycle = {phase.strip() for _, _, phase, _, _ in deep_matches}
+        deep_stress = {stress.strip() for _, _, _, stress, _ in deep_matches}
+        deep_proofs = {proof.strip() for _, _, _, _, proof in deep_matches}
+        expected_stress = set(deep.get("stress_profiles", []))
+        if deep_subsystems != set(required_subsystems):
+            fail(f"{shard_id} deep-closure subsystem coverage mismatch")
+        if deep_lifecycle != set(lifecycle):
+            fail(f"{shard_id} deep-closure lifecycle coverage mismatch")
+        if deep_stress != expected_stress:
+            fail(f"{shard_id} deep-closure stress coverage mismatch")
+        if deep_proofs != set(proof_labels):
+            fail(f"{shard_id} deep-closure proof coverage mismatch")
+
+        deep_cartesian = {
+            (sub.strip(), phase.strip(), stress.strip())
+            for _, sub, phase, stress, _ in deep_matches
+        }
+        expected_deep_cartesian = {
+            (sub, phase, stress)
+            for sub in required_subsystems
+            for phase in lifecycle
+            for stress in expected_stress
+        }
+        if deep_cartesian != expected_deep_cartesian:
+            fail(f"{shard_id} deep-closure cartesian matrix incomplete")
+
+    deep = data.get("deep_closure", {})
+    if deep.get("pass_id") != "FLGB-DEEP-CLOSURE-PASS-2":
+        fail("missing deep-closure pass identity")
+    if int(deep.get("required_atoms_total", 0)) != 23328:
+        fail("deep-closure total atom contract drift")
+    if deep.get("exact_cartesian_product_required") is not True:
+        fail("deep-closure exact cartesian requirement disabled")
+    if deep.get("runtime_signoff_forbidden_from_specification_alone") is not True:
+        fail("deep-closure runtime signoff protection disabled")
+
+    requested_minimum = int(data.get("bytes", {}).get("requested_minimum", 0))
+    if requested_minimum < 20_000_000:
+        fail(f"doubled atlas minimum regressed: {requested_minimum}")
+    if total < requested_minimum:
+        fail(f"aggregate specification bytes below doubled minimum: {total}")
     if total != int(data["bytes"]["shard_total"]):
         fail("aggregate byte total stale")
     if data["completion"].get("runtime_completion_claim") is not False:
@@ -145,7 +209,7 @@ def main() -> int:
 
     print(
         f"FLGB masterplan valid: {len(shards)} shards, {total} bytes, "
-        "18x12 subsystem/lifecycle coverage matrices present, "
+        "18x12 subsystem/lifecycle coverage matrices plus 23,328 deep-closure atoms present, "
         "runtime completion remains unsigned"
     )
     return 0
