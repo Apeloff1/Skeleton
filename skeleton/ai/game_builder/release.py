@@ -14,6 +14,7 @@ class ReleaseArbitrationError(RuntimeError):
 @dataclass(frozen=True, slots=True)
 class FamilyQualification:
     family_id: str
+    artifact_digest: str
     passed: bool
     evidence_digest: str
     evaluator_provenance: EvaluatorProvenance
@@ -21,6 +22,8 @@ class FamilyQualification:
     def __post_init__(self) -> None:
         if self.family_id not in {f"GB{i:02d}" for i in range(1, 51)}:
             raise ValueError("family_id must be GB01..GB50")
+        if not isinstance(self.artifact_digest, str) or len(self.artifact_digest) < 16:
+            raise ValueError("family qualification artifact_digest must be stable")
         if not isinstance(self.passed, bool):
             raise TypeError("family qualification passed state must be boolean")
         if not isinstance(self.evaluator_provenance, EvaluatorProvenance):
@@ -36,6 +39,7 @@ class FamilyQualification:
     def evidence_binding_digest(self) -> str:
         return canonical_digest(
             {
+                "artifact_digest": self.artifact_digest,
                 "evaluator_provenance_digest": self.evaluator_provenance.digest,
                 "evidence_digest": self.evidence_digest,
                 "family_id": self.family_id,
@@ -47,6 +51,7 @@ class FamilyQualification:
 @dataclass(frozen=True, slots=True)
 class CriticalGateQualification:
     gate_id: str
+    artifact_digest: str
     passed: bool
     evidence_digest: str
     evaluator_provenance: EvaluatorProvenance
@@ -54,6 +59,8 @@ class CriticalGateQualification:
     def __post_init__(self) -> None:
         if not isinstance(self.gate_id, str) or not self.gate_id.strip():
             raise ValueError("critical gate id must be non-empty")
+        if not isinstance(self.artifact_digest, str) or len(self.artifact_digest) < 16:
+            raise ValueError("critical gate artifact_digest must be stable")
         if not isinstance(self.passed, bool):
             raise TypeError("critical gate passed state must be boolean")
         if not isinstance(self.evaluator_provenance, EvaluatorProvenance):
@@ -69,6 +76,7 @@ class CriticalGateQualification:
     def evidence_binding_digest(self) -> str:
         return canonical_digest(
             {
+                "artifact_digest": self.artifact_digest,
                 "evaluator_provenance_digest": self.evaluator_provenance.digest,
                 "evidence_digest": self.evidence_digest,
                 "gate_id": self.gate_id,
@@ -383,6 +391,11 @@ class GoldMasterBundle:
         if [row.family_id for row in self.family_qualifications] != expected_families:
             raise ValueError("gold-master bundle requires exactly GB01..GB50")
         if any(
+            row.artifact_digest != self.artifact_digest
+            for row in self.family_qualifications
+        ):
+            raise ValueError("gold-master family qualification targets another artifact")
+        if any(
             not isinstance(row, CriticalGateQualification)
             for row in self.critical_gate_qualifications
         ):
@@ -391,6 +404,11 @@ class GoldMasterBundle:
             )
         if not self.critical_gate_qualifications:
             raise ValueError("gold-master bundle requires critical gates")
+        if any(
+            row.artifact_digest != self.artifact_digest
+            for row in self.critical_gate_qualifications
+        ):
+            raise ValueError("gold-master critical gate qualification targets another artifact")
         gate_ids = [row.gate_id for row in self.critical_gate_qualifications]
         if gate_ids != sorted(gate_ids):
             raise ValueError("gold-master critical gates must use canonical order")
@@ -429,6 +447,8 @@ class GoldMasterBundle:
         families = tuple(sorted(family_qualifications, key=lambda row: row.family_id))
         if [row.family_id for row in families] != [f"GB{i:02d}" for i in range(1, 51)]:
             raise ValueError("gold-master bundle requires exactly GB01..GB50")
+        if any(row.artifact_digest != artifact_digest for row in families):
+            raise ValueError("gold-master family qualification targets another artifact")
 
         gates: list[CriticalGateQualification] = []
         for gate_id in sorted(critical_gate_results):
@@ -446,6 +466,7 @@ class GoldMasterBundle:
             gates.append(
                 CriticalGateQualification(
                     gate_id=str(gate_id),
+                    artifact_digest=artifact_digest,
                     passed=raw[0],
                     evidence_digest=raw[1],
                     evaluator_provenance=raw[2],
@@ -482,6 +503,7 @@ class GoldMasterBundle:
                 "canon_digest": self.canon_digest,
                 "critical_gate_qualifications": [
                     {
+                        "artifact_digest": row.artifact_digest,
                         "evidence_digest": row.evidence_digest,
                         "evidence_binding_digest": row.evidence_binding_digest,
                         "evaluator_provenance_digest": row.evaluator_provenance.digest,
