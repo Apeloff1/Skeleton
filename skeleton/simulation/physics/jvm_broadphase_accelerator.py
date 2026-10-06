@@ -798,6 +798,6 @@ def get_default_broadphase_accelerator() -> JvmBroadPhaseAccelerator:
 
 def close_default_broadphase_accelerator() -> None:
     """Retire only the physics helper from the canonical JVM registry."""
-    from skeleton.native.jvm_registry import get_default_jvm_registry
+    from skeleton.native.jvm_registry import close_default_jvm_accelerator
 
-    get_default_jvm_registry().close("physics")
+    close_default_jvm_accelerator("physics")
