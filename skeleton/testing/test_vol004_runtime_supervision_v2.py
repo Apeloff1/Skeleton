@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from types import SimpleNamespace
 import urllib.error
@@ -15,6 +16,7 @@ from skeleton.automation.free_model import FreeModelClient
 from skeleton.automation.shift_supervisor import model_gateway
 from skeleton.automation.shift_supervisor.model_gateway import ModelGateway
 from skeleton.kernel.runtime_supervision import (
+    RuntimeAdmissionMiddleware,
     RuntimeServiceLifecycle,
     RuntimeSupervisionError,
     ServicePhase,
@@ -95,6 +97,145 @@ def test_lifecycle_rejects_impossible_or_reopening_transitions() -> None:
         lifecycle.begin_drain()
     with pytest.raises(RuntimeSupervisionError):
         lifecycle.mark_ready()
+
+
+def test_work_leases_are_generation_bound_and_stop_requires_quiescence() -> None:
+    lifecycle = RuntimeServiceLifecycle("skeleton")
+    lifecycle.mark_ready()
+    first = lifecycle.acquire_work("work:b")
+    second = lifecycle.acquire_work("work:a")
+
+    assert lifecycle.active_work() == (second, first)
+    assert lifecycle.snapshot()["active_work_ids"] == ["work:a", "work:b"]
+    assert lifecycle.inflight_work == 2
+
+    with pytest.raises(RuntimeSupervisionError, match="already leased"):
+        lifecycle.acquire_work("work:a")
+
+    lifecycle.begin_drain(reason="upgrade")
+    with pytest.raises(RuntimeSupervisionError, match="in-flight work leases"):
+        lifecycle.mark_stopped()
+
+    assert lifecycle.release_work(second) is True
+    assert lifecycle.release_work(second) is False
+    assert lifecycle.release_work(first) is True
+    lifecycle.mark_stopped()
+    restarted = lifecycle.restart()
+    assert restarted.generation == 2
+
+
+def _run_asgi(middleware, *, path: str):
+    messages: list[dict[str, object]] = []
+
+    async def receive():
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def send(message):
+        messages.append(dict(message))
+
+    async def run():
+        await middleware(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": path,
+                "headers": [],
+            },
+            receive,
+            send,
+        )
+
+    asyncio.run(run())
+    return messages
+
+
+def test_runtime_admission_middleware_admits_ready_and_releases_lease() -> None:
+    lifecycle = RuntimeServiceLifecycle("backend")
+    lifecycle.mark_ready()
+    calls: list[str] = []
+
+    async def app(_scope, _receive, send):
+        calls.append("called")
+        assert lifecycle.inflight_work == 1
+        await send({"type": "http.response.start", "status": 204, "headers": []})
+        await send({"type": "http.response.body", "body": b"", "more_body": False})
+
+    middleware = RuntimeAdmissionMiddleware(
+        app,
+        lifecycle=lifecycle,
+        exempt_prefixes=("/api/health",),
+    )
+    messages = _run_asgi(middleware, path="/api/projects")
+
+    assert calls == ["called"]
+    assert messages[0]["status"] == 204
+    assert lifecycle.inflight_work == 0
+
+
+def test_runtime_admission_middleware_rejects_starting_and_drain() -> None:
+    lifecycle = RuntimeServiceLifecycle("backend")
+    calls: list[str] = []
+
+    async def app(_scope, _receive, _send):
+        calls.append("called")
+
+    middleware = RuntimeAdmissionMiddleware(
+        app,
+        lifecycle=lifecycle,
+        exempt_prefixes=("/api/health",),
+    )
+
+    for path in ("/api/projects", "/api/healthcheck"):
+        messages = _run_asgi(middleware, path=path)
+        assert messages[0]["status"] == 503
+        headers = dict(messages[0]["headers"])
+        assert headers[b"retry-after"] == b"1"
+    assert calls == []
+
+    lifecycle.mark_ready()
+    lifecycle.begin_drain(reason="shutdown")
+    messages = _run_asgi(middleware, path="/api/projects")
+    assert messages[0]["status"] == 503
+    assert calls == []
+
+
+def test_runtime_admission_health_exemption_is_segment_safe() -> None:
+    lifecycle = RuntimeServiceLifecycle("backend")
+    calls: list[str] = []
+
+    async def app(scope, _receive, send):
+        calls.append(scope["path"])
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"ok", "more_body": False})
+
+    middleware = RuntimeAdmissionMiddleware(
+        app,
+        lifecycle=lifecycle,
+        exempt_prefixes=("/api/health",),
+    )
+
+    for path in ("/api/health", "/api/health/live", "/api/health/ready"):
+        messages = _run_asgi(middleware, path=path)
+        assert messages[0]["status"] == 200
+    assert calls == ["/api/health", "/api/health/live", "/api/health/ready"]
+
+    messages = _run_asgi(middleware, path="/api/healthz")
+    assert messages[0]["status"] == 503
+
+
+def test_runtime_admission_releases_lease_when_handler_raises() -> None:
+    lifecycle = RuntimeServiceLifecycle("skeleton")
+    lifecycle.mark_ready()
+
+    async def app(_scope, _receive, _send):
+        assert lifecycle.inflight_work == 1
+        raise RuntimeError("handler failed")
+
+    middleware = RuntimeAdmissionMiddleware(app, lifecycle=lifecycle)
+
+    with pytest.raises(RuntimeError, match="handler failed"):
+        _run_asgi(middleware, path="/api/v1/engine/executions")
+    assert lifecycle.inflight_work == 0
 
 
 def _provider_receipt():
