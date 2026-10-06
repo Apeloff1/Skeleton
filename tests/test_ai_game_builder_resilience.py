@@ -152,6 +152,34 @@ def test_impact_calibration_receipt_binds_observed_evidence() -> None:
         )
 
 
+def test_impact_calibration_receipt_rejects_self_consistent_false_scores() -> None:
+    evidence = "impact-evidence-" + "e" * 32
+    authority = _authority("impact-calibrator", evidence)
+    payload = {
+        "evaluator_provenance_digest": authority.digest,
+        "evidence_digest": evidence,
+        "observed_ids": ["project", "quest"],
+        "precision": 1.0,
+        "predicted_ids": ["project", "scene"],
+        "recall": 1.0,
+    }
+    with pytest.raises(
+        ResilienceError,
+        match="precision does not match recorded sets",
+    ):
+        from skeleton.ai.game_builder.resilience import ImpactCalibrationReceipt
+
+        ImpactCalibrationReceipt(
+            predicted_ids=("project", "scene"),
+            observed_ids=("project", "quest"),
+            precision=1.0,
+            recall=1.0,
+            evaluator_provenance=authority,
+            evidence_digest=evidence,
+            receipt_digest=canonical_digest(payload),
+        )
+
+
 def test_impact_graph_computes_transitive_blast_radius_and_rejects_unknown_dependency() -> None:
     graph = ImpactGraph()
     graph.add_node("project")
