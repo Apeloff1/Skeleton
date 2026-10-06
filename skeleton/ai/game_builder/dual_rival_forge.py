@@ -16,6 +16,7 @@ from .contracts import (
     EffortMode,
     GateResult,
     PromotionReceipt,
+    ProducerProvenance,
     Rival,
     Stage,
     canonical_digest,
@@ -43,10 +44,31 @@ def _candidate_from_payload(payload: Mapping[str, object]) -> Candidate:
     )
     evidence = payload.get("evidence_digests", ())
     parents = payload.get("parent_candidate_digests", ())
-    if not isinstance(evidence, list) or not isinstance(parents, list):
-        raise ForgeStateError("candidate lineage/evidence payload malformed")
+    provenance_payload = payload.get("producer_provenance")
+    if (
+        not isinstance(evidence, list)
+        or not isinstance(parents, list)
+        or not isinstance(provenance_payload, Mapping)
+    ):
+        raise ForgeStateError("candidate lineage/evidence/provenance payload malformed")
+    provider_refs = provenance_payload.get("provider_receipt_refs", ())
+    if not isinstance(provider_refs, list):
+        raise ForgeStateError("candidate provider receipt refs malformed")
+    provenance = ProducerProvenance(
+        project_id=provenance_payload.get("project_id"),
+        run_id=provenance_payload.get("run_id"),
+        operation_id=provenance_payload.get("operation_id"),
+        execution_id=provenance_payload.get("execution_id"),
+        execution_identity_digest=provenance_payload.get("execution_identity_digest"),
+        finalization_intent_digest=provenance_payload.get("finalization_intent_digest"),
+        model_identity_digest=provenance_payload.get("model_identity_digest"),
+        producer_behavior_digest=provenance_payload.get("producer_behavior_digest"),
+        source_revision=provenance_payload.get("source_revision"),
+        provider_receipt_refs=tuple(provider_refs),
+    )
     return Candidate.create(
         producer_id=str(payload["producer_id"]),
+        producer_provenance=provenance,
         artifact=artifact,
         quality={str(k): float(v) for k, v in quality.items()},
         evidence_digests=[str(x) for x in evidence],
@@ -130,6 +152,8 @@ class DualRivalForge:
         self.pending_construct = pending_construct
         self.pending_challenge = pending_challenge
         self.receipts = list(receipts)
+        self._project_id = champion.producer_provenance.project_id
+        self._run_id = champion.producer_provenance.run_id
         self._validate_state()
 
     @property
@@ -149,6 +173,13 @@ class DualRivalForge:
             champion_digest=self.champion.digest,
             completed=self.completed,
         )
+
+    def _validate_candidate_scope(self, candidate: Candidate, *, role: str) -> None:
+        provenance = candidate.producer_provenance
+        if provenance.project_id != self._project_id:
+            raise ForgeStateError(f"{role} candidate project_id does not match forge scope")
+        if provenance.run_id != self._run_id:
+            raise ForgeStateError(f"{role} candidate run_id does not match forge scope")
 
     def _validate_state(self) -> None:
         if len(self.receipts) != self.completed_rounds:
@@ -215,6 +246,7 @@ class DualRivalForge:
             raise ForgeStateError("construct submission is out of stage order")
         if candidate.producer_id != self.builder.value:
             raise ForgeStateError("construct candidate must come from current builder")
+        self._validate_candidate_scope(candidate, role="construct")
         self.pending_construct = candidate
         self.stage = Stage.ATTACK_AND_IMPROVE
         return self.status
@@ -230,6 +262,10 @@ class DualRivalForge:
             raise ForgeStateError("challenge target does not match constructed candidate")
         if challenge.improved_candidate.producer_id != self.challenger.value:
             raise ForgeStateError("improved candidate must be authored by challenger")
+        self._validate_candidate_scope(
+            challenge.improved_candidate,
+            role="challenge improvement",
+        )
         self.pending_challenge = challenge
         self.stage = Stage.RECONCILE_AND_PROMOTE
         return self.status
@@ -237,6 +273,7 @@ class DualRivalForge:
     def _eligible_reconcile_candidate(self, candidate: Candidate | None) -> None:
         if candidate is None:
             return
+        self._validate_candidate_scope(candidate, role="reconcile")
         assert self.pending_construct is not None
         assert self.pending_challenge is not None
         direct = {
@@ -343,8 +380,10 @@ class DualRivalForge:
                 if self.pending_construct is not None
                 else None
             ),
+            "project_id": self._project_id,
             "receipt_digests": [receipt.decision_digest for receipt in self.receipts],
             "round_index": self.round_index,
+            "run_id": self._run_id,
             "schema": self.SCHEMA,
             "stage": self.stage.value,
         }
@@ -367,6 +406,11 @@ class DualRivalForge:
         champion_payload = checkpoint.get("champion")
         if not isinstance(champion_payload, Mapping):
             raise ForgeStateError("checkpoint champion is missing")
+        restored_champion = _candidate_from_payload(champion_payload)
+        if checkpoint.get("project_id") != restored_champion.producer_provenance.project_id:
+            raise ForgeStateError("checkpoint project_id does not match champion provenance")
+        if checkpoint.get("run_id") != restored_champion.producer_provenance.run_id:
+            raise ForgeStateError("checkpoint run_id does not match champion provenance")
         pending_construct_payload = checkpoint.get("pending_construct")
         pending_challenge_payload = checkpoint.get("pending_challenge")
         pending_construct = (
@@ -388,7 +432,7 @@ class DualRivalForge:
 
         return cls(
             effort_mode=EffortMode.parse(checkpoint["effort_mode"]),
-            champion=_candidate_from_payload(champion_payload),
+            champion=restored_champion,
             builder=Rival(str(checkpoint["builder"])),
             round_index=int(checkpoint["round_index"]),
             completed_rounds=int(checkpoint["completed_rounds"]),
