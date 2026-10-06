@@ -121,3 +121,37 @@ Every FLGB plane now declares 12 required subsystems, 12 lifecycle stages, 10 ev
 The machine construction bridge is `machine/functional_llm_game_builder_execution_backlog.json`. It contains **216 planned build units**: exactly 12 subsystem tasks for each of the 18 FLGB planes. Every unit names a target implementation module, schema contract, focused test target, lifecycle/evidence/stress obligations, dependency context, acceptance gates, and exact-head closure rule. No unit is pre-completed or pre-signed.
 
 The backlog validator is `scripts/check_functional_llm_game_builder_execution_backlog.py`; it rejects missing plane/subsystem pairs, duplicate targets, dependency cycles, drift from the atlas coverage dimensions, premature completion/signoff, and an incomplete FLGB-18 whole-product fan-in.
+
+
+## Frontier competition protocol v2
+
+Frontier competition is a falsifiable promotion contract, not a marketing label.
+
+The terminal whole-product challenge must use at least three fresh frontier comparators, including the strongest available comparator, and no comparator may be older than 45 days without an explicit invalidation/requalification decision. Every scored task requires at least six independent runs. Task manifests are preregistered and immutable before candidate execution; public tasks are mixed with rotating hidden challenges, and exposed heldout tasks are retired rather than silently reused.
+
+### Measurement constitution
+
+- Compare exact model/provider/version, inference configuration, scaffold, tool policy, hardware/environment, source revision, and budget.
+- Run paired equal-budget head-to-head trials and a separate unconstrained quality-ceiling trial.
+- Publish compute-normalized Pareto analysis plus quality-per-cost and quality-per-wall-clock.
+- Retain failed, aborted, and suspicious trajectories; selective reruns may not erase failures.
+- Use 95% uncertainty intervals, a preregistered non-inferiority margin no larger than 2 percentage points, at least 10 of 12 domains at parity-or-better, and at least two superior core targets.
+- Critical domains are non-compensable; aggregate score cannot hide a critical regression.
+
+### Long-horizon challenge
+
+Human-equivalent duration buckets span 0.25, 1, 4, 16, 40, and 160 hours. The report must include both 50%- and 80%-success time-horizon curves, forced context resets, clean-process reopen, checkpoint restore, multi-session continuation, state/canon drift, cumulative error growth, interruption recovery, and multi-day project tasks. Short-task averages cannot substitute for long-horizon evidence.
+
+### Anti-gaming and evaluator independence
+
+Reward hacking, benchmark leakage, test-oracle introspection, evaluator manipulation, simulator/harness tampering, unauthorized external solution lookup, and hidden-test exploitation are explicit adversarial targets. Cheating or policy bypass scores zero and triggers manual review. Candidate self-scores are never decisive; at least two independent evaluator implementations are required, plus blinded human adjudication for subjective core outputs and explicit disagreement/collusion review.
+
+### Frontier dominance rule
+
+Promotion requires the strongest-comparator head-to-head, critical-domain non-inferiority, at least 10/12 domains at parity-or-better, and at least two superior core targets. Superiority means the 95% interval clears the preregistered superiority margin, or credible parity is achieved with at least 20% lower normalized resource cost. Dual-rival gains must survive both an equal-budget single-agent ablation and an extra-compute single-agent control. Any current-champion regression vetoes promotion.
+
+### Game-builder proving ground
+
+The challenge runs from brief to playable/reopenable export and continuation after a clean restart. It includes cross-scene and cross-session canon consistency, gameplay-loop quality, debugging, asset/code/narrative provenance and rights, frame-time/performance evidence, accessibility/localization/input equivalence, save migration, mod sandboxing, network faults, and blinded player/expert judgment.
+
+All implementation, frontier-completion, and independent-verification signoffs remain false until exact-head executable evidence satisfies this protocol.
