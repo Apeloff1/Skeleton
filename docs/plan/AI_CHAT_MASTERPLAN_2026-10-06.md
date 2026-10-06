@@ -462,9 +462,11 @@ authority.
 
 Product chat now binds the Mongo turn authority around canonical user commit,
 context compilation, routing/model execution, verification/finalization,
-assistant commit, retryable failure, terminal failure, and cancellation.
-Retries reuse the same operation identity and progressed durable state instead
-of requiring a fresh RECEIVED snapshot.
+assistant commit, confirmed terminal failure, and cancellation. Ordinary
+engine/provider availability failures remain at the current non-terminal
+durable stage so the same canonical turn can resume safely. Identical retries
+reuse the same operation identity and the original admitted conversation
+binding; request-digest or causal-user drift fails closed.
 
 ### Volume 3 — durable streaming projection
 

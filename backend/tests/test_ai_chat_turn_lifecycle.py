@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -131,6 +132,44 @@ async def test_progressed_operation_creation_is_idempotent_on_retry():
     )
     assert retried.snapshot.state is TurnState.MODEL_RUNNING
     assert retried.snapshot.last_event_digest == turn.snapshot.last_event_digest
+
+
+@pytest.mark.asyncio
+async def test_retry_rejects_request_or_causal_identity_drift():
+    authority = AsyncAuthority()
+    lifecycle = ChatTurnLifecycle(authority)
+    thread, user = _thread_and_user()
+    operation_id = str(uuid4())
+
+    await lifecycle.begin(
+        thread=thread,
+        user_message=user,
+        operation_id=operation_id,
+        request_digest="1" * 64,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+    )
+
+    with pytest.raises(ValueError, match="canonical retry identity"):
+        await lifecycle.begin(
+            thread=thread,
+            user_message=user,
+            operation_id=operation_id,
+            request_digest="2" * 64,
+            tenant_id=TENANT,
+            owner_id=OWNER,
+        )
+
+    wrong_user = replace(user, message_id=str(uuid4()))
+    with pytest.raises(ValueError, match="canonical retry identity"):
+        await lifecycle.begin(
+            thread=thread,
+            user_message=wrong_user,
+            operation_id=operation_id,
+            request_digest="1" * 64,
+            tenant_id=TENANT,
+            owner_id=OWNER,
+        )
 
 
 @pytest.mark.asyncio

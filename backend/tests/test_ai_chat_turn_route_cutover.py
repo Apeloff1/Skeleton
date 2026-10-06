@@ -189,7 +189,7 @@ async def test_live_chat_success_reaches_durable_complete(
 
 
 @pytest.mark.asyncio
-async def test_live_chat_engine_outage_remains_durable_and_resumable(
+async def test_live_chat_engine_outage_resumes_same_operation_to_completion(
     monkeypatch,
     ai_chat_turn_test_authority,
 ):
@@ -199,7 +199,7 @@ async def test_live_chat_engine_outage_remains_durable_and_resumable(
     monkeypatch.setattr(
         route,
         "conversation_authority",
-        _conversation_authority(thread, user, allow_commit=False),
+        _conversation_authority(thread, user),
     )
     fake_client = SimpleNamespace(
         config=SimpleNamespace(
@@ -207,31 +207,64 @@ async def test_live_chat_engine_outage_remains_durable_and_resumable(
             execution_timeout_s=30.0,
         )
     )
+    attempts = {"execute": 0}
 
     async def wait_for_terminal(**_kwargs):
         raise EngineNotFoundError("not started")
 
-    async def execute(_command):
-        raise EngineUnavailableError("down")
+    async def execute(command):
+        attempts["execute"] += 1
+        if attempts["execute"] == 1:
+            raise EngineUnavailableError("down")
+        return SimpleNamespace(
+            final_output="Recovered.",
+            execution_id=command.execution_request.execution_id,
+            verification="verified",
+            evidence_refs=(),
+            provider_receipts=("provider:test:recovered",),
+            tool_receipts=(),
+            memory_refs=(),
+            artifact_refs=(),
+        )
 
     fake_client.wait_for_terminal = wait_for_terminal
     fake_client.execute = execute
     monkeypatch.setattr(route.EngineClient, "from_env", lambda: fake_client)
 
-    response = await route.ai_chat(
+    first = await route.ai_chat(
         _request(route, thread.thread_id),
         user={"tenant_id": "tenant-a", "email": "owner-a"},
     )
 
-    assert response["success"] is False
-    assert response["error_code"] == "engine_unavailable"
+    assert first["success"] is False
+    assert first["error_code"] == "engine_unavailable"
     operation_id, _ = route._chat_turn_ids(thread.thread_id, user.message_id)
-    persisted = ai_chat_turn_test_authority.repo.reconstruct(
+    after_outage = ai_chat_turn_test_authority.repo.reconstruct(
         operation_id,
         tenant_id="tenant-a",
         owner_id="owner-a",
     )
-    assert persisted.snapshot.state is TurnState.MODEL_RUNNING
+    assert after_outage.snapshot.state is TurnState.MODEL_RUNNING
+    assert after_outage.snapshot.terminal is False
+    outage_digest = after_outage.snapshot.last_event_digest
+
+    second = await route.ai_chat(
+        _request(route, thread.thread_id),
+        user={"tenant_id": "tenant-a", "email": "owner-a"},
+    )
+
+    assert second["success"] is True
+    assert second["response"] == "Recovered."
+    assert second["operation_id"] == operation_id
+    assert second["turn_state"] == "complete"
+    recovered = ai_chat_turn_test_authority.repo.reconstruct(
+        operation_id,
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+    )
+    assert recovered.snapshot.state is TurnState.COMPLETE
+    assert recovered.snapshot.last_event_digest != outage_digest
+    assert attempts["execute"] == 2
 
 
 @pytest.mark.asyncio
