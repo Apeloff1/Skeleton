@@ -235,3 +235,49 @@ def test_tombstone_preserves_historical_truth_without_resurrection() -> None:
     assert current.claims == ()
     assert store.head("claim-a").lifecycle is ClaimLifecycle.TOMBSTONED
     assert len(store.history("claim-a")) == 2
+
+
+def test_temporal_revisions_reject_time_rollback_and_tombstone_resurrection() -> None:
+    store = TemporalKnowledgeStore()
+    claim = _claim(
+        "claim-a",
+        "eu-west",
+        confidence=0.8,
+        verification=VerificationState.SUPPORTED,
+    )
+    store.append(
+        claim,
+        operation_id="append-a",
+        expected_store_digest=store.store_digest,
+        evidence=_evidence("append-a"),
+    )
+    with pytest.raises(KnowledgeStoreError, match="recorded_at cannot move backward"):
+        store.revise(
+            "claim-a",
+            operation_id="revise-backward",
+            expected_store_digest=store.store_digest,
+            expected_head_digest=store.head("claim-a").revision_digest,
+            recorded_at=5.0,
+            source_revision="r-backward",
+            evidence=_evidence("revise-a"),
+        )
+
+    store.tombstone(
+        "claim-a",
+        operation_id="delete-a",
+        expected_store_digest=store.store_digest,
+        expected_head_digest=store.head("claim-a").revision_digest,
+        recorded_at=30.0,
+        source_revision="r-delete",
+        evidence=_evidence("delete-a"),
+    )
+    with pytest.raises(KnowledgeStoreError, match="tombstoned claim cannot be revised"):
+        store.revise(
+            "claim-a",
+            operation_id="revise-after-delete",
+            expected_store_digest=store.store_digest,
+            expected_head_digest=store.head("claim-a").revision_digest,
+            recorded_at=40.0,
+            source_revision="r-resurrect",
+            evidence=_evidence("revise-b"),
+        )
