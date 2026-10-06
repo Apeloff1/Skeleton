@@ -266,6 +266,15 @@ def validate_payloads(
     if not isinstance(profiles, dict):
         profiles = {}
 
+    risk_policy_seed = contract.get("risk_and_freshness_policy")
+    if isinstance(risk_policy_seed, dict):
+        defaults = risk_policy_seed.get("stratum_defaults")
+        if not isinstance(defaults, dict):
+            defaults = {}
+    else:
+        defaults = {}
+    expected_ages = {"standard": 30, "high": 14, "critical": 7}
+
     levels = _objects(
         contract.get("levels"),
         label="levels",
