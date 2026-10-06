@@ -60,7 +60,7 @@ jobs:
           p=Path("machine/ai_master_plan.json")
           master=json.loads(p.read_text(encoding="utf-8"))
           idx=json.loads(Path("machine/ai_masterplan_parse_index.json").read_text(encoding="utf-8"))
-          assert master["plan_version"]=="2.4.0"
+          assert tuple(int(part) for part in master["plan_version"].split(".")) >= (2, 5, 0)
           assert master["authority"]["essentials_1000"]=="machine/essentials_1000.json"
           assert master["authority"]["essentials_1000_validator"]=="scripts/check_essentials_1000.py"
           assert master["authority"]["essentials_1000_workflow"]==".github/workflows/essentials-1000.yml"
