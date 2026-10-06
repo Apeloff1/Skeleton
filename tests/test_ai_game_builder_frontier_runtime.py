@@ -244,18 +244,24 @@ def test_effort_scheduler_selects_exact_supported_tiers() -> None:
 
 def test_genealogy_requires_known_parents_and_recovers_ancestry() -> None:
     graph = ArtifactGenealogy()
+    root_evidence = "mutation-root-evidence-" + "b" * 24
     root = GenealogyNode(
         candidate_digest="candidate-root-" + "a" * 24,
         parent_digests=(),
         mutation_digest="mutation-root-" + "b" * 24,
         round_index=0,
+        mutation_authority=_authority("genealogy-root-authority", root_evidence),
+        mutation_evidence_digest=root_evidence,
     )
     graph.add(root, allow_root=True)
+    child_evidence = "mutation-child-evidence-" + "d" * 24
     child = GenealogyNode(
         candidate_digest="candidate-child-" + "c" * 24,
         parent_digests=(root.candidate_digest,),
         mutation_digest="mutation-child-" + "d" * 24,
         round_index=1,
+        mutation_authority=_authority("genealogy-child-authority", child_evidence),
+        mutation_evidence_digest=child_evidence,
     )
     graph.add(child)
     assert graph.ancestors(child.candidate_digest) == (root.candidate_digest,)
@@ -266,7 +272,30 @@ def test_genealogy_requires_known_parents_and_recovers_ancestry() -> None:
                 parent_digests=("missing-parent-" + "f" * 24,),
                 mutation_digest="mutation-bad-" + "1" * 24,
                 round_index=2,
+                mutation_authority=_authority(
+                    "genealogy-bad-authority",
+                    "mutation-bad-evidence-" + "1" * 24,
+                ),
+                mutation_evidence_digest="mutation-bad-evidence-" + "1" * 24,
             )
+        )
+
+
+def test_genealogy_rejects_unattributed_mutation_evidence() -> None:
+    with pytest.raises(
+        FrontierAssuranceError,
+        match="referenced by mutation authority",
+    ):
+        GenealogyNode(
+            candidate_digest="candidate-unbound-" + "a" * 24,
+            parent_digests=(),
+            mutation_digest="mutation-unbound-" + "b" * 24,
+            round_index=0,
+            mutation_authority=_authority(
+                "wrong-genealogy-authority",
+                "other-mutation-" + "x" * 24,
+            ),
+            mutation_evidence_digest="mutation-evidence-" + "e" * 24,
         )
 
 
@@ -304,14 +333,41 @@ def test_evidence_invalidation_propagates_to_release_qualification() -> None:
     graph.add("mechanic.proof", depends_on=("source.engine-doc",))
     graph.add("family.GB17", depends_on=("mechanic.proof",))
     graph.add("release.gold", depends_on=("family.GB17",))
-    affected = graph.invalidate("source.engine-doc")
-    assert affected == (
+    invalidation_evidence = "invalidation-evidence-" + "e" * 24
+    receipt = graph.invalidate(
+        "source.engine-doc",
+        authority_provenance=_authority(
+            "evidence-invalidation-authority",
+            invalidation_evidence,
+        ),
+        evidence_digest=invalidation_evidence,
+    )
+    assert receipt.affected_ids == (
         "family.GB17",
         "mechanic.proof",
         "release.gold",
         "source.engine-doc",
     )
+    assert canonical_digest(receipt.payload()) == receipt.receipt_digest
     assert not graph.is_valid("release.gold")
+
+
+def test_evidence_invalidation_requires_attributed_authority() -> None:
+    graph = EvidenceInvalidationGraph()
+    graph.add("source.engine-doc")
+    evidence = "invalidation-evidence-" + "e" * 24
+    with pytest.raises(
+        FrontierAssuranceError,
+        match="referenced by invalidation authority",
+    ):
+        graph.invalidate(
+            "source.engine-doc",
+            authority_provenance=_authority(
+                "wrong-invalidation-authority",
+                "other-invalidation-" + "x" * 24,
+            ),
+            evidence_digest=evidence,
+        )
 
 
 def test_convergence_monitor_detects_cycle_and_stagnation_without_declaring_success() -> None:
