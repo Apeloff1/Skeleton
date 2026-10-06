@@ -31,7 +31,7 @@ def test_position_sensitivity_tracks_decay_with_offset():
     )[0]
     assert report.anchor_offset == 0
     assert report.max_offset == 512
-    assert report.similarity_drop == 0.3
+    assert abs(report.similarity_drop - 0.3) < 1e-12
     assert report.monotonicity_violations == 0
     assert report.invariant_above_095_ratio == 0.5
 
