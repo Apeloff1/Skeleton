@@ -7,7 +7,10 @@ from uuid import uuid4
 import pytest
 
 from core.engine_client import EngineNotFoundError, EngineUnavailableError
-from skeleton.ai.assistant.turn_runtime import TurnState
+from skeleton.ai.assistant.turn_runtime import (
+    TurnState,
+    provider_receipt_set_ref,
+)
 from skeleton.contracts.conversation import (
     ConversationAuthorType,
     ConversationMessage,
@@ -147,7 +150,10 @@ async def test_live_chat_success_reaches_durable_complete(
             execution_id=command.execution_request.execution_id,
             verification="verified",
             evidence_refs=("evidence:1",),
-            provider_receipts=("provider:test:receipt-1",),
+            provider_receipts=(
+                "provider:test:receipt-2",
+                "provider:test:receipt-1",
+            ),
             tool_receipts=(),
             memory_refs=(),
             artifact_refs=(),
@@ -170,6 +176,17 @@ async def test_live_chat_success_reaches_durable_complete(
         owner_id="owner-a",
     )
     assert persisted.snapshot.state is TurnState.COMPLETE
+    expected_receipts = (
+        "provider:test:receipt-2",
+        "provider:test:receipt-1",
+    )
+    assert response["engine_provider_receipts"] == list(expected_receipts)
+    assert tuple(
+        response["assistant_message"]["provider_receipt_refs"]
+    ) == expected_receipts
+    assert persisted.snapshot.provider_receipt_ref == provider_receipt_set_ref(
+        expected_receipts
+    )
     events = ai_chat_turn_test_authority.repo.list_events(
         response["operation_id"],
         tenant_id="tenant-a",
@@ -186,6 +203,15 @@ async def test_live_chat_success_reaches_durable_complete(
         TurnState.ASSISTANT_MESSAGE_COMMITTED,
         TurnState.COMPLETE,
     ]
+    receipt_events = [
+        event for event in events
+        if event.provider_receipt_ref is not None
+    ]
+    assert len(receipt_events) == 1
+    assert receipt_events[0].to_state is TurnState.VERIFYING
+    assert receipt_events[0].provider_receipt_ref == provider_receipt_set_ref(
+        expected_receipts
+    )
 
 
 @pytest.mark.asyncio
