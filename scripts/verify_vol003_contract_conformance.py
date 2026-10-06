@@ -27,6 +27,11 @@ MIRROR = Path("skeleton/ai/runtime/contracts/canonical.py")
 
 EXPECTED_CATALOG_SCHEMA = "skeleton.architecture.contract_conformance.v1"
 
+QUALIFICATION_GAP = (
+    "independent exact-head VOL-003 Contract Conformance Closure "
+    "qualification remains pending"
+)
+
 REQUIRED_VOL003_PATHS = {
     "skeleton/contracts",
     "machine/ai_runtime_schemas.json",
@@ -415,8 +420,15 @@ def _verify_masterplan(master: dict[str, Any], errors: list[str]) -> dict[str, A
         errors.append("VOL-003 scope drift")
     if volume.get("implementation_status") not in {"implemented", "hardened", "verified"}:
         errors.append("VOL-003 implementation status below implemented")
-    if list(volume.get("gaps") or []) != []:
-        errors.append("VOL-003 must have zero live implementation gaps")
+    live_gaps = list(volume.get("gaps") or [])
+    if live_gaps not in ([QUALIFICATION_GAP], []):
+        errors.append(
+            "VOL-003 gap state must be pending exact-head qualification or signed"
+        )
+    if not live_gaps and volume.get("completion_checkbox") is not True:
+        errors.append("VOL-003 cannot clear qualification gap before signoff")
+    if live_gaps and volume.get("completion_checkbox") is True:
+        errors.append("VOL-003 cannot remain signed with pending qualification")
 
     paths = set(volume.get("implementation_paths") or [])
     tests = set(volume.get("tests") or [])
@@ -478,11 +490,27 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
             errors.append("catalog bound to wrong masterplan volume")
         if binding.get("title") != "Canonical Contract System":
             errors.append("catalog/masterplan title drift")
-        required_gap_texts = binding.get("required_gap_texts")
-        if not isinstance(required_gap_texts, list):
-            errors.append("catalog required_gap_texts must be a list")
-        elif required_gap_texts and list(_verify_masterplan(master, [] ).get("gaps") or []):
-            errors.append("retired VOL-003 implementation gaps reappeared")
+        if binding.get("qualification_gap") != QUALIFICATION_GAP:
+            errors.append("catalog qualification gap authority drift")
+        retired_gaps = binding.get("retired_implementation_gaps")
+        if not isinstance(retired_gaps, list) or not retired_gaps:
+            errors.append("catalog retired implementation gaps must be non-empty")
+        else:
+            volume_rows = master.get("volumes")
+            volume = next(
+                (
+                    row
+                    for row in volume_rows
+                    if isinstance(row, dict) and row.get("key") == "VOL-003"
+                ),
+                None,
+            ) if isinstance(volume_rows, list) else None
+            live_gaps = list(volume.get("gaps") or []) if isinstance(volume, dict) else []
+            for retired_gap in retired_gaps:
+                if retired_gap in live_gaps:
+                    errors.append(
+                        f"retired VOL-003 implementation gap reappeared: {retired_gap}"
+                    )
 
     contracts, override_count = _verify_inventory(
         catalog,
