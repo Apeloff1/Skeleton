@@ -189,7 +189,7 @@ async def test_live_chat_success_reaches_durable_complete(
 
 
 @pytest.mark.asyncio
-async def test_live_chat_engine_outage_is_durable_retryable_failure(
+async def test_live_chat_engine_outage_remains_durable_and_resumable(
     monkeypatch,
     ai_chat_turn_test_authority,
 ):
@@ -231,7 +231,7 @@ async def test_live_chat_engine_outage_is_durable_retryable_failure(
         tenant_id="tenant-a",
         owner_id="owner-a",
     )
-    assert persisted.snapshot.state is TurnState.FAILED_RETRYABLE
+    assert persisted.snapshot.state is TurnState.MODEL_RUNNING
 
 
 @pytest.mark.asyncio
@@ -309,3 +309,74 @@ async def test_live_chat_event_page_supports_digest_bound_reconnect(
             limit=100,
             user={"tenant_id": "tenant-a", "email": "owner-a"},
         )
+
+
+
+@pytest.mark.asyncio
+async def test_cancellation_request_does_not_fabricate_terminal_cancelled(
+    monkeypatch,
+    ai_chat_turn_test_authority,
+):
+    import routes.ai as route
+
+    thread, user = _thread_and_user()
+    monkeypatch.setattr(
+        route,
+        "conversation_authority",
+        _conversation_authority(thread, user, allow_commit=False),
+    )
+
+    operation_id, _execution_id = route._chat_turn_ids(
+        thread.thread_id,
+        user.message_id,
+    )
+    turn = await route.chat_turn_lifecycle.begin(
+        thread=thread,
+        user_message=user,
+        operation_id=operation_id,
+        request_digest=route._chat_request_digest(
+            _request(route, thread.thread_id)
+        ),
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+    )
+    await route.chat_turn_lifecycle.advance(
+        turn,
+        TurnState.MODEL_RUNNING,
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+        reason_code="engine-running",
+    )
+
+    fake_client = SimpleNamespace()
+
+    async def cancel(*_args, **_kwargs):
+        return {
+            "execution_state": "running",
+            "cancellation_requested": True,
+        }
+
+    fake_client.cancel = cancel
+    monkeypatch.setattr(route.EngineClient, "from_env", lambda: fake_client)
+
+    response = await route.cancel_ai_chat_turn(
+        thread.thread_id,
+        route.AIChatCancelRequest(
+            idempotency_key="turn-1",
+            reason="user_cancelled",
+        ),
+        user={"tenant_id": "tenant-a", "email": "owner-a"},
+    )
+
+    assert response["success"] is True
+    assert response["changed"] is True
+    assert response["terminal"] is False
+    assert response["state"] == "cancellation_requested"
+    assert response["turn_state"] == "model_running"
+
+    persisted = ai_chat_turn_test_authority.repo.reconstruct(
+        operation_id,
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+    )
+    assert persisted.snapshot.state is TurnState.MODEL_RUNNING
