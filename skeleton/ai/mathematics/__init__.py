@@ -28,6 +28,13 @@ from .approximation import (
     newton_interpolate,
     piecewise_linear_interpolate,
 )
+from .calculus2 import (
+    HessianReport,
+    finite_difference_hessian,
+    gradient_norm,
+    hessian_vector_product,
+    quadratic_model_change,
+)
 from .calibration_metrics import (
     CalibrationBin,
     CalibrationMetricReport,
@@ -35,6 +42,15 @@ from .calibration_metrics import (
     top_label_calibration_report,
 )
 from .contracts import MathInvariantError, Matrix, Vector
+from .decompositions import (
+    CholeskyReport,
+    LeastSquaresReport,
+    QRReport,
+    cholesky_decompose,
+    least_squares,
+    qr_decompose,
+    solve_cholesky,
+)
 from .distributions import (
     bernoulli_log_pmf,
     gaussian_mixture_log_density,
@@ -64,6 +80,14 @@ from .graph import (
     stationary_distribution,
     validate_transition_matrix,
 )
+from .information_geometry import (
+    bhattacharyya_coefficient,
+    bhattacharyya_distance,
+    fisher_rao_distance,
+    hellinger_distance,
+    mahalanobis_distance,
+    total_variation_distance,
+)
 from .integration import (
     ODEPoint,
     ODEReport,
@@ -81,6 +105,15 @@ from .linear import (
     matvec,
     solve_linear_system,
     transpose,
+)
+from .kernels import (
+    centered_gram,
+    gram_matrix,
+    laplacian_kernel,
+    linear_kernel,
+    maximum_mean_discrepancy_squared,
+    polynomial_kernel,
+    rbf_kernel,
 )
 from .losses import (
     binary_cross_entropy,
@@ -127,6 +160,13 @@ from .sampling import (
     systematic_resample,
 )
 from .sparse import CSRMatrix, sparse_dense_matmul
+from .sequence import (
+    DTWReport,
+    discrete_frechet_distance,
+    dynamic_time_warping,
+    levenshtein_distance,
+    normalized_levenshtein_distance,
+)
 from .solvers import (
     ConjugateGradientReport,
     RootReport,
@@ -182,6 +222,11 @@ __all__ = [
     "newton_divided_differences",
     "newton_interpolate",
     "piecewise_linear_interpolate",
+    "HessianReport",
+    "finite_difference_hessian",
+    "gradient_norm",
+    "hessian_vector_product",
+    "quadratic_model_change",
     "CalibrationBin",
     "CalibrationMetricReport",
     "binary_calibration_report",
@@ -202,6 +247,13 @@ __all__ = [
     "dual_sqrt",
     "dual_tanh",
     "value_and_gradient",
+    "CholeskyReport",
+    "LeastSquaresReport",
+    "QRReport",
+    "cholesky_decompose",
+    "least_squares",
+    "qr_decompose",
+    "solve_cholesky",
     "bernoulli_log_pmf",
     "gaussian_mixture_log_density",
     "normal_cdf",
@@ -225,6 +277,12 @@ __all__ = [
     "random_walk_matrix",
     "stationary_distribution",
     "validate_transition_matrix",
+    "bhattacharyya_coefficient",
+    "bhattacharyya_distance",
+    "fisher_rao_distance",
+    "hellinger_distance",
+    "mahalanobis_distance",
+    "total_variation_distance",
     "ODEPoint",
     "ODEReport",
     "QuadratureReport",
@@ -239,6 +297,13 @@ __all__ = [
     "matvec",
     "solve_linear_system",
     "transpose",
+    "centered_gram",
+    "gram_matrix",
+    "laplacian_kernel",
+    "linear_kernel",
+    "maximum_mean_discrepancy_squared",
+    "polynomial_kernel",
+    "rbf_kernel",
     "binary_cross_entropy",
     "brier_score",
     "cross_entropy_from_logits",
@@ -273,6 +338,11 @@ __all__ = [
     "monte_carlo_unit_cube",
     "radical_inverse",
     "systematic_resample",
+    "DTWReport",
+    "discrete_frechet_distance",
+    "dynamic_time_warping",
+    "levenshtein_distance",
+    "normalized_levenshtein_distance",
     "CSRMatrix",
     "sparse_dense_matmul",
     "ConjugateGradientReport",

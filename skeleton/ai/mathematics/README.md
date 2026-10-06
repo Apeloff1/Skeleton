@@ -46,6 +46,11 @@ model authority boundaries.
 - `distributions.py` — Normal, Student-t, Bernoulli, Poisson and Gaussian-mixture density references.
 - `transforms.py` — DFT, radix-2 FFT, inverse transforms, convolution and autocorrelation.
 - `calibration_metrics.py` — ECE/MCE/Brier metrics only; no calibration ledger or correction authority.
+- `decompositions.py` — Cholesky, re-orthogonalized thin QR, SPD solve and full-rank least squares.
+- `calculus2.py` — finite-difference Hessian, gradient and quadratic local-model diagnostics.
+- `kernels.py` — linear/polynomial/RBF/Laplacian kernels, Gram centering and MMD reference tests.
+- `information_geometry.py` — TV, Hellinger, Bhattacharyya, Fisher-Rao and Mahalanobis distances.
+- `sequence.py` — Levenshtein, DTW with explicit alignment path, and discrete Fréchet distance.
 - `validation.py` — parity evidence against existing optimized runtime kernels.
 
 ## Guarantees
@@ -69,6 +74,11 @@ model authority boundaries.
 - Distribution routines expose density/CDF math only and do not create predictive-model ownership.
 - Transform paths provide an O(n^2) DFT oracle beside radix-2 FFT so optimized paths can be parity checked.
 - Calibration helpers are read-only metrics; evidence ledgers and confidence correction remain in their existing owners.
+- Matrix decompositions expose reconstruction/orthogonality/residual evidence and reject numerical rank loss.
+- Second-order calculus is an oracle layer only; it does not own training steps, optimizers, or parameter updates.
+- Kernels and MMD measure similarity/distribution shift but do not fit or promote models.
+- Information geometry normalizes distributions explicitly and uses SPD covariance solves for Mahalanobis distance.
+- Sequence metrics return deterministic edit/alignment/trajectory distances without taking retrieval or ranking authority.
 - `audit_runtime_kernels()` compares optimized runtime softmax, matmul and attention against
   this reference substrate without replacing those kernels.
 
