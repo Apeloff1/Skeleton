@@ -1,0 +1,54 @@
+{
+  "authority_scope": "non-executing-decision-plane",
+  "effective_date": "2026-10-06",
+  "masterplan_volumes": [
+    "CHAT-V5-routing-v2",
+    "CHAT-V6-tool-recovery-integration"
+  ],
+  "placement_invariants": [
+    "stale-or-missing-health-fails-closed",
+    "fallback-cannot-weaken-privacy-locality-jurisdiction-modality-quality-reliability",
+    "open-breaker-or-saturated-endpoint-is-not-selectable",
+    "degraded-endpoint-requires-explicit-policy",
+    "deadline-cost-and-model-call-budgets-are-hard-admission-constraints",
+    "placement-is-deterministic-for-identical-evidence",
+    "failover-only-for-transient-capacity-unavailable-failures",
+    "failover-candidate-must-have-been-admitted-by-prior-receipt",
+    "failover-budget-may-decrease-but-never-amplify",
+    "decision-does-not-dispatch-inference"
+  ],
+  "production_authority": false,
+  "promotion": {
+    "completion_checkbox": false,
+    "required_before_completion": [
+      "exact-head-ci",
+      "independent-verification",
+      "provider-runtime-dispatch-cutover",
+      "turn-runtime-tool-recovery-cutover"
+    ],
+    "status": "implemented_candidate",
+    "verification_signature": null
+  },
+  "schema_version": 1,
+  "standard_id": "october-2026-ai-chat-resilience-v1",
+  "surfaces": {
+    "masterplan": "docs/plan/AI_CHAT_MASTERPLAN_2026-10-06.md",
+    "model_placement": "skeleton/ai/assistant/model_placement.py",
+    "regressions": "skeleton/testing/test_ai_chat_resilience_v2.py",
+    "tool_recovery": "skeleton/ai/assistant/tool_recovery.py",
+    "verifier": "scripts/verify_ai_chat_resilience_v2.py",
+    "workflow": ".github/workflows/ai-chat-resilience-v2.yml"
+  },
+  "tool_recovery_invariants": [
+    "unknown-consequential-write-reconciles-before-retry",
+    "unreconcilable-unknown-write-quarantines",
+    "write-retry-requires-durable-known-failure-and-idempotency",
+    "read-only-retry-is-budget-bound",
+    "reversible-write-can-compensate-after-downstream-failure",
+    "security-sensitive-retry-requires-current-user-authority",
+    "receipt-request-and-arguments-bindings-must-match",
+    "durable-success-is-reused-not-replayed",
+    "retry-budget-exhaustion-terminates-known-failure",
+    "decision-does-not-execute-side-effects"
+  ]
+}
