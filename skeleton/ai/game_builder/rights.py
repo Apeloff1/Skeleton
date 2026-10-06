@@ -133,6 +133,14 @@ class SimilarityFinding:
                 raise RightsError(
                     "similarity resolution evidence must be referenced by resolution authority"
                 )
+            if (
+                self.risk is SimilarityRisk.HIGH
+                and self.resolution_authority.evaluator_id
+                == self.evaluator_provenance.evaluator_id
+            ):
+                raise RightsError(
+                    "high-risk similarity resolution requires independent authority"
+                )
         elif (
             self.resolution is not None
             or self.resolution_evidence_digest is not None
