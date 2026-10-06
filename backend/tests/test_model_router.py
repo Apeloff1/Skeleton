@@ -2,7 +2,12 @@ import math
 
 import pytest
 
-from skeleton.ai.assistant.turn_runtime import ExecutionBudget
+from skeleton.ai.assistant.turn_runtime import (
+    BudgetUsage,
+    ExecutionBudget,
+    TurnSnapshot,
+    TurnState,
+)
 from skeleton.intelligence.admission import ResourceBudget
 from skeleton.vault.data_lifecycle import GovernedDataRecord
 from skeleton.vault.governance_registry import GovernanceRegistry
@@ -620,3 +625,89 @@ def test_governance_and_turn_budget_compose_as_hard_constraints():
     assert request.latency_budget_ms == 2500.0
     assert request.require_provider_receipt is True
     assert request.governance_record_ids == ("context-record",)
+
+
+def _turn_snapshot_for_routing(
+    *,
+    usage: BudgetUsage | None = None,
+    state: TurnState = TurnState.ROUTING,
+) -> TurnSnapshot:
+    return TurnSnapshot(
+        operation_id="route-turn",
+        request_digest="a" * 64,
+        thread_id="thread",
+        causal_user_message_id="message",
+        state=state,
+        budget=ExecutionBudget(
+            max_wall_seconds=10.0,
+            max_input_tokens=10_000,
+            max_output_tokens=2_000,
+            max_model_calls=3,
+            max_tool_calls=8,
+            max_agent_depth=2,
+            max_parallel_workers=2,
+            max_retrieval_queries=4,
+            max_external_writes=1,
+            max_cost_usd=1.0,
+        ),
+        usage=usage or BudgetUsage(),
+    )
+
+
+def test_turn_snapshot_projects_only_remaining_route_authority():
+    turn = _turn_snapshot_for_routing(
+        usage=BudgetUsage(
+            wall_seconds=4.0,
+            input_tokens=1_000,
+            output_tokens=500,
+            model_calls=1,
+            cost_usd=0.25,
+        )
+    )
+    request = RouteRequest.from_turn_snapshot(
+        "analysis",
+        turn,
+        context_tokens=500,
+        expected_output_tokens=1_000,
+    )
+    assert request.latency_budget_ms == 6000.0
+    assert request.cost_budget == 0.75
+    assert request.expected_output_tokens == 1000
+
+
+def test_turn_snapshot_does_not_restore_exhausted_model_call_authority():
+    turn = _turn_snapshot_for_routing(
+        usage=BudgetUsage(model_calls=3)
+    )
+    with pytest.raises(ValueError, match="model-call budget exhausted"):
+        RouteRequest.from_turn_snapshot("analysis", turn)
+
+
+def test_turn_snapshot_rejects_context_above_remaining_input_budget():
+    turn = _turn_snapshot_for_routing(
+        usage=BudgetUsage(input_tokens=9_900)
+    )
+    with pytest.raises(ValueError, match="remaining input-token"):
+        RouteRequest.from_turn_snapshot(
+            "analysis",
+            turn,
+            context_tokens=101,
+        )
+
+
+def test_turn_snapshot_rejects_output_above_remaining_output_budget():
+    turn = _turn_snapshot_for_routing(
+        usage=BudgetUsage(output_tokens=1_900)
+    )
+    with pytest.raises(ValueError, match="remaining output-token"):
+        RouteRequest.from_turn_snapshot(
+            "analysis",
+            turn,
+            expected_output_tokens=101,
+        )
+
+
+def test_terminal_turn_cannot_reacquire_model_routing_authority():
+    turn = _turn_snapshot_for_routing(state=TurnState.COMPLETE)
+    with pytest.raises(ValueError, match="terminal turn"):
+        RouteRequest.from_turn_snapshot("analysis", turn)

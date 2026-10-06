@@ -236,3 +236,36 @@ __all__ += [
     "admit_multimodal_reference",
     "attachment_context_evidence",
 ]
+
+
+from .resilience import (
+    CROSS_PLANE_RESILIENCE_SCHEMA_VERSION,
+    CrossPlaneResilienceReceipt,
+    ResilienceBindingError,
+    TurnAttachmentBinding,
+    TurnAuthorityFingerprint,
+    TurnRouteBinding,
+    TurnToolRecoveryBinding,
+    bind_attachment_batch,
+    bind_route_decision,
+    bind_tool_recovery_decision,
+    build_cross_plane_resilience_receipt,
+    remaining_execution_budget,
+    route_request_for_remaining_turn,
+)
+
+__all__ += [
+    "CROSS_PLANE_RESILIENCE_SCHEMA_VERSION",
+    "CrossPlaneResilienceReceipt",
+    "ResilienceBindingError",
+    "TurnAttachmentBinding",
+    "TurnAuthorityFingerprint",
+    "TurnRouteBinding",
+    "TurnToolRecoveryBinding",
+    "bind_attachment_batch",
+    "bind_route_decision",
+    "bind_tool_recovery_decision",
+    "build_cross_plane_resilience_receipt",
+    "remaining_execution_budget",
+    "route_request_for_remaining_turn",
+]

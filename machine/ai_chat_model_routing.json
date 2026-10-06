@@ -17,7 +17,8 @@
     "every fallback candidate satisfies the same immutable route request",
     "route request and route decision have deterministic sha256 evidence digests",
     "canonical and compatibility mirror routing modules are byte-identical",
-    "model routing performs no provider network call and reads no provider credential"
+    "model routing performs no provider network call and reads no provider credential",
+    "retry and failover routing consume the durable turn's remaining authority rather than restoring the original execution budget"
   ],
   "hard_constraint_fields": [
     "required_capabilities",

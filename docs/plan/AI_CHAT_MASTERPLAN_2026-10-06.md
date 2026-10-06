@@ -603,6 +603,39 @@ Next integration: replace remaining chat-inline base64/file payloads with
 durable attachment references backed by the repository's governed storage
 authority and sandbox extraction receipts.
 
+### Cross-volume resilience binding
+
+Status: **implemented candidate; exact-head qualification pending**.
+
+Implemented:
+
+- canonical model routing now accepts a durable turn snapshot and derives route
+  ceilings from **remaining** wall-time, input/output token, model-call, and
+  cost authority rather than restoring the original per-turn budget;
+- terminal turns and model-call-exhausted turns cannot reacquire routing
+  authority;
+- route decisions are rebound to immutable turn identity plus exact stage
+  snapshot and remaining-budget digests;
+- route cost, latency, input, and output ceilings are rechecked against the
+  remaining durable turn budget before cross-plane acceptance;
+- provider-receipt requirements survive routing and block post-model
+  qualification until a durable provider receipt is attached to the turn;
+- tool-recovery decisions retain approval/reconciliation requirements when
+  rebound to the turn and do not gain execution authority;
+- unresolved consequential tool effects block cross-plane qualification;
+- only context-ready, content-addressed attachment batches can be rebound to
+  the turn; quarantined attachments remain excluded;
+- one deterministic cross-plane receipt binds routing, tool-recovery,
+  attachment, provider-receipt, and turn evidence without creating a second
+  executor, router, attachment authority, or conversation store;
+- canonical and AI-compatibility model routers remain byte-identical;
+- structural and independent exact-head evidence lanes rehash the cross-plane
+  contract and its dependent runtime/routing/tool/attachment contracts.
+
+Remaining promotion work is exact-head CI plus independent verification. The
+binding remains evidence-only and cannot dispatch models, execute tools, ingest
+attachments, transition turns, or commit transcript state.
+
 ### Volume 8 — evidence and citation plane
 
 Add freshness classification, source quality, claim mapping, and citation
