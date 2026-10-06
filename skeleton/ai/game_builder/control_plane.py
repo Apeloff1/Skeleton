@@ -107,6 +107,12 @@ class ForgeControlPlane:
                 raise ControlPlaneError(
                     "evaluator panel decision does not match submitted candidate"
                 )
+            canonical_panel_decision = self.evaluation_panel.decide(submitted.digest)
+            if canonical_panel_decision.decision_digest != panel_decision.decision_digest:
+                raise ControlPlaneError(
+                    "panel decision is not the canonical decision from the bound evaluator panel"
+                )
+            panel_decision = canonical_panel_decision
             gates.append(
                 GateResult(
                     "evaluator_panel",
