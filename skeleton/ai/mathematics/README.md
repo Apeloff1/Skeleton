@@ -67,6 +67,10 @@ model authority boundaries.
 - `special_functions.py` — stable log-domain arithmetic, sigmoid/logit, softplus inverse and log-cosh.
 - `signal2.py` — standard windows, cross-correlation, rolling mean/RMS and linear detrending.
 - `distances.py` — Minkowski/Canberra/Bray-Curtis/cosine and set/weighted-Jaccard reference metrics.
+- `svd.py` — thin SVD, pseudoinverse and least-norm solves with reconstruction/projection evidence.
+- `quadrature2.py` — generated Gauss-Legendre rules and composite Gaussian quadrature.
+- `finite_difference.py` — grid derivatives, Dirichlet Poisson solves and explicit-diffusion stability bounds.
+- `entropy2.py` — Rényi/Tsallis/Gini plus mutual, conditional and variation-of-information metrics.
 - `validation.py` — parity evidence against existing optimized runtime kernels.
 
 ## Guarantees
@@ -111,6 +115,10 @@ model authority boundaries.
 - Stable scalar transforms keep log-domain subtraction/complements numerically meaningful near probability boundaries.
 - Signal diagnostics make window length and normalization contracts explicit and use least-squares detrending.
 - Distance primitives distinguish metric-domain assumptions such as non-negative weighted Jaccard inputs.
+- SVD keeps numerical rank explicit and verifies both reconstruction and Moore-Penrose projection identities.
+- Gaussian quadrature derives its own Legendre nodes/weights and bounds supported order explicitly.
+- Finite-difference PDE helpers expose their sign convention, boundary conditions and residual evidence.
+- Generalized information metrics normalize joint distributions explicitly and reject contradictory support.
 - `audit_runtime_kernels()` compares optimized runtime softmax, matmul and attention against
   this reference substrate without replacing those kernels.
 

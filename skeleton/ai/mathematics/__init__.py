@@ -89,11 +89,26 @@ from .distributions import (
     poisson_log_pmf,
     student_t_log_pdf,
 )
+from .entropy2 import (
+    conditional_entropy_y_given_x,
+    gini_impurity,
+    mutual_information,
+    renyi_entropy,
+    tsallis_entropy,
+    variation_of_information,
+)
 from .eigensystems import (
     PCAReport,
     SymmetricEigensystemReport,
     principal_components,
     symmetric_eigensystem,
+)
+from .finite_difference import (
+    Poisson1DReport,
+    explicit_diffusion_stable_step,
+    first_derivative_grid,
+    second_derivative_grid,
+    solve_poisson_dirichlet_1d,
 )
 from .geometry import (
     ProjectionReport,
@@ -193,6 +208,12 @@ from .probability import (
     normalize_distribution,
     weighted_moments,
 )
+from .quadrature2 import (
+    GaussLegendreRule,
+    GaussianQuadratureReport,
+    gauss_legendre_integrate,
+    gauss_legendre_rule,
+)
 from .resampling import BootstrapReport, JackknifeReport, bootstrap, jackknife
 from .robust import (
     HuberLocationReport,
@@ -226,6 +247,13 @@ from .sequence import (
     dynamic_time_warping,
     levenshtein_distance,
     normalized_levenshtein_distance,
+)
+from .svd import (
+    PseudoinverseReport,
+    SVDReport,
+    least_norm_solve,
+    pseudoinverse,
+    singular_value_decomposition,
 )
 from .stochastic import (
     HittingTimeReport,
@@ -374,10 +402,21 @@ __all__ = [
     "normal_quantile",
     "poisson_log_pmf",
     "student_t_log_pdf",
+    "conditional_entropy_y_given_x",
+    "gini_impurity",
+    "mutual_information",
+    "renyi_entropy",
+    "tsallis_entropy",
+    "variation_of_information",
     "PCAReport",
     "SymmetricEigensystemReport",
     "principal_components",
     "symmetric_eigensystem",
+    "Poisson1DReport",
+    "explicit_diffusion_stable_step",
+    "first_derivative_grid",
+    "second_derivative_grid",
+    "solve_poisson_dirichlet_1d",
     "ProjectionReport",
     "angular_distance",
     "barycentric_triangle",
@@ -461,6 +500,10 @@ __all__ = [
     "kl_divergence",
     "normalize_distribution",
     "weighted_moments",
+    "GaussLegendreRule",
+    "GaussianQuadratureReport",
+    "gauss_legendre_integrate",
+    "gauss_legendre_rule",
     "BootstrapReport",
     "JackknifeReport",
     "bootstrap",
@@ -491,6 +534,11 @@ __all__ = [
     "normalized_levenshtein_distance",
     "CSRMatrix",
     "sparse_dense_matmul",
+    "PseudoinverseReport",
+    "SVDReport",
+    "least_norm_solve",
+    "pseudoinverse",
+    "singular_value_decomposition",
     "HittingTimeReport",
     "absorbing_probability",
     "expected_hitting_times",
