@@ -151,7 +151,7 @@ def test_independent_architecture_verifier_accepts_closed_contract(
     monkeypatch,
 ) -> None:
     root = _valid_repo(tmp_path)
-    monkeypatch.setenv("GITHUB_SHA", "architecture-head")
+    monkeypatch.setenv("EVIDENCE_HEAD_SHA", "architecture-head")
 
     receipt = verify_repository(root)
 
