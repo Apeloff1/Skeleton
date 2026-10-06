@@ -58,8 +58,16 @@ def _producer_provenance(
     *,
     project_id: str = "project:test-game",
     run_id: str = "run:test-forge",
+    artifact_ref: str | None = None,
+    evidence_refs: tuple[str, ...] | None = None,
 ) -> ProducerProvenance:
     suffix = (token * 32)[:32]
+    default_evidence_refs = (
+        f"evidence-{suffix}",
+        f"assumption-{suffix}",
+        f"attack-{suffix}",
+        f"counterexample-{suffix}",
+    )
     return ProducerProvenance(
         project_id=project_id,
         run_id=run_id,
@@ -71,13 +79,8 @@ def _producer_provenance(
         producer_behavior_digest=canonical_digest({"behavior": token}),
         source_revision=canonical_digest({"source": token})[:40],
         provider_receipt_refs=(f"provider-receipt:{token}",),
-        output_artifact_refs=(f"artifact-{suffix}",),
-        output_evidence_refs=(
-            f"evidence-{suffix}",
-            f"assumption-{suffix}",
-            f"attack-{suffix}",
-            f"counterexample-{suffix}",
-        ),
+        output_artifact_refs=(artifact_ref or f"artifact-{suffix}",),
+        output_evidence_refs=evidence_refs or default_evidence_refs,
     )
 
 
@@ -267,12 +270,13 @@ def test_attack_rejects_cross_run_candidate_injection() -> None:
         "cross-run",
         run_id="run:other-forge",
     )
+    cross_run_suffix = ("cross-run" * 32)[:32]
     challenge = Challenge(
         challenger_id=Rival.B.value,
         target_candidate_digest=built.digest,
-        attack_digest="attack-cross-run-000000000000000000000",
+        attack_digest=f"attack-{cross_run_suffix}",
         improved_candidate=improved,
-        counterexample_digests=("counter-cross-run-0000000000000000000",),
+        counterexample_digests=(f"counterexample-{cross_run_suffix}",),
     )
     with pytest.raises(ForgeStateError, match="run_id does not match forge scope"):
         forge.submit_attack(challenge)
@@ -282,7 +286,11 @@ def test_candidate_digest_commits_to_producer_provenance() -> None:
     base = _candidate(Rival.A.value, "provenance-base")
     altered = Candidate.create(
         producer_id=base.producer_id,
-        producer_provenance=_producer_provenance("provenance-altered"),
+        producer_provenance=_producer_provenance(
+            "provenance-altered",
+            artifact_ref=base.artifact.artifact_digest,
+            evidence_refs=base.producer_provenance.output_evidence_refs,
+        ),
         artifact=base.artifact,
         quality=base.quality_map,
         evidence_digests=base.evidence_digests,
@@ -290,6 +298,106 @@ def test_candidate_digest_commits_to_producer_provenance() -> None:
         parent_candidate_digests=base.parent_candidate_digests,
     )
     assert altered.artifact == base.artifact
+    assert altered.digest != base.digest
+
+
+def test_candidate_rejects_artifact_not_committed_by_execution() -> None:
+    provenance = _producer_provenance("output-artifact")
+    suffix = ("output-artifact" * 32)[:32]
+    with pytest.raises(
+        ValueError,
+        match="artifact must be referenced by producer execution output",
+    ):
+        Candidate.create(
+            producer_id=Rival.A.value,
+            producer_provenance=provenance,
+            artifact=ArtifactIdentity(
+                artifact_digest="artifact-substituted-0000000000000000",
+                canon_digest=f"canon-{suffix}",
+                provenance_digest=f"provenance-{suffix}",
+                family_id="GB03",
+                level_id="GBL-021",
+            ),
+            quality=_quality(),
+            evidence_digests=(f"evidence-{suffix}",),
+            assumption_digest=f"assumption-{suffix}",
+        )
+
+
+def test_candidate_rejects_evidence_and_assumption_not_committed_by_execution() -> None:
+    provenance = _producer_provenance("output-evidence")
+    suffix = ("output-evidence" * 32)[:32]
+    artifact = ArtifactIdentity(
+        artifact_digest=f"artifact-{suffix}",
+        canon_digest=f"canon-{suffix}",
+        provenance_digest=f"provenance-{suffix}",
+        family_id="GB03",
+        level_id="GBL-021",
+    )
+    with pytest.raises(
+        ValueError,
+        match="evidence must be referenced by producer execution output",
+    ):
+        Candidate.create(
+            producer_id=Rival.A.value,
+            producer_provenance=provenance,
+            artifact=artifact,
+            quality=_quality(),
+            evidence_digests=("evidence-substituted-000000000000000",),
+            assumption_digest=f"assumption-{suffix}",
+        )
+    with pytest.raises(
+        ValueError,
+        match="assumption must be referenced by producer execution output",
+    ):
+        Candidate.create(
+            producer_id=Rival.A.value,
+            producer_provenance=provenance,
+            artifact=artifact,
+            quality=_quality(),
+            evidence_digests=(f"evidence-{suffix}",),
+            assumption_digest="assumption-substituted-0000000000000",
+        )
+
+
+def test_challenge_rejects_attack_or_counterexample_not_emitted_by_execution() -> None:
+    target = _candidate(Rival.A.value, "challenge-target")
+    improved = _candidate(Rival.B.value, "challenge-output")
+    with pytest.raises(
+        ValueError,
+        match="attack must be referenced by challenger execution output",
+    ):
+        Challenge(
+            challenger_id=Rival.B.value,
+            target_candidate_digest=target.digest,
+            attack_digest="attack-substituted-000000000000000000",
+            improved_candidate=improved,
+            counterexample_digests=(
+                improved.producer_provenance.output_evidence_refs[-1],
+            ),
+        )
+    suffix = ("challenge-output" * 32)[:32]
+    with pytest.raises(
+        ValueError,
+        match="counterexamples must be referenced by challenger execution output",
+    ):
+        Challenge(
+            challenger_id=Rival.B.value,
+            target_candidate_digest=target.digest,
+            attack_digest=f"attack-{suffix}",
+            improved_candidate=improved,
+            counterexample_digests=("counterexample-substituted-000000000000",),
+        )
+
+
+def test_output_binding_digest_changes_when_execution_refs_change() -> None:
+    base = _producer_provenance("binding-digest")
+    altered = _producer_provenance(
+        "binding-digest",
+        evidence_refs=base.output_evidence_refs + ("extra-evidence-0000000000000000",),
+    )
+    assert altered.finalization_intent_digest == base.finalization_intent_digest
+    assert altered.output_binding_digest != base.output_binding_digest
     assert altered.digest != base.digest
 
 
