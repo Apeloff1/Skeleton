@@ -1,0 +1,149 @@
+name: AI Chat Runtime Closure
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/assistant/turn_runtime.py"
+      - "skeleton/ai/assistant/__init__.py"
+      - "skeleton/ai/assistant/streaming.py"
+      - "skeleton/testing/test_ai_chat_turn_runtime.py"
+      - "skeleton/testing/test_ai_chat_streaming.py"
+      - "skeleton/persistence/chat_turn_repository.py"
+      - "skeleton/testing/test_ai_chat_turn_repository.py"
+      - "backend/core/chat_turns.py"
+      - "backend/tests/test_ai_chat_turn_persistence.py"
+      - "skeleton/testing/test_ai_assistant_runtime.py"
+      - "skeleton/testing/test_ai_assistant_manifest.py"
+      - "machine/ai_chat_runtime_contract.json"
+      - "machine/ai_assistant_control_plane.json"
+      - "scripts/check_ai_chat_runtime.py"
+      - "scripts/verify_ai_chat_runtime.py"
+      - "tests/test_ai_chat_runtime_contract.py"
+      - "docs/plan/AI_CHAT_MASTERPLAN_2026-10-06.md"
+      - ".github/workflows/ai-chat-runtime-closure.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-chat-runtime-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  turn-runtime:
+    name: Durable AI chat turn runtime
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      OPENAI_API_KEY: ""
+      ANTHROPIC_API_KEY: ""
+      GOOGLE_API_KEY: ""
+      XAI_API_KEY: ""
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install project test runtime
+        run: python -m pip install --disable-pip-version-check -e ".[dev]"
+
+      - name: Validate AI chat runtime structure
+        run: python scripts/check_ai_chat_runtime.py
+
+      - name: Compile AI chat and repaired deferred runtime
+        run: >-
+          python -m compileall -q
+          skeleton/ai/assistant
+          skeleton/persistence/chat_turn_repository.py
+          backend/core/chat_turns.py
+          skeleton/ai/runtime/deferred
+
+      - name: Run AI chat and inherited assistant regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_ai_chat_turn_runtime.py
+          skeleton/testing/test_ai_chat_streaming.py
+          skeleton/testing/test_ai_chat_turn_repository.py
+          backend/tests/test_ai_chat_turn_persistence.py
+          skeleton/testing/test_ai_assistant_runtime.py
+          skeleton/testing/test_ai_assistant_manifest.py
+          tests/test_ai_chat_runtime_contract.py
+
+      - name: Emit exact-head AI chat runtime evidence
+        env:
+          CHAT_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/check_ai_chat_runtime.py
+          --head-sha "$CHAT_HEAD_SHA"
+          --evidence-out .ai-chat-runtime.json
+          --print-evidence
+
+      - name: Independently rehash exact-head evidence
+        env:
+          CHAT_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_ai_chat_runtime.py
+          .ai-chat-runtime.json
+          --head-sha "$CHAT_HEAD_SHA"
+          --evidence-out .ai-chat-runtime-independent.json
+          --print-evidence
+
+      - name: Assert closure receipts
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          structural = json.loads(
+              Path(".ai-chat-runtime.json").read_text(encoding="utf-8")
+          )
+          independent = json.loads(
+              Path(".ai-chat-runtime-independent.json").read_text(encoding="utf-8")
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+
+          if structural.get("head_sha") != expected:
+              raise SystemExit("AI chat structural receipt is not exact-head")
+          if structural.get("valid") is not True or structural.get("errors"):
+              raise SystemExit("AI chat structural verifier failed")
+          if len(structural.get("digests") or {}) != 13:
+              raise SystemExit("AI chat structural digest coverage is incomplete")
+          if len(structural.get("evidence_digest") or "") != 64:
+              raise SystemExit("AI chat structural evidence digest is missing")
+
+          if independent.get("expected_head") != expected:
+              raise SystemExit("AI chat independent receipt is not exact-head")
+          if (
+              independent.get("verifier")
+              != "independent-ai-chat-runtime-rehasher-v1"
+          ):
+              raise SystemExit("unexpected AI chat independent verifier")
+          if independent.get("valid") is not True or independent.get("errors"):
+              raise SystemExit("AI chat independent verifier failed")
+          if (
+              independent.get("structural_evidence_digest")
+              != independent.get("recomputed_structural_evidence_digest")
+          ):
+              raise SystemExit("AI chat structural evidence was not rehashed")
+          for field in ("contract_digest", "receipt_digest", "verifier_digest"):
+              if len(independent.get(field) or "") != 64:
+                  raise SystemExit(f"AI chat independent {field} is missing")
+          print("AI chat runtime exact-head closure verified:", expected)
+          PY
