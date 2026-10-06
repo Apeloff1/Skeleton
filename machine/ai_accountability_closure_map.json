@@ -102,7 +102,7 @@
       "workflow_name": "Context Compiler Closure Gate",
       "verifier_script": "scripts/verify_context_compiler_closure.py",
       "expected_receipt_verifier": "independent-context-compiler-v1",
-      "expected_script_sha256": "2d6b98944f86fbde28bf2fff6aaaa64314bee82d012028a3e3f147b447ab4256"
+      "expected_script_sha256": "239a5f067fe832cddf549b47757f97b0f2a4e34f9c8df371beb8d968475a57ee"
     },
     {
       "key": "S2-PROTO",
