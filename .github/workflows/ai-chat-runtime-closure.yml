@@ -8,7 +8,9 @@ on:
     paths:
       - "skeleton/ai/assistant/turn_runtime.py"
       - "skeleton/ai/assistant/__init__.py"
+      - "skeleton/ai/assistant/streaming.py"
       - "skeleton/testing/test_ai_chat_turn_runtime.py"
+      - "skeleton/testing/test_ai_chat_streaming.py"
       - "skeleton/persistence/chat_turn_repository.py"
       - "skeleton/testing/test_ai_chat_turn_repository.py"
       - "backend/core/chat_turns.py"
@@ -74,6 +76,7 @@ jobs:
         run: >-
           python -m pytest -q --noconftest
           skeleton/testing/test_ai_chat_turn_runtime.py
+          skeleton/testing/test_ai_chat_streaming.py
           skeleton/testing/test_ai_chat_turn_repository.py
           backend/tests/test_ai_chat_turn_persistence.py
           skeleton/testing/test_ai_assistant_runtime.py
@@ -120,7 +123,7 @@ jobs:
               raise SystemExit("AI chat structural receipt is not exact-head")
           if structural.get("valid") is not True or structural.get("errors"):
               raise SystemExit("AI chat structural verifier failed")
-          if len(structural.get("digests") or {}) != 11:
+          if len(structural.get("digests") or {}) != 13:
               raise SystemExit("AI chat structural digest coverage is incomplete")
           if len(structural.get("evidence_digest") or "") != 64:
               raise SystemExit("AI chat structural evidence digest is missing")
