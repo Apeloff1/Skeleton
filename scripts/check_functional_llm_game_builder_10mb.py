@@ -185,6 +185,41 @@ def main() -> int:
     if deep.get("runtime_signoff_forbidden_from_specification_alone") is not True:
         fail("deep-closure runtime signoff protection disabled")
 
+    expansion = data.get("deep_closure_expansion", {})
+    if int(expansion.get("pass", 0)) != 2:
+        fail("deep-closure expansion pass drift")
+    if expansion.get("status") != "registered-specification":
+        fail("deep-closure expansion status drift")
+    if int(expansion.get("per_plane_atoms", 0)) != 1296:
+        fail("deep-closure expansion per-plane count drift")
+    if int(expansion.get("total_atoms", 0)) != expected_deep_total:
+        fail("deep-closure expansion total count drift")
+    shape = expansion.get("shape", {})
+    expected_shape = {
+        "planes": len(shards),
+        "subsystems_per_plane": 12,
+        "lifecycle_stages": len(lifecycle),
+        "adversarial_profiles": len(deep.get("stress_profiles", [])),
+    }
+    if shape != expected_shape:
+        fail("deep-closure expansion shape drift")
+    if expansion.get("required_heading") != "## Deep Functional Closure Expansion — Pass 2":
+        fail("deep-closure expansion heading contract drift")
+    if expansion.get("atom_prefix") != "FLGBX":
+        fail("deep-closure expansion atom prefix drift")
+    semantics = expansion.get("semantics")
+    if not isinstance(semantics, list) or len(semantics) < 6:
+        fail("deep-closure expansion semantics incomplete")
+    if coverage.get("deep_closure_cartesian_required") is not True:
+        fail("coverage deep-closure cartesian requirement disabled")
+    if coverage.get("deep_closure_adversarial_profiles") != deep.get("stress_profiles"):
+        fail("coverage/deep-closure adversarial profile drift")
+    for shard in shards:
+        if int(shard.get("deep_closure_pass", 0)) != 2:
+            fail(f"{shard['id']} deep-closure pass identity drift")
+        if shard.get("deep_closure_signed") is not False:
+            fail(f"{shard['id']} deep-closure specification cannot be signed")
+
     bytes_cfg = data.get("bytes", {})
     previous_total = int(bytes_cfg.get("previous_shard_total", 0))
     original_total = int(bytes_cfg.get("original_shard_total", 0))
@@ -193,6 +228,8 @@ def main() -> int:
         fail("missing previous atlas byte baseline")
     if original_total != previous_total:
         fail("original/previous atlas byte baseline drift")
+    if int(bytes_cfg.get("original_surface", original_total)) != original_total:
+        fail("original surface accounting drift")
     if int(bytes_cfg.get("double_baseline_target", 0)) != exact_double:
         fail("literal doubled baseline target drift")
     requested_minimum = int(bytes_cfg.get("requested_minimum", 0))
@@ -210,11 +247,16 @@ def main() -> int:
         fail(f"aggregate specification bytes below doubled minimum: {total}")
     if total != int(bytes_cfg["shard_total"]):
         fail("aggregate byte total stale")
-    if int(bytes_cfg.get("pass2_net_growth", -1)) != total - previous_total:
+    expected_growth = total - previous_total
+    if int(bytes_cfg.get("pass2_net_growth", -1)) != expected_growth:
         fail("pass-2 net-growth accounting stale")
+    if int(bytes_cfg.get("expansion_delta", expected_growth)) != expected_growth:
+        fail("expansion-delta accounting stale")
     expected_factor = round(total / previous_total, 4)
     if round(float(bytes_cfg.get("expansion_factor", 0.0)), 4) != expected_factor:
         fail("expansion-factor accounting stale")
+    if round(float(bytes_cfg.get("actual_vs_original_ratio", expected_factor)), 4) != expected_factor:
+        fail("actual-vs-original ratio accounting stale")
     if bytes_cfg.get("human_index_sync_required") is not True:
         fail("human index byte-ledger synchronization disabled")
     if int(bytes_cfg.get("human_index_shard_total", -1)) != total:
