@@ -986,7 +986,11 @@
           "skeleton/app",
           "skeleton/persistence/operation_runtime.py",
           "skeleton/api/server.py",
-          "machine/manifest.json"
+          "machine/manifest.json",
+          "machine/runtime_supervision.json",
+          "scripts/check_architecture_runtime_supervision.py",
+          "skeleton/kernel/runtime_supervision.py",
+          "skeleton/ai/runtime/kernel/runtime_supervision.py"
         ],
         "risks": [
           "orphan tasks",
@@ -994,20 +998,35 @@
           "shutdown ordering data loss"
         ],
         "gaps": [
-          "unify service supervision semantics across backend and engine",
-          "expand cancellation propagation coverage into all connectors"
+          "independent exact-head VOL-004 Runtime Supervision Closure qualification remains pending"
         ],
         "tests": [
           "skeleton/testing/test_app_assembly.py",
           "skeleton/testing/test_operation_runtime.py",
-          "skeleton/testing/test_operation_server_binding.py"
+          "skeleton/testing/test_operation_server_binding.py",
+          "tests/test_architecture_runtime_supervision.py",
+          "skeleton/testing/test_vol004_runtime_supervision_v2.py",
+          "skeleton/testing/test_kernel_supervisor_cancellation.py",
+          "backend/tests/test_engine_cross_service_closure.py",
+          "backend/tests/test_engine_cross_service_closure.py::test_cross_service_cancel_fences_late_provider_result"
         ],
         "evaluations": [
-          "planned:crash-at-every-lifecycle-boundary suite",
-          "planned:shutdown/cancellation latency evaluation"
+          "python scripts/check_architecture_runtime_supervision.py --json",
+          ".github/workflows/vol004-runtime-supervision.yml",
+          "skeleton/testing/test_vol004_runtime_supervision_v2.py",
+          "adversarial lifecycle state/lease/restart race suite",
+          "cross-service durable cancellation and late-result fencing journey",
+          "network-transport connector cancellation inventory convergence"
         ],
         "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/be408977891328b78522074c1fe693267b01ce5b"
+          "https://github.com/Apeloff1/Skeleton/commit/be408977891328b78522074c1fe693267b01ce5b",
+          "docs/architecture/RUNTIME_SUPERVISION.md",
+          "machine/runtime_supervision.json",
+          "scripts/check_architecture_runtime_supervision.py",
+          "skeleton/kernel/runtime_supervision.py",
+          "skeleton/ai/runtime/kernel/runtime_supervision.py",
+          "skeleton/testing/test_vol004_runtime_supervision_v2.py",
+          "tests/test_architecture_runtime_supervision.py"
         ]
       },
       "implementation_levels": [
@@ -1027,8 +1046,8 @@
           "id": "L01",
           "name": "Architecture & dependencies",
           "implementation_notes": [
-            "Canonical implementation surfaces: skeleton/app, skeleton/persistence/operation_runtime.py, skeleton/api/server.py, machine/manifest.json.",
-            "State authority must distinguish durable truth from projection/cache/ephemeral data; projection loss must be recoverable from authority."
+            "Canonical implementation surfaces: skeleton/app, skeleton/persistence/operation_runtime.py, skeleton/api/server.py, machine/manifest.json, machine/runtime_supervision.json, scripts/check_architecture_runtime_supervision.py, skeleton/kernel/runtime_supervision.py, skeleton/ai/runtime/kernel/runtime_supervision.py.",
+            "Runtime supervision is a first-class kernel boundary: engine, backend, provider and automation surfaces delegate lifecycle, readiness, cancellation, leases and shutdown to the canonical runtime-supervision owner rather than maintaining private process-local authority."
           ],
           "acceptance": [
             "Dependencies are declared, acyclic at the governed layer, and compatible with machine/architecture.json.",
@@ -1099,8 +1118,8 @@
           "id": "L07",
           "name": "Failure, resilience & recovery",
           "implementation_notes": [
-            "Open obligations: unify service supervision semantics across backend and engine | expand cancellation propagation coverage into all connectors.",
-            "Define timeout outcome semantics, retry budget, circuit/bulkhead/backpressure behavior, crash boundary, replay behavior, and recovery checkpoint for Kernel & Execution Foundation."
+            "Open obligations: independent exact-head VOL-004 Runtime Supervision Closure qualification remains pending.",
+            "Qualification injects lifecycle races at start, drain, cancellation, provider completion, lease turnover and process restart boundaries; stale callbacks and late provider results are fenced from changing terminal or newer-generation state."
           ],
           "acceptance": [
             "Fault injection covers dependency down/slow, crash-before/after-commit, replay, saturation, cancellation, stale evidence/worker, and rollback.",
@@ -1135,9 +1154,9 @@
           "id": "L10",
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
-            "Focused test surfaces: skeleton/testing/test_app_assembly.py, skeleton/testing/test_operation_runtime.py, skeleton/testing/test_operation_server_binding.py.",
-            "Evaluation surfaces: planned:crash-at-every-lifecycle-boundary suite, planned:shutdown/cancellation latency evaluation.",
-            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
+            "Focused tests: skeleton/testing/test_app_assembly.py, skeleton/testing/test_operation_runtime.py, skeleton/testing/test_operation_server_binding.py, tests/test_architecture_runtime_supervision.py, skeleton/testing/test_vol004_runtime_supervision_v2.py, skeleton/testing/test_kernel_supervisor_cancellation.py, backend/tests/test_engine_cross_service_closure.py, backend/tests/test_engine_cross_service_closure.py::test_cross_service_cancel_fences_late_provider_result.",
+            "Evaluations: python scripts/check_architecture_runtime_supervision.py --json, .github/workflows/vol004-runtime-supervision.yml, skeleton/testing/test_vol004_runtime_supervision_v2.py, adversarial lifecycle state/lease/restart race suite, cross-service durable cancellation and late-result fencing journey, network-transport connector cancellation inventory convergence.",
+            "Verification must prove cancellation propagation, stale-generation fencing, draining-state admission denial, restart-safe supervision and cross-service closure against the same exact-head runtime contract."
           ],
           "acceptance": [
             "Happy path, negative, adversarial, concurrency and recovery behavior are all exercised.",
@@ -1186,7 +1205,7 @@
         "Bind workload/dataset, model/provider where applicable, environment/hardware, policy/contracts, scorer, cost/resource budget, raw-result digest, and verifier verdict.",
         "Evidence expires when governed source, contract, policy, evaluator, or operating envelope changes."
       ],
-      "completion_rule": "Do not sign enterprise qualification from prose, file existence, LOC, happy-path tests, or legacy implementation status. Sign only after exact-head dossier requirements and enterprise gates pass."
+      "completion_rule": "Do not sign VOL-004 from implementation presence. Enterprise qualification requires the repaired masterplan, runtime-supervision architecture validator, focused lifecycle/cancellation/fencing tests, exact-head VOL-004 closure workflow, recovery evidence, and applicable enterprise superiority evidence to agree on one current source identity."
     },
     {
       "volume_ref": "VOL-005",
