@@ -33,7 +33,8 @@
     "advanced_ai_structure": "machine/advanced_ai_structure_100.json",
     "advanced_ai_structure_manual": "docs/plan/ADVANCED_AI_100_LEVELS.md",
     "advanced_ai_structure_validator": "scripts/check_advanced_ai_structure.py",
-    "advanced_ai_structure_independent_verifier": "scripts/verify_advanced_ai_structure.py"
+    "advanced_ai_structure_independent_verifier": "scripts/verify_advanced_ai_structure.py",
+    "advanced_ai_maturity_ledger": "machine/advanced_ai_maturity_ledger.json"
   },
   "objectives": [
     "one product shell",
