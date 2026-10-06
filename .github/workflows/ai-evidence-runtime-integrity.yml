@@ -31,6 +31,7 @@ on:
       - "tests/test_runtime_replay_terminal_contract.py"
       - "tests/test_runtime_capsule.py"
       - "tests/test_runtime_attestation.py"
+      - "tests/test_runtime_attestation.py"
       - "tests/test_session_audit.py"
       - "tests/test_session_audit_supersession.py"
       - "tests/test_ai_evidence_runtime_attestation_integrity.py"
@@ -62,6 +63,7 @@ on:
       - "tests/test_runtime_replay.py"
       - "tests/test_runtime_replay_terminal_contract.py"
       - "tests/test_runtime_capsule.py"
+      - "tests/test_runtime_attestation.py"
       - "tests/test_runtime_attestation.py"
       - "tests/test_session_audit.py"
       - "tests/test_session_audit_supersession.py"
@@ -137,6 +139,7 @@ jobs:
           skeleton/learning/school/runtime_attestation.py
           skeleton/school/runtime_attestation.py
           tests/test_ai_evidence_runtime_attestation_integrity.py
+          tests/test_runtime_attestation.py
 
       - name: Verify canonical AI namespace parity
         run: |
@@ -206,6 +209,7 @@ jobs:
           tests/test_runtime_replay.py
           tests/test_runtime_replay_terminal_contract.py
           tests/test_runtime_capsule.py
+          tests/test_runtime_attestation.py
           tests/test_session_audit.py
           tests/test_session_audit_supersession.py
           tests/test_ai_evidence_runtime_attestation_integrity.py
