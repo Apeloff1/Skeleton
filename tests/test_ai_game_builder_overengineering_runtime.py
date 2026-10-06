@@ -752,6 +752,28 @@ def test_forge_release_binding_rejects_self_consistent_incomplete_checkpoint() -
         )
 
 
+def test_release_reconstruction_rejects_rehashed_checkpoint_without_external_match() -> None:
+    forge = DualRivalForge(
+        effort_mode=100,
+        champion=_candidate("seed", "release-anchor", 0.5),
+    )
+    checkpoint = forge.checkpoint()
+    tampered = {
+        key: value
+        for key, value in checkpoint.items()
+        if key != "checkpoint_digest"
+    }
+    tampered["project_id"] = "project:substituted"
+    tampered["checkpoint_digest"] = canonical_digest(tampered)
+
+    with pytest.raises(ValueError, match="trusted external anchor"):
+        ForgeReleaseBinding.from_checkpoint(
+            tampered,
+            expected_checkpoint_digest=checkpoint["checkpoint_digest"],
+            receipts=(),
+        )
+
+
 def test_gold_master_failed_critical_gate_blocks_release() -> None:
     families = [
         FamilyQualification(
