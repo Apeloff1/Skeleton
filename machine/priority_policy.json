@@ -6,10 +6,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-094",
     "title": "Priority Engine",
-    "required_gap_texts": [
-      "define priority factor schema",
-      "add anti-starvation constraints"
-    ]
+    "required_gap_texts": []
   },
   "partitions": [
     {
