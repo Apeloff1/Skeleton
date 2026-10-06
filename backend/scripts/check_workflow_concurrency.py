@@ -43,8 +43,8 @@ REF_NAME_RE = re.compile(
     r"inputs\.[A-Za-z][A-Za-z0-9_]*)\b"
 )
 SAFE_IDENTITY_RE = re.compile(
-    r"\\b(?:github\\.(?:ref|sha|repository|workflow|run_id|event_name)|"
-    r"github\\.event\\.workflow_run\\.(?:head_sha|workflow_id))\\b"
+    r"\b(?:github\.(?:ref|sha|repository|workflow|run_id|event_name)|"
+    r"github\.event\.workflow_run\.(?:head_sha|workflow_id))\b"
 )
 LITERAL_RE = re.compile(r"^['\"][^'\"]*['\"]$")
 IDENTIFIER_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
