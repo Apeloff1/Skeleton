@@ -1,0 +1,111 @@
+name: Project Self-Improvement-1000 Authority
+
+on:
+  pull_request:
+    branches: [main, codex/masterplan-learning-400-adversarial-400]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main, codex/masterplan-project-self-improvement-1000]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: project-self-improvement-1000-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate PSI-1000 project self-improvement authority
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused test dependency
+        run: python -m pip install --disable-pip-version-check --no-input "pytest>=8,<9"
+
+      - name: Compile
+        run: >-
+          python -m py_compile
+          scripts/check_project_self_improvement_1000.py
+          tests/test_project_self_improvement_1000.py
+
+      - name: Parse PSI machine authorities
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for path in [
+              "machine/project_self_improvement_1000.json",
+              "machine/project_self_improvement_epoch_contract.json",
+              "machine/project_self_improvement_idle_scheduler.json",
+          ]:
+              data = json.loads(Path(path).read_text(encoding="utf-8"))
+              print(path, data["schema_version"])
+          PY
+
+      - name: Validate PSI-1000 machine authority
+        run: python scripts/check_project_self_improvement_1000.py
+
+      - name: Run PSI-1000 regressions
+        run: python -m pytest -q --noconftest tests/test_project_self_improvement_1000.py
+
+      - name: Validate canonical masterplan registration and parse-index freshness
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+
+          master_path = Path("machine/ai_master_plan.json")
+          master = json.loads(master_path.read_text(encoding="utf-8"))
+          index = json.loads(Path("machine/ai_masterplan_parse_index.json").read_text(encoding="utf-8"))
+
+          assert master["plan_version"] == "2.1.0"
+          assert master["authority"]["project_self_improvement_1000"] == "machine/project_self_improvement_1000.json"
+          assert master["authority"]["project_self_improvement_1000_validator"] == "scripts/check_project_self_improvement_1000.py"
+          assert master["authority"]["project_self_improvement_1000_workflow"] == ".github/workflows/project-self-improvement-1000.yml"
+          assert master["authority"]["project_self_improvement_epoch_contract"] == "machine/project_self_improvement_epoch_contract.json"
+          assert master["authority"]["project_self_improvement_idle_scheduler"] == "machine/project_self_improvement_idle_scheduler.json"
+
+          actual = subprocess.check_output(["git","hash-object",str(master_path)], text=True).strip()
+          expected = index["sources"]["machine/ai_master_plan.json"]["git_blob_sha"]
+          assert actual == expected, (actual, expected)
+          print("masterplan PSI-1000 registration fresh", actual)
+          PY
+
+      - name: Confirm exact-head identity
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          d = json.loads(Path("machine/project_self_improvement_1000.json").read_text(encoding="utf-8"))
+          print(
+              "psi-1000",
+              "levels=", len(d["levels"]),
+              "strata=", len(d["strata"]),
+              "template_signed=", d["completion"]["template_signed_complete"],
+              "epoch_contract=", Path("machine/project_self_improvement_epoch_contract.json").exists(),
+              "idle_scheduler=", Path("machine/project_self_improvement_idle_scheduler.json").exists(),
+              "head=", os.environ["EXPECTED_SHA"],
+          )
+          PY
