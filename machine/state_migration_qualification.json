@@ -555,12 +555,57 @@
         "skeleton/testing/test_state_recovery_drill.py",
         "skeleton/memory/projection.py"
       ]
+    },
+    {
+      "id": "conversation-mongo-compatibility",
+      "domains": [
+        "conversation-thread-state",
+        "conversation-message-state"
+      ],
+      "kind": "authoritative-mongo-idempotency-ordering-and-lineage-compatibility",
+      "command": "python -m pytest -q backend/tests/test_conversations_api.py",
+      "evidence_refs": [
+        "backend/core/conversations.py",
+        "backend/tests/test_conversations_api.py",
+        "frontend/src/product/conversationClient.ts"
+      ]
+    },
+    {
+      "id": "governance-lifecycle-sqlite-compatibility",
+      "domains": [
+        "governance-lifecycle-registry"
+      ],
+      "kind": "governance-state-schema-retention-delete-and-runtime-binding",
+      "command": "python -m pytest -q skeleton/testing/test_data_lifecycle.py skeleton/testing/test_governance_runtime_binding.py",
+      "evidence_refs": [
+        "skeleton/vault/data_lifecycle.py",
+        "skeleton/vault/governance_registry.py",
+        "skeleton/testing/test_data_lifecycle.py",
+        "skeleton/testing/test_governance_runtime_binding.py"
+      ]
+    },
+    {
+      "id": "local-reference-provenance-format-compatibility",
+      "domains": [
+        "local-reference-provenance"
+      ],
+      "kind": "checksum-framing-schema-and-roundtrip-compatibility",
+      "command": "python -m pytest -q skeleton/testing/test_reference_provenance.py",
+      "evidence_refs": [
+        "skeleton/cortex/reference_provenance.py",
+        "skeleton/testing/test_reference_provenance.py",
+        "docs/architecture/REFERENCE_PROVENANCE.md"
+      ]
     }
   ],
   "required_release_tests": [
     "skeleton/testing/test_migration_compatibility.py",
     "skeleton/testing/test_state_recovery_drill.py",
     "skeleton/testing/test_state_backup_bundle.py",
-    "backend/tests/test_rag_state_authority.py"
+    "backend/tests/test_rag_state_authority.py",
+    "backend/tests/test_conversations_api.py",
+    "skeleton/testing/test_data_lifecycle.py",
+    "skeleton/testing/test_governance_runtime_binding.py",
+    "skeleton/testing/test_reference_provenance.py"
   ]
 }
