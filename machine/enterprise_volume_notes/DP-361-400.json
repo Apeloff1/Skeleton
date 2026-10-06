@@ -2,7 +2,7 @@
   "schema_version": "skeleton.enterprise_ai.implementation_notes.v1",
   "standard_version": "2026.10",
   "depth_pass": "DP-361-400",
-  "generated_from_master_plan": "1.7.0",
+  "generated_from_master_plan": "2.6.0",
   "volume_count": 40,
   "dossiers": [
     {
@@ -13,7 +13,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "GC uses reachability/retention/trust policy rather than age alone.",
@@ -56,15 +55,7 @@
         "evaluations": [
           ".github/workflows/p1-memory-retrieval-knowledge-quality.yml"
         ],
-        "existing_evidence": [
-          "skeleton/memory/reconciliation.py",
-          "tests/test_memory_reconciliation.py",
-          "git-head:939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
-          "github-actions-job:108732888770",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36359213635",
-          "https://github.com/Apeloff1/Skeleton/commit/939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
-          "https://github.com/Apeloff1/Skeleton/commit/fb6b42094c41139d866ebbbdce402f51af7dd140"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -252,7 +243,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Evaluate memory against source/current truth where possible.",
@@ -300,16 +290,7 @@
           ".github/workflows/p1-memory-retrieval-knowledge-quality.yml",
           ".github/workflows/p1-core-intelligence-bundle.yml"
         ],
-        "existing_evidence": [
-          "skeleton/memory/reconciliation.py",
-          "tests/test_memory_reconciliation.py",
-          "git-head:939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
-          "github-actions-job:108732888770",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36359213635",
-          "https://github.com/Apeloff1/Skeleton/commit/939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
-          "https://github.com/Apeloff1/Skeleton/commit/fb6b42094c41139d866ebbbdce402f51af7dd140",
-          "git-head:0338bd4519e33e574ced4705b414f4b7345b4a7b"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -497,7 +478,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Include conflicting, stale and poisoned memories in evaluation.",
@@ -540,13 +520,7 @@
         "evaluations": [
           ".github/workflows/p1-memory-retrieval-knowledge-quality.yml"
         ],
-        "existing_evidence": [
-          "git-head:939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
-          "github-actions-job:108732888770",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36359213635",
-          "https://github.com/Apeloff1/Skeleton/commit/939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
-          "https://github.com/Apeloff1/Skeleton/commit/fb6b42094c41139d866ebbbdce402f51af7dd140"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -734,7 +708,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Every mutation records predecessor/version and source.",
@@ -772,13 +745,7 @@
         "evaluations": [
           "planned:concurrent update evaluation"
         ],
-        "existing_evidence": [
-          "skeleton/contracts/memory_record.py",
-          "skeleton/persistence/memory_repository.py",
-          "skeleton/testing/test_memory_repository.py",
-          "skeleton/testing/test_mongo_memory_repository.py",
-          "https://github.com/Apeloff1/Skeleton/commit/39f4b48424133d3823c1d9dc17952135778852fc"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -966,7 +933,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Reconciliation never silently merges different scopes/users/projects.",
@@ -1003,12 +969,7 @@
         "evaluations": [
           "planned:conflict resolution benchmark"
         ],
-        "existing_evidence": [
-          "skeleton/memory/reconciliation.py",
-          "skeleton/persistence/memory_repository.py",
-          "tests/test_memory_reconciliation.py",
-          "https://github.com/Apeloff1/Skeleton/commit/fb6b42094c41139d866ebbbdce402f51af7dd140"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -1196,7 +1157,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Strategies are versioned capabilities, not hidden prompt fragments.",
@@ -1418,7 +1378,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Selection remains within allowed strategy set and budgets.",
@@ -1640,7 +1599,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Attribute cost by operation/strategy/model/version.",
@@ -1862,7 +1820,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Keep task fixtures/versioned scorers stable enough for comparisons.",
@@ -1911,16 +1868,7 @@
           ".github/workflows/p1-core-intelligence-bundle.yml",
           ".github/workflows/p1-regression-corpus.yml"
         ],
-        "existing_evidence": [
-          "git-head:0338bd4519e33e574ced4705b414f4b7345b4a7b",
-          "github-actions-job:109014996463",
-          "github-actions-job:109014994255",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36447945816",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36447945487",
-          "https://github.com/Apeloff1/Skeleton/commit/0338bd4519e33e574ced4705b414f4b7345b4a7b",
-          "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
-          "github-actions-job:109096147873"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -2108,7 +2056,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Verifier is independent of planner for high-risk plans.",
@@ -2156,16 +2103,7 @@
           ".github/workflows/p1-plan-verification.yml",
           ".github/workflows/p1-core-intelligence-bundle.yml"
         ],
-        "existing_evidence": [
-          "skeleton/intelligence/plan_verifier.py",
-          "skeleton/ai/runtime/intelligence/plan_verifier.py",
-          "skeleton/testing/test_plan_static_analyzer.py",
-          "skeleton/testing/test_plan_cycles.py",
-          "skeleton/testing/test_plan_simulation.py",
-          "skeleton/testing/test_plan_qualification.py",
-          "skeleton/testing/test_plan_execution_admission.py",
-          ".github/workflows/p1-plan-verification.yml"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -2353,7 +2291,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Analysis is deterministic over versioned plan IR.",
@@ -2575,7 +2512,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Simulation receipts are marked non-production evidence.",
@@ -2797,7 +2733,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Composition cannot aggregate permissions into broader authority.",
@@ -3019,7 +2954,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Dependencies are versioned and typed.",
@@ -3241,7 +3175,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Health distinguishes transport success from semantic correctness.",
@@ -3463,7 +3396,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Discovery data is untrusted until validated/signed according to source.",
@@ -3685,7 +3617,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Tool output is data, not instructions or authority.",
@@ -3907,7 +3838,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Ledger entries are durable before/after effects according to operation class.",
@@ -4129,7 +4059,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Compensation semantics are explicit and not assumed equivalent to rollback.",
@@ -4351,7 +4280,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Saga state is durable and resumable across process failure.",
@@ -4610,12 +4538,7 @@
         "evaluations": [
           ".github/workflows/p1-model-placement.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102424008",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473821015",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -4839,12 +4762,7 @@
         "evaluations": [
           ".github/workflows/p1-model-placement.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102424008",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473821015",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -5512,12 +5430,7 @@
         "evaluations": [
           ".github/workflows/p1-model-placement.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102424008",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473821015",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -5742,12 +5655,7 @@
         "evaluations": [
           ".github/workflows/p1-batching-autoscaling.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102423944",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473821066",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -6638,12 +6546,7 @@
         "evaluations": [
           ".github/workflows/p1-batching-autoscaling.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102423944",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473821066",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -6867,12 +6770,7 @@
         "evaluations": [
           ".github/workflows/p1-capacity-qualification.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102424598",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473820988",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -7096,12 +6994,7 @@
         "evaluations": [
           ".github/workflows/p1-model-placement.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102424008",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473821015",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -8213,12 +8106,7 @@
         "evaluations": [
           ".github/workflows/p1-model-placement.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102424008",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473821015",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -8443,12 +8331,7 @@
         "evaluations": [
           ".github/workflows/p1-remote-worker-trust.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102424893",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473820961",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -8672,12 +8555,7 @@
         "evaluations": [
           ".github/workflows/p1-remote-worker-trust.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102424893",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473820961",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
