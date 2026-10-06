@@ -8,10 +8,57 @@ from skeleton.school.runtime_replay import RuntimeReplaySnapshot
 from skeleton.school.session_runtime import SessionEvent, SessionPhase
 
 
+@pytest.fixture
+def ledger():
+    value = DecisionLedger()
+    value.register_evidence(
+        EvidenceRef(
+            "e1",
+            EvidenceKind.OBSERVATION,
+            "skill",
+            "observed",
+            1.0,
+            "test",
+        )
+    )
+    value.append(
+        session_id="s1",
+        decision_id="s1:orient",
+        domain="session_runtime",
+        action="practice",
+        rationale=("fixture root",),
+        evidence=("e1",),
+        disposition=DecisionDisposition.ACCEPTED,
+    )
+    return value
+
+
+@pytest.fixture
+def runtime_snapshot(ledger):
+    return RuntimeReplaySnapshot.capture_verified(
+        session_id="s1",
+        phase=SessionPhase.DIAGNOSE,
+        events=(
+            SessionEvent(
+                1,
+                SessionPhase.INTAKE,
+                "session_opened",
+                (("session_id", "s1"),),
+            ),
+        ),
+        selected_policy="practice",
+        selected_policy_decision_id="s1:orient",
+        rejected_policies=(),
+        ledger=ledger,
+        pipeline_contract_digest="a" * 64,
+        provenance_digest="b" * 64,
+    )
+
+
 def test_runtime_attestation_round_trip(runtime_snapshot, ledger):
     attestation = RuntimeAttestation.capture(runtime_snapshot, ledger)
     assert verify_attestation(attestation, runtime_snapshot, ledger) == ()
-    assert attestation.session_root_decision_id == runtime_snapshot.events[0].decision_id
+    assert attestation.session_root_decision_id == "s1:orient"
     assert attestation.selected_policy_decision_id == runtime_snapshot.selected_policy_decision_id
     assert len(attestation.capsule_digest) == 64
     assert len(attestation.session_record_hashes) == len(ledger.session(runtime_snapshot.session_id))
