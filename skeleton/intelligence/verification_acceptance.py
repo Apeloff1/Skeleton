@@ -206,6 +206,7 @@ class IndependentVerificationProof:
 
     claim_id: str
     tenant_id: str
+    receipt_digest: str
     independent_check_id: str
     independent_check_digest: str
     independent_check_verified_at: datetime
@@ -219,6 +220,14 @@ class IndependentVerificationProof:
             "claim_id",
             _uuid(self.claim_id, "claim_id"),
         )
+        if (
+            not isinstance(self.receipt_digest, str)
+            or len(self.receipt_digest) != 64
+            or any(ch not in "0123456789abcdef" for ch in self.receipt_digest)
+        ):
+            raise VerificationAcceptanceError(
+                "receipt_digest must be lowercase sha256"
+            )
         object.__setattr__(
             self,
             "independent_check_id",
@@ -265,6 +274,7 @@ class IndependentVerificationProof:
             "schema_version": self.schema_version,
             "claim_id": self.claim_id,
             "tenant_id": self.tenant_id,
+            "receipt_digest": self.receipt_digest,
             "independent_check_id": self.independent_check_id,
             "independent_check_digest": self.independent_check_digest,
             "independent_check_verified_at":
@@ -281,6 +291,7 @@ class IndependentVerificationProof:
 def build_independent_verification_proof(
     *,
     claim: VerificationClaim,
+    receipt: VerificationReceipt,
     independent_check: VerificationCheck,
     generator: VerificationActorIdentity,
     verifier: VerificationActorIdentity,
@@ -289,8 +300,22 @@ def build_independent_verification_proof(
 
     if not isinstance(claim, VerificationClaim):
         raise TypeError("claim must be VerificationClaim")
+    if not isinstance(receipt, VerificationReceipt):
+        raise TypeError("receipt must be VerificationReceipt")
     if not isinstance(independent_check, VerificationCheck):
         raise TypeError("independent_check must be VerificationCheck")
+    if (
+        receipt.claim_id != claim.claim_id
+        or receipt.claim_digest != claim.digest
+        or receipt.tenant_id != claim.tenant_id
+    ):
+        raise VerificationAcceptanceError(
+            "receipt does not bind the canonical claim"
+        )
+    if not receipt.independent:
+        raise VerificationAcceptanceError(
+            "receipt does not claim independent verification"
+        )
     if independent_check.claim_id != claim.claim_id:
         raise VerificationAcceptanceError(
             "independent check belongs to another claim"
@@ -318,6 +343,7 @@ def build_independent_verification_proof(
     return IndependentVerificationProof(
         claim_id=claim.claim_id,
         tenant_id=claim.tenant_id,
+        receipt_digest=receipt.digest,
         independent_check_id=independent_check.check_id,
         independent_check_digest=_digest(
             _check_payload(independent_check)
@@ -642,9 +668,18 @@ class VerificationAcceptanceGate:
                 if (
                     independence_proof.claim_id != claim.claim_id
                     or independence_proof.tenant_id != claim.tenant_id
+                    or independence_proof.receipt_digest != receipt.digest
                 ):
                     reasons.append(
                         "independent_identity_proof_binding_mismatch"
+                    )
+                    quarantine = True
+                if (
+                    independence_proof.independent_check_verified_at
+                    > receipt.verified_at
+                ):
+                    reasons.append(
+                        "independent_check_postdates_receipt"
                     )
                     quarantine = True
                 if (
