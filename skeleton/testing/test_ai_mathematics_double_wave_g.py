@@ -66,7 +66,9 @@ def test_matrix_algebra_reference_operations() -> None:
     assert matrix_trace(matrix) == pytest.approx(5.0)
     assert frobenius_norm(matrix) == pytest.approx(math.sqrt(14.0))
     assert matrix_power(matrix, 0) == identity
-    assert matrix_power(matrix, 2) == pytest.approx(((4.0, 5.0), (0.0, 9.0)))
+    powered = matrix_power(matrix, 2)
+    assert powered[0] == pytest.approx((4.0, 5.0))
+    assert powered[1] == pytest.approx((0.0, 9.0))
 
     kron = kronecker_product(((1.0, 2.0),), ((3.0,), (4.0,)))
     assert kron[0] == pytest.approx((3.0, 6.0))

@@ -57,7 +57,7 @@ def isotonic_regression(
             right = blocks[-1]
             left_mean = float(left[3]) / float(left[2])
             right_mean = float(right[3]) / float(right[2])
-            if left_mean <= right_mean:
+            if left_mean < right_mean:
                 break
             merged = [
                 int(left[0]),

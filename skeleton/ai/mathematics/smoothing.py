@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from numbers import Real
 from typing import Sequence
 
-from .combinatorics import binomial_coefficient
 from .contracts import MathInvariantError, Vector, finite_vector, positive_scalar
 from .decompositions import least_squares
 

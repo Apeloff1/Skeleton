@@ -22,10 +22,10 @@ from skeleton.ai.mathematics import (
 
 def test_weighted_isotonic_regression_pools_violations() -> None:
     report = isotonic_regression((3.0, 1.0, 2.0, 5.0), weights=(1.0, 1.0, 2.0, 1.0))
-    assert report.fitted == pytest.approx((1.75, 1.75, 1.75, 5.0))
+    assert report.fitted == pytest.approx((2.0, 2.0, 2.0, 5.0))
     assert all(left <= right for left, right in zip(report.fitted, report.fitted[1:]))
     assert len(report.blocks) == 2
-    assert report.weighted_squared_error == pytest.approx(2.75)
+    assert report.weighted_squared_error == pytest.approx(2.0)
 
 
 def test_decreasing_isotonic_preserves_requested_order() -> None:
