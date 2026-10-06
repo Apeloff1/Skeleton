@@ -886,3 +886,12 @@ Two internal rivals execute the exact `construct -> attack_and_improve -> reconc
 The overlay stack is cumulative. Advanced-AI-100, Frontier-96, CS-300, Learning-400/Adversarial-400, PSI-1000, ESS-1000, Competitive-200 and Game-Builder-500 remain simultaneously authoritative unless an explicit supersession record names the retired authority.
 
 A reconciliation may not lower `plan_version`, remove a live registered overlay, replace a non-empty authority with an empty blob, remove the only validator/test/workflow for a live overlay, or reconstruct canonical authority from a stale ancestor. `scripts/check_masterplan_overlay_reconciliation.py` enforces the union fail-closed.
+
+
+## Functional LLM + Game Builder 10MB execution atlas
+
+The depth-only execution atlas at [FUNCTIONAL_LLM_GAME_BUILDER_10MB/README.md](FUNCTIONAL_LLM_GAME_BUILDER_10MB/README.md) adds 11,176,885 bytes of implementation-grade requirements across 18 primary planes while preserving the VOL-000..420 breadth freeze.
+
+Its machine authority is `machine/functional_llm_game_builder_10mb_manifest.json`. The atlas requires one durable end-to-end transaction from natural-language objective through governed context and provider-neutral inference, bounded dual-rival Forge competition, authorized project/world/scene mutations, simulation/presentation, automated playtest and continuity verification, rights/security/performance gates, reproducible build/export, and close/reopen/replay/recovery.
+
+This is specification depth, not a runtime-completion claim. All atoms remain implementation-unsigned and independently verification-unsigned until exact-head executable evidence exists.
