@@ -175,3 +175,20 @@ def test_independent_research_verifier_rejects_requirement_erosion(
 
     assert receipt["valid"] is False
     assert any("VOL-001 lost requirement invariant" in error for error in receipt["errors"])
+
+
+def test_independent_research_verifier_rejects_acceptance_mirror_drift(
+    tmp_path: Path,
+) -> None:
+    root = _valid_repo(tmp_path)
+    mirror = root / "skeleton" / "ai" / "evaluation" / "research_acceptance.py"
+    mirror.write_text("# acceptance drift\n", encoding="utf-8")
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "canonical AI research mirror drift" in error
+        and "research_acceptance.py" in error
+        for error in receipt["errors"]
+    )
