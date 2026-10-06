@@ -38,6 +38,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: masterplan-overlay-semantics-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   validate:
     runs-on: ubuntu-24.04

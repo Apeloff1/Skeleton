@@ -70,6 +70,20 @@ jobs: {}
     assert _scan(text, "pr-obsolete-run-drain.yml") == []
 
 
+def test_allows_workflow_run_source_identity_pair() -> None:
+    text = """name: feedback
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+concurrency:
+  group: feedback-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.workflow_id }}
+  cancel-in-progress: true
+jobs: {}
+"""
+    assert _scan(text, "feedback.yml") == []
+
+
 def test_rejects_missing_concurrency() -> None:
     text = """name: unsafe
 on:
