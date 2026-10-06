@@ -100,6 +100,7 @@ def _producer_provenance(
     project_id: str = "project:test-game",
     run_id: str = "run:test-forge",
 ) -> ProducerProvenance:
+    suffix = (token * 40)[:40]
     return ProducerProvenance(
         project_id=project_id,
         run_id=run_id,
@@ -111,6 +112,13 @@ def _producer_provenance(
         producer_behavior_digest=canonical_digest({"behavior": token}),
         source_revision=canonical_digest({"source": token})[:40],
         provider_receipt_refs=(f"provider-receipt:{token}",),
+        output_artifact_refs=(f"artifact-{suffix}",),
+        output_evidence_refs=(
+            f"evidence-{suffix}",
+            f"assumption-{suffix}",
+            f"attack-{suffix}",
+            f"counter-{suffix}",
+        ),
     )
 
 
