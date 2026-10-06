@@ -413,9 +413,17 @@ def test_master_plan_binds_500_level_ai_game_builder_overlay() -> None:
     assert overlay["human_spec"] == "docs/architecture/AI_GAME_BUILDER_500_LEVELS.md"
     assert overlay["overengineering_authority"] == "machine/ai_game_builder_overengineering.json"
     assert overlay["overengineering_human_spec"] == "docs/architecture/AI_GAME_BUILDER_OVERENGINEERING.md"
-    assert overlay["overengineering_planes"] == 24
+    assert overlay["overengineering_planes"] == 48
     assert overlay["runtime_contracts"]["contracts"] == "skeleton/ai/game_builder/contracts.py"
     assert overlay["runtime_contracts"]["dual_rival_state_machine"] == "skeleton/ai/game_builder/dual_rival_forge.py"
+    assert overlay["runtime_contracts"]["evaluation_panel"] == "skeleton/ai/game_builder/evaluation.py"
+    assert overlay["runtime_contracts"]["resource_governor"] == "skeleton/ai/game_builder/resource_governor.py"
+    assert overlay["runtime_contracts"]["quality_debt"] == "skeleton/ai/game_builder/quality_debt.py"
+    assert overlay["runtime_contracts"]["integrated_control_plane"] == "skeleton/ai/game_builder/control_plane.py"
+    assert overlay["runtime_contracts"]["tests"] == [
+        "tests/test_ai_game_builder_runtime.py",
+        "tests/test_ai_game_builder_overengineering_runtime.py",
+    ]
     assert overlay["governance_runtime"] == {
         "canon": "skeleton/ai/game_builder/canon.py",
         "rights": "skeleton/ai/game_builder/rights.py",
@@ -438,7 +446,7 @@ def test_master_plan_binds_500_level_ai_game_builder_overlay() -> None:
     assert duel["effort_modes"]["forge_1000"]["rounds"] == 1000
     assert duel["effort_modes"]["forge_10000"]["rounds"] == 10000
     assert duel["overengineering_authority"] == "machine/ai_game_builder_overengineering.json"
-    assert len(over["planes"]) == 24
+    assert len(over["planes"]) == 48
     assert len(over["family_bindings"]) == 50
 
 
@@ -447,7 +455,7 @@ def test_master_plan_rejects_ai_game_builder_topology_drift() -> None:
     mutated = json.loads(json.dumps(data))
     mutated["ai_game_builder_500_levels"]["total_levels"] = 499
     mutated["ai_game_builder_500_levels"]["effort_modes"]["forge_10000"] = 9999
-    mutated["ai_game_builder_500_levels"]["overengineering_planes"] = 23
+    mutated["ai_game_builder_500_levels"]["overengineering_planes"] = 47
     mutated["ai_game_builder_500_levels"]["runtime_contracts"]["contracts"] = "wrong.py"
     mutated["ai_game_builder_500_levels"]["governance_runtime"]["rights"] = "wrong.py"
 
@@ -455,6 +463,6 @@ def test_master_plan_rejects_ai_game_builder_topology_drift() -> None:
 
     assert "AI game builder total_levels must equal 500" in errors
     assert "AI game builder effort modes must equal 100/1000/10000" in errors
-    assert "AI game builder overengineering_planes must equal 24" in errors
+    assert "AI game builder overengineering_planes must equal 48" in errors
     assert "AI game builder runtime contract binding drifted" in errors
     assert "AI game builder governance runtime binding drifted" in errors
