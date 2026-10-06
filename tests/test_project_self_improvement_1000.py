@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "machine" / "project_self_improvement_1000.json"
 EPOCH = ROOT / "machine" / "project_self_improvement_epoch_contract.json"
+SCHEDULER = ROOT / "machine" / "project_self_improvement_idle_scheduler.json"
 MODULE = ROOT / "scripts" / "check_project_self_improvement_1000.py"
 
 def _module():
@@ -22,8 +23,11 @@ def _data():
 def _epoch():
     return json.loads(EPOCH.read_text(encoding="utf-8"))
 
-def test_contract_and_epoch_are_jointly_valid():
-    assert _module().validate(_data(), _epoch()) == []
+def _scheduler():
+    return json.loads(SCHEDULER.read_text(encoding="utf-8"))
+
+def test_contract_epoch_and_scheduler_are_jointly_valid():
+    assert _module().validate(_data(), _epoch(), _scheduler()) == []
 
 def test_exact_1000_level_identity_and_100_strata():
     d = _data()
@@ -115,6 +119,23 @@ def test_all_learning_links_remain_inside_learning_400_and_adversarial_400():
         n = ((i - 1) % 400) + 1
         assert level["linked_learning_layer"] == f"L400-{n:03d}"
         assert level["linked_adversarial_layer"] == f"A400-{n:03d}"
+
+def test_idle_scheduler_prefers_gain_but_preserves_exploration_and_preemption():
+    sch = _scheduler()
+    assert "expected_capability_gain" in sch["ranking"]["maximize"]
+    assert "expected_risk_reduction" in sch["ranking"]["maximize"]
+    assert sch["portfolio_policy"]["exploration_share_floor"] >= 0.20
+    assert sch["portfolio_policy"]["domain_starvation_limit_epochs"] > 0
+    assert sch["project_fairness"]["starvation_forbidden"] is True
+    assert sch["dispatch"]["foreground_preemption"] == "absolute"
+    assert sch["dispatch"]["one_active_epoch_per_project"] is True
+
+def test_scheduler_backs_off_dead_ends_and_quarantines_repeated_failures():
+    p = _scheduler()["plateau_policy"]
+    assert p["no_gain_threshold"] == 3
+    assert p["repeated_failure_threshold"] == 5
+    assert "exponential backoff" in p["action_after_no_gain"]
+    assert "quarantine" in p["action_after_repeated_failure"]
 
 def test_template_starts_unsigned():
     d = _data()
