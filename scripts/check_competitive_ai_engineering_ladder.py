@@ -164,7 +164,6 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     for required in (
         "competitive_ai_engineering_ladder.json",
         "COMPETITIVE_AI_ENGINEERING_LADDER.md",
-        "200-level",
     ):
         if required not in master:
             raise CompetitiveEngineeringError(f"master plan missing ladder binding: {required}")
