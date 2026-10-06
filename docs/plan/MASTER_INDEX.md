@@ -851,7 +851,9 @@ See [`EXOTIC_SYSTEMS_DEPTH.md`](EXOTIC_SYSTEMS_DEPTH.md) and [`machine/ai_exotic
 Items 53-77 remain authoritative and cumulative. Advanced-AI-100 is explicitly machine-registered in plan 2.5.0. Items 78-81 add falsifiable frontier-comparison engineering and anti-gaming benchmark governance. Items 82-84 add the dual-rival game-builder overlay. Items 85-87 make accidental authority rollback a fail-closed regression.
 
 
-Functional LLM + Game Builder 10MB execution atlas: [`FUNCTIONAL_LLM_GAME_BUILDER_10MB/README.md`](FUNCTIONAL_LLM_GAME_BUILDER_10MB/README.md)
+Functional LLM + Game Builder 20MB+ deep-closure atlas (legacy 10MB path retained): [`FUNCTIONAL_LLM_GAME_BUILDER_10MB/README.md`](FUNCTIONAL_LLM_GAME_BUILDER_10MB/README.md)
+
+Pass-2 authority: **52,648,747 bytes**, **23,328 deep-closure atoms**, runtime/implementation verification still unsigned.
 
 Machine authority: [`machine/functional_llm_game_builder_10mb_manifest.json`](../../machine/functional_llm_game_builder_10mb_manifest.json)
 
