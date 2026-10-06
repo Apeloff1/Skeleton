@@ -564,6 +564,11 @@ def test_dissent_resurfaces_when_dependency_changes() -> None:
         evidence_digest="evidence-" + "b" * 32,
         summary="late quest invalidates an early character promise",
         severity=8,
+        authority_provenance=_evaluator_provenance(
+            "dissent-authority",
+            method_id="resilience-assurance",
+            evidence_refs=("evidence-" + "b" * 32,),
+        ),
         dependency_ids=("quest.final", "character.arc"),
     )
     ledger.add(objection)
@@ -572,7 +577,15 @@ def test_dissent_resurfaces_when_dependency_changes() -> None:
         changed_dependency_ids=("quest.final",),
     )
     assert blockers == (objection,)
-    ledger.resolve("OBJ-001", resolution_digest="resolution-" + "c" * 32)
+    ledger.resolve(
+        "OBJ-001",
+        resolution_digest="resolution-" + "c" * 32,
+        resolution_authority=_evaluator_provenance(
+            "independent-dissent-resolver",
+            method_id="resilience-assurance",
+            evidence_refs=("resolution-" + "c" * 32,),
+        ),
+    )
     assert ledger.blockers_for(
         artifact_digest=objection.artifact_digest,
         changed_dependency_ids=("quest.final",),
