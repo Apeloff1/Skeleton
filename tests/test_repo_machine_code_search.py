@@ -9,6 +9,7 @@ from skeleton.repo_machine.builder import RepositoryModelBuilder
 from skeleton.repo_machine.code_search import (
     CodeSearchError,
     CodeSearchIndex,
+    MAX_REFERENCE_TERMS_PER_DOCUMENT,
     load_code_search_index,
     save_code_search_index,
 )
@@ -173,6 +174,66 @@ class CodeSearchIndexTests(unittest.TestCase):
             self.assertTrue(hits)
             self.assertEqual(hits[0].path, "alpha/broken.py")
             self.assertEqual(hits[0].match_kind, "reference")
+
+    def test_large_module_reference_postings_are_bounded_but_semantic_terms_survive(self) -> None:
+        temp, root = self.fixture()
+        with temp:
+            noise = [
+                f"temporary_local_{index:04d} = {index}"
+                for index in range(MAX_REFERENCE_TERMS_PER_DOCUMENT * 4)
+            ]
+            noise.extend([
+                "important_repository_search_token = temporary_local_0001",
+                "def durable_definition_for_search():",
+                "    return important_repository_search_token",
+            ])
+            (root / "alpha" / "large.py").write_text(
+                "\n".join(noise) + "\n",
+                encoding="utf-8",
+            )
+            model = RepositoryModelBuilder(root).build()
+            index = CodeSearchIndex.build(root, model)
+            document_id = next(
+                position
+                for position, document in enumerate(index.documents)
+                if document.path == "alpha/large.py"
+            )
+            document_postings = sum(
+                any(posting.document == document_id for posting in items)
+                for items in index.postings.values()
+            )
+            # One extracted definition is protected in addition to the
+            # deterministic generic-reference budget.
+            self.assertLessEqual(
+                document_postings,
+                MAX_REFERENCE_TERMS_PER_DOCUMENT + 1,
+            )
+            semantic_hits = index.search("important_repository_search_token")
+            self.assertTrue(semantic_hits)
+            self.assertEqual(semantic_hits[0].path, "alpha/large.py")
+            definition_hits = index.search("durable_definition_for_search")
+            self.assertTrue(definition_hits)
+            self.assertEqual(definition_hits[0].match_kind, "definition")
+
+    def test_all_definitions_survive_reference_budget_pressure(self) -> None:
+        temp, root = self.fixture()
+        with temp:
+            functions = [
+                f"def searchable_definition_{index:03d}():\n    return {index}\n"
+                for index in range(MAX_REFERENCE_TERMS_PER_DOCUMENT + 20)
+            ]
+            (root / "alpha" / "definitions.py").write_text(
+                "\n".join(functions),
+                encoding="utf-8",
+            )
+            model = RepositoryModelBuilder(root).build()
+            index = CodeSearchIndex.build(root, model)
+            hits = index.search(
+                f"searchable_definition_{MAX_REFERENCE_TERMS_PER_DOCUMENT + 19:03d}"
+            )
+            self.assertTrue(hits)
+            self.assertEqual(hits[0].path, "alpha/definitions.py")
+            self.assertEqual(hits[0].match_kind, "definition")
 
     def test_oversized_source_is_explicitly_skipped(self) -> None:
         temp, root = self.fixture()
