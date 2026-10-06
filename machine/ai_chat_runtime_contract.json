@@ -1,9 +1,9 @@
 {
   "schema_version": "ai-chat-runtime/v1",
   "status": "implemented_candidate",
-  "prepared_at_utc": "2026-10-06T04:25:00Z",
+  "prepared_at_utc": "2026-10-06T11:18:00Z",
   "prepared_by": "chatgpt:gpt-5.6-sol",
-  "base_main_sha": "692175ca8cd6531f8deeb6a262f7d6f426700b62",
+  "base_main_sha": "7f555592b7b8b5b488c905247daf60ca8008bbb5",
   "canonical_module": "skeleton/ai/assistant/turn_runtime.py",
   "scope": "durable provider-neutral AI chat turn state, live product-route persistence, replay, reconnectable streaming, resource admission, and crash recovery",
   "authority": {
@@ -60,7 +60,10 @@
     "stream reconnect is bound to operation identity, exact sequence, and prior event digest",
     "live product chat persists durable turn state around canonical conversation and engine milestones",
     "product replay heals existing durable turn completion without synthesizing historical turn journals",
-    "public reconnect transport requires operation, sequence, and digest continuity"
+    "public reconnect transport requires operation, sequence, and digest continuity",
+    "same-operation retries preserve the original durable conversation binding while revalidating request digest and causal user identity",
+    "transient engine or provider unavailability leaves the durable turn resumable instead of fabricating terminal completion",
+    "cancellation request acknowledgement is non-terminal until the engine confirms a terminal cancelled state"
   ],
   "budget_dimensions": [
     "wall_seconds",
@@ -150,6 +153,9 @@
       "complete"
     ],
     "reconnect_endpoint": "GET /ai/chat/turns/{thread_id}/events",
-    "replay_rule": "historical assistant replay does not synthesize a new journal; existing durable journals are reconciled forward"
+    "replay_rule": "historical assistant replay does not synthesize a new journal; existing durable journals are reconciled forward",
+    "retry_binding_rule": "an existing durable operation wins over later thread-version drift after operation, request, tenant, owner, thread, and causal-user identity are revalidated",
+    "transient_failure_rule": "configuration, availability, protocol, memory-backend, and provider transient failures do not fabricate a terminal durable turn",
+    "cancellation_rule": "cancellation_requested is an acknowledgement state; only engine terminal cancelled closes the durable turn"
   }
 }
