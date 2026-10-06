@@ -19,6 +19,29 @@ def test_ai_file_tree_manifest_is_valid_and_drift_free() -> None:
     assert _module().validate() == []
 
 
+def test_ai_file_tree_live_summary_counts_match_governed_collections() -> None:
+    import json
+
+    manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
+    mappings = manifest["mappings"]
+    native_owners = manifest["native_ai_owners"]
+    readiness = manifest["pre_move_readiness"]
+
+    expected_batches: dict[str, int] = {}
+    for mapping in mappings:
+        batch = mapping["move_batch"]
+        expected_batches[batch] = expected_batches.get(batch, 0) + 1
+
+    assert readiness["governed_mapping_count"] == len(mappings)
+    assert readiness["native_ai_owner_count"] == len(native_owners)
+    assert readiness["batch_counts"] == expected_batches
+    assert manifest["object_audit"]["current_mapping_count"] == len(mappings)
+    assert manifest["validation_state"].startswith(
+        f"{len(mappings)}_mapping_plus_{len(native_owners)}_native_owner_"
+    )
+    assert f"{len(mappings)}-mapping" in manifest["implementation_signoff"]["statement"]
+
+
 def test_ai_file_tree_contains_jeeves_and_build_planning() -> None:
     assert (ROOT / "skeleton/ai/agents/jeeves/__init__.py").is_file()
     assert (ROOT / "skeleton/ai/build/shift_supervisor/__init__.py").is_file()
