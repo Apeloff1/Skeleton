@@ -83,6 +83,7 @@ class AuthorizationDecision:
 class _AuthorityState:
     authority: ExecutionAuthority
     usage: ResourceUsage
+    descendant_usage: ResourceUsage
     revoked: bool = False
     admission_receipt_digest: str | None = None
     consumption_count: int = 0
@@ -207,6 +208,23 @@ class ExecutionAuthorityGuard:
             current = parent
         return None
 
+    def _ancestor_states(self, state: _AuthorityState) -> tuple[_AuthorityState, ...]:
+        """Return nearest-parent-first lineage after _lineage_error validation."""
+
+        ancestors: list[_AuthorityState] = []
+        current = state
+        while current.authority.parent_authority_digest is not None:
+            parent = self._authorities.get(current.authority.parent_authority_digest)
+            if parent is None:
+                raise ExecutionAuthorityError("ancestor authority is unavailable")
+            ancestors.append(parent)
+            current = parent
+        return tuple(ancestors)
+
+    @staticmethod
+    def _aggregate_usage(state: _AuthorityState) -> ResourceUsage:
+        return state.usage.add(state.descendant_usage)
+
     def _remember_authority(self, authority: ExecutionAuthority) -> _AuthorityState:
         digest = authority.digest
         existing = self._authorities.get(digest)
@@ -220,7 +238,11 @@ class ExecutionAuthorityGuard:
             raise ExecutionAuthorityError(
                 "authority guard capacity exhausted; refusing to forget usage state"
             )
-        state = _AuthorityState(authority=authority, usage=ResourceUsage())
+        state = _AuthorityState(
+            authority=authority,
+            usage=ResourceUsage(),
+            descendant_usage=ResourceUsage(),
+        )
         self._authorities[digest] = state
         self._authority_order.append(digest)
         return state
@@ -414,6 +436,22 @@ class ExecutionAuthorityGuard:
                 replay_key,
             )
 
+        ancestors = self._ancestor_states(state)
+        for ancestor in ancestors:
+            aggregate_projected = self._aggregate_usage(ancestor).add(usage_delta)
+            if not ancestor.authority.permits(
+                capability,
+                usage=aggregate_projected,
+                now=instant,
+            ):
+                return AuthorizationDecision(
+                    AuthorizationDisposition.DENY,
+                    "ancestor capability or aggregate resource budget denied",
+                    authority.digest,
+                    state.usage,
+                    replay_key,
+                )
+
         receipt = AuthorityConsumptionReceipt(
             authority_digest=authority.digest,
             operation_id=authority.operation_id,
@@ -430,6 +468,8 @@ class ExecutionAuthorityGuard:
         self._remember_replay(replay_key, replay_digest)
         self._authorization_receipts[replay_key] = receipt
         state.usage = projected
+        for ancestor in ancestors:
+            ancestor.descendant_usage = ancestor.descendant_usage.add(usage_delta)
         state.consumption_count = receipt.sequence
         state.latest_receipt_digest = receipt.digest
         state.last_authorized_at = instant
@@ -562,6 +602,7 @@ class ExecutionAuthorityGuard:
                 "authority guard capacity exhausted; refusing checkpoint restore"
             )
 
+        ancestors: tuple[_AuthorityState, ...] = ()
         if authority.parent_authority_digest is not None:
             parent_state = self._authorities.get(authority.parent_authority_digest)
             if parent_state is None:
@@ -569,6 +610,18 @@ class ExecutionAuthorityGuard:
                     "checkpoint parent authority must be restored first"
                 )
             validate_authority_attenuation(parent_state.authority, authority)
+            lineage_error = self._lineage_error(parent_state, now=checkpoint.created_at)
+            if lineage_error is not None:
+                raise ExecutionAuthorityError(lineage_error)
+            ancestors = (parent_state,) + self._ancestor_states(parent_state)
+            for ancestor in ancestors:
+                aggregate_projected = self._aggregate_usage(ancestor).add(
+                    checkpoint.final_usage
+                )
+                if not ancestor.authority.budget.permits(aggregate_projected):
+                    raise ExecutionAuthorityError(
+                        "checkpoint restore exceeds ancestor aggregate resource budget"
+                    )
 
         receipts = checkpoint.consumption_receipts
         replay_keys = [checkpoint.admission_receipt.replay_key]
@@ -609,6 +662,10 @@ class ExecutionAuthorityGuard:
             self._authorization_receipts[receipt.replay_key] = receipt
 
         state.usage = checkpoint.final_usage
+        for ancestor in ancestors:
+            ancestor.descendant_usage = ancestor.descendant_usage.add(
+                checkpoint.final_usage
+            )
         state.consumption_count = len(receipts)
         state.latest_receipt_digest = None if not receipts else receipts[-1].digest
         state.last_authorized_at = (
@@ -654,6 +711,7 @@ class ExecutionAuthorityGuard:
             latest_consumption_digest=state.latest_receipt_digest,
             final_usage=state.usage,
             revoked=state.revoked,
+            descendant_usage=state.descendant_usage,
             sealed_at=instant,
             revocation_receipt_digest=(
                 None
@@ -661,6 +719,15 @@ class ExecutionAuthorityGuard:
                 else state.revocation_receipt.digest
             ),
         )
+
+    @_synchronized
+    def effective_usage_for(self, authority: ExecutionAuthority) -> ResourceUsage:
+        """Return direct plus descendant usage charged to this authority."""
+
+        if not isinstance(authority, ExecutionAuthority):
+            raise ExecutionAuthorityError("authority must be ExecutionAuthority")
+        state = self._authorities.get(authority.digest)
+        return ResourceUsage() if state is None else self._aggregate_usage(state)
 
     @_synchronized
     def usage_for(self, authority: ExecutionAuthority) -> ResourceUsage:
@@ -684,6 +751,8 @@ class ExecutionAuthorityGuard:
                     "execution_id": state.authority.execution_id,
                     "revoked": state.revoked,
                     "usage": state.usage.as_dict(),
+                    "descendant_usage": state.descendant_usage.as_dict(),
+                    "aggregate_usage": self._aggregate_usage(state).as_dict(),
                     "consumption_count": state.consumption_count,
                     "latest_receipt_digest": state.latest_receipt_digest,
                     "admission_receipt_digest": state.admission_receipt_digest,
