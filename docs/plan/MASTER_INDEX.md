@@ -133,6 +133,8 @@ Machine CS-300 contract: [`machine/cs_300_computer_science_ladder.json`](../../m
 
 CS-300 validator: [`scripts/check_cs_300_ladder.py`](../../scripts/check_cs_300_ladder.py)
 
+CS-300 exact-head workflow: [`.github/workflows/cs-300-authority.yml`](../../.github/workflows/cs-300-authority.yml)
+
 ## Purpose
 
 This index is the canonical navigation root for the full Skeleton AI architecture, research, construction, validation, release, and operations program. It incorporates the architecture-planning passes that expanded the target from a model wrapper into a complete AI platform: durable state, provider-neutral inference, context, memory, retrieval, knowledge, cognition, planning, governed tools, agents, swarms, multimodal processing, repository engineering, research, training, evaluation, security, distributed compute, installation, release, and production operations.
@@ -201,8 +203,9 @@ Repository work on this plan must respect the existing PR #1904 bootstrap stack:
 56. `docs/plan/CS_300_COMPUTER_SCIENCE_LADDER.md`
 57. `machine/cs_300_computer_science_ladder.json`
 58. `scripts/check_cs_300_ladder.py`
+59. `.github/workflows/cs-300-authority.yml`
 
-The first ten remain the present implementation/construction authority. Items 11–40 form the frozen long-range planning, risk, sequencing, depth, adversarial-closure, exotic-research and engineering-validation stack. Items 41–42 define the historical implementation-depth frontier and its machine-checkable reconciliation contract. Items 43–45 define the bounded P1 trustworthy-production maturity frontier and its dependency-ordered 44-task execution DAG. Items 46–48 define the P2 capability-expansion boundary sourced exactly from P1's 314 deferred volumes, with explicit scheduled/queued ownership and fail-closed dependency validation. Items 49–52 deepen the frozen research/provider/runtime volumes with pinned OpenAI and xAI/Grok OSS provenance and bounded interoperability. Items 53–55 define and validate the post-enterprise Frontier-96 qualification overlay. Items 56–58 define and validate the CS-300 cutting-edge computer-science overlay above Frontier-96. Neither overlay adds a new architecture volume; both raise depth and evidence requirements while preserving the VOL-420 breadth freeze.
+The first ten remain the present implementation/construction authority. Items 11–40 form the frozen long-range planning, risk, sequencing, depth, adversarial-closure, exotic-research and engineering-validation stack. Items 41–42 define the historical implementation-depth frontier and its machine-checkable reconciliation contract. Items 43–45 define the bounded P1 trustworthy-production maturity frontier and its dependency-ordered 44-task execution DAG. Items 46–48 define the P2 capability-expansion boundary sourced exactly from P1's 314 deferred volumes, with explicit scheduled/queued ownership and fail-closed dependency validation. Items 49–52 deepen the frozen research/provider/runtime volumes with pinned OpenAI and xAI/Grok OSS provenance and bounded interoperability. Items 53–55 define and validate the post-enterprise Frontier-96 qualification overlay. Items 56–59 define and validate the CS-300 cutting-edge computer-science overlay above Frontier-96, including its exact-head CI authority. Neither overlay adds a new architecture volume; both raise depth and evidence requirements while preserving the VOL-420 breadth freeze.
 
 ## Index laws
 
