@@ -52,7 +52,10 @@ jobs:
           files = manifest["state"]["files"]
           summary = code_index.summary()
           print(f"Machine index contains {len(files)} files.")
-          print(f"Code search contains {summary[\"documents\"]} documents, {summary[\"terms\"]} terms, {summary[\"postings\"]} postings.")
+          print(
+              f"Code search contains {summary['documents']} documents, "
+              f"{summary['terms']} terms, {summary['postings']} postings."
+          )
           PY
 
       - name: Commit changed index
