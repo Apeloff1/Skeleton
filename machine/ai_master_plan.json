@@ -44,7 +44,8 @@
     "p1_reproducibility_engine": "scripts/check_p1_reproducibility.py",
     "p1_reproducibility_contract": "skeleton/contracts/reproducibility.py",
     "p1_privileged_tool_transaction_contract": "skeleton/skills/privileged_transaction.py",
-    "enterprise_ai_superiority": "machine/enterprise_ai_superiority.json"
+    "enterprise_ai_superiority": "machine/enterprise_ai_superiority.json",
+    "enterprise_ai_implementation_notes": "machine/enterprise_ai_implementation_notes_index.json"
   },
   "laws": [
     "durable governed state is authoritative",
@@ -24268,6 +24269,8 @@
     "target_grade": "superior",
     "rule": "All volumes inherit the enterprise common contract. Dedicated-profile volumes cannot be called enterprise-qualified or superior until their exact-head profile and non-compensable gates pass.",
     "anti_shortcut": "Implementation status, LOC, a green happy-path test, documentation, or self-scored evaluation cannot satisfy enterprise qualification.",
-    "required_for_product_claim": "A complete enterprise AI claim requires all VOL-000..VOL-420 to be enterprise_qualified on current evidence; dedicated critical profiles must additionally reach superior."
+    "required_for_product_claim": "A complete enterprise AI claim requires all VOL-000..VOL-420 to be enterprise_qualified on current evidence; dedicated critical profiles must additionally reach superior.",
+    "implementation_dossier_authority": "machine/enterprise_ai_implementation_notes_index.json",
+    "implementation_dossier_rule": "Every VOL-000..VOL-420 must carry a current 14-level October 2026 implementation dossier; enterprise qualification is invalid when dossier/masterplan drift exists."
   }
 }
