@@ -680,14 +680,22 @@ def test_gold_master_failed_critical_gate_blocks_release() -> None:
         )
         for i in range(1, 51)
     ]
+    artifact_digest = "artifact-" + "a" * 32
+    canon_digest = "canon-" + "c" * 32
+    provenance_digest = "provenance-" + "d" * 32
     bundle = GoldMasterBundle.create(
-        artifact_digest="artifact-" + "a" * 32,
+        artifact_digest=artifact_digest,
         build_digest="build-" + "b" * 32,
-        canon_digest="canon-" + "c" * 32,
-        provenance_digest="provenance-" + "d" * 32,
+        canon_digest=canon_digest,
+        provenance_digest=provenance_digest,
         replay_digest="replay-" + "e" * 32,
         rollback_target_digest="rollback-" + "f" * 32,
         red_team_digest="redteam-" + "1" * 32,
+        forge_binding=_forge_release_binding(
+            artifact_digest=artifact_digest,
+            canon_digest=canon_digest,
+            provenance_digest=provenance_digest,
+        ),
         family_qualifications=families,
         critical_gate_results={
             "rights": (False, "rights-" + "2" * 32),
