@@ -457,6 +457,61 @@ class AuthorityConsumptionReceipt:
 
 
 @dataclass(frozen=True, slots=True)
+class AuthorityRevocationReceipt:
+    """Immutable evidence that an admitted authority was explicitly revoked."""
+
+    authority_digest: str
+    operation_id: str
+    execution_id: str
+    revoked_by: str
+    reason_code: str
+    revoked_at: datetime
+    latest_consumption_digest: str | None = None
+    schema_version: int = EXECUTION_AUTHORITY_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self, "authority_digest", _digest(self.authority_digest, "authority_digest")
+        )
+        for name in ("operation_id", "execution_id", "revoked_by", "reason_code"):
+            object.__setattr__(self, name, _bounded_id(getattr(self, name), name))
+        object.__setattr__(
+            self, "revoked_at", _aware_utc(self.revoked_at, "revoked_at")
+        )
+        if self.latest_consumption_digest is not None:
+            object.__setattr__(
+                self,
+                "latest_consumption_digest",
+                _digest(
+                    self.latest_consumption_digest,
+                    "latest_consumption_digest",
+                ),
+            )
+        if self.schema_version != EXECUTION_AUTHORITY_SCHEMA_VERSION:
+            raise ExecutionAuthorityError("unsupported revocation-receipt schema")
+
+    def canonical_payload(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "authority_digest": self.authority_digest,
+            "operation_id": self.operation_id,
+            "execution_id": self.execution_id,
+            "revoked_by": self.revoked_by,
+            "reason_code": self.reason_code,
+            "revoked_at": self.revoked_at.isoformat(),
+            "latest_consumption_digest": self.latest_consumption_digest,
+        }
+
+    @property
+    def digest(self) -> str:
+        return hashlib.sha256(canonical_json_bytes(self.canonical_payload())).hexdigest()
+
+    @property
+    def evidence_ref(self) -> str:
+        return f"execution-authority-revocation:{self.digest}"
+
+
+@dataclass(frozen=True, slots=True)
 class AuthorityEvidenceBundle:
     """Compact final evidence binding authority admission to accounted consumption."""
 
@@ -469,6 +524,7 @@ class AuthorityEvidenceBundle:
     final_usage: ResourceUsage
     revoked: bool
     sealed_at: datetime
+    revocation_receipt_digest: str | None = None
     schema_version: int = EXECUTION_AUTHORITY_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -495,6 +551,19 @@ class AuthorityEvidenceBundle:
             raise ExecutionAuthorityError("final_usage must be ResourceUsage")
         if not isinstance(self.revoked, bool):
             raise ExecutionAuthorityError("revoked must be boolean")
+        if self.revocation_receipt_digest is not None:
+            object.__setattr__(
+                self,
+                "revocation_receipt_digest",
+                _digest(
+                    self.revocation_receipt_digest,
+                    "revocation_receipt_digest",
+                ),
+            )
+        if self.revoked != (self.revocation_receipt_digest is not None):
+            raise ExecutionAuthorityError(
+                "revoked state must match revocation receipt evidence"
+            )
         object.__setattr__(self, "sealed_at", _aware_utc(self.sealed_at, "sealed_at"))
         if self.schema_version != EXECUTION_AUTHORITY_SCHEMA_VERSION:
             raise ExecutionAuthorityError("unsupported authority-evidence schema")
@@ -510,6 +579,7 @@ class AuthorityEvidenceBundle:
             "latest_consumption_digest": self.latest_consumption_digest,
             "final_usage": self.final_usage.as_dict(),
             "revoked": self.revoked,
+            "revocation_receipt_digest": self.revocation_receipt_digest,
             "sealed_at": self.sealed_at.isoformat(),
         }
 
@@ -643,6 +713,7 @@ __all__ = [
     "AuthorityConsumptionReceipt",
     "AuthorityEffect",
     "AuthorityEvidenceBundle",
+    "AuthorityRevocationReceipt",
     "EXECUTION_AUTHORITY_SCHEMA_VERSION",
     "ExecutionAuthority",
     "ExecutionAuthorityError",
