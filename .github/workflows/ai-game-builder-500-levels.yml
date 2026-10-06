@@ -88,6 +88,7 @@ jobs:
           tests/test_ai_game_builder_500_levels.py
           tests/test_ai_game_builder_runtime.py
           tests/test_ai_game_builder_governance.py
+          tests/test_ai_game_builder_overengineering_runtime.py
 
       - name: Validate 500-level authority
         run: python scripts/check_ai_game_builder_500_levels.py --json
