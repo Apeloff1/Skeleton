@@ -7,7 +7,7 @@
   "relationship_to_masterplan": "depth-only overlay; VOL-000..420 breadth freeze preserved",
   "bytes": {
     "requested_minimum": 10000000,
-    "shard_total": 11189563,
+    "shard_total": 11476903,
     "threshold_met": true
   },
   "completion": {
@@ -102,7 +102,46 @@
       "cross-platform"
     ],
     "plan_surface_no_known_unmapped_primary_domain": true,
-    "runtime_gap_status": "not inferred; tracked by implementation/evidence authorities"
+    "runtime_gap_status": "not inferred; tracked by implementation/evidence authorities",
+    "proof_labels": [
+      "unit proof",
+      "property proof",
+      "integration proof",
+      "fault injection",
+      "determinism proof",
+      "security proof",
+      "performance proof",
+      "recovery proof",
+      "provenance proof",
+      "compatibility proof"
+    ],
+    "stress_scenarios": [
+      "cold start",
+      "warm path",
+      "partial failure",
+      "dependency timeout",
+      "cancellation race",
+      "stale state",
+      "concurrent mutation",
+      "resource pressure",
+      "malformed input",
+      "version skew",
+      "reconnect replay",
+      "cross-platform run"
+    ],
+    "coverage_policy": {
+      "subsystem_lifecycle_cartesian_required": true,
+      "evidence_class_presence_per_plane": true,
+      "stress_scenario_presence_per_plane": true,
+      "critical_negative_paths": [
+        "security",
+        "rights",
+        "recovery",
+        "cancellation",
+        "replay",
+        "persistent-state mutation"
+      ]
+    }
   },
   "end_to_end_acceptance": [
     "create or reopen a durable game project",
@@ -124,163 +163,451 @@
       "id": "FLGB-01",
       "title": "LLM Session and Inference Runtime",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_01_FLGB-01_LLM_SESSION_AND_INFERENCE_RUNTIME.md",
-      "bytes": 621445,
+      "bytes": 637410,
       "min_bytes": 620000,
       "implementation_signed": false,
-      "verification_signed": false
+      "verification_signed": false,
+      "subsystems": [
+        "operation envelope",
+        "conversation state",
+        "provider-neutral request",
+        "stream decoder",
+        "structured output",
+        "tool-call proposal",
+        "cancellation",
+        "deadline",
+        "usage accounting",
+        "terminal commit",
+        "replay receipt",
+        "provider failover"
+      ],
+      "minimum_requirement_atoms": 450,
+      "coverage_matrix_required": true
     },
     {
       "id": "FLGB-02",
       "title": "Tokenizer Model Runtime and Serving",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_02_FLGB-02_TOKENIZER_MODEL_RUNTIME_AND_SERVING.md",
-      "bytes": 620605,
+      "bytes": 636567,
       "min_bytes": 620000,
       "implementation_signed": false,
-      "verification_signed": false
+      "verification_signed": false,
+      "subsystems": [
+        "tokenization",
+        "vocabulary governance",
+        "model registry",
+        "weight loading",
+        "device placement",
+        "KV cache",
+        "continuous batching",
+        "quantization",
+        "speculative decoding",
+        "distributed serving",
+        "local model bridge",
+        "model lifecycle"
+      ],
+      "minimum_requirement_atoms": 450,
+      "coverage_matrix_required": true
     },
     {
       "id": "FLGB-03",
       "title": "Context Memory Retrieval and Knowledge",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_03_FLGB-03_CONTEXT_MEMORY_RETRIEVAL_AND_KNOWLEDGE.md",
-      "bytes": 622104,
+      "bytes": 638076,
       "min_bytes": 620000,
       "implementation_signed": false,
-      "verification_signed": false
+      "verification_signed": false,
+      "subsystems": [
+        "context compiler",
+        "working memory",
+        "episodic memory",
+        "semantic memory",
+        "project memory",
+        "hybrid retrieval",
+        "code retrieval",
+        "graph retrieval",
+        "temporal retrieval",
+        "claim evidence graph",
+        "contradiction handling",
+        "context compression"
+      ],
+      "minimum_requirement_atoms": 450,
+      "coverage_matrix_required": true
     },
     {
       "id": "FLGB-04",
       "title": "Tools Agents and Long-Horizon Execution",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_04_FLGB-04_TOOLS_AGENTS_AND_LONG_HORIZON_EXECUTION.md",
-      "bytes": 622256,
+      "bytes": 638197,
       "min_bytes": 620000,
       "implementation_signed": false,
-      "verification_signed": false
+      "verification_signed": false,
+      "subsystems": [
+        "tool registry",
+        "tool schema",
+        "authority subset",
+        "sandbox execution",
+        "idempotent writes",
+        "compensation",
+        "plan DAG",
+        "worker leases",
+        "checkpointing",
+        "handoff",
+        "multi-agent arbitration",
+        "long-run recovery"
+      ],
+      "minimum_requirement_atoms": 450,
+      "coverage_matrix_required": true
     },
     {
       "id": "FLGB-05",
       "title": "Security Safety Policy and Privacy",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_05_FLGB-05_SECURITY_SAFETY_POLICY_AND_PRIVACY.md",
-      "bytes": 621878,
+      "bytes": 637854,
       "min_bytes": 620000,
       "implementation_signed": false,
-      "verification_signed": false
+      "verification_signed": false,
+      "subsystems": [
+        "policy evaluation",
+        "prompt injection resistance",
+        "secret isolation",
+        "tenant isolation",
+        "PII handling",
+        "data classification",
+        "authorization",
+        "approval gates",
+        "sandbox boundary",
+        "supply-chain trust",
+        "audit evidence",
+        "incident fail-closed"
+      ],
+      "minimum_requirement_atoms": 450,
+      "coverage_matrix_required": true
     },
     {
       "id": "FLGB-06",
       "title": "Evaluation Observability Reliability and Recovery",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_06_FLGB-06_EVALUATION_OBSERVABILITY_RELIABILITY_AND_RECOVERY.md",
-      "bytes": 621336,
+      "bytes": 637311,
       "min_bytes": 620000,
       "implementation_signed": false,
-      "verification_signed": false
+      "verification_signed": false,
+      "subsystems": [
+        "evaluation harness",
+        "benchmark registry",
+        "golden fixtures",
+        "trace correlation",
+        "metric semantics",
+        "SLO budget",
+        "fault taxonomy",
+        "checkpoint restore",
+        "disaster recovery",
+        "rollback orchestration",
+        "drift detection",
+        "release qualification"
+      ],
+      "minimum_requirement_atoms": 450,
+      "coverage_matrix_required": true
     },
     {
       "id": "FLGB-07",
       "title": "Training Weights Adaptation and Self-Improvement",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_07_FLGB-07_TRAINING_WEIGHTS_ADAPTATION_AND_SELF_IMPROVEMENT.md",
-      "bytes": 622288,
+      "bytes": 638251,
       "min_bytes": 620000,
       "implementation_signed": false,
-      "verification_signed": false
+      "verification_signed": false,
+      "subsystems": [
+        "dataset rights",
+        "dataset lineage",
+        "deduplication",
+        "contamination scan",
+        "training manifest",
+        "checkpoint lineage",
+        "post-training",
+        "distillation",
+        "adapter training",
+        "candidate weights",
+        "mirror-room evaluation",
+        "promotion gate"
+      ],
+      "minimum_requirement_atoms": 450,
+      "coverage_matrix_required": true
     },
     {
       "id": "FLGB-08",
       "title": "Multimodal Vision Audio Video and Documents",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_08_FLGB-08_MULTIMODAL_VISION_AUDIO_VIDEO_AND_DOCUMENTS.md",
-      "bytes": 620993,
+      "bytes": 636960,
       "min_bytes": 620000,
       "implementation_signed": false,
-      "verification_signed": false
+      "verification_signed": false,
+      "subsystems": [
+        "image ingest",
+        "document vision",
+        "OCR boundary",
+        "speech ingest",
+        "speech synthesis",
+        "audio understanding",
+        "video sampling",
+        "temporal grounding",
+        "cross-modal retrieval",
+        "multimodal context",
+        "artifact alignment",
+        "modality fallback"
+      ],
+      "minimum_requirement_atoms": 450,
+      "coverage_matrix_required": true
     },
     {
       "id": "FLGB-09",
       "title": "Game Project Editor and World Model",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_09_FLGB-09_GAME_PROJECT_EDITOR_AND_WORLD_MODEL.md",
-      "bytes": 621666,
+      "bytes": 637620,
       "min_bytes": 620000,
       "implementation_signed": false,
-      "verification_signed": false
+      "verification_signed": false,
+      "subsystems": [
+        "project manifest",
+        "editor transaction",
+        "world identity",
+        "scene graph",
+        "entity identity",
+        "component schema",
+        "prefab inheritance",
+        "asset references",
+        "undo redo",
+        "world partition",
+        "project migration",
+        "editor recovery"
+      ],
+      "minimum_requirement_atoms": 450,
+      "coverage_matrix_required": true
     },
     {
       "id": "FLGB-10",
       "title": "Scene ECS Physics and Simulation",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_10_FLGB-10_SCENE_ECS_PHYSICS_AND_SIMULATION.md",
-      "bytes": 621014,
+      "bytes": 637002,
       "min_bytes": 620000,
       "implementation_signed": false,
-      "verification_signed": false
+      "verification_signed": false,
+      "subsystems": [
+        "entity component storage",
+        "transform hierarchy",
+        "fixed timestep",
+        "collision broadphase",
+        "collision narrowphase",
+        "rigid body",
+        "character controller",
+        "constraints",
+        "deterministic simulation",
+        "physics query",
+        "simulation snapshot",
+        "rollback simulation"
+      ],
+      "minimum_requirement_atoms": 450,
+      "coverage_matrix_required": true
     },
     {
       "id": "FLGB-11",
       "title": "Rendering Materials Lighting Cameras and VFX",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_11_FLGB-11_RENDERING_MATERIALS_LIGHTING_CAMERAS_AND_VFX.md",
-      "bytes": 621863,
+      "bytes": 637800,
       "min_bytes": 620000,
       "implementation_signed": false,
-      "verification_signed": false
+      "verification_signed": false,
+      "subsystems": [
+        "render graph",
+        "material graph",
+        "shader compilation",
+        "texture streaming",
+        "mesh pipeline",
+        "lighting model",
+        "shadow system",
+        "camera rig",
+        "post processing",
+        "particle VFX",
+        "LOD system",
+        "render recovery"
+      ],
+      "minimum_requirement_atoms": 450,
+      "coverage_matrix_required": true
     },
     {
       "id": "FLGB-12",
       "title": "Animation Audio UI Input and Accessibility",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_12_FLGB-12_ANIMATION_AUDIO_UI_INPUT_AND_ACCESSIBILITY.md",
-      "bytes": 622516,
+      "bytes": 638467,
       "min_bytes": 620000,
       "implementation_signed": false,
-      "verification_signed": false
+      "verification_signed": false,
+      "subsystems": [
+        "animation graph",
+        "skeletal animation",
+        "procedural animation",
+        "audio graph",
+        "music state",
+        "spatial audio",
+        "UI layout",
+        "input mapping",
+        "controller support",
+        "accessibility semantics",
+        "haptics",
+        "presentation replay"
+      ],
+      "minimum_requirement_atoms": 450,
+      "coverage_matrix_required": true
     },
     {
       "id": "FLGB-13",
       "title": "Gameplay Scripting Narrative Quests and NPC AI",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_13_FLGB-13_GAMEPLAY_SCRIPTING_NARRATIVE_QUESTS_AND_NPC_AI.md",
-      "bytes": 622502,
+      "bytes": 638440,
       "min_bytes": 620000,
       "implementation_signed": false,
-      "verification_signed": false
+      "verification_signed": false,
+      "subsystems": [
+        "gameplay ability",
+        "script sandbox",
+        "event bus",
+        "state machine",
+        "quest graph",
+        "dialogue graph",
+        "narrative canon",
+        "NPC planner",
+        "behavior tree",
+        "combat logic",
+        "economy rules",
+        "saveable gameplay state"
+      ],
+      "minimum_requirement_atoms": 450,
+      "coverage_matrix_required": true
     },
     {
       "id": "FLGB-14",
       "title": "Procedural Generation Worldbuilding and Longform Consistency",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_14_FLGB-14_PROCEDURAL_GENERATION_WORLDBUILDING_AND_LONGFORM_CONSISTENCY.md",
-      "bytes": 621159,
+      "bytes": 637128,
       "min_bytes": 620000,
       "implementation_signed": false,
-      "verification_signed": false
+      "verification_signed": false,
+      "subsystems": [
+        "seed contract",
+        "terrain generation",
+        "layout grammar",
+        "encounter generation",
+        "quest generation",
+        "character generation",
+        "lore graph",
+        "timeline consistency",
+        "canon constraints",
+        "style bible",
+        "continuity verifier",
+        "regeneration diff"
+      ],
+      "minimum_requirement_atoms": 450,
+      "coverage_matrix_required": true
     },
     {
       "id": "FLGB-15",
       "title": "Networking Saves Mods Localization and Platform Services",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_15_FLGB-15_NETWORKING_SAVES_MODS_LOCALIZATION_AND_PLATFORM_SERVICES.md",
-      "bytes": 622273,
+      "bytes": 638208,
       "min_bytes": 620000,
       "implementation_signed": false,
-      "verification_signed": false
+      "verification_signed": false,
+      "subsystems": [
+        "network protocol",
+        "replication",
+        "prediction",
+        "rollback netcode",
+        "save schema",
+        "cloud save",
+        "mod API",
+        "plugin isolation",
+        "localization",
+        "platform identity",
+        "achievements",
+        "cross-version migration"
+      ],
+      "minimum_requirement_atoms": 450,
+      "coverage_matrix_required": true
     },
     {
       "id": "FLGB-16",
       "title": "Assets Build Export Performance and Automated Testing",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_16_FLGB-16_ASSETS_BUILD_EXPORT_PERFORMANCE_AND_AUTOMATED_TESTING.md",
-      "bytes": 620747,
+      "bytes": 636720,
       "min_bytes": 620000,
       "implementation_signed": false,
-      "verification_signed": false
+      "verification_signed": false,
+      "subsystems": [
+        "asset import",
+        "asset normalization",
+        "dependency graph",
+        "content addressing",
+        "incremental build",
+        "shader bake",
+        "package build",
+        "platform export",
+        "performance budget",
+        "memory budget",
+        "automated playtest",
+        "release artifact verification"
+      ],
+      "minimum_requirement_atoms": 450,
+      "coverage_matrix_required": true
     },
     {
       "id": "FLGB-17",
       "title": "Dual-Rival Forge Adversarial Quality and Rights Clean Room",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_17_FLGB-17_DUAL_RIVAL_FORGE_ADVERSARIAL_QUALITY_AND_RIGHTS_CLEAN_ROOM.md",
-      "bytes": 622308,
+      "bytes": 638279,
       "min_bytes": 620000,
       "implementation_signed": false,
-      "verification_signed": false
+      "verification_signed": false,
+      "subsystems": [
+        "rival proposer",
+        "rival challenger",
+        "rival verifier",
+        "Forge-100 cycle",
+        "Forge-1000 cycle",
+        "Forge-10000 cycle",
+        "quality delta",
+        "stop policy",
+        "rights fingerprint",
+        "source provenance",
+        "clean-room transformation",
+        "promotion arbitration"
+      ],
+      "minimum_requirement_atoms": 450,
+      "coverage_matrix_required": true
     },
     {
       "id": "FLGB-18",
       "title": "Integrated Product Orchestration Deployment and Gapless Closure",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_18_FLGB-18_INTEGRATED_PRODUCT_ORCHESTRATION_DEPLOYMENT_AND_GAPLESS_CLOSURE.md",
-      "bytes": 620610,
+      "bytes": 636613,
       "min_bytes": 620000,
       "implementation_signed": false,
-      "verification_signed": false
+      "verification_signed": false,
+      "subsystems": [
+        "product boot",
+        "project bootstrap",
+        "chat-to-build transaction",
+        "build-to-chat evidence",
+        "resource scheduler",
+        "foreground priority",
+        "idle mirror room",
+        "cross-plane dependency",
+        "installer handoff",
+        "update rollback",
+        "whole-system acceptance",
+        "closure evidence fan-in"
+      ],
+      "minimum_requirement_atoms": 450,
+      "coverage_matrix_required": true
     }
   ]
 }
