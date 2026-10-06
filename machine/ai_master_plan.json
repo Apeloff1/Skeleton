@@ -716,6 +716,7 @@
         "tests/test_state_authority_independent_verifier.py"
       ],
       "evaluations": [
+        "scripts/check_state_topology.py --json",
         "scripts/state_migration_compatibility.py",
         "scripts/verify_state_authority_closure.py",
         ".github/workflows/state-recovery-drill.yml",
@@ -732,7 +733,8 @@
         "scripts/verify_state_authority_closure.py",
         "tests/test_state_authority_independent_verifier.py",
         ".github/workflows/state-recovery-drill.yml",
-        ".github/workflows/p1-migration-rollback-compatibility.yml"
+        ".github/workflows/p1-migration-rollback-compatibility.yml",
+        "scripts/check_state_topology.py"
       ],
       "risks": [
         "split-brain ownership",
