@@ -1,0 +1,197 @@
+name: VOL-005 State Migration Qualification
+
+on:
+  pull_request:
+    paths:
+      - "machine/state_topology.json"
+      - "machine/state_backup_policy.json"
+      - "machine/state_migration_qualification.json"
+      - "machine/ai_app_construction.json"
+      - "machine/ai_master_plan.json"
+      - "scripts/check_state_topology.py"
+      - "scripts/check_state_migration_qualification.py"
+      - "scripts/verify_vol005_state_migration_closure.py"
+      - "scripts/state_recovery_drill.py"
+      - "scripts/state_backup_bundle.py"
+      - "skeleton/persistence/migration_compatibility.py"
+      - "skeleton/ai/runtime/persistence/migration_compatibility.py"
+      - "skeleton/testing/test_migration_compatibility.py"
+      - "tests/test_state_migration_qualification.py"
+      - "tests/test_vol005_state_migration_independent_verifier.py"
+      - "skeleton/testing/test_state_recovery_drill.py"
+      - "skeleton/testing/test_state_backup_bundle.py"
+      - "backend/services/rag_service.py"
+      - "backend/services/rag_state_repository.py"
+      - "backend/tests/test_rag_state_authority.py"
+      - "backend/core/conversations.py"
+      - "backend/tests/test_conversations_api.py"
+      - "skeleton/vault/data_lifecycle.py"
+      - "skeleton/vault/governance_registry.py"
+      - "skeleton/testing/test_data_lifecycle.py"
+      - "skeleton/testing/test_governance_runtime_binding.py"
+      - "skeleton/cortex/reference_provenance.py"
+      - "skeleton/testing/test_reference_provenance.py"
+      - ".github/workflows/state-recovery-drill.yml"
+      - ".github/workflows/vol005-state-migration-qualification.yml"
+  push:
+    branches: [main]
+    paths:
+      - "machine/state_topology.json"
+      - "machine/state_migration_qualification.json"
+      - "machine/ai_app_construction.json"
+      - "scripts/check_state_topology.py"
+      - "scripts/check_state_migration_qualification.py"
+      - "scripts/verify_vol005_state_migration_closure.py"
+      - "skeleton/persistence/migration_compatibility.py"
+      - "skeleton/ai/runtime/persistence/migration_compatibility.py"
+      - "skeleton/testing/test_migration_compatibility.py"
+      - "tests/test_state_migration_qualification.py"
+      - "tests/test_vol005_state_migration_independent_verifier.py"
+      - ".github/workflows/vol005-state-migration-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vol005-state-migration-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  migration-qualification:
+    name: Migration and recovery qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          .
+          "pytest>=8,<9"
+          "pymongo>=4.13,<5"
+
+      - name: Compile migration and topology controls
+        run: >-
+          python -m compileall -q
+          scripts/check_state_topology.py
+          scripts/check_state_migration_qualification.py
+          scripts/verify_vol005_state_migration_closure.py
+          skeleton/persistence/migration_compatibility.py
+          skeleton/ai/runtime/persistence/migration_compatibility.py
+
+      - name: Validate canonical construction and state topology
+        run: |
+          python scripts/check_ai_app_construction.py --json
+          python scripts/check_state_topology.py --json
+
+      - name: Qualify migration release matrix
+        run: python scripts/check_state_migration_qualification.py --json
+
+      - name: Require governed migration runtime parity
+        run: cmp skeleton/persistence/migration_compatibility.py skeleton/ai/runtime/persistence/migration_compatibility.py
+
+      - name: Run migration and validator adversarial regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_migration_compatibility.py
+          tests/test_state_migration_qualification.py
+
+      - name: Run authoritative restore and backup regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_state_recovery_drill.py
+          skeleton/testing/test_state_backup_bundle.py
+
+      - name: Run legacy RAG authority cutover regressions
+        run: >-
+          python -m pytest -q --noconftest
+          backend/tests/test_rag_state_authority.py
+
+      - name: Run conversation and governance authority regressions
+        run: >-
+          python -m pytest -q --noconftest
+          backend/tests/test_conversations_api.py
+          skeleton/testing/test_data_lifecycle.py
+          skeleton/testing/test_governance_runtime_binding.py
+          skeleton/testing/test_reference_provenance.py
+
+  independent-verification:
+    name: Independent VOL-005 source verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install verifier test dependency
+        run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+
+      - name: Run independent verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_vol005_state_migration_independent_verifier.py
+
+      - name: Emit exact-head independent verification receipt
+        env:
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_vol005_state_migration_closure.py
+          --head-sha "$EVIDENCE_HEAD_SHA"
+          --evidence-out .vol005-state-migration-evidence.json
+          --print-evidence
+
+      - name: Assert receipt is exact-head and complete
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".vol005-state-migration-evidence.json").read_text(encoding="utf-8")
+          )
+          assert receipt["schema_version"] == 1
+          assert receipt["verifier"] == "independent-vol005-state-migration-v1"
+          assert receipt["head_sha"] == os.environ["EXPECTED_SHA"]
+          assert receipt["valid"] is True
+          assert receipt["physical_store_count"] == 9
+          assert receipt["state_domain_count"] == 20
+          assert receipt["source_of_truth_domain_count"] == 13
+          assert receipt["scenario_count"] >= 9
+          assert len(receipt["topology_blob_sha"]) == 40
+          assert len(receipt["authority_digest"]) == 64
+          print("vol005-independent-receipt: OK")
+          print("head:", receipt["head_sha"])
+          print("authority:", receipt["authority_digest"])
+          PY
