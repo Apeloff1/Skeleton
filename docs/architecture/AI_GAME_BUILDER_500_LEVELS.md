@@ -140,9 +140,9 @@ No Stage-10 level can self-sign. Round count, prose completeness, model confiden
 
 ## Overengineering constitution
 
-The base 500-level ladder is hardened by a 24-plane cross-cutting constitution in `machine/ai_game_builder_overengineering.json`. Every family inherits the critical isolation, anti-collusion, Pareto-promotion, anti-Goodhart, long-form causality, rights clean-room, replay, checkpoint/rollback, bounded-resource, artifact-lineage, and whole-game release planes, plus domain-specific planes.
+The base 500-level ladder is hardened by an 80-plane cross-cutting constitution in `machine/ai_game_builder_overengineering.json`. Every family inherits all 38 critical assurance planes plus domain-specific controls; current bindings carry 40–53 planes per family.
 
-A deterministic runtime kernel now materializes part of the authority at `skeleton/ai/game_builder/contracts.py` and `skeleton/ai/game_builder/dual_rival_forge.py`. It enforces stage order and promotion mechanics without granting model providers control-plane authority.
+A deterministic runtime kernel now materializes part of the authority at `skeleton/ai/game_builder/contracts.py` and `skeleton/ai/game_builder/dual_rival_forge.py`. Fourth-generation assurance is implemented in `skeleton/ai/game_builder/deep_assurance.py`, including quality-density complexity control, governed gaming-knowledge ingestion, combinatorial interaction coverage, rare-event tails, project resurrection, evidence Merkle roots, and zero-critical-gap terminal closure. It enforces stage order and promotion mechanics without granting model providers control-plane authority.
 
 See `docs/architecture/AI_GAME_BUILDER_OVERENGINEERING.md` for the full constitution.
 
