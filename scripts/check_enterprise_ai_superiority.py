@@ -325,6 +325,7 @@ def _validate_profiles(
 
 
 def _validate_master_bindings(
+    policy: Mapping[str, Any],
     master: Mapping[str, Any],
     master_volumes: Mapping[str, Mapping[str, Any]],
     profiles: Mapping[str, Mapping[str, Any]],
@@ -341,6 +342,39 @@ def _validate_master_bindings(
     _text(enterprise.get("anti_shortcut"), "enterprise_grade_policy.anti_shortcut")
     _text(enterprise.get("required_for_product_claim"), "enterprise_grade_policy.required_for_product_claim")
 
+    complete_claim = _mapping(
+        _mapping(
+            policy.get("coverage"),
+            "coverage",
+        ).get("complete_enterprise_ai_claim"),
+        "coverage.complete_enterprise_ai_claim",
+    )
+    if complete_claim.get("all_421_volumes_minimum_grade") != "enterprise_qualified":
+        raise EnterpriseSuperiorityError(
+            "complete enterprise AI claim must require all volumes enterprise_qualified"
+        )
+    if complete_claim.get("dedicated_profile_minimum_grade") != "superior":
+        raise EnterpriseSuperiorityError(
+            "dedicated profile minimum grade must be superior"
+        )
+
+    for volume_ref, volume in master_volumes.items():
+        state = volume.get("enterprise_grade_state")
+        if state not in REQUIRED_GRADE_STATES:
+            raise EnterpriseSuperiorityError(
+                f"{volume_ref} invalid enterprise_grade_state: {state!r}"
+            )
+        target = volume.get("enterprise_grade_target")
+        if volume_ref in profiles:
+            if target != "superior":
+                raise EnterpriseSuperiorityError(
+                    f"{volume_ref} enterprise grade target must be superior"
+                )
+        elif target != "enterprise_qualified":
+            raise EnterpriseSuperiorityError(
+                f"{volume_ref} non-dedicated enterprise target must be enterprise_qualified"
+            )
+
     for volume_ref, profile in profiles.items():
         volume = master_volumes[volume_ref]
         expected_profile = profile["id"]
@@ -348,15 +382,7 @@ def _validate_master_bindings(
             raise EnterpriseSuperiorityError(
                 f"{volume_ref} master binding does not reference {expected_profile}"
             )
-        state = volume.get("enterprise_grade_state")
-        if state not in REQUIRED_GRADE_STATES:
-            raise EnterpriseSuperiorityError(
-                f"{volume_ref} invalid enterprise_grade_state: {state!r}"
-            )
-        if volume.get("enterprise_grade_target") != "superior":
-            raise EnterpriseSuperiorityError(
-                f"{volume_ref} enterprise grade target must be superior"
-            )
+        state = volume["enterprise_grade_state"]
         if state in {"enterprise_qualified", "superior"}:
             if profile.get("qualification_state") not in {
                 "enterprise_qualified",
@@ -378,7 +404,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     _validate_common(policy)
     volumes = _volume_map(master)
     profiles = _validate_profiles(policy, volumes)
-    _validate_master_bindings(master, volumes, profiles)
+    _validate_master_bindings(policy, master, volumes, profiles)
 
     qualified = sum(
         1 for profile in profiles.values()
