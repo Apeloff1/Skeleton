@@ -420,3 +420,32 @@ __all__ += [
     "SafetyHazardSeverity",
     "make_safety_hazard_id",
 ]
+
+
+from .execution_authority import (
+    AdmissionReceipt,
+    AuthorityEffect,
+    EXECUTION_AUTHORITY_SCHEMA_VERSION,
+    ExecutionAuthority,
+    ExecutionAuthorityError,
+    MAX_AUTHORITY_CAPABILITIES,
+    MAX_AUTHORITY_LIFETIME_SECONDS,
+    ResourceBudget,
+    ResourceUsage,
+    authority_policy_digest,
+    validate_authority_attenuation,
+)
+
+__all__ += [
+    "AdmissionReceipt",
+    "AuthorityEffect",
+    "EXECUTION_AUTHORITY_SCHEMA_VERSION",
+    "ExecutionAuthority",
+    "ExecutionAuthorityError",
+    "MAX_AUTHORITY_CAPABILITIES",
+    "MAX_AUTHORITY_LIFETIME_SECONDS",
+    "ResourceBudget",
+    "ResourceUsage",
+    "authority_policy_digest",
+    "validate_authority_attenuation",
+]
