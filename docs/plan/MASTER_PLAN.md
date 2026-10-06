@@ -749,6 +749,8 @@ The frontier validator `scripts/check_ai_execution_frontier.py` cross-checks the
 
 The masterplan carries a second depth axis for areas where frontier AI systems are commonly marketed as exceptional. This axis is authoritative in `machine/competitive_ai_engineering_ladder.json` and documented in `docs/architecture/COMPETITIVE_AI_ENGINEERING_LADDER.md`.
 
+Competitive promotion evidence is separately governed by `machine/competitive_ai_benchmark_governance.json` / `docs/architecture/COMPETITIVE_AI_BENCHMARK_GOVERNANCE.md`. Benchmark targets, effect thresholds, exclusions, uncertainty methods, multiplicity handling and stopping rules are frozen before challenger results are visible; material protocol changes restart qualification.
+
 It contains **200 explicit engineering levels** constructed as **20 competitive claim families × 10 escalation stages**. The families cover reasoning, long context, memory, autonomous agents, tools/computer use, coding, retrieval/research, multimodality, realtime interaction, math/science verification, long-horizon planning, routing/ensembles, learning/self-improvement, safety, security/privacy/tenancy, reliability/recovery, advanced serving, hardware/resource scale, enterprise governance, and benchmark/evaluation integrity.
 
 This is an **overlay**, not a breadth expansion. Every `ENG-001` through `ENG-200` binds to existing `VOL-000..VOL-420` ownership and therefore does not violate the Volume-420 scope freeze.
@@ -761,7 +763,8 @@ Required validation:
 
 ```bash
 python scripts/check_competitive_ai_engineering_ladder.py --json
-python -m pytest -q --noconftest tests/test_competitive_ai_engineering_ladder.py
+python scripts/check_competitive_ai_benchmark_governance.py --json
+python -m pytest -q --noconftest tests/test_competitive_ai_engineering_ladder.py tests/test_competitive_ai_benchmark_governance.py
 ```
 
 ## 25. Scope freeze and future plan evolution
