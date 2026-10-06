@@ -445,7 +445,7 @@ class ProviderAdapter(ABC):
         operation_id: str | None = None,
         deadline: datetime | None = None,
     ) -> ProviderImageResponse:
-        del image, prompt, mask, size, data_class, tenant_id, operation_id
+        del image, prompt, mask, size, data_class, tenant_id, operation_id, deadline
         raise ProviderUnavailableError(
             f"provider does not implement image editing: {self.provider_id}"
         )
@@ -2378,11 +2378,6 @@ class OpenAIProviderAdapter(ProviderAdapter):
             self.timeout_seconds,
             label="image provider",
         )
-        media_timeout = _remaining_deadline_timeout(
-            request.deadline,
-            self.timeout_seconds,
-            label="speech provider",
-        )
         governance, lease, estimate = _require_media_policy(
             provider_id=self.provider_id,
             purpose=request.purpose,
@@ -2525,6 +2520,8 @@ class OpenAIProviderAdapter(ProviderAdapter):
                     configured_timeout=self.timeout_seconds,
                     label="image variation provider",
                 )
+            except ProviderError:
+                raise
             except Exception as exc:
                 raise ProviderInvocationError("image variation request failed") from exc
             images = _extract_b64_images(response, fallback_prompt="variation")
@@ -2644,6 +2641,8 @@ class OpenAIProviderAdapter(ProviderAdapter):
                     configured_timeout=self.timeout_seconds,
                     label="image edit provider",
                 )
+            except ProviderError:
+                raise
             except Exception as exc:
                 raise ProviderInvocationError("image edit request failed") from exc
             images = _extract_b64_images(response, fallback_prompt=prompt)
@@ -2712,6 +2711,11 @@ class OpenAIProviderAdapter(ProviderAdapter):
         if request.response_format not in {"mp3", "wav", "opus", "aac", "flac", "pcm"}:
             raise ProviderInvocationError("speech provider format is unsupported")
 
+        media_timeout = _remaining_deadline_timeout(
+            request.deadline,
+            self.timeout_seconds,
+            label="speech provider",
+        )
         governance, lease, estimate = _require_media_policy(
             provider_id=self.provider_id,
             purpose=request.purpose,
