@@ -175,7 +175,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_instruction_registry.py.",
-            "Evaluations: planned:instruction-version regression."
+            "Evaluations: planned:instruction-version regression.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -396,7 +397,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_prompt_regression.py.",
-            "Evaluations: planned:prompt mutation evaluation."
+            "Evaluations: planned:prompt mutation evaluation.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -617,7 +619,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_routing_policy_registry.py.",
-            "Evaluations: planned:routing/fallback matrix."
+            "Evaluations: planned:routing/fallback matrix.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -838,7 +841,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_memory_policy_registry.py.",
-            "Evaluations: planned:poisoning/retention evaluation."
+            "Evaluations: planned:poisoning/retention evaluation.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -1059,7 +1063,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_retrieval_policy_registry.py.",
-            "Evaluations: planned:stale/filter bypass evaluation."
+            "Evaluations: planned:stale/filter bypass evaluation.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -1280,7 +1285,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_knowledge_refresh.py.",
-            "Evaluations: planned:partial refresh/recovery."
+            "Evaluations: planned:partial refresh/recovery.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -1501,7 +1507,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_temporal_knowledge.py.",
-            "Evaluations: planned:time-travel query evaluation."
+            "Evaluations: planned:time-travel query evaluation.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -1736,7 +1743,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: skeleton/testing/test_reasoning_strategy_registry.py, skeleton/testing/test_cognition_control.py, skeleton/testing/test_jeeves_rational_metareasoning.py.",
-            "Evaluations: .github/workflows/p1-reasoning-search-stop-policy.yml."
+            "Evaluations: .github/workflows/p1-reasoning-search-stop-policy.yml.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -1957,7 +1965,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_hypothesis_engine.py.",
-            "Evaluations: planned:known-ground-truth hypothesis benchmark."
+            "Evaluations: planned:known-ground-truth hypothesis benchmark.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -2178,7 +2187,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_causal_knowledge.py.",
-            "Evaluations: planned:confounding evaluation."
+            "Evaluations: planned:confounding evaluation.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -2412,7 +2422,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: skeleton/testing/test_reasoning_strategy_registry.py, skeleton/testing/test_cognition_control.py, skeleton/testing/test_jeeves_rational_metareasoning.py.",
-            "Evaluations: .github/workflows/p1-reasoning-search-stop-policy.yml."
+            "Evaluations: .github/workflows/p1-reasoning-search-stop-policy.yml.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -2646,7 +2657,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: skeleton/testing/test_reasoning_strategy_registry.py, skeleton/testing/test_cognition_control.py, skeleton/testing/test_jeeves_rational_metareasoning.py.",
-            "Evaluations: .github/workflows/p1-reasoning-search-stop-policy.yml."
+            "Evaluations: .github/workflows/p1-reasoning-search-stop-policy.yml.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -2878,7 +2890,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: skeleton/testing/test_reasoning_strategy_registry.py, skeleton/testing/test_cognition_control.py, skeleton/testing/test_jeeves_rational_metareasoning.py.",
-            "Evaluations: .github/workflows/p1-reasoning-search-stop-policy.yml."
+            "Evaluations: .github/workflows/p1-reasoning-search-stop-policy.yml.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -3112,7 +3125,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: skeleton/testing/test_answer_artifact_quality.py, skeleton/testing/test_core_intelligence_bundle.py.",
-            "Evaluations: .github/workflows/p1-answer-artifact-quality.yml, .github/workflows/p1-core-intelligence-bundle.yml."
+            "Evaluations: .github/workflows/p1-answer-artifact-quality.yml, .github/workflows/p1-core-intelligence-bundle.yml.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -3346,7 +3360,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: skeleton/testing/test_answer_artifact_quality.py, skeleton/testing/test_core_intelligence_bundle.py.",
-            "Evaluations: .github/workflows/p1-answer-artifact-quality.yml, .github/workflows/p1-core-intelligence-bundle.yml."
+            "Evaluations: .github/workflows/p1-answer-artifact-quality.yml, .github/workflows/p1-core-intelligence-bundle.yml.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -3580,7 +3595,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: skeleton/testing/test_human_control.py, skeleton/testing/test_autonomy_deescalation.py, skeleton/testing/test_agent_delegation_qualification.py.",
-            "Evaluations: .github/workflows/p1-human-control.yml."
+            "Evaluations: .github/workflows/p1-human-control.yml.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -3815,7 +3831,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: skeleton/testing/test_blast_radius_alignment.py, skeleton/testing/test_human_control.py, skeleton/testing/test_autonomy_deescalation.py, skeleton/testing/test_agent_delegation_qualification.py.",
-            "Evaluations: .github/workflows/p1-blast-radius-alignment.yml."
+            "Evaluations: .github/workflows/p1-blast-radius-alignment.yml.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -4050,7 +4067,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: skeleton/testing/test_blast_radius_alignment.py, skeleton/testing/test_human_control.py, skeleton/testing/test_autonomy_deescalation.py, skeleton/testing/test_agent_delegation_qualification.py.",
-            "Evaluations: .github/workflows/p1-blast-radius-alignment.yml."
+            "Evaluations: .github/workflows/p1-blast-radius-alignment.yml.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -4285,7 +4303,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: skeleton/testing/test_blast_radius_alignment.py, skeleton/testing/test_human_control.py, skeleton/testing/test_autonomy_deescalation.py, skeleton/testing/test_agent_delegation_qualification.py.",
-            "Evaluations: .github/workflows/p1-blast-radius-alignment.yml."
+            "Evaluations: .github/workflows/p1-blast-radius-alignment.yml.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -4506,7 +4525,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_migration_engine.py.",
-            "Evaluations: planned:interrupted migration campaign."
+            "Evaluations: planned:interrupted migration campaign.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -4727,7 +4747,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_legacy_compatibility.py.",
-            "Evaluations: planned:consumer cutover evaluation."
+            "Evaluations: planned:consumer cutover evaluation.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -4948,7 +4969,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_deprecation_process.py.",
-            "Evaluations: planned:consumer-removal simulation."
+            "Evaluations: planned:consumer-removal simulation.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -5169,7 +5191,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_architecture_archaeology.py.",
-            "Evaluations: planned:known-history reconstruction."
+            "Evaluations: planned:known-history reconstruction.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -5390,7 +5413,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_repository_consolidation.py.",
-            "Evaluations: planned:mirror/import cutover simulation."
+            "Evaluations: planned:mirror/import cutover simulation.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -5611,7 +5635,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_code_provenance.py.",
-            "Evaluations: planned:rename/refactor lineage audit."
+            "Evaluations: planned:rename/refactor lineage audit.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -5832,7 +5857,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_duplication_detector.py.",
-            "Evaluations: planned:known-duplicate corpus."
+            "Evaluations: planned:known-duplicate corpus.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -6053,7 +6079,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_module_ownership.py.",
-            "Evaluations: planned:orphan/overlap audit."
+            "Evaluations: planned:orphan/overlap audit.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -6274,7 +6301,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_codeowners_generation.py.",
-            "Evaluations: planned:ownership parity audit."
+            "Evaluations: planned:ownership parity audit.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -6495,7 +6523,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_documentation_as_code.py.",
-            "Evaluations: planned:broken-reference mutation test."
+            "Evaluations: planned:broken-reference mutation test.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -6716,7 +6745,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_diagram_as_code.py.",
-            "Evaluations: planned:diagram/source parity audit."
+            "Evaluations: planned:diagram/source parity audit.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -6937,7 +6967,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_architecture_snapshots.py.",
-            "Evaluations: planned:snapshot diff evaluation."
+            "Evaluations: planned:snapshot diff evaluation.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -7158,7 +7189,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_release_reproducibility.py.",
-            "Evaluations: planned:independent rebuild."
+            "Evaluations: planned:independent rebuild.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -7379,7 +7411,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_build_hermeticity.py.",
-            "Evaluations: planned:network-disabled build."
+            "Evaluations: planned:network-disabled build.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -7600,7 +7633,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_build_cache.py.",
-            "Evaluations: planned:stale-cache invalidation evaluation."
+            "Evaluations: planned:stale-cache invalidation evaluation.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -7821,7 +7855,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_binary_provenance.py.",
-            "Evaluations: planned:tampered artifact verification."
+            "Evaluations: planned:tampered artifact verification.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -8042,7 +8077,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_installer_security.py.",
-            "Evaluations: planned:path/symlink/archive attack suite."
+            "Evaluations: planned:path/symlink/archive attack suite.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -8263,7 +8299,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_update_security.py.",
-            "Evaluations: planned:rollback-attack evaluation."
+            "Evaluations: planned:rollback-attack evaluation.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -8484,7 +8521,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_bootstrap_recovery.py.",
-            "Evaluations: planned:corrupt-bootstrap drill."
+            "Evaluations: planned:corrupt-bootstrap drill.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -8705,7 +8743,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_crash_diagnostics.py.",
-            "Evaluations: planned:crash-under-telemetry-loss evaluation."
+            "Evaluations: planned:crash-under-telemetry-loss evaluation.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
@@ -8926,7 +8965,8 @@
           "name": "Verification & adversarial evaluation",
           "implementation_notes": [
             "Focused tests: planned:skeleton/testing/test_support_bundle.py.",
-            "Evaluations: planned:sensitive-data bundle audit."
+            "Evaluations: planned:sensitive-data bundle audit.",
+            "Verification must map each masterplan requirement, declared risk, trust boundary, concurrency invariant, and recovery obligation to deterministic tests or immutable evaluation evidence; every discovered failure becomes a versioned regression before promotion."
           ],
           "acceptance": [
             "Happy, negative, adversarial, concurrency and recovery behavior are exercised.",
