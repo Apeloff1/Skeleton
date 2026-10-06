@@ -435,6 +435,135 @@ def validate_payloads(
                 minimum=3,
             )
 
+    consistency = contract.get("consistency_model")
+    if not isinstance(consistency, dict):
+        errors.append("consistency_model must be an object")
+    else:
+        for field in (
+            "canonical_writes",
+            "operation_coordination",
+            "derived_state",
+            "cross_service_mutation",
+            "read_policy",
+            "clock_policy",
+        ):
+            _text(
+                consistency.get(field),
+                f"consistency_model.{field}",
+                errors,
+            )
+
+    regional = contract.get("regional_strategy")
+    if not isinstance(regional, dict):
+        errors.append("regional_strategy must be an object")
+    else:
+        for field in (
+            "initial_enterprise_target",
+            "disaster_recovery",
+            "active_active_rule",
+            "residency",
+        ):
+            _text(
+                regional.get(field),
+                f"regional_strategy.{field}",
+                errors,
+            )
+
+    configuration = contract.get("configuration_management")
+    if not isinstance(configuration, dict):
+        errors.append("configuration_management must be an object")
+    else:
+        _text(
+            configuration.get("source_of_truth"),
+            "configuration_management.source_of_truth",
+            errors,
+        )
+        _string_list(
+            configuration.get("production_rules"),
+            label="configuration_management.production_rules",
+            errors=errors,
+            minimum=5,
+        )
+
+    federation = contract.get("enterprise_identity_federation")
+    if not isinstance(federation, dict):
+        errors.append("enterprise_identity_federation must be an object")
+    else:
+        for field in (
+            "human_authentication",
+            "lifecycle",
+            "strong_auth",
+            "session_policy",
+            "authorization_rule",
+        ):
+            _text(
+                federation.get(field),
+                f"enterprise_identity_federation.{field}",
+                errors,
+            )
+
+    dependency_policy = contract.get("external_dependency_policy")
+    if not isinstance(dependency_policy, dict):
+        errors.append("external_dependency_policy must be an object")
+    else:
+        if dependency_policy.get("registry_required") is not True:
+            errors.append("external dependencies must require registration")
+        _string_list(
+            dependency_policy.get("required_fields"),
+            label="external_dependency_policy.required_fields",
+            errors=errors,
+            minimum=10,
+        )
+        _text(
+            dependency_policy.get("rule"),
+            "external_dependency_policy.rule",
+            errors,
+        )
+
+    exception_policy = contract.get("exception_policy")
+    if not isinstance(exception_policy, dict):
+        errors.append("exception_policy must be an object")
+    else:
+        _text(
+            exception_policy.get("allowed_only_when"),
+            "exception_policy.allowed_only_when",
+            errors,
+        )
+        _string_list(
+            exception_policy.get("required_fields"),
+            label="exception_policy.required_fields",
+            errors=errors,
+            minimum=8,
+        )
+        _string_list(
+            exception_policy.get("non_overridable"),
+            label="exception_policy.non_overridable",
+            errors=errors,
+            minimum=5,
+        )
+        _text(
+            exception_policy.get("expiry_rule"),
+            "exception_policy.expiry_rule",
+            errors,
+        )
+
+    api_governance = contract.get("api_and_contract_governance")
+    if not isinstance(api_governance, dict):
+        errors.append("api_and_contract_governance must be an object")
+    else:
+        for field in (
+            "public_api",
+            "internal_api",
+            "compatibility",
+            "idempotency",
+            "error_contract",
+        ):
+            _text(
+                api_governance.get(field),
+                f"api_and_contract_governance.{field}",
+                errors,
+            )
+
     security = contract.get("security_architecture")
     if not isinstance(security, dict):
         errors.append("security_architecture must be an object")
