@@ -1,0 +1,297 @@
+{
+  "schema_version": "skeleton.ai_game_builder_dual_rival_forge.v1",
+  "version": "1.0.0",
+  "status": "active_design_authority",
+  "purpose": "Govern two internal AI systems that adversarially co-create a game by repeatedly producing, attacking, improving, verifying, and promoting every material game artifact under long-form continuity and rights/provenance constraints.",
+  "identities": {
+    "rival_a": {
+      "role": "producer/challenger",
+      "isolation": "private working state; only governed artifacts/evidence/canon are shared",
+      "rotation": "builder on odd rounds, challenger on even rounds"
+    },
+    "rival_b": {
+      "role": "producer/challenger",
+      "isolation": "private working state; only governed artifacts/evidence/canon are shared",
+      "rotation": "challenger on odd rounds, builder on even rounds"
+    },
+    "arbiter": {
+      "kind": "deterministic control plane, not a third AI",
+      "responsibilities": [
+        "score declared gates",
+        "enforce budgets",
+        "enforce canon",
+        "enforce rights/provenance",
+        "select or merge evidence-backed candidates",
+        "checkpoint and resume"
+      ]
+    }
+  },
+  "effort_modes": {
+    "forge_100": {
+      "rounds": 100,
+      "stages_per_round": 3,
+      "total_stage_executions": 300,
+      "wall_clock_deadline": null,
+      "description": "high-quality bounded adversarial refinement"
+    },
+    "forge_1000": {
+      "rounds": 1000,
+      "stages_per_round": 3,
+      "total_stage_executions": 3000,
+      "wall_clock_deadline": null,
+      "description": "deep production and integration refinement"
+    },
+    "forge_10000": {
+      "rounds": 10000,
+      "stages_per_round": 3,
+      "total_stage_executions": 30000,
+      "wall_clock_deadline": null,
+      "description": "extreme long-horizon refinement for flagship artifacts"
+    }
+  },
+  "three_stage_cycle": [
+    {
+      "stage": 1,
+      "key": "construct",
+      "actor": "current builder rival",
+      "action": "Produce the best complete candidate possible from the task contract, canon, evidence, game state, source-rights envelope, and current champion.",
+      "outputs": [
+        "candidate artifact",
+        "assumption ledger",
+        "source/evidence references",
+        "continuity claims",
+        "quality self-score"
+      ],
+      "prohibition": "No unlicensed expressive material may be copied into the candidate."
+    },
+    {
+      "stage": 2,
+      "key": "attack_and_improve",
+      "actor": "opposing rival",
+      "action": "Adversarially attack the candidate across correctness, fun, novelty, coherence, aesthetics, performance, accessibility, implementation feasibility, continuity, and rights risk; then produce a materially improved challenger rather than critique-only text.",
+      "outputs": [
+        "attack ledger",
+        "counterexamples",
+        "improved challenger artifact",
+        "quality delta",
+        "continuity and rights delta"
+      ],
+      "presentation_note": "The UI may render playful rival banter or laughter, but banter is non-authoritative and must never replace specific actionable criticism."
+    },
+    {
+      "stage": 3,
+      "key": "reconcile_and_promote",
+      "actor": "original builder plus deterministic arbiter",
+      "action": "Rebut, adopt, or synthesize the challenger using evidence. The deterministic arbiter applies hard gates and promotes only a Pareto-safe winner or synthesis; ties preserve both branches for the next round.",
+      "outputs": [
+        "champion artifact",
+        "decision receipt",
+        "discarded-alternative digest",
+        "canon delta",
+        "next-round attack targets"
+      ],
+      "prohibition": "A model cannot promote its own candidate without independent rival challenge and deterministic gate evaluation."
+    }
+  ],
+  "round_semantics": {
+    "role_rotation": "Roles swap every round to prevent one model from becoming a permanent author or critic.",
+    "champion_memory": "Only promoted artifacts and explicit rejected-alternative summaries enter durable shared memory.",
+    "branch_preservation": "Materially different high-scoring alternatives may remain as challenger branches; no silent overwrite.",
+    "checkpoints": "Checkpoint at every promoted round and every 10/100/1000 rounds according to effort tier.",
+    "resume": "Resume from the last durable champion, exact canon version, source-rights snapshot, round number, rival identities, scorer version, and random seed set where applicable.",
+    "stop_conditions": [
+      "exact effort round count reached",
+      "explicit operator cancellation",
+      "hard safety/rights/resource fault",
+      "declared terminal project completion policy"
+    ],
+    "forbidden_stop_condition": "Wall-clock duration alone; the effort modes intentionally have no time limit."
+  },
+  "artifact_atomization": {
+    "principle": "Every game artifact is decomposed to the smallest useful governed unit without losing its parent context.",
+    "visual": [
+      "pixel sample",
+      "pixel region",
+      "sprite cell",
+      "texture texel region",
+      "material sample",
+      "mesh element",
+      "frame region",
+      "shot",
+      "camera beat",
+      "scene"
+    ],
+    "narrative": [
+      "token span",
+      "line",
+      "dialogue turn",
+      "beat",
+      "scene",
+      "sequence",
+      "chapter/act",
+      "character arc",
+      "quest arc",
+      "campaign"
+    ],
+    "game_design": [
+      "input",
+      "verb",
+      "rule",
+      "mechanic",
+      "state transition",
+      "encounter",
+      "mission",
+      "level",
+      "system",
+      "meta-system"
+    ],
+    "audio": [
+      "sample window",
+      "event",
+      "SFX",
+      "voice line",
+      "music stem",
+      "cue",
+      "mix snapshot",
+      "scene soundscape"
+    ],
+    "code": [
+      "expression",
+      "statement",
+      "function",
+      "component",
+      "system",
+      "module",
+      "build artifact"
+    ],
+    "world": [
+      "entity",
+      "component",
+      "relationship",
+      "location",
+      "region",
+      "faction",
+      "timeline event",
+      "world state"
+    ],
+    "requirement": "Atomic inspection never severs provenance to the containing scene, story, system, project pillar, or canon state."
+  },
+  "longform_consistency": {
+    "prime_directive": "No local improvement may damage long-form story, world, character, gameplay, visual, audio, systemic, or thematic consistency.",
+    "authorities": [
+      "ProjectDNA",
+      "GamePillars",
+      "CanonLedger",
+      "WorldStateGraph",
+      "CharacterStateTimelines",
+      "NarrativeCausalityGraph",
+      "QuestDependencyGraph",
+      "MechanicInvariantSet",
+      "VisualLanguageBible",
+      "AudioLanguageBible",
+      "ForeshadowingLedger",
+      "PayoffLedger",
+      "ContinuityDebtLedger"
+    ],
+    "checks": [
+      "character knowledge and motivation continuity",
+      "world geography and travel-time consistency",
+      "timeline and causal ordering",
+      "setup/payoff and foreshadowing debt",
+      "quest preconditions and consequence propagation",
+      "mechanic/narrative agreement",
+      "difficulty/progression continuity",
+      "visual motif and silhouette language",
+      "audio leitmotif and diegetic consistency",
+      "player-choice consequence persistence",
+      "save/load/replay determinism where required",
+      "late-game callbacks against early-game facts"
+    ],
+    "failure_behavior": "Contradiction blocks promotion unless explicitly marked as intentional unreliable narration, retcon proposal, branch divergence, dream/simulation, or other declared narrative device."
+  },
+  "quality_vector": [
+    "player value",
+    "fun/engagement",
+    "originality",
+    "mechanical depth",
+    "clarity/readability",
+    "narrative coherence",
+    "long-form consistency",
+    "emotional impact",
+    "aesthetic coherence",
+    "technical correctness",
+    "performance",
+    "accessibility",
+    "replayability",
+    "maintainability",
+    "testability",
+    "platform fit",
+    "source/evidence quality",
+    "rights/provenance safety"
+  ],
+  "source_universe": {
+    "objective": "Use the broadest legally permitted game-development knowledge base while keeping source identity and rights status attached.",
+    "classes": [
+      "official game-engine documentation",
+      "platform and console documentation available to the project",
+      "graphics/GPU/shader specifications",
+      "physics and simulation literature",
+      "networking/distributed-systems literature",
+      "game-design theory and postmortems",
+      "interactive narrative and storytelling research",
+      "HCI/UX/accessibility research",
+      "audio/DSP/music-system references",
+      "animation/rigging references",
+      "procedural-generation research",
+      "AI/NPC and planning research",
+      "public standards",
+      "public-domain material",
+      "permissively licensed open source",
+      "project-owned source and assets",
+      "user-supplied licensed sources",
+      "community tutorials and discussions",
+      "market observations and public factual metadata"
+    ],
+    "ingestion_rule": "Availability is not permission to copy. Every source receives provenance, rights status, allowed uses, retention, and output constraints before it can influence production artifacts."
+  },
+  "rights_and_originality": {
+    "goal": "Minimize copyright, license, trademark, trade-dress, confidential-information, and provenance risk across the game-building pipeline; absolute worldwide non-infringement cannot be guaranteed by software alone.",
+    "rights_states": [
+      "project_owned",
+      "public_domain",
+      "permissive_reuse",
+      "licensed_reuse",
+      "facts_and_ideas_reference_only",
+      "restricted_reference_only",
+      "unknown_quarantine",
+      "forbidden"
+    ],
+    "default_for_unknown": "unknown_quarantine",
+    "hard_rules": [
+      "Do not reproduce protected text, code, art, music, audio, characters, maps, levels, logos, or other expressive material without a compatible permission basis.",
+      "Reference-only sources may inform abstract techniques, facts, constraints, and high-level ideas but not supply expressive output.",
+      "Preserve license notices and attribution where the governing license requires them.",
+      "Block export when provenance is missing for incorporated third-party material.",
+      "Run near-duplicate and similarity review across text, code, image, audio/music, names/marks, level layouts, and distinctive character/world elements before promotion.",
+      "Quarantine suspiciously similar output for human/legal review rather than attempting automatic legal conclusions.",
+      "Never claim that a similarity score is a legal determination."
+    ],
+    "originality_pressure": "The rivals receive an explicit novelty objective: solve the design problem from first principles and project-specific canon rather than imitate a named work, franchise, studio, artist, composer, writer, or codebase."
+  },
+  "implementation_bindings": [
+    "backend/gameforge/omega/conductor.py",
+    "backend/gameforge/agents/judge_tiebreak_evaluation_engine.py",
+    "backend/gameforge/exocortex/agentic/scenebind_omni_modal.py",
+    "backend/gameforge/exocortex/agentic/storyteller_narrative_grounding.py",
+    "backend/core/narrative_vault.py",
+    "backend/core/world_graph.py",
+    "skeleton/ai/runtime/intelligence/game_context.py",
+    "skeleton/ai/runtime/intelligence/narrative.py",
+    "skeleton/ai/simulation/world/scene.py",
+    "skeleton/ai/simulation/game/replay.py",
+    "planned:skeleton/ai/game_builder/dual_rival_forge.py",
+    "planned:skeleton/ai/game_builder/canon.py",
+    "planned:skeleton/ai/game_builder/rights.py",
+    "planned:skeleton/ai/game_builder/atomizer.py"
+  ]
+}
