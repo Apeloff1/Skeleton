@@ -28,9 +28,12 @@ The lab contains bounded analyzers for:
 - **tokenizer behavior** — token-count, token-id-space, and character/token fingerprints without persisting raw inputs;
 - **embedding geometry** — norms, pairwise cosine structure, centroid magnitude, and zero-norm accounting;
 - **KV-cache behavior** — measured bytes/token, approximate linearity, and theoretical-geometry error;
+- **cache eviction** — first over-capacity point, first retention loss, hit-rate and retention curves;
 - **attention geometry** — MHA/GQA/MQA classification, head ratios, and width-consistency checks;
 - **activation geometry** — per-layer norms, sparsity, and pairwise cosine structure while reports retain only vector digests;
 - **architecture-family scoring** — transparent evidence-weighted candidate ranking rather than opaque identity claims;
+- **expert routing** — observed top-k, expert load concentration, and routing-weight summaries for authorized MoE models;
+- **residual interventions** — output-change and metric-delta summaries for controlled causal interventions on authorized local models;
 - **authorized artifact manifests** — tensor shapes/dtypes/counts with provenance receipts but no raw tensor persistence;
 - **tensor topology** — indexed-layer and recurrent-shape inference from authorized tensor metadata;
 - **quantization** — numerical error and cosine-similarity characterization for authorized reference/quantized samples;

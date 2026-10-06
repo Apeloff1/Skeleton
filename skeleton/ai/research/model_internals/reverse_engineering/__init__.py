@@ -19,6 +19,7 @@ from .attention_geometry import (
     AttentionMode,
     analyze_attention_geometry,
 )
+from .cache_eviction import CacheEvictionReport, CacheTrial, analyze_cache_eviction
 from .context_window import ContextBoundaryReport, ContextTrial, characterize_context
 from .contracts import (
     AuthorizationScope,
@@ -34,6 +35,7 @@ from .differential import DifferentialFinding, compare_bundles
 from .embedding_geometry import EmbeddingGeometryReport, EmbeddingSample, analyze_embedding_geometry
 from .evidence_chain import EvidenceChain, EvidenceChainEntry
 from .experiment import ExperimentCell, build_experiment_matrix
+from .expert_routing import ExpertRoutingObservation, ExpertRoutingReport, analyze_expert_routing
 from .fingerprint import BehavioralFingerprint, fingerprint_bundle
 from .inference import infer_architecture
 from .kv_cache import KVCacheObservation, KVCacheReport, analyze_kv_cache
@@ -41,6 +43,11 @@ from .probes import ProbeRunner
 from .provenance import ArtifactProvenance, ProvenanceGate
 from .quantization import QuantizationPair, QuantizationReport, analyze_quantization
 from .replication import ReplicationAttempt, ReplicationStatus, replication_status
+from .residual_intervention import (
+    ResidualInterventionObservation,
+    ResidualInterventionReport,
+    analyze_residual_interventions,
+)
 from .routing import RoutingFingerprint, RoutingObservation, routing_fingerprint
 from .session import ReverseEngineeringSession, SessionReport
 from .state_memory import StateMemoryReport, StateTrial, analyze_state_memory
@@ -60,6 +67,8 @@ __all__ = [
     "AttentionMode",
     "AuthorizationScope",
     "BehavioralFingerprint",
+    "CacheEvictionReport",
+    "CacheTrial",
     "ContextBoundaryReport",
     "ContextTrial",
     "DecodeSample",
@@ -71,6 +80,8 @@ __all__ = [
     "EvidenceChain",
     "EvidenceChainEntry",
     "ExperimentCell",
+    "ExpertRoutingObservation",
+    "ExpertRoutingReport",
     "InferenceClaim",
     "KVCacheObservation",
     "KVCacheReport",
@@ -83,6 +94,8 @@ __all__ = [
     "QuantizationReport",
     "ReplicationAttempt",
     "ReplicationStatus",
+    "ResidualInterventionObservation",
+    "ResidualInterventionReport",
     "ReverseEngineeringError",
     "ReverseEngineeringSession",
     "RoutingFingerprint",
@@ -95,10 +108,13 @@ __all__ = [
     "TokenizerFingerprint",
     "TopologyReport",
     "analyze_activation_geometry",
+    "analyze_cache_eviction",
     "analyze_attention_geometry",
     "analyze_embedding_geometry",
+    "analyze_expert_routing",
     "analyze_kv_cache",
     "analyze_quantization",
+    "analyze_residual_interventions",
     "analyze_state_memory",
     "build_artifact_manifest",
     "build_experiment_matrix",
