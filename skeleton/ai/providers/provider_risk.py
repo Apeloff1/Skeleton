@@ -6,8 +6,8 @@ import hashlib,json
 class ProviderRiskError(ValueError): pass
 _DIMENSIONS=("availability","security","privacy","regulatory","lock_in")
 
-def _token(n:str,v:object)->str:
-    if not isinstance(v,str) or not v or v!=v.strip() or len(v)>512: raise ProviderRiskError(f"{n} must be non-empty normalized text")
+def _token(n:str,v:object,max_length:int=512)->str:
+    if not isinstance(v,str) or not v or v!=v.strip() or len(v)>max_length: raise ProviderRiskError(f"{n} must be non-empty normalized text")
     return v
 def _sha(n:str,v:object)->str:
     if not isinstance(v,str) or len(v)!=64 or any(c not in "0123456789abcdef" for c in v): raise ProviderRiskError(f"{n} must be lowercase sha256")
