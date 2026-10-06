@@ -1209,15 +1209,6 @@ async def ai_chat(
             operation_id,
             execution_id,
         )
-        try:
-            chat_turn = await chat_turn_lifecycle.fail(
-                chat_turn,
-                tenant_id=tenant_id,
-                owner_id=owner_id,
-                reason_code="engine-configuration-invalid",
-            )
-        except Exception as exc:
-            raise _chat_error(exc) from exc
         return {
             "success": False,
             "response": "The AI engine configuration is unavailable. Retry later.",
@@ -1397,16 +1388,6 @@ async def ai_chat(
                 operation_id,
                 execution_id,
             )
-            try:
-                chat_turn = await chat_turn_lifecycle.fail(
-                    chat_turn,
-                    tenant_id=tenant_id,
-                    owner_id=owner_id,
-                    reason_code="engine-unavailable",
-                    retryable=True,
-                )
-            except Exception as turn_exc:
-                raise _chat_error(turn_exc) from turn_exc
             return {
                 "success": False,
                 "response": "The AI engine is unavailable right now. Retry the request.",
@@ -1478,16 +1459,6 @@ async def ai_chat(
             ),
         }
     elif memory_write_intent is not None:
-        try:
-            chat_turn = await chat_turn_lifecycle.fail(
-                chat_turn,
-                tenant_id=tenant_id,
-                owner_id=owner_id,
-                reason_code="memory-persistence-unavailable",
-                retryable=True,
-            )
-        except Exception as exc:
-            raise _chat_error(exc) from exc
         return {
             "success": False,
             "response": (
@@ -1514,16 +1485,6 @@ async def ai_chat(
         )
 
     if not result["success"]:
-        try:
-            chat_turn = await chat_turn_lifecycle.fail(
-                chat_turn,
-                tenant_id=tenant_id,
-                owner_id=owner_id,
-                reason_code=str(result.get("error_code") or "model-failure"),
-                retryable=True,
-            )
-        except Exception as exc:
-            raise _chat_error(exc) from exc
         return {
             "success": False,
             "response": "The AI engine is unavailable right now. Retry the request.",
