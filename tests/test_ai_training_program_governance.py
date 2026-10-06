@@ -29,6 +29,7 @@ from skeleton.ai.learning.promotion_control import (
     CanaryEvidence,
     EvaluationBundle,
     ImprovementCandidate,
+    PromotionLedger,
     PromotionStatus,
     decide,
     promote_with_canary,
@@ -1051,12 +1052,20 @@ def governed_decision(candidate_value: ImprovementCandidate):
         rollback_ready=True,
         verifier_id="ACTOR.CANARY",
     )
-    return promote_with_canary(
+    decision = promote_with_canary(
         candidate_value,
         evaluation,
         "ACTOR.VERIFIER",
         canary,
     )
+    ledger = PromotionLedger()
+    ledger.record_decision(
+        candidate_value,
+        decision,
+        evaluation=evaluation,
+        canary=canary,
+    )
+    return decision, ledger
 
 
 def governed_registry(
@@ -1102,13 +1111,14 @@ def test_governed_model_promotion_binds_exact_trained_challenger() -> None:
         corpora={selected.dataset_id: corpus()},
     )
     candidate_value = governed_candidate(artifact.model_digest)
-    decision = governed_decision(candidate_value)
+    decision, ledger = governed_decision(candidate_value)
     promotion = registry.promote(
         run_id="run-1",
         verifier_id="ACTOR.VERIFIER",
         evaluation_refs=("eval:b", "eval:a"),
         governance_candidate=candidate_value,
         governance_decision=decision,
+        governance_ledger=ledger,
     )
 
     assert promotion.model_digest == artifact.model_digest
@@ -1125,7 +1135,7 @@ def test_governed_model_promotion_rejects_wrong_challenger_model() -> None:
         corpora={selected.dataset_id: corpus()},
     )
     candidate_value = governed_candidate(sha("different-model"))
-    decision = governed_decision(candidate_value)
+    decision, ledger = governed_decision(candidate_value)
 
     with pytest.raises(
         ModelProgramError,
@@ -1163,6 +1173,13 @@ def test_governed_model_promotion_rejects_rejected_decision() -> None:
         canary_digest=None,
     )
     assert rejected.status is PromotionStatus.REJECT
+    ledger = PromotionLedger()
+    ledger.record_decision(
+        candidate_value,
+        rejected,
+        evaluation=rejected_evaluation,
+        canary=None,
+    )
 
     with pytest.raises(
         ModelProgramError,
@@ -1174,6 +1191,7 @@ def test_governed_model_promotion_rejects_rejected_decision() -> None:
             evaluation_refs=("eval:a", "eval:b"),
             governance_candidate=candidate_value,
             governance_decision=rejected,
+            governance_ledger=ledger,
         )
 
 
@@ -1185,7 +1203,7 @@ def test_governed_model_promotion_verifier_must_match_decision() -> None:
         corpora={selected.dataset_id: corpus()},
     )
     candidate_value = governed_candidate(artifact.model_digest)
-    decision = governed_decision(candidate_value)
+    decision, ledger = governed_decision(candidate_value)
     with pytest.raises(
         ModelProgramError,
         match="verifier must match governance verifier",
@@ -1207,7 +1225,7 @@ def test_governance_candidate_and_decision_must_be_supplied_together() -> None:
         corpora={selected.dataset_id: corpus()},
     )
     candidate_value = governed_candidate(artifact.model_digest)
-    decision = governed_decision(candidate_value)
+    decision, ledger = governed_decision(candidate_value)
 
     with pytest.raises(
         TypeError,
@@ -1219,6 +1237,7 @@ def test_governance_candidate_and_decision_must_be_supplied_together() -> None:
             evaluation_refs=("eval:a", "eval:b"),
             governance_candidate=candidate_value,
             governance_decision=None,
+            governance_ledger=ledger,
         )
 
     with pytest.raises(
@@ -1231,6 +1250,20 @@ def test_governance_candidate_and_decision_must_be_supplied_together() -> None:
             evaluation_refs=("eval:a", "eval:b"),
             governance_candidate=None,
             governance_decision=decision,
+            governance_ledger=ledger,
+        )
+
+    with pytest.raises(
+        TypeError,
+        match="governance_ledger",
+    ):
+        registry.promote(
+            run_id="run-1",
+            verifier_id="ACTOR.VERIFIER",
+            evaluation_refs=("eval:a", "eval:b"),
+            governance_candidate=candidate_value,
+            governance_decision=decision,
+            governance_ledger=None,
         )
 
 
@@ -1242,7 +1275,7 @@ def test_governed_promotion_replay_is_idempotent_and_decision_bound() -> None:
         corpora={selected.dataset_id: corpus()},
     )
     candidate_value = governed_candidate(artifact.model_digest)
-    decision = governed_decision(candidate_value)
+    decision, ledger = governed_decision(candidate_value)
 
     first = registry.promote(
         run_id="run-1",
@@ -1250,6 +1283,7 @@ def test_governed_promotion_replay_is_idempotent_and_decision_bound() -> None:
         evaluation_refs=("eval:a", "eval:b"),
         governance_candidate=candidate_value,
         governance_decision=decision,
+        governance_ledger=ledger,
     )
     second = registry.promote(
         run_id="run-1",
@@ -1257,9 +1291,35 @@ def test_governed_promotion_replay_is_idempotent_and_decision_bound() -> None:
         evaluation_refs=("eval:b", "eval:a"),
         governance_candidate=candidate_value,
         governance_decision=decision,
+        governance_ledger=ledger,
     )
     assert first == second
     assert first.governance_decision_digest == decision.digest
+
+
+def test_model_registry_rejects_decision_not_verified_by_supplied_ledger() -> None:
+    selected = dataset()
+    registry = governed_registry(selected)
+    artifact, _ = registry.train(
+        training_spec(),
+        corpora={selected.dataset_id: corpus()},
+    )
+    candidate_value = governed_candidate(artifact.model_digest)
+    decision, _verified_ledger = governed_decision(candidate_value)
+    empty_ledger = PromotionLedger()
+
+    with pytest.raises(
+        ModelProgramError,
+        match="not verified by promotion ledger",
+    ):
+        registry.promote(
+            run_id="run-1",
+            verifier_id="ACTOR.VERIFIER",
+            evaluation_refs=("eval:a", "eval:b"),
+            governance_candidate=candidate_value,
+            governance_decision=decision,
+            governance_ledger=empty_ledger,
+        )
 
 
 def test_strict_registry_boolean_and_policy_configuration_are_validated() -> None:
