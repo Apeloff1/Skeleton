@@ -684,6 +684,13 @@ class PromotionReceipt:
             or any(ch not in "0123456789abcdef" for ch in self.evaluation_decision_digest)
         ):
             raise ValueError("evaluation_decision_digest must be lowercase sha256")
+        if (
+            self.evaluation_decision_digest is not None
+            and self.evaluation_decision_digest != self.authority_evidence_digest
+        ):
+            raise ValueError(
+                "evaluation decision digest must equal promotion authority evidence"
+            )
         if any(not isinstance(gate, GateResult) for gate in self.gate_results):
             raise TypeError("promotion receipt gate_results must contain GateResult values")
         gate_ids = [gate.gate_id for gate in self.gate_results]
@@ -835,6 +842,15 @@ def promotion_receipt(
     gate_ids = [gate.gate_id for gate in gates]
     if len(gate_ids) != len(set(gate_ids)):
         raise ValueError("gate_results must use unique gate ids")
+    if submitted_quality_override is not None:
+        if evaluation_decision_digest is None:
+            raise ValueError(
+                "evaluated quality override requires evaluation_decision_digest"
+            )
+        if evaluation_decision_digest != authority_evidence_digest:
+            raise ValueError(
+                "evaluation decision digest must equal promotion authority evidence"
+            )
     proposed_quality = (
         submitted.quality_map
         if submitted is not None and submitted_quality_override is None
