@@ -24,6 +24,17 @@ TOPOLOGY_PATH = Path("machine/state_topology.json")
 BACKUP_POLICY_PATH = Path("machine/state_backup_policy.json")
 COMPOSE_PATH = Path("docker-compose.yml")
 RECOVERY_WORKFLOW_PATH = Path(".github/workflows/state-recovery-drill.yml")
+RELEASE_WORKFLOW_PATH = Path(
+    ".github/workflows/p1-migration-rollback-compatibility.yml"
+)
+MIGRATION_TOOL_PATH = Path("scripts/state_migration_compatibility.py")
+MIGRATION_TEST_PATH = Path(
+    "skeleton/testing/test_state_migration_compatibility.py"
+)
+RETIRED_AUTHORITY_GAPS = {
+    "gap-state-authority-convergence",
+    "gap-memory-durable-authority",
+}
 
 REQUIRED_AUTHORITIES = {
     "backend-core-app-state": "mongo",
@@ -189,6 +200,18 @@ def _verify_authorities(
                 f"state-authority gap still owns unbound domain {domain_id}"
             )
         if authority == "authoritative":
+            status = str(domain.get("status", "")).lower()
+            if "partial" in status or "transitional" in status:
+                errors.append(
+                    f"authoritative domain {domain_id} remains partially bound: "
+                    f"{domain.get('status')!r}"
+                )
+            gap_id = domain.get("gap")
+            if gap_id in RETIRED_AUTHORITY_GAPS:
+                errors.append(
+                    f"authoritative domain {domain_id} retains retired gap "
+                    f"{gap_id!r}"
+                )
             if domain.get("source_of_truth") is not True:
                 errors.append(
                     f"authoritative domain {domain_id} must be source_of_truth"
@@ -393,10 +416,30 @@ def _verify_deployment(root: Path, errors: list[str]) -> None:
         "scripts/state_recovery_drill.py live-sqlite",
         "scripts/state_recovery_drill.py live-engine-sqlite",
         "scripts/verify_state_authority_closure.py",
+        MIGRATION_TOOL_PATH.as_posix(),
+        MIGRATION_TEST_PATH.as_posix(),
     ):
         if token not in workflow:
             errors.append(
                 f"State Recovery Drill lost required closure step: {token}"
+            )
+
+    try:
+        release_workflow = (root / RELEASE_WORKFLOW_PATH).read_text(
+            encoding="utf-8"
+        )
+    except OSError as exc:
+        raise VerificationError(
+            ".github/workflows/p1-migration-rollback-compatibility.yml "
+            "is unavailable"
+        ) from exc
+    for token in (
+        MIGRATION_TOOL_PATH.as_posix(),
+        MIGRATION_TEST_PATH.as_posix(),
+    ):
+        if token not in release_workflow:
+            errors.append(
+                f"Release migration gate lost state rehearsal binding: {token}"
             )
 
 
@@ -425,6 +468,31 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
     derived = _verify_derived(domains, errors)
     backup = _verify_backup_policy(policy, errors)
     _verify_deployment(root, errors)
+
+    migration = topology.get("migration_compatibility")
+    expected_migration = {
+        "tool": MIGRATION_TOOL_PATH.as_posix(),
+        "test": MIGRATION_TEST_PATH.as_posix(),
+        "release_workflow": RELEASE_WORKFLOW_PATH.as_posix(),
+        "recovery_workflow": RECOVERY_WORKFLOW_PATH.as_posix(),
+    }
+    if not isinstance(migration, dict):
+        errors.append("state topology must bind migration_compatibility")
+    else:
+        for key, value in expected_migration.items():
+            if migration.get(key) != value:
+                errors.append(
+                    f"state topology migration_compatibility.{key} must be "
+                    f"{value}"
+                )
+            if not (root / value).is_file():
+                errors.append(
+                    f"state migration compatibility path is missing: {value}"
+                )
+        if not isinstance(migration.get("policy"), str) or not migration["policy"].strip():
+            errors.append(
+                "state topology migration_compatibility.policy must be non-empty"
+            )
 
     topology_backup = topology.get("backup_policy")
     if not isinstance(topology_backup, dict):
