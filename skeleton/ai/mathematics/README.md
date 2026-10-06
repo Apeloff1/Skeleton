@@ -41,6 +41,11 @@ model authority boundaries.
 - `sampling.py` — deterministic SplitMix64, systematic resampling, Halton points and Monte Carlo error.
 - `geometry.py` — Euclidean/angular metrics, simplex projection, barycentric and subspace projection.
 - `losses.py` — stable regression/classification losses and logit-domain cross entropy.
+- `sparse.py` — canonical CSR storage, COO duplicate reduction, sparse matvec/transpose/dense products.
+- `approximation.py` — Horner evaluation, Chebyshev nodes, barycentric/Newton and piecewise interpolation.
+- `distributions.py` — Normal, Student-t, Bernoulli, Poisson and Gaussian-mixture density references.
+- `transforms.py` — DFT, radix-2 FFT, inverse transforms, convolution and autocorrelation.
+- `calibration_metrics.py` — ECE/MCE/Brier metrics only; no calibration ledger or correction authority.
 - `validation.py` — parity evidence against existing optimized runtime kernels.
 
 ## Guarantees
@@ -59,6 +64,11 @@ model authority boundaries.
 - Sampling is explicitly seeded and reproducible; quasi-random sequences have fixed index semantics.
 - Geometry projection rejects degenerate or rank-deficient constructions instead of hiding them.
 - Training losses operate in stable logit/log domains and reject impossible support.
+- Sparse matrices have one canonical CSR representation; duplicate COO coordinates are merged deterministically.
+- Approximation routines reject duplicate/non-monotonic nodes and make extrapolation policy explicit.
+- Distribution routines expose density/CDF math only and do not create predictive-model ownership.
+- Transform paths provide an O(n^2) DFT oracle beside radix-2 FFT so optimized paths can be parity checked.
+- Calibration helpers are read-only metrics; evidence ledgers and confidence correction remain in their existing owners.
 - `audit_runtime_kernels()` compares optimized runtime softmax, matmul and attention against
   this reference substrate without replacing those kernels.
 

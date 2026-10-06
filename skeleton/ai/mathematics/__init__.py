@@ -19,7 +19,32 @@ from .autodiff import (
     tanh as dual_tanh,
     value_and_gradient,
 )
+from .approximation import (
+    barycentric_interpolate,
+    barycentric_weights,
+    chebyshev_nodes,
+    horner,
+    newton_divided_differences,
+    newton_interpolate,
+    piecewise_linear_interpolate,
+)
+from .calibration_metrics import (
+    CalibrationBin,
+    CalibrationMetricReport,
+    binary_calibration_report,
+    top_label_calibration_report,
+)
 from .contracts import MathInvariantError, Matrix, Vector
+from .distributions import (
+    bernoulli_log_pmf,
+    gaussian_mixture_log_density,
+    normal_cdf,
+    normal_log_pdf,
+    normal_pdf,
+    normal_quantile,
+    poisson_log_pmf,
+    student_t_log_pdf,
+)
 from .geometry import (
     ProjectionReport,
     angular_distance,
@@ -101,6 +126,7 @@ from .sampling import (
     radical_inverse,
     systematic_resample,
 )
+from .sparse import CSRMatrix, sparse_dense_matmul
 from .solvers import (
     ConjugateGradientReport,
     RootReport,
@@ -138,9 +164,28 @@ from .tensor import (
     subtract as tensor_subtract,
     tensor_zip,
 )
+from .transforms import (
+    autocorrelation,
+    convolution,
+    dft,
+    fft_radix2,
+    inverse_dft,
+    inverse_fft_radix2,
+)
 from .validation import MathAuditCase, MathAuditReport, audit_runtime_kernels
 
 __all__ = [
+    "barycentric_interpolate",
+    "barycentric_weights",
+    "chebyshev_nodes",
+    "horner",
+    "newton_divided_differences",
+    "newton_interpolate",
+    "piecewise_linear_interpolate",
+    "CalibrationBin",
+    "CalibrationMetricReport",
+    "binary_calibration_report",
+    "top_label_calibration_report",
     "MathInvariantError",
     "Matrix",
     "Vector",
@@ -157,6 +202,14 @@ __all__ = [
     "dual_sqrt",
     "dual_tanh",
     "value_and_gradient",
+    "bernoulli_log_pmf",
+    "gaussian_mixture_log_density",
+    "normal_cdf",
+    "normal_log_pdf",
+    "normal_pdf",
+    "normal_quantile",
+    "poisson_log_pmf",
+    "student_t_log_pdf",
     "ProjectionReport",
     "angular_distance",
     "barycentric_triangle",
@@ -220,6 +273,8 @@ __all__ = [
     "monte_carlo_unit_cube",
     "radical_inverse",
     "systematic_resample",
+    "CSRMatrix",
+    "sparse_dense_matmul",
     "ConjugateGradientReport",
     "RootReport",
     "bisection_root",
@@ -249,6 +304,12 @@ __all__ = [
     "tensor_reduce_sum",
     "tensor_subtract",
     "tensor_zip",
+    "autocorrelation",
+    "convolution",
+    "dft",
+    "fft_radix2",
+    "inverse_dft",
+    "inverse_fft_radix2",
     "MathAuditCase",
     "MathAuditReport",
     "audit_runtime_kernels",
