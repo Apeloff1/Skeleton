@@ -11317,7 +11317,8 @@
       ],
       "implementation_paths": [
         "skeleton/observability/slo.py",
-        "skeleton/observability/operations_review.py"
+        "skeleton/observability/operations_review.py",
+        "skeleton/ai/runtime/observability/slo.py"
       ],
       "tests": [
         "skeleton/testing/test_slo_registry.py",
@@ -11366,7 +11367,8 @@
       ],
       "implementation_paths": [
         "skeleton/observability/error_budget_policy.py",
-        "skeleton/observability/operations_review.py"
+        "skeleton/observability/operations_review.py",
+        "skeleton/ai/runtime/observability/error_budget_policy.py"
       ],
       "tests": [
         "skeleton/testing/test_error_budgets.py",
@@ -11415,7 +11417,8 @@
       ],
       "implementation_paths": [
         "skeleton/observability/cardinality_control.py",
-        "skeleton/observability/operations_review.py"
+        "skeleton/observability/operations_review.py",
+        "skeleton/ai/runtime/observability/cardinality_control.py"
       ],
       "tests": [
         "skeleton/testing/test_observability_cardinality.py",
@@ -11464,7 +11467,8 @@
       ],
       "implementation_paths": [
         "skeleton/observability/trace_model.py",
-        "skeleton/observability/operations_review.py"
+        "skeleton/observability/operations_review.py",
+        "skeleton/ai/runtime/observability/trace_model.py"
       ],
       "tests": [
         "skeleton/testing/test_trace_model.py",
@@ -11513,7 +11517,8 @@
       ],
       "implementation_paths": [
         "skeleton/observability/profile_records.py",
-        "skeleton/observability/operations_review.py"
+        "skeleton/observability/operations_review.py",
+        "skeleton/ai/runtime/observability/profile_records.py"
       ],
       "tests": [
         "skeleton/testing/test_profile_records.py",
@@ -11562,7 +11567,8 @@
       ],
       "implementation_paths": [
         "skeleton/observability/latency_budget.py",
-        "skeleton/observability/operations_review.py"
+        "skeleton/observability/operations_review.py",
+        "skeleton/ai/runtime/observability/latency_budget.py"
       ],
       "tests": [
         "skeleton/testing/test_latency_budgets.py",
@@ -11611,7 +11617,8 @@
       ],
       "implementation_paths": [
         "skeleton/observability/cost_governor.py",
-        "skeleton/observability/operations_review.py"
+        "skeleton/observability/operations_review.py",
+        "skeleton/ai/runtime/observability/cost_governor.py"
       ],
       "tests": [
         "skeleton/testing/test_cost_governor.py",
@@ -11660,7 +11667,8 @@
       ],
       "implementation_paths": [
         "skeleton/observability/efficiency_metrics.py",
-        "skeleton/observability/operations_review.py"
+        "skeleton/observability/operations_review.py",
+        "skeleton/ai/runtime/observability/efficiency_metrics.py"
       ],
       "tests": [
         "skeleton/testing/test_efficiency_metrics.py",

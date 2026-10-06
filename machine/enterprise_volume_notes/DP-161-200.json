@@ -4314,7 +4314,8 @@
         ],
         "canonical_paths": [
           "skeleton/observability/slo.py",
-          "skeleton/observability/operations_review.py"
+          "skeleton/observability/operations_review.py",
+          "skeleton/ai/runtime/observability/slo.py"
         ],
         "risks": [
           "misleading SLI",
@@ -4536,7 +4537,8 @@
         ],
         "canonical_paths": [
           "skeleton/observability/error_budget_policy.py",
-          "skeleton/observability/operations_review.py"
+          "skeleton/observability/operations_review.py",
+          "skeleton/ai/runtime/observability/error_budget_policy.py"
         ],
         "risks": [
           "bad denominator",
@@ -4758,7 +4760,8 @@
         ],
         "canonical_paths": [
           "skeleton/observability/cardinality_control.py",
-          "skeleton/observability/operations_review.py"
+          "skeleton/observability/operations_review.py",
+          "skeleton/ai/runtime/observability/cardinality_control.py"
         ],
         "risks": [
           "metrics backend overload",
@@ -4980,7 +4983,8 @@
         ],
         "canonical_paths": [
           "skeleton/observability/trace_model.py",
-          "skeleton/observability/operations_review.py"
+          "skeleton/observability/operations_review.py",
+          "skeleton/ai/runtime/observability/trace_model.py"
         ],
         "risks": [
           "broken correlation",
@@ -5202,7 +5206,8 @@
         ],
         "canonical_paths": [
           "skeleton/observability/profile_records.py",
-          "skeleton/observability/operations_review.py"
+          "skeleton/observability/operations_review.py",
+          "skeleton/ai/runtime/observability/profile_records.py"
         ],
         "risks": [
           "benchmark distortion",
@@ -5424,7 +5429,8 @@
         ],
         "canonical_paths": [
           "skeleton/observability/latency_budget.py",
-          "skeleton/observability/operations_review.py"
+          "skeleton/observability/operations_review.py",
+          "skeleton/ai/runtime/observability/latency_budget.py"
         ],
         "risks": [
           "retry hides tail latency",
@@ -5646,7 +5652,8 @@
         ],
         "canonical_paths": [
           "skeleton/observability/cost_governor.py",
-          "skeleton/observability/operations_review.py"
+          "skeleton/observability/operations_review.py",
+          "skeleton/ai/runtime/observability/cost_governor.py"
         ],
         "risks": [
           "double charge",
@@ -5868,7 +5875,8 @@
         ],
         "canonical_paths": [
           "skeleton/observability/efficiency_metrics.py",
-          "skeleton/observability/operations_review.py"
+          "skeleton/observability/operations_review.py",
+          "skeleton/ai/runtime/observability/efficiency_metrics.py"
         ],
         "risks": [
           "greenwashing metric",
