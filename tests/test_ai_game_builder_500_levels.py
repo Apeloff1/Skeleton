@@ -29,7 +29,11 @@ def _fixture(tmp_path: Path) -> Path:
         "docs/plan/MASTER_PLAN.md",
         "skeleton/ai/game_builder/contracts.py",
         "skeleton/ai/game_builder/dual_rival_forge.py",
+        "skeleton/ai/game_builder/canon.py",
+        "skeleton/ai/game_builder/rights.py",
+        "skeleton/ai/game_builder/atomizer.py",
         "skeleton/testing/test_ai_game_builder_contracts.py",
+        "skeleton/testing/test_ai_game_builder_governance.py",
         *manifest["shards"],
     ]
     for relative in paths:
@@ -204,4 +208,26 @@ def test_rejects_runtime_binding_drift(tmp_path: Path) -> None:
     manifest["runtime_contracts"]["dual_rival_state_machine"] = "planned:wrong.py"
     _write(root, "machine/ai_game_builder_500_levels.json", manifest)
     with pytest.raises(MODULE.GameBuilderAuthorityError, match="runtime contract binding drifted"):
+        MODULE.validate(root)
+
+
+def test_governance_runtime_and_protected_quality_axes_are_bound() -> None:
+    manifest = _json(ROOT, "machine/ai_game_builder_500_levels.json")
+    duel = _json(ROOT, "machine/ai_game_builder_dual_rival_forge.json")
+    assert manifest["governance_runtime"] == {
+        "canon": "skeleton/ai/game_builder/canon.py",
+        "rights": "skeleton/ai/game_builder/rights.py",
+        "atom_lineage": "skeleton/ai/game_builder/atomizer.py",
+        "tests": "skeleton/testing/test_ai_game_builder_governance.py",
+    }
+    for axis in ("security/privacy", "state integrity", "reproducibility"):
+        assert axis in duel["quality_vector"]
+
+
+def test_rejects_governance_runtime_drift(tmp_path: Path) -> None:
+    root = _fixture(tmp_path)
+    manifest = _json(root, "machine/ai_game_builder_500_levels.json")
+    manifest["governance_runtime"]["rights"] = "planned:rights.py"
+    _write(root, "machine/ai_game_builder_500_levels.json", manifest)
+    with pytest.raises(MODULE.GameBuilderAuthorityError, match="governance runtime binding drifted"):
         MODULE.validate(root)
