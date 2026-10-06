@@ -1003,35 +1003,135 @@ class RecoveryPlanner:
         raise TurnRuntimeError(f"unhandled recovery state: {state.value}")
 
 
+def execution_budget_from_dict(raw: Mapping[str, object]) -> ExecutionBudget:
+    """Decode the canonical execution-budget wire shape."""
+
+    if not isinstance(raw, Mapping):
+        raise TurnRuntimeError("execution budget must be an object")
+    required = set(ExecutionBudget().as_dict())
+    if set(raw) != required:
+        raise TurnRuntimeError("execution budget fields drifted")
+    return ExecutionBudget(**{key: raw[key] for key in required})
+
+
+def budget_usage_from_dict(raw: Mapping[str, object]) -> BudgetUsage:
+    """Decode the canonical budget-usage wire shape."""
+
+    if not isinstance(raw, Mapping):
+        raise TurnRuntimeError("budget usage must be an object")
+    required = set(BudgetUsage().as_dict())
+    if set(raw) != required:
+        raise TurnRuntimeError("budget usage fields drifted")
+    return BudgetUsage(**{key: raw[key] for key in required})
+
+
+def turn_event_from_dict(raw: Mapping[str, object]) -> TurnEvent:
+    """Decode one canonical durable turn event."""
+
+    if not isinstance(raw, Mapping):
+        raise TurnRuntimeError("turn event must be an object")
+    version = raw.get("schema_version")
+    if version != CHAT_TURN_SCHEMA_VERSION:
+        raise TurnRuntimeError("unsupported turn event schema version")
+    observed_raw = raw.get("observed_at")
+    if not isinstance(observed_raw, str):
+        raise TurnRuntimeError("turn event observed_at must be ISO text")
+    try:
+        observed_at = datetime.fromisoformat(observed_raw)
+    except ValueError as exc:
+        raise TurnRuntimeError("turn event observed_at is invalid") from exc
+    usage_raw = raw.get("usage")
+    return TurnEvent(
+        operation_id=raw.get("operation_id"),
+        request_digest=raw.get("request_digest"),
+        sequence=raw.get("sequence"),
+        from_state=raw.get("from_state"),
+        to_state=raw.get("to_state"),
+        observed_at=observed_at,
+        previous_event_digest=raw.get("previous_event_digest"),
+        reason_code=raw.get("reason_code", "advance"),
+        failure_class=raw.get("failure_class"),
+        tool_call_id=raw.get("tool_call_id"),
+        tool_side_effect=raw.get("tool_side_effect"),
+        tool_receipt_ref=raw.get("tool_receipt_ref"),
+        external_effect_started=bool(raw.get("external_effect_started")),
+        provider_receipt_ref=raw.get("provider_receipt_ref"),
+        usage=(
+            None
+            if usage_raw is None
+            else budget_usage_from_dict(usage_raw)
+        ),
+        payload=raw.get("payload") or {},
+    )
+
+
+def turn_snapshot_dict(snapshot: TurnSnapshot) -> dict[str, object]:
+    """Canonical materialized snapshot representation."""
+
+    if not isinstance(snapshot, TurnSnapshot):
+        raise TurnRuntimeError("snapshot must be TurnSnapshot")
+    return {
+        "schema_version": CHAT_TURN_SCHEMA_VERSION,
+        "operation_id": snapshot.operation_id,
+        "request_digest": snapshot.request_digest,
+        "thread_id": snapshot.thread_id,
+        "causal_user_message_id": snapshot.causal_user_message_id,
+        "state": snapshot.state.value,
+        "budget": snapshot.budget.as_dict(),
+        "usage": snapshot.usage.as_dict(),
+        "next_sequence": snapshot.next_sequence,
+        "last_event_digest": snapshot.last_event_digest,
+        "pending_tool_call_id": snapshot.pending_tool_call_id,
+        "pending_tool_side_effect": (
+            None
+            if snapshot.pending_tool_side_effect is None
+            else snapshot.pending_tool_side_effect.value
+        ),
+        "pending_tool_receipt_ref": snapshot.pending_tool_receipt_ref,
+        "external_effect_started": snapshot.external_effect_started,
+        "provider_receipt_ref": snapshot.provider_receipt_ref,
+        "failure_class": (
+            None if snapshot.failure_class is None else snapshot.failure_class.value
+        ),
+    }
+
+
+def turn_snapshot_from_dict(raw: Mapping[str, object]) -> TurnSnapshot:
+    """Decode the canonical materialized snapshot representation."""
+
+    if not isinstance(raw, Mapping):
+        raise TurnRuntimeError("turn snapshot must be an object")
+    if raw.get("schema_version") != CHAT_TURN_SCHEMA_VERSION:
+        raise TurnRuntimeError("unsupported turn snapshot schema version")
+    budget_raw = raw.get("budget")
+    usage_raw = raw.get("usage")
+    if not isinstance(budget_raw, Mapping):
+        raise TurnRuntimeError("turn snapshot budget must be an object")
+    if not isinstance(usage_raw, Mapping):
+        raise TurnRuntimeError("turn snapshot usage must be an object")
+    return TurnSnapshot(
+        operation_id=raw.get("operation_id"),
+        request_digest=raw.get("request_digest"),
+        thread_id=raw.get("thread_id"),
+        causal_user_message_id=raw.get("causal_user_message_id"),
+        state=raw.get("state"),
+        budget=execution_budget_from_dict(budget_raw),
+        usage=budget_usage_from_dict(usage_raw),
+        next_sequence=raw.get("next_sequence"),
+        last_event_digest=raw.get("last_event_digest"),
+        pending_tool_call_id=raw.get("pending_tool_call_id"),
+        pending_tool_side_effect=raw.get("pending_tool_side_effect"),
+        pending_tool_receipt_ref=raw.get("pending_tool_receipt_ref"),
+        external_effect_started=bool(raw.get("external_effect_started")),
+        provider_receipt_ref=raw.get("provider_receipt_ref"),
+        failure_class=raw.get("failure_class"),
+    )
+
+
 def operation_digest(snapshot: TurnSnapshot) -> str:
     """Stable digest suitable for exact-head/runtime evidence receipts."""
 
-    return digest_json(
-        {
-            "schema_version": CHAT_TURN_SCHEMA_VERSION,
-            "operation_id": snapshot.operation_id,
-            "request_digest": snapshot.request_digest,
-            "thread_id": snapshot.thread_id,
-            "causal_user_message_id": snapshot.causal_user_message_id,
-            "state": snapshot.state.value,
-            "budget": snapshot.budget.as_dict(),
-            "usage": snapshot.usage.as_dict(),
-            "next_sequence": snapshot.next_sequence,
-            "last_event_digest": snapshot.last_event_digest,
-            "pending_tool_call_id": snapshot.pending_tool_call_id,
-            "pending_tool_side_effect": (
-                None
-                if snapshot.pending_tool_side_effect is None
-                else snapshot.pending_tool_side_effect.value
-            ),
-            "pending_tool_receipt_ref": snapshot.pending_tool_receipt_ref,
-            "external_effect_started": snapshot.external_effect_started,
-            "provider_receipt_ref": snapshot.provider_receipt_ref,
-            "failure_class": (
-                None if snapshot.failure_class is None else snapshot.failure_class.value
-            ),
-        }
-    )
+    return digest_json(turn_snapshot_dict(snapshot))
 
 
 __all__ = [
@@ -1050,7 +1150,12 @@ __all__ = [
     "TurnRuntimeError",
     "TurnSnapshot",
     "TurnState",
+    "budget_usage_from_dict",
+    "execution_budget_from_dict",
     "make_event",
     "operation_digest",
     "start_turn",
+    "turn_event_from_dict",
+    "turn_snapshot_dict",
+    "turn_snapshot_from_dict",
 ]
