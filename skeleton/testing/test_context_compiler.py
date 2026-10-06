@@ -1251,3 +1251,91 @@ def test_context_compiler_v2_digest_binds_compiler_version() -> None:
     assert current.compiler_version == "context-compiler-v2"
     assert legacy.context_digest != current.context_digest
     assert legacy.context_id != current.context_id
+
+
+def test_current_turn_fails_closed_when_policy_reserve_leaves_no_capacity() -> None:
+    operation_id, execution_id, turn_id = _ids()
+    policy = _segment(
+        "Required policy.",
+        kind=ContextKind.SYSTEM_POLICY,
+        trust=ContextTrust.TRUSTED_CONTROL,
+        source_type="platform-policy",
+        source_id="policy:reserve-pressure",
+        purpose="model-inference",
+        priority=1000,
+        relevance=1.0,
+        mandatory=True,
+    )
+    current = _segment(
+        "Current request " + ("q" * 150),
+        kind=ContextKind.USER_MESSAGE,
+        trust=ContextTrust.AUTHORIZED_USER_DATA,
+        source_type="conversation",
+        source_id=turn_id,
+        purpose="model-inference",
+        priority=1000,
+        relevance=1.0,
+    )
+
+    with pytest.raises(
+        ContextCompilationError,
+        match="current user turn plus mandatory policy exceeds provider input capacity",
+    ):
+        ContextCompiler().compile(
+            operation_id=operation_id,
+            execution_id=execution_id,
+            turn_id=turn_id,
+            tenant_id="tenant-a",
+            purpose="model-inference",
+            budget=_budget(
+                max_context=120,
+                output=10,
+                tools=0,
+                policy=70,
+                safety=10,
+                segment=100,
+                artifact=80,
+                tool_result=80,
+            ),
+            segments=(policy, current),
+            compiled_at=BASE,
+        )
+
+
+def test_multiple_canonical_current_turns_fail_closed() -> None:
+    operation_id, execution_id, turn_id = _ids()
+    first = _segment(
+        "First current candidate.",
+        kind=ContextKind.USER_MESSAGE,
+        trust=ContextTrust.AUTHORIZED_USER_DATA,
+        source_type="conversation",
+        source_id=turn_id,
+        purpose="model-inference",
+        priority=1000,
+        relevance=1.0,
+    )
+    second = _segment(
+        "Second current candidate.",
+        kind=ContextKind.USER_MESSAGE,
+        trust=ContextTrust.AUTHORIZED_USER_DATA,
+        source_type="conversation",
+        source_id=turn_id,
+        purpose="model-inference",
+        priority=999,
+        relevance=1.0,
+    )
+
+    with pytest.raises(
+        ContextCompilationError,
+        match="multiple canonical current user turns",
+    ):
+        ContextCompiler().compile(
+            operation_id=operation_id,
+            execution_id=execution_id,
+            turn_id=turn_id,
+            tenant_id="tenant-a",
+            purpose="model-inference",
+            budget=_budget(),
+            segments=(first, second),
+            compiled_at=BASE,
+        )
