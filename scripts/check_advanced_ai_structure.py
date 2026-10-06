@@ -138,6 +138,58 @@ def validate_payloads(
     if enterprise.get("plan_complete") is not True:
         errors.append("enterprise architecture baseline must be plan_complete")
 
+    summary = construction.get("advanced_ai_structure")
+    if not isinstance(summary, dict):
+        errors.append("AI construction contract is missing advanced_ai_structure")
+        summary = {}
+    expected_summary = {
+        "contract": CONTRACT.as_posix(),
+        "human_plan": EVIDENCE_PATHS["human_plan"],
+        "validator": EVIDENCE_PATHS["validator"],
+        "independent_verifier": EVIDENCE_PATHS["independent_verifier"],
+        "workflow": EVIDENCE_PATHS["workflow"],
+        "levels": 100,
+        "strata": 10,
+        "enterprise_baseline": ENTERPRISE.as_posix(),
+    }
+    for key, expected in expected_summary.items():
+        if summary.get(key) != expected:
+            errors.append(f"construction advanced_ai_structure.{key} drifted")
+
+    release_evidence = construction.get("release_evidence_bundle")
+    if (
+        not isinstance(release_evidence, list)
+        or "100-level advanced AI structure exact-head validator and independent receipt"
+        not in release_evidence
+    ):
+        errors.append("AI construction release bundle is missing 100-level evidence")
+
+    architecture_path = repo_root / "machine" / "architecture.json"
+    try:
+        architecture = _load(architecture_path)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+        errors.append(f"cannot load machine architecture for advanced AI binding: {exc}")
+        architecture = {}
+    sources = architecture.get("sources")
+    if not isinstance(sources, dict):
+        errors.append("machine architecture sources missing for advanced AI binding")
+        sources = {}
+    expected_sources = {
+        "advanced_ai_structure": CONTRACT.as_posix(),
+        "advanced_ai_structure_manual": EVIDENCE_PATHS["human_plan"],
+        "advanced_ai_structure_validator": EVIDENCE_PATHS["validator"],
+        "advanced_ai_structure_independent_verifier": EVIDENCE_PATHS[
+            "independent_verifier"
+        ],
+    }
+    for key, expected in expected_sources.items():
+        if sources.get(key) != expected:
+            errors.append(f"machine architecture source {key} drifted")
+
+    for raw in INTEGRATION_FILES:
+        if not (repo_root / raw).is_file():
+            errors.append(f"advanced AI integration file missing: {raw}")
+
     construction_planes = _objects(
         construction.get("planes"),
         label="construction.planes",
