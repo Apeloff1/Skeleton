@@ -6,6 +6,7 @@ import pytest
 from skeleton.ai.runtime.contracts.ai_execution import AIExecutionRequest, AIExecutionResult
 from skeleton.ai.runtime.contracts.execution_authority import (
     AuthorityRevocationReceipt,
+    AuthorityStateCheckpoint,
     ExecutionAuthority,
     ExecutionAuthorityError,
     ResourceBudget,
@@ -992,3 +993,145 @@ def test_sealed_evidence_binds_revocation_receipt_digest() -> None:
     assert evidence.revoked
     assert evidence.revocation_receipt_digest == revocation.digest
     assert guard.snapshot()["authorities"][0]["revocation_receipt_digest"] == revocation.digest
+
+
+
+def test_checkpoint_restore_preserves_budget_and_replay_state() -> None:
+    guard = ExecutionAuthorityGuard()
+    authority = _authority(budget=_budget(tool_calls=1))
+    _admit(guard, authority)
+    original = guard.authorize(
+        authority=authority,
+        capability="repo.write",
+        delta=ResourceUsage(tool_calls=1),
+        replay_key="write-before-restart",
+        now=NOW + timedelta(seconds=1),
+    )
+    assert original.receipt is not None
+
+    checkpoint = guard.checkpoint(
+        authority,
+        now=NOW + timedelta(seconds=2),
+    )
+    assert isinstance(checkpoint, AuthorityStateCheckpoint)
+
+    restored = ExecutionAuthorityGuard()
+    restored.restore_checkpoint(checkpoint)
+
+    replay = restored.authorize(
+        authority=authority,
+        capability="repo.write",
+        delta=ResourceUsage(tool_calls=1),
+        replay_key="write-before-restart",
+        now=NOW + timedelta(seconds=3),
+    )
+    denied = restored.authorize(
+        authority=authority,
+        capability="repo.write",
+        delta=ResourceUsage(tool_calls=1),
+        replay_key="write-after-restart",
+        now=NOW + timedelta(seconds=4),
+    )
+
+    assert replay.disposition is AuthorizationDisposition.REPLAY
+    assert replay.receipt == original.receipt
+    assert denied.disposition is AuthorizationDisposition.DENY
+    assert restored.usage_for(authority).tool_calls == 1
+
+
+def test_checkpoint_restore_preserves_revocation_state() -> None:
+    guard = ExecutionAuthorityGuard()
+    authority = _authority()
+    _admit(guard, authority)
+    revocation = guard.revoke(
+        authority,
+        revoked_by="supervisor",
+        reason_code="operator.cancelled",
+        now=NOW + timedelta(seconds=1),
+    )
+    checkpoint = guard.checkpoint(
+        authority,
+        now=NOW + timedelta(seconds=2),
+    )
+
+    restored = ExecutionAuthorityGuard()
+    restored.restore_checkpoint(checkpoint)
+    denied = restored.authorize(
+        authority=authority,
+        capability="repo.read",
+        replay_key="read-after-restart",
+        now=NOW + timedelta(seconds=3),
+    )
+    evidence = restored.seal_evidence(
+        authority,
+        now=NOW + timedelta(seconds=4),
+    )
+
+    assert denied.disposition is AuthorizationDisposition.DENY
+    assert denied.reason == "authority is revoked"
+    assert evidence.revocation_receipt_digest == revocation.digest
+
+
+def test_checkpoint_restore_requires_parent_first_for_delegated_authority() -> None:
+    source = ExecutionAuthorityGuard()
+    parent = _authority()
+    _admit(source, parent)
+    child = _child_authority(parent)
+    source.admit(
+        authority=child,
+        request=_request(),
+        receipt_id="receipt-child-checkpoint",
+        replay_key="admission-child-checkpoint",
+        now=NOW + timedelta(seconds=2),
+    )
+    parent_checkpoint = source.checkpoint(
+        parent,
+        now=NOW + timedelta(seconds=3),
+    )
+    child_checkpoint = source.checkpoint(
+        child,
+        now=NOW + timedelta(seconds=3),
+    )
+
+    restored = ExecutionAuthorityGuard()
+    with pytest.raises(
+        ExecutionAuthorityError,
+        match="parent authority must be restored first",
+    ):
+        restored.restore_checkpoint(child_checkpoint)
+
+    restored.restore_checkpoint(parent_checkpoint)
+    restored.restore_checkpoint(child_checkpoint)
+    allowed = restored.authorize(
+        authority=child,
+        capability="repo.read",
+        replay_key="child-read-after-restart",
+        now=NOW + timedelta(seconds=4),
+    )
+
+    assert allowed.allowed
+
+
+def test_checkpoint_digest_is_stable_for_identical_state() -> None:
+    guard = ExecutionAuthorityGuard()
+    authority = _authority()
+    _admit(guard, authority)
+    guard.authorize(
+        authority=authority,
+        capability="repo.read",
+        replay_key="read-checkpoint",
+        now=NOW + timedelta(seconds=1),
+    )
+
+    left = guard.checkpoint(
+        authority,
+        now=NOW + timedelta(seconds=2),
+    )
+    right = guard.checkpoint(
+        authority,
+        now=NOW + timedelta(seconds=2),
+    )
+
+    assert left == right
+    assert left.digest == right.digest
+    assert left.canonical_payload() == right.canonical_payload()
