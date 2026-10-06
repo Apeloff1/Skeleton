@@ -35,6 +35,8 @@ def _fixture(tmp_path: Path) -> Path:
         "tests/test_ai_game_builder_runtime.py",
         "tests/test_ai_game_builder_governance.py",
         "tests/test_ai_game_builder_overengineering_runtime.py",
+        "tests/test_ai_game_builder_frontier_runtime.py",
+        "skeleton/ai/game_builder/frontier_assurance.py",
         "skeleton/ai/game_builder/control_plane.py",
         "skeleton/ai/game_builder/quality_debt.py",
         "skeleton/ai/game_builder/resource_governor.py",
@@ -70,8 +72,8 @@ def test_current_500_level_authority_is_valid() -> None:
         "last_level": "GBL-500",
         "signed_levels": 0,
         "effort_rounds": [100, 1000, 10000],
-        "overengineering_plane_count": 48,
-        "minimum_planes_per_family": 20,
+        "overengineering_plane_count": 64,
+        "minimum_planes_per_family": 28,
         "runtime_kernel_bound": True,
     }
 
@@ -173,10 +175,10 @@ def test_rejects_unknown_rights_becoming_permissive(tmp_path: Path) -> None:
 def test_all_families_inherit_critical_overengineering_planes() -> None:
     over = _json(ROOT, "machine/ai_game_builder_overengineering.json")
     critical = set(over["critical_planes"])
-    assert len(over["planes"]) == 48
+    assert len(over["planes"]) == 64
     assert list(over["family_bindings"]) == [f"GB{i:02d}" for i in range(1, 51)]
     for family_id, bound in over["family_bindings"].items():
-        assert len(bound) >= 20, family_id
+        assert len(bound) >= 28, family_id
         assert critical.issubset(bound), family_id
 
 
