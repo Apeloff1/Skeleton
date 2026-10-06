@@ -40,6 +40,24 @@ from .resource_governor import (
     ResourceLimitError,
     ResourceSnapshot,
 )
+from .resilience import (
+    DissentLedger,
+    ImpactGraph,
+    Invariant,
+    InvariantRegistry,
+    NoveltyRecord,
+    NoveltyReservoir,
+    Objection,
+    ResilienceError,
+)
+from .release import (
+    FamilyQualification,
+    GoldMasterBundle,
+    GoldMasterTribunal,
+    GoldMasterVerdict,
+    ReleaseArbitrationError,
+    TribunalVote,
+)
 from .rights import (
     IncorporationDecision,
     RightsError,
@@ -95,4 +113,18 @@ __all__ = [
     "ResourceLimitError",
     "ResourceSnapshot",
     "blind_candidate_token",
+    "DissentLedger",
+    "ImpactGraph",
+    "Invariant",
+    "InvariantRegistry",
+    "NoveltyRecord",
+    "NoveltyReservoir",
+    "Objection",
+    "ResilienceError",
+    "FamilyQualification",
+    "GoldMasterBundle",
+    "GoldMasterTribunal",
+    "GoldMasterVerdict",
+    "ReleaseArbitrationError",
+    "TribunalVote",
 ]
