@@ -105,6 +105,12 @@ def damped_newton(
     grad_tol = positive_scalar("gradient_tolerance", gradient_tolerance)
     step0 = positive_scalar("initial_step", initial_step)
     armijo_value = positive_scalar("armijo", armijo)
+    if armijo_value >= 1.0:
+        raise MathInvariantError(
+            "armijo must lie in (0, 1)",
+            reason="invalid_armijo_constant",
+            field="armijo",
+        )
     shrink_value = finite_scalar("shrink", shrink)
     min_step = positive_scalar("minimum_step", minimum_step)
     damping_value = positive_scalar("damping", damping)
@@ -217,6 +223,12 @@ def bfgs(
     grad_tol = positive_scalar("gradient_tolerance", gradient_tolerance)
     step0 = positive_scalar("initial_step", initial_step)
     armijo_value = positive_scalar("armijo", armijo)
+    if armijo_value >= 1.0:
+        raise MathInvariantError(
+            "armijo must lie in (0, 1)",
+            reason="invalid_armijo_constant",
+            field="armijo",
+        )
     shrink_value = finite_scalar("shrink", shrink)
     min_step = positive_scalar("minimum_step", minimum_step)
     curvature = positive_scalar("curvature_floor", curvature_floor)

@@ -168,6 +168,14 @@ def absorbing_probability(
                 reason="invalid_state",
                 field="absorbing_states",
             )
+        for column, probability in enumerate(matrix[state]):
+            expected = 1.0 if column == state else 0.0
+            if abs(probability - expected) > 1e-12:
+                raise MathInvariantError(
+                    "declared absorbing state does not have an absorbing transition row",
+                    reason="non_absorbing_state",
+                    field=f"absorbing_states[{state}]",
+                )
     transient = [state for state in range(n) if state not in absorbing]
     probabilities = [1.0 if state == target else 0.0 for state in range(n)]
     if transient:

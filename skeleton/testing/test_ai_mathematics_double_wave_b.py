@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from skeleton.ai.mathematics import (
+    MathInvariantError,
     absorbing_probability,
     bootstrap,
     expected_hitting_times,
@@ -32,6 +33,8 @@ def test_modified_z_scores_flag_extreme_observation() -> None:
     scores = modified_z_scores((1.0, 1.1, 0.9, 1.05, 100.0))
     assert max(abs(value) for value in scores[:-1]) < 2.0
     assert abs(scores[-1]) > 100.0
+    with pytest.raises(MathInvariantError, match="MAD is zero"):
+        modified_z_scores((1.0, 1.0, 1.0, 2.0, 1.0))
 
 
 def test_jackknife_mean_has_expected_bias_and_standard_error() -> None:
@@ -97,3 +100,12 @@ def test_minimum_cost_assignment_handles_square_and_rectangular_cases() -> None:
     assert len(rectangular.pairs) == 2
     assert rectangular.total_cost == pytest.approx(8.0)
     assert len({column for _, column in rectangular.pairs}) == 2
+
+
+def test_absorption_requires_declared_states_to_be_actually_absorbing() -> None:
+    with pytest.raises(MathInvariantError, match="absorbing transition row"):
+        absorbing_probability(
+            ((0.5, 0.5), (0.0, 1.0)),
+            0,
+            absorbing_states=(0,),
+        )

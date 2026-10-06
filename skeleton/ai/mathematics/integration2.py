@@ -138,6 +138,15 @@ def adaptive_rk45(
             points.append(AdaptiveODEPoint(time, state, h, error_norm))
         else:
             rejected += 1
+            if abs(h) <= min_step:
+                return AdaptiveODEReport(
+                    tuple(points),
+                    accepted,
+                    rejected,
+                    evaluations,
+                    False,
+                    "minimum_step",
+                )
 
         if error_norm == 0.0:
             factor = 5.0

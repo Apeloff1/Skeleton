@@ -155,7 +155,13 @@ def modified_z_scores(
     mad = median(deviations)
     coefficient = positive_scalar("consistency", consistency)
     if mad == 0.0:
-        return tuple(0.0 if value == center else math.copysign(math.inf, value - center) for value in observations)
+        if all(value == center for value in observations):
+            return tuple(0.0 for _ in observations)
+        raise MathInvariantError(
+            "modified z-scores are undefined when MAD is zero for non-constant data",
+            reason="zero_robust_scale",
+            field="values",
+        )
     return tuple(coefficient * (value - center) / mad for value in observations)
 
 
