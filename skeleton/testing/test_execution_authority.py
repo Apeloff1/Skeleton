@@ -5,6 +5,7 @@ import pytest
 
 from skeleton.ai.runtime.contracts.ai_execution import AIExecutionRequest, AIExecutionResult
 from skeleton.ai.runtime.contracts.execution_authority import (
+    AuthorityRevocationReceipt,
     ExecutionAuthority,
     ExecutionAuthorityError,
     ResourceBudget,
@@ -897,3 +898,97 @@ def test_delegated_authority_cannot_change_policy_digest() -> None:
             replay_key="admission-child-policy-drift",
             now=NOW + timedelta(seconds=2),
         )
+
+
+
+def test_revocation_returns_stable_tamper_evident_receipt() -> None:
+    guard = ExecutionAuthorityGuard()
+    authority = _authority()
+    _admit(guard, authority)
+    decision = guard.authorize(
+        authority=authority,
+        capability="repo.write",
+        delta=ResourceUsage(tool_calls=1),
+        replay_key="write-before-revoke",
+        now=NOW + timedelta(seconds=1),
+    )
+    assert decision.receipt is not None
+
+    receipt = guard.revoke(
+        authority,
+        revoked_by="supervisor",
+        reason_code="policy.violation",
+        now=NOW + timedelta(seconds=2),
+    )
+    replay = guard.revoke(
+        authority,
+        revoked_by="supervisor",
+        reason_code="policy.violation",
+        now=NOW + timedelta(seconds=3),
+    )
+
+    assert isinstance(receipt, AuthorityRevocationReceipt)
+    assert replay == receipt
+    assert receipt.authority_digest == authority.digest
+    assert receipt.latest_consumption_digest == decision.receipt.digest
+    assert receipt.evidence_ref == f"execution-authority-revocation:{receipt.digest}"
+
+
+def test_revocation_of_unknown_authority_fails_closed() -> None:
+    guard = ExecutionAuthorityGuard()
+    authority = _authority()
+
+    with pytest.raises(
+        ExecutionAuthorityError,
+        match="authority has not been admitted",
+    ):
+        guard.revoke(
+            authority,
+            revoked_by="supervisor",
+            reason_code="operator.cancelled",
+            now=NOW + timedelta(seconds=1),
+        )
+
+
+def test_repeated_revocation_with_conflicting_evidence_is_rejected() -> None:
+    guard = ExecutionAuthorityGuard()
+    authority = _authority()
+    _admit(guard, authority)
+    guard.revoke(
+        authority,
+        revoked_by="supervisor",
+        reason_code="operator.cancelled",
+        now=NOW + timedelta(seconds=1),
+    )
+
+    with pytest.raises(
+        ExecutionAuthorityError,
+        match="already revoked with different evidence",
+    ):
+        guard.revoke(
+            authority,
+            revoked_by="different.actor",
+            reason_code="operator.cancelled",
+            now=NOW + timedelta(seconds=2),
+        )
+
+
+def test_sealed_evidence_binds_revocation_receipt_digest() -> None:
+    guard = ExecutionAuthorityGuard()
+    authority = _authority()
+    _admit(guard, authority)
+    revocation = guard.revoke(
+        authority,
+        revoked_by="supervisor",
+        reason_code="operator.cancelled",
+        now=NOW + timedelta(seconds=1),
+    )
+
+    evidence = guard.seal_evidence(
+        authority,
+        now=NOW + timedelta(seconds=2),
+    )
+
+    assert evidence.revoked
+    assert evidence.revocation_receipt_digest == revocation.digest
+    assert guard.snapshot()["authorities"][0]["revocation_receipt_digest"] == revocation.digest
