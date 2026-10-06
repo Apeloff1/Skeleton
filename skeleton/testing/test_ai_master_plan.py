@@ -373,3 +373,29 @@ def test_lifecycle_volumes_bind_landed_shared_contracts() -> None:
         assert not any(path.startswith("planned:") for path in volume["implementation_paths"] + volume["tests"])
         assert volume["implementation_status"] == "unverified"
         assert volume["completion_checkbox"] is False
+
+
+def test_master_plan_binds_200_level_competitive_engineering_overlay() -> None:
+    data = checker.load_plan()
+    overlay = data["competitive_engineering_ladder"]
+    ladder = json.loads(checker.COMPETITIVE_LADDER.read_text(encoding="utf-8"))
+
+    assert overlay["authority"] == "machine/competitive_ai_engineering_ladder.json"
+    assert overlay["human_spec"] == "docs/architecture/COMPETITIVE_AI_ENGINEERING_LADDER.md"
+    assert overlay["family_count"] == 20
+    assert overlay["levels_per_family"] == 10
+    assert overlay["total_levels"] == 200
+    assert len(ladder["families"]) == 20
+    assert len(ladder["levels"]) == 200
+    assert ladder["levels"][0]["id"] == "ENG-001"
+    assert ladder["levels"][-1]["id"] == "ENG-200"
+
+
+def test_master_plan_rejects_competitive_engineering_topology_drift() -> None:
+    data = checker.load_plan()
+    mutated = json.loads(json.dumps(data))
+    mutated["competitive_engineering_ladder"]["total_levels"] = 199
+
+    errors = checker.validate(mutated)
+
+    assert "competitive engineering total_levels must equal 200" in errors
