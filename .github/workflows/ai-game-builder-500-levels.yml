@@ -2,7 +2,6 @@ name: AI Game Builder 500 Levels
 
 on:
   pull_request:
-    branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "machine/ai_game_builder_500_levels.json"
