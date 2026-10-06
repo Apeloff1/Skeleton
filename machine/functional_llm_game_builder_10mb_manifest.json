@@ -7,7 +7,7 @@
   "relationship_to_masterplan": "depth-only overlay; VOL-000..420 breadth freeze preserved",
   "bytes": {
     "requested_minimum": 10000000,
-    "shard_total": 11176885,
+    "shard_total": 11187051,
     "threshold_met": true
   },
   "completion": {
@@ -124,7 +124,7 @@
       "id": "FLGB-01",
       "title": "LLM Session and Inference Runtime",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_01_FLGB-01_LLM_SESSION_AND_INFERENCE_RUNTIME.md",
-      "bytes": 620926,
+      "bytes": 621446,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
@@ -133,7 +133,7 @@
       "id": "FLGB-02",
       "title": "Tokenizer Model Runtime and Serving",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_02_FLGB-02_TOKENIZER_MODEL_RUNTIME_AND_SERVING.md",
-      "bytes": 620088,
+      "bytes": 620606,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
@@ -142,7 +142,7 @@
       "id": "FLGB-03",
       "title": "Context Memory Retrieval and Knowledge",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_03_FLGB-03_CONTEXT_MEMORY_RETRIEVAL_AND_KNOWLEDGE.md",
-      "bytes": 621585,
+      "bytes": 622105,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
@@ -151,7 +151,7 @@
       "id": "FLGB-04",
       "title": "Tools Agents and Long-Horizon Execution",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_04_FLGB-04_TOOLS_AGENTS_AND_LONG_HORIZON_EXECUTION.md",
-      "bytes": 621735,
+      "bytes": 622257,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
@@ -160,7 +160,7 @@
       "id": "FLGB-05",
       "title": "Security Safety Policy and Privacy",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_05_FLGB-05_SECURITY_SAFETY_POLICY_AND_PRIVACY.md",
-      "bytes": 621359,
+      "bytes": 621879,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
@@ -169,7 +169,7 @@
       "id": "FLGB-06",
       "title": "Evaluation Observability Reliability and Recovery",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_06_FLGB-06_EVALUATION_OBSERVABILITY_RELIABILITY_AND_RECOVERY.md",
-      "bytes": 620497,
+      "bytes": 621085,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
@@ -178,7 +178,7 @@
       "id": "FLGB-07",
       "title": "Training Weights Adaptation and Self-Improvement",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_07_FLGB-07_TRAINING_WEIGHTS_ADAPTATION_AND_SELF_IMPROVEMENT.md",
-      "bytes": 621447,
+      "bytes": 622037,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
@@ -187,7 +187,7 @@
       "id": "FLGB-08",
       "title": "Multimodal Vision Audio Video and Documents",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_08_FLGB-08_MULTIMODAL_VISION_AUDIO_VIDEO_AND_DOCUMENTS.md",
-      "bytes": 620154,
+      "bytes": 620742,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
@@ -196,7 +196,7 @@
       "id": "FLGB-09",
       "title": "Game Project Editor and World Model",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_09_FLGB-09_GAME_PROJECT_EDITOR_AND_WORLD_MODEL.md",
-      "bytes": 620823,
+      "bytes": 621415,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
@@ -205,7 +205,7 @@
       "id": "FLGB-10",
       "title": "Scene ECS Physics and Simulation",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_10_FLGB-10_SCENE_ECS_PHYSICS_AND_SIMULATION.md",
-      "bytes": 620177,
+      "bytes": 620763,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
@@ -214,7 +214,7 @@
       "id": "FLGB-11",
       "title": "Rendering Materials Lighting Cameras and VFX",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_11_FLGB-11_RENDERING_MATERIALS_LIGHTING_CAMERAS_AND_VFX.md",
-      "bytes": 621018,
+      "bytes": 621610,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
@@ -223,7 +223,7 @@
       "id": "FLGB-12",
       "title": "Animation Audio UI Input and Accessibility",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_12_FLGB-12_ANIMATION_AUDIO_UI_INPUT_AND_ACCESSIBILITY.md",
-      "bytes": 621673,
+      "bytes": 622263,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
@@ -232,7 +232,7 @@
       "id": "FLGB-13",
       "title": "Gameplay Scripting Narrative Quests and NPC AI",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_13_FLGB-13_GAMEPLAY_SCRIPTING_NARRATIVE_QUESTS_AND_NPC_AI.md",
-      "bytes": 621657,
+      "bytes": 622249,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
@@ -241,7 +241,7 @@
       "id": "FLGB-14",
       "title": "Procedural Generation Worldbuilding and Longform Consistency",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_14_FLGB-14_PROCEDURAL_GENERATION_WORLDBUILDING_AND_LONGFORM_CONSISTENCY.md",
-      "bytes": 620318,
+      "bytes": 620906,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
@@ -250,7 +250,7 @@
       "id": "FLGB-15",
       "title": "Networking Saves Mods Localization and Platform Services",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_15_FLGB-15_NETWORKING_SAVES_MODS_LOCALIZATION_AND_PLATFORM_SERVICES.md",
-      "bytes": 621428,
+      "bytes": 622020,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
@@ -259,7 +259,7 @@
       "id": "FLGB-16",
       "title": "Assets Build Export Performance and Automated Testing",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_16_FLGB-16_ASSETS_BUILD_EXPORT_PERFORMANCE_AND_AUTOMATED_TESTING.md",
-      "bytes": 620192,
+      "bytes": 620748,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
@@ -268,7 +268,7 @@
       "id": "FLGB-17",
       "title": "Dual-Rival Forge Adversarial Quality and Rights Clean Room",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_17_FLGB-17_DUAL_RIVAL_FORGE_ADVERSARIAL_QUALITY_AND_RIGHTS_CLEAN_ROOM.md",
-      "bytes": 621751,
+      "bytes": 622309,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
@@ -277,7 +277,7 @@
       "id": "FLGB-18",
       "title": "Integrated Product Orchestration Deployment and Gapless Closure",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_18_FLGB-18_INTEGRATED_PRODUCT_ORCHESTRATION_DEPLOYMENT_AND_GAPLESS_CLOSURE.md",
-      "bytes": 620057,
+      "bytes": 620611,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
