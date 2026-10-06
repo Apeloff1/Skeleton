@@ -347,7 +347,11 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     if runtime_binding != {
         "contracts": str(RUNTIME_CONTRACTS),
         "state_machine": str(RUNTIME_FORGE),
-        "tests": str(RUNTIME_TESTS),
+        "evaluation_panel": str(EVALUATION_RUNTIME),
+        "resource_governor": str(RESOURCE_RUNTIME),
+        "quality_debt": str(QUALITY_DEBT_RUNTIME),
+        "integrated_control_plane": str(CONTROL_PLANE_RUNTIME),
+        "tests": [str(RUNTIME_TESTS), str(OVERENGINEERING_RUNTIME_TESTS)],
     }:
         raise GameBuilderAuthorityError("dual-rival runtime binding drifted")
     if duel.get("overengineering_authority") != str(OVERENGINEERING):
@@ -361,7 +365,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         raise GameBuilderAuthorityError("long-form consistency prime directive is missing")
 
     over_human = (root / OVERENGINEERING_HUMAN).read_text(encoding="utf-8")
-    for marker in ("24 mandatory cross-cutting planes", "Bounded-Resource Infinite-Time Discipline", "Pixel-to-Project Traceability", "Runtime kernel"):
+    for marker in ("48 mandatory cross-cutting planes", "Bounded-Resource Infinite-Time Discipline", "Pixel-to-Project Traceability", "Second-generation runtime controls"):
         if marker not in over_human:
             raise GameBuilderAuthorityError(f"overengineering human authority missing marker: {marker}")
 
