@@ -17,7 +17,7 @@ def main() -> int:
     data = json.loads(MANIFEST.read_text(encoding="utf-8"))
     if data.get("kind") != "functional-llm-game-builder-execution-atlas":
         fail("wrong kind")
-    if data.get("plan_version") != "2.5.0":
+    if data.get("plan_version") != "2.7.0":
         fail("unexpected plan version")
 
     shards = data.get("shards")
