@@ -2236,11 +2236,21 @@ from services.ai_assistant_svc import AIAssistantService, ai_service  # noqa: E4
 executor_factory = ExecutorFactory()
 app_start_time = time.time()
 
-from skeleton.kernel.runtime_supervision import RuntimeServiceLifecycle
+from skeleton.kernel.runtime_supervision import (
+    RuntimeServiceLifecycle,
+    RuntimeSupervisionError,
+    ServicePhase,
+)
 _runtime_lifecycle = RuntimeServiceLifecycle("backend")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if _runtime_lifecycle.phase in (ServicePhase.STOPPED, ServicePhase.FAILED):
+        _runtime_lifecycle.restart(reason="backend-lifespan-restart")
+    elif _runtime_lifecycle.phase is not ServicePhase.STARTING:
+        raise RuntimeSupervisionError(
+            "backend lifespan cannot overlap an active lifecycle generation"
+        )
     app.state.runtime_lifecycle = _runtime_lifecycle
     # ═══════════════════════════════════════════════════════════════════════
     # ★ GUARANTEED LAUNCH ENVELOPE  (2026-02 deploy fix)
