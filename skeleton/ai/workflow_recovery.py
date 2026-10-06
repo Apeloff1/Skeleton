@@ -54,19 +54,26 @@ class StepCheckpoint:
 class WorkflowReceipt:
     receipt_id:str; plan_id:str; outcome:str; checkpoint_ids:tuple[str,...]
 
-def recover(plan,checkpoints,now_ns):
-    _u(now_ns,"now_ns")
-    by_step={}
+def _history(plan,checkpoints):
+    by={}
     for c in checkpoints:
         if c.plan_id!=plan.plan_id: raise PermissionError("foreign workflow checkpoint")
-        if c.step_id in by_step and by_step[c.step_id]!=c: raise PermissionError("conflicting workflow checkpoint")
-        by_step[c.step_id]=c
-    committed={s for s,c in by_step.items() if c.outcome=="committed"}
-    failed={s for s,c in by_step.items() if c.outcome=="failed"}
-    if failed or now_ns>=plan.deadline_ns:
-        return "compensating",compensation_order(plan,committed),()
-    ready=tuple(s.step_id for s in plan.steps if s.step_id not in by_step and set(s.dependencies)<=committed)
-    if len(committed)==len(plan.steps): return "committed",(),()
+        seq=by.setdefault(c.step_id,[])
+        if c in seq: continue
+        if c.outcome=="committed" and seq: raise PermissionError("commit cannot follow prior terminal step evidence")
+        if c.outcome=="compensated" and not any(x.outcome=="committed" for x in seq): raise PermissionError("compensation requires prior commit evidence")
+        if any(x.outcome=="compensated" for x in seq): raise PermissionError("checkpoint follows compensation")
+        seq.append(c)
+    return by
+
+def recover(plan,checkpoints,now_ns):
+    _u(now_ns,"now_ns");history=_history(plan,checkpoints)
+    latest={s:xs[-1] for s,xs in history.items()}
+    committed={s for s,c in latest.items() if c.outcome=="committed"}
+    failed={s for s,c in latest.items() if c.outcome=="failed"}
+    if failed or now_ns>=plan.deadline_ns:return "compensating",compensation_order(plan,committed),()
+    if len(committed)==len(plan.steps):return "committed",(),()
+    ready=tuple(s.step_id for s in plan.steps if s.step_id not in latest and set(s.dependencies)<=committed)
     return "running",(),ready
 
 def compensation_order(plan,committed):
@@ -83,14 +90,15 @@ def compensation_order(plan,committed):
 
 def terminal_receipt(plan,checkpoints,outcome):
     if outcome not in {"committed","compensated"}: raise ValueError("invalid terminal outcome")
-    cps=tuple(sorted(checkpoints,key=lambda x:x.step_id))
-    if any(c.plan_id!=plan.plan_id for c in cps): raise PermissionError("foreign checkpoint")
-    by={c.step_id:c for c in cps}
+    history=_history(plan,checkpoints)
     if outcome=="committed":
-        if set(by)!=set(s.step_id for s in plan.steps) or any(c.outcome!="committed" for c in cps): raise PermissionError("workflow is not fully committed")
+        if set(history)!=set(s.step_id for s in plan.steps) or any(xs[-1].outcome!="committed" for xs in history.values()): raise PermissionError("workflow is not fully committed")
     else:
-        needed={s.step_id for s in plan.steps if s.compensatable and s.step_id in by and by[s.step_id].outcome=="committed"}
-        compensated={c.step_id for c in cps if c.outcome=="compensated"}
-        if not needed<=compensated: raise PermissionError("workflow compensation is incomplete")
+        for step in plan.steps:
+            xs=history.get(step.step_id,[])
+            was_committed=any(c.outcome=="committed" for c in xs)
+            if was_committed and step.compensatable and (not xs or xs[-1].outcome!="compensated"): raise PermissionError("workflow compensation is incomplete")
+            if was_committed and not step.compensatable: raise PermissionError("non-compensatable committed work prevents compensated terminal claim")
+    cps=tuple(sorted(checkpoints,key=lambda c:(c.step_id,{"committed":0,"failed":1,"compensated":2}[c.outcome],c.checkpoint_id)))
     ids=tuple(c.checkpoint_id for c in cps);x={"plan_id":plan.plan_id,"outcome":outcome,"checkpoint_ids":ids}
     return WorkflowReceipt(_h("workflow-receipt-sha256:",x),plan.plan_id,outcome,ids)
