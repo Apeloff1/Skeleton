@@ -262,6 +262,10 @@ def validate_payloads(
                 + ", ".join(extra)
             )
 
+    profiles = contract.get("level_control_profiles")
+    if not isinstance(profiles, dict):
+        profiles = {}
+
     levels = _objects(
         contract.get("levels"),
         label="levels",
