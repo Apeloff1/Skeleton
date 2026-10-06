@@ -17,6 +17,10 @@ OVERENGINEERING_HUMAN = Path("docs/architecture/AI_GAME_BUILDER_OVERENGINEERING.
 RUNTIME_CONTRACTS = Path("skeleton/ai/game_builder/contracts.py")
 RUNTIME_FORGE = Path("skeleton/ai/game_builder/dual_rival_forge.py")
 RUNTIME_TESTS = Path("skeleton/testing/test_ai_game_builder_contracts.py")
+GOVERNANCE_CANON = Path("skeleton/ai/game_builder/canon.py")
+GOVERNANCE_RIGHTS = Path("skeleton/ai/game_builder/rights.py")
+GOVERNANCE_ATOMS = Path("skeleton/ai/game_builder/atomizer.py")
+GOVERNANCE_TESTS = Path("skeleton/testing/test_ai_game_builder_governance.py")
 
 
 class GameBuilderAuthorityError(RuntimeError):
@@ -125,6 +129,17 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     for path in (RUNTIME_CONTRACTS, RUNTIME_FORGE, RUNTIME_TESTS):
         if not (root / path).is_file():
             raise GameBuilderAuthorityError(f"missing game-builder runtime file: {path}")
+    expected_governance = {
+        "canon": str(GOVERNANCE_CANON),
+        "rights": str(GOVERNANCE_RIGHTS),
+        "atom_lineage": str(GOVERNANCE_ATOMS),
+        "tests": str(GOVERNANCE_TESTS),
+    }
+    if manifest.get("governance_runtime") != expected_governance:
+        raise GameBuilderAuthorityError("game-builder governance runtime binding drifted")
+    for path in (GOVERNANCE_CANON, GOVERNANCE_RIGHTS, GOVERNANCE_ATOMS, GOVERNANCE_TESTS):
+        if not (root / path).is_file():
+            raise GameBuilderAuthorityError(f"missing game-builder governance runtime file: {path}")
 
     if overengineering.get("schema_version") != "skeleton.ai_game_builder_overengineering.v1":
         raise GameBuilderAuthorityError("unsupported game-builder overengineering schema")
@@ -150,6 +165,21 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         raise GameBuilderAuthorityError("critical overengineering planes drifted")
     if over_topology.get("critical_plane_count") != len(critical):
         raise GameBuilderAuthorityError("critical_plane_count mismatch")
+
+    foundations = overengineering.get("implemented_foundations")
+    if not isinstance(foundations, dict):
+        raise GameBuilderAuthorityError("overengineering implemented_foundations must be an object")
+    for required_path in (
+        str(RUNTIME_CONTRACTS),
+        str(RUNTIME_FORGE),
+        str(GOVERNANCE_CANON),
+        str(GOVERNANCE_RIGHTS),
+        str(GOVERNANCE_ATOMS),
+    ):
+        if required_path not in json.dumps(foundations, sort_keys=True):
+            raise GameBuilderAuthorityError(
+                f"overengineering implemented foundation missing: {required_path}"
+            )
 
     planes = _list(overengineering.get("planes"), "overengineering.planes", 24)
     if len(planes) != 24:
@@ -277,6 +307,17 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     for token in ("similarity", "human/legal", "legal determination", "project_owned"):
         if token not in rights_text:
             raise GameBuilderAuthorityError(f"rights authority missing requirement: {token}")
+    if duel.get("governance_runtime") != expected_governance:
+        raise GameBuilderAuthorityError("dual-rival governance runtime binding drifted")
+    quality_vector = duel.get("quality_vector")
+    if not isinstance(quality_vector, list):
+        raise GameBuilderAuthorityError("dual-rival quality vector must be a list")
+    for protected_axis in ("security/privacy", "state integrity", "reproducibility"):
+        if protected_axis not in quality_vector:
+            raise GameBuilderAuthorityError(
+                f"dual-rival quality vector missing protected axis: {protected_axis}"
+            )
+
     runtime_binding = duel.get("runtime_contracts")
     if runtime_binding != {
         "contracts": str(RUNTIME_CONTRACTS),
