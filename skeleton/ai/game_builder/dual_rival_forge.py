@@ -35,13 +35,32 @@ def _candidate_from_payload(payload: Mapping[str, object]) -> Candidate:
         raise ForgeStateError("candidate artifact payload missing")
     if not isinstance(quality, Mapping):
         raise ForgeStateError("candidate quality payload missing")
+    artifact_fields = {
+        name: artifact_payload.get(name)
+        for name in (
+            "artifact_digest",
+            "canon_digest",
+            "provenance_digest",
+            "family_id",
+            "level_id",
+        )
+    }
+    if any(not isinstance(value, str) for value in artifact_fields.values()):
+        raise ForgeStateError("candidate artifact identity fields must be strings")
     artifact = ArtifactIdentity(
-        artifact_digest=str(artifact_payload["artifact_digest"]),
-        canon_digest=str(artifact_payload["canon_digest"]),
-        provenance_digest=str(artifact_payload["provenance_digest"]),
-        family_id=str(artifact_payload["family_id"]),
-        level_id=str(artifact_payload["level_id"]),
+        artifact_digest=artifact_fields["artifact_digest"],
+        canon_digest=artifact_fields["canon_digest"],
+        provenance_digest=artifact_fields["provenance_digest"],
+        family_id=artifact_fields["family_id"],
+        level_id=artifact_fields["level_id"],
     )
+    normalized_quality: dict[str, float] = {}
+    for key, value in quality.items():
+        if not isinstance(key, str):
+            raise ForgeStateError("candidate quality keys must be strings")
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ForgeStateError("candidate quality values must be numeric")
+        normalized_quality[key] = float(value)
     evidence = payload.get("evidence_digests", ())
     parents = payload.get("parent_candidate_digests", ())
     provenance_payload = payload.get("producer_provenance")
@@ -80,14 +99,22 @@ def _candidate_from_payload(payload: Mapping[str, object]) -> Candidate:
         or expected_output_binding != provenance.output_binding_digest
     ):
         raise ForgeStateError("candidate producer output binding digest mismatch")
+    producer_id = payload.get("producer_id")
+    assumption_digest = payload.get("assumption_digest")
+    if not isinstance(producer_id, str) or not isinstance(assumption_digest, str):
+        raise ForgeStateError("candidate producer/assumption identity must be strings")
+    if any(not isinstance(item, str) for item in evidence):
+        raise ForgeStateError("candidate evidence digests must be strings")
+    if any(not isinstance(item, str) for item in parents):
+        raise ForgeStateError("candidate parent digests must be strings")
     return Candidate.create(
-        producer_id=str(payload["producer_id"]),
+        producer_id=producer_id,
         producer_provenance=provenance,
         artifact=artifact,
-        quality={str(k): float(v) for k, v in quality.items()},
-        evidence_digests=[str(x) for x in evidence],
-        assumption_digest=str(payload["assumption_digest"]),
-        parent_candidate_digests=[str(x) for x in parents],
+        quality=normalized_quality,
+        evidence_digests=evidence,
+        assumption_digest=assumption_digest,
+        parent_candidate_digests=parents,
     )
 
 
@@ -96,12 +123,22 @@ def _challenge_from_payload(payload: Mapping[str, object]) -> Challenge:
     counters = payload.get("counterexample_digests")
     if not isinstance(improved, Mapping) or not isinstance(counters, list):
         raise ForgeStateError("challenge payload malformed")
+    challenger_id = payload.get("challenger_id")
+    target_candidate_digest = payload.get("target_candidate_digest")
+    attack_digest = payload.get("attack_digest")
+    if any(
+        not isinstance(value, str)
+        for value in (challenger_id, target_candidate_digest, attack_digest)
+    ):
+        raise ForgeStateError("challenge identity fields must be strings")
+    if any(not isinstance(item, str) for item in counters):
+        raise ForgeStateError("challenge counterexample digests must be strings")
     return Challenge(
-        challenger_id=str(payload["challenger_id"]),
-        target_candidate_digest=str(payload["target_candidate_digest"]),
-        attack_digest=str(payload["attack_digest"]),
+        challenger_id=challenger_id,
+        target_candidate_digest=target_candidate_digest,
+        attack_digest=attack_digest,
         improved_candidate=_candidate_from_payload(improved),
-        counterexample_digests=tuple(str(x) for x in counters),
+        counterexample_digests=tuple(counters),
     )
 
 
@@ -141,7 +178,7 @@ class DualRivalForge:
     wall-clock deadline anywhere in this state machine.
     """
 
-    SCHEMA = "skeleton.ai_game_builder.dual_rival_checkpoint.v1"
+    SCHEMA = "skeleton.ai_game_builder.dual_rival_checkpoint.v2"
 
     def __init__(
         self,
