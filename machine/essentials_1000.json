@@ -1405,7 +1405,8 @@
         "ESS1000-0010"
       ],
       "prerequisite_wave": null,
-      "status": "planned"
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W002",
@@ -1414,8 +1415,9 @@
         "ESS1000-0011",
         "ESS1000-0020"
       ],
-      "prerequisite_wave": "ESS-W001",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W003",
@@ -1424,8 +1426,9 @@
         "ESS1000-0021",
         "ESS1000-0030"
       ],
-      "prerequisite_wave": "ESS-W002",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W004",
@@ -1434,8 +1437,9 @@
         "ESS1000-0031",
         "ESS1000-0040"
       ],
-      "prerequisite_wave": "ESS-W003",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W005",
@@ -1444,8 +1448,9 @@
         "ESS1000-0041",
         "ESS1000-0050"
       ],
-      "prerequisite_wave": "ESS-W004",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W006",
@@ -1454,8 +1459,9 @@
         "ESS1000-0051",
         "ESS1000-0060"
       ],
-      "prerequisite_wave": "ESS-W005",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W007",
@@ -1464,8 +1470,9 @@
         "ESS1000-0061",
         "ESS1000-0070"
       ],
-      "prerequisite_wave": "ESS-W006",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W008",
@@ -1474,8 +1481,9 @@
         "ESS1000-0071",
         "ESS1000-0080"
       ],
-      "prerequisite_wave": "ESS-W007",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W009",
@@ -1484,8 +1492,9 @@
         "ESS1000-0081",
         "ESS1000-0090"
       ],
-      "prerequisite_wave": "ESS-W008",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W010",
@@ -1494,8 +1503,9 @@
         "ESS1000-0091",
         "ESS1000-0100"
       ],
-      "prerequisite_wave": "ESS-W009",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W011",
@@ -1504,8 +1514,9 @@
         "ESS1000-0101",
         "ESS1000-0110"
       ],
-      "prerequisite_wave": "ESS-W010",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W012",
@@ -1514,8 +1525,9 @@
         "ESS1000-0111",
         "ESS1000-0120"
       ],
-      "prerequisite_wave": "ESS-W011",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W013",
@@ -1524,8 +1536,9 @@
         "ESS1000-0121",
         "ESS1000-0130"
       ],
-      "prerequisite_wave": "ESS-W012",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W014",
@@ -1534,8 +1547,9 @@
         "ESS1000-0131",
         "ESS1000-0140"
       ],
-      "prerequisite_wave": "ESS-W013",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W015",
@@ -1544,8 +1558,9 @@
         "ESS1000-0141",
         "ESS1000-0150"
       ],
-      "prerequisite_wave": "ESS-W014",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W016",
@@ -1554,8 +1569,9 @@
         "ESS1000-0151",
         "ESS1000-0160"
       ],
-      "prerequisite_wave": "ESS-W015",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W017",
@@ -1564,8 +1580,9 @@
         "ESS1000-0161",
         "ESS1000-0170"
       ],
-      "prerequisite_wave": "ESS-W016",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W018",
@@ -1574,8 +1591,9 @@
         "ESS1000-0171",
         "ESS1000-0180"
       ],
-      "prerequisite_wave": "ESS-W017",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W019",
@@ -1584,8 +1602,9 @@
         "ESS1000-0181",
         "ESS1000-0190"
       ],
-      "prerequisite_wave": "ESS-W018",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W020",
@@ -1594,8 +1613,9 @@
         "ESS1000-0191",
         "ESS1000-0200"
       ],
-      "prerequisite_wave": "ESS-W019",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W021",
@@ -1604,8 +1624,9 @@
         "ESS1000-0201",
         "ESS1000-0210"
       ],
-      "prerequisite_wave": "ESS-W020",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W022",
@@ -1614,8 +1635,9 @@
         "ESS1000-0211",
         "ESS1000-0220"
       ],
-      "prerequisite_wave": "ESS-W021",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W023",
@@ -1624,8 +1646,9 @@
         "ESS1000-0221",
         "ESS1000-0230"
       ],
-      "prerequisite_wave": "ESS-W022",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W024",
@@ -1634,8 +1657,9 @@
         "ESS1000-0231",
         "ESS1000-0240"
       ],
-      "prerequisite_wave": "ESS-W023",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W025",
@@ -1644,8 +1668,9 @@
         "ESS1000-0241",
         "ESS1000-0250"
       ],
-      "prerequisite_wave": "ESS-W024",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W026",
@@ -1654,8 +1679,9 @@
         "ESS1000-0251",
         "ESS1000-0260"
       ],
-      "prerequisite_wave": "ESS-W025",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W027",
@@ -1664,8 +1690,9 @@
         "ESS1000-0261",
         "ESS1000-0270"
       ],
-      "prerequisite_wave": "ESS-W026",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W028",
@@ -1674,8 +1701,9 @@
         "ESS1000-0271",
         "ESS1000-0280"
       ],
-      "prerequisite_wave": "ESS-W027",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W029",
@@ -1684,8 +1712,9 @@
         "ESS1000-0281",
         "ESS1000-0290"
       ],
-      "prerequisite_wave": "ESS-W028",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W030",
@@ -1694,8 +1723,9 @@
         "ESS1000-0291",
         "ESS1000-0300"
       ],
-      "prerequisite_wave": "ESS-W029",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W031",
@@ -1704,8 +1734,9 @@
         "ESS1000-0301",
         "ESS1000-0310"
       ],
-      "prerequisite_wave": "ESS-W030",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W032",
@@ -1714,8 +1745,9 @@
         "ESS1000-0311",
         "ESS1000-0320"
       ],
-      "prerequisite_wave": "ESS-W031",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W033",
@@ -1724,8 +1756,9 @@
         "ESS1000-0321",
         "ESS1000-0330"
       ],
-      "prerequisite_wave": "ESS-W032",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W034",
@@ -1734,8 +1767,9 @@
         "ESS1000-0331",
         "ESS1000-0340"
       ],
-      "prerequisite_wave": "ESS-W033",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W035",
@@ -1744,8 +1778,9 @@
         "ESS1000-0341",
         "ESS1000-0350"
       ],
-      "prerequisite_wave": "ESS-W034",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W036",
@@ -1754,8 +1789,9 @@
         "ESS1000-0351",
         "ESS1000-0360"
       ],
-      "prerequisite_wave": "ESS-W035",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W037",
@@ -1764,8 +1800,9 @@
         "ESS1000-0361",
         "ESS1000-0370"
       ],
-      "prerequisite_wave": "ESS-W036",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W038",
@@ -1774,8 +1811,9 @@
         "ESS1000-0371",
         "ESS1000-0380"
       ],
-      "prerequisite_wave": "ESS-W037",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W039",
@@ -1784,8 +1822,9 @@
         "ESS1000-0381",
         "ESS1000-0390"
       ],
-      "prerequisite_wave": "ESS-W038",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W040",
@@ -1794,8 +1833,9 @@
         "ESS1000-0391",
         "ESS1000-0400"
       ],
-      "prerequisite_wave": "ESS-W039",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W041",
@@ -1804,8 +1844,9 @@
         "ESS1000-0401",
         "ESS1000-0410"
       ],
-      "prerequisite_wave": "ESS-W040",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W042",
@@ -1814,8 +1855,9 @@
         "ESS1000-0411",
         "ESS1000-0420"
       ],
-      "prerequisite_wave": "ESS-W041",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W043",
@@ -1824,8 +1866,9 @@
         "ESS1000-0421",
         "ESS1000-0430"
       ],
-      "prerequisite_wave": "ESS-W042",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W044",
@@ -1834,8 +1877,9 @@
         "ESS1000-0431",
         "ESS1000-0440"
       ],
-      "prerequisite_wave": "ESS-W043",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W045",
@@ -1844,8 +1888,9 @@
         "ESS1000-0441",
         "ESS1000-0450"
       ],
-      "prerequisite_wave": "ESS-W044",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W046",
@@ -1854,8 +1899,9 @@
         "ESS1000-0451",
         "ESS1000-0460"
       ],
-      "prerequisite_wave": "ESS-W045",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W047",
@@ -1864,8 +1910,9 @@
         "ESS1000-0461",
         "ESS1000-0470"
       ],
-      "prerequisite_wave": "ESS-W046",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W048",
@@ -1874,8 +1921,9 @@
         "ESS1000-0471",
         "ESS1000-0480"
       ],
-      "prerequisite_wave": "ESS-W047",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W049",
@@ -1884,8 +1932,9 @@
         "ESS1000-0481",
         "ESS1000-0490"
       ],
-      "prerequisite_wave": "ESS-W048",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W050",
@@ -1894,8 +1943,9 @@
         "ESS1000-0491",
         "ESS1000-0500"
       ],
-      "prerequisite_wave": "ESS-W049",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W051",
@@ -1904,8 +1954,9 @@
         "ESS1000-0501",
         "ESS1000-0510"
       ],
-      "prerequisite_wave": "ESS-W050",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W052",
@@ -1914,8 +1965,9 @@
         "ESS1000-0511",
         "ESS1000-0520"
       ],
-      "prerequisite_wave": "ESS-W051",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W053",
@@ -1924,8 +1976,9 @@
         "ESS1000-0521",
         "ESS1000-0530"
       ],
-      "prerequisite_wave": "ESS-W052",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W054",
@@ -1934,8 +1987,9 @@
         "ESS1000-0531",
         "ESS1000-0540"
       ],
-      "prerequisite_wave": "ESS-W053",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W055",
@@ -1944,8 +1998,9 @@
         "ESS1000-0541",
         "ESS1000-0550"
       ],
-      "prerequisite_wave": "ESS-W054",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W056",
@@ -1954,8 +2009,9 @@
         "ESS1000-0551",
         "ESS1000-0560"
       ],
-      "prerequisite_wave": "ESS-W055",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W057",
@@ -1964,8 +2020,9 @@
         "ESS1000-0561",
         "ESS1000-0570"
       ],
-      "prerequisite_wave": "ESS-W056",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W058",
@@ -1974,8 +2031,9 @@
         "ESS1000-0571",
         "ESS1000-0580"
       ],
-      "prerequisite_wave": "ESS-W057",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W059",
@@ -1984,8 +2042,9 @@
         "ESS1000-0581",
         "ESS1000-0590"
       ],
-      "prerequisite_wave": "ESS-W058",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W060",
@@ -1994,8 +2053,9 @@
         "ESS1000-0591",
         "ESS1000-0600"
       ],
-      "prerequisite_wave": "ESS-W059",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W061",
@@ -2004,8 +2064,9 @@
         "ESS1000-0601",
         "ESS1000-0610"
       ],
-      "prerequisite_wave": "ESS-W060",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W062",
@@ -2014,8 +2075,9 @@
         "ESS1000-0611",
         "ESS1000-0620"
       ],
-      "prerequisite_wave": "ESS-W061",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W063",
@@ -2024,8 +2086,9 @@
         "ESS1000-0621",
         "ESS1000-0630"
       ],
-      "prerequisite_wave": "ESS-W062",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W064",
@@ -2034,8 +2097,9 @@
         "ESS1000-0631",
         "ESS1000-0640"
       ],
-      "prerequisite_wave": "ESS-W063",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W065",
@@ -2044,8 +2108,9 @@
         "ESS1000-0641",
         "ESS1000-0650"
       ],
-      "prerequisite_wave": "ESS-W064",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W066",
@@ -2054,8 +2119,9 @@
         "ESS1000-0651",
         "ESS1000-0660"
       ],
-      "prerequisite_wave": "ESS-W065",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W067",
@@ -2064,8 +2130,9 @@
         "ESS1000-0661",
         "ESS1000-0670"
       ],
-      "prerequisite_wave": "ESS-W066",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W068",
@@ -2074,8 +2141,9 @@
         "ESS1000-0671",
         "ESS1000-0680"
       ],
-      "prerequisite_wave": "ESS-W067",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W069",
@@ -2084,8 +2152,9 @@
         "ESS1000-0681",
         "ESS1000-0690"
       ],
-      "prerequisite_wave": "ESS-W068",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W070",
@@ -2094,8 +2163,9 @@
         "ESS1000-0691",
         "ESS1000-0700"
       ],
-      "prerequisite_wave": "ESS-W069",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W071",
@@ -2104,8 +2174,9 @@
         "ESS1000-0701",
         "ESS1000-0710"
       ],
-      "prerequisite_wave": "ESS-W070",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W072",
@@ -2114,8 +2185,9 @@
         "ESS1000-0711",
         "ESS1000-0720"
       ],
-      "prerequisite_wave": "ESS-W071",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W073",
@@ -2124,8 +2196,9 @@
         "ESS1000-0721",
         "ESS1000-0730"
       ],
-      "prerequisite_wave": "ESS-W072",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W074",
@@ -2134,8 +2207,9 @@
         "ESS1000-0731",
         "ESS1000-0740"
       ],
-      "prerequisite_wave": "ESS-W073",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W075",
@@ -2144,8 +2218,9 @@
         "ESS1000-0741",
         "ESS1000-0750"
       ],
-      "prerequisite_wave": "ESS-W074",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W076",
@@ -2154,8 +2229,9 @@
         "ESS1000-0751",
         "ESS1000-0760"
       ],
-      "prerequisite_wave": "ESS-W075",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W077",
@@ -2164,8 +2240,9 @@
         "ESS1000-0761",
         "ESS1000-0770"
       ],
-      "prerequisite_wave": "ESS-W076",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W078",
@@ -2174,8 +2251,9 @@
         "ESS1000-0771",
         "ESS1000-0780"
       ],
-      "prerequisite_wave": "ESS-W077",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W079",
@@ -2184,8 +2262,9 @@
         "ESS1000-0781",
         "ESS1000-0790"
       ],
-      "prerequisite_wave": "ESS-W078",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W080",
@@ -2194,8 +2273,9 @@
         "ESS1000-0791",
         "ESS1000-0800"
       ],
-      "prerequisite_wave": "ESS-W079",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W081",
@@ -2204,8 +2284,9 @@
         "ESS1000-0801",
         "ESS1000-0810"
       ],
-      "prerequisite_wave": "ESS-W080",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W082",
@@ -2214,8 +2295,9 @@
         "ESS1000-0811",
         "ESS1000-0820"
       ],
-      "prerequisite_wave": "ESS-W081",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W083",
@@ -2224,8 +2306,9 @@
         "ESS1000-0821",
         "ESS1000-0830"
       ],
-      "prerequisite_wave": "ESS-W082",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W084",
@@ -2234,8 +2317,9 @@
         "ESS1000-0831",
         "ESS1000-0840"
       ],
-      "prerequisite_wave": "ESS-W083",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W085",
@@ -2244,8 +2328,9 @@
         "ESS1000-0841",
         "ESS1000-0850"
       ],
-      "prerequisite_wave": "ESS-W084",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W086",
@@ -2254,8 +2339,9 @@
         "ESS1000-0851",
         "ESS1000-0860"
       ],
-      "prerequisite_wave": "ESS-W085",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W087",
@@ -2264,8 +2350,9 @@
         "ESS1000-0861",
         "ESS1000-0870"
       ],
-      "prerequisite_wave": "ESS-W086",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W088",
@@ -2274,8 +2361,9 @@
         "ESS1000-0871",
         "ESS1000-0880"
       ],
-      "prerequisite_wave": "ESS-W087",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W089",
@@ -2284,8 +2372,9 @@
         "ESS1000-0881",
         "ESS1000-0890"
       ],
-      "prerequisite_wave": "ESS-W088",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W090",
@@ -2294,8 +2383,9 @@
         "ESS1000-0891",
         "ESS1000-0900"
       ],
-      "prerequisite_wave": "ESS-W089",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W091",
@@ -2304,8 +2394,9 @@
         "ESS1000-0901",
         "ESS1000-0910"
       ],
-      "prerequisite_wave": "ESS-W090",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W092",
@@ -2314,8 +2405,9 @@
         "ESS1000-0911",
         "ESS1000-0920"
       ],
-      "prerequisite_wave": "ESS-W091",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W093",
@@ -2324,8 +2416,9 @@
         "ESS1000-0921",
         "ESS1000-0930"
       ],
-      "prerequisite_wave": "ESS-W092",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W094",
@@ -2334,8 +2427,9 @@
         "ESS1000-0931",
         "ESS1000-0940"
       ],
-      "prerequisite_wave": "ESS-W093",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W095",
@@ -2344,8 +2438,9 @@
         "ESS1000-0941",
         "ESS1000-0950"
       ],
-      "prerequisite_wave": "ESS-W094",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W096",
@@ -2354,8 +2449,9 @@
         "ESS1000-0951",
         "ESS1000-0960"
       ],
-      "prerequisite_wave": "ESS-W095",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W097",
@@ -2364,8 +2460,9 @@
         "ESS1000-0961",
         "ESS1000-0970"
       ],
-      "prerequisite_wave": "ESS-W096",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W098",
@@ -2374,8 +2471,9 @@
         "ESS1000-0971",
         "ESS1000-0980"
       ],
-      "prerequisite_wave": "ESS-W097",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W099",
@@ -2384,8 +2482,9 @@
         "ESS1000-0981",
         "ESS1000-0990"
       ],
-      "prerequisite_wave": "ESS-W098",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": []
     },
     {
       "id": "ESS-W100",
@@ -2394,8 +2493,109 @@
         "ESS1000-0991",
         "ESS1000-1000"
       ],
-      "prerequisite_wave": "ESS-W099",
-      "status": "planned"
+      "prerequisite_wave": null,
+      "status": "planned",
+      "prerequisite_waves": [
+        "ESS-W001",
+        "ESS-W002",
+        "ESS-W003",
+        "ESS-W004",
+        "ESS-W005",
+        "ESS-W006",
+        "ESS-W007",
+        "ESS-W008",
+        "ESS-W009",
+        "ESS-W010",
+        "ESS-W011",
+        "ESS-W012",
+        "ESS-W013",
+        "ESS-W014",
+        "ESS-W015",
+        "ESS-W016",
+        "ESS-W017",
+        "ESS-W018",
+        "ESS-W019",
+        "ESS-W020",
+        "ESS-W021",
+        "ESS-W022",
+        "ESS-W023",
+        "ESS-W024",
+        "ESS-W025",
+        "ESS-W026",
+        "ESS-W027",
+        "ESS-W028",
+        "ESS-W029",
+        "ESS-W030",
+        "ESS-W031",
+        "ESS-W032",
+        "ESS-W033",
+        "ESS-W034",
+        "ESS-W035",
+        "ESS-W036",
+        "ESS-W037",
+        "ESS-W038",
+        "ESS-W039",
+        "ESS-W040",
+        "ESS-W041",
+        "ESS-W042",
+        "ESS-W043",
+        "ESS-W044",
+        "ESS-W045",
+        "ESS-W046",
+        "ESS-W047",
+        "ESS-W048",
+        "ESS-W049",
+        "ESS-W050",
+        "ESS-W051",
+        "ESS-W052",
+        "ESS-W053",
+        "ESS-W054",
+        "ESS-W055",
+        "ESS-W056",
+        "ESS-W057",
+        "ESS-W058",
+        "ESS-W059",
+        "ESS-W060",
+        "ESS-W061",
+        "ESS-W062",
+        "ESS-W063",
+        "ESS-W064",
+        "ESS-W065",
+        "ESS-W066",
+        "ESS-W067",
+        "ESS-W068",
+        "ESS-W069",
+        "ESS-W070",
+        "ESS-W071",
+        "ESS-W072",
+        "ESS-W073",
+        "ESS-W074",
+        "ESS-W075",
+        "ESS-W076",
+        "ESS-W077",
+        "ESS-W078",
+        "ESS-W079",
+        "ESS-W080",
+        "ESS-W081",
+        "ESS-W082",
+        "ESS-W083",
+        "ESS-W084",
+        "ESS-W085",
+        "ESS-W086",
+        "ESS-W087",
+        "ESS-W088",
+        "ESS-W089",
+        "ESS-W090",
+        "ESS-W091",
+        "ESS-W092",
+        "ESS-W093",
+        "ESS-W094",
+        "ESS-W095",
+        "ESS-W096",
+        "ESS-W097",
+        "ESS-W098",
+        "ESS-W099"
+      ]
     }
   ],
   "psi_priority_bridge": {
@@ -26320,6 +26520,7 @@
     "finality_lane_rule": "ESS-S100 begins only after the stage-10 closure gate of all 99 preceding strata is current; its remaining stages then execute sequentially.",
     "rationale": "Non-compensable does not mean globally serialized. Independent essentials may be implemented and verified in parallel, while whole-system finality waits for every domain closure.",
     "maximum_parallel_domain_lanes": 99,
-    "finality_fan_in": 99
+    "finality_fan_in": 99,
+    "construction_wave_rule": "ESS-W001..ESS-W099 are independently schedulable subject to their own level prerequisites; ESS-W100 waits for all 99 prior waves."
   }
 }
