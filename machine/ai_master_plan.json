@@ -610,8 +610,7 @@
         "backend/tests/test_engine_cross_service_closure.py::test_cross_service_cancel_fences_late_provider_result",
         "backend/tests/test_engine_cross_service_closure.py::test_stale_task_callback_cannot_release_newer_generation_lease",
         "backend/tests/test_engine_cross_service_closure.py::test_engine_lifecycle_draining_fences_new_execution_and_drains_lease",
-        "tests/test_vol004_runtime_supervision_independent.py",
-        "tests/test_vol004_runtime_supervision_independent_verifier.py"
+        "tests/test_vol004_runtime_supervision_independent.py"
       ],
       "evaluations": [
         "python scripts/check_architecture_runtime_supervision.py --json",
@@ -651,8 +650,7 @@
         "https://github.com/Apeloff1/Skeleton/commit/fb1b0eda89e3092f23491fa5f1732052aa625f89",
         "https://github.com/Apeloff1/Skeleton/commit/87177fe5f8c093c124078f1323e3989a6bd91eb6",
         "scripts/verify_vol004_runtime_supervision.py",
-        "tests/test_vol004_runtime_supervision_independent.py",
-        "tests/test_vol004_runtime_supervision_independent_verifier.py"
+        "tests/test_vol004_runtime_supervision_independent.py"
       ],
       "risks": [
         "orphan tasks",
