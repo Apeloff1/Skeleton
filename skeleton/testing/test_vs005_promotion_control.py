@@ -83,6 +83,21 @@ def promoted_decision(
     )
 
 
+def verified_promotion(
+    candidate_value: ImprovementCandidate | None = None,
+):
+    selected = candidate_value or candidate()
+    evaluation_value = evaluation(selected)
+    canary_value = canary(selected)
+    decision_value = promote_with_canary(
+        selected,
+        evaluation_value,
+        "ACTOR.VERIFIER",
+        canary_value,
+    )
+    return evaluation_value, canary_value, decision_value
+
+
 def rollback_receipt(
     candidate_value: ImprovementCandidate,
     decision_value: PromotionDecision,
@@ -503,7 +518,13 @@ def test_rollback_must_bind_exact_promotion_decision_digest() -> None:
 
 def test_rollback_requires_fourth_independent_verifier() -> None:
     selected = candidate()
-    decision = promoted_decision(selected)
+    evaluation_value, canary_value, decision = verified_promotion(selected)
+    ledger.record_decision(
+        selected,
+        decision,
+        evaluation=evaluation_value,
+        canary=canary_value,
+    )
     for verifier in (
         selected.builder_id,
         decision.verifier_id,
@@ -544,6 +565,49 @@ def test_rejected_candidate_cannot_claim_promotion_rollback() -> None:
         validate_rollback(selected, decision, receipt)
 
 
+def test_promotion_ledger_rejects_manually_forged_promote_decision() -> None:
+    ledger = PromotionLedger()
+    selected = candidate()
+    evaluation_value = evaluation(selected)
+    canary_value = canary(selected)
+    legitimate = promote_with_canary(
+        selected,
+        evaluation_value,
+        "ACTOR.VERIFIER",
+        canary_value,
+    )
+    forged = replace(
+        legitimate,
+        evaluation_digest=S("forged-evaluation"),
+    )
+    with pytest.raises(
+        ImprovementError,
+        match="does not match supplied evaluation/canary evidence",
+    ):
+        ledger.record_decision(
+            selected,
+            forged,
+            evaluation=evaluation_value,
+            canary=canary_value,
+        )
+
+
+def test_promotion_ledger_rollback_requires_preverified_decision() -> None:
+    ledger = PromotionLedger()
+    selected = candidate()
+    decision = promoted_decision(selected)
+    with pytest.raises(
+        ImprovementError,
+        match="must be evidence-verified before rollback",
+    ):
+        ledger.record_rollback(
+            selected,
+            decision,
+            rollback_evidence_digest=S("rollback"),
+            verifier_id="ACTOR.ROLLBACK",
+        )
+
+
 def test_promotion_ledger_candidate_id_is_immutable() -> None:
     ledger = PromotionLedger()
     first = candidate()
@@ -561,9 +625,19 @@ def test_promotion_ledger_candidate_id_is_immutable() -> None:
 def test_promotion_ledger_decision_is_idempotent_but_not_rebindable() -> None:
     ledger = PromotionLedger()
     selected = candidate()
-    decision = promoted_decision(selected)
-    assert ledger.record_decision(selected, decision) == decision
-    assert ledger.record_decision(selected, decision) == decision
+    evaluation_value, canary_value, decision = verified_promotion(selected)
+    assert ledger.record_decision(
+        selected,
+        decision,
+        evaluation=evaluation_value,
+        canary=canary_value,
+    ) == decision
+    assert ledger.record_decision(
+        selected,
+        decision,
+        evaluation=evaluation_value,
+        canary=canary_value,
+    ) == decision
 
     altered = replace(
         decision,
@@ -573,27 +647,44 @@ def test_promotion_ledger_decision_is_idempotent_but_not_rebindable() -> None:
         ImprovementError,
         match="already bound to another decision",
     ):
-        ledger.record_decision(selected, altered)
+        ledger.record_decision(
+            selected,
+            altered,
+            evaluation=evaluation_value,
+            canary=canary_value,
+        )
 
 
 def test_promotion_ledger_rejects_wrong_decision_id() -> None:
     ledger = PromotionLedger()
     selected = candidate()
+    evaluation_value, canary_value, base_decision = verified_promotion(selected)
     decision = replace(
-        promoted_decision(selected),
+        base_decision,
         decision_id="DECISION.OTHER",
     )
     with pytest.raises(
         ImprovementError,
         match="does not match candidate",
     ):
-        ledger.record_decision(selected, decision)
+        ledger.record_decision(
+            selected,
+            decision,
+            evaluation=evaluation_value,
+            canary=canary_value,
+        )
 
 
 def test_promotion_ledger_records_independent_rollback_once() -> None:
     ledger = PromotionLedger()
     selected = candidate()
-    decision = promoted_decision(selected)
+    evaluation_value, canary_value, decision = verified_promotion(selected)
+    ledger.record_decision(
+        selected,
+        decision,
+        evaluation=evaluation_value,
+        canary=canary_value,
+    )
     receipt = ledger.record_rollback(
         selected,
         decision,
@@ -616,7 +707,13 @@ def test_promotion_ledger_records_independent_rollback_once() -> None:
 def test_promotion_ledger_rollback_rebinding_fails_closed() -> None:
     ledger = PromotionLedger()
     selected = candidate()
-    decision = promoted_decision(selected)
+    evaluation_value, canary_value, decision = verified_promotion(selected)
+    ledger.record_decision(
+        selected,
+        decision,
+        evaluation=evaluation_value,
+        canary=canary_value,
+    )
     ledger.record_rollback(
         selected,
         decision,
@@ -660,8 +757,13 @@ def test_promotion_ledger_audit_digest_changes_on_decision_and_rollback() -> Non
     ledger = PromotionLedger()
     selected = candidate()
     before = ledger.audit_chain_digest
-    decision = promoted_decision(selected)
-    ledger.record_decision(selected, decision)
+    evaluation_value, canary_value, decision = verified_promotion(selected)
+    ledger.record_decision(
+        selected,
+        decision,
+        evaluation=evaluation_value,
+        canary=canary_value,
+    )
     after_decision = ledger.audit_chain_digest
     ledger.record_rollback(
         selected,
