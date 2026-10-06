@@ -7,7 +7,7 @@
   "relationship_to_masterplan": "depth-only overlay; VOL-000..420 breadth freeze preserved",
   "bytes": {
     "requested_minimum": 10000000,
-    "shard_total": 11187033,
+    "shard_total": 11188293,
     "threshold_met": true
   },
   "completion": {
@@ -169,7 +169,7 @@
       "id": "FLGB-06",
       "title": "Evaluation Observability Reliability and Recovery",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_06_FLGB-06_EVALUATION_OBSERVABILITY_RELIABILITY_AND_RECOVERY.md",
-      "bytes": 621084,
+      "bytes": 621336,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
@@ -178,7 +178,7 @@
       "id": "FLGB-07",
       "title": "Training Weights Adaptation and Self-Improvement",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_07_FLGB-07_TRAINING_WEIGHTS_ADAPTATION_AND_SELF_IMPROVEMENT.md",
-      "bytes": 622036,
+      "bytes": 622288,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
@@ -187,7 +187,7 @@
       "id": "FLGB-08",
       "title": "Multimodal Vision Audio Video and Documents",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_08_FLGB-08_MULTIMODAL_VISION_AUDIO_VIDEO_AND_DOCUMENTS.md",
-      "bytes": 620741,
+      "bytes": 620993,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
@@ -196,7 +196,7 @@
       "id": "FLGB-09",
       "title": "Game Project Editor and World Model",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_09_FLGB-09_GAME_PROJECT_EDITOR_AND_WORLD_MODEL.md",
-      "bytes": 621414,
+      "bytes": 621666,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
@@ -205,7 +205,7 @@
       "id": "FLGB-10",
       "title": "Scene ECS Physics and Simulation",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_10_FLGB-10_SCENE_ECS_PHYSICS_AND_SIMULATION.md",
-      "bytes": 620762,
+      "bytes": 621014,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
