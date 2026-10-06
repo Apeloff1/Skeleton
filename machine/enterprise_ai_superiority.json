@@ -1,6 +1,6 @@
 {
   "schema_version": "skeleton.enterprise_ai_superiority.v1",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "status": "active_design_authority",
   "purpose": "Convert the complete Skeleton AI masterplan from feature-coverage completion into enterprise-grade, comparator-backed superiority. Every volume inherits the common enterprise contract; critical production and serving volumes additionally carry dedicated dominance profiles.",
   "authority": {
@@ -9,7 +9,8 @@
     "validator": "scripts/check_enterprise_ai_superiority.py",
     "tests": "tests/test_enterprise_ai_superiority.py",
     "workflow": ".github/workflows/enterprise-ai-superiority.yml",
-    "enterprise_ai_implementation_notes": "machine/enterprise_ai_implementation_notes_index.json"
+    "enterprise_ai_implementation_notes": "machine/enterprise_ai_implementation_notes_index.json",
+    "competitive_engineering_ladder": "machine/competitive_ai_engineering_ladder.json"
   },
   "laws": [
     "implemented is not enterprise-qualified",
@@ -20,7 +21,8 @@
     "tail behavior, saturation behavior, and failure behavior are first-class; median-only wins do not qualify",
     "promotion uses exact-head evidence and an independent verifier or deterministic gate",
     "no benchmark or evaluator may self-promote the implementation it measures",
-    "enterprise qualification expires when governed source identity or acceptance policy changes"
+    "enterprise qualification expires when governed source identity or acceptance policy changes",
+    "competitive AI claims are governed by the 200-level engineering ladder; a boast is not a superiority claim until the applicable family reaches independently qualified stage 10"
   ],
   "coverage": {
     "all_masterplan_volumes_inherit_common_contract": true,
@@ -5731,5 +5733,15 @@
         ]
       }
     ]
+  },
+  "competitive_engineering_ladder": {
+    "schema_version": "skeleton.competitive_ai_engineering_ladder.v1",
+    "authority": "machine/competitive_ai_engineering_ladder.json",
+    "human_spec": "docs/architecture/COMPETITIVE_AI_ENGINEERING_LADDER.md",
+    "family_count": 20,
+    "total_levels": 200,
+    "binding_rule": "Every ENG level binds to existing masterplan volume ownership and inherits this enterprise non-compensable gate set.",
+    "family_exit_rule": "Each stage-10 family exit requires exact-head reproducible Pareto-safe comparator evidence and independent promotion authority.",
+    "stale_evidence_rule": "Material source, model/provider, policy, workload, scorer, environment, or budget drift expires the competitive superiority claim."
   }
 }
