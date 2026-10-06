@@ -64,13 +64,21 @@ jobs:
         run: >-
           python -m py_compile
           scripts/check_ai_game_builder_500_levels.py
+          scripts/check_ai_master_plan.py
           tests/test_ai_game_builder_500_levels.py
+          skeleton/testing/test_ai_master_plan.py
 
       - name: Validate 500-level authority
         run: python scripts/check_ai_game_builder_500_levels.py --json
 
+      - name: Validate canonical masterplan binding
+        run: python scripts/check_ai_master_plan.py
+
       - name: Run focused regression suite
-        run: python -m pytest -q --noconftest tests/test_ai_game_builder_500_levels.py
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_ai_game_builder_500_levels.py
+          skeleton/testing/test_ai_master_plan.py
 
       - name: Validate masterplan JSON
         run: python -m json.tool machine/ai_master_plan.json >/dev/null
