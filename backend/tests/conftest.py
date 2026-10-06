@@ -187,6 +187,9 @@ def ai_chat_turn_test_authority(request: pytest.FixtureRequest, monkeypatch):
         async def append_event(self, event, **kwargs):
             return self.repo.append_event(event, **kwargs)
 
+        async def list_events(self, operation_id, **kwargs):
+            return self.repo.list_events(operation_id, **kwargs)
+
     authority = AsyncSQLiteTurnAuthority()
     monkeypatch.setattr(
         ai,
