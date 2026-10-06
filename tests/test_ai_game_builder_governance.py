@@ -50,6 +50,7 @@ from skeleton.ai.game_builder.canon import (  # noqa: E402
     CharacterKnowledge,
 )
 from skeleton.ai.game_builder.rights import (  # noqa: E402
+    RightsError,
     RightsLedger,
     RightsState,
     SimilarityFinding,
