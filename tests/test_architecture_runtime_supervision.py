@@ -138,6 +138,34 @@ class RuntimeSupervisionTests(unittest.TestCase):
         ):
             MODULE.validate(root)
 
+    def test_rejects_public_drain_schema_expansion(self) -> None:
+        root = self._fixture()
+        path = root / "machine/runtime_supervision.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["lifecycle_semantics"]["public_drain_response"][
+            "allowed_lifecycle_fields"
+        ].append("active_work_ids")
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with self.assertRaisesRegex(
+            MODULE.RuntimeSupervisionError,
+            "public drain lifecycle fields drifted",
+        ):
+            MODULE.validate(root)
+
+    def test_rejects_async_shutdown_lease_reconciliation(self) -> None:
+        root = self._fixture()
+        path = root / "machine/runtime_supervision.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["lifecycle_semantics"]["work_leases"][
+            "shutdown_reconciliation"
+        ] = "callback_eventually"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with self.assertRaisesRegex(
+            MODULE.RuntimeSupervisionError,
+            "shutdown lease reconciliation must be synchronous",
+        ):
+            MODULE.validate(root)
+
     def test_rejects_disabled_work_lease_requirement(self) -> None:
         root = self._fixture()
         path = root / "machine/runtime_supervision.json"
