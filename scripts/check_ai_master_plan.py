@@ -14,6 +14,7 @@ MACHINE = ROOT / "machine" / "ai_master_plan.json"
 EXECUTION_FRONTIER = ROOT / "machine" / "ai_execution_frontier_20260924.json"
 INDEX = ROOT / "docs" / "plan" / "MASTER_INDEX.md"
 PLAN = ROOT / "docs" / "plan" / "MASTER_PLAN.md"
+COMPETITIVE_LADDER = ROOT / "machine" / "competitive_ai_engineering_ladder.json"
 DEPTH_000_040 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_000_040.md"
 DEPTH_041_080 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_041_080.md"
 DEPTH_081_120 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_081_120.md"
@@ -77,6 +78,45 @@ def validate(data: dict) -> list[str]:
     errors: list[str] = []
     if data.get("schema_version") != 1:
         errors.append("schema_version must equal 1")
+    competitive = data.get("competitive_engineering_ladder")
+    if not isinstance(competitive, dict):
+        errors.append("competitive_engineering_ladder must be an object")
+    else:
+        if competitive.get("authority") != "machine/competitive_ai_engineering_ladder.json":
+            errors.append("competitive engineering authority path drifted")
+        if competitive.get("human_spec") != "docs/architecture/COMPETITIVE_AI_ENGINEERING_LADDER.md":
+            errors.append("competitive engineering human spec path drifted")
+        if competitive.get("schema_version") != "skeleton.competitive_ai_engineering_ladder.v1":
+            errors.append("competitive engineering schema binding drifted")
+        if competitive.get("family_count") != 20:
+            errors.append("competitive engineering family_count must equal 20")
+        if competitive.get("levels_per_family") != 10:
+            errors.append("competitive engineering levels_per_family must equal 10")
+        if competitive.get("total_levels") != 200:
+            errors.append("competitive engineering total_levels must equal 200")
+        if not COMPETITIVE_LADDER.is_file():
+            errors.append("competitive engineering machine authority is missing")
+        else:
+            try:
+                ladder = json.loads(COMPETITIVE_LADDER.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                errors.append(f"cannot parse competitive engineering authority: {exc}")
+            else:
+                if not isinstance(ladder, dict):
+                    errors.append("competitive engineering authority root must be an object")
+                else:
+                    levels = ladder.get("levels")
+                    families = ladder.get("families")
+                    if not isinstance(families, list) or len(families) != 20:
+                        errors.append("competitive engineering authority must contain 20 families")
+                    if not isinstance(levels, list) or len(levels) != 200:
+                        errors.append("competitive engineering authority must contain 200 levels")
+                    elif (
+                        levels[0].get("id") != "ENG-001"
+                        or levels[-1].get("id") != "ENG-200"
+                    ):
+                        errors.append("competitive engineering authority range must be ENG-001..ENG-200")
+
     execution_frontier = data.get("execution_frontier")
     if not isinstance(execution_frontier, dict):
         errors.append("execution_frontier must be an object")
