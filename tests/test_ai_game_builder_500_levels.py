@@ -20,6 +20,7 @@ SPEC.loader.exec_module(MODULE)
 def _fixture(tmp_path: Path) -> Path:
     root = tmp_path / "repo"
     manifest = json.loads((ROOT / "machine/ai_game_builder_500_levels.json").read_text(encoding="utf-8"))
+    duel = json.loads((ROOT / "machine/ai_game_builder_dual_rival_forge.json").read_text(encoding="utf-8"))
     paths = [
         "machine/ai_game_builder_500_levels.json",
         "machine/ai_game_builder_dual_rival_forge.json",
@@ -27,6 +28,7 @@ def _fixture(tmp_path: Path) -> Path:
         "docs/plan/MASTER_PLAN.md",
         *manifest["shards"],
         *[family["owner_binding"] for family in manifest["families"]],
+        *duel["implementation_bindings"],
     ]
     for relative in dict.fromkeys(paths):
         source = ROOT / relative
@@ -183,4 +185,21 @@ def test_rejects_level_batch_drift_from_family_contract(tmp_path: Path) -> None:
     _write(root, first, shard)
 
     with pytest.raises(MODULE.GameBuilderAuthorityError, match="batch binding drifts"):
+        MODULE.validate(root)
+
+
+def test_rejects_stale_planned_or_missing_dual_rival_binding(tmp_path: Path) -> None:
+    root = _fixture(tmp_path)
+    duel = _json(root, "machine/ai_game_builder_dual_rival_forge.json")
+    duel["implementation_bindings"].append("planned:skeleton/ai/game_builder/future.py")
+    _write(root, "machine/ai_game_builder_dual_rival_forge.json", duel)
+
+    with pytest.raises(MODULE.GameBuilderAuthorityError, match="remains planned"):
+        MODULE.validate(root)
+
+    duel = _json(root, "machine/ai_game_builder_dual_rival_forge.json")
+    duel["implementation_bindings"][-1] = "skeleton/ai/game_builder/missing.py"
+    _write(root, "machine/ai_game_builder_dual_rival_forge.json", duel)
+
+    with pytest.raises(MODULE.GameBuilderAuthorityError, match="implementation binding is missing"):
         MODULE.validate(root)
