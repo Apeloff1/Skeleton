@@ -25,6 +25,14 @@ from skeleton.ai.learning.training_integrity import (
     TrainingIntegrityReceipt,
     TransformIdentity,
 )
+from skeleton.ai.learning.promotion_control import (
+    CanaryEvidence,
+    EvaluationBundle,
+    ImprovementCandidate,
+    PromotionStatus,
+    decide,
+    promote_with_canary,
+)
 
 
 def sha(text: str) -> str:
@@ -1015,10 +1023,253 @@ def test_registry_getters_fail_closed_for_unknown_identity() -> None:
         registry.integrity_binding("unknown-dataset")
 
 
+def governed_candidate(model_digest: str) -> ImprovementCandidate:
+    return ImprovementCandidate(
+        candidate_id="CANDIDATE.MODEL1",
+        champion_digest=sha("champion-model"),
+        challenger_digest=model_digest,
+        experiment_scope="isolated:model-program",
+        metric_ids=("METRIC.QUALITY",),
+        builder_id="ACTOR.BUILDER",
+    )
+
+
+def governed_decision(candidate_value: ImprovementCandidate):
+    evaluation = EvaluationBundle(
+        candidate_digest=candidate_value.digest,
+        metric_values=(("METRIC.QUALITY", 0.95),),
+        safety_passed=True,
+        cost_passed=True,
+        robustness_passed=True,
+        evidence_digest=sha("governance-evaluation"),
+    )
+    canary = CanaryEvidence(
+        candidate_digest=candidate_value.digest,
+        canary_digest=sha("canary-run"),
+        safety_passed=True,
+        quality_passed=True,
+        rollback_ready=True,
+        verifier_id="ACTOR.CANARY",
+    )
+    return promote_with_canary(
+        candidate_value,
+        evaluation,
+        "ACTOR.VERIFIER",
+        canary,
+    )
+
+
+def governed_registry(
+    selected: TrainingDataset,
+) -> ModelDevelopmentRegistry:
+    receipt = integrity_receipt(selected)
+    registry = ModelDevelopmentRegistry(
+        require_integrity_receipts=True,
+        allowed_integrity_policy_digests=(sha("policy-v1"),),
+        require_governed_promotion_decisions=True,
+    )
+    registry.register_dataset(selected)
+    registry.bind_training_integrity(
+        selected.dataset_id,
+        receipt,
+    )
+    return registry
+
+
+def test_governed_model_promotion_requires_typed_promotion_decision() -> None:
+    selected = dataset()
+    registry = governed_registry(selected)
+    registry.train(
+        training_spec(),
+        corpora={selected.dataset_id: corpus()},
+    )
+    with pytest.raises(
+        ModelProgramError,
+        match="governed promotion decision is required",
+    ):
+        registry.promote(
+            run_id="run-1",
+            verifier_id="ACTOR.VERIFIER",
+            evaluation_refs=("eval:a", "eval:b"),
+        )
+
+
+def test_governed_model_promotion_binds_exact_trained_challenger() -> None:
+    selected = dataset()
+    registry = governed_registry(selected)
+    artifact, _ = registry.train(
+        training_spec(),
+        corpora={selected.dataset_id: corpus()},
+    )
+    candidate_value = governed_candidate(artifact.model_digest)
+    decision = governed_decision(candidate_value)
+    promotion = registry.promote(
+        run_id="run-1",
+        verifier_id="ACTOR.VERIFIER",
+        evaluation_refs=("eval:b", "eval:a"),
+        governance_candidate=candidate_value,
+        governance_decision=decision,
+    )
+
+    assert promotion.model_digest == artifact.model_digest
+    assert promotion.governance_decision_digest == decision.digest
+    assert promotion.verifier_id == decision.verifier_id
+    assert promotion.evaluation_refs == ("eval:a", "eval:b")
+
+
+def test_governed_model_promotion_rejects_wrong_challenger_model() -> None:
+    selected = dataset()
+    registry = governed_registry(selected)
+    registry.train(
+        training_spec(),
+        corpora={selected.dataset_id: corpus()},
+    )
+    candidate_value = governed_candidate(sha("different-model"))
+    decision = governed_decision(candidate_value)
+
+    with pytest.raises(
+        ModelProgramError,
+        match="challenger does not match trained model",
+    ):
+        registry.promote(
+            run_id="run-1",
+            verifier_id="ACTOR.VERIFIER",
+            evaluation_refs=("eval:a", "eval:b"),
+            governance_candidate=candidate_value,
+            governance_decision=decision,
+        )
+
+
+def test_governed_model_promotion_rejects_rejected_decision() -> None:
+    selected = dataset()
+    registry = governed_registry(selected)
+    artifact, _ = registry.train(
+        training_spec(),
+        corpora={selected.dataset_id: corpus()},
+    )
+    candidate_value = governed_candidate(artifact.model_digest)
+    rejected_evaluation = EvaluationBundle(
+        candidate_digest=candidate_value.digest,
+        metric_values=(("METRIC.QUALITY", 0.95),),
+        safety_passed=False,
+        cost_passed=True,
+        robustness_passed=True,
+        evidence_digest=sha("rejected-evaluation"),
+    )
+    rejected = decide(
+        candidate_value,
+        rejected_evaluation,
+        "ACTOR.VERIFIER",
+        canary_digest=None,
+    )
+    assert rejected.status is PromotionStatus.REJECT
+
+    with pytest.raises(
+        ModelProgramError,
+        match="does not authorize promotion",
+    ):
+        registry.promote(
+            run_id="run-1",
+            verifier_id="ACTOR.VERIFIER",
+            evaluation_refs=("eval:a", "eval:b"),
+            governance_candidate=candidate_value,
+            governance_decision=rejected,
+        )
+
+
+def test_governed_model_promotion_verifier_must_match_decision() -> None:
+    selected = dataset()
+    registry = governed_registry(selected)
+    artifact, _ = registry.train(
+        training_spec(),
+        corpora={selected.dataset_id: corpus()},
+    )
+    candidate_value = governed_candidate(artifact.model_digest)
+    decision = governed_decision(candidate_value)
+    with pytest.raises(
+        ModelProgramError,
+        match="verifier must match governance verifier",
+    ):
+        registry.promote(
+            run_id="run-1",
+            verifier_id="ACTOR.OTHER",
+            evaluation_refs=("eval:a", "eval:b"),
+            governance_candidate=candidate_value,
+            governance_decision=decision,
+        )
+
+
+def test_governance_candidate_and_decision_must_be_supplied_together() -> None:
+    selected = dataset()
+    registry = governed_registry(selected)
+    artifact, _ = registry.train(
+        training_spec(),
+        corpora={selected.dataset_id: corpus()},
+    )
+    candidate_value = governed_candidate(artifact.model_digest)
+    decision = governed_decision(candidate_value)
+
+    with pytest.raises(
+        TypeError,
+        match="governance_decision",
+    ):
+        registry.promote(
+            run_id="run-1",
+            verifier_id="ACTOR.VERIFIER",
+            evaluation_refs=("eval:a", "eval:b"),
+            governance_candidate=candidate_value,
+            governance_decision=None,
+        )
+
+    with pytest.raises(
+        TypeError,
+        match="governance_candidate",
+    ):
+        registry.promote(
+            run_id="run-1",
+            verifier_id="ACTOR.VERIFIER",
+            evaluation_refs=("eval:a", "eval:b"),
+            governance_candidate=None,
+            governance_decision=decision,
+        )
+
+
+def test_governed_promotion_replay_is_idempotent_and_decision_bound() -> None:
+    selected = dataset()
+    registry = governed_registry(selected)
+    artifact, _ = registry.train(
+        training_spec(),
+        corpora={selected.dataset_id: corpus()},
+    )
+    candidate_value = governed_candidate(artifact.model_digest)
+    decision = governed_decision(candidate_value)
+
+    first = registry.promote(
+        run_id="run-1",
+        verifier_id="ACTOR.VERIFIER",
+        evaluation_refs=("eval:a", "eval:b"),
+        governance_candidate=candidate_value,
+        governance_decision=decision,
+    )
+    second = registry.promote(
+        run_id="run-1",
+        verifier_id="ACTOR.VERIFIER",
+        evaluation_refs=("eval:b", "eval:a"),
+        governance_candidate=candidate_value,
+        governance_decision=decision,
+    )
+    assert first == second
+    assert first.governance_decision_digest == decision.digest
+
+
 def test_strict_registry_boolean_and_policy_configuration_are_validated() -> None:
     with pytest.raises(TypeError):
         ModelDevelopmentRegistry(
             require_integrity_receipts=1,  # type: ignore[arg-type]
+        )
+    with pytest.raises(TypeError):
+        ModelDevelopmentRegistry(
+            require_governed_promotion_decisions=1,  # type: ignore[arg-type]
         )
     with pytest.raises(
         ModelProgramError,
