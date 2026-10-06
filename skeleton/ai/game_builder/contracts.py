@@ -153,6 +153,8 @@ class ProducerProvenance:
     producer_behavior_digest: str
     source_revision: str
     provider_receipt_refs: tuple[str, ...] = ()
+    output_artifact_refs: tuple[str, ...] = ()
+    output_evidence_refs: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         for name in ("project_id", "run_id", "operation_id", "execution_id"):
@@ -187,6 +189,25 @@ class ProducerProvenance:
             raise ValueError("provider receipt refs must be unique")
         object.__setattr__(self, "provider_receipt_refs", refs)
 
+        artifact_refs = tuple(
+            _normalized_identity_text("output_artifact_ref", ref, maximum=2048)
+            for ref in self.output_artifact_refs
+        )
+        evidence_refs = tuple(
+            _normalized_identity_text("output_evidence_ref", ref, maximum=2048)
+            for ref in self.output_evidence_refs
+        )
+        if len(artifact_refs) != len(set(artifact_refs)):
+            raise ValueError("output artifact refs must be unique")
+        if len(evidence_refs) != len(set(evidence_refs)):
+            raise ValueError("output evidence refs must be unique")
+        if not artifact_refs:
+            raise ValueError("producer provenance requires output artifact refs")
+        if not evidence_refs:
+            raise ValueError("producer provenance requires output evidence refs")
+        object.__setattr__(self, "output_artifact_refs", artifact_refs)
+        object.__setattr__(self, "output_evidence_refs", evidence_refs)
+
     def to_payload(self) -> dict[str, object]:
         return {
             "execution_id": self.execution_id,
@@ -199,7 +220,21 @@ class ProducerProvenance:
             "provider_receipt_refs": list(self.provider_receipt_refs),
             "run_id": self.run_id,
             "source_revision": self.source_revision,
+            "output_artifact_refs": list(self.output_artifact_refs),
+            "output_evidence_refs": list(self.output_evidence_refs),
+            "output_binding_digest": self.output_binding_digest,
         }
+
+    @property
+    def output_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "finalization_intent_digest": self.finalization_intent_digest,
+                "output_artifact_refs": list(self.output_artifact_refs),
+                "output_evidence_refs": list(self.output_evidence_refs),
+                "provider_receipt_refs": list(self.provider_receipt_refs),
+            }
+        )
 
     @property
     def digest(self) -> str:
@@ -270,6 +305,45 @@ class Candidate:
             raise TypeError("producer_provenance must be ProducerProvenance")
         if not isinstance(self.artifact, ArtifactIdentity):
             raise TypeError("artifact must be ArtifactIdentity")
+        if self.artifact.artifact_digest not in self.producer_provenance.output_artifact_refs:
+            raise ValueError(
+                "candidate artifact must be referenced by producer execution output"
+            )
+        if not self.evidence_digests:
+            raise ValueError("candidate requires stable evidence digests")
+        if any(
+            not isinstance(item, str) or not item.strip() or len(item) < 16
+            for item in self.evidence_digests
+        ):
+            raise ValueError("candidate requires stable evidence digests")
+        if len(self.evidence_digests) != len(set(self.evidence_digests)):
+            raise ValueError("candidate evidence digests must be unique")
+        missing_evidence = set(self.evidence_digests) - set(
+            self.producer_provenance.output_evidence_refs
+        )
+        if missing_evidence:
+            raise ValueError(
+                "candidate evidence must be referenced by producer execution output"
+            )
+        if (
+            not isinstance(self.assumption_digest, str)
+            or len(self.assumption_digest) < 16
+        ):
+            raise ValueError("assumption_digest must be a stable digest")
+        if self.assumption_digest not in self.producer_provenance.output_evidence_refs:
+            raise ValueError(
+                "candidate assumption must be referenced by producer execution output"
+            )
+        if any(
+            not isinstance(item, str) or not item.strip() or len(item) < 16
+            for item in self.parent_candidate_digests
+        ):
+            raise ValueError("candidate parent digests must be stable")
+        if len(self.parent_candidate_digests) != len(set(self.parent_candidate_digests)):
+            raise ValueError("candidate parent digests must be unique")
+        normalized_quality = normalize_quality(dict(self.quality))
+        if tuple(self.quality) != normalized_quality:
+            raise ValueError("candidate quality must use canonical axis ordering")
 
     @classmethod
     def create(
@@ -355,6 +429,24 @@ class Challenge:
             raise ValueError("challenge requires at least one counterexample")
         if self.improved_candidate.producer_id != self.challenger_id:
             raise ValueError("improved candidate producer must equal challenger")
+        if any(
+            not isinstance(item, str) or len(item) < 16
+            for item in self.counterexample_digests
+        ):
+            raise ValueError("counterexample digests must be stable")
+        if len(self.counterexample_digests) != len(set(self.counterexample_digests)):
+            raise ValueError("counterexample digests must be unique")
+        output_evidence = set(
+            self.improved_candidate.producer_provenance.output_evidence_refs
+        )
+        if self.attack_digest not in output_evidence:
+            raise ValueError(
+                "challenge attack must be referenced by challenger execution output"
+            )
+        if set(self.counterexample_digests) - output_evidence:
+            raise ValueError(
+                "challenge counterexamples must be referenced by challenger execution output"
+            )
 
     @property
     def digest(self) -> str:
