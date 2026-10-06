@@ -35,6 +35,8 @@ def _fixture(tmp_path: Path) -> Path:
         "machine/enterprise_ai_implementation_notes_index.json",
     }
     paths.update(row["path"] for row in index["dossier_files"])
+    paths.update(row["human_path"] for row in index["dossier_files"])
+    paths.add(index["authority"]["human_index"])
     for relative in sorted(paths):
         source = ROOT / relative
         target = root / relative
