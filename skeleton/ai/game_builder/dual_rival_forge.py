@@ -52,8 +52,14 @@ def _candidate_from_payload(payload: Mapping[str, object]) -> Candidate:
     ):
         raise ForgeStateError("candidate lineage/evidence/provenance payload malformed")
     provider_refs = provenance_payload.get("provider_receipt_refs", ())
-    if not isinstance(provider_refs, list):
-        raise ForgeStateError("candidate provider receipt refs malformed")
+    artifact_refs = provenance_payload.get("output_artifact_refs", ())
+    evidence_refs = provenance_payload.get("output_evidence_refs", ())
+    if (
+        not isinstance(provider_refs, list)
+        or not isinstance(artifact_refs, list)
+        or not isinstance(evidence_refs, list)
+    ):
+        raise ForgeStateError("candidate producer output refs malformed")
     provenance = ProducerProvenance(
         project_id=provenance_payload.get("project_id"),
         run_id=provenance_payload.get("run_id"),
@@ -65,7 +71,15 @@ def _candidate_from_payload(payload: Mapping[str, object]) -> Candidate:
         producer_behavior_digest=provenance_payload.get("producer_behavior_digest"),
         source_revision=provenance_payload.get("source_revision"),
         provider_receipt_refs=tuple(provider_refs),
+        output_artifact_refs=tuple(artifact_refs),
+        output_evidence_refs=tuple(evidence_refs),
     )
+    expected_output_binding = provenance_payload.get("output_binding_digest")
+    if (
+        not isinstance(expected_output_binding, str)
+        or expected_output_binding != provenance.output_binding_digest
+    ):
+        raise ForgeStateError("candidate producer output binding digest mismatch")
     return Candidate.create(
         producer_id=str(payload["producer_id"]),
         producer_provenance=provenance,
@@ -411,9 +425,18 @@ class DualRivalForge:
         cls,
         checkpoint: Mapping[str, object],
         *,
+        expected_checkpoint_digest: str,
         receipts: Sequence[PromotionReceipt] = (),
     ) -> "DualRivalForge":
         supplied_digest = checkpoint.get("checkpoint_digest")
+        if (
+            not isinstance(expected_checkpoint_digest, str)
+            or len(expected_checkpoint_digest) != 64
+            or any(ch not in "0123456789abcdef" for ch in expected_checkpoint_digest)
+        ):
+            raise ForgeStateError("expected checkpoint digest must be lowercase sha256")
+        if supplied_digest != expected_checkpoint_digest:
+            raise ForgeStateError("checkpoint digest does not match trusted external anchor")
         core = {key: value for key, value in checkpoint.items() if key != "checkpoint_digest"}
         if supplied_digest != canonical_digest(core):
             raise ForgeStateError("checkpoint digest mismatch")
