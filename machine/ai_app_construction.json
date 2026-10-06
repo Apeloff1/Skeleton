@@ -9786,6 +9786,7 @@
       "self-improvement may propose and evaluate but may not self-approve production promotion",
       "higher levels inherit lower authority, tenant, safety, provenance, budget and recovery invariants",
       "regression of a lower promoted level invalidates dependent higher-level promotion evidence"
-    ]
+    ],
+    "maturity_ledger": "machine/advanced_ai_maturity_ledger.json"
   }
 }
