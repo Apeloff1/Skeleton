@@ -11,9 +11,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
+from functools import wraps
 import hashlib
 import re
-from typing import Any
+from threading import RLock
+from typing import Any, Callable, ParamSpec, TypeVar
 
 from skeleton.ai.runtime.contracts.ai_execution import AIExecutionRequest
 from skeleton.ai.runtime.contracts.canonical import canonical_json_bytes
@@ -29,6 +31,26 @@ from skeleton.ai.runtime.contracts.execution_authority import (
 
 
 _REPLAY_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,191}$")
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
+
+
+def _synchronized(method: Callable[_P, _R]) -> Callable[_P, _R]:
+    """Serialize guard operations so budget and receipt updates are atomic."""
+
+    @wraps(method)
+    def wrapped(*args: _P.args, **kwargs: _P.kwargs) -> _R:
+        if not args:
+            raise RuntimeError("synchronized guard method requires self")
+        guard = args[0]
+        lock = getattr(guard, "_lock", None)
+        if lock is None:
+            raise RuntimeError("execution authority guard lock is unavailable")
+        with lock:
+            return method(*args, **kwargs)
+
+    return wrapped
+
 
 MAX_AUTHORITY_DELEGATION_DEPTH = 32
 MAX_GUARD_AUTHORITIES = 4096
@@ -82,6 +104,7 @@ class ExecutionAuthorityGuard:
                 raise ValueError(f"{name} must be a positive integer")
         self.max_authorities = max_authorities
         self.max_replay_keys = max_replay_keys
+        self._lock = RLock()
         self._authorities: dict[str, _AuthorityState] = {}
         self._authority_order: list[str] = []
         self._replay_digests: dict[str, str] = {}
@@ -122,11 +145,10 @@ class ExecutionAuthorityGuard:
     def _remember_replay(self, replay_key: str, digest: str) -> None:
         if replay_key in self._replay_digests:
             return
-        while len(self._replay_order) >= self.max_replay_keys:
-            oldest = self._replay_order.pop(0)
-            self._replay_digests.pop(oldest, None)
-            self._admission_receipts.pop(oldest, None)
-            self._authorization_receipts.pop(oldest, None)
+        if len(self._replay_order) >= self.max_replay_keys:
+            raise ExecutionAuthorityError(
+                "replay guard capacity exhausted; refusing to forget replay state"
+            )
         self._replay_digests[replay_key] = digest
         self._replay_order.append(replay_key)
 
@@ -170,14 +192,16 @@ class ExecutionAuthorityGuard:
                     "authority digest collision with different contract"
                 )
             return existing
-        while len(self._authority_order) >= self.max_authorities:
-            oldest = self._authority_order.pop(0)
-            self._authorities.pop(oldest, None)
+        if len(self._authority_order) >= self.max_authorities:
+            raise ExecutionAuthorityError(
+                "authority guard capacity exhausted; refusing to forget usage state"
+            )
         state = _AuthorityState(authority=authority, usage=ResourceUsage())
         self._authorities[digest] = state
         self._authority_order.append(digest)
         return state
 
+    @_synchronized
     def admit(
         self,
         *,
@@ -255,6 +279,7 @@ class ExecutionAuthorityGuard:
             state.admission_receipt_digest = receipt.digest
         return receipt
 
+    @_synchronized
     def authorize(
         self,
         *,
@@ -363,11 +388,11 @@ class ExecutionAuthorityGuard:
             total_usage=projected,
             previous_receipt_digest=state.latest_receipt_digest,
         )
+        self._remember_replay(replay_key, replay_digest)
+        self._authorization_receipts[replay_key] = receipt
         state.usage = projected
         state.consumption_count = receipt.sequence
         state.latest_receipt_digest = receipt.digest
-        self._remember_replay(replay_key, replay_digest)
-        self._authorization_receipts[replay_key] = receipt
         return AuthorizationDecision(
             AuthorizationDisposition.ALLOW,
             "authorized",
@@ -377,6 +402,7 @@ class ExecutionAuthorityGuard:
             receipt,
         )
 
+    @_synchronized
     def revoke(self, authority: ExecutionAuthority) -> None:
         if not isinstance(authority, ExecutionAuthority):
             raise ExecutionAuthorityError("authority must be ExecutionAuthority")
@@ -384,6 +410,7 @@ class ExecutionAuthorityGuard:
         if state is not None:
             state.revoked = True
 
+    @_synchronized
     def seal_evidence(
         self,
         authority: ExecutionAuthority,
@@ -414,12 +441,14 @@ class ExecutionAuthorityGuard:
             sealed_at=instant,
         )
 
+    @_synchronized
     def usage_for(self, authority: ExecutionAuthority) -> ResourceUsage:
         if not isinstance(authority, ExecutionAuthority):
             raise ExecutionAuthorityError("authority must be ExecutionAuthority")
         state = self._authorities.get(authority.digest)
         return ResourceUsage() if state is None else state.usage
 
+    @_synchronized
     def snapshot(self) -> dict[str, Any]:
         """Return deterministic observability state without exposing mutability."""
 
