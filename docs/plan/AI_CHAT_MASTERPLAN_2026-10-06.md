@@ -510,8 +510,35 @@ exposing prompt or evidence contents.
 
 ### Volume 5 — routing v2
 
-Bind turn budgets, privacy, endpoint health, provider receipts, and fail-closed
-fallback into model placement.
+Status: **implemented candidate on stacked routing branch; exact-head
+qualification pending**.
+
+Implemented:
+
+- durable AI-chat `ExecutionBudget` projects directly into routing latency,
+  cost, and output ceilings;
+- immutable route-request digests bind every hard placement constraint;
+- route-decision digests bind the selected endpoint, compliant fallbacks,
+  rejection evidence, and routing timestamp;
+- jurisdiction allowlists fail closed for unknown or disallowed placement;
+- provider receipt capability can be required as a hard constraint;
+- minimum telemetry observations can be required before an endpoint is
+  eligible;
+- telemetry freshness can be bounded and missing/stale/future evidence fails
+  closed;
+- explicit endpoint quarantine removes unhealthy endpoints from primary and
+  fallback selection until cleared or expired;
+- endpoint replacement and unregister operations clear stale quarantine state;
+- all fallback candidates are produced only after the same privacy,
+  capability, modality, context, quality, reliability, jurisdiction, receipt,
+  latency, and cost constraints;
+- canonical backend routing and clean-room AI compatibility mirror remain
+  byte-identical;
+- dedicated structural and independent exact-head routing closure evidence is
+  included.
+
+Next integration: bind durable provider execution receipts and runtime
+health/circuit-breaker observations back into quarantine/telemetry updates.
 
 ### Volume 6 — tool recovery integration
 
