@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from numbers import Real
 from typing import Sequence
 
-from .contracts import MathInvariantError, Matrix, Vector, finite_matrix, finite_vector
+from .contracts import MathInvariantError, finite_matrix, finite_vector
 from .linear import matvec
 from .lu import matrix_inverse
 

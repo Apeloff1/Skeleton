@@ -5,7 +5,7 @@ import math
 from numbers import Real
 from typing import Sequence
 
-from .contracts import MathInvariantError, Matrix, Vector, finite_matrix, finite_vector
+from .contracts import Matrix, Vector, finite_matrix, finite_vector
 
 
 def dct_ii(values: Sequence[Real]) -> Vector:
