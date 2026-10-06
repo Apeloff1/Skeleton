@@ -55,6 +55,7 @@ def test_matrix_equilibration_reconstructs_scaled_matrix_and_normalizes_support(
         assert actual == pytest.approx(expected, rel=1e-12, abs=1e-12)
     assert report.maximum_row_norm_error <= 1e-7
     assert report.maximum_column_norm_error <= 1e-7
+    assert report.scaled_dynamic_range <= report.original_dynamic_range
 
 
 def test_anderson_acceleration_converges_at_least_as_well_as_plain_iteration() -> None:
@@ -65,6 +66,7 @@ def test_anderson_acceleration_converges_at_least_as_well_as_plain_iteration() -
     assert accelerated.converged
     assert accelerated.solution[0] == pytest.approx(0.7390851332151607, abs=1e-9)
     assert accelerated.iterations < plain.iterations
+    assert accelerated.residual_l2 <= 1e-10
 
 
 def test_tensor_gauss_legendre_cubature_integrates_polynomials_exactly() -> None:

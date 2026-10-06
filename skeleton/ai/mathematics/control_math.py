@@ -9,9 +9,7 @@ from .contracts import MathInvariantError, Matrix, finite_matrix, positive_scala
 from .eigensystems import symmetric_eigensystem
 from .linear import matmul, transpose
 from .matrix_equations import solve_continuous_lyapunov
-from .matrix_exponential import MatrixExponentialReport
 from .matrix_functions import matrix_exponential
-from .numerics import compensated_sum
 from .svd import singular_value_decomposition
 
 
