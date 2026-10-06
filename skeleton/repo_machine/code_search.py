@@ -326,9 +326,10 @@ class CodeSearchIndex:
                 continue
             try:
                 symbols, _references = extract_records(record.path, content)
-            except CodeIndexError as exc:
-                skipped.append((record.path, f"static parser rejected source: {exc}"))
-                continue
+            except CodeIndexError:
+                # Lexical search remains useful for broken/in-progress source.
+                # Parser certainty is withheld rather than dropping the file.
+                symbols = ()
 
             document_id = len(documents)
             documents.append(IndexedDocument(
