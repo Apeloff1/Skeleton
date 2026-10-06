@@ -74,6 +74,7 @@ def release_work(): pass
         "masterplan_binding": {
             "volume_ref": "VOL-004",
             "title": "Kernel & Execution Foundation",
+            "implementation_state": "implemented_verification_pending",
             "qualification_gap": QUALIFICATION_GAP,
         },
         "sources": {
