@@ -28,6 +28,7 @@ from skeleton.ai.runtime.contracts.execution_authority import (
 
 _REPLAY_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,191}$")
 
+MAX_AUTHORITY_DELEGATION_DEPTH = 32
 MAX_GUARD_AUTHORITIES = 4096
 MAX_GUARD_REPLAY_KEYS = 16384
 
@@ -121,6 +122,37 @@ class ExecutionAuthorityGuard:
         self._replay_digests[replay_key] = digest
         self._replay_order.append(replay_key)
 
+    def _lineage_error(
+        self,
+        state: _AuthorityState,
+        *,
+        now: datetime,
+    ) -> str | None:
+        current = state
+        visited = {current.authority.digest}
+        depth = 0
+        while current.authority.parent_authority_digest is not None:
+            depth += 1
+            if depth > MAX_AUTHORITY_DELEGATION_DEPTH:
+                return "authority lineage exceeds maximum depth"
+            parent_digest = current.authority.parent_authority_digest
+            if parent_digest in visited:
+                return "authority lineage contains a cycle"
+            visited.add(parent_digest)
+            parent = self._authorities.get(parent_digest)
+            if parent is None:
+                return "ancestor authority is unavailable"
+            if parent.revoked:
+                return "ancestor authority is revoked"
+            if parent.authority.expired(now=now):
+                return "ancestor authority is expired"
+            try:
+                validate_authority_attenuation(parent.authority, current.authority)
+            except ExecutionAuthorityError:
+                return "authority lineage attenuation is invalid"
+            current = parent
+        return None
+
     def _remember_authority(self, authority: ExecutionAuthority) -> _AuthorityState:
         digest = authority.digest
         existing = self._authorities.get(digest)
@@ -170,6 +202,9 @@ class ExecutionAuthorityGuard:
                 raise ExecutionAuthorityError("parent authority is revoked")
             if parent_state.authority.expired(now=instant):
                 raise ExecutionAuthorityError("parent authority is expired")
+            lineage_error = self._lineage_error(parent_state, now=instant)
+            if lineage_error is not None:
+                raise ExecutionAuthorityError(lineage_error)
             validate_authority_attenuation(parent_state.authority, authority)
 
         state = self._remember_authority(authority)
@@ -248,6 +283,15 @@ class ExecutionAuthorityGuard:
             return AuthorizationDecision(
                 AuthorizationDisposition.DENY,
                 "authority is revoked",
+                authority.digest,
+                state.usage,
+                replay_key,
+            )
+        lineage_error = self._lineage_error(state, now=instant)
+        if lineage_error is not None:
+            return AuthorizationDecision(
+                AuthorizationDisposition.DENY,
+                lineage_error,
                 authority.digest,
                 state.usage,
                 replay_key,
@@ -342,6 +386,7 @@ __all__ = [
     "AuthorizationDecision",
     "AuthorizationDisposition",
     "ExecutionAuthorityGuard",
+    "MAX_AUTHORITY_DELEGATION_DEPTH",
     "MAX_GUARD_AUTHORITIES",
     "MAX_GUARD_REPLAY_KEYS",
 ]
