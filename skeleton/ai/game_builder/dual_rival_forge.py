@@ -151,6 +151,39 @@ class DualRivalForge:
         )
 
     def _validate_state(self) -> None:
+        if len(self.receipts) != self.completed_rounds:
+            raise ForgeStateError(
+                "completed_rounds must equal promotion receipt count"
+            )
+        previous_promoted_digest: str | None = None
+        for expected_round, receipt in enumerate(self.receipts, start=1):
+            if not isinstance(receipt, PromotionReceipt):
+                raise ForgeStateError(
+                    "promotion history must contain PromotionReceipt values"
+                )
+            if receipt.round_index != expected_round:
+                raise ForgeStateError(
+                    "promotion receipt rounds must form exact 1..N sequence"
+                )
+            if receipt.effort_mode is not self.effort_mode:
+                raise ForgeStateError(
+                    "promotion receipt effort mode must match forge effort mode"
+                )
+            if (
+                previous_promoted_digest is not None
+                and receipt.incumbent_digest != previous_promoted_digest
+            ):
+                raise ForgeStateError(
+                    "promotion receipt chain incumbent does not match prior winner"
+                )
+            previous_promoted_digest = receipt.promoted_digest
+        if (
+            previous_promoted_digest is not None
+            and self.champion.digest != previous_promoted_digest
+        ):
+            raise ForgeStateError(
+                "forge champion must match terminal promotion receipt"
+            )
         if self.round_index < 1:
             raise ForgeStateError("round_index must be positive")
         if not 0 <= self.completed_rounds <= self.effort_mode.rounds:
