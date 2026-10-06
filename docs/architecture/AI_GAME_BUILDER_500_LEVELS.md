@@ -3,6 +3,7 @@
 Status: **active design authority**  
 Machine authority: `machine/ai_game_builder_500_levels.json`  
 Rival-runtime authority: `machine/ai_game_builder_dual_rival_forge.json`  
+Overengineering constitution: `docs/architecture/AI_GAME_BUILDER_OVERENGINEERING.md` / `machine/ai_game_builder_overengineering.json`  
 Range: **GBL-001..GBL-500**  
 Shape: **50 game-building capability families × 10 maturation/proof stages**
 
@@ -136,6 +137,14 @@ No Stage-10 level can self-sign. Round count, prose completeness, model confiden
 | GB48 | Player Value, Fun & Experience QA |
 | GB49 | Asset Graph, Versioning & Reuse |
 | GB50 | Vertical Slice, Integration & Release Readiness |
+
+## Overengineering constitution
+
+The base 500-level ladder is hardened by a 24-plane cross-cutting constitution in `machine/ai_game_builder_overengineering.json`. Every family inherits the critical isolation, anti-collusion, Pareto-promotion, anti-Goodhart, long-form causality, rights clean-room, replay, checkpoint/rollback, bounded-resource, artifact-lineage, and whole-game release planes, plus domain-specific planes.
+
+A deterministic runtime kernel now materializes part of the authority at `skeleton/ai/game_builder/contracts.py` and `skeleton/ai/game_builder/dual_rival_forge.py`. It enforces stage order and promotion mechanics without granting model providers control-plane authority.
+
+See `docs/architecture/AI_GAME_BUILDER_OVERENGINEERING.md` for the full constitution.
 
 ## Completion semantics
 
