@@ -180,14 +180,8 @@ class RuntimeAdmissionMiddleware:
             await self.app(scope, receive, send)
             return
 
-        work_id = (
-            "http:"
-            + str(self.lifecycle.generation)
-            + ":"
-            + str(id(scope))
-        )
         try:
-            lease = self.lifecycle.acquire_work(work_id)
+            lease = self.lifecycle.acquire_generated_work("http")
         except RuntimeSupervisionError:
             body = json.dumps(
                 {
@@ -327,6 +321,37 @@ class RuntimeServiceLifecycle:
     def active_work(self) -> tuple[WorkLease, ...]:
         with self._lock:
             return tuple(self._leases[key] for key in sorted(self._leases))
+
+    def acquire_generated_work(
+        self,
+        prefix: str,
+        *,
+        allow_starting: bool = False,
+    ) -> WorkLease:
+        """Mint a collision-free generation-bound work identity and lease it."""
+
+        normalized_prefix = _work_id(prefix)
+        if ":" in normalized_prefix:
+            raise ValueError("generated work prefix must not contain ':'")
+        with self._lock:
+            self.require_work_admission(allow_starting=allow_starting)
+            self._lease_sequence += 1
+            work_id = (
+                normalized_prefix
+                + ":"
+                + str(self._generation)
+                + ":"
+                + str(self._lease_sequence)
+            )
+            lease = WorkLease(
+                service_id=self.service_id,
+                work_id=work_id,
+                generation=self._generation,
+                sequence=self._lease_sequence,
+                acquired_at_monotonic=self._now(),
+            )
+            self._leases[work_id] = lease
+            return lease
 
     def mark_ready(self, *, reason: str = "startup-complete") -> LifecycleReceipt:
         return self._transition(
