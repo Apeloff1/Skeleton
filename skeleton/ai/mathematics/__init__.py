@@ -172,6 +172,16 @@ from .probability import (
     normalize_distribution,
     weighted_moments,
 )
+from .resampling import BootstrapReport, JackknifeReport, bootstrap, jackknife
+from .robust import (
+    HuberLocationReport,
+    huber_location,
+    modified_z_scores,
+    robust_interquartile_range,
+    robust_scale_mad,
+    trimmed_mean,
+    winsorized_mean,
+)
 from .sampling import (
     MonteCarloReport,
     SplitMix64,
@@ -188,6 +198,14 @@ from .sequence import (
     levenshtein_distance,
     normalized_levenshtein_distance,
 )
+from .stochastic import (
+    HittingTimeReport,
+    absorbing_probability,
+    expected_hitting_times,
+    propagate_distribution,
+    transition_power,
+)
+from .matching import AssignmentReport, minimum_cost_assignment
 from .solvers import (
     ConjugateGradientReport,
     RootReport,
@@ -370,6 +388,17 @@ __all__ = [
     "kl_divergence",
     "normalize_distribution",
     "weighted_moments",
+    "BootstrapReport",
+    "JackknifeReport",
+    "bootstrap",
+    "jackknife",
+    "HuberLocationReport",
+    "huber_location",
+    "modified_z_scores",
+    "robust_interquartile_range",
+    "robust_scale_mad",
+    "trimmed_mean",
+    "winsorized_mean",
     "MonteCarloReport",
     "SplitMix64",
     "halton_point",
@@ -383,6 +412,13 @@ __all__ = [
     "normalized_levenshtein_distance",
     "CSRMatrix",
     "sparse_dense_matmul",
+    "HittingTimeReport",
+    "absorbing_probability",
+    "expected_hitting_times",
+    "propagate_distribution",
+    "transition_power",
+    "AssignmentReport",
+    "minimum_cost_assignment",
     "ConjugateGradientReport",
     "RootReport",
     "bisection_root",

@@ -55,6 +55,10 @@ model authority boundaries.
 - `differentiation.py` — Richardson scalar derivatives, finite-difference Jacobians and gradient checks.
 - `optimization2.py` — damped Newton and BFGS references with deterministic Armijo line search.
 - `integration2.py` — adaptive Dormand-Prince RK45 with accepted/rejected-step evidence.
+- `robust.py` — trimmed/winsorized location, MAD scale, Huber location and modified-z diagnostics.
+- `resampling.py` — deterministic jackknife and seeded bootstrap uncertainty reports.
+- `stochastic.py` — finite-state propagation, transition powers, hitting times and absorption probabilities.
+- `matching.py` — deterministic rectangular minimum-cost bipartite assignment.
 - `validation.py` — parity evidence against existing optimized runtime kernels.
 
 ## Guarantees
@@ -87,6 +91,10 @@ model authority boundaries.
 - Numerical differentiation explicitly detects output-shape drift and can cross-check analytic/autodiff gradients.
 - Second-order/quasi-Newton optimizers are reference solvers only and do not own model parameter updates.
 - Adaptive RK45 records accepted/rejected steps and fails closed on dimension or tolerance violations.
+- Robust estimators expose convergence/scale rather than silently masking degenerate samples.
+- Resampling uncertainty is explicitly seeded and carries its replicate evidence.
+- Stochastic-process analysis validates row-stochastic matrices and fails closed on infinite hitting-time systems.
+- Assignment solves cover the complete smaller partition with deterministic tie handling and explicit total cost.
 - `audit_runtime_kernels()` compares optimized runtime softmax, matmul and attention against
   this reference substrate without replacing those kernels.
 
