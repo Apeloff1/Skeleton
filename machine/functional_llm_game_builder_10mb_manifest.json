@@ -14,7 +14,9 @@
     "doubled_target_met": true,
     "double_baseline_target": 22953806,
     "per_shard_minimum": 2300000,
-    "per_shard_minimum_total": 41400000
+    "per_shard_minimum_total": 41400000,
+    "human_index_shard_total": 55500299,
+    "human_index_sync_required": true
   },
   "completion": {
     "specification_surface_registered": true,
