@@ -435,6 +435,7 @@ from .execution_authority import (
     ResourceBudget,
     ResourceUsage,
     authority_policy_digest,
+    bind_authority_evidence,
     validate_authority_attenuation,
     verify_authority_receipt_chain,
 )
@@ -452,6 +453,7 @@ __all__ += [
     "ResourceBudget",
     "ResourceUsage",
     "authority_policy_digest",
+    "bind_authority_evidence",
     "validate_authority_attenuation",
     "verify_authority_receipt_chain",
 ]
