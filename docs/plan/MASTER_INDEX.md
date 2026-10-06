@@ -858,3 +858,8 @@ Machine authority: [`machine/functional_llm_game_builder_10mb_manifest.json`](..
 Coverage validator: [`scripts/check_functional_llm_game_builder_10mb.py`](../../scripts/check_functional_llm_game_builder_10mb.py)
 
 Exact-head workflow: [`.github/workflows/functional-llm-game-builder-masterplan.yml`](../../.github/workflows/functional-llm-game-builder-masterplan.yml)
+
+
+Functional LLM + Game Builder execution backlog: [`machine/functional_llm_game_builder_execution_backlog.json`](../../machine/functional_llm_game_builder_execution_backlog.json)
+
+Execution-backlog validator: [`scripts/check_functional_llm_game_builder_execution_backlog.py`](../../scripts/check_functional_llm_game_builder_execution_backlog.py)
