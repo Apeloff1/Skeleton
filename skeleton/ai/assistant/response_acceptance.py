@@ -321,7 +321,7 @@ def _normalize_live_refs(
 
     if len(set(normalized)) != len(normalized):
         reasons.append(f"{field}_duplicate")
-    return tuple(normalized), tuple(sorted(set(reasons)))
+    return tuple(sorted(normalized)), tuple(sorted(set(reasons)))
 
 
 @dataclass(frozen=True, slots=True)
@@ -440,14 +440,38 @@ class LiveResponseAcceptanceReceipt:
             for digest in values:
                 _canonical_sha256(digest, field)
             object.__setattr__(self, field, values)
-        object.__setattr__(
-            self,
-            "reasons",
-            tuple(sorted(set(str(reason) for reason in self.reasons))),
+        if not isinstance(self.accepted, bool):
+            raise ResponseAcceptanceError("accepted must be boolean")
+        normalized_reasons = tuple(
+            sorted(
+                {
+                    _canonical_live_text(
+                        str(reason),
+                        "reason",
+                        maximum=128,
+                    )
+                    for reason in self.reasons
+                }
+            )
         )
+        object.__setattr__(self, "reasons", normalized_reasons)
         if self.accepted and self.reasons:
             raise ResponseAcceptanceError(
                 "accepted live response cannot retain rejection reasons"
+            )
+        if not self.accepted and not self.reasons:
+            raise ResponseAcceptanceError(
+                "rejected live response must retain at least one reason"
+            )
+        if self.accepted and (
+            self.observed_execution_id != self.expected_execution_id
+            or self.verification_ref_hash is None
+            or self.output_sha256 is None
+            or self.output_utf8_bytes <= 0
+            or not self.provider_receipt_ref_hashes
+        ):
+            raise ResponseAcceptanceError(
+                "accepted live response is missing mandatory lineage evidence"
             )
         if self.authority_scope != "live-response-acceptance-decision-only":
             raise ResponseAcceptanceError(
