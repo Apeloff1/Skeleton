@@ -34,6 +34,8 @@ _load("skeleton.ai.game_builder.evaluation", "skeleton/ai/game_builder/evaluatio
 _load("skeleton.ai.game_builder.resource_governor", "skeleton/ai/game_builder/resource_governor.py")
 _load("skeleton.ai.game_builder.quality_debt", "skeleton/ai/game_builder/quality_debt.py")
 _load("skeleton.ai.game_builder.control_plane", "skeleton/ai/game_builder/control_plane.py")
+_load("skeleton.ai.game_builder.resilience", "skeleton/ai/game_builder/resilience.py")
+_load("skeleton.ai.game_builder.release", "skeleton/ai/game_builder/release.py")
 
 from skeleton.ai.game_builder.contracts import (  # noqa: E402
     ArtifactIdentity,
@@ -62,6 +64,23 @@ from skeleton.ai.game_builder.resource_governor import (  # noqa: E402
     ResourceEnvelope,
     ResourceGovernor,
     ResourceLimitError,
+)
+from skeleton.ai.game_builder.resilience import (  # noqa: E402
+    DissentLedger,
+    ImpactGraph,
+    Invariant,
+    InvariantRegistry,
+    NoveltyRecord,
+    NoveltyReservoir,
+    Objection,
+    ResilienceError,
+)
+from skeleton.ai.game_builder.release import (  # noqa: E402
+    FamilyQualification,
+    GoldMasterBundle,
+    GoldMasterTribunal,
+    ReleaseArbitrationError,
+    TribunalVote,
 )
 
 
@@ -335,3 +354,144 @@ def test_control_plane_checkpoint_bundle_is_content_addressed() -> None:
     assert bundle["schema"] == "skeleton.ai_game_builder.control_plane.v1"
     assert isinstance(bundle["bundle_digest"], str)
     assert len(bundle["bundle_digest"]) == 64
+
+
+
+def test_novelty_reservoir_rejects_repetitive_weaker_candidate() -> None:
+    reservoir = NoveltyReservoir(capacity=4, minimum_distance=0.15)
+    first = NoveltyRecord.create(
+        candidate_digest="candidate-a-" + "a" * 32,
+        quality_score=0.8,
+        features={"mechanic": 0.5, "style": 0.5, "structure": 0.5},
+    )
+    repetitive = NoveltyRecord.create(
+        candidate_digest="candidate-b-" + "b" * 32,
+        quality_score=0.7,
+        features={"mechanic": 0.51, "style": 0.49, "structure": 0.5},
+    )
+    assert reservoir.admit(first)
+    assert not reservoir.admit(repetitive)
+    assert [row.candidate_digest for row in reservoir.records] == [first.candidate_digest]
+
+
+def test_dissent_resurfaces_when_dependency_changes() -> None:
+    ledger = DissentLedger()
+    objection = Objection(
+        objection_id="OBJ-001",
+        artifact_digest="artifact-" + "a" * 32,
+        evidence_digest="evidence-" + "b" * 32,
+        summary="late quest invalidates an early character promise",
+        severity=8,
+        dependency_ids=("quest.final", "character.arc"),
+    )
+    ledger.add(objection)
+    blockers = ledger.blockers_for(
+        artifact_digest="artifact-" + "z" * 32,
+        changed_dependency_ids=("quest.final",),
+    )
+    assert blockers == (objection,)
+    ledger.resolve("OBJ-001", resolution_digest="resolution-" + "c" * 32)
+    assert ledger.blockers_for(
+        artifact_digest=objection.artifact_digest,
+        changed_dependency_ids=("quest.final",),
+    ) == ()
+
+
+def test_impact_graph_predicts_transitive_blast_radius() -> None:
+    graph = ImpactGraph()
+    graph.add_node("project.dna")
+    graph.add_node("combat.rules", depends_on=("project.dna",))
+    graph.add_node("boss.scene", depends_on=("combat.rules",))
+    graph.add_node("ending", depends_on=("boss.scene",))
+    assert graph.blast_radius(("combat.rules",)) == (
+        "boss.scene",
+        "combat.rules",
+        "ending",
+    )
+    assert graph.calibration(
+        ("combat.rules", "boss.scene", "ending"),
+        ("combat.rules", "ending"),
+    ) == {"precision": 2 / 3, "recall": 1.0}
+
+
+def test_impact_graph_rejects_unknown_dependency() -> None:
+    graph = ImpactGraph()
+    graph.add_node("root")
+    with pytest.raises(ResilienceError, match="unknown impact dependencies"):
+        graph.add_node("child", depends_on=("missing",))
+
+
+def test_invariant_registry_rejects_ambiguous_cross_pillar_duplicate() -> None:
+    registry = InvariantRegistry()
+    registry.add(
+        Invariant(
+            invariant_id="INV-001",
+            scope="combat",
+            expression="player_damage >= 0",
+            source_pillar="fairness",
+            severity=8,
+            inherited_by=("boss.scene",),
+        )
+    )
+    assert registry.applicable("boss.scene")[0].invariant_id == "INV-001"
+    with pytest.raises(ResilienceError, match="ambiguous duplicate invariant"):
+        registry.add(
+            Invariant(
+                invariant_id="INV-002",
+                scope="combat",
+                expression="player_damage >= 0",
+                source_pillar="realism",
+                severity=4,
+            )
+        )
+
+
+def _gold_bundle(*, failed_family: str | None = None) -> GoldMasterBundle:
+    families = [
+        FamilyQualification(
+            family_id=f"GB{i:02d}",
+            passed=f"GB{i:02d}" != failed_family,
+            evidence_digest=f"family-{i:02d}-" + "e" * 24,
+        )
+        for i in range(1, 51)
+    ]
+    return GoldMasterBundle.create(
+        artifact_digest="artifact-" + "a" * 32,
+        build_digest="build-" + "b" * 32,
+        canon_digest="canon-" + "c" * 32,
+        provenance_digest="provenance-" + "d" * 32,
+        replay_digest="replay-" + "e" * 32,
+        rollback_target_digest="rollback-" + "f" * 32,
+        red_team_digest="redteam-" + "1" * 32,
+        family_qualifications=families,
+        critical_gate_digests={
+            "rights": "rights-" + "2" * 32,
+            "security": "security-" + "3" * 32,
+            "reproducibility": "repro-" + "4" * 32,
+        },
+    )
+
+
+def test_gold_master_requires_all_fifty_families() -> None:
+    tribunal = GoldMasterTribunal(("gm-1", "gm-2", "gm-3"))
+    with pytest.raises(ReleaseArbitrationError, match="failed family qualification"):
+        tribunal.decide(_gold_bundle(failed_family="GB47"))
+
+
+def test_gold_master_requires_unanimous_independent_quorum() -> None:
+    bundle = _gold_bundle()
+    tribunal = GoldMasterTribunal(("gm-1", "gm-2", "gm-3"))
+    for authority, accept in (("gm-1", True), ("gm-2", True), ("gm-3", False)):
+        tribunal.vote(
+            TribunalVote(
+                authority_id=authority,
+                bundle_digest=bundle.digest,
+                accept=accept,
+                evidence_digest=f"{authority}-evidence-" + "a" * 24,
+                rationale_digest=f"{authority}-rationale-" + "b" * 24,
+            )
+        )
+    verdict = tribunal.decide(bundle)
+    assert verdict.accepted is False
+    assert len(verdict.authority_ids) == 3
+    assert len(verdict.vote_digests) == 3
