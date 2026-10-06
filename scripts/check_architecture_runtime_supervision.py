@@ -148,6 +148,7 @@ def _validate_lifecycle_semantics(
 
     source = shared_path.read_text(encoding="utf-8")
     required = (
+        "class RuntimeAdmissionMiddleware:",
         "class RuntimeServiceLifecycle:",
         "class WorkLease:",
         "ServicePhase.DRAINING",
@@ -155,6 +156,10 @@ def _validate_lifecycle_semantics(
         "def require_work_admission(",
         "def acquire_work(",
         "def release_work(",
+        "self.lifecycle.acquire_work(",
+        "self.lifecycle.release_work(lease)",
+        "runtime_not_accepting_work",
+        "retry-after",
         "in-flight work leases",
         "def restart(",
         "LifecycleReceipt(",
