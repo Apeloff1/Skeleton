@@ -21,6 +21,7 @@ from skeleton.context.compaction import (
     compact_context_segment,
 )
 from skeleton.context.compiler import (
+    ContextAllocationPolicy,
     ContextCompilationError,
     ContextCompiler,
     project_provider_context,
@@ -1034,3 +1035,212 @@ def test_compiler_can_compact_oversized_evidence_with_auditable_mapping() -> Non
     assert envelope.source_snapshot == (
         (original.segment_id, original.content_digest),
     )
+
+
+def test_current_canonical_user_turn_cannot_be_displaced_by_retrieval() -> None:
+    operation_id, execution_id, turn_id = _ids()
+    policy = _segment(
+        "Platform policy remains authoritative.",
+        kind=ContextKind.SYSTEM_POLICY,
+        trust=ContextTrust.TRUSTED_CONTROL,
+        source_type="platform-policy",
+        source_id="policy:current-turn-protection",
+        purpose="model-inference",
+        priority=1000,
+        relevance=1.0,
+        mandatory=True,
+    )
+    current = _segment(
+        "Current user request " + ("u" * 120),
+        kind=ContextKind.USER_MESSAGE,
+        trust=ContextTrust.AUTHORIZED_USER_DATA,
+        source_type="conversation",
+        source_id=turn_id,
+        purpose="model-inference",
+        priority=-100,
+        relevance=1.0,
+    )
+    retrieval = tuple(
+        _segment(
+            "retrieval-" + str(index) + "-" + ("r" * 105),
+            kind=ContextKind.RETRIEVAL_EVIDENCE,
+            trust=ContextTrust.UNTRUSTED_EVIDENCE,
+            source_type="retrieval",
+            source_id="retrieval-high-" + str(index),
+            purpose="model-inference",
+            priority=1000 - index,
+            relevance=1.0,
+        )
+        for index in range(4)
+    )
+
+    envelope = ContextCompiler().compile(
+        operation_id=operation_id,
+        execution_id=execution_id,
+        turn_id=turn_id,
+        tenant_id="tenant-a",
+        purpose="model-inference",
+        budget=_budget(
+            max_context=210,
+            output=20,
+            tools=0,
+            policy=40,
+            safety=10,
+            segment=100,
+            artifact=80,
+            tool_result=80,
+        ),
+        segments=(policy, *retrieval, current),
+        compiled_at=BASE,
+    )
+    projection = project_provider_context(envelope)
+
+    assert current in envelope.evidence_segments
+    assert current.segment_id not in envelope.omitted_segment_ids
+    assert projection.prompt == current.content
+    assert envelope.selected_tokens_estimate <= envelope.budget.input_capacity(
+        tools_enabled=False
+    )
+
+
+def test_current_canonical_user_turn_is_never_compacted_away() -> None:
+    operation_id, execution_id, turn_id = _ids()
+    current = _segment(
+        "Current request must stay exact. " + ("x" * 300),
+        kind=ContextKind.USER_MESSAGE,
+        trust=ContextTrust.AUTHORIZED_USER_DATA,
+        source_type="conversation",
+        source_id=turn_id,
+        purpose="model-inference",
+        priority=1,
+        relevance=1.0,
+    )
+
+    with pytest.raises(
+        ContextCompilationError,
+        match="current user turn exceeds provider segment token limit",
+    ):
+        ContextCompiler().compile(
+            operation_id=operation_id,
+            execution_id=execution_id,
+            turn_id=turn_id,
+            tenant_id="tenant-a",
+            purpose="model-inference",
+            budget=_budget(
+                max_context=220,
+                output=20,
+                tools=0,
+                policy=20,
+                safety=10,
+                segment=40,
+                artifact=40,
+                tool_result=40,
+            ),
+            segments=(current,),
+            compaction_max_tokens=20,
+            compiled_at=BASE,
+        )
+
+
+def test_trust_tier_reservation_prevents_low_priority_user_history_starvation() -> None:
+    operation_id, execution_id, turn_id = _ids()
+    authorized_history = _segment(
+        "authorized-history-" + ("a" * 70),
+        kind=ContextKind.USER_MESSAGE,
+        trust=ContextTrust.AUTHORIZED_USER_DATA,
+        source_type="conversation",
+        source_id="prior-authorized-user",
+        purpose="model-inference",
+        priority=-100,
+        relevance=0.1,
+    )
+    retrieval = tuple(
+        _segment(
+            "untrusted-" + str(index) + "-" + ("z" * 70),
+            kind=ContextKind.RETRIEVAL_EVIDENCE,
+            trust=ContextTrust.UNTRUSTED_EVIDENCE,
+            source_type="retrieval",
+            source_id="retrieval-tier-" + str(index),
+            purpose="model-inference",
+            priority=1000 - index,
+            relevance=1.0,
+        )
+        for index in range(4)
+    )
+
+    envelope = ContextCompiler(
+        allocation_policy=ContextAllocationPolicy(
+            authorized_user_fraction=0.50,
+            untrusted_evidence_fraction=0.30,
+            derived_untrusted_fraction=0.20,
+        )
+    ).compile(
+        operation_id=operation_id,
+        execution_id=execution_id,
+        turn_id=turn_id,
+        tenant_id="tenant-a",
+        purpose="model-inference",
+        budget=_budget(
+            max_context=130,
+            output=10,
+            tools=0,
+            policy=0,
+            safety=10,
+            segment=80,
+            artifact=80,
+            tool_result=80,
+        ),
+        segments=(*retrieval, authorized_history),
+        compiled_at=BASE,
+    )
+
+    assert authorized_history in envelope.evidence_segments
+    selected_retrieval = [
+        segment
+        for segment in envelope.evidence_segments
+        if segment.trust_level is ContextTrust.UNTRUSTED_EVIDENCE
+    ]
+    assert len(selected_retrieval) < len(retrieval)
+
+
+def test_context_allocation_policy_rejects_invalid_fraction_budget() -> None:
+    with pytest.raises(ValueError, match="sum to one"):
+        ContextAllocationPolicy(
+            authorized_user_fraction=0.7,
+            untrusted_evidence_fraction=0.3,
+            derived_untrusted_fraction=0.3,
+        )
+
+    with pytest.raises(ValueError, match="in \[0,1\]"):
+        ContextAllocationPolicy(
+            authorized_user_fraction=1.1,
+            untrusted_evidence_fraction=0.0,
+            derived_untrusted_fraction=-0.1,
+        )
+
+
+def test_context_compiler_v2_digest_binds_compiler_version() -> None:
+    operation_id, execution_id, turn_id = _ids()
+    evidence = _segment(
+        "stable evidence",
+        source_id="digest-version-evidence",
+    )
+    kwargs = dict(
+        operation_id=operation_id,
+        execution_id=execution_id,
+        turn_id=turn_id,
+        tenant_id="tenant-a",
+        purpose="chat",
+        budget=_budget(),
+        segments=(evidence,),
+        compiled_at=BASE,
+    )
+
+    legacy = ContextCompiler(compiler_version="context-compiler-v1").compile(
+        **kwargs
+    )
+    current = ContextCompiler().compile(**kwargs)
+
+    assert current.compiler_version == "context-compiler-v2"
+    assert legacy.context_digest != current.context_digest
+    assert legacy.context_id != current.context_id
