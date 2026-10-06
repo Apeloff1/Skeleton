@@ -418,3 +418,92 @@ def test_blueprint_owner_and_collaborators_cover_level_planes() -> None:
         "ADV-L021 owner/collaborator planes must cover the level plane set"
         in errors
     )
+
+
+
+def test_model_runtime_identity_cannot_drop_policy_binding() -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_model_identity")
+    payloads = _payloads()
+    payloads["contract"] = copy.deepcopy(payloads["contract"])
+    payloads["contract"]["model_and_runtime_lifecycle"]["identity_fields"] = [
+        item
+        for item in payloads["contract"]["model_and_runtime_lifecycle"][
+            "identity_fields"
+        ]
+        if item != "policy_bundle_version"
+    ]
+    errors = _validate(checker, payloads)
+    assert any(
+        error.startswith(
+            "model_and_runtime_lifecycle.identity_fields must contain at least"
+        )
+        for error in errors
+    )
+
+
+def test_evaluation_partition_rules_cannot_be_removed() -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_eval_partition")
+    payloads = _payloads()
+    payloads["contract"] = copy.deepcopy(payloads["contract"])
+    payloads["contract"]["data_and_evaluation_lifecycle"][
+        "partition_rules"
+    ] = []
+    errors = _validate(checker, payloads)
+    assert any(
+        error.startswith(
+            "data_and_evaluation_lifecycle.partition_rules must contain at least"
+        )
+        for error in errors
+    )
+
+
+def test_portability_default_must_fail_closed_unknown() -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_portability")
+    payloads = _payloads()
+    payloads["contract"] = copy.deepcopy(payloads["contract"])
+    payloads["contract"]["compatibility_and_portability"]["default"] = "PORTABLE"
+    errors = _validate(checker, payloads)
+    assert "compatibility portability default must be UNKNOWN" in errors
+
+
+def test_prompt_supply_chain_requires_versioned_artifacts() -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_prompt_supply")
+    payloads = _payloads()
+    payloads["contract"] = copy.deepcopy(payloads["contract"])
+    payloads["contract"]["policy_and_prompt_supply_chain"][
+        "requirements"
+    ] = ["looks good"]
+    errors = _validate(checker, payloads)
+    assert any(
+        error.startswith(
+            "policy_and_prompt_supply_chain.requirements must contain at least"
+        )
+        for error in errors
+    )
+
+
+def test_hardware_scheduler_inputs_cannot_collapse_to_device_only() -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_hardware")
+    payloads = _payloads()
+    payloads["contract"] = copy.deepcopy(payloads["contract"])
+    payloads["contract"]["hardware_aware_execution"]["scheduler_inputs"] = [
+        "hardware"
+    ]
+    errors = _validate(checker, payloads)
+    assert any(
+        error.startswith(
+            "hardware_aware_execution.scheduler_inputs must contain at least"
+        )
+        for error in errors
+    )
+
+
+def test_evaluator_independence_requires_all_four_tiers() -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_evaluator")
+    payloads = _payloads()
+    payloads["contract"] = copy.deepcopy(payloads["contract"])
+    payloads["contract"]["evaluator_independence"]["tiers"] = (
+        payloads["contract"]["evaluator_independence"]["tiers"][:2]
+    )
+    errors = _validate(checker, payloads)
+    assert "evaluator independence tier set drifted" in errors
