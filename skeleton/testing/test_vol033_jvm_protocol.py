@@ -9,6 +9,8 @@ import pytest
 
 from skeleton.contracts.canonical import canonical_json_bytes
 from skeleton.native.jvm_registry import JvmAcceleratorRegistry
+from skeleton.native import jvm_registry as canonical_jvm_registry
+from skeleton.ai.runtime.native import jvm_registry as ai_jvm_registry
 from skeleton.native.jvm_protocol import (
     JvmBenchmarkEvidence,
     JvmCallResult,
@@ -566,6 +568,11 @@ def test_registry_preflight_exposes_protocol_identity_without_starting_java() ->
     assert preflight.minimum_java_major == capability.minimum_java_major
     assert preflight.source_available is True
     assert registry.initialized("vector") is False
+
+
+def test_jvm_registry_policy_root_is_mirror_safe() -> None:
+    assert canonical_jvm_registry._repository_root() == ROOT
+    assert ai_jvm_registry._repository_root() == ROOT
 
 
 def test_jvm_registry_source_and_ai_mirror_remain_byte_identical() -> None:
