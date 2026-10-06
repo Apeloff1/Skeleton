@@ -592,7 +592,7 @@ def _normalize_targets(
     node_map: Mapping[str, Any],
 ) -> tuple[str, ...]:
     if targets is None:
-        return tuple(topological_order)
+        return tuple(sorted(topological_order))
     if isinstance(targets, (str, bytes, bytearray)):
         raise ParallelSchedulerError("targets must be a sequence of node ids")
     if not targets:
