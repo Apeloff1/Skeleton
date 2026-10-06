@@ -468,9 +468,6 @@ class SQLiteChatTurnRepository:
             existing.snapshot.request_digest == request_digest
             and existing.binding == binding
             and existing.snapshot.budget == budget
-            and existing.snapshot.state is TurnState.RECEIVED
-            and existing.snapshot.next_sequence == 1
-            and existing.snapshot.last_event_digest is None
         )
 
     def create_operation(

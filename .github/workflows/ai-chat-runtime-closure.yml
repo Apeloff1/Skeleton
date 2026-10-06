@@ -14,7 +14,12 @@ on:
       - "skeleton/persistence/chat_turn_repository.py"
       - "skeleton/testing/test_ai_chat_turn_repository.py"
       - "backend/core/chat_turns.py"
+      - "backend/core/chat_turn_lifecycle.py"
+      - "backend/routes/ai.py"
+      - "backend/tests/conftest.py"
       - "backend/tests/test_ai_chat_turn_persistence.py"
+      - "backend/tests/test_ai_chat_turn_lifecycle.py"
+      - "backend/tests/test_ai_chat_turn_route_cutover.py"
       - "skeleton/testing/test_ai_assistant_runtime.py"
       - "skeleton/testing/test_ai_assistant_manifest.py"
       - "machine/ai_chat_runtime_contract.json"
@@ -70,6 +75,8 @@ jobs:
           skeleton/ai/assistant
           skeleton/persistence/chat_turn_repository.py
           backend/core/chat_turns.py
+          backend/core/chat_turn_lifecycle.py
+          backend/routes/ai.py
           skeleton/ai/runtime/deferred
 
       - name: Run AI chat and inherited assistant regressions
@@ -82,6 +89,12 @@ jobs:
           skeleton/testing/test_ai_assistant_runtime.py
           skeleton/testing/test_ai_assistant_manifest.py
           tests/test_ai_chat_runtime_contract.py
+
+      - name: Run live chat route cutover regressions
+        run: >-
+          python -m pytest -q
+          backend/tests/test_ai_chat_turn_lifecycle.py
+          backend/tests/test_ai_chat_turn_route_cutover.py
 
       - name: Emit exact-head AI chat runtime evidence
         env:
@@ -123,7 +136,7 @@ jobs:
               raise SystemExit("AI chat structural receipt is not exact-head")
           if structural.get("valid") is not True or structural.get("errors"):
               raise SystemExit("AI chat structural verifier failed")
-          if len(structural.get("digests") or {}) != 13:
+          if len(structural.get("digests") or {}) != 16:
               raise SystemExit("AI chat structural digest coverage is incomplete")
           if len(structural.get("evidence_digest") or "") != 64:
               raise SystemExit("AI chat structural evidence digest is missing")

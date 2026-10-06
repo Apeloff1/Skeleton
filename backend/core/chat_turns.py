@@ -243,8 +243,6 @@ class MongoChatTurnAuthority:
                 existing.snapshot.request_digest == request_digest
                 and existing.binding == binding
                 and existing.snapshot.budget == effective_budget
-                and existing.snapshot.next_sequence == 1
-                and existing.snapshot.last_event_digest is None
             ):
                 return existing
             raise ChatTurnConflict(

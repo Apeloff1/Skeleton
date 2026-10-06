@@ -1,11 +1,11 @@
 {
   "schema_version": "ai-chat-runtime/v1",
   "status": "implemented_candidate",
-  "prepared_at_utc": "2026-10-06T00:48:00Z",
+  "prepared_at_utc": "2026-10-06T04:25:00Z",
   "prepared_by": "chatgpt:gpt-5.6-sol",
-  "base_main_sha": "92a6dcc85976e41c3d86fcd87866e1c5d384f125",
+  "base_main_sha": "692175ca8cd6531f8deeb6a262f7d6f426700b62",
   "canonical_module": "skeleton/ai/assistant/turn_runtime.py",
-  "scope": "durable provider-neutral AI chat turn state, persistence, replay, reconnectable streaming, resource admission, and crash recovery",
+  "scope": "durable provider-neutral AI chat turn state, live product-route persistence, replay, reconnectable streaming, resource admission, and crash recovery",
   "authority": {
     "conversation_authority": "backend/core/conversations.py",
     "assistant_control_plane": "skeleton/ai/assistant/runtime.py",
@@ -57,7 +57,10 @@
     "portable and production persistence decode the canonical runtime wire schema",
     "Mongo event persistence uses prepare, atomic snapshot advance, and committed-marker recovery",
     "public stream projection excludes arbitrary model, prompt, retrieval, and tool payload content",
-    "stream reconnect is bound to operation identity, exact sequence, and prior event digest"
+    "stream reconnect is bound to operation identity, exact sequence, and prior event digest",
+    "live product chat persists durable turn state around canonical conversation and engine milestones",
+    "product replay heals existing durable turn completion without synthesizing historical turn journals",
+    "public reconnect transport requires operation, sequence, and digest continuity"
   ],
   "budget_dimensions": [
     "wall_seconds",
@@ -102,13 +105,13 @@
     "persistence_tests": "skeleton/testing/test_ai_chat_turn_repository.py",
     "mongo_tests": "backend/tests/test_ai_chat_turn_persistence.py",
     "streaming": "skeleton/ai/assistant/streaming.py",
-    "streaming_tests": "skeleton/testing/test_ai_chat_streaming.py"
+    "streaming_tests": "skeleton/testing/test_ai_chat_streaming.py",
+    "live_lifecycle": "backend/core/chat_turn_lifecycle.py",
+    "live_route": "backend/routes/ai.py",
+    "live_route_tests": "backend/tests/test_ai_chat_turn_route_cutover.py"
   },
   "promotion_rule": "implemented candidate only; no completion or verification signoff until exact-head CI and independent verification pass",
   "next_integrations": [
-    "wire MongoChatTurnAuthority into product chat admission/finalization",
-    "project canonical conversation version into turn admission",
-    "publish turn events through the durable operation stream",
     "bind model/provider execution receipts into turn events",
     "bind canonical tool receipt reconciliation into restart handling",
     "move attachment payloads to governed content-addressed references",
@@ -131,5 +134,22 @@
     "content_rule": "project structured transition metadata only; arbitrary durable event payload is not exposed",
     "gap_rule": "sequence or digest-chain mismatch fails closed",
     "transport_rule": "projection is transport-neutral and can feed SSE, WebSocket, polling, or native clients"
+  },
+  "live_route": {
+    "endpoint": "backend/routes/ai.py",
+    "lifecycle": "backend/core/chat_turn_lifecycle.py",
+    "turn_binding": "canonical thread plus causal user message plus admitted thread version",
+    "milestones": [
+      "user message committed",
+      "context compiling",
+      "routing",
+      "model running",
+      "verifying",
+      "finalizing",
+      "assistant message committed",
+      "complete"
+    ],
+    "reconnect_endpoint": "GET /ai/chat/turns/{thread_id}/events",
+    "replay_rule": "historical assistant replay does not synthesize a new journal; existing durable journals are reconciled forward"
   }
 }
