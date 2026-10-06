@@ -350,6 +350,27 @@ def validate_payloads(
         if required_planes - plane_ids:
             errors.append(f"{expected_id} references unknown canonical plane")
 
+        risk_class = level.get("risk_class")
+        if risk_class not in {"standard", "high", "critical"}:
+            errors.append(f"{expected_id}.risk_class invalid")
+        expected_risk = defaults.get(expected_stratum)
+        if risk_class != expected_risk:
+            errors.append(
+                f"{expected_id}.risk_class must equal stratum default "
+                f"{expected_risk}"
+            )
+        expected_age = expected_ages.get(risk_class)
+        if level.get("maximum_evidence_age_days") != expected_age:
+            errors.append(
+                f"{expected_id}.maximum_evidence_age_days must be {expected_age}"
+            )
+        _strings(
+            level.get("requalification_triggers"),
+            label=f"{expected_id}.requalification_triggers",
+            errors=errors,
+            minimum=3,
+        )
+
         _strings(
             level.get("deliverables"),
             label=f"{expected_id}.deliverables",
@@ -377,6 +398,108 @@ def validate_payloads(
     for index, band in enumerate(maturity, start=1):
         if band.get("band") != f"A{index}":
             errors.append(f"maturity band {index} identity drifted")
+
+    risk_policy = contract.get("risk_and_freshness_policy")
+    if not isinstance(risk_policy, dict):
+        errors.append("risk_and_freshness_policy must be an object")
+        risk_policy = {}
+    risk_classes = _objects(
+        risk_policy.get("classes"),
+        label="risk_and_freshness_policy.classes",
+        errors=errors,
+        minimum=3,
+    )
+    risk_map = _ids(
+        risk_classes,
+        label="risk_and_freshness_policy.classes",
+        errors=errors,
+    )
+    if set(risk_map) != {"standard", "high", "critical"}:
+        errors.append("risk class set must be standard/high/critical")
+    expected_ages = {"standard": 30, "high": 14, "critical": 7}
+    for risk_id, expected_age in expected_ages.items():
+        risk = risk_map.get(risk_id, {})
+        if risk.get("maximum_evidence_age_days") != expected_age:
+            errors.append(
+                f"{risk_id} maximum_evidence_age_days must be {expected_age}"
+            )
+        _strings(
+            risk.get("required_evidence"),
+            label=f"risk classes[{risk_id}].required_evidence",
+            errors=errors,
+            minimum=3 if risk_id == "standard" else 6,
+        )
+        _strings(
+            risk.get("change_requalification"),
+            label=f"risk classes[{risk_id}].change_requalification",
+            errors=errors,
+            minimum=3,
+        )
+    defaults = risk_policy.get("stratum_defaults")
+    if not isinstance(defaults, dict):
+        errors.append("risk_and_freshness_policy.stratum_defaults must be object")
+        defaults = {}
+    if set(defaults) != EXPECTED_STRATA:
+        errors.append("risk stratum defaults must cover S01 through S10")
+    for sid, risk_id in defaults.items():
+        if risk_id not in {"standard", "high", "critical"}:
+            errors.append(f"{sid} has invalid risk class {risk_id}")
+    for field in ("gate_rule", "freshness_rule", "change_rule"):
+        value = risk_policy.get(field)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(f"risk_and_freshness_policy.{field} must be non-empty")
+
+    evidence_profiles = contract.get("promotion_evidence_profiles")
+    if not isinstance(evidence_profiles, dict):
+        errors.append("promotion_evidence_profiles must be an object")
+        evidence_profiles = {}
+    if set(evidence_profiles) != {"standard", "high", "critical"}:
+        errors.append("promotion evidence profiles must match risk classes")
+    for risk_id in ("standard", "high", "critical"):
+        profile = evidence_profiles.get(risk_id, {})
+        if not isinstance(profile, dict):
+            errors.append(f"promotion evidence profile {risk_id} must be object")
+            continue
+        _strings(
+            profile.get("requires"),
+            label=f"promotion_evidence_profiles.{risk_id}.requires",
+            errors=errors,
+            minimum=4,
+        )
+        if not isinstance(profile.get("independent_review"), bool):
+            errors.append(
+                f"promotion_evidence_profiles.{risk_id}.independent_review "
+                "must be boolean"
+            )
+        value = profile.get("fault_injection")
+        if not isinstance(value, str) or not value.strip():
+            errors.append(
+                f"promotion_evidence_profiles.{risk_id}.fault_injection "
+                "must be non-empty"
+            )
+
+    evidence_status = contract.get("evidence_status_model")
+    if not isinstance(evidence_status, dict):
+        errors.append("evidence_status_model must be an object")
+        evidence_status = {}
+    if evidence_status.get("statuses") != [
+        "CURRENT",
+        "STALE",
+        "INVALIDATED",
+        "MISSING",
+        "SUPERSEDED",
+    ]:
+        errors.append("evidence status model drifted")
+    for field in (
+        "current_rule",
+        "stale_rule",
+        "invalidated_rule",
+        "superseded_rule",
+        "missing_rule",
+    ):
+        value = evidence_status.get(field)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(f"evidence_status_model.{field} must be non-empty")
 
     dimensions = _objects(
         contract.get("maturity_dimensions"),
