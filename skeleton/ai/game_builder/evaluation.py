@@ -144,10 +144,9 @@ class PanelDecision:
             raise ValueError("panel decision does not satisfy recorded quorum")
         if len(set(self.evaluator_ids)) != len(self.evaluator_ids):
             raise ValueError("panel evaluator ids must be unique")
-        if self.decision_digest != "0" * 64:
-            expected = canonical_digest(self.decision_payload())
-            if self.decision_digest != expected:
-                raise ValueError("panel decision digest mismatch")
+        expected = canonical_digest(self.decision_payload())
+        if self.decision_digest != expected:
+            raise ValueError("panel decision digest mismatch")
 
     @property
     def quality_map(self) -> dict[str, float]:
@@ -279,15 +278,29 @@ class EvaluationPanel:
             "max_axis_disagreement_limit": self.max_axis_disagreement,
             "minimum_method_diversity": self.minimum_method_diversity,
         }
-        provisional = PanelDecision(
-            **decision_kwargs,
-            decision_digest="0" * 64,
-        )
+        payload = {
+            "aggregate_quality": dict(decision_kwargs["aggregate_quality"]),
+            "candidate_digest": candidate_digest,
+            "disagreement_axes": list(decision_kwargs["disagreement_axes"]),
+            "evaluator_ids": list(decision_kwargs["evaluator_ids"]),
+            "evaluator_verdict_digests": list(decision_kwargs["verdict_digests"]),
+            "evidence_binding_digests": list(
+                decision_kwargs["evidence_binding_digests"]
+            ),
+            "eligible": eligible,
+            "max_axis_disagreement": self.max_axis_disagreement,
+            "median_confidence": decision_kwargs["median_confidence"],
+            "methods": list(methods),
+            "minimum_confidence": confidence_floor,
+            "minimum_quorum": self.minimum_quorum,
+            "required_minimum_confidence": self.minimum_confidence,
+            "minimum_method_diversity": self.minimum_method_diversity,
+            "requires_appeal": requires_appeal,
+        }
         return PanelDecision(
             **decision_kwargs,
-            decision_digest=canonical_digest(provisional.decision_payload()),
+            decision_digest=canonical_digest(payload),
         )
-)
 
 
 def blind_candidate_token(candidate_digest: str, *, salt: str) -> str:
