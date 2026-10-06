@@ -514,6 +514,17 @@
         "Prevent orphan work and unbounded background execution after terminal operation state."
       ],
       "capabilities": [
+        "runtime bootstrap",
+        "lifecycle supervision",
+        "operation admission/cancellation"
+      ],
+      "contracts": [
+        "OperationEnvelope",
+        "ExecutionContext",
+        "LifecycleState",
+        "ServiceHealth"
+      ],
+      "implementation_paths": [
         "skeleton/app",
         "skeleton/persistence/operation_runtime.py",
         "skeleton/api/server.py",
@@ -527,7 +538,9 @@
         "skeleton/automation/free_model.py",
         "skeleton/automation/chatgpt_adapter.py",
         "skeleton/automation/shift_supervisor/model_gateway.py",
-        ".github/workflows/vol004-runtime-supervision.yml"
+        ".github/workflows/vol004-runtime-supervision.yml",
+        "machine/ai_app_construction.json",
+        "docs/architecture/RUNTIME_SUPERVISION.md"
       ],
       "tests": [
         "skeleton/testing/test_app_assembly.py",
@@ -536,14 +549,21 @@
         "tests/test_architecture_runtime_supervision.py",
         "skeleton/testing/test_vol004_runtime_supervision_v2.py",
         "skeleton/testing/test_kernel_supervisor_cancellation.py",
-        "backend/tests/test_engine_cross_service_closure.py"
+        "backend/tests/test_engine_cross_service_closure.py",
+        "backend/tests/test_engine_cross_service_closure.py::test_cross_service_cancel_fences_late_provider_result",
+        "backend/tests/test_engine_cross_service_closure.py::test_stale_task_callback_cannot_release_newer_generation_lease",
+        "backend/tests/test_engine_cross_service_closure.py::test_engine_lifecycle_draining_fences_new_execution_and_drains_lease"
       ],
       "evaluations": [
         "python scripts/check_architecture_runtime_supervision.py --json",
-        "VOL-004 Runtime Supervision Closure exact-head workflow",
+        ".github/workflows/vol004-runtime-supervision.yml",
+        "skeleton/testing/test_vol004_runtime_supervision_v2.py",
         "adversarial lifecycle state/lease/restart race suite",
         "cross-service durable cancellation and late-result fencing journey",
-        "network-transport connector cancellation inventory convergence"
+        "network-transport connector cancellation inventory convergence",
+        "backend/tests/test_engine_cross_service_closure.py::test_cross_service_cancel_fences_late_provider_result",
+        "backend/tests/test_engine_cross_service_closure.py::test_stale_task_callback_cannot_release_newer_generation_lease",
+        "backend/tests/test_engine_cross_service_closure.py::test_engine_lifecycle_draining_fences_new_execution_and_drains_lease"
       ],
       "evidence": [
         "https://github.com/Apeloff1/Skeleton/commit/be408977891328b78522074c1fe693267b01ce5b",
@@ -555,47 +575,6 @@
         "skeleton/testing/test_vol004_runtime_supervision_v2.py",
         "tests/test_architecture_runtime_supervision.py",
         "backend/tests/test_engine_cross_service_closure.py",
-        ".github/workflows/vol004-runtime-supervision.yml"
-      ],
-      "risks": [
-        "orphan tasks",
-        "readiness before dependencies are usable",
-        "shutdown ordering data loss"
-      ],
-      "gaps": [
-        "independent exact-head VOL-004 Runtime Supervision Closure qualification remains pending"
-      ],
-      "accountability_id": "ACC-VOL-004",
-      "completion_checkbox": false,
-        "machine/ai_app_construction.json",
-        "docs/architecture/RUNTIME_SUPERVISION.md"
-      ],
-      "tests": [
-        "skeleton/testing/test_app_assembly.py",
-        "skeleton/testing/test_operation_runtime.py",
-        "skeleton/testing/test_operation_server_binding.py",
-        "tests/test_architecture_runtime_supervision.py",
-        "skeleton/testing/test_vol004_runtime_supervision_v2.py",
-        "skeleton/testing/test_kernel_supervisor_cancellation.py",
-        "backend/tests/test_engine_cross_service_closure.py::test_cross_service_cancel_fences_late_provider_result",
-        "backend/tests/test_engine_cross_service_closure.py::test_stale_task_callback_cannot_release_newer_generation_lease",
-        "backend/tests/test_engine_cross_service_closure.py::test_engine_lifecycle_draining_fences_new_execution_and_drains_lease"
-      ],
-      "evaluations": [
-        "python scripts/check_architecture_runtime_supervision.py --json",
-        ".github/workflows/vol004-runtime-supervision.yml",
-        "skeleton/testing/test_vol004_runtime_supervision_v2.py",
-        "backend/tests/test_engine_cross_service_closure.py::test_cross_service_cancel_fences_late_provider_result",
-        "backend/tests/test_engine_cross_service_closure.py::test_stale_task_callback_cannot_release_newer_generation_lease",
-        "backend/tests/test_engine_cross_service_closure.py::test_engine_lifecycle_draining_fences_new_execution_and_drains_lease"
-      ],
-      "evidence": [
-        "https://github.com/Apeloff1/Skeleton/commit/be408977891328b78522074c1fe693267b01ce5b",
-        "machine/runtime_supervision.json",
-        "scripts/check_architecture_runtime_supervision.py",
-        "skeleton/kernel/runtime_supervision.py",
-        "skeleton/ai/runtime/kernel/runtime_supervision.py",
-        "skeleton/testing/test_vol004_runtime_supervision_v2.py",
         ".github/workflows/vol004-runtime-supervision.yml",
         "https://github.com/Apeloff1/Skeleton/commit/a9accd0f01bad20f1b3a29e190dd97fb3323cec5",
         "https://github.com/Apeloff1/Skeleton/commit/f5ccf1cb56175dc08d3f518e713d4a6552f301cb",
@@ -604,7 +583,6 @@
         "https://github.com/Apeloff1/Skeleton/commit/eec3ef34a1b8808b3878180c40710fb317d16314",
         "https://github.com/Apeloff1/Skeleton/commit/b24cd2651f5a29d5ccb54b8f0563542c41f2a827",
         "https://github.com/Apeloff1/Skeleton/commit/0cb5e0399ee058d9f9ca0fbab47fa980b66c8f2d",
-        "docs/architecture/RUNTIME_SUPERVISION.md",
         "skeleton/provider_runtime.py",
         "skeleton/api/engine_runtime.py",
         "backend/server.py",
