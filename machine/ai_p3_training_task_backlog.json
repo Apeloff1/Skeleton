@@ -55,7 +55,7 @@
           "title": "Distributed Transaction Strategy",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-133",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -68,13 +68,13 @@
             "non-idempotent compensation"
           ],
           "gaps": [
-            "identify multi-resource operations",
-            "materialize saga state store"
+            "independent distributed-transaction recovery and compensation verification remains pending"
           ],
           "implementation_paths": [
-            "skeleton/ai",
-            "skeleton/persistence",
-            "skeleton/storage/cas"
+            "skeleton/storage/cas",
+            "skeleton/ai/runtime/storage/cas",
+            "skeleton/storage/cas/__init__.py",
+            "skeleton/ai/runtime/storage/cas/__init__.py"
           ],
           "tests": [
             "skeleton/testing/test_distributed_transactions.py"
@@ -88,7 +88,7 @@
           "title": "Cache Architecture",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-135",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -101,13 +101,13 @@
             "cross-tenant key collision"
           ],
           "gaps": [
-            "catalog caches",
-            "define invalidation/rebuild contracts"
+            "independent cache-identity, invalidation, and poison-resistance verification remains pending"
           ],
           "implementation_paths": [
-            "skeleton/ai/runtime/state",
-            "skeleton/persistence",
-            "skeleton/storage/cas"
+            "skeleton/storage/cas",
+            "skeleton/ai/runtime/storage/cas",
+            "skeleton/storage/cas/__init__.py",
+            "skeleton/ai/runtime/storage/cas/__init__.py"
           ],
           "tests": [
             "skeleton/testing/test_cache_architecture.py"
@@ -121,7 +121,7 @@
           "title": "Content Addressing",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-136",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -134,12 +134,13 @@
             "hash algorithm lock-in"
           ],
           "gaps": [
-            "unify with VOL-076 CAS",
-            "define digest migration procedure"
+            "independent content-addressing digest-migration and integrity verification remains pending"
           ],
           "implementation_paths": [
-            "planned:skeleton/artifacts",
-            "skeleton/storage/cas"
+            "skeleton/storage/cas",
+            "skeleton/ai/runtime/storage/cas",
+            "skeleton/storage/cas/__init__.py",
+            "skeleton/ai/runtime/storage/cas/__init__.py"
           ],
           "tests": [
             "skeleton/testing/test_content_addressing.py"
@@ -153,7 +154,7 @@
           "title": "Data Ingestion Engine",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-137",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -166,13 +167,11 @@
             "duplicate ingest"
           ],
           "gaps": [
-            "converge acquired ingest lineage",
-            "bind ingestion to data lineage"
+            "independent ingestion lineage, quarantine, and trust-bound verification remains pending"
           ],
           "implementation_paths": [
-            "skeleton/ai",
-            "skeleton/data",
-            "skeleton/data/ingestion.py"
+            "skeleton/data/ingestion.py",
+            "skeleton/ai/runtime/data/ingestion.py"
           ],
           "tests": [
             "skeleton/testing/test_data_ingestion.py"
@@ -186,7 +185,7 @@
           "title": "Document Intelligence",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-138",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -199,13 +198,11 @@
             "prompt injection in document"
           ],
           "gaps": [
-            "define document schema",
-            "integrate trust labels with context"
+            "independent document uncertainty, coordinate, and trust-label verification remains pending"
           ],
           "implementation_paths": [
-            "skeleton/ai",
-            "planned:skeleton/document",
-            "skeleton/data/document_intelligence.py"
+            "skeleton/data/document_intelligence.py",
+            "skeleton/ai/runtime/data/document_intelligence.py"
           ],
           "tests": [
             "skeleton/testing/test_document_intelligence.py"
@@ -219,7 +216,7 @@
           "title": "Data Lineage",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-139",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -232,13 +229,11 @@
             "classification laundering"
           ],
           "gaps": [
-            "materialize lineage graph",
-            "bind artifacts/datasets/indexes"
+            "independent lineage governance, deletion, and provenance verification remains pending"
           ],
           "implementation_paths": [
-            "skeleton/persistence",
-            "machine",
-            "skeleton/data/lineage_governance.py"
+            "skeleton/data/lineage_governance.py",
+            "skeleton/ai/runtime/data/lineage_governance.py"
           ],
           "tests": [
             "skeleton/testing/test_data_lineage.py"
@@ -252,7 +247,7 @@
           "title": "Data Quality Engine",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-140",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -265,13 +260,11 @@
             "silent distribution drift"
           ],
           "gaps": [
-            "define rule registry",
-            "bind dataset gates"
+            "independent raw-observation quality-gate and policy verification remains pending"
           ],
           "implementation_paths": [
-            "skeleton/ai",
-            "skeleton/eval",
-            "skeleton/data/quality.py"
+            "skeleton/data/quality.py",
+            "skeleton/ai/runtime/data/quality.py"
           ],
           "tests": [
             "skeleton/testing/test_data_quality.py"
@@ -285,7 +278,7 @@
           "title": "Dataset Registry",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-141",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -298,13 +291,11 @@
             "rights ambiguity"
           ],
           "gaps": [
-            "materialize dataset manifests",
-            "bind training/eval consumers"
+            "independent dataset-registry rights, retention, split, and contamination verification remains pending"
           ],
           "implementation_paths": [
-            "machine",
-            "datasets",
-            "skeleton/data/dataset_registry.py"
+            "skeleton/data/dataset_registry.py",
+            "skeleton/ai/runtime/data/dataset_registry.py"
           ],
           "tests": [
             "skeleton/testing/test_dataset_registry.py"
@@ -318,7 +309,7 @@
           "title": "Synthetic Data Factory",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-142",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -331,13 +322,11 @@
             "synthetic contamination"
           ],
           "gaps": [
-            "define generator lineage",
-            "add diversity/leakage gates"
+            "independent synthetic-data lineage, diversity, memorization, and collapse-gate verification remains pending"
           ],
           "implementation_paths": [
-            "skeleton/ai",
-            "experiments",
-            "skeleton/data/synthetic.py"
+            "skeleton/data/synthetic.py",
+            "skeleton/ai/runtime/data/synthetic.py"
           ],
           "tests": [
             "skeleton/testing/test_synthetic_data_factory.py"
@@ -396,7 +385,7 @@
           "title": "Training Control Plane",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-143",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -409,15 +398,13 @@
             "run orphaning"
           ],
           "gaps": [
-            "define training manifest",
-            "bind runs to dataset/model registries"
+            "independent training-control replay and registry-binding verification remains pending"
           ],
           "implementation_paths": [
-            "training",
-            "machine"
+            "skeleton/training/control_plane.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_training_control_plane.py"
+            "skeleton/testing/test_training_control_plane.py"
           ],
           "evaluations": [
             "planned:training run replay"
@@ -428,7 +415,7 @@
           "title": "Distributed Training",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-144",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -441,15 +428,13 @@
             "silent replica divergence"
           ],
           "gaps": [
-            "select topology abstractions",
-            "materialize failure drills"
+            "independent distributed-topology and worker-failure verification remains pending"
           ],
           "implementation_paths": [
-            "training",
-            "skeleton/network"
+            "skeleton/training/distributed.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_distributed_training.py"
+            "skeleton/testing/test_distributed_training.py"
           ],
           "evaluations": [
             "planned:worker-loss/straggler evaluation"
@@ -460,7 +445,7 @@
           "title": "Training Checkpointing",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-145",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -473,15 +458,13 @@
             "resume changes training trajectory"
           ],
           "gaps": [
-            "define checkpoint schema",
-            "bind retention and CAS"
+            "independent checkpoint/resume equivalence and retention verification remains pending"
           ],
           "implementation_paths": [
-            "training",
-            "planned:skeleton/artifacts"
+            "skeleton/training/checkpointing.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_training_checkpointing.py"
+            "skeleton/testing/test_training_checkpointing.py"
           ],
           "evaluations": [
             "planned:resume equivalence evaluation"
@@ -492,7 +475,7 @@
           "title": "Elastic Training Recovery",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-146",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -505,15 +488,13 @@
             "sample duplication"
           ],
           "gaps": [
-            "design epoch/fence protocol",
-            "bind to checkpoints"
+            "independent elastic-recovery fencing and scale-transition verification remains pending"
           ],
           "implementation_paths": [
-            "training",
-            "skeleton/reliability"
+            "skeleton/training/elastic_recovery.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_elastic_training_recovery.py"
+            "skeleton/testing/test_elastic_training_recovery.py"
           ],
           "evaluations": [
             "planned:scale-up/down recovery campaign"
@@ -524,7 +505,7 @@
           "title": "Training Observability",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-147",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -537,15 +518,13 @@
             "telemetry overload"
           ],
           "gaps": [
-            "define training signal schema",
-            "bind alerts to runbooks"
+            "independent privacy-bounded training-observability verification remains pending"
           ],
           "implementation_paths": [
-            "training",
-            "skeleton/observability"
+            "skeleton/training/observability.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_training_observability.py"
+            "skeleton/testing/test_training_observability.py"
           ],
           "evaluations": [
             "planned:divergence/stall injection"
@@ -598,7 +577,7 @@
           "title": "Training Evaluation Gates",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-148",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -611,15 +590,13 @@
             "regression waived silently"
           ],
           "gaps": [
-            "define gate bundles",
-            "bind to model registry"
+            "independent evidence-bound training-gate verification remains pending"
           ],
           "implementation_paths": [
-            "training",
-            "skeleton/eval"
+            "skeleton/training/eval_gates.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_training_eval_gates.py"
+            "skeleton/testing/test_training_eval_gates.py"
           ],
           "evaluations": [
             "planned:champion/challenger evaluation"
@@ -630,7 +607,7 @@
           "title": "Verifier Model Program",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-152",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -643,15 +620,13 @@
             "shared training bias"
           ],
           "gaps": [
-            "define verifier registry",
-            "bind verification tasks to baselines"
+            "independent verifier-program baseline and separation verification remains pending"
           ],
           "implementation_paths": [
-            "training",
-            "skeleton/eval"
+            "skeleton/training/verifier_models.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_verifier_model_program.py"
+            "skeleton/testing/test_verifier_model_program.py"
           ],
           "evaluations": [
             "planned:correlated-error evaluation"
@@ -704,7 +679,7 @@
           "title": "Post-Training Lab",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-149",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -717,15 +692,13 @@
             "capability regression"
           ],
           "gaps": [
-            "define experiment families",
-            "bind promotion to eval gates"
+            "independent post-training isolation and promotion-boundary verification remains pending"
           ],
           "implementation_paths": [
-            "training/post",
-            "experiments"
+            "skeleton/training/post_training.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_post_training_lab.py"
+            "skeleton/testing/test_post_training_lab.py"
           ],
           "evaluations": [
             "planned:post-training ablation suite"
@@ -736,7 +709,7 @@
           "title": "Reinforcement Learning Environments",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-150",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -749,15 +722,13 @@
             "non-reset contamination"
           ],
           "gaps": [
-            "define environment interface",
-            "materialize deterministic fixtures"
+            "independent deterministic-environment replay and adversarial transition verification remains pending"
           ],
           "implementation_paths": [
-            "training/rl",
-            "skeleton/simulation"
+            "skeleton/training/rl_environment.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_rl_environments.py"
+            "skeleton/testing/test_rl_environments.py"
           ],
           "evaluations": [
             "planned:reward-hacking challenge suite"
@@ -768,7 +739,7 @@
           "title": "Curriculum Engine",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-151",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -781,15 +752,13 @@
             "easy-task bias"
           ],
           "gaps": [
-            "define curriculum policy",
-            "bind stages to capability evals"
+            "independent curriculum progression and anti-starvation verification remains pending"
           ],
           "implementation_paths": [
-            "training",
-            "skeleton/ai"
+            "skeleton/training/curriculum.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_curriculum_engine.py"
+            "skeleton/testing/test_curriculum_engine.py"
           ],
           "evaluations": [
             "planned:curriculum ablation evaluation"
