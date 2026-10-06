@@ -65,6 +65,9 @@ def _conversation_authority(thread, user, *, allow_commit=True):
     async def append_user_message(*_args, **_kwargs):
         return thread, user
 
+    async def get_thread(*_args, **_kwargs):
+        return thread
+
     async def commit_assistant_message(_thread_id, **kwargs):
         if not allow_commit:
             raise AssertionError("assistant commit must not run")
@@ -110,6 +113,7 @@ def _conversation_authority(thread, user, *, allow_commit=True):
     return SimpleNamespace(
         active_transcript=active_transcript,
         append_user_message=append_user_message,
+        get_thread=get_thread,
         commit_assistant_message=commit_assistant_message,
     )
 
@@ -228,3 +232,80 @@ async def test_live_chat_engine_outage_is_durable_retryable_failure(
         owner_id="owner-a",
     )
     assert persisted.snapshot.state is TurnState.FAILED_RETRYABLE
+
+
+@pytest.mark.asyncio
+async def test_live_chat_event_page_supports_digest_bound_reconnect(
+    monkeypatch,
+    ai_chat_turn_test_authority,
+):
+    import routes.ai as route
+
+    thread, user = _thread_and_user()
+    authority = _conversation_authority(thread, user)
+    monkeypatch.setattr(route, "conversation_authority", authority)
+    fake_client = SimpleNamespace(
+        config=SimpleNamespace(
+            service_principal="codedock-backend",
+            execution_timeout_s=30.0,
+        )
+    )
+
+    async def wait_for_terminal(**_kwargs):
+        raise EngineNotFoundError("not started")
+
+    async def execute(command):
+        return SimpleNamespace(
+            final_output="Done.",
+            execution_id=command.execution_request.execution_id,
+            verification="verified",
+            evidence_refs=(),
+            provider_receipts=("provider:test:receipt-1",),
+            tool_receipts=(),
+            memory_refs=(),
+            artifact_refs=(),
+        )
+
+    fake_client.wait_for_terminal = wait_for_terminal
+    fake_client.execute = execute
+    monkeypatch.setattr(route.EngineClient, "from_env", lambda: fake_client)
+
+    response = await route.ai_chat(
+        _request(route, thread.thread_id),
+        user={"tenant_id": "tenant-a", "email": "owner-a"},
+    )
+    page1 = await route.get_ai_chat_turn_events(
+        thread.thread_id,
+        idempotency_key="turn-1",
+        after_sequence=0,
+        last_event_digest=None,
+        limit=4,
+        user={"tenant_id": "tenant-a", "email": "owner-a"},
+    )
+    assert page1["success"] is True
+    assert page1["operation_id"] == response["operation_id"]
+    assert [item["sequence"] for item in page1["events"]] == [1, 2, 3, 4]
+    assert page1["terminal"] is True
+
+    cursor = page1["cursor"]
+    page2 = await route.get_ai_chat_turn_events(
+        thread.thread_id,
+        idempotency_key="turn-1",
+        after_sequence=cursor["last_seen_sequence"],
+        last_event_digest=cursor["last_event_digest"],
+        limit=100,
+        user={"tenant_id": "tenant-a", "email": "owner-a"},
+    )
+    assert [item["sequence"] for item in page2["events"]] == [5, 6, 7, 8, 9]
+    assert page2["events"][-1]["kind"] == "turn.completed"
+    assert len(page2["page_digest"]) == 64
+
+    with pytest.raises(Exception):
+        await route.get_ai_chat_turn_events(
+            thread.thread_id,
+            idempotency_key="turn-1",
+            after_sequence=4,
+            last_event_digest="b" * 64,
+            limit=100,
+            user={"tenant_id": "tenant-a", "email": "owner-a"},
+        )
