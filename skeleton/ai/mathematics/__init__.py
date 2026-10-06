@@ -41,6 +41,14 @@ from .calibration_metrics import (
     binary_calibration_report,
     top_label_calibration_report,
 )
+from .combinatorics import (
+    binomial_coefficient,
+    binomial_log_pmf,
+    hypergeometric_log_pmf,
+    log_binomial_coefficient,
+    log_factorial,
+    multinomial_log_pmf,
+)
 from .contracts import MathInvariantError, Matrix, Vector
 from .decompositions import (
     CholeskyReport,
@@ -58,6 +66,18 @@ from .differentiation import (
     check_gradient,
     finite_difference_jacobian,
     richardson_derivative,
+)
+from .distances import (
+    bray_curtis_distance,
+    canberra_distance,
+    chebyshev_distance,
+    cosine_distance,
+    dice_distance,
+    jaccard_distance,
+    manhattan_distance,
+    minkowski_distance,
+    pairwise_distance_matrix,
+    weighted_jaccard_distance,
 )
 from .distributions import (
     bernoulli_log_pmf,
@@ -230,6 +250,26 @@ from .spectral import (
     periodogram,
     spectral_power_fraction,
 )
+from .signal2 import (
+    CrossCorrelationReport,
+    blackman_window,
+    cross_correlation,
+    hamming_window,
+    hann_window,
+    linear_detrend,
+    moving_average,
+    moving_rms,
+)
+from .special_functions import (
+    inverse_softplus,
+    log1mexp,
+    log_cosh,
+    logaddexp,
+    logsubexp,
+    stable_logit,
+    stable_sigmoid,
+    stable_softplus,
+)
 from .splines import NaturalCubicSpline, natural_cubic_spline
 from .statistics import (
     MomentReport,
@@ -281,6 +321,12 @@ __all__ = [
     "CalibrationMetricReport",
     "binary_calibration_report",
     "top_label_calibration_report",
+    "binomial_coefficient",
+    "binomial_log_pmf",
+    "hypergeometric_log_pmf",
+    "log_binomial_coefficient",
+    "log_factorial",
+    "multinomial_log_pmf",
     "MathInvariantError",
     "Matrix",
     "Vector",
@@ -310,6 +356,16 @@ __all__ = [
     "check_gradient",
     "finite_difference_jacobian",
     "richardson_derivative",
+    "bray_curtis_distance",
+    "canberra_distance",
+    "chebyshev_distance",
+    "cosine_distance",
+    "dice_distance",
+    "jaccard_distance",
+    "manhattan_distance",
+    "minkowski_distance",
+    "pairwise_distance_matrix",
+    "weighted_jaccard_distance",
     "bernoulli_log_pmf",
     "gaussian_mixture_log_density",
     "normal_cdf",
@@ -453,6 +509,22 @@ __all__ = [
     "dominant_frequency",
     "periodogram",
     "spectral_power_fraction",
+    "CrossCorrelationReport",
+    "blackman_window",
+    "cross_correlation",
+    "hamming_window",
+    "hann_window",
+    "linear_detrend",
+    "moving_average",
+    "moving_rms",
+    "inverse_softplus",
+    "log1mexp",
+    "log_cosh",
+    "logaddexp",
+    "logsubexp",
+    "stable_logit",
+    "stable_sigmoid",
+    "stable_softplus",
     "NaturalCubicSpline",
     "natural_cubic_spline",
     "MomentReport",

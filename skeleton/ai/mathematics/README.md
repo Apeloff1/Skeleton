@@ -63,6 +63,10 @@ model authority boundaries.
 - `splines.py` — natural cubic splines with derivatives and exact piecewise polynomial integrals.
 - `transport.py` — weighted 1D Wasserstein distance and entropy-regularized Sinkhorn plans.
 - `rotations.py` — quaternion composition, axis-angle conversion, vector rotation, SLERP and matrices.
+- `combinatorics.py` — exact counts plus stable binomial, hypergeometric and multinomial log masses.
+- `special_functions.py` — stable log-domain arithmetic, sigmoid/logit, softplus inverse and log-cosh.
+- `signal2.py` — standard windows, cross-correlation, rolling mean/RMS and linear detrending.
+- `distances.py` — Minkowski/Canberra/Bray-Curtis/cosine and set/weighted-Jaccard reference metrics.
 - `validation.py` — parity evidence against existing optimized runtime kernels.
 
 ## Guarantees
@@ -103,6 +107,10 @@ model authority boundaries.
 - Natural splines keep interpolation, derivative and integration semantics inside the knot domain unless clamp is explicit.
 - Optimal transport normalizes marginals explicitly and records Sinkhorn marginal residuals/convergence.
 - Quaternion operations normalize rotations and reject zero-axis/zero-norm ambiguities.
+- Discrete mass functions preserve exact combinatorial support and fail closed instead of returning silent infinities.
+- Stable scalar transforms keep log-domain subtraction/complements numerically meaningful near probability boundaries.
+- Signal diagnostics make window length and normalization contracts explicit and use least-squares detrending.
+- Distance primitives distinguish metric-domain assumptions such as non-negative weighted Jaccard inputs.
 - `audit_runtime_kernels()` compares optimized runtime softmax, matmul and attention against
   this reference substrate without replacing those kernels.
 
