@@ -237,7 +237,7 @@ class CodeSearchIndex:
     def _validate_runtime(self) -> None:
         if not self.repository or not self.repository_fingerprint:
             raise CodeSearchError("index repository identity is missing")
-        if len(self.repository_fingerprint) != 64:
+        if re.fullmatch(r"[0-9a-f]{64}", self.repository_fingerprint) is None:
             raise CodeSearchError("index repository fingerprint is invalid")
         paths = [item.path for item in self.documents]
         if paths != sorted(paths) or len(paths) != len(set(paths)):
@@ -252,8 +252,8 @@ class CodeSearchIndex:
             for posting in items:
                 if not 0 <= posting.document < len(self.documents):
                     raise CodeSearchError("posting references an unknown document")
-                if posting.document < previous:
-                    raise CodeSearchError("posting list is not document-sorted")
+                if posting.document <= previous:
+                    raise CodeSearchError("posting list must contain one sorted posting per document")
                 previous = posting.document
                 if posting.line < 1 or posting.column < 0 or posting.count < 1:
                     raise CodeSearchError("posting location/count is invalid")
@@ -348,12 +348,10 @@ class CodeSearchIndex:
             # term -> [count, first_line, first_column, definition_line, definition_column]
             local: dict[str, list[int]] = {}
             for line_number, line in enumerate(content.splitlines(), start=1):
-                seen_on_line: set[str] = set()
                 for match in _IDENTIFIER.finditer(line):
                     term = match.group(0).casefold()
-                    if term in seen_on_line or len(term) > MAX_TERM_LENGTH:
+                    if len(term) > MAX_TERM_LENGTH:
                         continue
-                    seen_on_line.add(term)
                     state = local.get(term)
                     if state is None:
                         state = [0, line_number, match.start(), 0, 0]
@@ -508,7 +506,13 @@ class CodeSearchIndex:
                 score += 3
 
             if best is None:
-                best = CodePosting(document_id, 1, 0, "reference", 1)
+                result_line = 1
+                result_column = 0
+                result_kind = "path"
+            else:
+                result_line = best.line
+                result_column = best.column
+                result_kind = best.kind
 
             hits.append(CodeSearchHit(
                 path=document.path,
@@ -517,9 +521,9 @@ class CodeSearchIndex:
                 kind=document.kind,
                 score=score,
                 matched_terms=tuple(sorted(matched)),
-                line=best.line,
-                column=best.column,
-                match_kind=best.kind,
+                line=result_line,
+                column=result_column,
+                match_kind=result_kind,
                 occurrence_count=occurrence_count,
                 reasons=tuple(reasons),
             ))
