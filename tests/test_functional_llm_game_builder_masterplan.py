@@ -54,6 +54,25 @@ class FunctionalLLMGameBuilderMasterplanTest(unittest.TestCase):
             self.assertEqual(int(shard["deep_closure_pass"]),2)
             self.assertFalse(shard["deep_closure_signed"])
 
+        expected_legacy={
+            "FLGB-01":259,"FLGB-02":258,"FLGB-03":259,"FLGB-04":260,
+            "FLGB-05":259,"FLGB-06":293,"FLGB-07":294,"FLGB-08":293,
+            "FLGB-09":295,"FLGB-10":292,"FLGB-11":295,"FLGB-12":294,
+            "FLGB-13":295,"FLGB-14":293,"FLGB-15":295,"FLGB-16":277,
+            "FLGB-17":278,"FLGB-18":276,
+        }
+        legacy=data["legacy_requirement_baseline"]
+        self.assertEqual(
+            legacy["source_commit"],
+            "4f2d5f736bebc30e7156d0431da18ada41664afa",
+        )
+        self.assertEqual(legacy["per_plane"],expected_legacy)
+        self.assertEqual(int(legacy["total_atoms"]),sum(expected_legacy.values()))
+        for shard in data["shards"]:
+            expected=expected_legacy[shard["id"]]
+            self.assertEqual(int(shard["legacy_baseline_requirement_atoms"]),expected)
+            self.assertEqual(int(shard["minimum_requirement_atoms"]),expected)
+
         readme=(ROOT/"docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/README.md").read_text(encoding="utf-8")
         self.assertIn(f"{target:,}",readme)
         self.assertIn(f"{total:,}",readme)
