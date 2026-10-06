@@ -242,7 +242,11 @@ def test_architecture_sources_link_all_contract_layers() -> None:
             "ai_implementation_handoff": "machine/ai_implementation_handoff.json",
             "ai_closure_evidence": "machine/ai_closure_evidence.json",
             "ai_capability_registry": "machine/ai_capabilities.json",
-            "ai_file_tree": "machine/ai_file_tree.json"
+            "ai_file_tree": "machine/ai_file_tree.json",
+            "enterprise_system_contract": "machine/enterprise_system_architecture.json",
+            "enterprise_system_manual": "docs/ENTERPRISE_SYSTEM_ARCHITECTURE.md",
+            "enterprise_system_validator": "scripts/check_enterprise_system_architecture.py",
+            "enterprise_system_independent_verifier": "scripts/verify_enterprise_system_architecture.py"
         }
 
 
