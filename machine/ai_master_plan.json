@@ -24379,14 +24379,21 @@
     "originality_rule": "Unknown incorporated rights are quarantined; reference-only sources may inform facts, techniques and abstract ideas but may not supply protected expression; ambiguous legal/similarity cases require human/legal review.",
     "overengineering_authority": "machine/ai_game_builder_overengineering.json",
     "overengineering_human_spec": "docs/architecture/AI_GAME_BUILDER_OVERENGINEERING.md",
-    "overengineering_planes": 24,
+    "overengineering_planes": 48,
     "runtime_contracts": {
       "package": "skeleton/ai/game_builder",
       "contracts": "skeleton/ai/game_builder/contracts.py",
       "dual_rival_state_machine": "skeleton/ai/game_builder/dual_rival_forge.py",
-      "tests": "tests/test_ai_game_builder_runtime.py"
+      "evaluation_panel": "skeleton/ai/game_builder/evaluation.py",
+      "resource_governor": "skeleton/ai/game_builder/resource_governor.py",
+      "quality_debt": "skeleton/ai/game_builder/quality_debt.py",
+      "integrated_control_plane": "skeleton/ai/game_builder/control_plane.py",
+      "tests": [
+        "tests/test_ai_game_builder_runtime.py",
+        "tests/test_ai_game_builder_overengineering_runtime.py"
+      ]
     },
-    "overengineering_rule": "Every GB family inherits all critical cross-cutting planes and no plane may weaken family/level hard gates.",
+    "overengineering_rule": "Every GB family inherits all 20 critical cross-cutting planes and at least 20 total planes. Cross-cutting evidence is additive and can only tighten family/GBL gates.",
     "governance_runtime": {
       "canon": "skeleton/ai/game_builder/canon.py",
       "rights": "skeleton/ai/game_builder/rights.py",
