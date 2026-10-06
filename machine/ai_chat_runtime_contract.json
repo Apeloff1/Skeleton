@@ -5,7 +5,7 @@
   "prepared_by": "chatgpt:gpt-5.6-sol",
   "base_main_sha": "92a6dcc85976e41c3d86fcd87866e1c5d384f125",
   "canonical_module": "skeleton/ai/assistant/turn_runtime.py",
-  "scope": "durable provider-neutral AI chat turn state, persistence, replay, resource admission, and crash recovery",
+  "scope": "durable provider-neutral AI chat turn state, persistence, replay, reconnectable streaming, resource admission, and crash recovery",
   "authority": {
     "conversation_authority": "backend/core/conversations.py",
     "assistant_control_plane": "skeleton/ai/assistant/runtime.py",
@@ -55,7 +55,9 @@
     "runtime stores structured reason codes and provenance rather than hidden chain-of-thought",
     "turn persistence stores operation state only and never duplicates canonical transcript authority",
     "portable and production persistence decode the canonical runtime wire schema",
-    "Mongo event persistence uses prepare, atomic snapshot advance, and committed-marker recovery"
+    "Mongo event persistence uses prepare, atomic snapshot advance, and committed-marker recovery",
+    "public stream projection excludes arbitrary model, prompt, retrieval, and tool payload content",
+    "stream reconnect is bound to operation identity, exact sequence, and prior event digest"
   ],
   "budget_dimensions": [
     "wall_seconds",
@@ -98,7 +100,9 @@
     "portable_repository": "skeleton/persistence/chat_turn_repository.py",
     "mongo_authority": "backend/core/chat_turns.py",
     "persistence_tests": "skeleton/testing/test_ai_chat_turn_repository.py",
-    "mongo_tests": "backend/tests/test_ai_chat_turn_persistence.py"
+    "mongo_tests": "backend/tests/test_ai_chat_turn_persistence.py",
+    "streaming": "skeleton/ai/assistant/streaming.py",
+    "streaming_tests": "skeleton/testing/test_ai_chat_streaming.py"
   },
   "promotion_rule": "implemented candidate only; no completion or verification signoff until exact-head CI and independent verification pass",
   "next_integrations": [
@@ -116,5 +120,16 @@
     "commit_protocol": "prepare immutable event -> exact-sequence/digest operation snapshot advance -> committed marker",
     "conversation_binding": "tenant, owner, thread, causal user message, admitted thread version",
     "transcript_rule": "turn repositories never own or duplicate conversation message content"
+  },
+  "streaming": {
+    "canonical_projection": "skeleton/ai/assistant/streaming.py",
+    "cursor_binding": [
+      "operation_id",
+      "last_seen_sequence",
+      "last_event_digest"
+    ],
+    "content_rule": "project structured transition metadata only; arbitrary durable event payload is not exposed",
+    "gap_rule": "sequence or digest-chain mismatch fails closed",
+    "transport_rule": "projection is transport-neutral and can feed SSE, WebSocket, polling, or native clients"
   }
 }
