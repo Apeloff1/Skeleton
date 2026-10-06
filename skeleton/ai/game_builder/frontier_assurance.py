@@ -294,14 +294,42 @@ class GenealogyNode:
     parent_digests: tuple[str, ...]
     mutation_digest: str
     round_index: int
+    mutation_authority: EvaluatorProvenance
+    mutation_evidence_digest: str
 
     def __post_init__(self) -> None:
         _stable(self.candidate_digest, "candidate_digest")
         _stable(self.mutation_digest, "mutation_digest")
+        _stable(self.mutation_evidence_digest, "mutation_evidence_digest")
+        if isinstance(self.round_index, bool) or not isinstance(self.round_index, int):
+            raise TypeError("round_index must be an integer")
         if self.round_index < 0:
             raise FrontierAssuranceError("round_index must be non-negative")
+        if not isinstance(self.mutation_authority, EvaluatorProvenance):
+            raise TypeError("genealogy mutation_authority must be EvaluatorProvenance")
+        if self.mutation_evidence_digest not in self.mutation_authority.output_evidence_refs:
+            raise FrontierAssuranceError(
+                "genealogy mutation evidence must be referenced by mutation authority"
+            )
+        if len(self.parent_digests) != len(set(self.parent_digests)):
+            raise FrontierAssuranceError("genealogy parent digests must be unique")
+        for parent in self.parent_digests:
+            _stable(parent, "parent_digest")
         if self.candidate_digest in self.parent_digests:
             raise FrontierAssuranceError("candidate cannot parent itself")
+
+    @property
+    def mutation_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "candidate_digest": self.candidate_digest,
+                "mutation_authority_digest": self.mutation_authority.digest,
+                "mutation_digest": self.mutation_digest,
+                "mutation_evidence_digest": self.mutation_evidence_digest,
+                "parent_digests": list(self.parent_digests),
+                "round_index": self.round_index,
+            }
+        )
 
 
 class ArtifactGenealogy:
@@ -332,6 +360,21 @@ class ArtifactGenealogy:
             seen.add(current)
             stack.extend(self._nodes[current].parent_digests)
         return tuple(sorted(seen))
+
+    @property
+    def digest(self) -> str:
+        return canonical_digest(
+            [
+                {
+                    "candidate_digest": row.candidate_digest,
+                    "mutation_binding_digest": row.mutation_binding_digest,
+                }
+                for row in sorted(
+                    self._nodes.values(),
+                    key=lambda item: item.candidate_digest,
+                )
+            ]
+        )
 
 
 class EvaluatorIndependenceGraph:
@@ -415,8 +458,45 @@ class RegretLedger:
         return bool(self._rows) and self.weighted_regret <= self.maximum_weighted_regret
 
 
+@dataclass(frozen=True, slots=True)
+class EvidenceInvalidationReceipt:
+    node_id: str
+    affected_ids: tuple[str, ...]
+    authority_provenance: EvaluatorProvenance
+    evidence_digest: str
+    receipt_digest: str
+
+    def __post_init__(self) -> None:
+        _stable(self.node_id, "node_id")
+        _stable(self.evidence_digest, "evidence_digest")
+        if not isinstance(self.authority_provenance, EvaluatorProvenance):
+            raise TypeError("invalidation authority_provenance must be EvaluatorProvenance")
+        if self.evidence_digest not in self.authority_provenance.output_evidence_refs:
+            raise FrontierAssuranceError(
+                "invalidation evidence must be referenced by invalidation authority"
+            )
+        if not self.affected_ids or self.node_id not in self.affected_ids:
+            raise FrontierAssuranceError(
+                "invalidation receipt must include the invalidated source node"
+            )
+        if tuple(sorted(set(self.affected_ids))) != self.affected_ids:
+            raise FrontierAssuranceError(
+                "invalidation affected ids must be unique canonical order"
+            )
+        if self.receipt_digest != canonical_digest(self.payload()):
+            raise FrontierAssuranceError("invalidation receipt digest mismatch")
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "affected_ids": list(self.affected_ids),
+            "authority_provenance_digest": self.authority_provenance.digest,
+            "evidence_digest": self.evidence_digest,
+            "node_id": self.node_id,
+        }
+
+
 class EvidenceInvalidationGraph:
-    """Propagates material source/evidence drift into dependent qualifications."""
+    """Propagates attributed source/evidence drift into dependent qualifications."""
 
     def __init__(self) -> None:
         self._deps: dict[str, set[str]] = {}
@@ -436,10 +516,23 @@ class EvidenceInvalidationGraph:
         for parent in parents:
             self._reverse.setdefault(parent, set()).add(node)
 
-    def invalidate(self, node_id: str) -> tuple[str, ...]:
+    def invalidate(
+        self,
+        node_id: str,
+        *,
+        authority_provenance: EvaluatorProvenance,
+        evidence_digest: str,
+    ) -> EvidenceInvalidationReceipt:
         node = _stable(node_id, "node_id")
         if node not in self._deps:
             raise FrontierAssuranceError("unknown evidence node")
+        if not isinstance(authority_provenance, EvaluatorProvenance):
+            raise TypeError("invalidation authority_provenance must be EvaluatorProvenance")
+        _stable(evidence_digest, "evidence_digest")
+        if evidence_digest not in authority_provenance.output_evidence_refs:
+            raise FrontierAssuranceError(
+                "invalidation evidence must be referenced by invalidation authority"
+            )
         affected: set[str] = set()
         stack = [node]
         while stack:
@@ -448,8 +541,21 @@ class EvidenceInvalidationGraph:
                 continue
             affected.add(current)
             stack.extend(self._reverse.get(current, ()))
+        affected_ids = tuple(sorted(affected))
         self._invalid.update(affected)
-        return tuple(sorted(affected))
+        payload = {
+            "affected_ids": list(affected_ids),
+            "authority_provenance_digest": authority_provenance.digest,
+            "evidence_digest": evidence_digest,
+            "node_id": node,
+        }
+        return EvidenceInvalidationReceipt(
+            node_id=node,
+            affected_ids=affected_ids,
+            authority_provenance=authority_provenance,
+            evidence_digest=evidence_digest,
+            receipt_digest=canonical_digest(payload),
+        )
 
     def is_valid(self, node_id: str) -> bool:
         if node_id not in self._deps:
