@@ -39,23 +39,30 @@ jobs:
         run: |
           python -m pip install .
           mkdir -p .machine
-          skeleton-repo-machine --root . --output .machine/repository-machine.json
+          skeleton-repo-machine --root . --output .machine/repository-machine.json --build-code-search .machine/code-search-index.json
           python - <<'PY'
+          from skeleton.repo_machine.code_search import load_code_search_index
           from skeleton.repo_machine.manifest import load_manifest, validate_manifest
           manifest = load_manifest(".machine/repository-machine.json")
           validate_manifest(manifest)
+          code_index = load_code_search_index(
+              ".machine/code-search-index.json",
+              expected_fingerprint=manifest["fingerprint"],
+          )
           files = manifest["state"]["files"]
+          summary = code_index.summary()
           print(f"Machine index contains {len(files)} files.")
+          print(f"Code search contains {summary[\"documents\"]} documents, {summary[\"terms\"]} terms, {summary[\"postings\"]} postings.")
           PY
 
       - name: Commit changed index
         run: |
-          if git diff --quiet -- .machine/repository-machine.json; then
+          if git diff --quiet -- .machine/repository-machine.json .machine/code-search-index.json; then
             echo "Machine index is current."
             exit 0
           fi
           git config user.name "skeleton-machine"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .machine/repository-machine.json
-          git commit -m "chore(machine): refresh repository index"
+          git add .machine/repository-machine.json .machine/code-search-index.json
+          git commit -m "chore(machine): refresh repository and code-search indexes"
           git push
