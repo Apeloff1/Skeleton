@@ -107,22 +107,25 @@ def test_live_chat_writes_durable_turn_and_reconnectable_events(
         ai_result_id="engine-result:" + execution_id,
         provider_receipt_refs=("provider:local:receipt-1",),
     )
-    committed = {"value": False}
+    state = {"appended": False, "committed": False}
 
     async def active_transcript(*_args, **_kwargs):
-        if committed["value"]:
+        if state["committed"]:
             return (user_message, assistant_message)
-        return (user_message,)
+        if state["appended"]:
+            return (user_message,)
+        return ()
 
     async def append_user_message(*_args, **_kwargs):
+        state["appended"] = True
         return after_user, user_message
 
     async def commit_assistant_message(*_args, **_kwargs):
-        committed["value"] = True
+        state["committed"] = True
         return after_assistant, assistant_message
 
     async def get_thread(*_args, **_kwargs):
-        return after_assistant if committed["value"] else after_user
+        return after_assistant if state["committed"] else after_user
 
     monkeypatch.setattr(
         route,
