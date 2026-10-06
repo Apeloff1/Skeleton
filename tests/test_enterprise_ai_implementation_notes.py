@@ -51,6 +51,27 @@ def _first_dossier_file(root: Path) -> tuple[Path, dict]:
     return path, _load(path)
 
 
+def test_canonical_construction_requires_enterprise_gates() -> None:
+    construction = _load(ROOT / "machine/ai_app_construction.json")
+    gates = {
+        row["id"]: row
+        for row in construction["acceptance_gates"]
+    }
+
+    assert gates["enterprise-ai-superiority"] == {
+        "id": "enterprise-ai-superiority",
+        "kind": "static",
+        "command": "python scripts/check_enterprise_ai_superiority.py --json",
+        "required": True,
+    }
+    assert gates["enterprise-ai-implementation-notes"] == {
+        "id": "enterprise-ai-implementation-notes",
+        "kind": "static",
+        "command": "python scripts/check_enterprise_ai_implementation_notes.py --json",
+        "required": True,
+    }
+
+
 def test_current_october_2026_implementation_dossiers_are_complete() -> None:
     result = MODULE.validate(ROOT)
 
