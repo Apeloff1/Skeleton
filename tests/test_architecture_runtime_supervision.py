@@ -24,9 +24,11 @@ class RuntimeSupervisionTests(unittest.TestCase):
         self.assertEqual(result["status"], "valid")
         self.assertEqual(result["service_count"], 2)
         self.assertEqual(result["lifecycle_phase_count"], 5)
+        self.assertEqual(result["contract_version"], "1.2.0")
         self.assertEqual(result["connector_count"], 5)
+        self.assertEqual(result["connector_operation_count"], 11)
         self.assertEqual(result["network_surface_count"], 4)
-        self.assertGreater(result["required_symbol_count"], 20)
+        self.assertGreater(result["required_symbol_count"], 50)
 
     def _fixture(self) -> Path:
         temp = Path(tempfile.mkdtemp(prefix="runtime-supervision-"))
@@ -178,13 +180,37 @@ class RuntimeSupervisionTests(unittest.TestCase):
         ):
             MODULE.validate(root)
 
-    def test_rejects_stale_masterplan_gap(self) -> None:
+    def test_rejects_resurrected_closed_masterplan_gap(self) -> None:
         root = self._fixture()
-        path = root / "machine/runtime_supervision.json"
+        contract_path = root / "machine/runtime_supervision.json"
+        contract = json.loads(contract_path.read_text(encoding="utf-8"))
+        closed = contract["masterplan_binding"]["closed_implementation_gap_texts"][0]
+
+        path = root / "machine/ai_master_plan.json"
         data = json.loads(path.read_text(encoding="utf-8"))
-        data["masterplan_binding"]["required_gap_texts"][0] = "not a real gap"
+        volume = next(item for item in data["volumes"] if item["key"] == "VOL-004")
+        volume["gaps"].insert(0, closed)
         path.write_text(json.dumps(data), encoding="utf-8")
-        with self.assertRaisesRegex(MODULE.RuntimeSupervisionError, "masterplan gap drift"):
+
+        with self.assertRaisesRegex(
+            MODULE.RuntimeSupervisionError,
+            "closed VOL-004 implementation gap reappeared",
+        ):
+            MODULE.validate(root)
+
+    def test_rejects_premature_completion_with_verification_gap(self) -> None:
+        root = self._fixture()
+        path = root / "machine/ai_master_plan.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        volume = next(item for item in data["volumes"] if item["key"] == "VOL-004")
+        volume["completion_checkbox"] = True
+        volume["completion_checkbox_mark"] = "[x]"
+        path.write_text(json.dumps(data), encoding="utf-8")
+
+        with self.assertRaisesRegex(
+            MODULE.RuntimeSupervisionError,
+            "completed VOL-004 cannot retain gaps",
+        ):
             MODULE.validate(root)
 
 
