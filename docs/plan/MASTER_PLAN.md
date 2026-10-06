@@ -1,6 +1,6 @@
 # Skeleton AI Master Plan
 
-Plan version: **1.9.0**
+Plan version: **2.0.0**
 
 Architecture lane: `PR #1904 / integration/architecture-map-v1`
 
@@ -13,6 +13,8 @@ Exotic systems depth: [`EXOTIC_SYSTEMS_DEPTH.md`](EXOTIC_SYSTEMS_DEPTH.md) / [`m
 Post-enterprise Frontier-96 ladder: [`FRONTIER_96_AI_LADDER.md`](FRONTIER_96_AI_LADDER.md) / [`machine/frontier_96_ai_ladder.json`](../../machine/frontier_96_ai_ladder.json)
 
 Cutting-edge CS-300 ladder: [`CS_300_COMPUTER_SCIENCE_LADDER.md`](CS_300_COMPUTER_SCIENCE_LADDER.md) / [`machine/cs_300_computer_science_ladder.json`](../../machine/cs_300_computer_science_ladder.json)
+
+Paired Learning-400 + Adversarial-400: [`LEARNING_400_ADVERSARIAL_400.md`](LEARNING_400_ADVERSARIAL_400.md) / [`machine/learning_400_adversarial_400.json`](../../machine/learning_400_adversarial_400.json)
 
 Existing construction manual: [`docs/AI_APP_CONSTRUCTION_MANUAL.md`](../AI_APP_CONSTRUCTION_MANUAL.md)
 
@@ -772,6 +774,24 @@ CS-300 is a **depth and qualification overlay**, not a new top-level architectur
 Its entry gate is deliberately stricter than Frontier-96: a CS-300 layer cannot qualify until Frontier-96 is currently qualified on exact-head evidence and all declared earlier CS-300 dependencies are signed complete. Every CS-300 layer then requires its own implementation contract, acceptance proof, current evidence, implementation signature and independent-verification signature. Research-only layers remain non-production until promotion evidence exists.
 
 `CS300-300` is the signed finality layer. It cannot self-attest and may qualify only when all 300 layers are simultaneously current and independently verified, with cross-layer invariants, independent reproduction, evidence freshness/revocation and rollback readiness where applicable.
+
+## 24.8 Learning-400 + Adversarial-400 paired intelligence overlay
+
+The learning authority is defined by [`docs/plan/LEARNING_400_ADVERSARIAL_400.md`](LEARNING_400_ADVERSARIAL_400.md) and [`machine/learning_400_adversarial_400.json`](../../machine/learning_400_adversarial_400.json).
+
+It adds **400 learning levels** `L400-001..L400-400` and an equal **400-level adversarial learning plane** `A400-001..A400-400`, grouped into forty ten-level strata on each side. Every learning level is paired one-for-one with an adversarial challenger. This is a depth overlay, not a new top-level volume family, so `VOL-000..420` remains frozen.
+
+The learning plane is deliberately broader than model fine-tuning. It covers epistemic foundations; lawful open-web discovery and crawling; public/authorized web acquisition including feeds/APIs and rendered dynamic pages; long-form reading; temporal video/audio understanding; multimodal grounding; provenance; source trust; knowledge extraction and graphs; memory formation/consolidation; temporal knowledge; calibration; evidence-grounded and causal reasoning; scientific experimentation; self-directed curricula; skills; project-derived learning; human teaching; benchmarks; dataset governance; synthetic data; representation/self-supervised/supervised/preference learning; continual learning; meta-learning; architecture search; native weight genesis/pretraining; training optimization/distribution; distillation; project adapters; weight merging/editing; model registry/promotion; wisdom/judgment; and autonomous learning research.
+
+Web acquisition is powerful but bounded. Search, sitemaps, feeds, public links, authorized APIs and rendered public pages are eligible. Authentication bypass, paywall bypass and anti-bot evasion are explicitly outside the learning authority. External content remains untrusted evidence rather than instruction authority, and every durable learning object carries source, rights/privacy, transformation, freshness and project/tenant lineage.
+
+Video learning is temporal and multimodal rather than transcript-only: speech, keyframes, scene changes, on-screen text, diagrams, actions and demonstrations are bound to timestamped evidence while preserving modality-specific provenance and disagreement.
+
+Native learning may initialize and train Skeleton-owned candidate weights, perform pretraining, continual learning, distillation, parameter-efficient project adaptation, weight editing/merging and architecture search. Project outcomes may improve future candidates, but project/tenant boundaries are preserved. Production weights **never silently self-modify in place**: improvement creates a versioned candidate with immutable dataset/recipe/checkpoint lineage, held-out evaluation, paired adversarial qualification, independent promotion authority, canary and rollback.
+
+The adversarial plane is a peer system, not a final audit. It covers search/crawl poisoning; hostile documents and multimodal injection; provenance spoofing; semantic/knowledge/memory poisoning; staleness; overconfidence; reasoning and causal traps; scientific fraud; curriculum/skill/project/feedback attacks; benchmark leakage; dataset poisoning; synthetic collapse; representation/objective/label attacks; reward hacking; catastrophic forgetting; meta-learning and architecture-search gaming; weight/training/distributed-training integrity; compression/adapter/weight-edit attacks; registry/promotion attacks; wisdom failure; and autonomous-learning governance escape.
+
+A learning level may be signed complete only when its corresponding adversarial level is also signed complete on current exact-head evidence. `L400-400` and `A400-400` are paired finality gates; the learning program cannot claim completion until **400/400 learning + 400/400 adversarial** levels are independently verified and current.
 
 ## 25. Scope freeze and future plan evolution
 
