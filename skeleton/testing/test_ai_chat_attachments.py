@@ -11,7 +11,15 @@ from skeleton.ai.assistant.attachments import (
     AttachmentFormat,
     AttachmentPolicy,
     AttachmentUpload,
+    admit_multimodal_reference,
     attachment_context_evidence,
+)
+from skeleton.ai.runtime.extensions.multimodal import ResourceLimits
+from skeleton.artifacts.multimodal_ingestion import (
+    IngestionPolicy,
+    MediaProbe,
+    MultimodalIngestionCore,
+    PipelineBinding,
 )
 from skeleton.contracts.context import ContextKind, ContextTrust
 
@@ -230,4 +238,95 @@ def test_binary_signature_detection_rejects_unknown_payload() -> None:
                 declared_size=4,
                 claimed_mime="application/octet-stream",
             )
+        )
+
+
+def _image_ingestion() -> MultimodalIngestionCore:
+    return MultimodalIngestionCore(
+        IngestionPolicy(
+            policy_id="CHAT.IMAGE.V1",
+            allowed_media_types=frozenset({"image"}),
+            allowed_trust_labels=frozenset({"untrusted"}),
+            allowed_classifications=frozenset({"internal"}),
+            limits=ResourceLimits(
+                max_bytes=1024,
+                max_pixels=1_000_000,
+                max_audio_seconds=0,
+                max_video_seconds=0,
+                max_frames=0,
+            ),
+        ),
+        (
+            PipelineBinding(
+                "image",
+                "PIPE.CHAT.IMAGE.V1",
+                frozenset({"png", "jpeg"}),
+            ),
+        ),
+    )
+
+
+def test_admitted_image_binds_to_canonical_multimodal_pipeline() -> None:
+    payload = b"\x89PNG\r\n\x1a\n" + b"bounded-image"
+    ref = AttachmentAdmissionPlane().admit(
+        AttachmentUpload(
+            payload=payload,
+            declared_size=len(payload),
+            claimed_mime="image/png",
+            filename="diagram.png",
+            data_class="internal",
+        )
+    )
+    receipt = admit_multimodal_reference(
+        ref,
+        payload=payload,
+        probe=MediaProbe(
+            media_type="image",
+            format="png",
+            byte_size=len(payload),
+            width=32,
+            height=16,
+        ),
+        ingestion=_image_ingestion(),
+    )
+    assert receipt.source_digest == ref.source_digest
+    assert receipt.pipeline_id == "PIPE.CHAT.IMAGE.V1"
+
+
+def test_multimodal_binding_rejects_digest_or_probe_drift() -> None:
+    payload = b"\x89PNG\r\n\x1a\n" + b"bounded-image"
+    ref = AttachmentAdmissionPlane().admit(
+        AttachmentUpload(
+            payload=payload,
+            declared_size=len(payload),
+            claimed_mime="image/png",
+            filename="diagram.png",
+        )
+    )
+    with pytest.raises(AttachmentAdmissionError, match="digest"):
+        admit_multimodal_reference(
+            ref,
+            payload=payload + b"x",
+            probe=MediaProbe(
+                media_type="image",
+                format="png",
+                byte_size=len(payload) + 1,
+                width=32,
+                height=16,
+            ),
+            ingestion=_image_ingestion(),
+        )
+
+    with pytest.raises(AttachmentAdmissionError, match="format"):
+        admit_multimodal_reference(
+            ref,
+            payload=payload,
+            probe=MediaProbe(
+                media_type="image",
+                format="jpeg",
+                byte_size=len(payload),
+                width=32,
+                height=16,
+            ),
+            ingestion=_image_ingestion(),
         )
