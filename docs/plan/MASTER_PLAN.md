@@ -1,6 +1,6 @@
 # Skeleton AI Master Plan
 
-Plan version: **1.8.0**
+Plan version: **1.9.0**
 
 Architecture lane: `PR #1904 / integration/architecture-map-v1`
 
@@ -8,7 +8,11 @@ Index: [`MASTER_INDEX.md`](MASTER_INDEX.md)
 
 Machine mirror: [`machine/ai_master_plan.json`](../../machine/ai_master_plan.json)
 
-Exotic systems depth: [`EXOTIC_SYSTEMS_DEPTH.md`](EXOTIC_SYSTEMS_DEPTH.md) / [`machine/ai_exotic_systems_catalog.json`](../../machine/ai_exotic_systems_catalog.json)\n\nPost-enterprise Frontier-96 ladder: [`FRONTIER_96_AI_LADDER.md`](FRONTIER_96_AI_LADDER.md) / [`machine/frontier_96_ai_ladder.json`](../../machine/frontier_96_ai_ladder.json)
+Exotic systems depth: [`EXOTIC_SYSTEMS_DEPTH.md`](EXOTIC_SYSTEMS_DEPTH.md) / [`machine/ai_exotic_systems_catalog.json`](../../machine/ai_exotic_systems_catalog.json)
+
+Post-enterprise Frontier-96 ladder: [`FRONTIER_96_AI_LADDER.md`](FRONTIER_96_AI_LADDER.md) / [`machine/frontier_96_ai_ladder.json`](../../machine/frontier_96_ai_ladder.json)
+
+Cutting-edge CS-300 ladder: [`CS_300_COMPUTER_SCIENCE_LADDER.md`](CS_300_COMPUTER_SCIENCE_LADDER.md) / [`machine/cs_300_computer_science_ladder.json`](../../machine/cs_300_computer_science_ladder.json)
 
 Existing construction manual: [`docs/AI_APP_CONSTRUCTION_MANUAL.md`](../AI_APP_CONSTRUCTION_MANUAL.md)
 
@@ -756,6 +760,18 @@ Eligibility is fail-closed: a Frontier-96 layer may qualify only when its mapped
 The `96` label is an organizational discipline inspired by the published GPT-3 175B depth; it is **not** a claim that the current ChatGPT product exposes a fixed 96-transformer-layer architecture. Skeleton uses the count to force a complete system-level ladder rather than to imitate undocumented model internals.
 
 The final `frontier_96_qualified` claim is valid only when all 96 layers are simultaneously signed complete on current evidence and `F96-096` has independent finality evidence. A stale lower-layer prerequisite automatically invalidates downstream frontier qualification.
+
+## 24.7 CS-300 cutting-edge computer-science qualification overlay
+
+The computer-science superstructure is defined by [`docs/plan/CS_300_COMPUTER_SCIENCE_LADDER.md`](CS_300_COMPUTER_SCIENCE_LADDER.md) and [`machine/cs_300_computer_science_ladder.json`](../../machine/cs_300_computer_science_ladder.json).
+
+It adds **300 independently specifiable and signable layers** `CS300-001..CS300-300` grouped into **30 ten-layer strata**. The strata span computability and complexity; data structures; programming languages and types; compilers; runtimes; kernels; concurrency; distributed systems; networking; storage; databases; streaming/dataflow; information theory; cryptography; formal methods; software evolution; reliability; observability/performance; security/supply chain; privacy; numerical/scientific computing; accelerators; heterogeneous hardware; cloud/edge; cyber-physical systems; graphics/simulation; quantum; neuromorphic/unconventional computing; autonomic systems; and whole-system frontier synthesis.
+
+CS-300 is a **depth and qualification overlay**, not a new top-level architecture-volume family. The `VOL-000..420` breadth freeze therefore remains intact.
+
+Its entry gate is deliberately stricter than Frontier-96: a CS-300 layer cannot qualify until Frontier-96 is currently qualified on exact-head evidence and all declared earlier CS-300 dependencies are signed complete. Every CS-300 layer then requires its own implementation contract, acceptance proof, current evidence, implementation signature and independent-verification signature. Research-only layers remain non-production until promotion evidence exists.
+
+`CS300-300` is the signed finality layer. It cannot self-attest and may qualify only when all 300 layers are simultaneously current and independently verified, with cross-layer invariants, independent reproduction, evidence freshness/revocation and rollback readiness where applicable.
 
 ## 25. Scope freeze and future plan evolution
 
