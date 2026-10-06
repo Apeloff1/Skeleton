@@ -1,0 +1,566 @@
+{
+  "schema_version": 1,
+  "contract_version": "1.0.0",
+  "status": "active",
+  "title": "VOL-005 State Migration and Release Qualification",
+  "purpose": "Make every state domain release-accountable: exact topology coverage, source-bound migration policy, mixed-version compatibility, replay idempotence, rollback/compensation, backup restore and authoritative-first recovery.",
+  "topology_contract": "machine/state_topology.json",
+  "topology_blob_sha": "25f515cd6d0d38c9e324d526d08fc2d8c3ce2f88",
+  "backup_policy": "machine/state_backup_policy.json",
+  "construction_contract": "machine/ai_app_construction.json",
+  "runtime": "skeleton/persistence/migration_compatibility.py",
+  "governed_runtime_mirror": "skeleton/ai/runtime/persistence/migration_compatibility.py",
+  "validator": "scripts/check_state_migration_qualification.py",
+  "release_gate": {
+    "id": "state-migration-qualification",
+    "kind": "release",
+    "command": "python scripts/check_state_migration_qualification.py --json",
+    "required": true,
+    "failure_policy": "fail-closed"
+  },
+  "policies": {
+    "exact_domain_coverage": true,
+    "topology_blob_binding": true,
+    "authoritative_identity_preservation": true,
+    "canonical_backup_bytes": true,
+    "migration_replay_idempotence": true,
+    "mixed_version_semantic_compatibility": true,
+    "rollback_or_compensation_required": true,
+    "authoritative_restore_before_derived_rebuild": true,
+    "ghost_physical_stores_forbidden": true,
+    "placeholder_source_of_truth_forbidden": true,
+    "planned_evidence_forbidden": true
+  },
+  "retired_legacy_authorities": [
+    {
+      "id": "verification-evidence-unbound",
+      "replacement_domain": "verification-receipt-ledger",
+      "disposition": "retired"
+    },
+    {
+      "id": "engine-mongo-state",
+      "replacement_domain": "canonical-ai-memory-records",
+      "disposition": "retired"
+    }
+  ],
+  "domain_qualification": [
+    {
+      "domain_id": "backend-core-app-state",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "physical_store": "mongo",
+      "qualification_mode": "authoritative-migrate-rollback-restore",
+      "release_required": true,
+      "mixed_version_policy": "reader/writer compatibility must be rehearsed for any schema-changing release; otherwise explicit no-schema-change evidence is required",
+      "rollback_policy": "exact rollback or an explicitly tested compensation/restore path is mandatory before cutover",
+      "migration_contract": "migrated production application state",
+      "backup_restore_contract": "live scratch logical backup/restore rehearsal verifies document counts, canonical document digests and user index digests before derived rebuild; production backup policy remains operator/deployment controlled",
+      "evidence_refs": [
+        "backend/core/databases.py",
+        "backend/services/database.py",
+        "backend/services/rag_state_repository.py",
+        "scripts/state_recovery_drill.py",
+        ".github/workflows/state-recovery-drill.yml",
+        "skeleton/testing/test_state_recovery_drill.py"
+      ]
+    },
+    {
+      "domain_id": "backend-seeded-content",
+      "authority": "derived",
+      "source_of_truth": false,
+      "physical_store": "mongo",
+      "qualification_mode": "derived-rebuild",
+      "release_required": true,
+      "mixed_version_policy": "non-authoritative state may be rebuilt/reconciled only after authoritative restore verifies",
+      "rollback_policy": "discard/rebuild/reconcile from declared authority",
+      "migration_contract": "skip application-state migration and rebuild from reviewed seed/content sources",
+      "backup_restore_contract": "optional; code/seed source is authority",
+      "evidence_refs": [
+        "backend/core/databases.py"
+      ]
+    },
+    {
+      "domain_id": "backend-swarm-scratch",
+      "authority": "scratch",
+      "source_of_truth": false,
+      "physical_store": "mongo",
+      "qualification_mode": "scratch-discard-recreate",
+      "release_required": true,
+      "mixed_version_policy": "non-authoritative state may be rebuilt/reconciled only after authoritative restore verifies",
+      "rollback_policy": "discard/rebuild/reconcile from declared authority",
+      "migration_contract": "skip canonical app migration; rebuild/recompute",
+      "backup_restore_contract": "not required for canonical recovery",
+      "evidence_refs": [
+        "backend/core/databases.py"
+      ]
+    },
+    {
+      "domain_id": "backend-rag-local-chroma",
+      "authority": "derived",
+      "source_of_truth": false,
+      "physical_store": "backend-data-volume",
+      "qualification_mode": "derived-rebuild",
+      "release_required": true,
+      "mixed_version_policy": "non-authoritative state may be rebuilt/reconciled only after authoritative restore verifies",
+      "rollback_policy": "discard/rebuild/reconcile from declared authority",
+      "migration_contract": "legacy user_progress, feedback, learning-session and co-coding records import idempotently to Mongo; new writes are Mongo-first",
+      "backup_restore_contract": "discard/rebuild after the authoritative Mongo restore has passed digest/count/index verification; tested for total projection loss",
+      "evidence_refs": [
+        "backend/services/rag_service.py",
+        "docker-compose.yml",
+        "backend/services/rag_state_repository.py",
+        "backend/tests/test_rag_state_repository.py",
+        "backend/tests/test_rag_state_authority.py",
+        "scripts/state_recovery_drill.py",
+        ".github/workflows/state-recovery-drill.yml"
+      ]
+    },
+    {
+      "domain_id": "optional-vector-index",
+      "authority": "derived",
+      "source_of_truth": false,
+      "physical_store": "chroma-service",
+      "qualification_mode": "derived-rebuild",
+      "release_required": true,
+      "mixed_version_policy": "non-authoritative state may be rebuilt/reconciled only after authoritative restore verifies",
+      "rollback_policy": "discard/rebuild/reconcile from declared authority",
+      "migration_contract": "re-index from authoritative sources",
+      "backup_restore_contract": "rebuild only after authoritative source restore verification passes; backup optional when fully derived",
+      "evidence_refs": [
+        "docker-compose.yml",
+        "skeleton/config/settings.py",
+        "scripts/state_recovery_drill.py",
+        ".github/workflows/state-recovery-drill.yml",
+        "skeleton/memory/projection.py",
+        "skeleton/testing/test_memory_projection.py",
+        "skeleton/api/server.py"
+      ]
+    },
+    {
+      "domain_id": "canonical-operation-state",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "physical_store": "operation-state-sqlite",
+      "qualification_mode": "authoritative-migrate-rollback-restore",
+      "release_required": true,
+      "mixed_version_policy": "reader/writer compatibility must be rehearsed for any schema-changing release; otherwise explicit no-schema-change evidence is required",
+      "rollback_policy": "exact rollback or an explicitly tested compensation/restore path is mandatory before cutover",
+      "migration_contract": "preserve operation identity digest, state/version monotonicity, terminal status and unpublished outbox rows",
+      "backup_restore_contract": "persistent Compose binding plus SQLite online-backup destruction/restore rehearsal verify operation identity/state/version and unpublished outbox identity before restored reconciliation",
+      "evidence_refs": [
+        "skeleton/contracts/operation.py",
+        "skeleton/persistence/operation_store.py",
+        "skeleton/testing/test_operation_contract.py",
+        "skeleton/testing/test_operation_store.py",
+        "skeleton/persistence/operation_runtime.py",
+        "skeleton/api/server.py",
+        "skeleton/config/settings.py",
+        "docker-compose.yml",
+        "skeleton/testing/test_operation_runtime.py",
+        "skeleton/testing/test_operation_server_binding.py",
+        "scripts/state_recovery_drill.py",
+        "skeleton/testing/test_state_recovery_drill.py",
+        ".github/workflows/state-recovery-drill.yml"
+      ]
+    },
+    {
+      "domain_id": "operation-event-stream",
+      "authority": "durable-projection",
+      "source_of_truth": false,
+      "physical_store": "operation-stream-sqlite",
+      "qualification_mode": "projection-reconcile-replay",
+      "release_required": true,
+      "mixed_version_policy": "non-authoritative state may be rebuilt/reconciled only after authoritative restore verifies",
+      "rollback_policy": "discard/rebuild/reconcile from declared authority",
+      "migration_contract": "preserve event IDs, sequence, terminal fence, replay watermark and consumer acknowledgements",
+      "backup_restore_contract": "persistent Compose binding is implemented; reopen preserves replay semantics and startup reconciliation drains unpublished operation outbox rows",
+      "evidence_refs": [
+        "skeleton/frontier/runtime/operation_stream_store.py",
+        "skeleton/frontier/runtime/operation_stream.py",
+        "skeleton/persistence/operation_runtime.py",
+        "skeleton/api/server.py",
+        "docker-compose.yml",
+        "skeleton/testing/test_operation_runtime.py",
+        "skeleton/testing/test_operation_server_binding.py"
+      ]
+    },
+    {
+      "domain_id": "in-process-retrieval-memory",
+      "authority": "derived",
+      "source_of_truth": false,
+      "physical_store": "process-memory",
+      "qualification_mode": "derived-rebuild",
+      "release_required": true,
+      "mixed_version_policy": "non-authoritative state may be rebuilt/reconciled only after authoritative restore verifies",
+      "rollback_policy": "discard/rebuild/reconcile from declared authority",
+      "migration_contract": "rebuild after restart",
+      "backup_restore_contract": "none",
+      "evidence_refs": [
+        "skeleton/retrieval/index.py",
+        "skeleton/memory/vector.py",
+        "skeleton/frontier/runtime/operation_stream.py"
+      ]
+    },
+    {
+      "domain_id": "manual-memory-snapshots",
+      "authority": "recovery-aid",
+      "source_of_truth": false,
+      "physical_store": "snapshot-files",
+      "qualification_mode": "recovery-format-compatibility",
+      "release_required": true,
+      "mixed_version_policy": "non-authoritative state may be rebuilt/reconciled only after authoritative restore verifies",
+      "rollback_policy": "discard/rebuild/reconcile from declared authority",
+      "migration_contract": "format compatibility required for restore",
+      "backup_restore_contract": "debug/manual recovery only",
+      "evidence_refs": [
+        "skeleton/persistence/snapshots.py"
+      ]
+    },
+    {
+      "domain_id": "cognitive-execution-ledger",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "physical_store": "engine-cognitive-sqlite",
+      "qualification_mode": "authoritative-migrate-rollback-restore",
+      "release_required": true,
+      "mixed_version_policy": "reader/writer compatibility must be rehearsed for any schema-changing release; otherwise explicit no-schema-change evidence is required",
+      "rollback_policy": "exact rollback or an explicitly tested compensation/restore path is mandatory before cutover",
+      "migration_contract": "must preserve operation_id, execution_id, turn_id lineage, checkpoint version and terminal execution state",
+      "backup_restore_contract": "restore engine_execution.sqlite before engine recovery; repository corruption checks validate request identity, turn/checkpoint contracts and terminal result payloads before resume",
+      "evidence_refs": [
+        "skeleton/contracts/ai_execution.py",
+        "skeleton/persistence/execution_repository.py",
+        "skeleton/intelligence/execution_runtime.py",
+        "skeleton/api/engine_runtime.py",
+        "skeleton/api/server.py",
+        "skeleton/config/settings.py",
+        "docker-compose.yml",
+        "skeleton/testing/test_execution_repository.py",
+        "skeleton/testing/test_execution_runtime.py",
+        "skeleton/testing/test_engine_execution_coordinator.py"
+      ]
+    },
+    {
+      "domain_id": "tool-idempotency-ledger",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "physical_store": "engine-cognitive-sqlite",
+      "qualification_mode": "authoritative-migrate-rollback-restore",
+      "release_required": true,
+      "mixed_version_policy": "reader/writer compatibility must be rehearsed for any schema-changing release; otherwise explicit no-schema-change evidence is required",
+      "rollback_policy": "exact rollback or an explicitly tested compensation/restore path is mandatory before cutover",
+      "migration_contract": "preserve call_id, arguments digest, idempotency mode, fence/version, status, receipt and compensation metadata",
+      "backup_restore_contract": "restore engine_tool_receipts.sqlite before resumed execution can replay tool calls; persisted request/lineage/privacy fingerprints fence conflicting idempotency reuse",
+      "evidence_refs": [
+        "skeleton/skills/tool_contract.py",
+        "skeleton/skills/tool_runtime.py",
+        "skeleton/skills/tool_receipt_store.py",
+        "skeleton/api/server.py",
+        "docker-compose.yml",
+        "skeleton/testing/test_tool_runtime.py",
+        "skeleton/testing/test_tool_receipt_store.py",
+        "skeleton/testing/test_execution_runtime.py"
+      ]
+    },
+    {
+      "domain_id": "human-approval-ledger",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "physical_store": "engine-cognitive-sqlite",
+      "qualification_mode": "authoritative-migrate-rollback-restore",
+      "release_required": true,
+      "mixed_version_policy": "reader/writer compatibility must be rehearsed for any schema-changing release; otherwise explicit no-schema-change evidence is required",
+      "rollback_policy": "exact rollback or an explicitly tested compensation/restore path is mandatory before cutover",
+      "migration_contract": "preserve approval identity, arguments digest, risk class, requester/decider identities, expiry and decision",
+      "backup_restore_contract": "restore engine_submissions.sqlite with execution state before resume; approval call/tool/arguments/idempotency identity and expiry remain restart-safe and fail closed after authority expiry",
+      "evidence_refs": [
+        "skeleton/api/engine_authority.py",
+        "skeleton/api/engine_service.py",
+        "skeleton/api/engine_runtime.py",
+        "skeleton/api/server.py",
+        "docker-compose.yml",
+        "skeleton/testing/test_engine_execution_service.py",
+        "skeleton/testing/test_engine_execution_coordinator.py"
+      ]
+    },
+    {
+      "domain_id": "execution-usage-ledger",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "physical_store": "engine-cognitive-sqlite",
+      "qualification_mode": "authoritative-migrate-rollback-restore",
+      "release_required": true,
+      "mixed_version_policy": "reader/writer compatibility must be rehearsed for any schema-changing release; otherwise explicit no-schema-change evidence is required",
+      "rollback_policy": "exact rollback or an explicitly tested compensation/restore path is mandatory before cutover",
+      "migration_contract": "preserve normalized units, provider/tool source, estimate-versus-actual distinction and monotonic cumulative totals",
+      "backup_restore_contract": "restore engine_quota.sqlite before admission so active reservations, committed usage and replay-safe completion identities survive restart; Compose binds the ledger to skeleton_data",
+      "evidence_refs": [
+        "skeleton/intelligence/admission.py",
+        "skeleton/intelligence/admission_runtime.py",
+        "skeleton/intelligence/quota_sqlite.py",
+        "skeleton/api/server.py",
+        "docker-compose.yml",
+        "skeleton/testing/test_admission_runtime.py",
+        "skeleton/testing/test_tenant_quota_sqlite.py",
+        "skeleton/testing/test_actual_usage_metering.py"
+      ]
+    },
+    {
+      "domain_id": "final-ai-result-ledger",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "physical_store": "engine-cognitive-sqlite",
+      "qualification_mode": "authoritative-migrate-rollback-restore",
+      "release_required": true,
+      "mixed_version_policy": "reader/writer compatibility must be rehearsed for any schema-changing release; otherwise explicit no-schema-change evidence is required",
+      "rollback_policy": "exact rollback or an explicitly tested compensation/restore path is mandatory before cutover",
+      "migration_contract": "preserve final status/output reference, verification, route/provider/tool receipts, usage, memory/artifact refs and terminal event identity",
+      "backup_restore_contract": "restore engine_execution.sqlite before recovery; terminal results and staged finalization intents are validated against canonical execution identity/version and cannot be reconstructed from stream projections alone",
+      "evidence_refs": [
+        "skeleton/contracts/ai_execution.py",
+        "skeleton/persistence/execution_repository.py",
+        "skeleton/intelligence/execution_runtime.py",
+        "skeleton/api/engine_runtime.py",
+        "docker-compose.yml",
+        "skeleton/testing/test_execution_repository.py",
+        "skeleton/testing/test_execution_runtime.py"
+      ]
+    },
+    {
+      "domain_id": "conversation-thread-state",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "physical_store": "mongo",
+      "qualification_mode": "authoritative-migrate-rollback-restore",
+      "release_required": true,
+      "mixed_version_policy": "reader/writer compatibility must be rehearsed for any schema-changing release; otherwise explicit no-schema-change evidence is required",
+      "rollback_policy": "exact rollback or an explicitly tested compensation/restore path is mandatory before cutover",
+      "migration_contract": "preserve thread_id, tenant/owner identity, status, active branch, version and retention metadata",
+      "backup_restore_contract": "required with backend core application state",
+      "evidence_refs": [
+        "machine/ai_app_construction.json",
+        "skeleton/contracts/conversation.py",
+        "skeleton/persistence/conversation_repository.py",
+        "skeleton/testing/test_conversation_repository.py",
+        "backend/core/databases.py",
+        "backend/core/conversations.py",
+        "backend/routes/conversations.py",
+        "backend/tests/test_conversations_api.py",
+        "frontend/src/product/conversationClient.ts"
+      ]
+    },
+    {
+      "domain_id": "conversation-message-state",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "physical_store": "mongo",
+      "qualification_mode": "authoritative-migrate-rollback-restore",
+      "release_required": true,
+      "mixed_version_policy": "reader/writer compatibility must be rehearsed for any schema-changing release; otherwise explicit no-schema-change evidence is required",
+      "rollback_policy": "exact rollback or an explicitly tested compensation/restore path is mandatory before cutover",
+      "migration_contract": "preserve message_id, thread/tenant/author identity, sequence, branch/supersedes lineage, operation/result refs and content/provenance refs",
+      "backup_restore_contract": "required with backend core application state",
+      "evidence_refs": [
+        "machine/ai_app_construction.json",
+        "skeleton/contracts/conversation.py",
+        "skeleton/persistence/conversation_repository.py",
+        "skeleton/testing/test_conversation_repository.py",
+        "backend/core/conversations.py",
+        "backend/routes/conversations.py",
+        "backend/gameforge/jeeves/chat_contract.py",
+        "backend/routes/jeeves_compose.py",
+        "backend/tests/test_conversations_api.py",
+        "tests/test_jeeves_chat_workspace.py",
+        "frontend/src/product/conversationClient.ts"
+      ]
+    },
+    {
+      "domain_id": "verification-receipt-ledger",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "physical_store": "engine-cognitive-sqlite",
+      "qualification_mode": "authoritative-migrate-rollback-restore",
+      "release_required": true,
+      "mixed_version_policy": "reader/writer compatibility must be rehearsed for any schema-changing release; otherwise explicit no-schema-change evidence is required",
+      "rollback_policy": "exact rollback or an explicitly tested compensation/restore path is mandatory before cutover",
+      "migration_contract": "preserve verification receipt identity, claim/execution/operation/result lineage, digest, outcome/reason codes, evidence/postcondition checks and verified timestamp",
+      "backup_restore_contract": "restore engine_execution.sqlite before resumed/finalized execution; verification receipts are durable authoritative state and must retain receipt/execution/operation/result lineage",
+      "evidence_refs": [
+        "skeleton/contracts/verification.py",
+        "skeleton/persistence/execution_repository.py",
+        "skeleton/intelligence/verification_runtime.py",
+        "skeleton/intelligence/execution_runtime.py",
+        "skeleton/testing/test_execution_repository.py",
+        "skeleton/testing/test_execution_runtime.py",
+        "docker-compose.yml",
+        "machine/state_backup_policy.json"
+      ]
+    },
+    {
+      "domain_id": "governance-lifecycle-registry",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "physical_store": "governance-lifecycle-sqlite",
+      "qualification_mode": "authoritative-migrate-rollback-restore",
+      "release_required": true,
+      "mixed_version_policy": "reader/writer compatibility must be rehearsed for any schema-changing release; otherwise explicit no-schema-change evidence is required",
+      "rollback_policy": "exact rollback or an explicitly tested compensation/restore path is mandatory before cutover",
+      "migration_contract": "preserve record_id, tenant, owner/source identity, classification, purposes, deletion targets, retention, lifecycle state, plan identity, acknowledgements and receipts",
+      "backup_restore_contract": "restore with skeleton_data before governance actions; corrupt or unsupported snapshots fail closed at registry construction",
+      "evidence_refs": [
+        "skeleton/vault/data_lifecycle.py",
+        "skeleton/vault/governance_registry.py",
+        "skeleton/vault/lifecycle_adapters.py",
+        "skeleton/api/server.py",
+        "docker-compose.yml",
+        "skeleton/testing/test_data_lifecycle.py",
+        "skeleton/testing/test_governance_runtime_binding.py"
+      ]
+    },
+    {
+      "domain_id": "canonical-ai-memory-records",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "physical_store": "mongo",
+      "qualification_mode": "authoritative-migrate-rollback-restore",
+      "release_required": true,
+      "mixed_version_policy": "reader/writer compatibility must be rehearsed for any schema-changing release; otherwise explicit no-schema-change evidence is required",
+      "rollback_policy": "exact rollback or an explicitly tested compensation/restore path is mandatory before cutover",
+      "migration_contract": "preserve memory_id, tenant/user/namespace, kind, content reference/digest, provenance, authority class, retention, dedupe/idempotency key, complete version/revision lineage, tombstone state, and unpublished projection-outbox events",
+      "backup_restore_contract": "canonical memory is part of authoritative Mongo recovery and must be restored and verified before any vector/MAG/CAG/search projection rebuild; lifecycle state is restored with governance before export/delete/retention actions resume",
+      "evidence_refs": [
+        "machine/ai_app_construction.json",
+        "skeleton/frontier/runtime/memory.py",
+        "skeleton/frontier/runtime/retrieval_context.py",
+        "skeleton/memory/frontier_adapter.py",
+        "skeleton/contracts/memory_record.py",
+        "skeleton/persistence/memory_repository.py",
+        "skeleton/memory/projection.py",
+        "skeleton/testing/test_memory_repository.py",
+        "skeleton/testing/test_mongo_memory_repository.py",
+        "skeleton/testing/test_memory_projection.py",
+        "skeleton/api/server.py",
+        "skeleton/memory/writeback.py",
+        "skeleton/testing/test_governance_runtime_binding.py",
+        "pyproject.toml",
+        "skeleton/vault/lifecycle_adapters.py"
+      ]
+    },
+    {
+      "domain_id": "local-reference-provenance",
+      "authority": "conditional-authoritative",
+      "source_of_truth": true,
+      "physical_store": "snapshot-files",
+      "qualification_mode": "authoritative-migrate-rollback-restore",
+      "release_required": true,
+      "mixed_version_policy": "reader/writer compatibility must be rehearsed for any schema-changing release; otherwise explicit no-schema-change evidence is required",
+      "rollback_policy": "exact rollback or an explicitly tested compensation/restore path is mandatory before cutover",
+      "migration_contract": "historical skeleton/acquired/gaming/provenance.jsonl remains unchanged; no automatic import, relocation or mutation; caller must explicitly select workspace when restoring a reference port",
+      "backup_restore_contract": "preserve operator-owned journals when observation history matters; read_provenance verifies framing/schema/checksums before use; failures preserve evidence and fail closed",
+      "evidence_refs": [
+        "skeleton/cortex/reference_provenance.py",
+        "skeleton/cortex/refs.py",
+        "skeleton/cortex/deck_interactions.py",
+        "skeleton/testing/test_reference_provenance.py",
+        "docs/architecture/REFERENCE_PROVENANCE.md"
+      ]
+    }
+  ],
+  "executable_scenarios": [
+    {
+      "id": "migration-engine-reference",
+      "domains": [
+        "canonical-operation-state"
+      ],
+      "kind": "deterministic-forward-mixed-replay-rollback-restore",
+      "command": "python scripts/check_state_migration_qualification.py --json",
+      "evidence_refs": [
+        "skeleton/persistence/migration_compatibility.py",
+        "skeleton/testing/test_migration_compatibility.py"
+      ]
+    },
+    {
+      "id": "rag-legacy-chroma-to-mongo",
+      "domains": [
+        "backend-core-app-state",
+        "backend-rag-local-chroma"
+      ],
+      "kind": "legacy-import-idempotence-and-authority-cutover",
+      "command": "python -m pytest -q backend/tests/test_rag_state_authority.py",
+      "evidence_refs": [
+        "backend/services/rag_service.py",
+        "backend/services/rag_state_repository.py",
+        "backend/tests/test_rag_state_authority.py"
+      ]
+    },
+    {
+      "id": "mongo-authority-backup-restore",
+      "domains": [
+        "backend-core-app-state",
+        "canonical-ai-memory-records"
+      ],
+      "kind": "destructive-backup-restore-derived-rebuild",
+      "command": "python scripts/state_recovery_drill.py live-mongo --help",
+      "evidence_refs": [
+        "scripts/state_recovery_drill.py",
+        "skeleton/testing/test_state_recovery_drill.py",
+        ".github/workflows/state-recovery-drill.yml"
+      ]
+    },
+    {
+      "id": "operation-sqlite-outbox-restore",
+      "domains": [
+        "canonical-operation-state",
+        "operation-event-stream"
+      ],
+      "kind": "online-backup-destroy-restore-reconcile",
+      "command": "python -m pytest -q skeleton/testing/test_state_recovery_drill.py::test_operation_sqlite_restore_preserves_authority_and_outbox_order",
+      "evidence_refs": [
+        "scripts/state_recovery_drill.py",
+        "skeleton/testing/test_state_recovery_drill.py",
+        "skeleton/persistence/operation_store.py",
+        "skeleton/persistence/operation_runtime.py"
+      ]
+    },
+    {
+      "id": "engine-sqlite-bundle-restore",
+      "domains": [
+        "cognitive-execution-ledger",
+        "tool-idempotency-ledger",
+        "human-approval-ledger",
+        "execution-usage-ledger",
+        "final-ai-result-ledger",
+        "verification-receipt-ledger"
+      ],
+      "kind": "bundle-backup-destroy-restore-identity-verification",
+      "command": "python -m pytest -q skeleton/testing/test_state_recovery_drill.py::test_engine_sqlite_bundle_restore_preserves_authoritative_ledgers",
+      "evidence_refs": [
+        "scripts/state_recovery_drill.py",
+        "skeleton/testing/test_state_recovery_drill.py",
+        "machine/state_backup_policy.json",
+        "scripts/state_backup_bundle.py"
+      ]
+    },
+    {
+      "id": "canonical-memory-rebuild-order",
+      "domains": [
+        "canonical-ai-memory-records",
+        "optional-vector-index",
+        "in-process-retrieval-memory"
+      ],
+      "kind": "authoritative-first-active-only-derived-rebuild",
+      "command": "python -m pytest -q skeleton/testing/test_state_recovery_drill.py::test_derived_rebuild_includes_only_active_canonical_memory",
+      "evidence_refs": [
+        "scripts/state_recovery_drill.py",
+        "skeleton/testing/test_state_recovery_drill.py",
+        "skeleton/memory/projection.py"
+      ]
+    }
+  ],
+  "required_release_tests": [
+    "skeleton/testing/test_migration_compatibility.py",
+    "skeleton/testing/test_state_recovery_drill.py",
+    "skeleton/testing/test_state_backup_bundle.py",
+    "backend/tests/test_rag_state_authority.py"
+  ]
+}
