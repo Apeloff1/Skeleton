@@ -57,6 +57,7 @@ class ForgeReleaseBinding:
     producer_behavior_digest: str
     source_revision: str
     champion_producer_provenance_digest: str
+    champion_output_binding_digest: str
     champion_candidate_digest: str
     champion_artifact_digest: str
     champion_canon_digest: str
@@ -75,6 +76,7 @@ class ForgeReleaseBinding:
             "model_identity_digest",
             "producer_behavior_digest",
             "champion_producer_provenance_digest",
+            "champion_output_binding_digest",
             "champion_candidate_digest",
             "promotion_chain_digest",
         ):
@@ -114,11 +116,22 @@ class ForgeReleaseBinding:
         cls,
         checkpoint: Mapping[str, object],
         *,
+        expected_checkpoint_digest: str,
         receipts: Iterable[PromotionReceipt],
     ) -> "ForgeReleaseBinding":
         if not isinstance(checkpoint, Mapping):
             raise TypeError("forge checkpoint must be a mapping")
+        if (
+            not isinstance(expected_checkpoint_digest, str)
+            or len(expected_checkpoint_digest) != 64
+            or any(ch not in "0123456789abcdef" for ch in expected_checkpoint_digest)
+        ):
+            raise ValueError("expected checkpoint digest must be lowercase sha256")
         supplied_digest = checkpoint.get("checkpoint_digest")
+        if supplied_digest != expected_checkpoint_digest:
+            raise ValueError(
+                "forge release checkpoint does not match trusted external anchor"
+            )
         core = {
             key: value
             for key, value in checkpoint.items()
@@ -225,6 +238,7 @@ class ForgeReleaseBinding:
                 "finalization_intent_digest",
                 "model_identity_digest",
                 "producer_behavior_digest",
+                "output_binding_digest",
             )
         }
         if any(
@@ -248,6 +262,7 @@ class ForgeReleaseBinding:
             producer_behavior_digest=required_provenance_digests["producer_behavior_digest"],
             source_revision=required_provenance_text["source_revision"],
             champion_producer_provenance_digest=canonical_digest(producer_provenance),
+            champion_output_binding_digest=required_provenance_digests["output_binding_digest"],
             champion_candidate_digest=champion_candidate_digest,
             champion_artifact_digest=identities["artifact_digest"],
             champion_canon_digest=identities["canon_digest"],
@@ -272,6 +287,7 @@ class ForgeReleaseBinding:
             "producer_behavior_digest": self.producer_behavior_digest,
             "source_revision": self.source_revision,
             "champion_producer_provenance_digest": self.champion_producer_provenance_digest,
+            "champion_output_binding_digest": self.champion_output_binding_digest,
             "champion_artifact_digest": self.champion_artifact_digest,
             "champion_candidate_digest": self.champion_candidate_digest,
             "champion_canon_digest": self.champion_canon_digest,
