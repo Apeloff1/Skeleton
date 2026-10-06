@@ -5,31 +5,53 @@ not a model, router, knowledge store, optimizer authority, or promotion plane.
 
 ## Reverse-engineering basis
 
-The build was derived from three existing repository surfaces:
+The build is derived from existing repository contracts rather than inventing a
+parallel AI stack:
 
 1. the quarantined `research/legacy/gameforge/math_exocortex` lineage, which
-   demonstrated calculator, uncertainty, symbolic/formal-tooling, and mechanics
+   demonstrates calculator, uncertainty, symbolic/formal-tooling, and mechanics
    ambitions but is explicitly non-authoritative;
-2. the optimized `runtime/kernel/ops` math paths, which need a small,
-   deterministic correctness oracle for numerical parity;
-3. the Jeeves probabilistic stack, whose evidence custody already requires
-   finite values, explicit calibration identities, and fail-closed validation.
+2. optimized `runtime/kernel/ops` and `runtime/cortex/attn.py` primitives,
+   which need deterministic correctness oracles for numerics, tensor shapes,
+   attention-supporting algebra, and differentiation;
+3. the Jeeves probabilistic and spectral stack, whose evidence custody requires
+   finite values, explicit dimensionality, calibration identity, and leakage-safe
+   mathematical behavior;
+4. local recurrent-model training, which already owns model learning and therefore
+   must not be duplicated by this package.
 
 The result intentionally does **not** copy the legacy exocortex into production.
-It extracts the reusable contract: deterministic finite math, explicit dimensions,
-stable normalization, auditable optimization, and invariant checks.
+It extracts reusable mathematical contracts while preserving existing runtime and
+model authority boundaries.
+
+## Implemented reference domains
+
+- `contracts.py` — finite scalar/vector/matrix validation and dimension errors.
+- `numerics.py` — compensated summation, log-sum-exp, stable softmax and error metrics.
+- `linear.py` — dense reference algebra and pivoted linear solve evidence.
+- `probability.py` — normalized probability and information-theory invariants.
+- `optimization.py` — bounded deterministic projected-gradient reference solver.
+- `autodiff.py` — multi-direction dual numbers, exact first derivatives and Jacobians.
+- `tensor.py` — immutable row-major dense tensors, reshape, transpose and broadcasting.
+- `spectral.py` — symmetric dominant eigenpair and deterministic periodogram diagnostics.
+- `integration.py` — adaptive Simpson quadrature and bounded fixed-step RK4 dynamics.
+- `statistics.py` — Welford moments, covariance/correlation, robust quantiles and MAD.
+- `validation.py` — parity evidence against existing optimized runtime kernels.
 
 ## Guarantees
 
 - Python standard library only; no optional dependency is required for correctness.
 - NaN and infinity are rejected at public boundaries.
-- Dense matrix operations reject ragged and dimension-mismatched inputs.
-- Probability operations normalize explicitly and reject missing support where a
-  finite divergence cannot be justified.
-- Optimization is deterministic, bounded by iteration/line-search limits, and
-  records a trace rather than silently claiming convergence.
-- `audit_runtime_kernels()` compares the optimized runtime softmax, matmul, and
-  attention row against this reference substrate without replacing those kernels.
+- Dense matrix/tensor operations reject ragged, invalid-index and dimension-mismatched input.
+- Broadcasting follows explicit right-aligned compatibility rules.
+- Probability operations normalize explicitly and reject missing support where finite
+  divergence cannot be justified.
+- Automatic differentiation rejects silent derivative-dimension changes.
+- Spectral eigen analysis reports residuals and convergence instead of merely returning a vector.
+- Quadrature reports an error estimate/evaluation count; RK4 validates every derivative state.
+- Optimization is deterministic, bounded by iteration/line-search limits, and records a trace.
+- `audit_runtime_kernels()` compares optimized runtime softmax, matmul and attention against
+  this reference substrate without replacing those kernels.
 
 ## Promotion rule
 
