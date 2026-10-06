@@ -657,6 +657,10 @@ class ServerState:
         """Bind durable engine API authority and local execution coordinator."""
 
         if self.engine_execution_service is not None:
+    ) -> Any:
+        """Bind durable engine API authority and local execution coordinator."""
+
+        if self.engine_execution_service is not None:
             return self.engine_execution_service
 
         from pathlib import Path
@@ -815,12 +819,13 @@ class ServerState:
         )
         provider_registry = ProviderRegistry.from_env(
             admission_runtime=provider_admission_runtime,
-        )
-        coordinator = EngineExecutionCoordinator(
-            service,
-            provider_registry=provider_registry,
             finalization_binding_hook=(
                 self.bind_verified_memory_finalization
+            ),
+            lifecycle=runtime_lifecycle,
+            tool_runtime=build_engine_tool_runtime(
+                admission_runtime=execution_admission_runtime,
+                receipt_store=receipt_store,
             ),
             lifecycle=runtime_lifecycle,
             tool_runtime=build_engine_tool_runtime(
@@ -964,16 +969,27 @@ _DEV_OPEN_PREFIXES = (
     "/cortex/status",
     "/cockpit",
     "/docs",
-    "/openapi.json",
-    "/redoc",
-    "/api/v1/health",
-    "/api/v1/metrics",
-    "/api/v1/genesis",
-)
 
 
-def _public_dev_surfaces_enabled() -> bool:
-    return os.environ.get("SKELETON_PUBLIC_DEV_SURFACES", "").strip().lower() in {
+def create_app() -> Any:
+    from skeleton.kernel.runtime_supervision import RuntimeServiceLifecycle
+
+    fastapi = _get_fastapi()
+    app = fastapi.FastAPI(title="Skeleton API", version="16.0.0", description="AI game engine / agent orchestration framework")
+    runtime_lifecycle = RuntimeServiceLifecycle("skeleton")
+    app.state.runtime_lifecycle = runtime_lifecycle
+    install_error_handlers(app)
+
+    from skeleton.kernel.runtime_supervision import RuntimeAdmissionMiddleware
+    app.add_middleware(
+        RuntimeAdmissionMiddleware,
+        lifecycle=runtime_lifecycle,
+        exempt_prefixes=("/api/v1/health",),
+    )
+
+    from skeleton.api.routes import router
+    from skeleton.api.command_routes import router as command_router
+    from skeleton.api.cockpit import router as cockpit_router
         "1", "true", "yes", "on",
     }
 
@@ -1017,24 +1033,29 @@ def create_app() -> Any:
 
     fastapi = _get_fastapi()
     app = fastapi.FastAPI(title="Skeleton API", version="16.0.0", description="AI game engine / agent orchestration framework")
-    runtime_lifecycle = RuntimeServiceLifecycle("skeleton")
-    app.state.runtime_lifecycle = runtime_lifecycle
-    install_error_handlers(app)
+        state.bind_governance_registry()
+        state.bind_canonical_artifact_store()
+        state.bind_canonical_retrieval_index()
+        state.bind_engine_execution_service(
+            runtime_lifecycle=runtime_lifecycle,
+        )
+        if _canonical_memory_mongo_configured():
+            await state.bind_canonical_memory_writer()
+        await state.recover_engine_executions()
+        runtime_lifecycle.mark_ready(reason="engine-recovery-complete")
 
-    from skeleton.kernel.runtime_supervision import RuntimeAdmissionMiddleware
-    app.add_middleware(
-        RuntimeAdmissionMiddleware,
-        lifecycle=runtime_lifecycle,
-        exempt_prefixes=("/api/v1/health",),
-    )
+    @app.on_event("shutdown")
+    async def shutdown():
+        runtime_lifecycle.begin_drain(reason="engine-fastapi-shutdown")
+        state = get_state()
+        await state.close_canonical_memory_writer()
+        await state.close_engine_execution_service()
+        state.close_governance_registry()
+        state.close_operation_runtime()
+        runtime_lifecycle.mark_stopped(reason="engine-durable-runtimes-drained")
 
-    from skeleton.api.routes import router
-    from skeleton.api.command_routes import router as command_router
-    from skeleton.api.cockpit import router as cockpit_router
-    from skeleton.api.swarm_routes import router as swarm_router
-    from skeleton.api.swarm_operator_routes import router as swarm_operator_router
-    from skeleton.api.swarm_policy_routes import router as swarm_policy_router
-    from skeleton.api.swarm_lifecycle_routes import router as swarm_lifecycle_router
+    @app.get("/")
+    async def root():
     from skeleton.api.swarm_integrity_routes import router as swarm_integrity_router
     from skeleton.api.swarm_fence_routes import router as swarm_fence_router
     from skeleton.api.swarm_supervisor_routes import router as swarm_supervisor_router

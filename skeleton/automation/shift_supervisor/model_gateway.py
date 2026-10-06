@@ -14,6 +14,7 @@ from skeleton.security.activation_security import enforce_bot_activation_securit
 from .prompts import compose_system_prompt
 
 
+
 class ModelRequestError(RuntimeError):
     """Raised when a bounded model request cannot be completed safely."""
 
@@ -154,7 +155,6 @@ class ModelGateway:
         self,
         *,
         system_prompt: str,
-        user_prompt: str,
         correlation_id: str,
         max_output_tokens: int = 8000,
         extra_headers: Mapping[str, str] | None = None,
@@ -162,6 +162,12 @@ class ModelGateway:
     ) -> dict[str, Any]:
         enforce_bot_activation_security()
         if cancellation is not None:
+            if not isinstance(cancellation, CancellationToken):
+                raise TypeError("cancellation must be CancellationToken")
+            cancellation.require_active()
+        endpoint, api_key, model = self._config()
+        system_prompt = compose_system_prompt(system_prompt)
+        web_search = self._web_search_enabled()
             if not isinstance(cancellation, CancellationToken):
                 raise TypeError("cancellation must be CancellationToken")
             cancellation.require_active()
@@ -186,12 +192,14 @@ class ModelGateway:
 
         fallback_models = self._fallback_models(model)
         active_model = model
-        last_error_summary = "unknown model request failure"
-        attempts = max(1, int(self.max_attempts))
-        standard_attempts = max(
-            1,
-            min(attempts, int(self.max_non_rate_limit_attempts)),
-        )
+        attempts_used = 0
+        saw_retryable_rate_limit = False
+        for attempt in range(1, attempts + 1):
+            if cancellation is not None:
+                cancellation.require_active()
+            attempts_used = attempt
+            if (
+                attempt > standard_attempts
         attempts_used = 0
         saw_retryable_rate_limit = False
         for attempt in range(1, attempts + 1):
@@ -213,14 +221,18 @@ class ModelGateway:
                 max_output_tokens=max_output_tokens,
                 enable_web_search=web_search,
                 max_tool_calls=self.max_tool_calls,
+                method="POST",
             )
-            encoded = json.dumps(body, separators=(",", ":")).encode("utf-8")
-            headers = dict(base_headers)
-            headers["Idempotency-Key"] = f"{correlation_id}:{active_model}"
-            request = urllib.request.Request(
-                endpoint,
-                data=encoded,
-                headers=headers,
+            try:
+                if cancellation is not None:
+                    cancellation.require_active()
+                with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:
+                    raw = response.read(self.max_response_bytes + 1)
+                if cancellation is not None:
+                    cancellation.require_active()
+                if len(raw) > self.max_response_bytes:
+                    raise ValueError("model response exceeded configured byte limit")
+                payload = json.loads(raw.decode("utf-8"))
                 method="POST",
             )
             try:
@@ -236,12 +248,14 @@ class ModelGateway:
                 content = self._extract_content(payload)
                 if isinstance(content, dict):
                     return content
-                decoded = json.loads(content)
-                if not isinstance(decoded, dict):
-                    raise TypeError("model JSON response must be an object")
-                return decoded
-            except (
-                urllib.error.URLError,
+                TypeError,
+                ValueError,
+            ) as exc:
+                if cancellation is not None and cancellation.cancelled:
+                    cancellation.require_active()
+                if isinstance(exc, urllib.error.HTTPError):
+                    error_code, error_type, request_id = self._http_error_details(exc)
+                    last_error_summary = self._http_error_summary(
                 urllib.error.HTTPError,
                 TimeoutError,
                 OSError,
@@ -257,13 +271,17 @@ class ModelGateway:
                     error_code, error_type, request_id = self._http_error_details(exc)
                     last_error_summary = self._http_error_summary(
                         exc,
-                        error_code=error_code,
-                        error_type=error_type,
-                        request_id=request_id,
-                    )
-                    if exc.code == 429:
-                        if self._non_retryable_429(error_code, error_type):
-                            break
+                    else standard_attempts
+                )
+                if attempt < retry_limit:
+                    delay = self._retry_delay(exc, attempt)
+                    if cancellation is None:
+                        time.sleep(delay)
+                    elif cancellation.wait(delay):
+                        cancellation.require_active()
+                    continue
+                break
+        raise ModelRequestError(
                         saw_retryable_rate_limit = True
                 else:
                     last_error_summary = f"{type(exc).__name__}: {exc}"
