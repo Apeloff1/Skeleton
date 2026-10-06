@@ -1220,6 +1220,9 @@ async def ai_chat(
             "error": "AI engine configuration invalid",
             "error_code": "engine_configuration_invalid",
             "operation_id": operation_id,
+            "turn_state": (
+                None if chat_turn is None else chat_turn.snapshot.state.value
+            ),
             "engine_execution_id": execution_id,
             "thread": thread.as_dict(),
             "user_message": user_message.as_dict(),
@@ -1372,6 +1375,9 @@ async def ai_chat(
                 "error": "AI execution failed",
                 "error_code": exc.failure_code or "engine_execution_failed",
                 "operation_id": operation_id,
+                "turn_state": (
+                    None if chat_turn is None else chat_turn.snapshot.state.value
+                ),
                 "engine_execution_id": execution_id,
                 "thread": thread.as_dict(),
                 "user_message": user_message.as_dict(),
@@ -1669,7 +1675,25 @@ async def get_ai_chat_turn(
         thread.thread_id,
         user_message.message_id,
     )
+    try:
+        chat_turn = await chat_turn_lifecycle.get_if_present(
+            operation_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+    except Exception as exc:
+        raise _chat_error(exc) from exc
+
     if assistant_message is not None:
+        if chat_turn is not None:
+            try:
+                chat_turn = await chat_turn_lifecycle.finalize_existing_assistant(
+                    operation_id,
+                    tenant_id=tenant_id,
+                    owner_id=owner_id,
+                )
+            except Exception as exc:
+                raise _chat_error(exc) from exc
         return {
             "success": True,
             "accepted": True,
@@ -1681,6 +1705,9 @@ async def get_ai_chat_turn(
             "model": _active_model(),
             "replayed": True,
             "operation_id": operation_id,
+            "turn_state": (
+                None if chat_turn is None else chat_turn.snapshot.state.value
+            ),
             "engine_execution_id": execution_id,
             "ai_result_id": assistant_message.ai_result_id,
             "engine_provider_receipts": list(
@@ -1720,6 +1747,17 @@ async def get_ai_chat_turn(
             ),
             "failed",
         )
+        if chat_turn is not None and not chat_turn.snapshot.terminal:
+            try:
+                chat_turn = await chat_turn_lifecycle.fail(
+                    chat_turn,
+                    tenant_id=tenant_id,
+                    owner_id=owner_id,
+                    reason_code="canonical-terminal-marker",
+                    cancelled=state == "cancelled",
+                )
+            except Exception as exc:
+                raise _chat_error(exc) from exc
         return {
             "success": False,
             "accepted": True,
@@ -1797,6 +1835,17 @@ async def get_ai_chat_turn(
             trace_id=trace_id,
         )
     except EngineExecutionFailed as exc:
+        if chat_turn is not None and not chat_turn.snapshot.terminal:
+            try:
+                chat_turn = await chat_turn_lifecycle.fail(
+                    chat_turn,
+                    tenant_id=tenant_id,
+                    owner_id=owner_id,
+                    reason_code=exc.failure_code or "engine-execution-failed",
+                    cancelled=exc.status == "cancelled",
+                )
+            except Exception as turn_exc:
+                raise _chat_error(turn_exc) from turn_exc
         try:
             latest_thread = await conversation_authority.get_thread(
                 thread_id,
@@ -1880,6 +1929,23 @@ async def get_ai_chat_turn(
             detail="AI engine handoff identity mismatch",
         ) from exc
 
+    if chat_turn is not None:
+        try:
+            chat_turn = await chat_turn_lifecycle.advance(
+                chat_turn,
+                TurnState.FINALIZING,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+                reason_code="deferred-engine-result-verified",
+                provider_receipt_ref=(
+                    engine_result.provider_receipts[0]
+                    if len(engine_result.provider_receipts) == 1
+                    else None
+                ),
+            )
+        except Exception as exc:
+            raise _chat_error(exc) from exc
+
     ai_result_id = "engine-result:" + execution_id
     assistant_key = idempotency_key + ":assistant"
     try:
@@ -1932,6 +1998,18 @@ async def get_ai_chat_turn(
     except Exception as exc:
         raise _chat_error(exc) from exc
 
+    if chat_turn is not None:
+        try:
+            chat_turn = await chat_turn_lifecycle.advance(
+                chat_turn,
+                TurnState.COMPLETE,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+                reason_code="deferred-assistant-committed",
+            )
+        except Exception as exc:
+            raise _chat_error(exc) from exc
+
     return {
         "success": True,
         "accepted": True,
@@ -1943,6 +2021,9 @@ async def get_ai_chat_turn(
         "model": "engine-routed",
         "replayed": False,
         "operation_id": operation_id,
+        "turn_state": (
+            None if chat_turn is None else chat_turn.snapshot.state.value
+        ),
         "engine_execution_id": execution_id,
         "ai_result_id": ai_result_id,
         "engine_verification": engine_result.verification,
