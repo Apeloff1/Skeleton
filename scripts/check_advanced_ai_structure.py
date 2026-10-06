@@ -378,6 +378,102 @@ def validate_payloads(
         if band.get("band") != f"A{index}":
             errors.append(f"maturity band {index} identity drifted")
 
+    state_machine = contract.get("promotion_state_machine")
+    if not isinstance(state_machine, dict):
+        errors.append("promotion_state_machine must be an object")
+        state_machine = {}
+    expected_states = [
+        "PLANNED",
+        "CONTRACT_READY",
+        "IMPLEMENTED_CANDIDATE",
+        "QUALIFIED",
+        "PROMOTED",
+        "SUSPENDED",
+        "ROLLED_BACK",
+    ]
+    if state_machine.get("states") != expected_states:
+        errors.append("advanced AI promotion states drifted")
+    if state_machine.get("initial") != "PLANNED":
+        errors.append("advanced AI promotion initial state must be PLANNED")
+    transitions = _objects(
+        state_machine.get("transitions"),
+        label="promotion_state_machine.transitions",
+        errors=errors,
+        minimum=8,
+    )
+    known_states = set(expected_states)
+    for index, transition in enumerate(transitions):
+        source = transition.get("from")
+        target = transition.get("to")
+        if source not in known_states or target not in known_states:
+            errors.append(
+                f"promotion_state_machine.transitions[{index}] references unknown state"
+            )
+        _strings(
+            transition.get("requires"),
+            label=f"promotion_state_machine.transitions[{index}].requires",
+            errors=errors,
+            minimum=1,
+        )
+    for field in ("contiguous_rule", "invalidation_rule", "production_rule"):
+        value = state_machine.get(field)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(f"promotion_state_machine.{field} must be non-empty")
+
+    bridges = _objects(
+        contract.get("cross_stratum_bridges"),
+        label="cross_stratum_bridges",
+        errors=errors,
+        minimum=10,
+    )
+    bridge_map = _ids(bridges, label="cross_stratum_bridges", errors=errors)
+    expected_bridge_ids = {f"B{i:02d}" for i in range(1, 11)}
+    if set(bridge_map) != expected_bridge_ids:
+        errors.append("cross-stratum bridge set must be B01 through B10")
+    for index in range(1, 11):
+        bridge = bridge_map.get(f"B{index:02d}", {})
+        expected_from = f"S{index:02d}"
+        expected_to = "S01" if index == 10 else f"S{index + 1:02d}"
+        if bridge.get("from") != expected_from:
+            errors.append(f"B{index:02d}.from must be {expected_from}")
+        if bridge.get("to") != expected_to:
+            errors.append(f"B{index:02d}.to must be {expected_to}")
+        contract_text = bridge.get("contract")
+        if not isinstance(contract_text, str) or not contract_text.strip():
+            errors.append(f"B{index:02d}.contract must be non-empty")
+
+    profiles = _objects(
+        contract.get("activation_profiles"),
+        label="activation_profiles",
+        errors=errors,
+        minimum=4,
+    )
+    profile_map = _ids(
+        profiles,
+        label="activation_profiles",
+        errors=errors,
+    )
+    expected_profiles = {
+        "advanced-assistant": "L050",
+        "enterprise-agent-system": "L080",
+        "scientific-intelligence": "L090",
+        "frontier-governed-system": "L100",
+    }
+    if set(profile_map) != set(expected_profiles):
+        errors.append("advanced AI activation profile set drifted")
+    for profile_id, ceiling in expected_profiles.items():
+        profile = profile_map.get(profile_id, {})
+        if profile.get("target_ceiling") != ceiling:
+            errors.append(
+                f"activation profile {profile_id} target ceiling must be {ceiling}"
+            )
+        for field in ("description", "rule"):
+            value = profile.get(field)
+            if not isinstance(value, str) or not value.strip():
+                errors.append(
+                    f"activation profile {profile_id}.{field} must be non-empty"
+                )
+
     cross_cutting = contract.get("cross_cutting_requirements")
     if not isinstance(cross_cutting, dict):
         errors.append("cross_cutting_requirements must be an object")
