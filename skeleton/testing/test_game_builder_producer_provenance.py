@@ -5,8 +5,10 @@ import hashlib
 
 import pytest
 
+from skeleton.ai.game_builder.contracts import ArtifactIdentity, QUALITY_AXES
 from skeleton.ai.game_builder.producer_provenance import (
     ProducerProvenanceBindingError,
+    candidate_from_canonical_execution,
     producer_provenance_from_canonical_execution,
 )
 from skeleton.ai.learning.model_identity import (
@@ -52,7 +54,7 @@ def _finalization(
             completed_at=datetime(2026, 10, 7, 0, 1, tzinfo=timezone.utc),
             final_output="candidate" if status == "completed" else None,
             provider_receipts=("provider-receipt:001",),
-            evidence_refs=("evidence:001",),
+            evidence_refs=("evidence:001", "assumption:001", "attack:001", "counter:001"),
             artifact_refs=("artifact:001",),
         ),
         expected_execution_version=3,
@@ -111,7 +113,95 @@ def test_canonical_execution_derives_replayable_candidate_provenance() -> None:
     assert provenance.finalization_intent_digest == finalization.intent_digest
     assert provenance.model_identity_digest == model.artifact_id.split(":", 1)[1]
     assert provenance.provider_receipt_refs == ("provider-receipt:001",)
+    assert provenance.output_artifact_refs == ("artifact:001",)
+    assert provenance.output_evidence_refs == (
+        "evidence:001",
+        "assumption:001",
+        "attack:001",
+        "counter:001",
+    )
+    assert len(provenance.output_binding_digest) == 64
     assert len(provenance.digest) == 64
+
+
+def test_canonical_candidate_factory_requires_committed_artifact_and_evidence() -> None:
+    candidate = candidate_from_canonical_execution(
+        producer_id="rival_a",
+        project_id="project:alpha",
+        run_id="run:forge-001",
+        request=_request(),
+        finalization=_finalization(),
+        model_manifest=_model(),
+        producer_behavior_digest=_sha("behavior-bundle"),
+        source_revision="a" * 40,
+        artifact=ArtifactIdentity(
+            artifact_digest="artifact:001",
+            canon_digest="canon:" + "c" * 32,
+            provenance_digest="provenance:" + "d" * 32,
+            family_id="GB03",
+            level_id="GBL-021",
+        ),
+        quality={axis: 0.5 for axis in QUALITY_AXES},
+        evidence_digests=("evidence:001",),
+        assumption_digest="assumption:001",
+    )
+    assert candidate.artifact.artifact_digest == "artifact:001"
+    assert candidate.evidence_digests == ("evidence:001",)
+    assert candidate.producer_provenance.finalization_intent_digest == _finalization().intent_digest
+
+
+def test_canonical_candidate_factory_rejects_uncommitted_artifact() -> None:
+    with pytest.raises(
+        ValueError,
+        match="artifact must be referenced by producer execution output",
+    ):
+        candidate_from_canonical_execution(
+            producer_id="rival_a",
+            project_id="project:alpha",
+            run_id="run:forge-001",
+            request=_request(),
+            finalization=_finalization(),
+            model_manifest=_model(),
+            producer_behavior_digest=_sha("behavior-bundle"),
+            source_revision="a" * 40,
+            artifact=ArtifactIdentity(
+                artifact_digest="artifact:substituted",
+                canon_digest="canon:" + "c" * 32,
+                provenance_digest="provenance:" + "d" * 32,
+                family_id="GB03",
+                level_id="GBL-021",
+            ),
+            quality={axis: 0.5 for axis in QUALITY_AXES},
+            evidence_digests=("evidence:001",),
+            assumption_digest="assumption:001",
+        )
+
+
+def test_canonical_candidate_factory_rejects_uncommitted_evidence() -> None:
+    with pytest.raises(
+        ValueError,
+        match="evidence must be referenced by producer execution output",
+    ):
+        candidate_from_canonical_execution(
+            producer_id="rival_a",
+            project_id="project:alpha",
+            run_id="run:forge-001",
+            request=_request(),
+            finalization=_finalization(),
+            model_manifest=_model(),
+            producer_behavior_digest=_sha("behavior-bundle"),
+            source_revision="a" * 40,
+            artifact=ArtifactIdentity(
+                artifact_digest="artifact:001",
+                canon_digest="canon:" + "c" * 32,
+                provenance_digest="provenance:" + "d" * 32,
+                family_id="GB03",
+                level_id="GBL-021",
+            ),
+            quality={axis: 0.5 for axis in QUALITY_AXES},
+            evidence_digests=("evidence:not-produced",),
+            assumption_digest="assumption:001",
+        )
 
 
 def test_canonical_execution_rejects_execution_identity_substitution() -> None:
