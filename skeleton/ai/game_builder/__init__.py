@@ -20,6 +20,17 @@ from .contracts import (
 )
 from .dual_rival_forge import DualRivalForge, ForgeStateError
 from .control_plane import ControlPlaneError, ControlledStatus, ForgeControlPlane
+from .experience_eval import (
+    EXPERIENCE_METRICS,
+    ExperienceDefect,
+    ExperienceEvaluationError,
+    ExperienceObservation,
+    ExperiencePromotionDecision,
+    ExperienceReport,
+    build_experience_report,
+    evaluate_experience_promotion,
+    normalize_experience_metrics,
+)
 from .evaluation import (
     EvaluationError,
     EvaluationPanel,
@@ -130,6 +141,15 @@ __all__ = [
     "DebtItem",
     "DebtSeverity",
     "EvaluationError",
+    "normalize_experience_metrics",
+    "evaluate_experience_promotion",
+    "build_experience_report",
+    "ExperienceReport",
+    "ExperiencePromotionDecision",
+    "ExperienceObservation",
+    "ExperienceEvaluationError",
+    "ExperienceDefect",
+    "EXPERIENCE_METRICS",
     "EvaluationPanel",
     "ForgeControlPlane",
     "JudgeVerdict",
