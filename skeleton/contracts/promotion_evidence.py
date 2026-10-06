@@ -13,13 +13,17 @@ authority.
 from __future__ import annotations
 
 import hashlib
-import json
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Iterable
 
-from .canonical import EvidenceRef, evidence_ref_identity
+from .canonical import (
+    CanonicalContractError,
+    EvidenceRef,
+    canonical_json_bytes,
+    evidence_ref_identity,
+)
 
 
 PROMOTION_EVIDENCE_SCHEMA_ID = "skeleton.p1.promotion_evidence"
@@ -71,13 +75,12 @@ def _utc(value: object, field: str) -> datetime:
 
 
 def _canonical_bytes(payload: dict[str, Any]) -> bytes:
-    raw = json.dumps(
-        payload,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-        allow_nan=False,
-    ).encode("utf-8")
+    try:
+        raw = canonical_json_bytes(payload)
+    except CanonicalContractError as exc:
+        raise PromotionEvidenceError(
+            "promotion evidence is not strict canonical JSON"
+        ) from exc
     if len(raw) > MAX_PROMOTION_EVIDENCE_BYTES:
         raise PromotionEvidenceError("promotion evidence exceeds byte budget")
     return raw
