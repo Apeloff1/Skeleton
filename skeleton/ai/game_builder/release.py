@@ -515,6 +515,7 @@ class GoldMasterBundle:
                 "forge_binding": self.forge_binding.to_payload(),
                 "family_qualifications": [
                     {
+                        "artifact_digest": row.artifact_digest,
                         "evidence_digest": row.evidence_digest,
                         "evidence_binding_digest": row.evidence_binding_digest,
                         "evaluator_provenance_digest": row.evaluator_provenance.digest,
@@ -582,15 +583,27 @@ class GoldMasterVerdict:
     accepted: bool
     authority_ids: tuple[str, ...]
     vote_digests: tuple[str, ...]
+    vote_acceptances: tuple[bool, ...]
+    quorum: int
     verdict_digest: str
 
     def __post_init__(self) -> None:
         if not isinstance(self.accepted, bool):
             raise TypeError("gold-master verdict accepted state must be boolean")
+        if isinstance(self.quorum, bool) or not isinstance(self.quorum, int) or self.quorum < 3:
+            raise ValueError("gold-master verdict quorum must be an integer >=3")
         if len(self.authority_ids) != len(self.vote_digests):
             raise ValueError("gold-master verdict votes must cover every authority")
+        if len(self.authority_ids) != len(self.vote_acceptances):
+            raise ValueError("gold-master verdict acceptances must cover every authority")
+        if len(self.authority_ids) < self.quorum:
+            raise ValueError("gold-master verdict does not satisfy recorded quorum")
         if len(self.authority_ids) != len(set(self.authority_ids)):
             raise ValueError("gold-master verdict authority ids must be unique")
+        if any(not isinstance(value, bool) for value in self.vote_acceptances):
+            raise TypeError("gold-master vote acceptance states must be boolean")
+        if self.accepted != all(self.vote_acceptances):
+            raise ValueError("gold-master verdict acceptance does not match recorded votes")
         expected = canonical_digest(self.decision_payload())
         if self.verdict_digest != expected:
             raise ValueError("gold-master verdict digest mismatch")
@@ -600,6 +613,8 @@ class GoldMasterVerdict:
             "accepted": self.accepted,
             "authority_ids": list(self.authority_ids),
             "bundle_digest": self.bundle_digest,
+            "quorum": self.quorum,
+            "vote_acceptances": list(self.vote_acceptances),
             "vote_digests": list(self.vote_digests),
         }
 
@@ -654,10 +669,13 @@ class GoldMasterTribunal:
         # within the participating independent panel blocks acceptance.
         accepted = all(vote.accept for vote in votes)
         vote_digests = tuple(vote.vote_digest for vote in votes)
+        vote_acceptances = tuple(vote.accept for vote in votes)
         payload = {
             "accepted": accepted,
             "authority_ids": [vote.authority_id for vote in votes],
             "bundle_digest": bundle.digest,
+            "quorum": self.quorum,
+            "vote_acceptances": list(vote_acceptances),
             "vote_digests": list(vote_digests),
         }
         return GoldMasterVerdict(
@@ -665,5 +683,7 @@ class GoldMasterTribunal:
             accepted=accepted,
             authority_ids=tuple(vote.authority_id for vote in votes),
             vote_digests=vote_digests,
+            vote_acceptances=vote_acceptances,
+            quorum=self.quorum,
             verdict_digest=canonical_digest(payload),
         )
