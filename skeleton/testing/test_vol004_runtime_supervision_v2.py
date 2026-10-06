@@ -193,10 +193,17 @@ def test_runtime_admission_middleware_rejects_starting_and_drain() -> None:
     assert calls == []
 
     lifecycle.mark_ready()
+    hidden = lifecycle.acquire_work("secret:execution-identity")
     lifecycle.begin_drain(reason="shutdown")
     messages = _run_asgi(middleware, path="/api/projects")
     assert messages[0]["status"] == 503
+    payload = json.loads(messages[1]["body"].decode("utf-8"))
+    assert payload["lifecycle"]["inflight_work"] == 1
+    assert "active_work_ids" not in payload["lifecycle"]
+    assert "cancellation" not in payload["lifecycle"]
+    assert "secret:execution-identity" not in messages[1]["body"].decode("utf-8")
     assert calls == []
+    lifecycle.release_work(hidden)
 
 
 def test_runtime_admission_health_exemption_is_segment_safe() -> None:
