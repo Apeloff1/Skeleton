@@ -510,6 +510,102 @@ def validate_payloads(
             if not isinstance(value, str) or not value.strip():
                 errors.append(f"{sid} control profile {field} must be non-empty")
 
+    blueprints = _objects(
+        contract.get("level_blueprints"),
+        label="level_blueprints",
+        errors=errors,
+        minimum=100,
+    )
+    if len(blueprints) != 100:
+        errors.append("advanced AI structure must contain exactly 100 level blueprints")
+    blueprint_map = _ids(
+        blueprints,
+        label="level_blueprints",
+        errors=errors,
+    )
+    expected_blueprint_ids = {f"ADV-L{i:03d}" for i in range(1, 101)}
+    if set(blueprint_map) != expected_blueprint_ids:
+        errors.append("level blueprint IDs must be exactly ADV-L001 through ADV-L100")
+    for index in range(1, 101):
+        level_id = f"L{index:03d}"
+        blueprint_id = f"ADV-{level_id}"
+        blueprint = blueprint_map.get(blueprint_id, {})
+        level = level_map.get(level_id, {})
+        if blueprint.get("level_id") != level_id:
+            errors.append(f"{blueprint_id}.level_id must be {level_id}")
+        if blueprint.get("ordinal") != index:
+            errors.append(f"{blueprint_id}.ordinal must be {index}")
+        if blueprint.get("stratum") != level.get("stratum"):
+            errors.append(f"{blueprint_id}.stratum must match {level_id}")
+        if blueprint.get("title") != level.get("title"):
+            errors.append(f"{blueprint_id}.title must match {level_id}")
+        owner = blueprint.get("primary_owner_plane")
+        if owner not in set(level.get("required_planes") or []):
+            errors.append(
+                f"{blueprint_id}.primary_owner_plane must be in level required planes"
+            )
+        collaborators = _strings(
+            blueprint.get("collaborating_planes"),
+            label=f"{blueprint_id}.collaborating_planes",
+            errors=errors,
+            minimum=0,
+        )
+        if owner in collaborators:
+            errors.append(
+                f"{blueprint_id}.primary_owner_plane cannot also be collaborator"
+            )
+        if set(collaborators) | ({owner} if isinstance(owner, str) else set()) != set(
+            level.get("required_planes") or []
+        ):
+            errors.append(
+                f"{blueprint_id} owner/collaborator planes must cover the level plane set"
+            )
+        for field in (
+            "implementation_mode",
+            "entry_gate",
+            "rollout_mode",
+            "rollback_mode",
+            "promotion_result",
+        ):
+            value = blueprint.get(field)
+            if not isinstance(value, str) or not value.strip():
+                errors.append(f"{blueprint_id}.{field} must be non-empty")
+        _strings(
+            blueprint.get("build_contract"),
+            label=f"{blueprint_id}.build_contract",
+            errors=errors,
+            minimum=5,
+        )
+        _strings(
+            blueprint.get("adversarial_focus"),
+            label=f"{blueprint_id}.adversarial_focus",
+            errors=errors,
+            minimum=5,
+        )
+        _strings(
+            blueprint.get("exit_gate"),
+            label=f"{blueprint_id}.exit_gate",
+            errors=errors,
+            minimum=7,
+        )
+
+    blueprint_rules = contract.get("blueprint_rules")
+    if not isinstance(blueprint_rules, dict):
+        errors.append("blueprint_rules must be an object")
+        blueprint_rules = {}
+    for field in (
+        "count_rule",
+        "owner_rule",
+        "collaboration_rule",
+        "build_rule",
+        "rollout_rule",
+        "adversarial_rule",
+        "closure_rule",
+    ):
+        value = blueprint_rules.get(field)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(f"blueprint_rules.{field} must be non-empty")
+
     risk_policy = contract.get("risk_and_freshness_policy")
     if not isinstance(risk_policy, dict):
         errors.append("risk_and_freshness_policy must be an object")
