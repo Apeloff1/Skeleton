@@ -32,7 +32,21 @@ class FunctionalLLMGameBuilderExecutionBacklogTest(unittest.TestCase):
         self.assertFalse(gate["completion_claim"])
         self.assertEqual(gate["required_task_ids"], ["FLGB-18-T11", "FLGB-18-T12"])
         self.assertEqual(len(gate["core_targets"]), 3)
-        self.assertGreaterEqual(len(gate["required_outputs"]), 10)
+        self.assertGreaterEqual(len(gate["required_outputs"]), 17)
+        self.assertEqual(gate["protocol_version"], "2.0")
+        measurement = gate["measurement_requirements"]
+        self.assertLessEqual(measurement["comparator_maximum_age_days"], 45)
+        self.assertGreaterEqual(measurement["minimum_independent_runs_per_scored_task"], 6)
+        self.assertGreaterEqual(measurement["confidence_interval_level"], 0.95)
+        self.assertLessEqual(measurement["non_inferiority_margin_pp_max"], 2.0)
+        self.assertGreaterEqual(measurement["minimum_parity_or_better_domains"], 10)
+        self.assertGreaterEqual(measurement["minimum_superior_core_targets"], 2)
+        self.assertTrue(measurement["equal_budget_head_to_head"])
+        self.assertTrue(measurement["compute_normalized_pareto"])
+        self.assertTrue(measurement["hidden_challenge_rotation"])
+        self.assertTrue(measurement["anti_gaming_review"])
+        self.assertTrue(measurement["long_horizon_50_and_80_percent_curves"])
+        self.assertTrue(measurement["evaluator_independence"])
         by_id = {task["id"]: task for task in backlog["tasks"]}
         for task_id in gate["required_task_ids"]:
             task = by_id[task_id]
@@ -40,7 +54,14 @@ class FunctionalLLMGameBuilderExecutionBacklogTest(unittest.TestCase):
             self.assertIn("12-domain frontier competition scorecard", corpus)
             self.assertIn("frontier parity-or-better", corpus)
             self.assertIn("blind human evaluation", corpus)
-            self.assertIn("frontier-competition gate", task["closure_rule"])
+            closure = task["closure_rule"].lower()
+            self.assertIn("frontier protocol v2", closure)
+            self.assertIn("six independent", closure)
+            self.assertIn("50%/80%", closure)
+            self.assertIn("compute-normalized", closure)
+            self.assertIn("anti-gaming", closure)
+            self.assertIn("evaluator independence", closure)
+            self.assertIn("statistical dominance", closure)
 
 
 if __name__ == "__main__":
