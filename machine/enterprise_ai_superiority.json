@@ -5483,7 +5483,7 @@
         "must_prove": [
           "plan and delegation authority are bounded before execution",
           "worker leases/fencing prevent stale commits",
-          "checkpoint survives injected process loss",
+          "checkpoint survives injected process crash or process loss",
           "recovery resumes without duplicate privileged effects",
           "cancellation terminates descendant work within declared bound",
           "retry/fan-out/token/time budgets cannot run away"
