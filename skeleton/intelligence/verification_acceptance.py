@@ -479,6 +479,61 @@ class VerificationAcceptanceDecision:
             "checked_at",
             _utc(self.checked_at, "checked_at"),
         )
+        if not isinstance(self.reasons, tuple) or any(
+            not isinstance(item, str) or not item
+            for item in self.reasons
+        ):
+            raise VerificationAcceptanceError(
+                "acceptance decision reasons must be strings"
+            )
+        if (
+            not isinstance(self.canonical_required_modes, tuple)
+            or not self.canonical_required_modes
+            or any(
+                not isinstance(item, str) or not item
+                for item in self.canonical_required_modes
+            )
+        ):
+            raise VerificationAcceptanceError(
+                "canonical_required_modes must be non-empty strings"
+            )
+        for field in (
+            "profile_digest",
+            "receipt_digest",
+            "independence_proof_digest",
+        ):
+            value = getattr(self, field)
+            if value is None and field != "profile_digest":
+                continue
+            if (
+                not isinstance(value, str)
+                or len(value) != 64
+                or any(ch not in "0123456789abcdef" for ch in value)
+            ):
+                raise VerificationAcceptanceError(
+                    f"{field} must be lowercase sha256"
+                )
+        if (
+            self.independence_proof_digest is not None
+            and self.receipt_digest is None
+        ):
+            raise VerificationAcceptanceError(
+                "independence proof digest requires receipt digest"
+            )
+        if (
+            self.disposition is AcceptanceDisposition.ACCEPT
+            and self.reasons
+        ):
+            raise VerificationAcceptanceError(
+                "accepted decision cannot carry rejection reasons"
+            )
+        if (
+            self.disposition is AcceptanceDisposition.QUARANTINE
+            and not self.reasons
+        ):
+            raise VerificationAcceptanceError(
+                "quarantine decision requires reason evidence"
+            )
         if self.authority_scope != "verification-acceptance-only":
             raise VerificationAcceptanceError(
                 "acceptance authority scope escalated"
