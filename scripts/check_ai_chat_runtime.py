@@ -38,6 +38,8 @@ REQUIRED_INVARIANTS = (
     "turn persistence stores operation state only and never duplicates canonical transcript authority",
     "portable and production persistence decode the canonical runtime wire schema",
     "Mongo event persistence uses prepare, atomic snapshot advance, and committed-marker recovery",
+    "public stream projection excludes arbitrary model, prompt, retrieval, and tool payload content",
+    "stream reconnect is bound to operation identity, exact sequence, and prior event digest",
 )
 
 
@@ -98,6 +100,8 @@ def validate() -> list[str]:
         "mongo_authority",
         "persistence_tests",
         "mongo_tests",
+        "streaming",
+        "streaming_tests",
     }
     if set(files) != expected_roles:
         errors.append("AI chat runtime contract file roles drifted")
@@ -186,6 +190,31 @@ def validate() -> list[str]:
                 f"AI chat persistence lost fail-closed markers: {role}: "
                 + ", ".join(missing_persistence)
             )
+
+    streaming_path = files.get("streaming")
+    if isinstance(streaming_path, str) and (ROOT / streaming_path).is_file():
+        try:
+            streaming_source = (ROOT / streaming_path).read_text(encoding="utf-8")
+            ast.parse(streaming_source)
+        except (OSError, UnicodeDecodeError, SyntaxError) as exc:
+            errors.append(f"AI chat streaming module is invalid: {exc}")
+        else:
+            required_streaming = (
+                "TurnStreamCursor",
+                "last_event_digest",
+                "stream journal contains a sequence gap",
+                "stream journal digest chain is broken",
+                "project_turn_event",
+            )
+            missing_streaming = [
+                marker for marker in required_streaming
+                if marker not in streaming_source
+            ]
+            if missing_streaming:
+                errors.append(
+                    "AI chat streaming lost reconnect/minimization markers: "
+                    + ", ".join(missing_streaming)
+                )
 
     required_states = contract.get("required_states")
     if not isinstance(required_states, list) or not required_states:
