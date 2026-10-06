@@ -54,7 +54,12 @@ def main() -> int:
             fail(f"missing {shard['path']}")
         raw = path.read_bytes()
         total += len(raw)
-        if len(raw) < int(shard.get("min_bytes", 620000)):
+        per_shard_floor = int(data.get("bytes", {}).get("per_shard_minimum", 0))
+        if per_shard_floor < 2_300_000:
+            fail(f"per-shard minimum regressed: {per_shard_floor}")
+        if int(shard.get("min_bytes", 0)) != per_shard_floor:
+            fail(f"{shard_id} per-shard minimum drift")
+        if len(raw) < per_shard_floor:
             fail(f"undersized {shard['path']}")
         if len(raw) != int(shard["bytes"]):
             fail(f"byte manifest stale for {shard['path']}")
@@ -175,13 +180,32 @@ def main() -> int:
     if deep.get("runtime_signoff_forbidden_from_specification_alone") is not True:
         fail("deep-closure runtime signoff protection disabled")
 
-    requested_minimum = int(data.get("bytes", {}).get("requested_minimum", 0))
-    if requested_minimum < 20_000_000:
-        fail(f"doubled atlas minimum regressed: {requested_minimum}")
+    bytes_cfg = data.get("bytes", {})
+    previous_total = int(bytes_cfg.get("previous_shard_total", 0))
+    exact_double = previous_total * 2
+    if previous_total <= 0:
+        fail("missing previous atlas byte baseline")
+    if int(bytes_cfg.get("double_baseline_target", 0)) != exact_double:
+        fail("literal doubled baseline target drift")
+    requested_minimum = int(bytes_cfg.get("requested_minimum", 0))
+    if requested_minimum < exact_double:
+        fail(f"atlas minimum is below literal doubled baseline: {requested_minimum} < {exact_double}")
+    if bytes_cfg.get("doubled_target_met") is not True:
+        fail("doubled target marker is not true")
     if total < requested_minimum:
         fail(f"aggregate specification bytes below doubled minimum: {total}")
-    if total != int(data["bytes"]["shard_total"]):
+    if total != int(bytes_cfg["shard_total"]):
         fail("aggregate byte total stale")
+    if bytes_cfg.get("human_index_sync_required") is not True:
+        fail("human index byte-ledger synchronization disabled")
+    if int(bytes_cfg.get("human_index_shard_total", -1)) != total:
+        fail("human index byte ledger stale in manifest")
+    human_index = ROOT / data["authorities"]["human_index"]
+    if not human_index.is_file():
+        fail("missing human index")
+    human_text = human_index.read_text(encoding="utf-8")
+    if f"{total:,}" not in human_text:
+        fail("human index byte ledger stale")
     if data["completion"].get("runtime_completion_claim") is not False:
         fail("runtime completion must remain fail-closed")
     if data["completion"].get("implementation_signed") is not False:
