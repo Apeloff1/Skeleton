@@ -296,12 +296,23 @@
     "skeleton/ai/game_builder/canon.py",
     "skeleton/ai/game_builder/rights.py",
     "skeleton/ai/game_builder/atomizer.py",
-    "skeleton/ai/game_builder/contracts.py"
+    "skeleton/ai/game_builder/contracts.py",
+    "skeleton/ai/game_builder/evaluation.py",
+    "skeleton/ai/game_builder/resource_governor.py",
+    "skeleton/ai/game_builder/quality_debt.py",
+    "skeleton/ai/game_builder/control_plane.py"
   ],
   "runtime_contracts": {
     "contracts": "skeleton/ai/game_builder/contracts.py",
     "state_machine": "skeleton/ai/game_builder/dual_rival_forge.py",
-    "tests": "tests/test_ai_game_builder_runtime.py"
+    "evaluation_panel": "skeleton/ai/game_builder/evaluation.py",
+    "resource_governor": "skeleton/ai/game_builder/resource_governor.py",
+    "quality_debt": "skeleton/ai/game_builder/quality_debt.py",
+    "integrated_control_plane": "skeleton/ai/game_builder/control_plane.py",
+    "tests": [
+      "tests/test_ai_game_builder_runtime.py",
+      "tests/test_ai_game_builder_overengineering_runtime.py"
+    ]
   },
   "overengineering_authority": "machine/ai_game_builder_overengineering.json",
   "governance_runtime": {
