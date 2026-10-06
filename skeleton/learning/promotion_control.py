@@ -555,22 +555,23 @@ def validate_rollback(
         raise ImprovementError(
             "rollback does not restore exact champion"
         )
-    if (
-        receipt.decision_digest is not None
-        and receipt.decision_digest != decision.digest
-    ):
+    if receipt.decision_digest is None:
+        raise ImprovementError(
+            "rollback receipt must bind exact promotion decision digest"
+        )
+    if receipt.decision_digest != decision.digest:
         raise ImprovementError(
             "rollback receipt decision digest mismatch"
         )
-    if (
-        receipt.verifier_id is not None
-        and receipt.verifier_id
-        in {
-            candidate.builder_id,
-            decision.verifier_id,
-            decision.canary_verifier_id,
-        }
-    ):
+    if receipt.verifier_id is None:
+        raise ImprovementError(
+            "rollback receipt requires independent verifier"
+        )
+    if receipt.verifier_id in {
+        candidate.builder_id,
+        decision.verifier_id,
+        decision.canary_verifier_id,
+    }:
         raise ImprovementError(
             "rollback verifier must be independently separated"
         )
