@@ -281,7 +281,9 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         file_entry = _mapping(raw, "dossier file")
         depth_pass = _text(file_entry.get("depth_pass"), "dossier file depth_pass")
         path = Path(_text(file_entry.get("path"), f"{depth_pass}.path"))
-        _text(file_entry.get("human_path"), f"{depth_pass}.human_path")
+        human_path = Path(
+            _text(file_entry.get("human_path"), f"{depth_pass}.human_path")
+        )
         if depth_pass in seen_depth:
             raise ImplementationNotesError(f"duplicate depth-pass file: {depth_pass}")
         seen_depth.add(depth_pass)
@@ -299,6 +301,18 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         rows = payload.get("dossiers")
         if not isinstance(rows, list) or payload.get("volume_count") != len(rows):
             raise ImplementationNotesError(f"{path} volume count drift")
+        try:
+            human_text = (root / human_path).read_text(encoding="utf-8")
+        except OSError as exc:
+            raise ImplementationNotesError(
+                f"cannot load human notebook {human_path}: {exc}"
+            ) from exc
+        authority_line = f"Machine authority: \`{path}\`"
+        if authority_line not in human_text:
+            raise ImplementationNotesError(
+                f"{human_path} does not bind machine authority {path}"
+            )
+
         for dossier_raw in rows:
             dossier = _mapping(dossier_raw, f"{path}.dossier")
             ref = _text(dossier.get("volume_ref"), "dossier.volume_ref")
@@ -314,6 +328,20 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
                 required_levels=required_levels,
                 standard_version=str(index["standard_version"]),
             )
+            expected_heading = f"## {ref} — {dossier['title']}"
+            if expected_heading not in human_text:
+                raise ImplementationNotesError(
+                    f"{human_path} missing human section for {ref}"
+                )
+            for required_level in required_levels:
+                heading = (
+                    f"### {required_level['id']} "
+                    f"{required_level['name']}"
+                )
+                if heading not in human_text:
+                    raise ImplementationNotesError(
+                        f"{human_path} missing {heading}"
+                    )
             seen_volumes.add(ref)
             dossiers += 1
 
@@ -322,6 +350,20 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         extra = sorted(seen_volumes - set(master_volumes))
         raise ImplementationNotesError(
             f"dossier coverage mismatch missing={missing} extra={extra}"
+        )
+
+    human_index = Path(
+        _text(authority.get("human_index"), "authority.human_index")
+    )
+    try:
+        human_index_text = (root / human_index).read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ImplementationNotesError(
+            f"cannot load human implementation-note index: {exc}"
+        ) from exc
+    if "VOL-000" not in human_index_text or "VOL-420" not in human_index_text:
+        raise ImplementationNotesError(
+            "human implementation-note index does not declare full volume scope"
         )
 
     master_authority = _mapping(master.get("authority"), "master.authority")
