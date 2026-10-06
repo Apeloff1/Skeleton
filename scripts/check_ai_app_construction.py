@@ -1953,6 +1953,8 @@ def _validate_acceptance_gates(
         "capability-interfaces",
         "state-topology",
         "app-assembly",
+        "enterprise-ai-superiority",
+        "enterprise-ai-implementation-notes",
     ):
         if required not in ids:
             errors.append(f"mandatory acceptance gate missing: {required}")
