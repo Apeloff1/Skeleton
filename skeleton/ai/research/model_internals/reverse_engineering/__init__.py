@@ -145,6 +145,17 @@ from .transport_stress import TransportStressPoint, TransportStressReport, analy
 from .transportability import TransportObservation, TransportabilityReport, analyze_transportability
 from .version_drift import VersionDriftReport, VersionDriftStep, VersionSignature, analyze_version_drift
 
+from .campaign_verification import CampaignVerificationControl, CampaignVerificationReport, verify_campaign
+from .claim_dependencies import ClaimDependency, ClaimDependencyReport, ClaimDependencyResult, analyze_claim_dependencies
+from .closure_certificate import ClosureCertificate, issue_closure_certificate, verify_closure_certificate
+from .contradiction_resolution import ContradictionEvidence, ContradictionResolution, resolve_contradictions
+from .evidence_refresh import EvidenceRefreshCandidate, EvidenceRefreshPlan, plan_evidence_refresh
+from .evidence_supersession import EvidenceRevision, EvidenceSupersessionReport, analyze_evidence_supersession
+from .experiment_replay import ReplayExpectation, ReplayObservation, ReplayVerificationReport, verify_experiment_replay
+from .power_audit import PowerAuditItem, PowerAuditReport, PowerRequirement, audit_experiment_power
+from .protocol_integrity import ProtocolManifest, build_protocol_manifest, verify_protocol_manifest
+from .reproducibility import ReproductionRun, ReproducibilityReport, analyze_reproducibility
+
 __all__ = [
     "ActivationLayerReport",
     "ActivationSample",
@@ -482,4 +493,37 @@ __all__ = [
     "evaluate_stopping_rule",
     "select_adaptive_experiments",
     "verify_bundle",
+    "CampaignVerificationControl",
+    "CampaignVerificationReport",
+    "ClaimDependency",
+    "ClaimDependencyReport",
+    "ClaimDependencyResult",
+    "ClosureCertificate",
+    "ContradictionEvidence",
+    "ContradictionResolution",
+    "EvidenceRefreshCandidate",
+    "EvidenceRefreshPlan",
+    "EvidenceRevision",
+    "EvidenceSupersessionReport",
+    "PowerAuditItem",
+    "PowerAuditReport",
+    "PowerRequirement",
+    "ProtocolManifest",
+    "ReplayExpectation",
+    "ReplayObservation",
+    "ReplayVerificationReport",
+    "ReproductionRun",
+    "ReproducibilityReport",
+    "analyze_claim_dependencies",
+    "analyze_evidence_supersession",
+    "analyze_reproducibility",
+    "audit_experiment_power",
+    "build_protocol_manifest",
+    "issue_closure_certificate",
+    "plan_evidence_refresh",
+    "resolve_contradictions",
+    "verify_campaign",
+    "verify_closure_certificate",
+    "verify_experiment_replay",
+    "verify_protocol_manifest",
 ]

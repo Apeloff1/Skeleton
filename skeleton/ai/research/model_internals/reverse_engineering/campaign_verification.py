@@ -108,7 +108,13 @@ def verify_campaign(
         passed_count=len(controls) - len(failed),
         failed_count=len(failed),
         critical_failure_count=len(critical_failed) + len(missing_categories),
-        verified_categories=tuple(sorted(category for category in by_category if category not in missing_categories)),
+        verified_categories=tuple(
+            sorted(
+                category
+                for category, category_controls in by_category.items()
+                if all(control.passed for control in category_controls)
+            )
+        ),
         failed_control_ids=tuple(sorted(control.control_id for control in failed)),
         status=status,
         digest=stable_digest(payload),

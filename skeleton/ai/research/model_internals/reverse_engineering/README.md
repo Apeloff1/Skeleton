@@ -125,6 +125,16 @@ The lab contains bounded analyzers for:
 - **bundle verification** — dependency completeness and cycle checks across exported research artifacts;
 - **claim closure** — final fail-closed closure gate combining quality, quorum, lineage, falsification, replication, freshness, and contradiction;
 - **campaign audit** — ready/hold/blocked end-state audit over critical and noncritical research controls.
+- **contradiction resolution** — domain-aware adjudication with decisive margins and explicit conflicted/insufficient states;
+- **reproducibility scoring** — repeated protocol output agreement plus normalized metric dispersion across environments;
+- **evidence refresh planning** — stale/critical/drifting evidence prioritization with deterministic refresh queues;
+- **experiment replay** — exact step/output replay verification with missing, unexpected, and mismatched-step accounting;
+- **power audits** — observed group counts checked against predeclared per-group power requirements;
+- **evidence supersession** — cycle-checked replacement chains with active evidence tips;
+- **claim dependencies** — fail-closed propagation of rejected/conflicted prerequisites into derived claims;
+- **protocol integrity** — canonical protocol manifests with tamper verification;
+- **closure certificates** — tamper-evident certificates issued only after claim, campaign, bundle, and lineage closure;
+- **campaign verification** — final critical-category verification across authorization, protocol, coverage, power, replay, reproducibility, lineage, falsification, replication, freshness, and closure.
 
 These surfaces characterize what can be observed or what is available in artifacts
 the operator is authorized to inspect. They do not assert proprietary architecture
@@ -132,5 +142,5 @@ identity, recover hidden weights from inaccessible systems, bypass access contro
 or create a right to inspect artifacts without ownership or permission.
 
 Future work can deepen nonlinear structural models, cross-modal causal transport, richer
-hierarchical Bayes-style uncertainty approximations, automated experiment generation, and
-independent adversarial replication while preserving the same evidence/inference boundary.
+hierarchical uncertainty approximations, automatic experiment synthesis, and independent
+adversarial replication while preserving the same evidence/inference boundary.
