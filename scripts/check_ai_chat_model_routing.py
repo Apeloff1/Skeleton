@@ -26,6 +26,7 @@ FORBIDDEN = (
 REQUIRED = (
     "class RouteRequest",
     "from_turn_budget",
+    "from_turn_snapshot",
     "allowed_jurisdictions",
     "require_provider_receipt",
     "minimum_observations",
@@ -114,6 +115,7 @@ def validate() -> list[str]:
         "privacy is a hard eligibility constraint for primary and fallback endpoints",
         "quarantined endpoints are ineligible until explicit clear or expiry",
         "every fallback candidate satisfies the same immutable route request",
+        "retry and failover routing consume the durable turn's remaining authority rather than restoring the original execution budget",
     }
     invariants = contract.get("invariants")
     if not isinstance(invariants, list):
