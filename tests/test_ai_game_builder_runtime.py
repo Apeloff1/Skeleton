@@ -801,7 +801,7 @@ def test_forge_rejects_terminal_champion_not_bound_to_receipt_chain() -> None:
 
     with pytest.raises(
         ForgeStateError,
-        match="forge champion must match terminal promotion receipt",
+        match="first promotion receipt incumbent must match forge origin champion",
     ):
         DualRivalForge(
             effort_mode=100,
