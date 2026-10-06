@@ -5,7 +5,7 @@ This depth overlay expands the canonical Skeleton AI masterplan without adding t
 ## Size and authority
 
 - Requested addition: at least 10,000,000 bytes of implementation-grade masterplan depth.
-- Shard bytes committed by this overlay: **11,187,033 bytes** across 18 shards.
+- Shard bytes committed by this overlay: **11,188,293 bytes** across 18 shards.
 - Runtime completion is **not** claimed.
 - Implementation signoff is **false**.
 - Independent verification signoff is **false**.
@@ -41,11 +41,11 @@ Provider-native objects, engine-native objects, model confidence, chat history, 
 - **FLGB-03 — Context Memory Retrieval and Knowledge**: [SHARD_03_FLGB-03_CONTEXT_MEMORY_RETRIEVAL_AND_KNOWLEDGE.md](SHARD_03_FLGB-03_CONTEXT_MEMORY_RETRIEVAL_AND_KNOWLEDGE.md) — 622,104 bytes
 - **FLGB-04 — Tools Agents and Long-Horizon Execution**: [SHARD_04_FLGB-04_TOOLS_AGENTS_AND_LONG_HORIZON_EXECUTION.md](SHARD_04_FLGB-04_TOOLS_AGENTS_AND_LONG_HORIZON_EXECUTION.md) — 622,256 bytes
 - **FLGB-05 — Security Safety Policy and Privacy**: [SHARD_05_FLGB-05_SECURITY_SAFETY_POLICY_AND_PRIVACY.md](SHARD_05_FLGB-05_SECURITY_SAFETY_POLICY_AND_PRIVACY.md) — 621,878 bytes
-- **FLGB-06 — Evaluation Observability Reliability and Recovery**: [SHARD_06_FLGB-06_EVALUATION_OBSERVABILITY_RELIABILITY_AND_RECOVERY.md](SHARD_06_FLGB-06_EVALUATION_OBSERVABILITY_RELIABILITY_AND_RECOVERY.md) — 621,084 bytes
-- **FLGB-07 — Training Weights Adaptation and Self-Improvement**: [SHARD_07_FLGB-07_TRAINING_WEIGHTS_ADAPTATION_AND_SELF_IMPROVEMENT.md](SHARD_07_FLGB-07_TRAINING_WEIGHTS_ADAPTATION_AND_SELF_IMPROVEMENT.md) — 622,036 bytes
-- **FLGB-08 — Multimodal Vision Audio Video and Documents**: [SHARD_08_FLGB-08_MULTIMODAL_VISION_AUDIO_VIDEO_AND_DOCUMENTS.md](SHARD_08_FLGB-08_MULTIMODAL_VISION_AUDIO_VIDEO_AND_DOCUMENTS.md) — 620,741 bytes
-- **FLGB-09 — Game Project Editor and World Model**: [SHARD_09_FLGB-09_GAME_PROJECT_EDITOR_AND_WORLD_MODEL.md](SHARD_09_FLGB-09_GAME_PROJECT_EDITOR_AND_WORLD_MODEL.md) — 621,414 bytes
-- **FLGB-10 — Scene ECS Physics and Simulation**: [SHARD_10_FLGB-10_SCENE_ECS_PHYSICS_AND_SIMULATION.md](SHARD_10_FLGB-10_SCENE_ECS_PHYSICS_AND_SIMULATION.md) — 620,762 bytes
+- **FLGB-06 — Evaluation Observability Reliability and Recovery**: [SHARD_06_FLGB-06_EVALUATION_OBSERVABILITY_RELIABILITY_AND_RECOVERY.md](SHARD_06_FLGB-06_EVALUATION_OBSERVABILITY_RELIABILITY_AND_RECOVERY.md) — 621,336 bytes
+- **FLGB-07 — Training Weights Adaptation and Self-Improvement**: [SHARD_07_FLGB-07_TRAINING_WEIGHTS_ADAPTATION_AND_SELF_IMPROVEMENT.md](SHARD_07_FLGB-07_TRAINING_WEIGHTS_ADAPTATION_AND_SELF_IMPROVEMENT.md) — 622,288 bytes
+- **FLGB-08 — Multimodal Vision Audio Video and Documents**: [SHARD_08_FLGB-08_MULTIMODAL_VISION_AUDIO_VIDEO_AND_DOCUMENTS.md](SHARD_08_FLGB-08_MULTIMODAL_VISION_AUDIO_VIDEO_AND_DOCUMENTS.md) — 620,993 bytes
+- **FLGB-09 — Game Project Editor and World Model**: [SHARD_09_FLGB-09_GAME_PROJECT_EDITOR_AND_WORLD_MODEL.md](SHARD_09_FLGB-09_GAME_PROJECT_EDITOR_AND_WORLD_MODEL.md) — 621,666 bytes
+- **FLGB-10 — Scene ECS Physics and Simulation**: [SHARD_10_FLGB-10_SCENE_ECS_PHYSICS_AND_SIMULATION.md](SHARD_10_FLGB-10_SCENE_ECS_PHYSICS_AND_SIMULATION.md) — 621,014 bytes
 - **FLGB-11 — Rendering Materials Lighting Cameras and VFX**: [SHARD_11_FLGB-11_RENDERING_MATERIALS_LIGHTING_CAMERAS_AND_VFX.md](SHARD_11_FLGB-11_RENDERING_MATERIALS_LIGHTING_CAMERAS_AND_VFX.md) — 621,609 bytes
 - **FLGB-12 — Animation Audio UI Input and Accessibility**: [SHARD_12_FLGB-12_ANIMATION_AUDIO_UI_INPUT_AND_ACCESSIBILITY.md](SHARD_12_FLGB-12_ANIMATION_AUDIO_UI_INPUT_AND_ACCESSIBILITY.md) — 622,262 bytes
 - **FLGB-13 — Gameplay Scripting Narrative Quests and NPC AI**: [SHARD_13_FLGB-13_GAMEPLAY_SCRIPTING_NARRATIVE_QUESTS_AND_NPC_AI.md](SHARD_13_FLGB-13_GAMEPLAY_SCRIPTING_NARRATIVE_QUESTS_AND_NPC_AI.md) — 622,248 bytes
