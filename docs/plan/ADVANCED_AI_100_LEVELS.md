@@ -351,6 +351,145 @@ claim frontier maturity:
 A profile ceiling limits what the deployment claims. It does not permit skipping
 lower levels.
 
+## Maturity dimensions
+
+A level is not considered mature because one aggregate benchmark score is high.
+Promotion evidence is tracked across independent dimensions:
+
+1. correctness;
+2. calibration;
+3. safety;
+4. security;
+5. authority integrity;
+6. provenance;
+7. reliability;
+8. recoverability;
+9. efficiency;
+10. adaptation;
+11. autonomy control;
+12. human control;
+13. observability;
+14. governance;
+15. generalization.
+
+Every stratum gate requires fresh evidence for the dimensions applicable to that
+stratum. Security, authority integrity, tenant isolation, privileged-action
+audit, and fabricated-completion failures are zero-tolerance blockers. No
+weighted average can compensate for one of those failures.
+
+## Evidence inheritance
+
+Higher levels may reuse lower-level evidence only when the evidence is still
+valid for the exact contract and risk surface.
+
+The inherited evidence binds:
+
+- level ID;
+- source revision;
+- contract digest;
+- test/evaluation suite version;
+- dataset or fixture digest;
+- policy version;
+- environment profile;
+- result digest.
+
+Evidence is invalidated by lower-level regression, owner/interface changes,
+security or governance changes, material evaluation changes, contamination,
+runtime topology changes that affect the claim, or expiry of the evidence
+freshness window.
+
+## Capability ceilings
+
+Every admitted operation has an effective maturity ceiling.
+
+The ceiling is the minimum permitted by:
+
+- deployment profile;
+- tenant policy;
+- principal role;
+- risk class;
+- data class;
+- release maturity;
+- operator override.
+
+A stronger model cannot increase the ceiling.
+
+The ceiling is enforced at request admission, tool/capability resolution, agent
+spawning, learning activation, scheduled autonomy, frontier experiments, and
+release promotion.
+
+If the ceiling is reduced while work is active, work above the new ceiling is
+cancelled, suspended, or safely drained according to its durable operation
+semantics.
+
+## Kill and suspension controls
+
+The architecture defines independent controls for:
+
+- one operation;
+- one tenant;
+- one capability;
+- one provider or tool;
+- one release;
+- the complete frontier/self-improvement stratum.
+
+These controls do not depend on model cooperation. Invocation is authenticated,
+authorized, audited, and idempotent. Suspension never fabricates success, and
+ambiguous side effects enter reconciliation before replay.
+
+## Anti-gaming rules
+
+The maturity system rejects common benchmark and evaluation shortcuts.
+
+In particular:
+
+- known failing slices cannot be silently omitted;
+- synthetic/self-generated evaluation cannot be the only promotion evidence;
+- a model cannot be its only promotion evaluator;
+- safety/security/authority regressions block promotion regardless of aggregate
+  score;
+- hidden retries, fallback providers, human intervention, and cached answers
+  must be present in provenance;
+- privileged test fixtures cannot prove ordinary tenant capability;
+- benchmark leakage, contamination, memorization, or evaluator coupling
+  invalidate affected evidence;
+- efficiency wins obtained by bypassing verification, provenance, safety, or
+  recovery are not improvements.
+
+## Frontier experiment boundary
+
+Levels 091-100 run experiments only in isolated or explicitly shadowed
+environments with separate credentials, budgets, datasets, and write
+boundaries.
+
+They may perform architecture analysis, code/config proposal generation,
+sandbox execution, offline/shadow evaluation, simulation, benchmarking, and
+counterfactual comparison.
+
+Without external authority they may not:
+
+- deploy to production;
+- broaden policy;
+- grant credentials;
+- expand tenant-data scope;
+- perform irreversible external writes;
+- delete safeguards;
+- change their own promotion criteria.
+
+The promotion chain is:
+
+```text
+experiment receipt
+ -> independent evaluation
+ -> security/governance review
+ -> canary or shadow evidence
+ -> release-authority decision
+ -> rollback-ready deployment
+```
+
+Recursive self-improvement proposal generation is allowed only inside explicit
+depth, time, cost, and capability ceilings.
+
 ## Cross-cutting requirements
 
 Every level inherits the same enterprise controls regardless of cognitive
