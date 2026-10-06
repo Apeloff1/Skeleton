@@ -111,6 +111,10 @@ model authority boundaries.
 - `continuous_distributions.py` — regularized beta/gamma functions and Beta/Gamma/Dirichlet density-CDF references.
 - `inference_tests.py` — Welch t, Mann-Whitney U and one-way ANOVA diagnostics with explicit test evidence.
 - `derivative_free.py` — bounded golden-section and deterministic Nelder-Mead minimization references.
+- `control_math.py` — controllability/observability ranks, zero-order-hold discretization and continuous Gramians.
+- `matrix_scaling.py` — deterministic row/column max-norm equilibration with explicit scaling evidence.
+- `acceleration.py` — bounded fixed-point iteration and regularized Anderson acceleration.
+- `cubature.py` — tensor-product Gauss-Legendre cubature over bounded hyperrectangles.
 - `validation.py` — parity evidence against existing optimized runtime kernels.
 
 ## Guarantees
@@ -199,6 +203,10 @@ model authority boundaries.
 - Continuous distributions keep special-function convergence/domain checks explicit and do not create predictive authority.
 - Statistical inference reports test statistics/degrees/effect structure and keeps decision thresholds outside this layer.
 - Derivative-free solvers are bounded reference optimizers and do not own model training or parameter promotion.
+- Linear-control mathematics reports rank/Gramian/discretization evidence only and never owns runtime control authority.
+- Matrix equilibration exposes both diagonal scales and post-scaling row/column norm errors.
+- Anderson acceleration regularizes its residual Gram system and falls back deterministically on singular history.
+- Cubature bounds dimensionality and panel/order semantics so evaluation growth remains explicit.
 - `audit_runtime_kernels()` compares optimized runtime softmax, matmul and attention against
   this reference substrate without replacing those kernels.
 

@@ -4,6 +4,7 @@ The package is deterministic, side-effect free, and authority-neutral.  It exist
 to make numerical contracts explicit and to provide a correctness oracle for
 optimized runtime implementations.
 """
+from .acceleration import FixedPointReport, anderson_accelerate, fixed_point_iteration
 from .autodiff import (
     Dual,
     cos as dual_cos,
@@ -71,6 +72,18 @@ from .covariance_shrinkage import (
     oracle_approximating_shrinkage,
     shrink_covariance,
 )
+from .control_math import (
+    DiscreteLinearSystemReport,
+    GramianReport,
+    LinearSystemRankReport,
+    controllability_gramian,
+    controllability_matrix,
+    controllability_report,
+    discretize_zero_order_hold,
+    observability_gramian,
+    observability_matrix,
+    observability_report,
+)
 from .conditioning import (
     BackwardErrorReport,
     ConditionReport,
@@ -82,6 +95,7 @@ from .conditioning import (
 )
 from .contracts import MathInvariantError, Matrix, Vector
 from .cosine_transforms import dct2, dct_ii, dct_iv, inverse_dct2, inverse_dct_ii
+from .cubature import CubatureReport, integrate_rectangle_2d, tensor_gauss_legendre_cubature
 from .decompositions import (
     CholeskyReport,
     LeastSquaresReport,
@@ -459,6 +473,7 @@ from .matrix_updates import (
     cholesky_rank_one_update,
     symmetric_rank_one_update,
 )
+from .matrix_scaling import EquilibrationReport, apply_diagonal_scaling, equilibrate_matrix
 from .matching import AssignmentReport, minimum_cost_assignment
 from .solvers import (
     ConjugateGradientReport,
@@ -545,6 +560,9 @@ from .wavelets import (
 from .validation import MathAuditCase, MathAuditReport, audit_runtime_kernels
 
 __all__ = [
+    "FixedPointReport",
+    "anderson_accelerate",
+    "fixed_point_iteration",
     "barycentric_interpolate",
     "barycentric_weights",
     "chebyshev_nodes",
@@ -590,6 +608,16 @@ __all__ = [
     "matrix_infinity_norm",
     "matrix_max_norm",
     "matrix_one_norm",
+    "DiscreteLinearSystemReport",
+    "GramianReport",
+    "LinearSystemRankReport",
+    "controllability_gramian",
+    "controllability_matrix",
+    "controllability_report",
+    "discretize_zero_order_hold",
+    "observability_gramian",
+    "observability_matrix",
+    "observability_report",
     "MathInvariantError",
     "Matrix",
     "Vector",
@@ -611,6 +639,9 @@ __all__ = [
     "dct_iv",
     "inverse_dct2",
     "inverse_dct_ii",
+    "CubatureReport",
+    "integrate_rectangle_2d",
+    "tensor_gauss_legendre_cubature",
     "CholeskyReport",
     "LeastSquaresReport",
     "QRReport",
@@ -926,6 +957,9 @@ __all__ = [
     "cholesky_factor_after_rank_one_update",
     "cholesky_rank_one_update",
     "symmetric_rank_one_update",
+    "EquilibrationReport",
+    "apply_diagonal_scaling",
+    "equilibrate_matrix",
     "AssignmentReport",
     "minimum_cost_assignment",
     "ConjugateGradientReport",
