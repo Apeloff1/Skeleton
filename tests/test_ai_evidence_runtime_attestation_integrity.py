@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 import hashlib
+import threading
 import unittest
 
 from skeleton.ai.learning.audit_chain import (
@@ -60,17 +61,20 @@ class _Record:
 class _MemoryBackend:
     def __init__(self) -> None:
         self.records: dict[tuple[str, str], _Record] = {}
+        self.lock = threading.RLock()
 
     def get(self, namespace: str, key: str):
-        return self.records.get((namespace, key))
+        with self.lock:
+            return self.records.get((namespace, key))
 
     def put_if_absent(self, namespace: str, key: str, value: object):
-        slot = (namespace, key)
-        if slot in self.records:
-            raise RuntimeError("already exists")
-        record = _Record(1, value)
-        self.records[slot] = record
-        return record
+        with self.lock:
+            slot = (namespace, key)
+            if slot in self.records:
+                raise RuntimeError("already exists")
+            record = _Record(1, value)
+            self.records[slot] = record
+            return record
 
     def compare_and_swap(
         self,
@@ -80,14 +84,15 @@ class _MemoryBackend:
         expected_revision: int,
         value: object,
     ):
-        slot = (namespace, key)
-        current = self.records.get(slot)
-        current_revision = 0 if current is None else current.revision
-        if current_revision != expected_revision:
-            raise RuntimeError("CAS conflict")
-        record = _Record(current_revision + 1, value)
-        self.records[slot] = record
-        return record
+        with self.lock:
+            slot = (namespace, key)
+            current = self.records.get(slot)
+            current_revision = 0 if current is None else current.revision
+            if current_revision != expected_revision:
+                raise RuntimeError("CAS conflict")
+            record = _Record(current_revision + 1, value)
+            self.records[slot] = record
+            return record
 
 
 def audit_event(
@@ -695,6 +700,139 @@ class EvidenceRuntimeAttestationIntegrityTests(unittest.TestCase):
             second_attestation,
         )
 
+
+    def test_shared_backend_event_id_claim_is_cross_instance_race_safe(self) -> None:
+        backend = _MemoryBackend()
+        first = LearningAuditLedger(backend)
+        second = LearningAuditLedger(backend)
+        barrier = threading.Barrier(2)
+        outcomes: list[str] = []
+        result_lock = threading.Lock()
+
+        def worker(ledger: LearningAuditLedger) -> None:
+            barrier.wait()
+            try:
+                ledger.append(audit_event("evt-race"))
+                result = "admitted"
+            except LearningAuditError:
+                result = "rejected"
+            with result_lock:
+                outcomes.append(result)
+
+        threads = (
+            threading.Thread(target=worker, args=(first,)),
+            threading.Thread(target=worker, args=(second,)),
+        )
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        self.assertEqual(sorted(outcomes), ["admitted", "rejected"])
+        verifier = LearningAuditLedger(backend)
+        self.assertTrue(verifier.verify())
+        self.assertEqual(verifier.length(), 1)
+
+    def test_concurrent_duplicate_evidence_write_commits_once(self) -> None:
+        store = evidence_store()
+        item = observation("obs-race")
+        barrier = threading.Barrier(8)
+        outcomes: list[str] = []
+        result_lock = threading.Lock()
+
+        def worker() -> None:
+            barrier.wait()
+            try:
+                store.record_observation(item)
+                result = "admitted"
+            except LearningEvidenceError:
+                result = "rejected"
+            with result_lock:
+                outcomes.append(result)
+
+        threads = tuple(threading.Thread(target=worker) for _ in range(8))
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        self.assertEqual(outcomes.count("admitted"), 1)
+        self.assertEqual(outcomes.count("rejected"), 7)
+        self.assertEqual(store.version, 1)
+        self.assertEqual(len(store.history()), 1)
+
+    def test_canonical_fingerprint_rejects_normalized_key_collision(self) -> None:
+        with self.assertRaisesRegex(
+            LearningEvidenceError,
+            "collide",
+        ):
+            canonical_fingerprint({"x": 1, " x": 2})
+
+    def test_verified_runtime_capture_rejects_malformed_provenance_pair(self) -> None:
+        ledger = decision_ledger()
+        permissive = RuntimeReplaySnapshot.capture(
+            session_id="session-1",
+            phase=SessionPhase.DIAGNOSE,
+            events=(
+                SessionEvent(
+                    1,
+                    SessionPhase.INTAKE,
+                    "session_opened",
+                ),
+            ),
+            selected_policy="practice",
+            selected_policy_decision_id="session-1:orient",
+            rejected_policies=(),
+            ledger=ledger,
+            pipeline_contract_digest="not-a-digest",
+            provenance_digest="",
+        )
+        self.assertFalse(audit_runtime(permissive, ledger).valid)
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "cannot capture verified runtime snapshot",
+        ):
+            RuntimeReplaySnapshot.capture_verified(
+                session_id="session-1",
+                phase=SessionPhase.DIAGNOSE,
+                events=(
+                    SessionEvent(
+                        1,
+                        SessionPhase.INTAKE,
+                        "session_opened",
+                    ),
+                ),
+                selected_policy="practice",
+                selected_policy_decision_id="session-1:orient",
+                rejected_policies=(),
+                ledger=ledger,
+                pipeline_contract_digest="not-a-digest",
+                provenance_digest="",
+            )
+
+    def test_runtime_event_payload_duplicate_keys_are_rejected(self) -> None:
+        ledger = decision_ledger()
+        with self.assertRaisesRegex(
+            ValueError,
+            "keys must be unique",
+        ):
+            RuntimeReplaySnapshot.capture(
+                session_id="session-1",
+                phase=SessionPhase.DIAGNOSE,
+                events=(
+                    SessionEvent(
+                        1,
+                        SessionPhase.INTAKE,
+                        "session_opened",
+                        (("x", "1"), ("x", "2")),
+                    ),
+                ),
+                selected_policy="practice",
+                selected_policy_decision_id="session-1:orient",
+                rejected_policies=(),
+                ledger=ledger,
+            )
 
 if __name__ == "__main__":
     unittest.main()
