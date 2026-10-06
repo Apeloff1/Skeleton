@@ -526,6 +526,48 @@ def test_checkpoint_round_trip_preserves_pending_attack_state() -> None:
         )
 
 
+def test_trusted_checkpoint_rejects_boolean_quality_coercion() -> None:
+    forge = DualRivalForge(effort_mode=100, champion=_candidate("seed", "quality-seed"))
+    built = _candidate(Rival.A.value, "quality-built")
+    forge.submit_construct(built)
+    checkpoint = forge.checkpoint()
+    tampered = {
+        key: value
+        for key, value in checkpoint.items()
+        if key != "checkpoint_digest"
+    }
+    pending = dict(tampered["pending_construct"])
+    quality = dict(pending["quality"])
+    quality["player_value"] = True
+    pending["quality"] = quality
+    tampered["pending_construct"] = pending
+    tampered["checkpoint_digest"] = canonical_digest(tampered)
+
+    with pytest.raises(ForgeStateError, match="quality values must be numeric"):
+        DualRivalForge.restore(
+            tampered,
+            expected_checkpoint_digest=tampered["checkpoint_digest"],
+        )
+
+
+def test_v1_checkpoint_schema_is_rejected_after_provenance_upgrade() -> None:
+    forge = DualRivalForge(effort_mode=100, champion=_candidate("seed", "schema-seed"))
+    checkpoint = forge.checkpoint()
+    legacy = {
+        key: value
+        for key, value in checkpoint.items()
+        if key != "checkpoint_digest"
+    }
+    legacy["schema"] = "skeleton.ai_game_builder.dual_rival_checkpoint.v1"
+    legacy["checkpoint_digest"] = canonical_digest(legacy)
+
+    with pytest.raises(ForgeStateError, match="unsupported checkpoint schema"):
+        DualRivalForge.restore(
+            legacy,
+            expected_checkpoint_digest=legacy["checkpoint_digest"],
+        )
+
+
 def test_promotion_receipt_rehashes_public_decision_evidence() -> None:
     incumbent = _candidate("seed", "s", quality=_quality(0.4))
     forge = DualRivalForge(effort_mode=100, champion=incumbent)
