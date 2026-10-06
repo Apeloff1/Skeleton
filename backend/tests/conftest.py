@@ -190,6 +190,18 @@ def ai_chat_turn_test_authority(request: pytest.FixtureRequest, monkeypatch):
         async def list_events(self, operation_id, **kwargs):
             return self.repo.list_events(operation_id, **kwargs)
 
+        async def acquire_lease(self, operation_id, **kwargs):
+            return self.repo.acquire_lease(operation_id, **kwargs)
+
+        async def renew_lease(self, lease, **kwargs):
+            return self.repo.renew_lease(lease, **kwargs)
+
+        async def release_lease(self, lease, **kwargs):
+            return self.repo.release_lease(lease, **kwargs)
+
+        async def assert_lease(self, lease, **kwargs):
+            return self.repo.assert_lease(lease, **kwargs)
+
     authority = AsyncSQLiteTurnAuthority()
     monkeypatch.setattr(
         ai,

@@ -46,6 +46,12 @@ REQUIRED_INVARIANTS = (
     "same-operation retries preserve the original durable conversation binding while revalidating request digest and causal user identity",
     "transient engine or provider unavailability leaves the durable turn resumable instead of fabricating terminal completion",
     "cancellation request acknowledgement is non-terminal until the engine confirms a terminal cancelled state",
+    "at most one live execution holder owns mutable model or terminal progression for a turn",
+    "every execution ownership takeover increments a monotonic fencing epoch",
+    "heartbeat renewal invalidates the previous lease token even when the fencing epoch is unchanged",
+    "lease-bound durable event append validates holder epoch digest and expiry at the atomic write boundary",
+    "Mongo crash recovery discards a prepared event when its authorizing lease is stale expired or superseded",
+    "ownership acquire renew release and takeover mutations produce a digest-chained audit receipt",
 )
 
 
@@ -111,6 +117,9 @@ def validate() -> list[str]:
         "live_lifecycle",
         "live_route",
         "live_route_tests",
+        "ownership",
+        "ownership_tests",
+        "ownership_repository_tests",
     }
     if set(files) != expected_roles:
         errors.append("AI chat runtime contract file roles drifted")
@@ -158,6 +167,9 @@ def validate() -> list[str]:
             "TurnJournal.verify",
             "snapshot_digest",
             "assert_assistant_message_binding",
+            "acquire_lease",
+            "_assert_matching_lease",
+            "ownership_receipt_digest",
         ),
         "mongo_authority": (
             "_commit_state",
@@ -165,6 +177,9 @@ def validate() -> list[str]:
             "find_one_and_update",
             "_recover_prepared",
             "TurnJournal.verify",
+            "acquire_lease",
+            "_lease_from_payload",
+            "ownership_audit_sequence",
         ),
     }
     for role, markers in persistence_checks.items():
@@ -200,6 +215,33 @@ def validate() -> list[str]:
                 + ", ".join(missing_persistence)
             )
 
+    ownership_path = files.get("ownership")
+    if isinstance(ownership_path, str) and (ROOT / ownership_path).is_file():
+        try:
+            ownership_source = (ROOT / ownership_path).read_text(encoding="utf-8")
+            ast.parse(ownership_source)
+        except (OSError, UnicodeDecodeError, SyntaxError) as exc:
+            errors.append(f"AI chat ownership module is invalid: {exc}")
+        else:
+            required_ownership = (
+                "TurnLeaseToken",
+                "TurnLeasePolicy",
+                "TurnOwnershipReceipt",
+                "heartbeat_sequence",
+                "previous_lease_digest",
+                "TurnLeaseStale",
+                "TurnLeaseExpired",
+            )
+            missing_ownership = [
+                marker for marker in required_ownership
+                if marker not in ownership_source
+            ]
+            if missing_ownership:
+                errors.append(
+                    "AI chat ownership lost fencing markers: "
+                    + ", ".join(missing_ownership)
+                )
+
     streaming_path = files.get("streaming")
     if isinstance(streaming_path, str) and (ROOT / streaming_path).is_file():
         try:
@@ -231,6 +273,9 @@ def validate() -> list[str]:
             "finalize_existing_assistant",
             "existing durable turn does not match canonical retry identity",
             "conversation-assistant-already-committed",
+            "acquire_execution",
+            "renew_execution",
+            "release_execution",
         ),
         "live_route": (
             "chat_turn_lifecycle.begin",

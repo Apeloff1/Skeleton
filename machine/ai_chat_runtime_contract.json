@@ -1,11 +1,11 @@
 {
   "schema_version": "ai-chat-runtime/v1",
   "status": "implemented_candidate",
-  "prepared_at_utc": "2026-10-06T11:18:00Z",
+  "prepared_at_utc": "2026-10-06T12:45:00Z",
   "prepared_by": "chatgpt:gpt-5.6-sol",
-  "base_main_sha": "7f555592b7b8b5b488c905247daf60ca8008bbb5",
+  "base_main_sha": "a04fffb388317a9744d9025f4e523ac0cdc19d7f",
   "canonical_module": "skeleton/ai/assistant/turn_runtime.py",
-  "scope": "durable provider-neutral AI chat turn state, live product-route persistence, replay, reconnectable streaming, resource admission, and crash recovery",
+  "scope": "durable provider-neutral AI chat turn state, live product-route persistence, replay, reconnectable streaming, execution ownership fencing, resource admission, and crash recovery",
   "authority": {
     "conversation_authority": "backend/core/conversations.py",
     "assistant_control_plane": "skeleton/ai/assistant/runtime.py",
@@ -63,7 +63,13 @@
     "public reconnect transport requires operation, sequence, and digest continuity",
     "same-operation retries preserve the original durable conversation binding while revalidating request digest and causal user identity",
     "transient engine or provider unavailability leaves the durable turn resumable instead of fabricating terminal completion",
-    "cancellation request acknowledgement is non-terminal until the engine confirms a terminal cancelled state"
+    "cancellation request acknowledgement is non-terminal until the engine confirms a terminal cancelled state",
+    "at most one live execution holder owns mutable model or terminal progression for a turn",
+    "every execution ownership takeover increments a monotonic fencing epoch",
+    "heartbeat renewal invalidates the previous lease token even when the fencing epoch is unchanged",
+    "lease-bound durable event append validates holder epoch digest and expiry at the atomic write boundary",
+    "Mongo crash recovery discards a prepared event when its authorizing lease is stale expired or superseded",
+    "ownership acquire renew release and takeover mutations produce a digest-chained audit receipt"
   ],
   "budget_dimensions": [
     "wall_seconds",
@@ -111,7 +117,10 @@
     "streaming_tests": "skeleton/testing/test_ai_chat_streaming.py",
     "live_lifecycle": "backend/core/chat_turn_lifecycle.py",
     "live_route": "backend/routes/ai.py",
-    "live_route_tests": "backend/tests/test_ai_chat_turn_route_cutover.py"
+    "live_route_tests": "backend/tests/test_ai_chat_turn_route_cutover.py",
+    "ownership": "skeleton/ai/assistant/turn_ownership.py",
+    "ownership_tests": "skeleton/testing/test_ai_chat_turn_ownership.py",
+    "ownership_repository_tests": "skeleton/testing/test_ai_chat_turn_ownership_repository.py"
   },
   "promotion_rule": "implemented candidate only; no completion or verification signoff until exact-head CI and independent verification pass",
   "next_integrations": [
@@ -157,5 +166,15 @@
     "retry_binding_rule": "an existing durable operation wins over later thread-version drift after operation, request, tenant, owner, thread, and causal-user identity are revalidated",
     "transient_failure_rule": "configuration, availability, protocol, memory-backend, and provider transient failures do not fabricate a terminal durable turn",
     "cancellation_rule": "cancellation_requested is an acknowledgement state; only engine terminal cancelled closes the durable turn"
+  },
+  "ownership": {
+    "contract": "skeleton/ai/assistant/turn_ownership.py",
+    "fence": "strictly monotonic per-operation epoch plus exact lease digest",
+    "holder_rule": "one live holder per operation; competing acquisition fails closed",
+    "heartbeat_rule": "renewal preserves epoch but increments heartbeat sequence and replaces the accepted lease digest",
+    "takeover_rule": "only expired or released ownership can be replaced; takeover increments epoch",
+    "write_rule": "lease-bound append checks holder, epoch, lease digest, and expiry inside the persistence CAS",
+    "crash_rule": "prepared Mongo events carry their authorizing lease and are discarded before replay if that lease is no longer current",
+    "audit_rule": "acquire, renew, release, and takeover emit digest-chained ownership receipts"
   }
 }

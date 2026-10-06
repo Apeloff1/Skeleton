@@ -18,13 +18,21 @@ or replaying an ambiguous external side effect.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Mapping
 
 from pymongo import ASCENDING, ReturnDocument
 from pymongo.errors import DuplicateKeyError, PyMongoError
 
 from core.databases import core_db
+from skeleton.ai.assistant.turn_ownership import (
+    TurnLeaseBusy,
+    TurnLeaseExpired,
+    TurnLeasePolicy,
+    TurnLeaseStale,
+    TurnLeaseToken,
+    TurnOwnershipReceipt,
+)
 from skeleton.ai.assistant.turn_runtime import (
     CHAT_TURN_SCHEMA_VERSION,
     ExecutionBudget,
@@ -87,6 +95,15 @@ def _operation_doc(turn: PersistedChatTurn) -> dict[str, Any]:
         "state": snapshot.state.value,
         "next_sequence": snapshot.next_sequence,
         "last_event_digest": snapshot.last_event_digest,
+        "lease_epoch": 0,
+        "lease_holder_id": None,
+        "lease_granted_at": None,
+        "lease_expires_at": None,
+        "lease_heartbeat_sequence": 0,
+        "lease_previous_digest": None,
+        "lease_digest": None,
+        "ownership_receipt_digest": None,
+        "ownership_audit_sequence": 0,
         "created_at": turn.created_at,
         "updated_at": turn.updated_at,
         "schema_version": CHAT_TURN_SCHEMA_VERSION,
@@ -139,7 +156,82 @@ def _turn_from_doc(doc: Mapping[str, Any]) -> PersistedChatTurn:
     return turn
 
 
-def _event_doc(event: TurnEvent) -> dict[str, Any]:
+def _lease_from_doc(doc: Mapping[str, Any]) -> TurnLeaseToken | None:
+    holder = doc.get("lease_holder_id")
+    if holder is None:
+        return None
+    granted = doc.get("lease_granted_at")
+    expires = doc.get("lease_expires_at")
+    if not isinstance(granted, datetime) or not isinstance(expires, datetime):
+        raise ChatTurnCorruption("Mongo lease timestamps must be datetimes")
+    try:
+        return TurnLeaseToken(
+            operation_id=str(doc["operation_id"]),
+            tenant_id=str(doc["tenant_id"]),
+            owner_id=str(doc["owner_id"]),
+            holder_id=str(holder),
+            epoch=int(doc.get("lease_epoch") or 0),
+            heartbeat_sequence=int(doc.get("lease_heartbeat_sequence") or 0),
+            granted_at=_aware_utc(granted, "lease_granted_at"),
+            expires_at=_aware_utc(expires, "lease_expires_at"),
+            previous_lease_digest=doc.get("lease_previous_digest"),
+        )
+    except (KeyError, TypeError, ValueError, ChatTurnRepositoryError) as exc:
+        raise ChatTurnCorruption("persisted Mongo turn lease is invalid") from exc
+
+
+def _lease_from_payload(raw: object) -> TurnLeaseToken | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, Mapping):
+        raise ChatTurnCorruption("prepared event lease binding is invalid")
+    try:
+        token = TurnLeaseToken(
+            operation_id=str(raw["operation_id"]),
+            tenant_id=str(raw["tenant_id"]),
+            owner_id=str(raw["owner_id"]),
+            holder_id=str(raw["holder_id"]),
+            epoch=int(raw["epoch"]),
+            heartbeat_sequence=int(raw["heartbeat_sequence"]),
+            granted_at=datetime.fromisoformat(str(raw["granted_at"])),
+            expires_at=datetime.fromisoformat(str(raw["expires_at"])),
+            previous_lease_digest=raw.get("previous_lease_digest"),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ChatTurnCorruption("prepared event lease binding is invalid") from exc
+    if raw.get("digest") != token.digest:
+        raise ChatTurnCorruption("prepared event lease digest drifted")
+    return token
+
+
+def _assert_lease_doc(
+    doc: Mapping[str, Any],
+    lease: TurnLeaseToken,
+    *,
+    now: datetime,
+) -> TurnLeaseToken:
+    current = _lease_from_doc(doc)
+    if current is None:
+        raise TurnLeaseStale("turn has no active execution lease")
+    if (
+        current.operation_id != lease.operation_id
+        or current.tenant_id != lease.tenant_id
+        or current.owner_id != lease.owner_id
+        or current.holder_id != lease.holder_id
+        or current.epoch != lease.epoch
+        or current.digest != lease.digest
+    ):
+        raise TurnLeaseStale(
+            "turn execution lease no longer matches current fencing token"
+        )
+    current.require_live(_aware_utc(now, "lease validation time"))
+    return current
+
+
+def _event_doc(
+    event: TurnEvent,
+    lease: TurnLeaseToken | None = None,
+) -> dict[str, Any]:
     return {
         "_id": f"{event.operation_id}:{event.sequence}",
         "operation_id": event.operation_id,
@@ -147,11 +239,11 @@ def _event_doc(event: TurnEvent) -> dict[str, Any]:
         "event_digest": event.digest,
         "event": event.as_dict(),
         "observed_at": event.observed_at,
+        "lease": None if lease is None else lease.as_dict(),
         "_commit_state": "prepared",
         "_expected_sequence": event.sequence,
         "_expected_previous_event_digest": event.previous_event_digest,
     }
-
 
 def _event_from_doc(doc: Mapping[str, Any]) -> TurnEvent:
     try:
@@ -186,6 +278,7 @@ class MongoChatTurnAuthority:
         self.database = database
         self.operations = database["ai_chat_turn_operations"]
         self.events = database["ai_chat_turn_events"]
+        self.ownership_audit = database["ai_chat_turn_ownership_audit"]
 
     @staticmethod
     def _authorized_filter(
@@ -253,6 +346,64 @@ class MongoChatTurnAuthority:
                 "AI chat turn operation could not be created"
             ) from exc
         return turn
+
+    async def _ensure_ownership_fields(
+        self,
+        operation_id: str,
+        *,
+        tenant_id: str,
+        owner_id: str,
+    ) -> Mapping[str, Any]:
+        raw = await self._raw_operation(
+            operation_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        if "lease_epoch" in raw and "ownership_audit_sequence" in raw:
+            return raw
+
+        query = {
+            **self._authorized_filter(
+                operation_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+            ),
+            "lease_epoch": {"$exists": False},
+        }
+        defaults = {
+            "lease_epoch": 0,
+            "lease_holder_id": None,
+            "lease_granted_at": None,
+            "lease_expires_at": None,
+            "lease_heartbeat_sequence": 0,
+            "lease_previous_digest": None,
+            "lease_digest": None,
+            "ownership_receipt_digest": None,
+            "ownership_audit_sequence": 0,
+        }
+        try:
+            initialized = await self.operations.find_one_and_update(
+                query,
+                {"$set": defaults},
+                return_document=ReturnDocument.AFTER,
+            )
+        except PyMongoError as exc:
+            raise ChatTurnStorageUnavailable(
+                "legacy AI chat ownership fields could not be initialized"
+            ) from exc
+        if initialized is not None:
+            return initialized
+
+        refreshed = await self._raw_operation(
+            operation_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        if "lease_epoch" not in refreshed:
+            raise ChatTurnStorageUnavailable(
+                "AI chat ownership schema initialization did not converge"
+            )
+        return refreshed
 
     async def _raw_operation(
         self,
@@ -332,6 +483,28 @@ class MongoChatTurnAuthority:
                 pass
             return current
 
+        prepared_lease = _lease_from_payload(prepared.get("lease"))
+        if prepared_lease is not None:
+            try:
+                _assert_lease_doc(
+                    raw,
+                    prepared_lease,
+                    now=_utcnow(),
+                )
+            except (TurnLeaseStale, TurnLeaseExpired):
+                try:
+                    await self.events.delete_one(
+                        {
+                            "_id": prepared["_id"],
+                            "_commit_state": "prepared",
+                        }
+                    )
+                except PyMongoError as exc:
+                    raise ChatTurnStorageUnavailable(
+                        "stale prepared AI chat event could not be discarded"
+                    ) from exc
+                return current
+
         if (
             event.sequence != current.snapshot.next_sequence
             or event.previous_event_digest
@@ -366,6 +539,14 @@ class MongoChatTurnAuthority:
             "next_sequence": current.snapshot.next_sequence,
             "last_event_digest": current.snapshot.last_event_digest,
         }
+        if prepared_lease is not None:
+            query.update(
+                {
+                    "lease_epoch": prepared_lease.epoch,
+                    "lease_holder_id": prepared_lease.holder_id,
+                    "lease_digest": prepared_lease.digest,
+                }
+            )
 
         try:
             advanced = await self.operations.find_one_and_update(
@@ -426,6 +607,290 @@ class MongoChatTurnAuthority:
             "updated_at": updated_at,
         }
 
+    async def _record_ownership_receipt(
+        self,
+        receipt: TurnOwnershipReceipt,
+        *,
+        sequence: int,
+    ) -> None:
+        try:
+            await self.ownership_audit.insert_one(
+                {
+                    "_id": receipt.digest,
+                    "operation_id": receipt.operation_id,
+                    "sequence": sequence,
+                    "action": receipt.action,
+                    "epoch": receipt.epoch,
+                    "holder_id": receipt.holder_id,
+                    "receipt": receipt.as_dict(),
+                    "_commit_state": "prepared",
+                }
+            )
+        except DuplicateKeyError:
+            existing = await self.ownership_audit.find_one({"_id": receipt.digest})
+            if existing is None:
+                raise ChatTurnConflict("ownership receipt identity conflict")
+        except PyMongoError as exc:
+            raise ChatTurnStorageUnavailable(
+                "AI chat ownership audit storage is unavailable"
+            ) from exc
+
+    async def _commit_ownership_receipt(self, digest: str) -> None:
+        try:
+            await self.ownership_audit.update_one(
+                {"_id": digest, "_commit_state": "prepared"},
+                {"$set": {"_commit_state": "committed"}},
+            )
+        except PyMongoError:
+            pass
+
+    async def acquire_lease(
+        self,
+        operation_id: str,
+        *,
+        tenant_id: str,
+        owner_id: str,
+        holder_id: str,
+        policy: TurnLeasePolicy | None = None,
+        ttl_seconds: float | None = None,
+        now: datetime | None = None,
+    ) -> TurnLeaseToken:
+        if not isinstance(holder_id, str) or not holder_id.strip():
+            raise ValueError("holder_id must be non-empty text")
+        lease_policy = policy or TurnLeasePolicy()
+        ttl = lease_policy.clamp_ttl(ttl_seconds)
+        instant = _utcnow() if now is None else _aware_utc(now, "now")
+        raw = await self._ensure_ownership_fields(
+            operation_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        current = _lease_from_doc(raw)
+        if current is not None and current.is_live(instant):
+            if current.holder_id == holder_id.strip():
+                return current
+            raise TurnLeaseBusy("turn already has a live execution owner")
+
+        epoch = int(raw.get("lease_epoch") or 0) + 1
+        token = TurnLeaseToken(
+            operation_id=operation_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            holder_id=holder_id.strip(),
+            epoch=epoch,
+            heartbeat_sequence=0,
+            granted_at=instant,
+            expires_at=instant + timedelta(seconds=ttl),
+            previous_lease_digest=raw.get("lease_digest"),
+        )
+        receipt = TurnOwnershipReceipt(
+            operation_id=operation_id,
+            action="acquire" if epoch == 1 else "takeover",
+            epoch=epoch,
+            holder_id=token.holder_id,
+            observed_at=instant,
+            lease_digest=token.digest,
+            previous_receipt_digest=raw.get("ownership_receipt_digest"),
+        )
+        sequence = int(raw.get("ownership_audit_sequence") or 0) + 1
+        await self._record_ownership_receipt(receipt, sequence=sequence)
+
+        query = {
+            **self._authorized_filter(
+                operation_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+            ),
+            "lease_epoch": int(raw.get("lease_epoch") or 0),
+            "lease_holder_id": raw.get("lease_holder_id"),
+            "lease_digest": raw.get("lease_digest"),
+            "ownership_audit_sequence": int(raw.get("ownership_audit_sequence") or 0),
+        }
+        update = {
+            "$set": {
+                "lease_epoch": token.epoch,
+                "lease_holder_id": token.holder_id,
+                "lease_granted_at": token.granted_at,
+                "lease_expires_at": token.expires_at,
+                "lease_heartbeat_sequence": token.heartbeat_sequence,
+                "lease_previous_digest": token.previous_lease_digest,
+                "lease_digest": token.digest,
+                "ownership_receipt_digest": receipt.digest,
+                "ownership_audit_sequence": sequence,
+            }
+        }
+        try:
+            advanced = await self.operations.find_one_and_update(
+                query,
+                update,
+                return_document=ReturnDocument.AFTER,
+            )
+        except PyMongoError as exc:
+            raise ChatTurnStorageUnavailable(
+                "AI chat turn lease could not be acquired"
+            ) from exc
+        if advanced is None:
+            raise TurnLeaseBusy("turn ownership changed during lease acquisition")
+        await self._commit_ownership_receipt(receipt.digest)
+        return token
+
+    async def renew_lease(
+        self,
+        lease: TurnLeaseToken,
+        *,
+        policy: TurnLeasePolicy | None = None,
+        ttl_seconds: float | None = None,
+        now: datetime | None = None,
+    ) -> TurnLeaseToken:
+        if not isinstance(lease, TurnLeaseToken):
+            raise TypeError("lease must be TurnLeaseToken")
+        lease_policy = policy or TurnLeasePolicy()
+        ttl = lease_policy.clamp_ttl(ttl_seconds)
+        instant = _utcnow() if now is None else _aware_utc(now, "now")
+        raw = await self._ensure_ownership_fields(
+            lease.operation_id,
+            tenant_id=lease.tenant_id,
+            owner_id=lease.owner_id,
+        )
+        current = _assert_lease_doc(raw, lease, now=instant)
+        renewed = TurnLeaseToken(
+            operation_id=current.operation_id,
+            tenant_id=current.tenant_id,
+            owner_id=current.owner_id,
+            holder_id=current.holder_id,
+            epoch=current.epoch,
+            heartbeat_sequence=current.heartbeat_sequence + 1,
+            granted_at=current.granted_at,
+            expires_at=instant + timedelta(seconds=ttl),
+            previous_lease_digest=current.digest,
+        )
+        receipt = TurnOwnershipReceipt(
+            operation_id=current.operation_id,
+            action="renew",
+            epoch=current.epoch,
+            holder_id=current.holder_id,
+            observed_at=instant,
+            lease_digest=renewed.digest,
+            previous_receipt_digest=raw.get("ownership_receipt_digest"),
+        )
+        sequence = int(raw.get("ownership_audit_sequence") or 0) + 1
+        await self._record_ownership_receipt(receipt, sequence=sequence)
+
+        query = {
+            **self._authorized_filter(
+                lease.operation_id,
+                tenant_id=lease.tenant_id,
+                owner_id=lease.owner_id,
+            ),
+            "lease_epoch": current.epoch,
+            "lease_holder_id": current.holder_id,
+            "lease_digest": current.digest,
+            "ownership_audit_sequence": int(raw.get("ownership_audit_sequence") or 0),
+        }
+        try:
+            advanced = await self.operations.find_one_and_update(
+                query,
+                {
+                    "$set": {
+                        "lease_expires_at": renewed.expires_at,
+                        "lease_heartbeat_sequence": renewed.heartbeat_sequence,
+                        "lease_previous_digest": renewed.previous_lease_digest,
+                        "lease_digest": renewed.digest,
+                        "ownership_receipt_digest": receipt.digest,
+                        "ownership_audit_sequence": sequence,
+                    }
+                },
+                return_document=ReturnDocument.AFTER,
+            )
+        except PyMongoError as exc:
+            raise ChatTurnStorageUnavailable(
+                "AI chat turn lease could not be renewed"
+            ) from exc
+        if advanced is None:
+            raise TurnLeaseStale("turn ownership changed during lease renewal")
+        await self._commit_ownership_receipt(receipt.digest)
+        return renewed
+
+    async def release_lease(
+        self,
+        lease: TurnLeaseToken,
+        *,
+        now: datetime | None = None,
+    ) -> TurnOwnershipReceipt:
+        if not isinstance(lease, TurnLeaseToken):
+            raise TypeError("lease must be TurnLeaseToken")
+        instant = _utcnow() if now is None else _aware_utc(now, "now")
+        raw = await self._ensure_ownership_fields(
+            lease.operation_id,
+            tenant_id=lease.tenant_id,
+            owner_id=lease.owner_id,
+        )
+        current = _assert_lease_doc(raw, lease, now=instant)
+        receipt = TurnOwnershipReceipt(
+            operation_id=current.operation_id,
+            action="release",
+            epoch=current.epoch,
+            holder_id=current.holder_id,
+            observed_at=instant,
+            lease_digest=current.digest,
+            previous_receipt_digest=raw.get("ownership_receipt_digest"),
+        )
+        sequence = int(raw.get("ownership_audit_sequence") or 0) + 1
+        await self._record_ownership_receipt(receipt, sequence=sequence)
+
+        query = {
+            **self._authorized_filter(
+                lease.operation_id,
+                tenant_id=lease.tenant_id,
+                owner_id=lease.owner_id,
+            ),
+            "lease_epoch": current.epoch,
+            "lease_holder_id": current.holder_id,
+            "lease_digest": current.digest,
+            "ownership_audit_sequence": int(raw.get("ownership_audit_sequence") or 0),
+        }
+        try:
+            advanced = await self.operations.find_one_and_update(
+                query,
+                {
+                    "$set": {
+                        "lease_holder_id": None,
+                        "lease_granted_at": None,
+                        "lease_expires_at": None,
+                        "lease_heartbeat_sequence": 0,
+                        "lease_previous_digest": current.digest,
+                        "lease_digest": current.digest,
+                        "ownership_receipt_digest": receipt.digest,
+                        "ownership_audit_sequence": sequence,
+                    }
+                },
+                return_document=ReturnDocument.AFTER,
+            )
+        except PyMongoError as exc:
+            raise ChatTurnStorageUnavailable(
+                "AI chat turn lease could not be released"
+            ) from exc
+        if advanced is None:
+            raise TurnLeaseStale("turn ownership changed during lease release")
+        await self._commit_ownership_receipt(receipt.digest)
+        return receipt
+
+    async def assert_lease(
+        self,
+        lease: TurnLeaseToken,
+        *,
+        now: datetime | None = None,
+    ) -> TurnLeaseToken:
+        if not isinstance(lease, TurnLeaseToken):
+            raise TypeError("lease must be TurnLeaseToken")
+        raw = await self._ensure_ownership_fields(
+            lease.operation_id,
+            tenant_id=lease.tenant_id,
+            owner_id=lease.owner_id,
+        )
+        instant = _utcnow() if now is None else _aware_utc(now, "now")
+        return _assert_lease_doc(raw, lease, now=instant)
+
     async def get_operation(
         self,
         operation_id: str,
@@ -445,6 +910,7 @@ class MongoChatTurnAuthority:
         *,
         tenant_id: str,
         owner_id: str,
+        lease: TurnLeaseToken | None = None,
     ) -> PersistedChatTurn:
         if not isinstance(event, TurnEvent):
             raise TypeError("event must be TurnEvent")
@@ -453,13 +919,28 @@ class MongoChatTurnAuthority:
             tenant_id=tenant_id,
             owner_id=owner_id,
         )
+        raw = (
+            await self._ensure_ownership_fields(
+                event.operation_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+            )
+            if lease is not None
+            else await self._raw_operation(
+                event.operation_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+            )
+        )
+        if lease is not None:
+            _assert_lease_doc(raw, lease, now=event.observed_at)
 
         try:
             next_snapshot = current.snapshot.apply(event)
         except TurnRuntimeError as exc:
             raise ChatTurnConflict(str(exc)) from exc
 
-        prepared = _event_doc(event)
+        prepared = _event_doc(event, lease)
         try:
             await self.events.insert_one(prepared)
         except DuplicateKeyError:
@@ -499,6 +980,14 @@ class MongoChatTurnAuthority:
             "next_sequence": current.snapshot.next_sequence,
             "last_event_digest": current.snapshot.last_event_digest,
         }
+        if lease is not None:
+            query.update(
+                {
+                    "lease_epoch": lease.epoch,
+                    "lease_holder_id": lease.holder_id,
+                    "lease_digest": lease.digest,
+                }
+            )
 
         try:
             advanced = await self.operations.find_one_and_update(

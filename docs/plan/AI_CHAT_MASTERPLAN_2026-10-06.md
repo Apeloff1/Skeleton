@@ -489,6 +489,58 @@ operation, last sequence, and last event digest; sequence gaps or digest
 mismatches fail closed. SSE/WebSocket delivery can layer over the same
 transport-neutral journal projection without creating a second event source.
 
+### Enterprise execution ownership overlay
+
+Status: **implemented candidate; exact-head qualification pending**.
+
+The chat execution plane now treats distributed ownership as a first-class
+durable invariant rather than an advisory in-process lock.
+
+Implemented:
+
+- one live execution holder per durable turn operation;
+- bounded ownership TTL with policy-controlled minimum/default/maximum values;
+- strictly monotonic fencing epochs across release/reacquire and expiry
+  takeover;
+- heartbeat renewal that retains the epoch but replaces the accepted lease
+  digest and increments heartbeat sequence;
+- exact holder + epoch + lease-digest + expiry validation at the same atomic
+  persistence boundary as a lease-bound turn-event append;
+- SQLite transactional fencing for conformance, tests, local recovery, and
+  deterministic replay;
+- Mongo compare-and-swap acquire/renew/release with ownership-schema
+  initialization for pre-fencing legacy operations;
+- prepared Mongo turn events bind the lease that authorized them;
+- crash recovery discards an uncommitted prepared event when its authorizing
+  lease is expired, stale, or superseded before the turn snapshot reaches its
+  commit point;
+- ownership acquire, renew, release, and takeover actions emit a
+  digest-chained audit receipt;
+- live synchronous chat holds a unique per-attempt lease across model
+  execution, verification, transcript commit, and durable completion;
+- deferred requests release route ownership after engine admission so a later
+  poller can take a higher fencing epoch for finalization;
+- terminal polling and confirmed cancellation use short-lived finalizer
+  leases;
+- a duplicate HTTP worker encountering a live owner returns
+  `execution_in_progress` rather than performing another model call;
+- terminal reconciliation encountering a live owner returns
+  `finalization_in_progress` rather than racing the current owner;
+- transient provider/engine exits release ownership so identical retries can
+  resume the same canonical operation without waiting for lease expiry;
+- adversarial tests cover live-owner contention, stale-token rejection,
+  heartbeat invalidation, expiry takeover, crash-prepared stale events,
+  legacy-operation ownership initialization, ownership receipt chaining, and
+  route-level duplicate execution suppression.
+
+Authority boundary:
+
+The ownership lease authorizes **which worker may advance the durable chat
+execution**, not what privileged external effects are allowed. Tool grants,
+tool receipts, conversation authority, model/provider authority, evidence
+acceptance, and user approval remain separate authorities. A fencing token can
+never self-promote into tool or data authority.
+
 ### Volume 4 — context compiler v2
 
 Status: **implemented candidate; exact-head qualification pending**.

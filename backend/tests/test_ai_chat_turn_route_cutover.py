@@ -187,6 +187,22 @@ async def test_live_chat_success_reaches_durable_complete(
         TurnState.COMPLETE,
     ]
 
+    ownership = ai_chat_turn_test_authority.repo.list_ownership_receipts(
+        response["operation_id"],
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+    )
+    assert [receipt["action"] for receipt in ownership] == [
+        "acquire",
+        "renew",
+        "renew",
+        "release",
+    ]
+    assert [receipt["epoch"] for receipt in ownership] == [1, 1, 1, 1]
+    assert ownership[1]["previous_receipt_digest"] == ownership[0]["digest"]
+    assert ownership[2]["previous_receipt_digest"] == ownership[1]["digest"]
+    assert ownership[3]["previous_receipt_digest"] == ownership[2]["digest"]
+
 
 @pytest.mark.asyncio
 async def test_live_chat_engine_outage_remains_durable_and_resumable(
@@ -232,6 +248,26 @@ async def test_live_chat_engine_outage_remains_durable_and_resumable(
         owner_id="owner-a",
     )
     assert persisted.snapshot.state is TurnState.MODEL_RUNNING
+
+    retry_lease = ai_chat_turn_test_authority.repo.acquire_lease(
+        operation_id,
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+        holder_id="retry-worker",
+        ttl_seconds=30,
+    )
+    assert retry_lease.epoch == 2
+    ownership = ai_chat_turn_test_authority.repo.list_ownership_receipts(
+        operation_id,
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+    )
+    assert [receipt["action"] for receipt in ownership] == [
+        "acquire",
+        "release",
+        "takeover",
+    ]
+    ai_chat_turn_test_authority.repo.release_lease(retry_lease)
 
 
 @pytest.mark.asyncio
@@ -380,3 +416,73 @@ async def test_cancellation_request_does_not_fabricate_terminal_cancelled(
         owner_id="owner-a",
     )
     assert persisted.snapshot.state is TurnState.MODEL_RUNNING
+
+
+@pytest.mark.asyncio
+async def test_live_owner_prevents_duplicate_engine_execution(
+    monkeypatch,
+    ai_chat_turn_test_authority,
+):
+    import routes.ai as route
+
+    thread, user = _thread_and_user()
+    monkeypatch.setattr(
+        route,
+        "conversation_authority",
+        _conversation_authority(thread, user, allow_commit=False),
+    )
+    operation_id, _execution_id = route._chat_turn_ids(
+        thread.thread_id,
+        user.message_id,
+    )
+    turn = await route.chat_turn_lifecycle.begin(
+        thread=thread,
+        user_message=user,
+        operation_id=operation_id,
+        request_digest=route._chat_request_digest(
+            _request(route, thread.thread_id)
+        ),
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+    )
+    lease = await route.chat_turn_lifecycle.acquire_execution(
+        turn,
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+        holder_id="existing-worker",
+        ttl_seconds=60,
+    )
+
+    calls = {"execute": 0}
+    fake_client = SimpleNamespace(
+        config=SimpleNamespace(
+            service_principal="codedock-backend",
+            execution_timeout_s=30.0,
+        )
+    )
+
+    async def wait_for_terminal(**_kwargs):
+        raise EngineNotFoundError("not started")
+
+    async def execute(_command):
+        calls["execute"] += 1
+        raise AssertionError("competing route must not execute the engine")
+
+    fake_client.wait_for_terminal = wait_for_terminal
+    fake_client.execute = execute
+    monkeypatch.setattr(route.EngineClient, "from_env", lambda: fake_client)
+
+    response = await route.ai_chat(
+        _request(route, thread.thread_id),
+        user={"tenant_id": "tenant-a", "email": "owner-a"},
+    )
+    assert response["success"] is True
+    assert response["accepted"] is True
+    assert response["terminal"] is False
+    assert response["state"] == "execution_in_progress"
+    assert response["operation_id"] == operation_id
+    assert calls["execute"] == 0
+
+    current = ai_chat_turn_test_authority.repo.assert_lease(lease)
+    assert current.holder_id == "existing-worker"
+    assert current.epoch == 1
