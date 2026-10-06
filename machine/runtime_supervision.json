@@ -1,8 +1,8 @@
 {
-  "schema_version": "skeleton.architecture.runtime_supervision.v1",
-  "contract_version": "0.1.0",
+  "schema_version": "skeleton.architecture.runtime_supervision.v2",
+  "contract_version": "1.0.0",
   "status": "active",
-  "purpose": "One machine-readable backend/engine supervision contract covering dependency order, readiness, shutdown, recovery, cancellation, deadlines and operation identity.",
+  "purpose": "One executable backend/engine lifecycle and connector-cancellation contract covering readiness, draining, recovery, deadlines, cancellation propagation, retry interruption, late-result fencing and operation identity.",
   "masterplan_binding": {
     "volume_ref": "VOL-004",
     "title": "Kernel & Execution Foundation",
@@ -18,17 +18,24 @@
     "engine_server": "skeleton/api/server.py",
     "engine_runtime": "skeleton/api/engine_runtime.py",
     "engine_service": "skeleton/api/engine_service.py",
-    "operation_runtime": "skeleton/persistence/operation_runtime.py"
+    "operation_runtime": "skeleton/persistence/operation_runtime.py",
+    "shared_lifecycle": "skeleton/kernel/runtime_supervision.py",
+    "governed_lifecycle_mirror": "skeleton/ai/runtime/kernel/runtime_supervision.py",
+    "construction_contract": "machine/ai_app_construction.json"
   },
   "invariants": [
     "backend depends on skeleton and mongo; skeleton depends on mongo",
-    "backend and skeleton both expose declared health paths before being treated as ready",
+    "backend and skeleton use the same RuntimeServiceLifecycle state machine",
+    "only READY services admit new work; DRAINING atomically revokes work admission",
+    "shutdown cancellation is generation-bound and restart creates a fresh cancellation token",
     "shutdown cancels/drains background execution before closing durable dependencies",
     "backend cancellation delegates to the engine cancel endpoint rather than inventing local terminal truth",
     "engine cancellation is persisted through the execution repository and is idempotent around terminal state",
     "engine coordinator supports restart recovery and bounded shutdown",
-    "operation deadlines are explicit and cannot be created already expired",
-    "operation identity is preserved across backend client and engine service boundaries"
+    "operation and provider deadlines are explicit and cannot be created already expired",
+    "operation identity is preserved across backend client and engine service boundaries",
+    "every declared network-transport owner has explicit bounded cancellation semantics",
+    "late connector results are fenced after cancellation and cannot become authoritative output"
   ],
   "services": [
     {
@@ -45,6 +52,10 @@
           "path": "backend/server.py",
           "required_symbols": [
             "async def lifespan(app: FastAPI):",
+            "RuntimeServiceLifecycle(\"backend\")",
+            "runtime_lifecycle.mark_ready(",
+            "runtime_lifecycle.begin_drain(",
+            "runtime_lifecycle.mark_stopped(",
             "t.cancel()",
             "client.close()",
             "@api_router.get(\"/health/ready\")"
@@ -75,6 +86,10 @@
         {
           "path": "skeleton/api/server.py",
           "required_symbols": [
+            "RuntimeServiceLifecycle(\"skeleton\")",
+            "runtime_lifecycle.mark_ready(",
+            "runtime_lifecycle.begin_drain(",
+            "runtime_lifecycle.mark_stopped(",
             "async def close_engine_execution_service",
             "await coordinator.shutdown()",
             "def close_operation_runtime"
@@ -107,6 +122,131 @@
             "operation_deadline"
           ]
         }
+      ]
+    }
+  ],
+  "lifecycle_semantics": {
+    "shared_owner": "skeleton/kernel/runtime_supervision.py:RuntimeServiceLifecycle",
+    "governed_mirror": "skeleton/ai/runtime/kernel/runtime_supervision.py",
+    "phases": [
+      "starting",
+      "ready",
+      "draining",
+      "stopped",
+      "failed"
+    ],
+    "work_admission_phase": "ready",
+    "draining_revokes_admission": true,
+    "terminal_phases": [
+      "stopped",
+      "failed"
+    ],
+    "restart_requires_terminal_generation": true,
+    "restart_refreshes_cancellation_token": true,
+    "monotonic_receipts": true,
+    "receipt_fields": [
+      "service_id",
+      "sequence",
+      "generation",
+      "from_phase",
+      "to_phase",
+      "reason",
+      "at_monotonic",
+      "cancellation"
+    ]
+  },
+  "connector_inventory": {
+    "construction_source": "machine/ai_app_construction.json:provider_surfaces",
+    "selection_rule": "network_transport_owner == true",
+    "coverage_rule": "every selected provider surface must appear exactly once in connectors",
+    "extra_internal_connectors": [
+      "backend-engine"
+    ],
+    "undeclared_connector_policy": "fail-closed"
+  },
+  "connectors": [
+    {
+      "id": "backend-engine",
+      "surface_id": null,
+      "owner": "backend/core/engine_client.py",
+      "family": "internal-service",
+      "cancellation_mode": "delegated_durable_cancel",
+      "deadline_propagation": true,
+      "bounded_timeout": true,
+      "retry_wait_cancellable": true,
+      "late_result_fencing": true,
+      "required_symbols": [
+        "async def cancel(",
+        "f\"/executions/{execution}/cancel\"",
+        "execution_timeout_s",
+        "request_timeout_s",
+        "operation_id"
+      ]
+    },
+    {
+      "id": "engine-runtime",
+      "surface_id": "engine-runtime",
+      "owner": "skeleton/provider_runtime.py",
+      "family": "runtime_model",
+      "cancellation_mode": "async_task_cancellation",
+      "deadline_propagation": true,
+      "bounded_timeout": true,
+      "retry_wait_cancellable": true,
+      "late_result_fencing": true,
+      "required_symbols": [
+        "def _remaining_provider_timeout(",
+        "asyncio.wait_for(",
+        "except asyncio.TimeoutError",
+        "ProviderInvocationError("
+      ]
+    },
+    {
+      "id": "repository-automation",
+      "surface_id": "repository-automation",
+      "owner": "skeleton/automation/free_model.py",
+      "family": "automation_model",
+      "cancellation_mode": "bounded_blocking_token_fence",
+      "deadline_propagation": false,
+      "bounded_timeout": true,
+      "retry_wait_cancellable": true,
+      "late_result_fencing": true,
+      "required_symbols": [
+        "CancellationToken",
+        "cancellation.require_active()",
+        "urllib.request.urlopen(req, timeout=self.timeout)"
+      ]
+    },
+    {
+      "id": "shift-supervisor-model-gateway",
+      "surface_id": "shift-supervisor-model-gateway",
+      "owner": "skeleton/automation/shift_supervisor/model_gateway.py",
+      "family": "automation_model",
+      "cancellation_mode": "bounded_blocking_token_fence",
+      "deadline_propagation": false,
+      "bounded_timeout": true,
+      "retry_wait_cancellable": true,
+      "late_result_fencing": true,
+      "required_symbols": [
+        "CancellationToken",
+        "cancellation.require_active()",
+        "cancellation.wait(delay)",
+        "urllib.request.urlopen(request, timeout=self.timeout_seconds)"
+      ]
+    },
+    {
+      "id": "repository-automation-chatgpt-adapter",
+      "surface_id": "repository-automation-chatgpt-adapter",
+      "owner": "skeleton/automation/chatgpt_adapter.py",
+      "family": "automation_model",
+      "cancellation_mode": "bounded_blocking_token_fence",
+      "deadline_propagation": false,
+      "bounded_timeout": true,
+      "retry_wait_cancellable": true,
+      "late_result_fencing": true,
+      "required_symbols": [
+        "CancellationToken",
+        "cancellation.require_active()",
+        "request.urlopen(api_request, timeout=self.timeout)"
       ]
     }
   ]
