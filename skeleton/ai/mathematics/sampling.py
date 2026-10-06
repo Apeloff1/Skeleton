@@ -77,7 +77,7 @@ def systematic_resample(
     index = 0
     for sample_index in range(count):
         threshold = offset + sample_index / count
-        while threshold > cumulative and index < len(probabilities) - 1:
+        while threshold >= cumulative and index < len(probabilities) - 1:
             index += 1
             cumulative += probabilities[index]
         output.append(index)

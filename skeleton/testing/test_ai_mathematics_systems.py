@@ -99,6 +99,7 @@ def test_splitmix64_and_systematic_resampling_are_reproducible() -> None:
     assert systematic_resample((0.1, 0.2, 0.7), 20, seed=7) == systematic_resample(
         (0.1, 0.2, 0.7), 20, seed=7
     )
+    assert 0 not in systematic_resample((0.0, 0.25, 0.75), 64, seed=0)
 
 
 def test_halton_and_monte_carlo_reference_sampling() -> None:
