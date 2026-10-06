@@ -178,6 +178,19 @@ from skeleton.intelligence.router_registry import (
     RouterRegistry,
     RouterRegistrySnapshot,
 )
+
+from skeleton.intelligence.verification_acceptance import (
+    ACCEPTANCE_SCHEMA_VERSION,
+    AcceptanceDisposition,
+    IndependentVerificationProof,
+    VerificationAcceptanceDecision,
+    VerificationAcceptanceError,
+    VerificationAcceptanceGate,
+    VerificationAcceptanceProfile,
+    VerificationActorIdentity,
+    build_independent_verification_proof,
+    default_acceptance_profile,
+)
 from skeleton.intelligence.quests import (
     QuestObjective,
     QuestProgress,
@@ -331,4 +344,14 @@ __all__ = [
     "REGISTRY_SCHEMA_VERSION",
     "RouterRegistry",
     "RouterRegistrySnapshot",
+    "default_acceptance_profile",
+    "build_independent_verification_proof",
+    "VerificationActorIdentity",
+    "VerificationAcceptanceProfile",
+    "VerificationAcceptanceGate",
+    "VerificationAcceptanceError",
+    "VerificationAcceptanceDecision",
+    "IndependentVerificationProof",
+    "AcceptanceDisposition",
+    "ACCEPTANCE_SCHEMA_VERSION",
 ]
