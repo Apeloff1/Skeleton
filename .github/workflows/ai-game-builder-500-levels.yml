@@ -6,8 +6,12 @@ on:
     paths:
       - "machine/ai_game_builder_500_levels.json"
       - "machine/ai_game_builder_dual_rival_forge.json"
+      - "machine/ai_game_builder_overengineering.json"
       - "machine/ai_game_builder_levels_*.json"
       - "docs/architecture/AI_GAME_BUILDER_500_LEVELS.md"
+      - "docs/architecture/AI_GAME_BUILDER_OVERENGINEERING.md"
+      - "skeleton/ai/game_builder/**"
+      - "skeleton/testing/test_ai_game_builder_contracts.py"
       - "docs/plan/MASTER_PLAN.md"
       - "machine/ai_master_plan.json"
       - "scripts/check_ai_game_builder_500_levels.py"
@@ -18,8 +22,12 @@ on:
     paths:
       - "machine/ai_game_builder_500_levels.json"
       - "machine/ai_game_builder_dual_rival_forge.json"
+      - "machine/ai_game_builder_overengineering.json"
       - "machine/ai_game_builder_levels_*.json"
       - "docs/architecture/AI_GAME_BUILDER_500_LEVELS.md"
+      - "docs/architecture/AI_GAME_BUILDER_OVERENGINEERING.md"
+      - "skeleton/ai/game_builder/**"
+      - "skeleton/testing/test_ai_game_builder_contracts.py"
       - "docs/plan/MASTER_PLAN.md"
       - "machine/ai_master_plan.json"
       - "scripts/check_ai_game_builder_500_levels.py"
@@ -64,7 +72,10 @@ jobs:
           python -m py_compile
           scripts/check_ai_game_builder_500_levels.py
           scripts/check_ai_master_plan.py
+          skeleton/ai/game_builder/contracts.py
+          skeleton/ai/game_builder/dual_rival_forge.py
           tests/test_ai_game_builder_500_levels.py
+          skeleton/testing/test_ai_game_builder_contracts.py
 
       - name: Validate 500-level authority
         run: python scripts/check_ai_game_builder_500_levels.py --json
@@ -73,7 +84,10 @@ jobs:
         run: python scripts/check_ai_master_plan.py
 
       - name: Run focused regression suite
-        run: python -m pytest -q --noconftest tests/test_ai_game_builder_500_levels.py
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_ai_game_builder_500_levels.py
+          skeleton/testing/test_ai_game_builder_contracts.py
 
       - name: Validate masterplan JSON
         run: python -m json.tool machine/ai_master_plan.json >/dev/null
