@@ -3,7 +3,7 @@
   "mode": "dry_run_only",
   "authority": "non_mutating_reconstruction_plan",
   "source": "machine/accountability_recovery_evidence.json",
-  "record_count": 169,
+  "record_count": 170,
   "records": [
     {
       "record_id": "ACC-AIQ-S0-COST-01",
@@ -1786,6 +1786,19 @@
       ],
       "sources": [
         "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-253",
+      "recoverable": [
+        "verification_evidence_anchor"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "8d74b7d3979421780d50b23c211788f185a379b81"
       ]
     },
     {
