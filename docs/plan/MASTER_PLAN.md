@@ -16,7 +16,7 @@ Cutting-edge CS-300 ladder: [`CS_300_COMPUTER_SCIENCE_LADDER.md`](CS_300_COMPUTE
 
 Paired Learning-400 + Adversarial-400: [`LEARNING_400_ADVERSARIAL_400.md`](LEARNING_400_ADVERSARIAL_400.md) / [`machine/learning_400_adversarial_400.json`](../../machine/learning_400_adversarial_400.json)
 
-Project Self-Improvement-1000: [`PROJECT_SELF_IMPROVEMENT_1000.md`](PROJECT_SELF_IMPROVEMENT_1000.md) / [`machine/project_self_improvement_1000.json`](../../machine/project_self_improvement_1000.json) / [`machine/project_self_improvement_epoch_contract.json`](../../machine/project_self_improvement_epoch_contract.json)
+Project Self-Improvement-1000: [`PROJECT_SELF_IMPROVEMENT_1000.md`](PROJECT_SELF_IMPROVEMENT_1000.md) / [`machine/project_self_improvement_1000.json`](../../machine/project_self_improvement_1000.json) / [`machine/project_self_improvement_epoch_contract.json`](../../machine/project_self_improvement_epoch_contract.json) / [`machine/project_self_improvement_idle_scheduler.json`](../../machine/project_self_improvement_idle_scheduler.json)
 
 Existing construction manual: [`docs/AI_APP_CONSTRUCTION_MANUAL.md`](../AI_APP_CONSTRUCTION_MANUAL.md)
 
@@ -808,6 +808,8 @@ Each epoch freezes an exact baseline, mines gaps, generates diverse candidates, 
 The plane covers project mission and requirements; architecture; APIs; data/state; concurrency; algorithms; code quality; static analysis; unit/property/fuzz/integration/E2E testing; build/CI; dependencies and supply chain; secrets/auth/authz/isolation/privacy/network/content safety; reliability/chaos/recovery/DR; observability; performance/cost/hardware/distributed execution; databases/caches/search/RAG/knowledge/memory/context; reasoning/planning/tools/agents/model routing/inference; prompts and multimodal systems; web/research/evidence/science; datasets and all major learning modes; native weights, adapters, weight editing, compression and evaluation; red-team/drift; project skill acquisition; UX/accessibility/product/DX/docs/migrations/governance; wisdom; and whole-project finality.
 
 Mirror rooms are deliberately non-authoritative. Proposer, challenger and verifier roles cannot self-promote. Production state and production model weights never silently mutate in place. Every accepted change is a versioned candidate tied to an immutable baseline and requires measurable project-relevant gain or risk reduction, held-out/counterfactual evidence where applicable, current adversarial challenge, independent verification, non-compensable gate preservation and rollback.
+
+Idle opportunity selection is governed by `machine/project_self_improvement_idle_scheduler.json`: it ranks measurable project capability gain, risk reduction, knowledge value, project relevance, uncertainty reduction and evidence staleness against cost and interference risk; critical correctness/security/data-loss/recovery regressions override ordinary optimization. It reserves long-run idle capacity for exploration, prevents eligible PSI strata from starving indefinitely, and requires a durable scheduler-decision receipt.
 
 Repeated no-gain hypotheses are not allowed to consume idle resources forever: they receive evidence-backed backoff while materially new project evidence can reopen them. Every epoch carries explicit limits for wall time, model compute, CPU, memory, accelerator use, storage, network, external API calls and experiment count.
 
