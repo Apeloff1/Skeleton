@@ -2085,7 +2085,25 @@ async def cancel_ai_chat_turn(
         thread.thread_id,
         user_message.message_id,
     )
+    try:
+        chat_turn = await chat_turn_lifecycle.get_if_present(
+            operation_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+    except Exception as exc:
+        raise _chat_error(exc) from exc
+
     if assistant_message is not None:
+        if chat_turn is not None:
+            try:
+                chat_turn = await chat_turn_lifecycle.finalize_existing_assistant(
+                    operation_id,
+                    tenant_id=tenant_id,
+                    owner_id=owner_id,
+                )
+            except Exception as exc:
+                raise _chat_error(exc) from exc
         return {
             "success": True,
             "changed": False,
@@ -2105,12 +2123,26 @@ async def cancel_ai_chat_turn(
             ),
             "failed",
         )
+        if chat_turn is not None and not chat_turn.snapshot.terminal:
+            try:
+                chat_turn = await chat_turn_lifecycle.fail(
+                    chat_turn,
+                    tenant_id=tenant_id,
+                    owner_id=owner_id,
+                    reason_code="canonical-terminal-marker",
+                    cancelled=terminal_state == "cancelled",
+                )
+            except Exception as exc:
+                raise _chat_error(exc) from exc
         return {
             "success": True,
             "changed": False,
             "terminal": True,
             "state": terminal_state,
             "operation_id": operation_id,
+            "turn_state": (
+                None if chat_turn is None else chat_turn.snapshot.state.value
+            ),
             "engine_execution_id": execution_id,
         }
 
@@ -2144,6 +2176,21 @@ async def cancel_ai_chat_turn(
     if cancellation_requested and state not in {"completed", "failed", "cancelled"}:
         state = "cancelled"
     if state in {"failed", "cancelled"}:
+        if chat_turn is not None and not chat_turn.snapshot.terminal:
+            try:
+                chat_turn = await chat_turn_lifecycle.fail(
+                    chat_turn,
+                    tenant_id=tenant_id,
+                    owner_id=owner_id,
+                    reason_code=(
+                        str(status_payload.get("failure_code") or "cancelled")
+                        if state == "cancelled"
+                        else str(status_payload.get("failure_code") or "failed")
+                    ),
+                    cancelled=state == "cancelled",
+                )
+            except Exception as exc:
+                raise _chat_error(exc) from exc
         try:
             latest_thread = await conversation_authority.get_thread(
                 thread_id,
@@ -2187,6 +2234,9 @@ async def cancel_ai_chat_turn(
         "state": state,
         "cancellation_requested": cancellation_requested,
         "operation_id": operation_id,
+        "turn_state": (
+            None if chat_turn is None else chat_turn.snapshot.state.value
+        ),
         "engine_execution_id": execution_id,
         "timestamp": _utcnow(),
     }
