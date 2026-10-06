@@ -27,6 +27,13 @@ def _sha(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+ARTIFACT_REF = "artifact:001-" + "a" * 24
+EVIDENCE_REF = "evidence:001-" + "e" * 24
+ASSUMPTION_REF = "assumption:001-" + "s" * 24
+ATTACK_REF = "attack:001-" + "t" * 24
+COUNTER_REF = "counter:001-" + "c" * 24
+
+
 def _request() -> AIExecutionRequest:
     return AIExecutionRequest(
         operation_id="operation:game-builder",
@@ -54,8 +61,8 @@ def _finalization(
             completed_at=datetime(2026, 10, 7, 0, 1, tzinfo=timezone.utc),
             final_output="candidate" if status == "completed" else None,
             provider_receipts=("provider-receipt:001",),
-            evidence_refs=("evidence:001", "assumption:001", "attack:001", "counter:001"),
-            artifact_refs=("artifact:001",),
+            evidence_refs=(EVIDENCE_REF, ASSUMPTION_REF, ATTACK_REF, COUNTER_REF),
+            artifact_refs=(ARTIFACT_REF,),
         ),
         expected_execution_version=3,
         staged_at=datetime(2026, 10, 7, 0, 1, tzinfo=timezone.utc),
@@ -113,12 +120,12 @@ def test_canonical_execution_derives_replayable_candidate_provenance() -> None:
     assert provenance.finalization_intent_digest == finalization.intent_digest
     assert provenance.model_identity_digest == model.artifact_id.split(":", 1)[1]
     assert provenance.provider_receipt_refs == ("provider-receipt:001",)
-    assert provenance.output_artifact_refs == ("artifact:001",)
+    assert provenance.output_artifact_refs == (ARTIFACT_REF,)
     assert provenance.output_evidence_refs == (
-        "evidence:001",
-        "assumption:001",
-        "attack:001",
-        "counter:001",
+        EVIDENCE_REF,
+        ASSUMPTION_REF,
+        ATTACK_REF,
+        COUNTER_REF,
     )
     assert len(provenance.output_binding_digest) == 64
     assert len(provenance.digest) == 64
@@ -135,18 +142,18 @@ def test_canonical_candidate_factory_requires_committed_artifact_and_evidence() 
         producer_behavior_digest=_sha("behavior-bundle"),
         source_revision="a" * 40,
         artifact=ArtifactIdentity(
-            artifact_digest="artifact:001",
+            artifact_digest=ARTIFACT_REF,
             canon_digest="canon:" + "c" * 32,
             provenance_digest="provenance:" + "d" * 32,
             family_id="GB03",
             level_id="GBL-021",
         ),
         quality={axis: 0.5 for axis in QUALITY_AXES},
-        evidence_digests=("evidence:001",),
-        assumption_digest="assumption:001",
+        evidence_digests=(EVIDENCE_REF,),
+        assumption_digest=ASSUMPTION_REF,
     )
-    assert candidate.artifact.artifact_digest == "artifact:001"
-    assert candidate.evidence_digests == ("evidence:001",)
+    assert candidate.artifact.artifact_digest == ARTIFACT_REF
+    assert candidate.evidence_digests == (EVIDENCE_REF,)
     assert candidate.producer_provenance.finalization_intent_digest == _finalization().intent_digest
 
 
@@ -172,8 +179,8 @@ def test_canonical_candidate_factory_rejects_uncommitted_artifact() -> None:
                 level_id="GBL-021",
             ),
             quality={axis: 0.5 for axis in QUALITY_AXES},
-            evidence_digests=("evidence:001",),
-            assumption_digest="assumption:001",
+            evidence_digests=(EVIDENCE_REF,),
+            assumption_digest=ASSUMPTION_REF,
         )
 
 
@@ -192,7 +199,7 @@ def test_canonical_candidate_factory_rejects_uncommitted_evidence() -> None:
             producer_behavior_digest=_sha("behavior-bundle"),
             source_revision="a" * 40,
             artifact=ArtifactIdentity(
-                artifact_digest="artifact:001",
+                artifact_digest=ARTIFACT_REF,
                 canon_digest="canon:" + "c" * 32,
                 provenance_digest="provenance:" + "d" * 32,
                 family_id="GB03",
@@ -200,7 +207,7 @@ def test_canonical_candidate_factory_rejects_uncommitted_evidence() -> None:
             ),
             quality={axis: 0.5 for axis in QUALITY_AXES},
             evidence_digests=("evidence:not-produced",),
-            assumption_digest="assumption:001",
+            assumption_digest=ASSUMPTION_REF,
         )
 
 
