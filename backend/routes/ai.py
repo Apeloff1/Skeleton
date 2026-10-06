@@ -1202,6 +1202,15 @@ async def ai_chat(
             operation_id,
             execution_id,
         )
+        try:
+            chat_turn = await chat_turn_lifecycle.fail(
+                chat_turn,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+                reason_code="engine-configuration-invalid",
+            )
+        except Exception as exc:
+            raise _chat_error(exc) from exc
         return {
             "success": False,
             "response": "The AI engine configuration is unavailable. Retry later.",
@@ -1217,6 +1226,17 @@ async def ai_chat(
             "context": context_envelope.binding_dict(),
             "timestamp": _utcnow(),
         }
+
+    try:
+        chat_turn = await chat_turn_lifecycle.advance(
+            chat_turn,
+            TurnState.MODEL_RUNNING,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            reason_code="model-execution-started",
+        )
+    except Exception as exc:
+        raise _chat_error(exc) from exc
 
     if engine_client is not None:
         engine_started = time.monotonic()
@@ -1288,6 +1308,7 @@ async def ai_chat(
                             "model": "engine-routed",
                             "replayed": False,
                             "operation_id": operation_id,
+                            "turn_state": chat_turn.snapshot.state.value,
                             "engine_execution_id": execution_id,
                             "thread": thread.as_dict(),
                             "user_message": user_message.as_dict(),
@@ -1303,6 +1324,16 @@ async def ai_chat(
                 execution_id,
                 exc.failure_code or "unknown",
             )
+            try:
+                chat_turn = await chat_turn_lifecycle.fail(
+                    chat_turn,
+                    tenant_id=tenant_id,
+                    owner_id=owner_id,
+                    reason_code=exc.failure_code or "engine-execution-failed",
+                    cancelled=exc.status == "cancelled",
+                )
+            except Exception as turn_exc:
+                raise _chat_error(turn_exc) from turn_exc
             try:
                 current_thread = await conversation_authority.get_thread(
                     request.thread_id,
@@ -1353,6 +1384,16 @@ async def ai_chat(
                 operation_id,
                 execution_id,
             )
+            try:
+                chat_turn = await chat_turn_lifecycle.fail(
+                    chat_turn,
+                    tenant_id=tenant_id,
+                    owner_id=owner_id,
+                    reason_code="engine-unavailable",
+                    retryable=True,
+                )
+            except Exception as turn_exc:
+                raise _chat_error(turn_exc) from turn_exc
             return {
                 "success": False,
                 "response": "The AI engine is unavailable right now. Retry the request.",
@@ -1374,6 +1415,15 @@ async def ai_chat(
                 operation_id,
                 execution_id,
             )
+            try:
+                chat_turn = await chat_turn_lifecycle.fail(
+                    chat_turn,
+                    tenant_id=tenant_id,
+                    owner_id=owner_id,
+                    reason_code="engine-protocol-failure",
+                )
+            except Exception as turn_exc:
+                raise _chat_error(turn_exc) from turn_exc
             return {
                 "success": False,
                 "response": "The AI execution request could not be safely admitted.",
@@ -1415,6 +1465,16 @@ async def ai_chat(
             ),
         }
     elif memory_write_intent is not None:
+        try:
+            chat_turn = await chat_turn_lifecycle.fail(
+                chat_turn,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+                reason_code="memory-persistence-unavailable",
+                retryable=True,
+            )
+        except Exception as exc:
+            raise _chat_error(exc) from exc
         return {
             "success": False,
             "response": (
@@ -1441,6 +1501,16 @@ async def ai_chat(
         )
 
     if not result["success"]:
+        try:
+            chat_turn = await chat_turn_lifecycle.fail(
+                chat_turn,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+                reason_code=str(result.get("error_code") or "model-failure"),
+                retryable=True,
+            )
+        except Exception as exc:
+            raise _chat_error(exc) from exc
         return {
             "success": False,
             "response": "The AI engine is unavailable right now. Retry the request.",
@@ -1454,6 +1524,23 @@ async def ai_chat(
             "context": context_envelope.binding_dict(),
             "timestamp": _utcnow(),
         }
+
+    try:
+        provider_receipts = tuple(result.get("engine_provider_receipts") or ())
+        chat_turn = await chat_turn_lifecycle.advance(
+            chat_turn,
+            TurnState.FINALIZING,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            reason_code="model-result-verified",
+            provider_receipt_ref=(
+                provider_receipts[0]
+                if len(provider_receipts) == 1
+                else None
+            ),
+        )
+    except Exception as exc:
+        raise _chat_error(exc) from exc
 
     engine_execution_id = result.get("engine_execution_id")
     if engine_execution_id:
@@ -1504,6 +1591,17 @@ async def ai_chat(
     except Exception as exc:
         raise _chat_error(exc) from exc
 
+    try:
+        chat_turn = await chat_turn_lifecycle.advance(
+            chat_turn,
+            TurnState.COMPLETE,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            reason_code="conversation-assistant-committed",
+        )
+    except Exception as exc:
+        raise _chat_error(exc) from exc
+
     return {
         "success": True,
         "response": result["response"],
@@ -1527,6 +1625,7 @@ async def ai_chat(
         "latency_ms": result.get("latency_ms"),
         "replayed": False,
         "operation_id": operation_id,
+        "turn_state": chat_turn.snapshot.state.value,
         "ai_result_id": ai_result_id,
         "thread": committed_thread.as_dict(),
         "user_message": user_message.as_dict(),
