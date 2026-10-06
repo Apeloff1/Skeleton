@@ -123,6 +123,12 @@ from .continuous_distributions import (
     regularized_beta,
     regularized_gamma_p,
 )
+from .design_sampling import (
+    SpaceFillingDesignReport,
+    centered_l2_discrepancy,
+    latin_hypercube,
+    scale_unit_design,
+)
 from .density import (
     EmpiricalCDF,
     HistogramReport,
@@ -379,6 +385,12 @@ from .orthogonal_polynomials import (
     legendre_p,
     probabilists_hermite,
 )
+from .pde_time import (
+    PDETimeReport,
+    advection_upwind_periodic,
+    diffusion_explicit_periodic,
+    wave_leapfrog_periodic,
+)
 from .probability import (
     cross_entropy,
     effective_sample_size,
@@ -494,6 +506,14 @@ from .matrix_updates import (
     symmetric_rank_one_update,
 )
 from .matrix_scaling import EquilibrationReport, apply_diagonal_scaling, equilibrate_matrix
+from .markov_diagnostics import (
+    DetailedBalanceReport,
+    MixingReport,
+    detailed_balance_report,
+    dobrushin_coefficient,
+    mixing_profile,
+    total_variation_distance as markov_total_variation_distance,
+)
 from .matching import AssignmentReport, minimum_cost_assignment
 from .solvers import (
     ConjugateGradientReport,
@@ -501,6 +521,14 @@ from .solvers import (
     bisection_root,
     bracketed_newton_root,
     conjugate_gradient,
+)
+from .spherical import (
+    great_circle_distance,
+    sphere_exp_map,
+    sphere_log_map,
+    spherical_angle,
+    spherical_interpolate,
+    unit_vector,
 )
 from .spectral import (
     EigenReport,
@@ -689,6 +717,10 @@ __all__ = [
     "log_beta",
     "regularized_beta",
     "regularized_gamma_p",
+    "SpaceFillingDesignReport",
+    "centered_l2_discrepancy",
+    "latin_hypercube",
+    "scale_unit_design",
     "EmpiricalCDF",
     "HistogramReport",
     "empirical_cdf",
@@ -908,6 +940,10 @@ __all__ = [
     "fit_chebyshev_series",
     "legendre_p",
     "probabilists_hermite",
+    "PDETimeReport",
+    "advection_upwind_periodic",
+    "diffusion_explicit_periodic",
+    "wave_leapfrog_periodic",
     "cross_entropy",
     "effective_sample_size",
     "entropy",
@@ -1000,6 +1036,12 @@ __all__ = [
     "EquilibrationReport",
     "apply_diagonal_scaling",
     "equilibrate_matrix",
+    "DetailedBalanceReport",
+    "MixingReport",
+    "detailed_balance_report",
+    "dobrushin_coefficient",
+    "mixing_profile",
+    "markov_total_variation_distance",
     "AssignmentReport",
     "minimum_cost_assignment",
     "ConjugateGradientReport",
@@ -1007,6 +1049,12 @@ __all__ = [
     "bisection_root",
     "bracketed_newton_root",
     "conjugate_gradient",
+    "great_circle_distance",
+    "sphere_exp_map",
+    "sphere_log_map",
+    "spherical_angle",
+    "spherical_interpolate",
+    "unit_vector",
     "EigenReport",
     "SpectrumBin",
     "dominant_eigenpair_symmetric",

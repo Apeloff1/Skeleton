@@ -119,6 +119,10 @@ model authority boundaries.
 - `fft_blocks.py` — FFT convolution, overlap-add streaming convolution and FFT cross-correlation on canonical radix-2 transforms.
 - `gaussian_process.py` — zero-mean GP posterior covariance and log-marginal evidence over canonical kernels/Cholesky.
 - `kalman.py` — linear-Gaussian Kalman filtering and Rauch-Tung-Striebel smoothing with Joseph covariance updates.
+- `pde_time.py` — periodic upwind advection, explicit diffusion and leapfrog wave integration with CFL gates.
+- `spherical.py` — unit-sphere geodesic distance, log/exp maps and shortest-arc interpolation.
+- `markov_diagnostics.py` — total variation, Dobrushin contraction, detailed balance and finite-step mixing profiles.
+- `design_sampling.py` — deterministic Latin-hypercube designs, centered L2 discrepancy and bounded rescaling.
 - `validation.py` — parity evidence against existing optimized runtime kernels.
 
 ## Guarantees
@@ -215,6 +219,10 @@ model authority boundaries.
 - FFT block convolution reuses canonical radix-2 transforms and exposes block-size semantics instead of introducing a parallel FFT.
 - Gaussian-process helpers expose posterior covariance/evidence only; kernel learning and model promotion remain outside this layer.
 - Kalman/RTS math exposes innovations, gains and covariances without assuming runtime control or tracking authority.
+- Time-domain PDE references reject CFL-unstable steps instead of returning numerically plausible but invalid trajectories.
+- Spherical geometry rejects antipodal ambiguity and non-tangent exponential-map inputs explicitly.
+- Markov diagnostics reuse canonical transition/stationary semantics and expose contraction/reversibility rather than redefining graph authority.
+- Latin-hypercube design complements canonical Halton sampling and reports spacing/discrepancy evidence deterministically.
 - `audit_runtime_kernels()` compares optimized runtime softmax, matmul and attention against
   this reference substrate without replacing those kernels.
 
