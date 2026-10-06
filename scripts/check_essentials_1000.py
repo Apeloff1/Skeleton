@@ -7,10 +7,91 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PATH = ROOT / "machine" / "essentials_1000.json"
 SCHEDULER = ROOT / "machine" / "project_self_improvement_idle_scheduler.json"
+CLOSURE = ROOT / "machine" / "essentials_1000_closure_protocol.json"
+LEDGER = ROOT / "machine" / "essentials_1000_gap_ledger.json"
 
 MATURITY = ["planned","specified","implemented","integrated","independently_verified","signed_complete"]
 
-def validate(data: dict, scheduler: dict | None = None) -> list[str]:
+def validate_closure_protocol(protocol: dict) -> list[str]:
+    errors: list[str] = []
+    if protocol.get("schema_version") != "skeleton.essentials_1000_closure_protocol.v1":
+        errors.append("closure: unexpected schema_version")
+    evidence=set(protocol.get("evidence_classes",[]))
+    required={
+        "canonical_contract","implementation_identity","positive_test","negative_test","boundary_test",
+        "observability_evidence","security_privacy_isolation_evidence","recovery_rollback_evidence",
+        "exact_head_reproduction","independent_verification"
+    }
+    if not required <= evidence:
+        errors.append("closure: required evidence classes missing")
+    sig=protocol.get("signatures",{})
+    if "distinct identities" not in sig.get("separation_rule",""):
+        errors.append("closure: signature separation weakened")
+    fresh=protocol.get("freshness",{})
+    if not fresh.get("invalidation_triggers"):
+        errors.append("closure: freshness invalidation triggers missing")
+    if "moves the affected essential out of signed closure" not in fresh.get("revalidation_rule",""):
+        errors.append("closure: stale evidence must reopen closure")
+    ex=protocol.get("exception_policy",{})
+    if ex.get("waivers_can_mark_complete") is not False:
+        errors.append("closure: waiver completion forbidden")
+    if ex.get("exception_can_bypass_non_compensable_invariant") is not False:
+        errors.append("closure: non-compensable bypass forbidden")
+    app=protocol.get("applicability",{})
+    if app.get("not_applicable_completion") is not False:
+        errors.append("closure: not-applicable completion forbidden")
+    final=protocol.get("finality",{})
+    if final.get("total_required") != 1000:
+        errors.append("closure: finality total must be 1000")
+    if final.get("no_majority_vote") is not True or final.get("no_score_substitution") is not True:
+        errors.append("closure: finality cannot be score/majority based")
+    return errors
+
+def validate_ledger(ledger: dict, data: dict) -> list[str]:
+    errors: list[str] = []
+    if ledger.get("schema_version") != "skeleton.essentials_1000_gap_ledger.v1":
+        errors.append("ledger: unexpected schema_version")
+    records=ledger.get("records",[])
+    if len(records) != 1000:
+        errors.append(f"ledger: expected 1000 records, got {len(records)}")
+        return errors
+    expected=[f"ESS1000-{i:04d}" for i in range(1,1001)]
+    if [r.get("essential_id") for r in records] != expected:
+        errors.append("ledger: essential identity/order mismatch")
+    allowed={"open","specified","implementation_candidate","evidence_incomplete","verification_pending","signed_current","stale","regressed","revoked","blocked"}
+    counts={k:0 for k in allowed}
+    for i,r in enumerate(records,1):
+        state=r.get("state")
+        if state not in allowed:
+            errors.append(f"ledger: {r.get('essential_id')}: invalid state")
+            continue
+        counts[state]+=1
+        if r.get("paired_psi_layer") != f"PSI1000-{i:04d}":
+            errors.append(f"ledger: ESS1000-{i:04d}: PSI pairing mismatch")
+        if state=="signed_current":
+            if not r.get("implementation_identity"):
+                errors.append(f"ledger: ESS1000-{i:04d}: signed without implementation identity")
+            if not r.get("closure_receipt_digest"):
+                errors.append(f"ledger: ESS1000-{i:04d}: signed without closure receipt")
+            if not r.get("current_evidence_ids"):
+                errors.append(f"ledger: ESS1000-{i:04d}: signed without evidence")
+        else:
+            if r.get("closure_receipt_digest") and state=="open":
+                errors.append(f"ledger: ESS1000-{i:04d}: open with closure receipt")
+    summary=ledger.get("summary",{})
+    if summary.get("total") != 1000:
+        errors.append("ledger: summary total mismatch")
+    for key in ("signed_current","open","stale","regressed","revoked","blocked"):
+        if summary.get(key) != counts.get(key,0):
+            errors.append(f"ledger: summary {key} mismatch")
+    if summary.get("essentials_1000_qualified") is not (counts["signed_current"]==1000):
+        errors.append("ledger: qualification mismatch")
+    signed_plan=sum(bool(x.get("complete")) for x in data.get("levels",[]))
+    if signed_plan != counts["signed_current"]:
+        errors.append("ledger: signed-current count diverges from ESS level completion count")
+    return errors
+
+def validate(data: dict, scheduler: dict | None = None, closure: dict | None = None, ledger: dict | None = None) -> list[str]:
     errors: list[str] = []
     levels=data.get("levels",[]); strata=data.get("strata",[]); waves=data.get("construction_waves",[])
     rel=data.get("relationship",{}); completion=data.get("completion",{})
@@ -60,20 +141,28 @@ def validate(data: dict, scheduler: dict | None = None) -> list[str]:
         if ep.get("enabled") is not True: errors.append("scheduler essential priority disabled")
         if ep.get("mapping")!="ESS1000-nnnn -> PSI1000-nnnn": errors.append("scheduler essential mapping mismatch")
         if ep.get("unresolved_essential_priority")!="above_optional_same_domain": errors.append("scheduler essential priority weakened")
+    if closure is not None:
+        errors.extend(validate_closure_protocol(closure))
+    if ledger is not None:
+        errors.extend(validate_ledger(ledger,data))
     return errors
 
 def main() -> int:
     p=argparse.ArgumentParser()
     p.add_argument("--path",type=Path,default=PATH)
     p.add_argument("--scheduler-path",type=Path,default=SCHEDULER)
+    p.add_argument("--closure-path",type=Path,default=CLOSURE)
+    p.add_argument("--ledger-path",type=Path,default=LEDGER)
     a=p.parse_args()
     d=json.loads(a.path.read_text(encoding="utf-8"))
     s=json.loads(a.scheduler_path.read_text(encoding="utf-8"))
-    errors=validate(d,s)
+    c=json.loads(a.closure_path.read_text(encoding="utf-8"))
+    l=json.loads(a.ledger_path.read_text(encoding="utf-8"))
+    errors=validate(d,s,c,l)
     if errors:
         for e in errors: print("ERROR:",e)
         return 1
-    print("ESS-1000 valid: 1000 non-compensable essentials / 100 strata / PSI priority bridge enforced")
+    print("ESS-1000 valid: 1000 essentials / closure freshness + gap ledger + PSI priority enforced")
     return 0
 
 if __name__=="__main__":
