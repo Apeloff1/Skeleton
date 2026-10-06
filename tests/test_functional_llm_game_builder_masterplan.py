@@ -38,9 +38,21 @@ class FunctionalLLMGameBuilderMasterplanTest(unittest.TestCase):
         deep=data["deep_closure"]
         self.assertEqual(int(deep["required_atoms_per_plane"]),1296)
         self.assertEqual(int(deep["required_atoms_total"]),1296*18)
+        expansion=data["deep_closure_expansion"]
+        self.assertEqual(int(expansion["pass"]),2)
+        self.assertEqual(expansion["status"],"registered-specification")
+        self.assertEqual(int(expansion["per_plane_atoms"]),1296)
+        self.assertEqual(int(expansion["total_atoms"]),1296*18)
+        self.assertEqual(expansion["shape"]["planes"],18)
+        self.assertEqual(expansion["shape"]["subsystems_per_plane"],12)
+        self.assertEqual(expansion["shape"]["lifecycle_stages"],12)
+        self.assertEqual(expansion["shape"]["adversarial_profiles"],9)
+        self.assertEqual(data["coverage"]["deep_closure_adversarial_profiles"],deep["stress_profiles"])
         for shard in data["shards"]:
             self.assertTrue(shard["deep_closure_pass2_required"])
             self.assertEqual(int(shard["deep_closure_pass2_atoms"]),1296)
+            self.assertEqual(int(shard["deep_closure_pass"]),2)
+            self.assertFalse(shard["deep_closure_signed"])
 
         readme=(ROOT/"docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/README.md").read_text(encoding="utf-8")
         self.assertIn(f"{target:,}",readme)
