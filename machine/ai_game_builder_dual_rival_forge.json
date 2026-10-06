@@ -1,6 +1,6 @@
 {
   "schema_version": "skeleton.ai_game_builder_dual_rival_forge.v1",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "status": "active_design_authority",
   "purpose": "Govern two internal AI systems that adversarially co-create a game by repeatedly producing, attacking, improving, verifying, and promoting every material game artifact under long-form continuity and rights/provenance constraints.",
   "identities": {
@@ -303,5 +303,26 @@
     "skeleton/ai/game_builder/deep_assurance.py",
     "skeleton/ai/game_builder/frontier_assurance.py",
     "skeleton/ai/game_builder/release.py"
-  ]
+  ],
+  "runtime_contracts": {
+    "contracts": "skeleton/ai/game_builder/contracts.py",
+    "state_machine": "skeleton/ai/game_builder/dual_rival_forge.py",
+    "evaluation_panel": "skeleton/ai/game_builder/evaluation.py",
+    "resource_governor": "skeleton/ai/game_builder/resource_governor.py",
+    "quality_debt": "skeleton/ai/game_builder/quality_debt.py",
+    "integrated_control_plane": "skeleton/ai/game_builder/control_plane.py",
+    "tests": [
+      "tests/test_ai_game_builder_runtime.py",
+      "tests/test_ai_game_builder_overengineering_runtime.py"
+    ],
+    "resilience": "skeleton/ai/game_builder/resilience.py",
+    "gold_master": "skeleton/ai/game_builder/release.py"
+  },
+  "overengineering_authority": "machine/ai_game_builder_overengineering.json",
+  "governance_runtime": {
+    "canon": "skeleton/ai/game_builder/canon.py",
+    "rights": "skeleton/ai/game_builder/rights.py",
+    "atom_lineage": "skeleton/ai/game_builder/atomizer.py",
+    "tests": "tests/test_ai_game_builder_governance.py"
+  }
 }
