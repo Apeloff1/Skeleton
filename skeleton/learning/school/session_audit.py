@@ -49,9 +49,15 @@ def audit_session(ledger: DecisionLedger, session_id: str) -> SessionAudit:
                 failures.append(f"cross-session predecessor for {record.decision_id}")
             elif prior.sequence >= record.sequence:
                 failures.append(f"causal predecessor is not earlier: {record.decision_id}")
+    roots = tuple(record for record in records if not record.predecessors)
+    if len(roots) != 1:
+        failures.append("session must have exactly one causal root")
+    else:
+        checks.append("causal-root")
     if records[0].predecessors:
         failures.append(f"session root has predecessors: {records[0].decision_id}")
-    checks.append("causal-ancestry" if any(record.predecessors for record in records) else "causal-root")
+    if any(record.predecessors for record in records):
+        checks.append("causal-ancestry")
 
     rejected = tuple(record for record in records if record.disposition is DecisionDisposition.REJECTED)
     if rejected:
