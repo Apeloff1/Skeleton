@@ -26,6 +26,7 @@ def _fixture(tmp_path: Path) -> Path:
         "machine/enterprise_ai_superiority.json",
         "machine/ai_master_plan.json",
         "machine/competitive_ai_engineering_ladder.json",
+        "machine/competitive_ai_benchmark_governance.json",
     ):
         source = ROOT / relative
         target = root / relative
@@ -58,6 +59,7 @@ def test_current_enterprise_superiority_authority_is_valid() -> None:
     assert result["all_volumes_inherit_common_contract"] is True
     assert result["competitive_engineering_family_count"] == 20
     assert result["competitive_engineering_level_count"] == 200
+    assert result["competitive_benchmark_journey_count"] == 8
 
 
 def test_core_and_advanced_serving_volumes_have_dedicated_profiles() -> None:
@@ -302,3 +304,15 @@ def test_rejects_competitive_ladder_binding_drift(tmp_path: Path) -> None:
         match="competitive ladder topology binding drift",
     ):
         MODULE.validate(root)
+
+
+def test_enterprise_policy_binds_competitive_benchmark_governance() -> None:
+    policy = _load(ROOT, "machine/enterprise_ai_superiority.json")
+    benchmark = _load(ROOT, "machine/competitive_ai_benchmark_governance.json")
+
+    assert (
+        policy["authority"]["competitive_benchmark_governance"]
+        == "machine/competitive_ai_benchmark_governance.json"
+    )
+    assert benchmark["preregistration"]["required"] is True
+    assert len(benchmark["cross_family_journeys"]) == 8
