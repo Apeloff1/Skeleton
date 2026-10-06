@@ -139,7 +139,7 @@ class ForgeReleaseBinding:
         }
         if not isinstance(supplied_digest, str) or supplied_digest != canonical_digest(core):
             raise ValueError("forge release checkpoint digest mismatch")
-        if checkpoint.get("schema") != "skeleton.ai_game_builder.dual_rival_checkpoint.v1":
+        if checkpoint.get("schema") != "skeleton.ai_game_builder.dual_rival_checkpoint.v2":
             raise ValueError("forge release checkpoint schema is unsupported")
 
         effort_mode = EffortMode.parse(checkpoint.get("effort_mode"))
