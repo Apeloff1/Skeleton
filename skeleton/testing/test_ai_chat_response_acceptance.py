@@ -293,6 +293,7 @@ def test_acceptance_decision_is_deterministic_and_non_executing() -> None:
 def live_acceptance(**overrides):
     values = {
         "operation_id": "operation-1",
+        "observed_operation_id": "operation-1",
         "expected_execution_id": "execution-1",
         "observed_execution_id": "execution-1",
         "context_digest": "d" * 64,
@@ -317,6 +318,12 @@ def test_live_engine_response_is_bound_before_commit() -> None:
     assert receipt_value.artifact_ref == (
         "response-acceptance-sha256:" + receipt_value.digest
     )
+
+
+def test_live_response_acceptance_rejects_operation_identity_drift() -> None:
+    receipt_value = live_acceptance(observed_operation_id="operation-2")
+    assert receipt_value.accepted is False
+    assert "operation_identity_mismatch" in receipt_value.reasons
 
 
 def test_live_response_acceptance_rejects_execution_identity_drift() -> None:
