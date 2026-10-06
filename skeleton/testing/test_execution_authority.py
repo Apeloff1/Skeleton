@@ -9,6 +9,7 @@ from skeleton.ai.runtime.contracts.execution_authority import (
     ResourceBudget,
     ResourceUsage,
     authority_policy_digest,
+    verify_authority_receipt_chain,
 )
 from skeleton.ai.runtime.core.execution_authority import (
     AuthorizationDisposition,
@@ -435,3 +436,181 @@ def test_revoked_ancestor_invalidates_admitted_child() -> None:
 
     assert decision.disposition is AuthorizationDisposition.DENY
     assert decision.reason == "ancestor authority is revoked"
+
+
+
+def test_allow_emits_hash_chained_consumption_receipt() -> None:
+    guard = ExecutionAuthorityGuard()
+    authority = _authority()
+    _admit(guard, authority)
+
+    first = guard.authorize(
+        authority=authority,
+        capability="repo.read",
+        delta=ResourceUsage(provider_calls=1, input_tokens=100),
+        replay_key="read-001",
+        now=NOW + timedelta(seconds=1),
+    )
+    second = guard.authorize(
+        authority=authority,
+        capability="repo.write",
+        delta=ResourceUsage(tool_calls=1, artifact_bytes=64),
+        replay_key="write-001",
+        now=NOW + timedelta(seconds=2),
+    )
+
+    assert first.receipt is not None
+    assert second.receipt is not None
+    assert first.receipt.sequence == 1
+    assert first.receipt.previous_receipt_digest is None
+    assert second.receipt.sequence == 2
+    assert second.receipt.previous_receipt_digest == first.receipt.digest
+    assert second.receipt.total_usage.provider_calls == 1
+    assert second.receipt.total_usage.tool_calls == 1
+    assert second.receipt.total_usage.artifact_bytes == 64
+
+
+def test_authorization_replay_returns_identical_receipt_without_advancing_chain() -> None:
+    guard = ExecutionAuthorityGuard()
+    authority = _authority()
+    _admit(guard, authority)
+    delta = ResourceUsage(tool_calls=1)
+
+    first = guard.authorize(
+        authority=authority,
+        capability="repo.write",
+        delta=delta,
+        replay_key="write-001",
+        now=NOW + timedelta(seconds=1),
+    )
+    replay = guard.authorize(
+        authority=authority,
+        capability="repo.write",
+        delta=delta,
+        replay_key="write-001",
+        now=NOW + timedelta(seconds=20),
+    )
+
+    assert first.receipt is not None
+    assert replay.receipt == first.receipt
+    assert replay.receipt.digest == first.receipt.digest
+    assert guard.snapshot()["authorities"][0]["consumption_count"] == 1
+    assert guard.snapshot()["authorization_receipt_count"] == 1
+
+
+def test_denial_does_not_advance_consumption_chain() -> None:
+    guard = ExecutionAuthorityGuard()
+    authority = _authority(budget=_budget(tool_calls=1))
+    _admit(guard, authority)
+
+    allowed = guard.authorize(
+        authority=authority,
+        capability="repo.write",
+        delta=ResourceUsage(tool_calls=1),
+        replay_key="write-001",
+        now=NOW + timedelta(seconds=1),
+    )
+    denied = guard.authorize(
+        authority=authority,
+        capability="repo.write",
+        delta=ResourceUsage(tool_calls=1),
+        replay_key="write-002",
+        now=NOW + timedelta(seconds=2),
+    )
+
+    assert allowed.receipt is not None
+    assert denied.receipt is None
+    snapshot = guard.snapshot()["authorities"][0]
+    assert snapshot["consumption_count"] == 1
+    assert snapshot["latest_receipt_digest"] == allowed.receipt.digest
+
+
+def test_receipt_chain_verifier_reconstructs_exact_usage() -> None:
+    guard = ExecutionAuthorityGuard()
+    authority = _authority()
+    _admit(guard, authority)
+
+    decisions = [
+        guard.authorize(
+            authority=authority,
+            capability="repo.read",
+            delta=ResourceUsage(provider_calls=1, input_tokens=80),
+            replay_key="read-001",
+            now=NOW + timedelta(seconds=1),
+        ),
+        guard.authorize(
+            authority=authority,
+            capability="repo.write",
+            delta=ResourceUsage(tool_calls=1, output_tokens=40),
+            replay_key="write-001",
+            now=NOW + timedelta(seconds=2),
+        ),
+    ]
+    receipts = [decision.receipt for decision in decisions]
+    assert all(receipt is not None for receipt in receipts)
+
+    reconstructed = verify_authority_receipt_chain(
+        authority,
+        [receipt for receipt in receipts if receipt is not None],
+    )
+
+    assert reconstructed == guard.usage_for(authority)
+
+
+def test_receipt_chain_verifier_rejects_missing_middle_receipt() -> None:
+    guard = ExecutionAuthorityGuard()
+    authority = _authority()
+    _admit(guard, authority)
+
+    first = guard.authorize(
+        authority=authority,
+        capability="repo.read",
+        replay_key="read-001",
+        now=NOW + timedelta(seconds=1),
+    )
+    second = guard.authorize(
+        authority=authority,
+        capability="repo.read",
+        replay_key="read-002",
+        now=NOW + timedelta(seconds=2),
+    )
+    third = guard.authorize(
+        authority=authority,
+        capability="repo.read",
+        replay_key="read-003",
+        now=NOW + timedelta(seconds=3),
+    )
+
+    assert first.receipt is not None
+    assert second.receipt is not None
+    assert third.receipt is not None
+    with pytest.raises(ExecutionAuthorityError, match="sequence is not contiguous"):
+        verify_authority_receipt_chain(
+            authority,
+            [first.receipt, third.receipt],
+        )
+
+
+def test_sealed_evidence_binds_admission_latest_receipt_and_usage() -> None:
+    guard = ExecutionAuthorityGuard()
+    authority = _authority()
+    _admit(guard, authority)
+    decision = guard.authorize(
+        authority=authority,
+        capability="repo.write",
+        delta=ResourceUsage(tool_calls=1, artifact_bytes=256),
+        replay_key="write-001",
+        now=NOW + timedelta(seconds=1),
+    )
+    assert decision.receipt is not None
+
+    evidence = guard.seal_evidence(
+        authority,
+        now=NOW + timedelta(seconds=2),
+    )
+
+    assert evidence.authority_digest == authority.digest
+    assert evidence.consumption_count == 1
+    assert evidence.latest_consumption_digest == decision.receipt.digest
+    assert evidence.final_usage == guard.usage_for(authority)
+    assert evidence.digest
