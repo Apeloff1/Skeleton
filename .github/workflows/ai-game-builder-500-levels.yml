@@ -85,6 +85,8 @@ jobs:
           skeleton/ai/game_builder/resource_governor.py
           skeleton/ai/game_builder/quality_debt.py
           skeleton/ai/game_builder/control_plane.py
+          skeleton/ai/game_builder/resilience.py
+          skeleton/ai/game_builder/release.py
           tests/test_ai_game_builder_500_levels.py
           tests/test_ai_game_builder_runtime.py
           tests/test_ai_game_builder_governance.py
