@@ -9,8 +9,7 @@
       "title": "Code Intelligence",
       "accountability_id": "ACC-VOL-021",
       "required_gap_texts": [
-        "complete cross-language graph extraction",
-        "connect ownership/test mapping to change planner"
+        "independent cross-language repository-graph, ownership/test impact, and change-planner verification remains pending"
       ],
       "risks": [
         "stale index",
@@ -28,10 +27,7 @@
       "volume_ref": "VOL-022",
       "title": "Autonomous Repository Engineering",
       "accountability_id": "ACC-VOL-022",
-      "required_gap_texts": [
-        "transactional workspace layer incomplete",
-        "independent reviewer/verifier routing needs full integration"
-      ],
+      "required_gap_texts": [],
       "risks": [
         "destructive edits",
         "test gaming",
@@ -49,10 +45,7 @@
       "volume_ref": "VOL-092",
       "title": "Repository Maintenance",
       "accountability_id": "ACC-VOL-092",
-      "required_gap_texts": [
-        "define maintenance ownership registry",
-        "bind deletion to reachability/retention checks"
-      ],
+      "required_gap_texts": [],
       "risks": [
         "destructive cleanup",
         "bot churn",
@@ -61,7 +54,10 @@
       "contracts": [
         "MaintenanceTask",
         "RepositoryOwnership",
-        "MaintenanceReceipt"
+        "ResourceEvidence",
+        "MaintenanceReceipt",
+        "MaintenancePlan",
+        "MaintenanceRegistry"
       ]
     },
     {
@@ -69,8 +65,7 @@
       "title": "Backlog Control",
       "accountability_id": "ACC-VOL-093",
       "required_gap_texts": [
-        "establish canonical backlog IDs",
-        "bind backlog to gap/risk closure"
+        "independent backlog coverage, deduplication, and stale-state verification remains pending"
       ],
       "risks": [
         "duplicate work",
@@ -87,10 +82,7 @@
       "volume_ref": "VOL-094",
       "title": "Priority Engine",
       "accountability_id": "ACC-VOL-094",
-      "required_gap_texts": [
-        "define priority factor schema",
-        "add anti-starvation constraints"
-      ],
+      "required_gap_texts": [],
       "risks": [
         "critical blocker starvation",
         "metric gaming",
@@ -106,10 +98,7 @@
       "volume_ref": "VOL-095",
       "title": "Build Work Packages",
       "accountability_id": "ACC-VOL-095",
-      "required_gap_texts": [
-        "bind all packages to exact requirements",
-        "materialize package evidence rollup"
-      ],
+      "required_gap_texts": [],
       "risks": [
         "oversized package",
         "hidden dependency",
@@ -126,8 +115,7 @@
       "title": "Anti-Patterns",
       "accountability_id": "ACC-VOL-108",
       "required_gap_texts": [
-        "seed registry from historical failures",
-        "bind detectable patterns to CI"
+        "independent anti-pattern detector and exception-expiry verification remains pending"
       ],
       "risks": [
         "prose-only guidance",
@@ -145,8 +133,7 @@
       "title": "Build Order",
       "accountability_id": "ACC-VOL-109",
       "required_gap_texts": [
-        "bind every AIQ task into construction DAG",
-        "materialize cycle/blocked-state reporting"
+        "independent construction-DAG cycle and blocked-state verification remains pending"
       ],
       "risks": [
         "hidden cycle",
@@ -163,10 +150,7 @@
       "volume_ref": "VOL-110",
       "title": "Definition of Done",
       "accountability_id": "ACC-VOL-110",
-      "required_gap_texts": [
-        "unify maturity and DoD rules",
-        "bind change-impact triggers to DoD"
-      ],
+      "required_gap_texts": [],
       "risks": [
         "checkbox completion",
         "evidence omission",
@@ -175,7 +159,11 @@
       "contracts": [
         "DefinitionOfDone",
         "DoDRequirement",
-        "CompletionEvidence"
+        "ChangeImpactProfile",
+        "CompletionEvidence",
+        "CompletionSignoff",
+        "CompletionEvaluation",
+        "DefinitionOfDoneEvaluator"
       ]
     },
     {
@@ -183,8 +171,7 @@
       "title": "Technical Debt Ledger",
       "accountability_id": "ACC-VOL-115",
       "required_gap_texts": [
-        "establish debt IDs and ownership",
-        "bind debt to risk/backlog/ADR"
+        "independent cleanup-compatibility evaluation remains pending"
       ],
       "risks": [
         "unowned debt",
@@ -202,8 +189,7 @@
       "title": "Roadmap Control",
       "accountability_id": "ACC-VOL-118",
       "required_gap_texts": [
-        "bind roadmap to build DAG",
-        "materialize revision lineage"
+        "independent roadmap-control verification remains pending"
       ],
       "risks": [
         "schedule fiction",
@@ -221,8 +207,8 @@
       "title": "Completion Model",
       "accountability_id": "ACC-VOL-119",
       "required_gap_texts": [
-        "implement canonical rollup function",
-        "bind UI progress to derived completion only"
+        "independent stale-signoff evaluation remains pending",
+        "independent critical-blocker evaluation remains pending"
       ],
       "risks": [
         "manual status drift",
@@ -284,10 +270,10 @@
   ],
   "backlog": {
     "summary": {
-      "item_count": 1772,
-      "gap_count": 792,
+      "item_count": 1644,
+      "gap_count": 664,
       "risk_count": 980,
-      "open_count": 1772,
+      "open_count": 1644,
       "closed_count": 0
     },
     "items": [
@@ -296,7 +282,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-001:gap:001",
         "volume_ref": "VOL-001",
-        "statement": "research ingestion implementation is incomplete",
+        "statement": "independent exact-head AI Research Lineage Closure qualification for reconciliation receipt remains pending",
         "accountability_id": "ACC-VOL-001",
         "requirement_refs": [
           "REQ:VOL-001:001",
@@ -305,23 +291,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:research ingestion implementation is incomplete"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-001-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-001:gap:002",
-        "volume_ref": "VOL-001",
-        "statement": "cross-source citation graph needs executable reconciliation",
-        "accountability_id": "ACC-VOL-001",
-        "requirement_refs": [
-          "REQ:VOL-001:001",
-          "REQ:VOL-001:002",
-          "REQ:VOL-001:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:cross-source citation graph needs executable reconciliation"
+        "deduplication_key": "gap:independent exact-head AI Research Lineage Closure qualification for reconciliation receipt remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-002-001",
@@ -354,38 +324,6 @@
         "state": "open",
         "closure_evidence_refs": [],
         "deduplication_key": "gap:automate owner lookup for newly created paths"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-003-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-003:gap:001",
-        "volume_ref": "VOL-003",
-        "statement": "materialize shared conformance vectors",
-        "accountability_id": "ACC-VOL-003",
-        "requirement_refs": [
-          "REQ:VOL-003:001",
-          "REQ:VOL-003:002",
-          "REQ:VOL-003:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize shared conformance vectors"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-003-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-003:gap:002",
-        "volume_ref": "VOL-003",
-        "statement": "complete producer/consumer inventory for every canonical contract",
-        "accountability_id": "ACC-VOL-003",
-        "requirement_refs": [
-          "REQ:VOL-003:001",
-          "REQ:VOL-003:002",
-          "REQ:VOL-003:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:complete producer/consumer inventory for every canonical contract"
       },
       {
         "backlog_id": "BL-GAP-VOL-004-001",
@@ -456,7 +394,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-006:gap:001",
         "volume_ref": "VOL-006",
-        "statement": "native training infrastructure remains a target capability",
+        "statement": "independent model-development reproducibility, registry, evaluation, and publication verification remains pending",
         "accountability_id": "ACC-VOL-006",
         "requirement_refs": [
           "REQ:VOL-006:001",
@@ -465,30 +403,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:native training infrastructure remains a target capability"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-006-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-006:gap:002",
-        "volume_ref": "VOL-006",
-        "statement": "model registry contract needs implementation",
-        "accountability_id": "ACC-VOL-006",
-        "requirement_refs": [
-          "REQ:VOL-006:001",
-          "REQ:VOL-006:002",
-          "REQ:VOL-006:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:model registry contract needs implementation"
+        "deduplication_key": "gap:independent model-development reproducibility, registry, evaluation, and publication verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-007-001",
         "source_kind": "gap",
         "source_ref": "VOL-007:gap:001",
         "volume_ref": "VOL-007",
-        "statement": "continuous batching and local serving need dedicated implementation",
+        "statement": "continuous batching and local serving optimization remain future performance work",
         "accountability_id": "ACC-VOL-007",
         "requirement_refs": [
           "REQ:VOL-007:001",
@@ -497,7 +419,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:continuous batching and local serving need dedicated implementation"
+        "deduplication_key": "gap:continuous batching and local serving optimization remain future performance work"
       },
       {
         "backlog_id": "BL-GAP-VOL-007-002",
@@ -520,7 +442,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-008:gap:001",
         "volume_ref": "VOL-008",
-        "statement": "implement canonical router registry",
+        "statement": "bind evidence-qualified canonical router decisions into every live model-routing entrypoint",
         "accountability_id": "ACC-VOL-008",
         "requirement_refs": [
           "REQ:VOL-008:001",
@@ -529,7 +451,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:implement canonical router registry"
+        "deduplication_key": "gap:bind evidence-qualified canonical router decisions into every live model-routing entrypoint"
       },
       {
         "backlog_id": "BL-GAP-VOL-008-002",
@@ -552,7 +474,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-009:gap:001",
         "volume_ref": "VOL-009",
-        "statement": "add semantic compression with invariant checks",
+        "statement": "bind verifier-qualified semantic compression into live ContextCompiler candidate selection",
         "accountability_id": "ACC-VOL-009",
         "requirement_refs": [
           "REQ:VOL-009:001",
@@ -561,7 +483,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:add semantic compression with invariant checks"
+        "deduplication_key": "gap:bind verifier-qualified semantic compression into live ContextCompiler candidate selection"
       },
       {
         "backlog_id": "BL-GAP-VOL-009-002",
@@ -609,7 +531,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind deterministic quality/reconciliation decisions into governed promotion, gc, retention and unresolved-conflict workflows"
+        "deduplication_key": "gap:bind deterministic quality/reconciliation decisions into governed promotion, GC, retention and unresolved-conflict workflows"
       },
       {
         "backlog_id": "BL-GAP-VOL-011-001",
@@ -648,7 +570,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-012:gap:001",
         "volume_ref": "VOL-012",
-        "statement": "knowledge store implementation is incomplete",
+        "statement": "bind the temporal claim graph to durable persistence and retrieval adapters",
         "accountability_id": "ACC-VOL-012",
         "requirement_refs": [
           "REQ:VOL-012:001",
@@ -657,14 +579,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:knowledge store implementation is incomplete"
+        "deduplication_key": "gap:bind the temporal claim graph to durable persistence and retrieval adapters"
       },
       {
         "backlog_id": "BL-GAP-VOL-012-002",
         "source_kind": "gap",
         "source_ref": "VOL-012:gap:002",
         "volume_ref": "VOL-012",
-        "statement": "define confidence/verification interaction without collapsing them",
+        "statement": "qualify production knowledge write/query entrypoints and recovery rehearsal",
         "accountability_id": "ACC-VOL-012",
         "requirement_refs": [
           "REQ:VOL-012:001",
@@ -673,7 +595,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define confidence/verification interaction without collapsing them"
+        "deduplication_key": "gap:qualify production knowledge write/query entrypoints and recovery rehearsal"
       },
       {
         "backlog_id": "BL-GAP-VOL-018-001",
@@ -705,78 +627,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:human override ux/api must be unified"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-019-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-019:gap:001",
-        "volume_ref": "VOL-019",
-        "statement": "environment adapter standard missing",
-        "accountability_id": "ACC-VOL-019",
-        "requirement_refs": [
-          "REQ:VOL-019:001",
-          "REQ:VOL-019:002",
-          "REQ:VOL-019:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:environment adapter standard missing"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-019-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-019:gap:002",
-        "volume_ref": "VOL-019",
-        "statement": "uncertainty propagation policy needs definition",
-        "accountability_id": "ACC-VOL-019",
-        "requirement_refs": [
-          "REQ:VOL-019:001",
-          "REQ:VOL-019:002",
-          "REQ:VOL-019:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:uncertainty propagation policy needs definition"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-020-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-020:gap:001",
-        "volume_ref": "VOL-020",
-        "statement": "document/audio/video pipelines need convergence",
-        "accountability_id": "ACC-VOL-020",
-        "requirement_refs": [
-          "REQ:VOL-020:001",
-          "REQ:VOL-020:002",
-          "REQ:VOL-020:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:document/audio/video pipelines need convergence"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-020-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-020:gap:002",
-        "volume_ref": "VOL-020",
-        "statement": "modality-specific sanitization policies need implementation",
-        "accountability_id": "ACC-VOL-020",
-        "requirement_refs": [
-          "REQ:VOL-020:001",
-          "REQ:VOL-020:002",
-          "REQ:VOL-020:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:modality-specific sanitization policies need implementation"
+        "deduplication_key": "gap:human override UX/API must be unified"
       },
       {
         "backlog_id": "BL-GAP-VOL-021-001",
         "source_kind": "gap",
         "source_ref": "VOL-021:gap:001",
         "volume_ref": "VOL-021",
-        "statement": "complete cross-language graph extraction",
+        "statement": "independent cross-language repository-graph, ownership/test impact, and change-planner verification remains pending",
         "accountability_id": "ACC-VOL-021",
         "requirement_refs": [
           "REQ:VOL-021:001",
@@ -785,55 +643,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:complete cross-language graph extraction"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-021-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-021:gap:002",
-        "volume_ref": "VOL-021",
-        "statement": "connect ownership/test mapping to change planner",
-        "accountability_id": "ACC-VOL-021",
-        "requirement_refs": [
-          "REQ:VOL-021:001",
-          "REQ:VOL-021:002",
-          "REQ:VOL-021:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:connect ownership/test mapping to change planner"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-022-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-022:gap:001",
-        "volume_ref": "VOL-022",
-        "statement": "transactional workspace layer incomplete",
-        "accountability_id": "ACC-VOL-022",
-        "requirement_refs": [
-          "REQ:VOL-022:001",
-          "REQ:VOL-022:002",
-          "REQ:VOL-022:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:transactional workspace layer incomplete"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-022-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-022:gap:002",
-        "volume_ref": "VOL-022",
-        "statement": "independent reviewer/verifier routing needs full integration",
-        "accountability_id": "ACC-VOL-022",
-        "requirement_refs": [
-          "REQ:VOL-022:001",
-          "REQ:VOL-022:002",
-          "REQ:VOL-022:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:independent reviewer/verifier routing needs full integration"
+        "deduplication_key": "gap:independent cross-language repository-graph, ownership/test impact, and change-planner verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-023-001",
@@ -936,7 +746,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-026:gap:001",
         "volume_ref": "VOL-026",
-        "statement": "complete unified threat model",
+        "statement": "independent capability-security, threat-model, and tool-authorization verification remains pending",
         "accountability_id": "ACC-VOL-026",
         "requirement_refs": [
           "REQ:VOL-026:001",
@@ -945,55 +755,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:complete unified threat model"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-026-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-026:gap:002",
-        "volume_ref": "VOL-026",
-        "statement": "bind runtime tool permissions to capability-security primitives",
-        "accountability_id": "ACC-VOL-026",
-        "requirement_refs": [
-          "REQ:VOL-026:001",
-          "REQ:VOL-026:002",
-          "REQ:VOL-026:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind runtime tool permissions to capability-security primitives"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-027-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-027:gap:001",
-        "volume_ref": "VOL-027",
-        "statement": "regional policy mapping remains incomplete",
-        "accountability_id": "ACC-VOL-027",
-        "requirement_refs": [
-          "REQ:VOL-027:001",
-          "REQ:VOL-027:002",
-          "REQ:VOL-027:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:regional policy mapping remains incomplete"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-027-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-027:gap:002",
-        "volume_ref": "VOL-027",
-        "statement": "prove deletion through all future derived stores",
-        "accountability_id": "ACC-VOL-027",
-        "requirement_refs": [
-          "REQ:VOL-027:001",
-          "REQ:VOL-027:002",
-          "REQ:VOL-027:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:prove deletion through all future derived stores"
+        "deduplication_key": "gap:independent capability-security, threat-model, and tool-authorization verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-028-001",
@@ -1009,7 +771,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:policy dsl/compiler needs implementation"
+        "deduplication_key": "gap:policy DSL/compiler needs implementation"
       },
       {
         "backlog_id": "BL-GAP-VOL-028-002",
@@ -1057,7 +819,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:connect slo/error-budget state to admission control"
+        "deduplication_key": "gap:connect SLO/error-budget state to admission control"
       },
       {
         "backlog_id": "BL-GAP-VOL-030-001",
@@ -1124,38 +886,6 @@
         "deduplication_key": "gap:resource reservation must bind to scheduler"
       },
       {
-        "backlog_id": "BL-GAP-VOL-032-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-032:gap:001",
-        "volume_ref": "VOL-032",
-        "statement": "select acceleration targets by profiling evidence",
-        "accountability_id": "ACC-VOL-032",
-        "requirement_refs": [
-          "REQ:VOL-032:001",
-          "REQ:VOL-032:002",
-          "REQ:VOL-032:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:select acceleration targets by profiling evidence"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-032-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-032:gap:002",
-        "volume_ref": "VOL-032",
-        "statement": "expand isolation strategy for crash-prone native code",
-        "accountability_id": "ACC-VOL-032",
-        "requirement_refs": [
-          "REQ:VOL-032:001",
-          "REQ:VOL-032:002",
-          "REQ:VOL-032:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:expand isolation strategy for crash-prone native code"
-      },
-      {
         "backlog_id": "BL-GAP-VOL-033-001",
         "source_kind": "gap",
         "source_ref": "VOL-033:gap:001",
@@ -1169,7 +899,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:identify workloads where jvm is actually beneficial"
+        "deduplication_key": "gap:identify workloads where JVM is actually beneficial"
       },
       {
         "backlog_id": "BL-GAP-VOL-033-002",
@@ -1186,38 +916,6 @@
         "state": "open",
         "closure_evidence_refs": [],
         "deduplication_key": "gap:standardize protocol/version negotiation"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-039-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-039:gap:001",
-        "volume_ref": "VOL-039",
-        "statement": "formalize event compatibility registry",
-        "accountability_id": "ACC-VOL-039",
-        "requirement_refs": [
-          "REQ:VOL-039:001",
-          "REQ:VOL-039:002",
-          "REQ:VOL-039:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:formalize event compatibility registry"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-039-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-039:gap:002",
-        "volume_ref": "VOL-039",
-        "statement": "add compaction/replay retention contracts",
-        "accountability_id": "ACC-VOL-039",
-        "requirement_refs": [
-          "REQ:VOL-039:001",
-          "REQ:VOL-039:002",
-          "REQ:VOL-039:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:add compaction/replay retention contracts"
       },
       {
         "backlog_id": "BL-GAP-VOL-040-001",
@@ -1265,7 +963,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize api schema registry"
+        "deduplication_key": "gap:materialize API schema registry"
       },
       {
         "backlog_id": "BL-GAP-VOL-041-002",
@@ -1585,7 +1283,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind all ai roots to one ownership graph"
+        "deduplication_key": "gap:bind all AI roots to one ownership graph"
       },
       {
         "backlog_id": "BL-GAP-VOL-051-002",
@@ -1672,7 +1370,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-054:gap:001",
         "volume_ref": "VOL-054",
-        "statement": "unify manifest reference validation",
+        "statement": "independent manifest-reference drift, schema-downgrade, and doc-digest verification remains pending",
         "accountability_id": "ACC-VOL-054",
         "requirement_refs": [
           "REQ:VOL-054:001",
@@ -1681,23 +1379,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:unify manifest reference validation"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-054-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-054:gap:002",
-        "volume_ref": "VOL-054",
-        "statement": "bind generated docs to manifest digests",
-        "accountability_id": "ACC-VOL-054",
-        "requirement_refs": [
-          "REQ:VOL-054:001",
-          "REQ:VOL-054:002",
-          "REQ:VOL-054:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind generated docs to manifest digests"
+        "deduplication_key": "gap:independent manifest-reference drift, schema-downgrade, and doc-digest verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-055-001",
@@ -1745,7 +1427,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:create canonical adr index schema"
+        "deduplication_key": "gap:create canonical ADR index schema"
       },
       {
         "backlog_id": "BL-GAP-VOL-058-002",
@@ -1761,7 +1443,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind cross-cutting changes to adr check"
+        "deduplication_key": "gap:bind cross-cutting changes to ADR check"
       },
       {
         "backlog_id": "BL-GAP-VOL-060-001",
@@ -1953,7 +1635,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize full dr evidence bundle"
+        "deduplication_key": "gap:materialize full DR evidence bundle"
       },
       {
         "backlog_id": "BL-GAP-VOL-066-001",
@@ -2088,7 +1770,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-070:gap:001",
         "volume_ref": "VOL-070",
-        "statement": "bind dimensions to eval suites",
+        "statement": "independent quality-vector threshold and non-compensable-failure verification remains pending",
         "accountability_id": "ACC-VOL-070",
         "requirement_refs": [
           "REQ:VOL-070:001",
@@ -2097,30 +1779,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind dimensions to eval suites"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-070-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-070:gap:002",
-        "volume_ref": "VOL-070",
-        "statement": "define non-compensable failure rules",
-        "accountability_id": "ACC-VOL-070",
-        "requirement_refs": [
-          "REQ:VOL-070:001",
-          "REQ:VOL-070:002",
-          "REQ:VOL-070:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define non-compensable failure rules"
+        "deduplication_key": "gap:independent quality-vector threshold and non-compensable-failure verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-071-001",
         "source_kind": "gap",
         "source_ref": "VOL-071:gap:001",
         "volume_ref": "VOL-071",
-        "statement": "define domain registry",
+        "statement": "independent specialization routing and out-of-domain verification remains pending",
         "accountability_id": "ACC-VOL-071",
         "requirement_refs": [
           "REQ:VOL-071:001",
@@ -2129,30 +1795,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define domain registry"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-071-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-071:gap:002",
-        "volume_ref": "VOL-071",
-        "statement": "bind specialization to explicit eval ownership",
-        "accountability_id": "ACC-VOL-071",
-        "requirement_refs": [
-          "REQ:VOL-071:001",
-          "REQ:VOL-071:002",
-          "REQ:VOL-071:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind specialization to explicit eval ownership"
+        "deduplication_key": "gap:independent specialization routing and out-of-domain verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-072-001",
         "source_kind": "gap",
         "source_ref": "VOL-072:gap:001",
         "volume_ref": "VOL-072",
-        "statement": "finish Jeeves custody map",
+        "statement": "independent Jeeves custody, freshness, provenance, and parity verification remains pending",
         "accountability_id": "ACC-VOL-072",
         "requirement_refs": [
           "REQ:VOL-072:001",
@@ -2161,23 +1811,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:finish jeeves custody map"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-072-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-072:gap:002",
-        "volume_ref": "VOL-072",
-        "statement": "bind data freshness/provenance into responses",
-        "accountability_id": "ACC-VOL-072",
-        "requirement_refs": [
-          "REQ:VOL-072:001",
-          "REQ:VOL-072:002",
-          "REQ:VOL-072:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind data freshness/provenance into responses"
+        "deduplication_key": "gap:independent Jeeves custody, freshness, provenance, and parity verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-075-001",
@@ -2372,203 +2006,11 @@
         "deduplication_key": "gap:materialize revocation propagation proof"
       },
       {
-        "backlog_id": "BL-GAP-VOL-087-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-087:gap:001",
-        "volume_ref": "VOL-087",
-        "statement": "define canonical locale policy",
-        "accountability_id": "ACC-VOL-087",
-        "requirement_refs": [
-          "REQ:VOL-087:001",
-          "REQ:VOL-087:002",
-          "REQ:VOL-087:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define canonical locale policy"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-087-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-087:gap:002",
-        "volume_ref": "VOL-087",
-        "statement": "materialize critical-string coverage",
-        "accountability_id": "ACC-VOL-087",
-        "requirement_refs": [
-          "REQ:VOL-087:001",
-          "REQ:VOL-087:002",
-          "REQ:VOL-087:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize critical-string coverage"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-088-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-088:gap:001",
-        "volume_ref": "VOL-088",
-        "statement": "define compliance registry schema",
-        "accountability_id": "ACC-VOL-088",
-        "requirement_refs": [
-          "REQ:VOL-088:001",
-          "REQ:VOL-088:002",
-          "REQ:VOL-088:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define compliance registry schema"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-088-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-088:gap:002",
-        "volume_ref": "VOL-088",
-        "statement": "bind controls to evidence owners",
-        "accountability_id": "ACC-VOL-088",
-        "requirement_refs": [
-          "REQ:VOL-088:001",
-          "REQ:VOL-088:002",
-          "REQ:VOL-088:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind controls to evidence owners"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-089-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-089:gap:001",
-        "volume_ref": "VOL-089",
-        "statement": "define generated-doc boundaries",
-        "accountability_id": "ACC-VOL-089",
-        "requirement_refs": [
-          "REQ:VOL-089:001",
-          "REQ:VOL-089:002",
-          "REQ:VOL-089:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define generated-doc boundaries"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-089-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-089:gap:002",
-        "volume_ref": "VOL-089",
-        "statement": "materialize doc drift gate",
-        "accountability_id": "ACC-VOL-089",
-        "requirement_refs": [
-          "REQ:VOL-089:001",
-          "REQ:VOL-089:002",
-          "REQ:VOL-089:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize doc drift gate"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-090-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-090:gap:001",
-        "volume_ref": "VOL-090",
-        "statement": "define generated artifact manifest",
-        "accountability_id": "ACC-VOL-090",
-        "requirement_refs": [
-          "REQ:VOL-090:001",
-          "REQ:VOL-090:002",
-          "REQ:VOL-090:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define generated artifact manifest"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-090-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-090:gap:002",
-        "volume_ref": "VOL-090",
-        "statement": "add regeneration cleanliness gate",
-        "accountability_id": "ACC-VOL-090",
-        "requirement_refs": [
-          "REQ:VOL-090:001",
-          "REQ:VOL-090:002",
-          "REQ:VOL-090:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:add regeneration cleanliness gate"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-091-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-091:gap:001",
-        "volume_ref": "VOL-091",
-        "statement": "establish runbook registry",
-        "accountability_id": "ACC-VOL-091",
-        "requirement_refs": [
-          "REQ:VOL-091:001",
-          "REQ:VOL-091:002",
-          "REQ:VOL-091:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:establish runbook registry"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-091-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-091:gap:002",
-        "volume_ref": "VOL-091",
-        "statement": "bind drills to runbook versions",
-        "accountability_id": "ACC-VOL-091",
-        "requirement_refs": [
-          "REQ:VOL-091:001",
-          "REQ:VOL-091:002",
-          "REQ:VOL-091:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind drills to runbook versions"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-092-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-092:gap:001",
-        "volume_ref": "VOL-092",
-        "statement": "define maintenance ownership registry",
-        "accountability_id": "ACC-VOL-092",
-        "requirement_refs": [
-          "REQ:VOL-092:001",
-          "REQ:VOL-092:002",
-          "REQ:VOL-092:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define maintenance ownership registry"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-092-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-092:gap:002",
-        "volume_ref": "VOL-092",
-        "statement": "bind deletion to reachability/retention checks",
-        "accountability_id": "ACC-VOL-092",
-        "requirement_refs": [
-          "REQ:VOL-092:001",
-          "REQ:VOL-092:002",
-          "REQ:VOL-092:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind deletion to reachability/retention checks"
-      },
-      {
         "backlog_id": "BL-GAP-VOL-093-001",
         "source_kind": "gap",
         "source_ref": "VOL-093:gap:001",
         "volume_ref": "VOL-093",
-        "statement": "establish canonical backlog IDs",
+        "statement": "independent backlog coverage, deduplication, and stale-state verification remains pending",
         "accountability_id": "ACC-VOL-093",
         "requirement_refs": [
           "REQ:VOL-093:001",
@@ -2577,119 +2019,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:establish canonical backlog ids"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-093-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-093:gap:002",
-        "volume_ref": "VOL-093",
-        "statement": "bind backlog to gap/risk closure",
-        "accountability_id": "ACC-VOL-093",
-        "requirement_refs": [
-          "REQ:VOL-093:001",
-          "REQ:VOL-093:002",
-          "REQ:VOL-093:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind backlog to gap/risk closure"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-094-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-094:gap:001",
-        "volume_ref": "VOL-094",
-        "statement": "define priority factor schema",
-        "accountability_id": "ACC-VOL-094",
-        "requirement_refs": [
-          "REQ:VOL-094:001",
-          "REQ:VOL-094:002",
-          "REQ:VOL-094:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define priority factor schema"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-094-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-094:gap:002",
-        "volume_ref": "VOL-094",
-        "statement": "add anti-starvation constraints",
-        "accountability_id": "ACC-VOL-094",
-        "requirement_refs": [
-          "REQ:VOL-094:001",
-          "REQ:VOL-094:002",
-          "REQ:VOL-094:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:add anti-starvation constraints"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-095-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-095:gap:001",
-        "volume_ref": "VOL-095",
-        "statement": "bind all packages to exact requirements",
-        "accountability_id": "ACC-VOL-095",
-        "requirement_refs": [
-          "REQ:VOL-095:001",
-          "REQ:VOL-095:002",
-          "REQ:VOL-095:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind all packages to exact requirements"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-095-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-095:gap:002",
-        "volume_ref": "VOL-095",
-        "statement": "materialize package evidence rollup",
-        "accountability_id": "ACC-VOL-095",
-        "requirement_refs": [
-          "REQ:VOL-095:001",
-          "REQ:VOL-095:002",
-          "REQ:VOL-095:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize package evidence rollup"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-096-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-096:gap:001",
-        "volume_ref": "VOL-096",
-        "statement": "materialize end-to-end VS-000 harness",
-        "accountability_id": "ACC-VOL-096",
-        "requirement_refs": [
-          "REQ:VOL-096:001",
-          "REQ:VOL-096:002",
-          "REQ:VOL-096:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize end-to-end vs-000 harness"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-096-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-096:gap:002",
-        "volume_ref": "VOL-096",
-        "statement": "bind recovery evidence to release gates",
-        "accountability_id": "ACC-VOL-096",
-        "requirement_refs": [
-          "REQ:VOL-096:001",
-          "REQ:VOL-096:002",
-          "REQ:VOL-096:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind recovery evidence to release gates"
+        "deduplication_key": "gap:independent backlog coverage, deduplication, and stale-state verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-097-001",
@@ -2705,7 +2035,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize canonical vs-001 fixture"
+        "deduplication_key": "gap:materialize canonical VS-001 fixture"
       },
       {
         "backlog_id": "BL-GAP-VOL-097-002",
@@ -2721,7 +2051,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind all w00-w17 dependencies"
+        "deduplication_key": "gap:bind all W00-W17 dependencies"
       },
       {
         "backlog_id": "BL-GAP-VOL-098-001",
@@ -2760,7 +2090,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-099:gap:001",
         "volume_ref": "VOL-099",
-        "statement": "materialize research fixture corpus",
+        "statement": "independent research provenance, source-conflict, and reproducibility verification remains pending",
         "accountability_id": "ACC-VOL-099",
         "requirement_refs": [
           "REQ:VOL-099:001",
@@ -2769,23 +2099,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize research fixture corpus"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-099-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-099:gap:002",
-        "volume_ref": "VOL-099",
-        "statement": "bind experiment/reproducibility records",
-        "accountability_id": "ACC-VOL-099",
-        "requirement_refs": [
-          "REQ:VOL-099:001",
-          "REQ:VOL-099:002",
-          "REQ:VOL-099:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind experiment/reproducibility records"
+        "deduplication_key": "gap:independent research provenance, source-conflict, and reproducibility verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-100-001",
@@ -2916,43 +2230,11 @@
         "deduplication_key": "gap:bind installer/updater/release evidence"
       },
       {
-        "backlog_id": "BL-GAP-VOL-104-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-104:gap:001",
-        "volume_ref": "VOL-104",
-        "statement": "define exact acceptance matrix",
-        "accountability_id": "ACC-VOL-104",
-        "requirement_refs": [
-          "REQ:VOL-104:001",
-          "REQ:VOL-104:002",
-          "REQ:VOL-104:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define exact acceptance matrix"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-104-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-104:gap:002",
-        "volume_ref": "VOL-104",
-        "statement": "bind signoff to immutable evidence bundle",
-        "accountability_id": "ACC-VOL-104",
-        "requirement_refs": [
-          "REQ:VOL-104:001",
-          "REQ:VOL-104:002",
-          "REQ:VOL-104:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind signoff to immutable evidence bundle"
-      },
-      {
         "backlog_id": "BL-GAP-VOL-105-001",
         "source_kind": "gap",
         "source_ref": "VOL-105:gap:001",
         "volume_ref": "VOL-105",
-        "statement": "define long-horizon acceptance envelope",
+        "statement": "independent autonomous-worker durability and authority-revocation verification remains pending",
         "accountability_id": "ACC-VOL-105",
         "requirement_refs": [
           "REQ:VOL-105:001",
@@ -2961,30 +2243,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define long-horizon acceptance envelope"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-105-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-105:gap:002",
-        "volume_ref": "VOL-105",
-        "statement": "materialize aging/recovery evidence",
-        "accountability_id": "ACC-VOL-105",
-        "requirement_refs": [
-          "REQ:VOL-105:001",
-          "REQ:VOL-105:002",
-          "REQ:VOL-105:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize aging/recovery evidence"
+        "deduplication_key": "gap:independent autonomous-worker durability and authority-revocation verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-106-001",
         "source_kind": "gap",
         "source_ref": "VOL-106:gap:001",
         "volume_ref": "VOL-106",
-        "statement": "define research acceptance rubric",
+        "statement": "independent research-system evidence and conflicting-source verification remains pending",
         "accountability_id": "ACC-VOL-106",
         "requirement_refs": [
           "REQ:VOL-106:001",
@@ -2993,30 +2259,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define research acceptance rubric"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-106-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-106:gap:002",
-        "volume_ref": "VOL-106",
-        "statement": "bind conclusions to evidence graph",
-        "accountability_id": "ACC-VOL-106",
-        "requirement_refs": [
-          "REQ:VOL-106:001",
-          "REQ:VOL-106:002",
-          "REQ:VOL-106:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind conclusions to evidence graph"
+        "deduplication_key": "gap:independent research-system evidence and conflicting-source verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-107-001",
         "source_kind": "gap",
         "source_ref": "VOL-107:gap:001",
         "volume_ref": "VOL-107",
-        "statement": "define claim template and prohibited shortcuts",
+        "statement": "independent SOTA benchmark replay, robustness, and cost verification remains pending",
         "accountability_id": "ACC-VOL-107",
         "requirement_refs": [
           "REQ:VOL-107:001",
@@ -3025,30 +2275,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define claim template and prohibited shortcuts"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-107-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-107:gap:002",
-        "volume_ref": "VOL-107",
-        "statement": "materialize independent replay path",
-        "accountability_id": "ACC-VOL-107",
-        "requirement_refs": [
-          "REQ:VOL-107:001",
-          "REQ:VOL-107:002",
-          "REQ:VOL-107:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize independent replay path"
+        "deduplication_key": "gap:independent SOTA benchmark replay, robustness, and cost verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-108-001",
         "source_kind": "gap",
         "source_ref": "VOL-108:gap:001",
         "volume_ref": "VOL-108",
-        "statement": "seed registry from historical failures",
+        "statement": "independent anti-pattern detector and exception-expiry verification remains pending",
         "accountability_id": "ACC-VOL-108",
         "requirement_refs": [
           "REQ:VOL-108:001",
@@ -3057,30 +2291,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:seed registry from historical failures"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-108-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-108:gap:002",
-        "volume_ref": "VOL-108",
-        "statement": "bind detectable patterns to CI",
-        "accountability_id": "ACC-VOL-108",
-        "requirement_refs": [
-          "REQ:VOL-108:001",
-          "REQ:VOL-108:002",
-          "REQ:VOL-108:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind detectable patterns to ci"
+        "deduplication_key": "gap:independent anti-pattern detector and exception-expiry verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-109-001",
         "source_kind": "gap",
         "source_ref": "VOL-109:gap:001",
         "volume_ref": "VOL-109",
-        "statement": "bind every AIQ task into construction DAG",
+        "statement": "independent construction-DAG cycle and blocked-state verification remains pending",
         "accountability_id": "ACC-VOL-109",
         "requirement_refs": [
           "REQ:VOL-109:001",
@@ -3089,62 +2307,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind every aiq task into construction dag"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-109-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-109:gap:002",
-        "volume_ref": "VOL-109",
-        "statement": "materialize cycle/blocked-state reporting",
-        "accountability_id": "ACC-VOL-109",
-        "requirement_refs": [
-          "REQ:VOL-109:001",
-          "REQ:VOL-109:002",
-          "REQ:VOL-109:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize cycle/blocked-state reporting"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-110-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-110:gap:001",
-        "volume_ref": "VOL-110",
-        "statement": "unify maturity and DoD rules",
-        "accountability_id": "ACC-VOL-110",
-        "requirement_refs": [
-          "REQ:VOL-110:001",
-          "REQ:VOL-110:002",
-          "REQ:VOL-110:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:unify maturity and dod rules"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-110-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-110:gap:002",
-        "volume_ref": "VOL-110",
-        "statement": "bind change-impact triggers to DoD",
-        "accountability_id": "ACC-VOL-110",
-        "requirement_refs": [
-          "REQ:VOL-110:001",
-          "REQ:VOL-110:002",
-          "REQ:VOL-110:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind change-impact triggers to dod"
+        "deduplication_key": "gap:independent construction-DAG cycle and blocked-state verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-111-001",
         "source_kind": "gap",
         "source_ref": "VOL-111:gap:001",
         "volume_ref": "VOL-111",
-        "statement": "define packet schema",
+        "statement": "independent construction-packet reference and delegation-completeness verification remains pending",
         "accountability_id": "ACC-VOL-111",
         "requirement_refs": [
           "REQ:VOL-111:001",
@@ -3153,30 +2323,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define packet schema"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-111-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-111:gap:002",
-        "volume_ref": "VOL-111",
-        "statement": "generate packet skeletons from machine plan",
-        "accountability_id": "ACC-VOL-111",
-        "requirement_refs": [
-          "REQ:VOL-111:001",
-          "REQ:VOL-111:002",
-          "REQ:VOL-111:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:generate packet skeletons from machine plan"
+        "deduplication_key": "gap:independent construction-packet reference and delegation-completeness verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-112-001",
         "source_kind": "gap",
         "source_ref": "VOL-112:gap:001",
         "volume_ref": "VOL-112",
-        "statement": "materialize canonical trace graph",
+        "statement": "repository-wide trace population remains separate",
         "accountability_id": "ACC-VOL-112",
         "requirement_refs": [
           "REQ:VOL-112:001",
@@ -3185,14 +2339,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize canonical trace graph"
+        "deduplication_key": "gap:repository-wide trace population remains separate"
       },
       {
         "backlog_id": "BL-GAP-VOL-112-002",
         "source_kind": "gap",
         "source_ref": "VOL-112:gap:002",
         "volume_ref": "VOL-112",
-        "statement": "bind PR impact checks to trace edges",
+        "statement": "independent completeness audit remains pending",
         "accountability_id": "ACC-VOL-112",
         "requirement_refs": [
           "REQ:VOL-112:001",
@@ -3201,14 +2355,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind pr impact checks to trace edges"
+        "deduplication_key": "gap:independent completeness audit remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-113-001",
         "source_kind": "gap",
         "source_ref": "VOL-113:gap:001",
         "volume_ref": "VOL-113",
-        "statement": "unify capability descriptors",
+        "statement": "repository-wide capability descriptor/evidence population remains separate",
         "accountability_id": "ACC-VOL-113",
         "requirement_refs": [
           "REQ:VOL-113:001",
@@ -3217,14 +2371,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:unify capability descriptors"
+        "deduplication_key": "gap:repository-wide capability descriptor/evidence population remains separate"
       },
       {
         "backlog_id": "BL-GAP-VOL-113-002",
         "source_kind": "gap",
         "source_ref": "VOL-113:gap:002",
         "volume_ref": "VOL-113",
-        "statement": "bind runtime discovery to registry",
+        "statement": "independent capability maturity verification remains pending",
         "accountability_id": "ACC-VOL-113",
         "requirement_refs": [
           "REQ:VOL-113:001",
@@ -3233,14 +2387,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind runtime discovery to registry"
+        "deduplication_key": "gap:independent capability maturity verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-114-001",
         "source_kind": "gap",
         "source_ref": "VOL-114:gap:001",
         "volume_ref": "VOL-114",
-        "statement": "define radar state machine",
+        "statement": "independent candidate-baseline evaluation remains pending",
         "accountability_id": "ACC-VOL-114",
         "requirement_refs": [
           "REQ:VOL-114:001",
@@ -3249,14 +2403,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define radar state machine"
+        "deduplication_key": "gap:independent candidate-baseline evaluation remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-114-002",
         "source_kind": "gap",
         "source_ref": "VOL-114:gap:002",
         "volume_ref": "VOL-114",
-        "statement": "bind adopted tech to architecture decisions",
+        "statement": "architecture-decision verification remains pending",
         "accountability_id": "ACC-VOL-114",
         "requirement_refs": [
           "REQ:VOL-114:001",
@@ -3265,14 +2419,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind adopted tech to architecture decisions"
+        "deduplication_key": "gap:architecture-decision verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-115-001",
         "source_kind": "gap",
         "source_ref": "VOL-115:gap:001",
         "volume_ref": "VOL-115",
-        "statement": "establish debt IDs and ownership",
+        "statement": "independent cleanup-compatibility evaluation remains pending",
         "accountability_id": "ACC-VOL-115",
         "requirement_refs": [
           "REQ:VOL-115:001",
@@ -3281,30 +2435,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:establish debt ids and ownership"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-115-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-115:gap:002",
-        "volume_ref": "VOL-115",
-        "statement": "bind debt to risk/backlog/ADR",
-        "accountability_id": "ACC-VOL-115",
-        "requirement_refs": [
-          "REQ:VOL-115:001",
-          "REQ:VOL-115:002",
-          "REQ:VOL-115:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind debt to risk/backlog/adr"
+        "deduplication_key": "gap:independent cleanup-compatibility evaluation remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-116-001",
         "source_kind": "gap",
         "source_ref": "VOL-116:gap:001",
         "volume_ref": "VOL-116",
-        "statement": "unify architecture check registry",
+        "statement": "independent architecture-rule and waiver verification remains pending",
         "accountability_id": "ACC-VOL-116",
         "requirement_refs": [
           "REQ:VOL-116:001",
@@ -3313,30 +2451,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:unify architecture check registry"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-116-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-116:gap:002",
-        "volume_ref": "VOL-116",
-        "statement": "bind rules to ADR/ownership",
-        "accountability_id": "ACC-VOL-116",
-        "requirement_refs": [
-          "REQ:VOL-116:001",
-          "REQ:VOL-116:002",
-          "REQ:VOL-116:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind rules to adr/ownership"
+        "deduplication_key": "gap:independent architecture-rule and waiver verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-117-001",
         "source_kind": "gap",
         "source_ref": "VOL-117:gap:001",
         "volume_ref": "VOL-117",
-        "statement": "define metric registry",
+        "statement": "independent metric-provenance verification remains pending",
         "accountability_id": "ACC-VOL-117",
         "requirement_refs": [
           "REQ:VOL-117:001",
@@ -3345,30 +2467,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define metric registry"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-117-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-117:gap:002",
-        "volume_ref": "VOL-117",
-        "statement": "bind progress percentages to traceable state",
-        "accountability_id": "ACC-VOL-117",
-        "requirement_refs": [
-          "REQ:VOL-117:001",
-          "REQ:VOL-117:002",
-          "REQ:VOL-117:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind progress percentages to traceable state"
+        "deduplication_key": "gap:independent metric-provenance verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-118-001",
         "source_kind": "gap",
         "source_ref": "VOL-118:gap:001",
         "volume_ref": "VOL-118",
-        "statement": "bind roadmap to build DAG",
+        "statement": "independent roadmap-control verification remains pending",
         "accountability_id": "ACC-VOL-118",
         "requirement_refs": [
           "REQ:VOL-118:001",
@@ -3377,30 +2483,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind roadmap to build dag"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-118-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-118:gap:002",
-        "volume_ref": "VOL-118",
-        "statement": "materialize revision lineage",
-        "accountability_id": "ACC-VOL-118",
-        "requirement_refs": [
-          "REQ:VOL-118:001",
-          "REQ:VOL-118:002",
-          "REQ:VOL-118:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize revision lineage"
+        "deduplication_key": "gap:independent roadmap-control verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-119-001",
         "source_kind": "gap",
         "source_ref": "VOL-119:gap:001",
         "volume_ref": "VOL-119",
-        "statement": "implement canonical rollup function",
+        "statement": "independent stale-signoff evaluation remains pending",
         "accountability_id": "ACC-VOL-119",
         "requirement_refs": [
           "REQ:VOL-119:001",
@@ -3409,14 +2499,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:implement canonical rollup function"
+        "deduplication_key": "gap:independent stale-signoff evaluation remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-119-002",
         "source_kind": "gap",
         "source_ref": "VOL-119:gap:002",
         "volume_ref": "VOL-119",
-        "statement": "bind UI progress to derived completion only",
+        "statement": "independent critical-blocker evaluation remains pending",
         "accountability_id": "ACC-VOL-119",
         "requirement_refs": [
           "REQ:VOL-119:001",
@@ -3425,14 +2515,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind ui progress to derived completion only"
+        "deduplication_key": "gap:independent critical-blocker evaluation remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-120-001",
         "source_kind": "gap",
         "source_ref": "VOL-120:gap:001",
         "volume_ref": "VOL-120",
-        "statement": "materialize final assembly harness",
+        "statement": "independent final-assembly verification remains pending",
         "accountability_id": "ACC-VOL-120",
         "requirement_refs": [
           "REQ:VOL-120:001",
@@ -3441,14 +2531,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize final assembly harness"
+        "deduplication_key": "gap:independent final-assembly verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-120-002",
         "source_kind": "gap",
         "source_ref": "VOL-120:gap:002",
         "volume_ref": "VOL-120",
-        "statement": "bind release promotion to final evidence digest",
+        "statement": "P2-QUAL-01 release-qualification dependencies remain external to this bounded implementation",
         "accountability_id": "ACC-VOL-120",
         "requirement_refs": [
           "REQ:VOL-120:001",
@@ -3457,14 +2547,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind release promotion to final evidence digest"
+        "deduplication_key": "gap:P2-QUAL-01 release-qualification dependencies remain external to this bounded implementation"
       },
       {
         "backlog_id": "BL-GAP-VOL-121-001",
         "source_kind": "gap",
         "source_ref": "VOL-121:gap:001",
         "volume_ref": "VOL-121",
-        "statement": "generate cross-reference inventory",
+        "statement": "independent reference-integrity evaluation remains pending",
         "accountability_id": "ACC-VOL-121",
         "requirement_refs": [
           "REQ:VOL-121:001",
@@ -3472,22 +2562,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:generate cross-reference inventory"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-121-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-121:gap:002",
-        "volume_ref": "VOL-121",
-        "statement": "bind normative terms to owners",
-        "accountability_id": "ACC-VOL-121",
-        "requirement_refs": [
-          "REQ:VOL-121:001",
-          "REQ:VOL-121:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind normative terms to owners"
+        "deduplication_key": "gap:independent reference-integrity evaluation remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-122-001",
@@ -3502,7 +2577,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize canonical requirement ids"
+        "deduplication_key": "gap:materialize canonical requirement IDs"
       },
       {
         "backlog_id": "BL-GAP-VOL-122-002",
@@ -3532,7 +2607,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind all production claims to nfr ids"
+        "deduplication_key": "gap:bind all production claims to NFR IDs"
       },
       {
         "backlog_id": "BL-GAP-VOL-123-002",
@@ -3637,7 +2712,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind behaviors to requirement ids"
+        "deduplication_key": "gap:bind behaviors to requirement IDs"
       },
       {
         "backlog_id": "BL-GAP-VOL-127-001",
@@ -3742,7 +2817,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind schema/api versions to matrix"
+        "deduplication_key": "gap:bind schema/API versions to matrix"
       },
       {
         "backlog_id": "BL-GAP-VOL-130-002",
@@ -3824,7 +2899,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-133:gap:001",
         "volume_ref": "VOL-133",
-        "statement": "identify multi-resource operations",
+        "statement": "independent distributed-transaction recovery and compensation verification remains pending",
         "accountability_id": "ACC-VOL-133",
         "requirement_refs": [
           "REQ:VOL-133:001",
@@ -3832,22 +2907,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:identify multi-resource operations"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-133-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-133:gap:002",
-        "volume_ref": "VOL-133",
-        "statement": "materialize saga state store",
-        "accountability_id": "ACC-VOL-133",
-        "requirement_refs": [
-          "REQ:VOL-133:001",
-          "REQ:VOL-133:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize saga state store"
+        "deduplication_key": "gap:independent distributed-transaction recovery and compensation verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-134-001",
@@ -3884,7 +2944,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-135:gap:001",
         "volume_ref": "VOL-135",
-        "statement": "catalog caches",
+        "statement": "independent cache-identity, invalidation, and poison-resistance verification remains pending",
         "accountability_id": "ACC-VOL-135",
         "requirement_refs": [
           "REQ:VOL-135:001",
@@ -3892,29 +2952,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:catalog caches"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-135-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-135:gap:002",
-        "volume_ref": "VOL-135",
-        "statement": "define invalidation/rebuild contracts",
-        "accountability_id": "ACC-VOL-135",
-        "requirement_refs": [
-          "REQ:VOL-135:001",
-          "REQ:VOL-135:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define invalidation/rebuild contracts"
+        "deduplication_key": "gap:independent cache-identity, invalidation, and poison-resistance verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-136-001",
         "source_kind": "gap",
         "source_ref": "VOL-136:gap:001",
         "volume_ref": "VOL-136",
-        "statement": "unify with VOL-076 CAS",
+        "statement": "independent content-addressing digest-migration and integrity verification remains pending",
         "accountability_id": "ACC-VOL-136",
         "requirement_refs": [
           "REQ:VOL-136:001",
@@ -3922,29 +2967,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:unify with vol-076 cas"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-136-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-136:gap:002",
-        "volume_ref": "VOL-136",
-        "statement": "define digest migration procedure",
-        "accountability_id": "ACC-VOL-136",
-        "requirement_refs": [
-          "REQ:VOL-136:001",
-          "REQ:VOL-136:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define digest migration procedure"
+        "deduplication_key": "gap:independent content-addressing digest-migration and integrity verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-137-001",
         "source_kind": "gap",
         "source_ref": "VOL-137:gap:001",
         "volume_ref": "VOL-137",
-        "statement": "converge acquired ingest lineage",
+        "statement": "independent ingestion lineage, quarantine, and trust-bound verification remains pending",
         "accountability_id": "ACC-VOL-137",
         "requirement_refs": [
           "REQ:VOL-137:001",
@@ -3952,29 +2982,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:converge acquired ingest lineage"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-137-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-137:gap:002",
-        "volume_ref": "VOL-137",
-        "statement": "bind ingestion to data lineage",
-        "accountability_id": "ACC-VOL-137",
-        "requirement_refs": [
-          "REQ:VOL-137:001",
-          "REQ:VOL-137:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind ingestion to data lineage"
+        "deduplication_key": "gap:independent ingestion lineage, quarantine, and trust-bound verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-138-001",
         "source_kind": "gap",
         "source_ref": "VOL-138:gap:001",
         "volume_ref": "VOL-138",
-        "statement": "define document schema",
+        "statement": "independent document uncertainty, coordinate, and trust-label verification remains pending",
         "accountability_id": "ACC-VOL-138",
         "requirement_refs": [
           "REQ:VOL-138:001",
@@ -3982,29 +2997,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define document schema"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-138-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-138:gap:002",
-        "volume_ref": "VOL-138",
-        "statement": "integrate trust labels with context",
-        "accountability_id": "ACC-VOL-138",
-        "requirement_refs": [
-          "REQ:VOL-138:001",
-          "REQ:VOL-138:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:integrate trust labels with context"
+        "deduplication_key": "gap:independent document uncertainty, coordinate, and trust-label verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-139-001",
         "source_kind": "gap",
         "source_ref": "VOL-139:gap:001",
         "volume_ref": "VOL-139",
-        "statement": "materialize lineage graph",
+        "statement": "independent lineage governance, deletion, and provenance verification remains pending",
         "accountability_id": "ACC-VOL-139",
         "requirement_refs": [
           "REQ:VOL-139:001",
@@ -4012,29 +3012,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize lineage graph"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-139-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-139:gap:002",
-        "volume_ref": "VOL-139",
-        "statement": "bind artifacts/datasets/indexes",
-        "accountability_id": "ACC-VOL-139",
-        "requirement_refs": [
-          "REQ:VOL-139:001",
-          "REQ:VOL-139:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind artifacts/datasets/indexes"
+        "deduplication_key": "gap:independent lineage governance, deletion, and provenance verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-140-001",
         "source_kind": "gap",
         "source_ref": "VOL-140:gap:001",
         "volume_ref": "VOL-140",
-        "statement": "define rule registry",
+        "statement": "independent raw-observation quality-gate and policy verification remains pending",
         "accountability_id": "ACC-VOL-140",
         "requirement_refs": [
           "REQ:VOL-140:001",
@@ -4042,29 +3027,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define rule registry"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-140-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-140:gap:002",
-        "volume_ref": "VOL-140",
-        "statement": "bind dataset gates",
-        "accountability_id": "ACC-VOL-140",
-        "requirement_refs": [
-          "REQ:VOL-140:001",
-          "REQ:VOL-140:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind dataset gates"
+        "deduplication_key": "gap:independent raw-observation quality-gate and policy verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-141-001",
         "source_kind": "gap",
         "source_ref": "VOL-141:gap:001",
         "volume_ref": "VOL-141",
-        "statement": "materialize dataset manifests",
+        "statement": "independent dataset-registry rights, retention, split, and contamination verification remains pending",
         "accountability_id": "ACC-VOL-141",
         "requirement_refs": [
           "REQ:VOL-141:001",
@@ -4072,29 +3042,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize dataset manifests"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-141-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-141:gap:002",
-        "volume_ref": "VOL-141",
-        "statement": "bind training/eval consumers",
-        "accountability_id": "ACC-VOL-141",
-        "requirement_refs": [
-          "REQ:VOL-141:001",
-          "REQ:VOL-141:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind training/eval consumers"
+        "deduplication_key": "gap:independent dataset-registry rights, retention, split, and contamination verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-142-001",
         "source_kind": "gap",
         "source_ref": "VOL-142:gap:001",
         "volume_ref": "VOL-142",
-        "statement": "define generator lineage",
+        "statement": "independent synthetic-data lineage, diversity, memorization, and collapse-gate verification remains pending",
         "accountability_id": "ACC-VOL-142",
         "requirement_refs": [
           "REQ:VOL-142:001",
@@ -4102,29 +3057,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define generator lineage"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-142-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-142:gap:002",
-        "volume_ref": "VOL-142",
-        "statement": "add diversity/leakage gates",
-        "accountability_id": "ACC-VOL-142",
-        "requirement_refs": [
-          "REQ:VOL-142:001",
-          "REQ:VOL-142:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:add diversity/leakage gates"
+        "deduplication_key": "gap:independent synthetic-data lineage, diversity, memorization, and collapse-gate verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-143-001",
         "source_kind": "gap",
         "source_ref": "VOL-143:gap:001",
         "volume_ref": "VOL-143",
-        "statement": "define training manifest",
+        "statement": "independent training-control replay and registry-binding verification remains pending",
         "accountability_id": "ACC-VOL-143",
         "requirement_refs": [
           "REQ:VOL-143:001",
@@ -4132,29 +3072,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define training manifest"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-143-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-143:gap:002",
-        "volume_ref": "VOL-143",
-        "statement": "bind runs to dataset/model registries",
-        "accountability_id": "ACC-VOL-143",
-        "requirement_refs": [
-          "REQ:VOL-143:001",
-          "REQ:VOL-143:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind runs to dataset/model registries"
+        "deduplication_key": "gap:independent training-control replay and registry-binding verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-144-001",
         "source_kind": "gap",
         "source_ref": "VOL-144:gap:001",
         "volume_ref": "VOL-144",
-        "statement": "select topology abstractions",
+        "statement": "independent distributed-topology and worker-failure verification remains pending",
         "accountability_id": "ACC-VOL-144",
         "requirement_refs": [
           "REQ:VOL-144:001",
@@ -4162,29 +3087,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:select topology abstractions"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-144-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-144:gap:002",
-        "volume_ref": "VOL-144",
-        "statement": "materialize failure drills",
-        "accountability_id": "ACC-VOL-144",
-        "requirement_refs": [
-          "REQ:VOL-144:001",
-          "REQ:VOL-144:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize failure drills"
+        "deduplication_key": "gap:independent distributed-topology and worker-failure verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-145-001",
         "source_kind": "gap",
         "source_ref": "VOL-145:gap:001",
         "volume_ref": "VOL-145",
-        "statement": "define checkpoint schema",
+        "statement": "independent checkpoint/resume equivalence and retention verification remains pending",
         "accountability_id": "ACC-VOL-145",
         "requirement_refs": [
           "REQ:VOL-145:001",
@@ -4192,29 +3102,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define checkpoint schema"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-145-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-145:gap:002",
-        "volume_ref": "VOL-145",
-        "statement": "bind retention and CAS",
-        "accountability_id": "ACC-VOL-145",
-        "requirement_refs": [
-          "REQ:VOL-145:001",
-          "REQ:VOL-145:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind retention and cas"
+        "deduplication_key": "gap:independent checkpoint/resume equivalence and retention verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-146-001",
         "source_kind": "gap",
         "source_ref": "VOL-146:gap:001",
         "volume_ref": "VOL-146",
-        "statement": "design epoch/fence protocol",
+        "statement": "independent elastic-recovery fencing and scale-transition verification remains pending",
         "accountability_id": "ACC-VOL-146",
         "requirement_refs": [
           "REQ:VOL-146:001",
@@ -4222,29 +3117,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:design epoch/fence protocol"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-146-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-146:gap:002",
-        "volume_ref": "VOL-146",
-        "statement": "bind to checkpoints",
-        "accountability_id": "ACC-VOL-146",
-        "requirement_refs": [
-          "REQ:VOL-146:001",
-          "REQ:VOL-146:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind to checkpoints"
+        "deduplication_key": "gap:independent elastic-recovery fencing and scale-transition verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-147-001",
         "source_kind": "gap",
         "source_ref": "VOL-147:gap:001",
         "volume_ref": "VOL-147",
-        "statement": "define training signal schema",
+        "statement": "independent privacy-bounded training-observability verification remains pending",
         "accountability_id": "ACC-VOL-147",
         "requirement_refs": [
           "REQ:VOL-147:001",
@@ -4252,29 +3132,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define training signal schema"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-147-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-147:gap:002",
-        "volume_ref": "VOL-147",
-        "statement": "bind alerts to runbooks",
-        "accountability_id": "ACC-VOL-147",
-        "requirement_refs": [
-          "REQ:VOL-147:001",
-          "REQ:VOL-147:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind alerts to runbooks"
+        "deduplication_key": "gap:independent privacy-bounded training-observability verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-148-001",
         "source_kind": "gap",
         "source_ref": "VOL-148:gap:001",
         "volume_ref": "VOL-148",
-        "statement": "define gate bundles",
+        "statement": "independent evidence-bound training-gate verification remains pending",
         "accountability_id": "ACC-VOL-148",
         "requirement_refs": [
           "REQ:VOL-148:001",
@@ -4282,29 +3147,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define gate bundles"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-148-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-148:gap:002",
-        "volume_ref": "VOL-148",
-        "statement": "bind to model registry",
-        "accountability_id": "ACC-VOL-148",
-        "requirement_refs": [
-          "REQ:VOL-148:001",
-          "REQ:VOL-148:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind to model registry"
+        "deduplication_key": "gap:independent evidence-bound training-gate verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-149-001",
         "source_kind": "gap",
         "source_ref": "VOL-149:gap:001",
         "volume_ref": "VOL-149",
-        "statement": "define experiment families",
+        "statement": "independent post-training isolation and promotion-boundary verification remains pending",
         "accountability_id": "ACC-VOL-149",
         "requirement_refs": [
           "REQ:VOL-149:001",
@@ -4312,29 +3162,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define experiment families"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-149-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-149:gap:002",
-        "volume_ref": "VOL-149",
-        "statement": "bind promotion to eval gates",
-        "accountability_id": "ACC-VOL-149",
-        "requirement_refs": [
-          "REQ:VOL-149:001",
-          "REQ:VOL-149:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind promotion to eval gates"
+        "deduplication_key": "gap:independent post-training isolation and promotion-boundary verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-150-001",
         "source_kind": "gap",
         "source_ref": "VOL-150:gap:001",
         "volume_ref": "VOL-150",
-        "statement": "define environment interface",
+        "statement": "independent deterministic-environment replay and adversarial transition verification remains pending",
         "accountability_id": "ACC-VOL-150",
         "requirement_refs": [
           "REQ:VOL-150:001",
@@ -4342,29 +3177,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define environment interface"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-150-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-150:gap:002",
-        "volume_ref": "VOL-150",
-        "statement": "materialize deterministic fixtures",
-        "accountability_id": "ACC-VOL-150",
-        "requirement_refs": [
-          "REQ:VOL-150:001",
-          "REQ:VOL-150:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize deterministic fixtures"
+        "deduplication_key": "gap:independent deterministic-environment replay and adversarial transition verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-151-001",
         "source_kind": "gap",
         "source_ref": "VOL-151:gap:001",
         "volume_ref": "VOL-151",
-        "statement": "define curriculum policy",
+        "statement": "independent curriculum progression and anti-starvation verification remains pending",
         "accountability_id": "ACC-VOL-151",
         "requirement_refs": [
           "REQ:VOL-151:001",
@@ -4372,29 +3192,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define curriculum policy"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-151-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-151:gap:002",
-        "volume_ref": "VOL-151",
-        "statement": "bind stages to capability evals",
-        "accountability_id": "ACC-VOL-151",
-        "requirement_refs": [
-          "REQ:VOL-151:001",
-          "REQ:VOL-151:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind stages to capability evals"
+        "deduplication_key": "gap:independent curriculum progression and anti-starvation verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-152-001",
         "source_kind": "gap",
         "source_ref": "VOL-152:gap:001",
         "volume_ref": "VOL-152",
-        "statement": "define verifier registry",
+        "statement": "independent verifier-program baseline and separation verification remains pending",
         "accountability_id": "ACC-VOL-152",
         "requirement_refs": [
           "REQ:VOL-152:001",
@@ -4402,29 +3207,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define verifier registry"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-152-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-152:gap:002",
-        "volume_ref": "VOL-152",
-        "statement": "bind verification tasks to baselines",
-        "accountability_id": "ACC-VOL-152",
-        "requirement_refs": [
-          "REQ:VOL-152:001",
-          "REQ:VOL-152:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind verification tasks to baselines"
+        "deduplication_key": "gap:independent verifier-program baseline and separation verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-153-001",
         "source_kind": "gap",
         "source_ref": "VOL-153:gap:001",
         "volume_ref": "VOL-153",
-        "statement": "define common media envelope",
+        "statement": "independent adversarial multimodal-ingestion and resource-bound verification remains pending",
         "accountability_id": "ACC-VOL-153",
         "requirement_refs": [
           "REQ:VOL-153:001",
@@ -4432,29 +3222,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define common media envelope"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-153-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-153:gap:002",
-        "volume_ref": "VOL-153",
-        "statement": "bind modality pipelines",
-        "accountability_id": "ACC-VOL-153",
-        "requirement_refs": [
-          "REQ:VOL-153:001",
-          "REQ:VOL-153:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind modality pipelines"
+        "deduplication_key": "gap:independent adversarial multimodal-ingestion and resource-bound verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-154-001",
         "source_kind": "gap",
         "source_ref": "VOL-154:gap:001",
         "volume_ref": "VOL-154",
-        "statement": "define image limits",
+        "statement": "independent vision provenance and bounded-image verification remains pending",
         "accountability_id": "ACC-VOL-154",
         "requirement_refs": [
           "REQ:VOL-154:001",
@@ -4462,29 +3237,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define image limits"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-154-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-154:gap:002",
-        "volume_ref": "VOL-154",
-        "statement": "integrate region evidence",
-        "accountability_id": "ACC-VOL-154",
-        "requirement_refs": [
-          "REQ:VOL-154:001",
-          "REQ:VOL-154:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:integrate region evidence"
+        "deduplication_key": "gap:independent vision provenance and bounded-image verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-155-001",
         "source_kind": "gap",
         "source_ref": "VOL-155:gap:001",
         "volume_ref": "VOL-155",
-        "statement": "define fusion policy",
+        "statement": "independent coordinate/fusion provenance verification remains pending",
         "accountability_id": "ACC-VOL-155",
         "requirement_refs": [
           "REQ:VOL-155:001",
@@ -4492,29 +3252,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define fusion policy"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-155-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-155:gap:002",
-        "volume_ref": "VOL-155",
-        "statement": "bind to document intelligence",
-        "accountability_id": "ACC-VOL-155",
-        "requirement_refs": [
-          "REQ:VOL-155:001",
-          "REQ:VOL-155:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind to document intelligence"
+        "deduplication_key": "gap:independent coordinate/fusion provenance verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-156-001",
         "source_kind": "gap",
         "source_ref": "VOL-156:gap:001",
         "volume_ref": "VOL-156",
-        "statement": "define audio envelope",
+        "statement": "independent bounded-audio provenance and codec-resource verification remains pending",
         "accountability_id": "ACC-VOL-156",
         "requirement_refs": [
           "REQ:VOL-156:001",
@@ -4522,29 +3267,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define audio envelope"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-156-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-156:gap:002",
-        "volume_ref": "VOL-156",
-        "statement": "materialize codec limits",
-        "accountability_id": "ACC-VOL-156",
-        "requirement_refs": [
-          "REQ:VOL-156:001",
-          "REQ:VOL-156:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize codec limits"
+        "deduplication_key": "gap:independent bounded-audio provenance and codec-resource verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-157-001",
         "source_kind": "gap",
         "source_ref": "VOL-157:gap:001",
         "volume_ref": "VOL-157",
-        "statement": "define session state machine",
+        "statement": "independent live-speech session-state and streaming verification remains pending",
         "accountability_id": "ACC-VOL-157",
         "requirement_refs": [
           "REQ:VOL-157:001",
@@ -4552,29 +3282,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define session state machine"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-157-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-157:gap:002",
-        "volume_ref": "VOL-157",
-        "statement": "bind speech events to streaming",
-        "accountability_id": "ACC-VOL-157",
-        "requirement_refs": [
-          "REQ:VOL-157:001",
-          "REQ:VOL-157:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind speech events to streaming"
+        "deduplication_key": "gap:independent live-speech session-state and streaming verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-158-001",
         "source_kind": "gap",
         "source_ref": "VOL-158:gap:001",
         "volume_ref": "VOL-158",
-        "statement": "define sampling policies",
+        "statement": "independent temporal-sampling and cross-modal evidence verification remains pending",
         "accountability_id": "ACC-VOL-158",
         "requirement_refs": [
           "REQ:VOL-158:001",
@@ -4582,29 +3297,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define sampling policies"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-158-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-158:gap:002",
-        "volume_ref": "VOL-158",
-        "statement": "integrate audio/vision evidence",
-        "accountability_id": "ACC-VOL-158",
-        "requirement_refs": [
-          "REQ:VOL-158:001",
-          "REQ:VOL-158:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:integrate audio/vision evidence"
+        "deduplication_key": "gap:independent temporal-sampling and cross-modal evidence verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-159-001",
         "source_kind": "gap",
         "source_ref": "VOL-159:gap:001",
         "volume_ref": "VOL-159",
-        "statement": "define cross-modal scoring contract",
+        "statement": "independent cross-modal retrieval trust-filtering, scoring, and evidence-fusion verification remains pending",
         "accountability_id": "ACC-VOL-159",
         "requirement_refs": [
           "REQ:VOL-159:001",
@@ -4612,29 +3312,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define cross-modal scoring contract"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-159-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-159:gap:002",
-        "volume_ref": "VOL-159",
-        "statement": "bind modality indexes",
-        "accountability_id": "ACC-VOL-159",
-        "requirement_refs": [
-          "REQ:VOL-159:001",
-          "REQ:VOL-159:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind modality indexes"
+        "deduplication_key": "gap:independent cross-modal retrieval trust-filtering, scoring, and evidence-fusion verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-160-001",
         "source_kind": "gap",
         "source_ref": "VOL-160:gap:001",
         "volume_ref": "VOL-160",
-        "statement": "materialize SDK package",
+        "statement": "independent Tool SDK schema, authority-scope, idempotency, and invocation verification remains pending",
         "accountability_id": "ACC-VOL-160",
         "requirement_refs": [
           "REQ:VOL-160:001",
@@ -4642,29 +3327,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize sdk package"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-160-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-160:gap:002",
-        "volume_ref": "VOL-160",
-        "statement": "bind tools to policy/receipt contracts",
-        "accountability_id": "ACC-VOL-160",
-        "requirement_refs": [
-          "REQ:VOL-160:001",
-          "REQ:VOL-160:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind tools to policy/receipt contracts"
+        "deduplication_key": "gap:independent Tool SDK schema, authority-scope, idempotency, and invocation verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-161-001",
         "source_kind": "gap",
         "source_ref": "VOL-161:gap:001",
         "volume_ref": "VOL-161",
-        "statement": "materialize connector SDK",
+        "statement": "independent connector scope/permission and lifecycle verification remains pending",
         "accountability_id": "ACC-VOL-161",
         "requirement_refs": [
           "REQ:VOL-161:001",
@@ -4672,29 +3342,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize connector sdk"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-161-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-161:gap:002",
-        "volume_ref": "VOL-161",
-        "statement": "bind connectors to tool policy",
-        "accountability_id": "ACC-VOL-161",
-        "requirement_refs": [
-          "REQ:VOL-161:001",
-          "REQ:VOL-161:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind connectors to tool policy"
+        "deduplication_key": "gap:independent connector scope/permission and lifecycle verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-162-001",
         "source_kind": "gap",
         "source_ref": "VOL-162:gap:001",
         "volume_ref": "VOL-162",
-        "statement": "define plugin manifest schema",
+        "statement": "independent plugin-lifecycle and capability-integration verification remains pending",
         "accountability_id": "ACC-VOL-162",
         "requirement_refs": [
           "REQ:VOL-162:001",
@@ -4702,29 +3357,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define plugin manifest schema"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-162-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-162:gap:002",
-        "volume_ref": "VOL-162",
-        "statement": "bind plugin state to capability registry",
-        "accountability_id": "ACC-VOL-162",
-        "requirement_refs": [
-          "REQ:VOL-162:001",
-          "REQ:VOL-162:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind plugin state to capability registry"
+        "deduplication_key": "gap:independent plugin-lifecycle and capability-integration verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-163-001",
         "source_kind": "gap",
         "source_ref": "VOL-163:gap:001",
         "volume_ref": "VOL-163",
-        "statement": "define trust tiers",
+        "statement": "independent marketplace attestation, quarantine, and revocation verification remains pending",
         "accountability_id": "ACC-VOL-163",
         "requirement_refs": [
           "REQ:VOL-163:001",
@@ -4732,22 +3372,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define trust tiers"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-163-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-163:gap:002",
-        "volume_ref": "VOL-163",
-        "statement": "materialize quarantine/revocation path",
-        "accountability_id": "ACC-VOL-163",
-        "requirement_refs": [
-          "REQ:VOL-163:001",
-          "REQ:VOL-163:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize quarantine/revocation path"
+        "deduplication_key": "gap:independent marketplace attestation, quarantine, and revocation verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-164-001",
@@ -4814,7 +3439,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-166:gap:001",
         "volume_ref": "VOL-166",
-        "statement": "share evaluator with runtime",
+        "statement": "independent exact-head policy-simulation reconciliation remains pending",
         "accountability_id": "ACC-VOL-166",
         "requirement_refs": [
           "REQ:VOL-166:001",
@@ -4822,29 +3447,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:share evaluator with runtime"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-166-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-166:gap:002",
-        "volume_ref": "VOL-166",
-        "statement": "establish trace corpus governance",
-        "accountability_id": "ACC-VOL-166",
-        "requirement_refs": [
-          "REQ:VOL-166:001",
-          "REQ:VOL-166:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:establish trace corpus governance"
+        "deduplication_key": "gap:independent exact-head policy-simulation reconciliation remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-167-001",
         "source_kind": "gap",
         "source_ref": "VOL-167:gap:001",
         "volume_ref": "VOL-167",
-        "statement": "materialize threat IDs",
+        "statement": "independent exact-head threat-model impact-trigger verification remains pending",
         "accountability_id": "ACC-VOL-167",
         "requirement_refs": [
           "REQ:VOL-167:001",
@@ -4852,22 +3462,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize threat ids"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-167-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-167:gap:002",
-        "volume_ref": "VOL-167",
-        "statement": "bind PR impact triggers",
-        "accountability_id": "ACC-VOL-167",
-        "requirement_refs": [
-          "REQ:VOL-167:001",
-          "REQ:VOL-167:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind pr impact triggers"
+        "deduplication_key": "gap:independent exact-head threat-model impact-trigger verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-168-001",
@@ -4904,7 +3499,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-169:gap:001",
         "volume_ref": "VOL-169",
-        "statement": "map all trust boundaries",
+        "statement": "independent exact-head boundary-crossing verification remains pending",
         "accountability_id": "ACC-VOL-169",
         "requirement_refs": [
           "REQ:VOL-169:001",
@@ -4912,22 +3507,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:map all trust boundaries"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-169-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-169:gap:002",
-        "volume_ref": "VOL-169",
-        "statement": "bind crossings to trace model",
-        "accountability_id": "ACC-VOL-169",
-        "requirement_refs": [
-          "REQ:VOL-169:001",
-          "REQ:VOL-169:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind crossings to trace model"
+        "deduplication_key": "gap:independent exact-head boundary-crossing verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-170-001",
@@ -4957,14 +3537,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind internal rpc auth"
+        "deduplication_key": "gap:bind internal RPC auth"
       },
       {
         "backlog_id": "BL-GAP-VOL-171-001",
         "source_kind": "gap",
         "source_ref": "VOL-171:gap:001",
         "volume_ref": "VOL-171",
-        "statement": "materialize network topology",
+        "statement": "independent network-topology, identity, and egress-policy verification remains pending",
         "accountability_id": "ACC-VOL-171",
         "requirement_refs": [
           "REQ:VOL-171:001",
@@ -4972,29 +3552,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize network topology"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-171-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-171:gap:002",
-        "volume_ref": "VOL-171",
-        "statement": "bind egress/identity controls",
-        "accountability_id": "ACC-VOL-171",
-        "requirement_refs": [
-          "REQ:VOL-171:001",
-          "REQ:VOL-171:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind egress/identity controls"
+        "deduplication_key": "gap:independent network-topology, identity, and egress-policy verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-172-001",
         "source_kind": "gap",
         "source_ref": "VOL-172:gap:001",
         "volume_ref": "VOL-172",
-        "statement": "implement destination canonicalization",
+        "statement": "independent exact-head egress-policy and connected-peer verification remains pending",
         "accountability_id": "ACC-VOL-172",
         "requirement_refs": [
           "REQ:VOL-172:001",
@@ -5002,29 +3567,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:implement destination canonicalization"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-172-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-172:gap:002",
-        "volume_ref": "VOL-172",
-        "statement": "bind network tools to egress policy",
-        "accountability_id": "ACC-VOL-172",
-        "requirement_refs": [
-          "REQ:VOL-172:001",
-          "REQ:VOL-172:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind network tools to egress policy"
+        "deduplication_key": "gap:independent exact-head egress-policy and connected-peer verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-173-001",
         "source_kind": "gap",
         "source_ref": "VOL-173:gap:001",
         "volume_ref": "VOL-173",
-        "statement": "unify secret access path",
+        "statement": "independent exact-head secret-handle/lifecycle verification remains pending",
         "accountability_id": "ACC-VOL-173",
         "requirement_refs": [
           "REQ:VOL-173:001",
@@ -5032,29 +3582,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:unify secret access path"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-173-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-173:gap:002",
-        "volume_ref": "VOL-173",
-        "statement": "bind detectors to CI/runtime",
-        "accountability_id": "ACC-VOL-173",
-        "requirement_refs": [
-          "REQ:VOL-173:001",
-          "REQ:VOL-173:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind detectors to ci/runtime"
+        "deduplication_key": "gap:independent exact-head secret-handle/lifecycle verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-174-001",
         "source_kind": "gap",
         "source_ref": "VOL-174:gap:001",
         "volume_ref": "VOL-174",
-        "statement": "define KMS abstraction",
+        "statement": "independent exact-head key-version/rotation/restore verification remains pending",
         "accountability_id": "ACC-VOL-174",
         "requirement_refs": [
           "REQ:VOL-174:001",
@@ -5062,29 +3597,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define kms abstraction"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-174-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-174:gap:002",
-        "volume_ref": "VOL-174",
-        "statement": "bind signatures/encryption to versions",
-        "accountability_id": "ACC-VOL-174",
-        "requirement_refs": [
-          "REQ:VOL-174:001",
-          "REQ:VOL-174:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind signatures/encryption to versions"
+        "deduplication_key": "gap:independent exact-head key-version/rotation/restore verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-175-001",
         "source_kind": "gap",
         "source_ref": "VOL-175:gap:001",
         "volume_ref": "VOL-175",
-        "statement": "propagate tenant identity universally",
+        "statement": "independent exact-head cross-tenant negative-path verification remains pending",
         "accountability_id": "ACC-VOL-175",
         "requirement_refs": [
           "REQ:VOL-175:001",
@@ -5092,29 +3612,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:propagate tenant identity universally"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-175-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-175:gap:002",
-        "volume_ref": "VOL-175",
-        "statement": "bind isolation to trace/evidence",
-        "accountability_id": "ACC-VOL-175",
-        "requirement_refs": [
-          "REQ:VOL-175:001",
-          "REQ:VOL-175:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind isolation to trace/evidence"
+        "deduplication_key": "gap:independent exact-head cross-tenant negative-path verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-176-001",
         "source_kind": "gap",
         "source_ref": "VOL-176:gap:001",
         "volume_ref": "VOL-176",
-        "statement": "define privacy label lattice",
+        "statement": "independent exact-head privacy-label propagation and purpose-boundary verification remains pending",
         "accountability_id": "ACC-VOL-176",
         "requirement_refs": [
           "REQ:VOL-176:001",
@@ -5122,29 +3627,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define privacy label lattice"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-176-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-176:gap:002",
-        "volume_ref": "VOL-176",
-        "statement": "bind to ingestion/retrieval/tools",
-        "accountability_id": "ACC-VOL-176",
-        "requirement_refs": [
-          "REQ:VOL-176:001",
-          "REQ:VOL-176:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind to ingestion/retrieval/tools"
+        "deduplication_key": "gap:independent exact-head privacy-label propagation and purpose-boundary verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-177-001",
         "source_kind": "gap",
         "source_ref": "VOL-177:gap:001",
         "volume_ref": "VOL-177",
-        "statement": "materialize deletion graph",
+        "statement": "independent exact-head deletion/restore-resurrection verification remains pending",
         "accountability_id": "ACC-VOL-177",
         "requirement_refs": [
           "REQ:VOL-177:001",
@@ -5152,29 +3642,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize deletion graph"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-177-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-177:gap:002",
-        "volume_ref": "VOL-177",
-        "statement": "bind backup/restore reconciliation",
-        "accountability_id": "ACC-VOL-177",
-        "requirement_refs": [
-          "REQ:VOL-177:001",
-          "REQ:VOL-177:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind backup/restore reconciliation"
+        "deduplication_key": "gap:independent exact-head deletion/restore-resurrection verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-178-001",
         "source_kind": "gap",
         "source_ref": "VOL-178:gap:001",
         "volume_ref": "VOL-178",
-        "statement": "select SBOM format",
+        "statement": "independent exact-head SBOM artifact-binding and coverage verification remains pending",
         "accountability_id": "ACC-VOL-178",
         "requirement_refs": [
           "REQ:VOL-178:001",
@@ -5182,29 +3657,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:select sbom format"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-178-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-178:gap:002",
-        "volume_ref": "VOL-178",
-        "statement": "bind generation to release pipeline",
-        "accountability_id": "ACC-VOL-178",
-        "requirement_refs": [
-          "REQ:VOL-178:001",
-          "REQ:VOL-178:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind generation to release pipeline"
+        "deduplication_key": "gap:independent exact-head SBOM artifact-binding and coverage verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-179-001",
         "source_kind": "gap",
         "source_ref": "VOL-179:gap:001",
         "volume_ref": "VOL-179",
-        "statement": "define MBOM schema",
+        "statement": "independent model-BOM integrity and promotion-binding verification remains pending",
         "accountability_id": "ACC-VOL-179",
         "requirement_refs": [
           "REQ:VOL-179:001",
@@ -5212,29 +3672,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define mbom schema"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-179-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-179:gap:002",
-        "volume_ref": "VOL-179",
-        "statement": "bind model registry promotion",
-        "accountability_id": "ACC-VOL-179",
-        "requirement_refs": [
-          "REQ:VOL-179:001",
-          "REQ:VOL-179:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind model registry promotion"
+        "deduplication_key": "gap:independent model-BOM integrity and promotion-binding verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-180-001",
         "source_kind": "gap",
         "source_ref": "VOL-180:gap:001",
         "volume_ref": "VOL-180",
-        "statement": "define core service SLOs",
+        "statement": "independent exact-head SLO/SLI and operations-review verification remains pending",
         "accountability_id": "ACC-VOL-180",
         "requirement_refs": [
           "REQ:VOL-180:001",
@@ -5242,29 +3687,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define core service slos"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-180-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-180:gap:002",
-        "volume_ref": "VOL-180",
-        "statement": "bind alerts/error budgets",
-        "accountability_id": "ACC-VOL-180",
-        "requirement_refs": [
-          "REQ:VOL-180:001",
-          "REQ:VOL-180:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind alerts/error budgets"
+        "deduplication_key": "gap:independent exact-head SLO/SLI and operations-review verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-181-001",
         "source_kind": "gap",
         "source_ref": "VOL-181:gap:001",
         "volume_ref": "VOL-181",
-        "statement": "define burn policy",
+        "statement": "independent exact-head error-budget burn/release-boundary verification remains pending",
         "accountability_id": "ACC-VOL-181",
         "requirement_refs": [
           "REQ:VOL-181:001",
@@ -5272,29 +3702,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define burn policy"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-181-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-181:gap:002",
-        "volume_ref": "VOL-181",
-        "statement": "bind to canary/release gates",
-        "accountability_id": "ACC-VOL-181",
-        "requirement_refs": [
-          "REQ:VOL-181:001",
-          "REQ:VOL-181:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind to canary/release gates"
+        "deduplication_key": "gap:independent exact-head error-budget burn/release-boundary verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-182-001",
         "source_kind": "gap",
         "source_ref": "VOL-182:gap:001",
         "volume_ref": "VOL-182",
-        "statement": "inventory metric labels",
+        "statement": "independent exact-head telemetry-cardinality and sensitive-label verification remains pending",
         "accountability_id": "ACC-VOL-182",
         "requirement_refs": [
           "REQ:VOL-182:001",
@@ -5302,29 +3717,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:inventory metric labels"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-182-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-182:gap:002",
-        "volume_ref": "VOL-182",
-        "statement": "add cardinality linting",
-        "accountability_id": "ACC-VOL-182",
-        "requirement_refs": [
-          "REQ:VOL-182:001",
-          "REQ:VOL-182:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:add cardinality linting"
+        "deduplication_key": "gap:independent exact-head telemetry-cardinality and sensitive-label verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-183-001",
         "source_kind": "gap",
         "source_ref": "VOL-183:gap:001",
         "volume_ref": "VOL-183",
-        "statement": "define span taxonomy",
+        "statement": "independent exact-head trace-causality and non-authoritative telemetry verification remains pending",
         "accountability_id": "ACC-VOL-183",
         "requirement_refs": [
           "REQ:VOL-183:001",
@@ -5332,29 +3732,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define span taxonomy"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-183-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-183:gap:002",
-        "volume_ref": "VOL-183",
-        "statement": "bind receipts/events to traces",
-        "accountability_id": "ACC-VOL-183",
-        "requirement_refs": [
-          "REQ:VOL-183:001",
-          "REQ:VOL-183:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind receipts/events to traces"
+        "deduplication_key": "gap:independent exact-head trace-causality and non-authoritative telemetry verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-184-001",
         "source_kind": "gap",
         "source_ref": "VOL-184:gap:001",
         "volume_ref": "VOL-184",
-        "statement": "standardize profile bundles",
+        "statement": "independent exact-head profile-identity and regression verification remains pending",
         "accountability_id": "ACC-VOL-184",
         "requirement_refs": [
           "REQ:VOL-184:001",
@@ -5362,29 +3747,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:standardize profile bundles"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-184-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-184:gap:002",
-        "volume_ref": "VOL-184",
-        "statement": "bind findings to backlog",
-        "accountability_id": "ACC-VOL-184",
-        "requirement_refs": [
-          "REQ:VOL-184:001",
-          "REQ:VOL-184:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind findings to backlog"
+        "deduplication_key": "gap:independent exact-head profile-identity and regression verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-185-001",
         "source_kind": "gap",
         "source_ref": "VOL-185:gap:001",
         "volume_ref": "VOL-185",
-        "statement": "define canonical operation budgets",
+        "statement": "independent exact-head percentile/stage latency-budget verification remains pending",
         "accountability_id": "ACC-VOL-185",
         "requirement_refs": [
           "REQ:VOL-185:001",
@@ -5392,29 +3762,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define canonical operation budgets"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-185-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-185:gap:002",
-        "volume_ref": "VOL-185",
-        "statement": "bind routing/admission",
-        "accountability_id": "ACC-VOL-185",
-        "requirement_refs": [
-          "REQ:VOL-185:001",
-          "REQ:VOL-185:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind routing/admission"
+        "deduplication_key": "gap:independent exact-head percentile/stage latency-budget verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-186-001",
         "source_kind": "gap",
         "source_ref": "VOL-186:gap:001",
         "volume_ref": "VOL-186",
-        "statement": "unify cost ledger",
+        "statement": "independent exact-head durable cost reservation/fallback verification remains pending",
         "accountability_id": "ACC-VOL-186",
         "requirement_refs": [
           "REQ:VOL-186:001",
@@ -5422,29 +3777,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:unify cost ledger"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-186-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-186:gap:002",
-        "volume_ref": "VOL-186",
-        "statement": "bind model/tool routing",
-        "accountability_id": "ACC-VOL-186",
-        "requirement_refs": [
-          "REQ:VOL-186:001",
-          "REQ:VOL-186:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind model/tool routing"
+        "deduplication_key": "gap:independent exact-head durable cost reservation/fallback verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-187-001",
         "source_kind": "gap",
         "source_ref": "VOL-187:gap:001",
         "volume_ref": "VOL-187",
-        "statement": "define measurement methodology",
+        "statement": "independent exact-head quality-normalized efficiency verification remains pending",
         "accountability_id": "ACC-VOL-187",
         "requirement_refs": [
           "REQ:VOL-187:001",
@@ -5452,22 +3792,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define measurement methodology"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-187-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-187:gap:002",
-        "volume_ref": "VOL-187",
-        "statement": "bind to capacity/cost reviews",
-        "accountability_id": "ACC-VOL-187",
-        "requirement_refs": [
-          "REQ:VOL-187:001",
-          "REQ:VOL-187:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind to capacity/cost reviews"
+        "deduplication_key": "gap:independent exact-head quality-normalized efficiency verification remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-188-001",
@@ -5684,7 +4009,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-195:gap:001",
         "volume_ref": "VOL-195",
-        "statement": "define one-command bootstrap",
+        "statement": "check in canonical uv.lock and bind its digest as the authoritative local dependency graph",
         "accountability_id": "ACC-VOL-195",
         "requirement_refs": [
           "REQ:VOL-195:001",
@@ -5692,52 +4017,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define one-command bootstrap"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-195-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-195:gap:002",
-        "volume_ref": "VOL-195",
-        "statement": "bind versions to environment spec",
-        "accountability_id": "ACC-VOL-195",
-        "requirement_refs": [
-          "REQ:VOL-195:001",
-          "REQ:VOL-195:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind versions to environment spec"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-196-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-196:gap:001",
-        "volume_ref": "VOL-196",
-        "statement": "catalog fixtures",
-        "accountability_id": "ACC-VOL-196",
-        "requirement_refs": [
-          "REQ:VOL-196:001",
-          "REQ:VOL-196:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:catalog fixtures"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-196-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-196:gap:002",
-        "volume_ref": "VOL-196",
-        "statement": "add hermeticity checks",
-        "accountability_id": "ACC-VOL-196",
-        "requirement_refs": [
-          "REQ:VOL-196:001",
-          "REQ:VOL-196:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:add hermeticity checks"
+        "deduplication_key": "gap:check in canonical uv.lock and bind its digest as the authoritative local dependency graph"
       },
       {
         "backlog_id": "BL-GAP-VOL-197-001",
@@ -5782,7 +4062,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:select p0 contract targets"
+        "deduplication_key": "gap:select P0 contract targets"
       },
       {
         "backlog_id": "BL-GAP-VOL-198-002",
@@ -5834,7 +4114,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-200:gap:001",
         "volume_ref": "VOL-200",
-        "statement": "rank first candidate set",
+        "statement": "materialize the first ranked candidate set from concrete high-consequence runtime targets",
         "accountability_id": "ACC-VOL-200",
         "requirement_refs": [
           "REQ:VOL-200:001",
@@ -5842,14 +4122,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:rank first candidate set"
+        "deduplication_key": "gap:materialize the first ranked candidate set from concrete high-consequence runtime targets"
       },
       {
         "backlog_id": "BL-GAP-VOL-200-002",
         "source_kind": "gap",
         "source_ref": "VOL-200:gap:002",
         "volume_ref": "VOL-200",
-        "statement": "establish conformance workflow",
+        "statement": "wire proof-to-test handoff validation into exact-head conformance CI",
         "accountability_id": "ACC-VOL-200",
         "requirement_refs": [
           "REQ:VOL-200:001",
@@ -5857,7 +4137,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:establish conformance workflow"
+        "deduplication_key": "gap:wire proof-to-test handoff validation into exact-head conformance CI"
       },
       {
         "backlog_id": "BL-GAP-VOL-201-001",
@@ -6157,7 +4437,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind to vs-003"
+        "deduplication_key": "gap:bind to VS-003"
       },
       {
         "backlog_id": "BL-GAP-VOL-211-001",
@@ -6427,7 +4707,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind audit to sota claims"
+        "deduplication_key": "gap:bind audit to SOTA claims"
       },
       {
         "backlog_id": "BL-GAP-VOL-220-001",
@@ -6464,7 +4744,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-221:gap:001",
         "volume_ref": "VOL-221",
-        "statement": "define card schema",
+        "statement": "independent exact-head model-card MBOM/evaluation generation validation remains pending",
         "accountability_id": "ACC-VOL-221",
         "requirement_refs": [
           "REQ:VOL-221:001",
@@ -6472,29 +4752,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define card schema"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-221-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-221:gap:002",
-        "volume_ref": "VOL-221",
-        "statement": "generate from MBOM/evals",
-        "accountability_id": "ACC-VOL-221",
-        "requirement_refs": [
-          "REQ:VOL-221:001",
-          "REQ:VOL-221:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:generate from mbom/evals"
+        "deduplication_key": "gap:independent exact-head model-card MBOM/evaluation generation validation remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-222-001",
         "source_kind": "gap",
         "source_ref": "VOL-222:gap:001",
         "volume_ref": "VOL-222",
-        "statement": "define card schema",
+        "statement": "independent exact-head dataset-card registry/lineage validation remains pending",
         "accountability_id": "ACC-VOL-222",
         "requirement_refs": [
           "REQ:VOL-222:001",
@@ -6502,29 +4767,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define card schema"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-222-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-222:gap:002",
-        "volume_ref": "VOL-222",
-        "statement": "generate from dataset registry",
-        "accountability_id": "ACC-VOL-222",
-        "requirement_refs": [
-          "REQ:VOL-222:001",
-          "REQ:VOL-222:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:generate from dataset registry"
+        "deduplication_key": "gap:independent exact-head dataset-card registry/lineage validation remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-223-001",
         "source_kind": "gap",
         "source_ref": "VOL-223:gap:001",
         "volume_ref": "VOL-223",
-        "statement": "generate from ToolDefinition",
+        "statement": "independent exact-head tool-card definition/security-review validation remains pending",
         "accountability_id": "ACC-VOL-223",
         "requirement_refs": [
           "REQ:VOL-223:001",
@@ -6532,29 +4782,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:generate from tooldefinition"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-223-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-223:gap:002",
-        "volume_ref": "VOL-223",
-        "statement": "bind security review",
-        "accountability_id": "ACC-VOL-223",
-        "requirement_refs": [
-          "REQ:VOL-223:001",
-          "REQ:VOL-223:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind security review"
+        "deduplication_key": "gap:independent exact-head tool-card definition/security-review validation remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-224-001",
         "source_kind": "gap",
         "source_ref": "VOL-224:gap:001",
         "volume_ref": "VOL-224",
-        "statement": "generate from agent registry",
+        "statement": "independent exact-head agent-card registry/performance/control validation remains pending",
         "accountability_id": "ACC-VOL-224",
         "requirement_refs": [
           "REQ:VOL-224:001",
@@ -6562,29 +4797,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:generate from agent registry"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-224-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-224:gap:002",
-        "volume_ref": "VOL-224",
-        "statement": "bind performance evidence",
-        "accountability_id": "ACC-VOL-224",
-        "requirement_refs": [
-          "REQ:VOL-224:001",
-          "REQ:VOL-224:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind performance evidence"
+        "deduplication_key": "gap:independent exact-head agent-card registry/performance/control validation remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-225-001",
         "source_kind": "gap",
         "source_ref": "VOL-225:gap:001",
         "volume_ref": "VOL-225",
-        "statement": "define dimensions",
+        "statement": "independent exact-head component-health evidence-source validation remains pending",
         "accountability_id": "ACC-VOL-225",
         "requirement_refs": [
           "REQ:VOL-225:001",
@@ -6592,29 +4812,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define dimensions"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-225-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-225:gap:002",
-        "volume_ref": "VOL-225",
-        "statement": "bind dashboard to evidence sources",
-        "accountability_id": "ACC-VOL-225",
-        "requirement_refs": [
-          "REQ:VOL-225:001",
-          "REQ:VOL-225:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind dashboard to evidence sources"
+        "deduplication_key": "gap:independent exact-head component-health evidence-source validation remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-226-001",
         "source_kind": "gap",
         "source_ref": "VOL-226:gap:001",
         "volume_ref": "VOL-226",
-        "statement": "connect SBOM to health",
+        "statement": "independent exact-head SBOM/dependency-backlog validation remains pending",
         "accountability_id": "ACC-VOL-226",
         "requirement_refs": [
           "REQ:VOL-226:001",
@@ -6622,29 +4827,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:connect sbom to health"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-226-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-226:gap:002",
-        "volume_ref": "VOL-226",
-        "statement": "bind findings to backlog",
-        "accountability_id": "ACC-VOL-226",
-        "requirement_refs": [
-          "REQ:VOL-226:001",
-          "REQ:VOL-226:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind findings to backlog"
+        "deduplication_key": "gap:independent exact-head SBOM/dependency-backlog validation remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-227-001",
         "source_kind": "gap",
         "source_ref": "VOL-227:gap:001",
         "volume_ref": "VOL-227",
-        "statement": "map provider dependencies",
+        "statement": "independent exact-head provider dependency/risk validation remains pending",
         "accountability_id": "ACC-VOL-227",
         "requirement_refs": [
           "REQ:VOL-227:001",
@@ -6652,29 +4842,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:map provider dependencies"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-227-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-227:gap:002",
-        "volume_ref": "VOL-227",
-        "statement": "bind to failover",
-        "accountability_id": "ACC-VOL-227",
-        "requirement_refs": [
-          "REQ:VOL-227:001",
-          "REQ:VOL-227:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind to failover"
+        "deduplication_key": "gap:independent exact-head provider dependency/risk validation remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-228-001",
         "source_kind": "gap",
         "source_ref": "VOL-228:gap:001",
         "volume_ref": "VOL-228",
-        "statement": "define compatibility classes",
+        "statement": "independent exact-head compatibility-safe provider failover validation remains pending",
         "accountability_id": "ACC-VOL-228",
         "requirement_refs": [
           "REQ:VOL-228:001",
@@ -6682,29 +4857,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define compatibility classes"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-228-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-228:gap:002",
-        "volume_ref": "VOL-228",
-        "statement": "bind health to router",
-        "accountability_id": "ACC-VOL-228",
-        "requirement_refs": [
-          "REQ:VOL-228:001",
-          "REQ:VOL-228:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind health to router"
+        "deduplication_key": "gap:independent exact-head compatibility-safe provider failover validation remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-229-001",
         "source_kind": "gap",
         "source_ref": "VOL-229:gap:001",
         "volume_ref": "VOL-229",
-        "statement": "define offline capability map",
+        "statement": "independent exact-head offline capability/model/storage validation remains pending",
         "accountability_id": "ACC-VOL-229",
         "requirement_refs": [
           "REQ:VOL-229:001",
@@ -6712,29 +4872,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define offline capability map"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-229-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-229:gap:002",
-        "volume_ref": "VOL-229",
-        "statement": "bind local model/storage",
-        "accountability_id": "ACC-VOL-229",
-        "requirement_refs": [
-          "REQ:VOL-229:001",
-          "REQ:VOL-229:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind local model/storage"
+        "deduplication_key": "gap:independent exact-head offline capability/model/storage validation remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-230-001",
         "source_kind": "gap",
         "source_ref": "VOL-230:gap:001",
         "volume_ref": "VOL-230",
-        "statement": "define package trust workflow",
+        "statement": "independent exact-head air-gap package trust/install validation remains pending",
         "accountability_id": "ACC-VOL-230",
         "requirement_refs": [
           "REQ:VOL-230:001",
@@ -6742,29 +4887,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define package trust workflow"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-230-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-230:gap:002",
-        "volume_ref": "VOL-230",
-        "statement": "materialize air-gap install test",
-        "accountability_id": "ACC-VOL-230",
-        "requirement_refs": [
-          "REQ:VOL-230:001",
-          "REQ:VOL-230:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:materialize air-gap install test"
+        "deduplication_key": "gap:independent exact-head air-gap package trust/install validation remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-231-001",
         "source_kind": "gap",
         "source_ref": "VOL-231:gap:001",
         "volume_ref": "VOL-231",
-        "statement": "define edge resource tiers",
+        "statement": "independent exact-head edge resource-tier/router validation remains pending",
         "accountability_id": "ACC-VOL-231",
         "requirement_refs": [
           "REQ:VOL-231:001",
@@ -6772,29 +4902,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define edge resource tiers"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-231-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-231:gap:002",
-        "volume_ref": "VOL-231",
-        "statement": "bind model/router constraints",
-        "accountability_id": "ACC-VOL-231",
-        "requirement_refs": [
-          "REQ:VOL-231:001",
-          "REQ:VOL-231:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind model/router constraints"
+        "deduplication_key": "gap:independent exact-head edge resource-tier/router validation remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-232-001",
         "source_kind": "gap",
         "source_ref": "VOL-232:gap:001",
         "volume_ref": "VOL-232",
-        "statement": "define reference topologies",
+        "statement": "independent exact-head enterprise topology/security acceptance validation remains pending",
         "accountability_id": "ACC-VOL-232",
         "requirement_refs": [
           "REQ:VOL-232:001",
@@ -6802,29 +4917,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define reference topologies"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-232-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-232:gap:002",
-        "volume_ref": "VOL-232",
-        "statement": "bind enterprise acceptance",
-        "accountability_id": "ACC-VOL-232",
-        "requirement_refs": [
-          "REQ:VOL-232:001",
-          "REQ:VOL-232:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind enterprise acceptance"
+        "deduplication_key": "gap:independent exact-head enterprise topology/security acceptance validation remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-233-001",
         "source_kind": "gap",
         "source_ref": "VOL-233:gap:001",
         "volume_ref": "VOL-233",
-        "statement": "define principal mapping",
+        "statement": "independent exact-head federated principal/session/revocation validation remains pending",
         "accountability_id": "ACC-VOL-233",
         "requirement_refs": [
           "REQ:VOL-233:001",
@@ -6832,29 +4932,14 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define principal mapping"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-233-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-233:gap:002",
-        "volume_ref": "VOL-233",
-        "statement": "bind revocation/sessions",
-        "accountability_id": "ACC-VOL-233",
-        "requirement_refs": [
-          "REQ:VOL-233:001",
-          "REQ:VOL-233:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind revocation/sessions"
+        "deduplication_key": "gap:independent exact-head federated principal/session/revocation validation remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-234-001",
         "source_kind": "gap",
         "source_ref": "VOL-234:gap:001",
         "volume_ref": "VOL-234",
-        "statement": "define admin capability scopes",
+        "statement": "independent exact-head admin scope/approval/break-glass validation remains pending",
         "accountability_id": "ACC-VOL-234",
         "requirement_refs": [
           "REQ:VOL-234:001",
@@ -6862,22 +4947,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define admin capability scopes"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-234-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-234:gap:002",
-        "volume_ref": "VOL-234",
-        "statement": "bind break-glass/approval",
-        "accountability_id": "ACC-VOL-234",
-        "requirement_refs": [
-          "REQ:VOL-234:001",
-          "REQ:VOL-234:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind break-glass/approval"
+        "deduplication_key": "gap:independent exact-head admin scope/approval/break-glass validation remains pending"
       },
       {
         "backlog_id": "BL-GAP-VOL-235-001",
@@ -6892,7 +4962,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define audit api contract"
+        "deduplication_key": "gap:define audit API contract"
       },
       {
         "backlog_id": "BL-GAP-VOL-235-002",
@@ -7702,7 +5772,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:evolve ai-tree cutover contract"
+        "deduplication_key": "gap:evolve AI-tree cutover contract"
       },
       {
         "backlog_id": "BL-GAP-VOL-264-002",
@@ -7807,7 +5877,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind codeowners"
+        "deduplication_key": "gap:bind CODEOWNERS"
       },
       {
         "backlog_id": "BL-GAP-VOL-268-001",
@@ -7852,7 +5922,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:expand doc ci"
+        "deduplication_key": "gap:expand doc CI"
       },
       {
         "backlog_id": "BL-GAP-VOL-269-002",
@@ -8242,7 +6312,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define diagnostic api"
+        "deduplication_key": "gap:define diagnostic API"
       },
       {
         "backlog_id": "BL-GAP-VOL-282-002",
@@ -8467,7 +6537,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind capacity/slos"
+        "deduplication_key": "gap:bind capacity/SLOs"
       },
       {
         "backlog_id": "BL-GAP-VOL-290-001",
@@ -8602,7 +6672,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define dlq schema"
+        "deduplication_key": "gap:define DLQ schema"
       },
       {
         "backlog_id": "BL-GAP-VOL-294-002",
@@ -8617,7 +6687,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind operator ui/runbook"
+        "deduplication_key": "gap:bind operator UI/runbook"
       },
       {
         "backlog_id": "BL-GAP-VOL-295-001",
@@ -8722,7 +6792,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:inventory id formats"
+        "deduplication_key": "gap:inventory ID formats"
       },
       {
         "backlog_id": "BL-GAP-VOL-298-002",
@@ -8947,7 +7017,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind adr/runtime decisions"
+        "deduplication_key": "gap:bind ADR/runtime decisions"
       },
       {
         "backlog_id": "BL-GAP-VOL-306-001",
@@ -8962,7 +7032,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define ir schema"
+        "deduplication_key": "gap:define IR schema"
       },
       {
         "backlog_id": "BL-GAP-VOL-306-002",
@@ -8977,7 +7047,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind dsl/compiler"
+        "deduplication_key": "gap:bind DSL/compiler"
       },
       {
         "backlog_id": "BL-GAP-VOL-307-001",
@@ -9532,7 +7602,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind action receipts to plan dag"
+        "deduplication_key": "gap:bind action receipts to plan DAG"
       },
       {
         "backlog_id": "BL-GAP-VOL-325-002",
@@ -9622,7 +7692,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define trust ui patterns"
+        "deduplication_key": "gap:define trust UI patterns"
       },
       {
         "backlog_id": "BL-GAP-VOL-328-002",
@@ -9877,7 +7947,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind changeset budget/ci"
+        "deduplication_key": "gap:bind changeset budget/CI"
       },
       {
         "backlog_id": "BL-GAP-VOL-337-001",
@@ -10012,7 +8082,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define source api schema"
+        "deduplication_key": "gap:define source API schema"
       },
       {
         "backlog_id": "BL-GAP-VOL-341-002",
@@ -10027,7 +8097,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:publish sdk artifacts"
+        "deduplication_key": "gap:publish SDK artifacts"
       },
       {
         "backlog_id": "BL-GAP-VOL-342-001",
@@ -10162,7 +8232,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define sdk contracts"
+        "deduplication_key": "gap:define SDK contracts"
       },
       {
         "backlog_id": "BL-GAP-VOL-346-002",
@@ -10657,7 +8727,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind implemented quality scoring to governed promotion, contradiction resolution and gc decisions"
+        "deduplication_key": "gap:bind implemented quality scoring to governed promotion, contradiction resolution and GC decisions"
       },
       {
         "backlog_id": "BL-GAP-VOL-363-001",
@@ -10702,7 +8772,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind immutable revision history into memory api/export and operator rollback workflows"
+        "deduplication_key": "gap:bind immutable revision history into memory API/export and operator rollback workflows"
       },
       {
         "backlog_id": "BL-GAP-VOL-364-002",
@@ -10822,7 +8892,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define stage ids"
+        "deduplication_key": "gap:define stage IDs"
       },
       {
         "backlog_id": "BL-GAP-VOL-368-002",
@@ -10972,7 +9042,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:define composition ir"
+        "deduplication_key": "gap:define composition IR"
       },
       {
         "backlog_id": "BL-GAP-VOL-373-002",
@@ -10987,7 +9057,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind tool sdk/workflows"
+        "deduplication_key": "gap:bind tool SDK/workflows"
       },
       {
         "backlog_id": "BL-GAP-VOL-374-001",
@@ -11077,7 +9147,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind tool sdk"
+        "deduplication_key": "gap:bind tool SDK"
       },
       {
         "backlog_id": "BL-GAP-VOL-377-001",
@@ -11287,7 +9357,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind model/kv caches"
+        "deduplication_key": "gap:bind model/KV caches"
       },
       {
         "backlog_id": "BL-GAP-VOL-384-001",
@@ -11407,7 +9477,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind gpu memory manager"
+        "deduplication_key": "gap:bind GPU memory manager"
       },
       {
         "backlog_id": "BL-GAP-VOL-388-001",
@@ -11572,7 +9642,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:implement linux-aware adapter"
+        "deduplication_key": "gap:implement Linux-aware adapter"
       },
       {
         "backlog_id": "BL-GAP-VOL-393-002",
@@ -11647,7 +9717,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind cas/model/data registries"
+        "deduplication_key": "gap:bind CAS/model/data registries"
       },
       {
         "backlog_id": "BL-GAP-VOL-396-001",
@@ -11812,7 +9882,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind evaluation sdk"
+        "deduplication_key": "gap:bind Evaluation SDK"
       },
       {
         "backlog_id": "BL-GAP-VOL-401-002",
@@ -11992,7 +10062,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind sbom/mbom/datasets"
+        "deduplication_key": "gap:bind SBOM/MBOM/datasets"
       },
       {
         "backlog_id": "BL-GAP-VOL-407-002",
@@ -12013,21 +10083,6 @@
         "backlog_id": "BL-GAP-VOL-408-001",
         "source_kind": "gap",
         "source_ref": "VOL-408:gap:001",
-        "volume_ref": "VOL-408",
-        "statement": "define rights schema",
-        "accountability_id": "ACC-VOL-408",
-        "requirement_refs": [
-          "REQ:VOL-408:001",
-          "REQ:VOL-408:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define rights schema"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-408-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-408:gap:002",
         "volume_ref": "VOL-408",
         "statement": "bind lineage/training/exports",
         "accountability_id": "ACC-VOL-408",
@@ -12104,21 +10159,6 @@
         "source_kind": "gap",
         "source_ref": "VOL-411:gap:001",
         "volume_ref": "VOL-411",
-        "statement": "define lifecycle state machine",
-        "accountability_id": "ACC-VOL-411",
-        "requirement_refs": [
-          "REQ:VOL-411:001",
-          "REQ:VOL-411:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define lifecycle state machine"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-411-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-411:gap:002",
-        "volume_ref": "VOL-411",
         "statement": "bind model ops/MBOM",
         "accountability_id": "ACC-VOL-411",
         "requirement_refs": [
@@ -12127,7 +10167,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind model ops/mbom"
+        "deduplication_key": "gap:bind model ops/MBOM"
       },
       {
         "backlog_id": "BL-GAP-VOL-412-001",
@@ -12163,21 +10203,6 @@
         "backlog_id": "BL-GAP-VOL-413-001",
         "source_kind": "gap",
         "source_ref": "VOL-413:gap:001",
-        "volume_ref": "VOL-413",
-        "statement": "define parity matrix",
-        "accountability_id": "ACC-VOL-413",
-        "requirement_refs": [
-          "REQ:VOL-413:001",
-          "REQ:VOL-413:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define parity matrix"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-413-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-413:gap:002",
         "volume_ref": "VOL-413",
         "statement": "bind shadow traffic",
         "accountability_id": "ACC-VOL-413",
@@ -12253,21 +10278,6 @@
         "backlog_id": "BL-GAP-VOL-416-001",
         "source_kind": "gap",
         "source_ref": "VOL-416:gap:001",
-        "volume_ref": "VOL-416",
-        "statement": "define sandbox lifecycle",
-        "accountability_id": "ACC-VOL-416",
-        "requirement_refs": [
-          "REQ:VOL-416:001",
-          "REQ:VOL-416:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define sandbox lifecycle"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-416-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-416:gap:002",
         "volume_ref": "VOL-416",
         "statement": "bind feature flags/technology radar",
         "accountability_id": "ACC-VOL-416",
@@ -12751,7 +10761,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:kv/prefix cache semantic corruption"
+        "deduplication_key": "risk:KV/prefix cache semantic corruption"
       },
       {
         "backlog_id": "BL-RISK-VOL-007-003",
@@ -13727,7 +11737,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:toctou"
+        "deduplication_key": "risk:TOCTOU"
       },
       {
         "backlog_id": "BL-RISK-VOL-026-002",
@@ -13743,7 +11753,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:ssrf/dns rebinding"
+        "deduplication_key": "risk:SSRF/DNS rebinding"
       },
       {
         "backlog_id": "BL-RISK-VOL-026-003",
@@ -14031,7 +12041,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:aba/stale lease"
+        "deduplication_key": "risk:ABA/stale lease"
       },
       {
         "backlog_id": "BL-RISK-VOL-030-004",
@@ -14063,7 +12073,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:vram fragmentation"
+        "deduplication_key": "risk:VRAM fragmentation"
       },
       {
         "backlog_id": "BL-RISK-VOL-031-002",
@@ -14095,7 +12105,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:numa/interconnect penalties"
+        "deduplication_key": "risk:NUMA/interconnect penalties"
       },
       {
         "backlog_id": "BL-RISK-VOL-031-004",
@@ -14143,7 +12153,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:abi drift"
+        "deduplication_key": "risk:ABI drift"
       },
       {
         "backlog_id": "BL-RISK-VOL-032-003",
@@ -14207,7 +12217,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:gc pauses"
+        "deduplication_key": "risk:GC pauses"
       },
       {
         "backlog_id": "BL-RISK-VOL-033-003",
@@ -14655,7 +12665,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:ui-specific fields leak into core contracts"
+        "deduplication_key": "risk:UI-specific fields leak into core contracts"
       },
       {
         "backlog_id": "BL-RISK-VOL-042-001",
@@ -14671,7 +12681,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:ui becomes authoritative"
+        "deduplication_key": "risk:UI becomes authoritative"
       },
       {
         "backlog_id": "BL-RISK-VOL-042-002",
@@ -15455,7 +13465,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:stale adr authority"
+        "deduplication_key": "risk:stale ADR authority"
       },
       {
         "backlog_id": "BL-RISK-VOL-058-003",
@@ -15807,7 +13817,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:rpo/rto unproven"
+        "deduplication_key": "risk:RPO/RTO unproven"
       },
       {
         "backlog_id": "BL-RISK-VOL-066-001",
@@ -16111,7 +14121,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:parallel jeeves authority"
+        "deduplication_key": "risk:parallel Jeeves authority"
       },
       {
         "backlog_id": "BL-RISK-VOL-072-002",
@@ -18287,7 +16297,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:goodhart effects"
+        "deduplication_key": "risk:Goodhart effects"
       },
       {
         "backlog_id": "BL-RISK-VOL-117-003",
@@ -19242,7 +17252,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:silent nan propagation"
+        "deduplication_key": "risk:silent NaN propagation"
       },
       {
         "backlog_id": "BL-RISK-VOL-147-002",
@@ -19482,7 +17492,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:ocr hallucination"
+        "deduplication_key": "risk:OCR hallucination"
       },
       {
         "backlog_id": "BL-RISK-VOL-155-002",
@@ -19587,7 +17597,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:a/v timestamp drift"
+        "deduplication_key": "risk:A/V timestamp drift"
       },
       {
         "backlog_id": "BL-RISK-VOL-159-001",
@@ -19992,7 +18002,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:ssrf"
+        "deduplication_key": "risk:SSRF"
       },
       {
         "backlog_id": "BL-RISK-VOL-172-002",
@@ -20232,7 +18242,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:misleading sli"
+        "deduplication_key": "risk:misleading SLI"
       },
       {
         "backlog_id": "BL-RISK-VOL-180-002",
@@ -20307,7 +18317,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:pii in labels"
+        "deduplication_key": "risk:PII in labels"
       },
       {
         "backlog_id": "BL-RISK-VOL-183-001",
@@ -20667,7 +18677,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:tooling drifts from ci"
+        "deduplication_key": "risk:tooling drifts from CI"
       },
       {
         "backlog_id": "BL-RISK-VOL-195-001",
@@ -20937,7 +18947,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:goodhart behavior"
+        "deduplication_key": "risk:Goodhart behavior"
       },
       {
         "backlog_id": "BL-RISK-VOL-204-001",
@@ -21852,7 +19862,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:admin csrf/confused deputy"
+        "deduplication_key": "risk:admin CSRF/confused deputy"
       },
       {
         "backlog_id": "BL-RISK-VOL-234-002",
@@ -21942,7 +19952,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:ui authority bypass"
+        "deduplication_key": "risk:UI authority bypass"
       },
       {
         "backlog_id": "BL-RISK-VOL-237-002",
@@ -22047,7 +20057,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:stale kv/cache semantics"
+        "deduplication_key": "risk:stale KV/cache semantics"
       },
       {
         "backlog_id": "BL-RISK-VOL-241-001",
@@ -22407,7 +20417,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:voi bypasses policy"
+        "deduplication_key": "risk:VOI bypasses policy"
       },
       {
         "backlog_id": "BL-RISK-VOL-253-001",
@@ -23232,7 +21242,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:pii/secret leakage"
+        "deduplication_key": "risk:PII/secret leakage"
       },
       {
         "backlog_id": "BL-RISK-VOL-280-002",
@@ -23772,7 +21782,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:id collision"
+        "deduplication_key": "risk:ID collision"
       },
       {
         "backlog_id": "BL-RISK-VOL-298-002",
@@ -23787,7 +21797,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:case/unicode ambiguity"
+        "deduplication_key": "risk:case/Unicode ambiguity"
       },
       {
         "backlog_id": "BL-RISK-VOL-299-001",
@@ -24027,7 +22037,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:invalid dag"
+        "deduplication_key": "risk:invalid DAG"
       },
       {
         "backlog_id": "BL-RISK-VOL-307-001",
@@ -24612,7 +22622,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:confusing critical ui"
+        "deduplication_key": "risk:confusing critical UI"
       },
       {
         "backlog_id": "BL-RISK-VOL-326-002",
@@ -24927,7 +22937,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:overbroad impact slows ci"
+        "deduplication_key": "risk:overbroad impact slows CI"
       },
       {
         "backlog_id": "BL-RISK-VOL-337-001",
@@ -25092,7 +23102,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:sdk becomes god api"
+        "deduplication_key": "risk:SDK becomes god API"
       },
       {
         "backlog_id": "BL-RISK-VOL-342-002",
@@ -25317,7 +23327,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:sli sampled incorrectly"
+        "deduplication_key": "risk:SLI sampled incorrectly"
       },
       {
         "backlog_id": "BL-RISK-VOL-350-001",
@@ -26082,7 +24092,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:200-ok but wrong result"
+        "deduplication_key": "risk:200-OK but wrong result"
       },
       {
         "backlog_id": "BL-RISK-VOL-375-002",
@@ -26292,7 +24302,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:oom placement"
+        "deduplication_key": "risk:OOM placement"
       },
       {
         "backlog_id": "BL-RISK-VOL-382-002",
@@ -26322,7 +24332,7 @@
         ],
         "state": "open",
         "closure_evidence_refs": [],
-        "deduplication_key": "risk:gpu oom"
+        "deduplication_key": "risk:GPU OOM"
       },
       {
         "backlog_id": "BL-RISK-VOL-383-002",
@@ -27520,7 +25530,9 @@
     "summary": {
       "count": 31,
       "requirement_count": 940,
-      "aiq_binding_count": 144
+      "aiq_binding_count": 144,
+      "work_package_count": 31,
+      "package_requirement_count": 940
     },
     "items": [
       {
@@ -34988,56 +33000,69 @@
     ],
     "tasks": [
       {
-        "task_id": "AIQ-S0-COST-01",
+        "task_id": "AIQ-S0-STATE-01",
         "status": "done",
         "stage": 0,
         "task_dependencies": [],
         "closure_dependencies": [],
         "work_package_refs": [
-          "WP-W06",
-          "WP-W11"
+          "WP-W03",
+          "WP-W04"
         ],
-        "accountability_id": "ACC-AIQ-S0-COST-01",
+        "accountability_id": "ACC-AIQ-S0-STATE-01",
         "target_paths": [
-          "skeleton/intelligence/quota.py",
-          "skeleton/intelligence/admission_runtime.py"
+          "backend/services/rag_service.py",
+          "backend/services/database.py",
+          "machine/state_topology.json",
+          "backend/services/rag_state_repository.py",
+          "backend/tests/test_rag_state_repository.py",
+          "backend/tests/test_rag_state_authority.py",
+          "machine/ai_app_construction.json",
+          "docs/AI_APP_CONSTRUCTION_MANUAL.md",
+          ".github/workflows/app-assembly.yml",
+          "scripts/quality-gates.sh"
         ]
       },
       {
-        "task_id": "AIQ-S0-COST-02",
+        "task_id": "AIQ-S0-STATE-02",
         "status": "done",
         "stage": 0,
         "task_dependencies": [
-          "AIQ-S0-COST-01"
+          "AIQ-S0-STATE-01"
         ],
         "closure_dependencies": [],
         "work_package_refs": [
-          "WP-W06",
-          "WP-W11"
+          "WP-W03",
+          "WP-W04"
         ],
-        "accountability_id": "ACC-AIQ-S0-COST-02",
+        "accountability_id": "ACC-AIQ-S0-STATE-02",
         "target_paths": [
-          "skeleton/intelligence/admission.py",
-          "skeleton/skills",
-          "skeleton/artifact_plane"
+          "skeleton/contracts/operation.py",
+          "skeleton/frontier/operation_stream_store.py",
+          "skeleton/persistence"
         ]
       },
       {
-        "task_id": "AIQ-S0-COST-03",
+        "task_id": "AIQ-S0-STATE-03",
         "status": "done",
         "stage": 0,
         "task_dependencies": [
-          "AIQ-S0-COST-01"
+          "AIQ-S0-STATE-02"
         ],
         "closure_dependencies": [],
         "work_package_refs": [
-          "WP-W06",
-          "WP-W11"
+          "WP-W03",
+          "WP-W04"
         ],
-        "accountability_id": "ACC-AIQ-S0-COST-03",
+        "accountability_id": "ACC-AIQ-S0-STATE-03",
         "target_paths": [
-          "skeleton/intelligence/capacity_planner.py",
-          "skeleton/agents"
+          "machine/state_topology.json",
+          "docker-compose.yml",
+          "scripts/state_recovery_drill.py",
+          "skeleton/testing/test_state_recovery_drill.py",
+          ".github/workflows/state-recovery-drill.yml",
+          "docs/runbooks/STATE_RECOVERY.md",
+          "docs/AI_APP_CONSTRUCTION_MANUAL.md"
         ]
       },
       {
@@ -35104,6 +33129,59 @@
         ]
       },
       {
+        "task_id": "AIQ-S0-COST-01",
+        "status": "done",
+        "stage": 0,
+        "task_dependencies": [],
+        "closure_dependencies": [],
+        "work_package_refs": [
+          "WP-W06",
+          "WP-W11"
+        ],
+        "accountability_id": "ACC-AIQ-S0-COST-01",
+        "target_paths": [
+          "skeleton/intelligence/quota.py",
+          "skeleton/intelligence/admission_runtime.py"
+        ]
+      },
+      {
+        "task_id": "AIQ-S0-COST-02",
+        "status": "done",
+        "stage": 0,
+        "task_dependencies": [
+          "AIQ-S0-COST-01"
+        ],
+        "closure_dependencies": [],
+        "work_package_refs": [
+          "WP-W06",
+          "WP-W11"
+        ],
+        "accountability_id": "ACC-AIQ-S0-COST-02",
+        "target_paths": [
+          "skeleton/intelligence/admission.py",
+          "skeleton/skills",
+          "skeleton/artifact_plane"
+        ]
+      },
+      {
+        "task_id": "AIQ-S0-COST-03",
+        "status": "done",
+        "stage": 0,
+        "task_dependencies": [
+          "AIQ-S0-COST-01"
+        ],
+        "closure_dependencies": [],
+        "work_package_refs": [
+          "WP-W06",
+          "WP-W11"
+        ],
+        "accountability_id": "ACC-AIQ-S0-COST-03",
+        "target_paths": [
+          "skeleton/intelligence/capacity_planner.py",
+          "skeleton/agents"
+        ]
+      },
+      {
         "task_id": "AIQ-S0-PROV-01",
         "status": "done",
         "stage": 0,
@@ -35155,72 +33233,6 @@
         "accountability_id": "ACC-AIQ-S0-PROV-03",
         "target_paths": [
           "scripts/check_provider_bootstrap.py"
-        ]
-      },
-      {
-        "task_id": "AIQ-S0-STATE-01",
-        "status": "done",
-        "stage": 0,
-        "task_dependencies": [],
-        "closure_dependencies": [],
-        "work_package_refs": [
-          "WP-W03",
-          "WP-W04"
-        ],
-        "accountability_id": "ACC-AIQ-S0-STATE-01",
-        "target_paths": [
-          "backend/services/rag_service.py",
-          "backend/services/database.py",
-          "machine/state_topology.json",
-          "backend/services/rag_state_repository.py",
-          "backend/tests/test_rag_state_repository.py",
-          "backend/tests/test_rag_state_authority.py",
-          "machine/ai_app_construction.json",
-          "docs/AI_APP_CONSTRUCTION_MANUAL.md",
-          ".github/workflows/app-assembly.yml",
-          "scripts/quality-gates.sh"
-        ]
-      },
-      {
-        "task_id": "AIQ-S0-STATE-02",
-        "status": "done",
-        "stage": 0,
-        "task_dependencies": [
-          "AIQ-S0-STATE-01"
-        ],
-        "closure_dependencies": [],
-        "work_package_refs": [
-          "WP-W03",
-          "WP-W04"
-        ],
-        "accountability_id": "ACC-AIQ-S0-STATE-02",
-        "target_paths": [
-          "skeleton/contracts/operation.py",
-          "skeleton/frontier/operation_stream_store.py",
-          "skeleton/persistence"
-        ]
-      },
-      {
-        "task_id": "AIQ-S0-STATE-03",
-        "status": "done",
-        "stage": 0,
-        "task_dependencies": [
-          "AIQ-S0-STATE-02"
-        ],
-        "closure_dependencies": [],
-        "work_package_refs": [
-          "WP-W03",
-          "WP-W04"
-        ],
-        "accountability_id": "ACC-AIQ-S0-STATE-03",
-        "target_paths": [
-          "machine/state_topology.json",
-          "docker-compose.yml",
-          "scripts/state_recovery_drill.py",
-          "skeleton/testing/test_state_recovery_drill.py",
-          ".github/workflows/state-recovery-drill.yml",
-          "docs/runbooks/STATE_RECOVERY.md",
-          "docs/AI_APP_CONSTRUCTION_MANUAL.md"
         ]
       },
       {
