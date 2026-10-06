@@ -9,6 +9,8 @@ Independent verification signed: false
 ## Plane objective
 Convert Gameplay Scripting Narrative Quests and NPC AI from an architectural intention into a buildable, testable, replayable contract surface for the integrated LLM/game-builder product.
 
+**Plane provenance.** Every accepted artifact and state transition binds exact source revision, schema, engine/model identity, runtime configuration, dependency identity and evidence lineage so the result can be reconstructed and independently audited.
+
 ## FLGB-13-00001 — gameplay ability / contract / unit proof
 **Capability target.** gameplay ability must survive the contract lifecycle during cold start while maintaining explicit identities, schemas, deterministic transaction boundaries, cancellation semantics, version compatibility and reproducible evidence.
 
