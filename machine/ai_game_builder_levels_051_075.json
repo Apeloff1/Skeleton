@@ -41,11 +41,6 @@
         1000,
         10000
       ],
-      "round_cycle": [
-        "construct",
-        "attack_and_improve",
-        "reconcile_and_promote"
-      ],
       "gates": [
         "known rights/provenance for incorporated material",
         "no unresolved high similarity risk",
@@ -66,7 +61,12 @@
         "gap ledger"
       ],
       "status": "planned",
-      "signed": false
+      "signed": false,
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ]
     },
     {
       "id": "GBL-052",
@@ -104,11 +104,6 @@
         1000,
         10000
       ],
-      "round_cycle": [
-        "construct",
-        "attack_and_improve",
-        "reconcile_and_promote"
-      ],
       "gates": [
         "known rights/provenance for incorporated material",
         "no unresolved high similarity risk",
@@ -129,7 +124,12 @@
         "gap ledger"
       ],
       "status": "planned",
-      "signed": false
+      "signed": false,
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ]
     },
     {
       "id": "GBL-053",
@@ -167,11 +167,6 @@
         1000,
         10000
       ],
-      "round_cycle": [
-        "construct",
-        "attack_and_improve",
-        "reconcile_and_promote"
-      ],
       "gates": [
         "known rights/provenance for incorporated material",
         "no unresolved high similarity risk",
@@ -192,7 +187,12 @@
         "gap ledger"
       ],
       "status": "planned",
-      "signed": false
+      "signed": false,
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ]
     },
     {
       "id": "GBL-054",
@@ -230,11 +230,6 @@
         1000,
         10000
       ],
-      "round_cycle": [
-        "construct",
-        "attack_and_improve",
-        "reconcile_and_promote"
-      ],
       "gates": [
         "known rights/provenance for incorporated material",
         "no unresolved high similarity risk",
@@ -255,7 +250,12 @@
         "gap ledger"
       ],
       "status": "planned",
-      "signed": false
+      "signed": false,
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ]
     },
     {
       "id": "GBL-055",
@@ -293,11 +293,6 @@
         1000,
         10000
       ],
-      "round_cycle": [
-        "construct",
-        "attack_and_improve",
-        "reconcile_and_promote"
-      ],
       "gates": [
         "known rights/provenance for incorporated material",
         "no unresolved high similarity risk",
@@ -318,7 +313,12 @@
         "gap ledger"
       ],
       "status": "planned",
-      "signed": false
+      "signed": false,
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ]
     },
     {
       "id": "GBL-056",
@@ -356,11 +356,6 @@
         1000,
         10000
       ],
-      "round_cycle": [
-        "construct",
-        "attack_and_improve",
-        "reconcile_and_promote"
-      ],
       "gates": [
         "known rights/provenance for incorporated material",
         "no unresolved high similarity risk",
@@ -381,7 +376,12 @@
         "gap ledger"
       ],
       "status": "planned",
-      "signed": false
+      "signed": false,
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ]
     },
     {
       "id": "GBL-057",
@@ -419,11 +419,6 @@
         1000,
         10000
       ],
-      "round_cycle": [
-        "construct",
-        "attack_and_improve",
-        "reconcile_and_promote"
-      ],
       "gates": [
         "known rights/provenance for incorporated material",
         "no unresolved high similarity risk",
@@ -444,7 +439,12 @@
         "gap ledger"
       ],
       "status": "planned",
-      "signed": false
+      "signed": false,
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ]
     },
     {
       "id": "GBL-058",
@@ -482,11 +482,6 @@
         1000,
         10000
       ],
-      "round_cycle": [
-        "construct",
-        "attack_and_improve",
-        "reconcile_and_promote"
-      ],
       "gates": [
         "known rights/provenance for incorporated material",
         "no unresolved high similarity risk",
@@ -507,7 +502,12 @@
         "gap ledger"
       ],
       "status": "planned",
-      "signed": false
+      "signed": false,
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ]
     },
     {
       "id": "GBL-059",
@@ -545,11 +545,6 @@
         1000,
         10000
       ],
-      "round_cycle": [
-        "construct",
-        "attack_and_improve",
-        "reconcile_and_promote"
-      ],
       "gates": [
         "known rights/provenance for incorporated material",
         "no unresolved high similarity risk",
@@ -570,7 +565,12 @@
         "gap ledger"
       ],
       "status": "planned",
-      "signed": false
+      "signed": false,
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ]
     },
     {
       "id": "GBL-060",
@@ -608,11 +608,6 @@
         1000,
         10000
       ],
-      "round_cycle": [
-        "construct",
-        "attack_and_improve",
-        "reconcile_and_promote"
-      ],
       "gates": [
         "known rights/provenance for incorporated material",
         "no unresolved high similarity risk",
@@ -633,7 +628,12 @@
         "independent promotion verdict"
       ],
       "status": "planned",
-      "signed": false
+      "signed": false,
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ]
     },
     {
       "id": "GBL-061",
@@ -672,11 +672,6 @@
         1000,
         10000
       ],
-      "round_cycle": [
-        "construct",
-        "attack_and_improve",
-        "reconcile_and_promote"
-      ],
       "gates": [
         "known rights/provenance for incorporated material",
         "no unresolved high similarity risk",
@@ -697,7 +692,12 @@
         "gap ledger"
       ],
       "status": "planned",
-      "signed": false
+      "signed": false,
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ]
     },
     {
       "id": "GBL-062",
@@ -736,11 +736,6 @@
         1000,
         10000
       ],
-      "round_cycle": [
-        "construct",
-        "attack_and_improve",
-        "reconcile_and_promote"
-      ],
       "gates": [
         "known rights/provenance for incorporated material",
         "no unresolved high similarity risk",
@@ -761,7 +756,12 @@
         "gap ledger"
       ],
       "status": "planned",
-      "signed": false
+      "signed": false,
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ]
     },
     {
       "id": "GBL-063",
@@ -800,11 +800,6 @@
         1000,
         10000
       ],
-      "round_cycle": [
-        "construct",
-        "attack_and_improve",
-        "reconcile_and_promote"
-      ],
       "gates": [
         "known rights/provenance for incorporated material",
         "no unresolved high similarity risk",
@@ -825,7 +820,12 @@
         "gap ledger"
       ],
       "status": "planned",
-      "signed": false
+      "signed": false,
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ]
     },
     {
       "id": "GBL-064",
@@ -864,11 +864,6 @@
         1000,
         10000
       ],
-      "round_cycle": [
-        "construct",
-        "attack_and_improve",
-        "reconcile_and_promote"
-      ],
       "gates": [
         "known rights/provenance for incorporated material",
         "no unresolved high similarity risk",
@@ -889,7 +884,12 @@
         "gap ledger"
       ],
       "status": "planned",
-      "signed": false
+      "signed": false,
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ]
     },
     {
       "id": "GBL-065",
@@ -928,11 +928,6 @@
         1000,
         10000
       ],
-      "round_cycle": [
-        "construct",
-        "attack_and_improve",
-        "reconcile_and_promote"
-      ],
       "gates": [
         "known rights/provenance for incorporated material",
         "no unresolved high similarity risk",
@@ -953,7 +948,12 @@
         "gap ledger"
       ],
       "status": "planned",
-      "signed": false
+      "signed": false,
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ]
     },
     {
       "id": "GBL-066",
@@ -992,11 +992,6 @@
         1000,
         10000
       ],
-      "round_cycle": [
-        "construct",
-        "attack_and_improve",
-        "reconcile_and_promote"
-      ],
       "gates": [
         "known rights/provenance for incorporated material",
         "no unresolved high similarity risk",
@@ -1017,7 +1012,12 @@
         "gap ledger"
       ],
       "status": "planned",
-      "signed": false
+      "signed": false,
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ]
     },
     {
       "id": "GBL-067",
@@ -1056,11 +1056,6 @@
         1000,
         10000
       ],
-      "round_cycle": [
-        "construct",
-        "attack_and_improve",
-        "reconcile_and_promote"
-      ],
       "gates": [
         "known rights/provenance for incorporated material",
         "no unresolved high similarity risk",
@@ -1081,7 +1076,12 @@
         "gap ledger"
       ],
       "status": "planned",
-      "signed": false
+      "signed": false,
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ]
     },
     {
       "id": "GBL-068",
@@ -1120,11 +1120,6 @@
         1000,
         10000
       ],
-      "round_cycle": [
-        "construct",
-        "attack_and_improve",
-        "reconcile_and_promote"
-      ],
       "gates": [
         "known rights/provenance for incorporated material",
         "no unresolved high similarity risk",
@@ -1145,7 +1140,12 @@
         "gap ledger"
       ],
       "status": "planned",
-      "signed": false
+      "signed": false,
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ]
     },
     {
       "id": "GBL-069",
@@ -1184,11 +1184,6 @@
         1000,
         10000
       ],
-      "round_cycle": [
-        "construct",
-        "attack_and_improve",
-        "reconcile_and_promote"
-      ],
       "gates": [
         "known rights/provenance for incorporated material",
         "no unresolved high similarity risk",
@@ -1209,7 +1204,12 @@
         "gap ledger"
       ],
       "status": "planned",
-      "signed": false
+      "signed": false,
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ]
     },
     {
       "id": "GBL-070",
@@ -1248,11 +1248,6 @@
         1000,
         10000
       ],
-      "round_cycle": [
-        "construct",
-        "attack_and_improve",
-        "reconcile_and_promote"
-      ],
       "gates": [
         "known rights/provenance for incorporated material",
         "no unresolved high similarity risk",
@@ -1273,7 +1268,12 @@
         "independent promotion verdict"
       ],
       "status": "planned",
-      "signed": false
+      "signed": false,
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ]
     },
     {
       "id": "GBL-071",
@@ -1311,11 +1311,6 @@
         1000,
         10000
       ],
-      "round_cycle": [
-        "construct",
-        "attack_and_improve",
-        "reconcile_and_promote"
-      ],
       "gates": [
         "known rights/provenance for incorporated material",
         "no unresolved high similarity risk",
@@ -1336,7 +1331,12 @@
         "gap ledger"
       ],
       "status": "planned",
-      "signed": false
+      "signed": false,
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ]
     },
     {
       "id": "GBL-072",
@@ -1374,11 +1374,6 @@
         1000,
         10000
       ],
-      "round_cycle": [
-        "construct",
-        "attack_and_improve",
-        "reconcile_and_promote"
-      ],
       "gates": [
         "known rights/provenance for incorporated material",
         "no unresolved high similarity risk",
@@ -1399,7 +1394,12 @@
         "gap ledger"
       ],
       "status": "planned",
-      "signed": false
+      "signed": false,
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ]
     },
     {
       "id": "GBL-073",
@@ -1437,11 +1437,6 @@
         1000,
         10000
       ],
-      "round_cycle": [
-        "construct",
-        "attack_and_improve",
-        "reconcile_and_promote"
-      ],
       "gates": [
         "known rights/provenance for incorporated material",
         "no unresolved high similarity risk",
@@ -1462,7 +1457,12 @@
         "gap ledger"
       ],
       "status": "planned",
-      "signed": false
+      "signed": false,
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ]
     },
     {
       "id": "GBL-074",
@@ -1500,11 +1500,6 @@
         1000,
         10000
       ],
-      "round_cycle": [
-        "construct",
-        "attack_and_improve",
-        "reconcile_and_promote"
-      ],
       "gates": [
         "known rights/provenance for incorporated material",
         "no unresolved high similarity risk",
@@ -1525,7 +1520,12 @@
         "gap ledger"
       ],
       "status": "planned",
-      "signed": false
+      "signed": false,
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ]
     },
     {
       "id": "GBL-075",
@@ -1563,11 +1563,6 @@
         1000,
         10000
       ],
-      "round_cycle": [
-        "construct",
-        "attack_and_improve",
-        "reconcile_and_promote"
-      ],
       "gates": [
         "known rights/provenance for incorporated material",
         "no unresolved high similarity risk",
@@ -1588,7 +1583,12 @@
         "gap ledger"
       ],
       "status": "planned",
-      "signed": false
+      "signed": false,
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ]
     }
   ]
 }
