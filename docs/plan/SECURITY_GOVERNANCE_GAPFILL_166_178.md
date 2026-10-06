@@ -10,9 +10,11 @@ Exact-head validator:
 
 ## Scope
 
-This batch reconciles ten deferred masterplan volumes that were either already
-implemented but still described as `unverified` with planned tests, or were
-missing one concrete deterministic control surface.
+This batch originally reconciled ten masterplan volumes. Current lifecycle
+reconciliation shows six remain in the P3-T2 deferred queue, while four were
+already scheduled by the closed P2 functional tranche. The implementation
+record remains cumulative; the candidate authority now applies only to the
+still-deferred subset.
 
 The exact set is:
 
@@ -27,9 +29,10 @@ The exact set is:
 - VOL-177 Data Deletion
 - VOL-178 Software Bill of Materials
 
-These volumes remain in the explicit P3-T2 queued set. This batch does not
-schedule them into the active 32-volume tranche and does not reduce the queued
-count.
+Current P3-T2 deferred candidate set: VOL-166, VOL-173, VOL-174, VOL-176,
+VOL-177, and VOL-178. Historical P2-scheduled predecessors: VOL-167, VOL-169,
+VOL-172, and VOL-175. The validator proves both classifications against their
+machine authorities and grants no new scheduling or completion authority.
 
 ## Reconciled existing implementation
 
@@ -88,7 +91,7 @@ The candidate validator checks byte parity and binds the exact
 
 ## Promotion boundary
 
-All ten completion checkboxes remain false. The candidate may not grant
+No completion checkbox is promoted by this reconciliation. The candidate may not grant
 implementation signatures, verification signatures, production authority, or
 independent closure.
 

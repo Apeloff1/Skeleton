@@ -72,8 +72,7 @@ jobs:
           "pydantic-settings>=2,<3"
           "httpx>=0.28,<0.29"
           "pytest-asyncio>=0.24,<2"
-          "httpx>=0.28,<0.29"
-          "pytest-asyncio>=0.24,<2"
+          "fastapi==0.136.1"
 
       - name: Compile resilience surfaces
         run: >-

@@ -15,11 +15,12 @@ ROOT=Path(__file__).resolve().parents[1]
 CANDIDATE=Path("machine/ai_security_governance_gapfill_candidate.json")
 MASTER=Path("machine/ai_master_plan.json")
 FRONTIER=Path("machine/ai_masterplan_continuation_frontier.json")
+P2_MAP=Path("machine/ai_p2_execution_map.json")
 TREE=Path("machine/ai_file_tree.json")
 EXPECTED=(
-    "VOL-166","VOL-167","VOL-169","VOL-172","VOL-173",
-    "VOL-174","VOL-175","VOL-176","VOL-177","VOL-178",
+    "VOL-166","VOL-173","VOL-174","VOL-176","VOL-177","VOL-178",
 )
+P2_SCHEDULED=frozenset({"VOL-167","VOL-169","VOL-172","VOL-175"})
 SECURITY_VOLUMES=frozenset(EXPECTED[:-1])
 SUPPLY_VOLUMES=frozenset({"VOL-178"})
 
@@ -53,6 +54,7 @@ def validate(root:Path=ROOT, *, head:str|None=None)->dict[str,Any]:
     candidate=_load(root,CANDIDATE)
     master=_load(root,MASTER)
     frontier=_load(root,FRONTIER)
+    p2_map=_load(root,P2_MAP)
     tree=_load(root,TREE)
 
     if candidate.get("schema_version")!="skeleton.ai.security_governance_gapfill_candidate.v1":
@@ -61,8 +63,10 @@ def validate(root:Path=ROOT, *, head:str|None=None)->dict[str,Any]:
         raise SecurityGovernanceCandidateError("candidate status drift")
     if tuple(candidate.get("volume_refs",()))!=EXPECTED:
         raise SecurityGovernanceCandidateError("candidate volume identity drift")
-    if candidate.get("source_queue_state")!="queued_unmodified":
-        raise SecurityGovernanceCandidateError("candidate may not claim scheduling authority")
+    if candidate.get("source_queue_state")!="p3_deferred_with_p2_scheduled_predecessors":
+        raise SecurityGovernanceCandidateError("candidate lifecycle classification drift")
+    if set(candidate.get("p2_scheduled_volume_refs",()))!=P2_SCHEDULED:
+        raise SecurityGovernanceCandidateError("P2 scheduled predecessor registry drift")
 
     promotion=candidate.get("promotion_state",{})
     for key in (
@@ -89,6 +93,9 @@ def validate(root:Path=ROOT, *, head:str|None=None)->dict[str,Any]:
         raise SecurityGovernanceCandidateError("deferred gap-fill volumes escaped into scheduled frontier")
     if not set(EXPECTED).issubset(queued):
         raise SecurityGovernanceCandidateError("deferred gap-fill volumes must remain explicitly queued")
+    p2_scheduled=set(p2_map.get("first_tranche",{}).get("scheduled_volume_refs",()))
+    if not P2_SCHEDULED.issubset(p2_scheduled):
+        raise SecurityGovernanceCandidateError("historical P2 scheduling evidence drift")
 
     modules=candidate.get("primary_implementation_by_volume",{})
     tests=candidate.get("primary_test_by_volume",{})
@@ -182,6 +189,7 @@ def validate(root:Path=ROOT, *, head:str|None=None)->dict[str,Any]:
         "actual_head":actual_head,
         "reported_head":head,
         "queued_frontier_preserved":True,
+        "p2_scheduled_predecessors":sorted(P2_SCHEDULED),
         "completion_checkbox":False,
         "production_authority":False,
     }

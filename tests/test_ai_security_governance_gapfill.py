@@ -22,8 +22,9 @@ def head()->str:
 
 def test_current_candidate_is_exact_head_valid() -> None:
     result=validate(ROOT,head=head())
-    assert result["volume_count"]==10
+    assert result["volume_count"]==6
     assert result["queued_frontier_preserved"] is True
+    assert result["p2_scheduled_predecessors"] == ["VOL-167","VOL-169","VOL-172","VOL-175"]
     assert result["completion_checkbox"] is False
     assert result["production_authority"] is False
     assert result["mirror_pair_count"]>=12
