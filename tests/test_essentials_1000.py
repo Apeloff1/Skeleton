@@ -106,3 +106,16 @@ def test_dependency_topology_parallelizes_domains_and_fans_in_finality():
         assert l["depends_on"]==expected
     assert d["dependency_topology"]["maximum_parallel_domain_lanes"]==99
     assert d["dependency_topology"]["finality_fan_in"]==99
+
+
+def test_construction_waves_match_parallel_dependency_topology():
+    d=_d()
+    waves=d["construction_waves"]
+    assert len(waves)==100
+    for i,w in enumerate(waves,1):
+        assert w["id"]==f"ESS-W{i:03d}"
+        assert w["prerequisite_wave"] is None
+        if i<100:
+            assert w["prerequisite_waves"]==[]
+        else:
+            assert w["prerequisite_waves"]==[f"ESS-W{k:03d}" for k in range(1,100)]
