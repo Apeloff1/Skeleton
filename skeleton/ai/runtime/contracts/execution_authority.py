@@ -379,6 +379,178 @@ class AdmissionReceipt:
         return hashlib.sha256(canonical_json_bytes(self.canonical_payload())).hexdigest()
 
 
+
+@dataclass(frozen=True, slots=True)
+class AuthorityConsumptionReceipt:
+    """Tamper-evident evidence for one granted capability consumption."""
+
+    authority_digest: str
+    operation_id: str
+    execution_id: str
+    actor_id: str
+    capability: str
+    sequence: int
+    replay_key: str
+    authorized_at: datetime
+    delta_usage: ResourceUsage
+    total_usage: ResourceUsage
+    previous_receipt_digest: str | None = None
+    schema_version: int = EXECUTION_AUTHORITY_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self, "authority_digest", _digest(self.authority_digest, "authority_digest")
+        )
+        for name in ("operation_id", "execution_id", "actor_id", "replay_key"):
+            object.__setattr__(self, name, _bounded_id(getattr(self, name), name))
+        if not isinstance(self.capability, str) or _CAPABILITY.fullmatch(self.capability) is None:
+            raise ExecutionAuthorityError("invalid capability")
+        _finite_positive_int(self.sequence, "sequence")
+        object.__setattr__(
+            self, "authorized_at", _aware_utc(self.authorized_at, "authorized_at")
+        )
+        if not isinstance(self.delta_usage, ResourceUsage):
+            raise ExecutionAuthorityError("delta_usage must be ResourceUsage")
+        if not isinstance(self.total_usage, ResourceUsage):
+            raise ExecutionAuthorityError("total_usage must be ResourceUsage")
+        if self.previous_receipt_digest is not None:
+            object.__setattr__(
+                self,
+                "previous_receipt_digest",
+                _digest(self.previous_receipt_digest, "previous_receipt_digest"),
+            )
+        if self.sequence == 1 and self.previous_receipt_digest is not None:
+            raise ExecutionAuthorityError(
+                "first consumption receipt cannot have previous_receipt_digest"
+            )
+        if self.sequence > 1 and self.previous_receipt_digest is None:
+            raise ExecutionAuthorityError(
+                "non-root consumption receipt requires previous_receipt_digest"
+            )
+        if self.schema_version != EXECUTION_AUTHORITY_SCHEMA_VERSION:
+            raise ExecutionAuthorityError("unsupported consumption-receipt schema")
+
+    def canonical_payload(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "authority_digest": self.authority_digest,
+            "operation_id": self.operation_id,
+            "execution_id": self.execution_id,
+            "actor_id": self.actor_id,
+            "capability": self.capability,
+            "sequence": self.sequence,
+            "replay_key": self.replay_key,
+            "authorized_at": self.authorized_at.isoformat(),
+            "delta_usage": self.delta_usage.as_dict(),
+            "total_usage": self.total_usage.as_dict(),
+            "previous_receipt_digest": self.previous_receipt_digest,
+        }
+
+    @property
+    def digest(self) -> str:
+        return hashlib.sha256(canonical_json_bytes(self.canonical_payload())).hexdigest()
+
+
+@dataclass(frozen=True, slots=True)
+class AuthorityEvidenceBundle:
+    """Compact final evidence binding authority admission to accounted consumption."""
+
+    authority_digest: str
+    operation_id: str
+    execution_id: str
+    admission_receipt_digest: str
+    consumption_count: int
+    latest_consumption_digest: str | None
+    final_usage: ResourceUsage
+    revoked: bool
+    sealed_at: datetime
+    schema_version: int = EXECUTION_AUTHORITY_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        for name in ("authority_digest", "admission_receipt_digest"):
+            object.__setattr__(self, name, _digest(getattr(self, name), name))
+        for name in ("operation_id", "execution_id"):
+            object.__setattr__(self, name, _bounded_id(getattr(self, name), name))
+        _finite_non_negative_int(self.consumption_count, "consumption_count")
+        if self.latest_consumption_digest is not None:
+            object.__setattr__(
+                self,
+                "latest_consumption_digest",
+                _digest(self.latest_consumption_digest, "latest_consumption_digest"),
+            )
+        if self.consumption_count == 0 and self.latest_consumption_digest is not None:
+            raise ExecutionAuthorityError(
+                "empty authority evidence cannot have latest consumption digest"
+            )
+        if self.consumption_count > 0 and self.latest_consumption_digest is None:
+            raise ExecutionAuthorityError(
+                "non-empty authority evidence requires latest consumption digest"
+            )
+        if not isinstance(self.final_usage, ResourceUsage):
+            raise ExecutionAuthorityError("final_usage must be ResourceUsage")
+        if not isinstance(self.revoked, bool):
+            raise ExecutionAuthorityError("revoked must be boolean")
+        object.__setattr__(self, "sealed_at", _aware_utc(self.sealed_at, "sealed_at"))
+        if self.schema_version != EXECUTION_AUTHORITY_SCHEMA_VERSION:
+            raise ExecutionAuthorityError("unsupported authority-evidence schema")
+
+    def canonical_payload(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "authority_digest": self.authority_digest,
+            "operation_id": self.operation_id,
+            "execution_id": self.execution_id,
+            "admission_receipt_digest": self.admission_receipt_digest,
+            "consumption_count": self.consumption_count,
+            "latest_consumption_digest": self.latest_consumption_digest,
+            "final_usage": self.final_usage.as_dict(),
+            "revoked": self.revoked,
+            "sealed_at": self.sealed_at.isoformat(),
+        }
+
+    @property
+    def digest(self) -> str:
+        return hashlib.sha256(canonical_json_bytes(self.canonical_payload())).hexdigest()
+
+
+def verify_authority_receipt_chain(
+    authority: ExecutionAuthority,
+    receipts: Iterable[AuthorityConsumptionReceipt],
+) -> ResourceUsage:
+    """Verify receipt identity, hash continuity, sequence, and cumulative accounting."""
+
+    if not isinstance(authority, ExecutionAuthority):
+        raise ExecutionAuthorityError("authority must be ExecutionAuthority")
+    if isinstance(receipts, (str, bytes)):
+        raise ExecutionAuthorityError("receipts must be an iterable")
+
+    total = ResourceUsage()
+    previous_digest: str | None = None
+    expected_sequence = 1
+    for receipt in receipts:
+        if not isinstance(receipt, AuthorityConsumptionReceipt):
+            raise ExecutionAuthorityError(
+                "receipt chain contains non-consumption receipt"
+            )
+        if receipt.authority_digest != authority.digest:
+            raise ExecutionAuthorityError("receipt authority digest mismatch")
+        for name in ("operation_id", "execution_id", "actor_id"):
+            if getattr(receipt, name) != getattr(authority, name):
+                raise ExecutionAuthorityError(f"receipt {name} mismatch")
+        if receipt.sequence != expected_sequence:
+            raise ExecutionAuthorityError("receipt sequence is not contiguous")
+        if receipt.previous_receipt_digest != previous_digest:
+            raise ExecutionAuthorityError("receipt hash chain is discontinuous")
+        total = total.add(receipt.delta_usage)
+        if receipt.total_usage != total:
+            raise ExecutionAuthorityError("receipt cumulative usage mismatch")
+        if not authority.budget.permits(total):
+            raise ExecutionAuthorityError("receipt chain exceeds authority budget")
+        previous_digest = receipt.digest
+        expected_sequence += 1
+    return total
+
+
 def validate_authority_attenuation(
     parent: ExecutionAuthority,
     child: ExecutionAuthority,
@@ -416,7 +588,9 @@ def authority_policy_digest(policy: Mapping[str, Any]) -> str:
 
 __all__ = [
     "AdmissionReceipt",
+    "AuthorityConsumptionReceipt",
     "AuthorityEffect",
+    "AuthorityEvidenceBundle",
     "EXECUTION_AUTHORITY_SCHEMA_VERSION",
     "ExecutionAuthority",
     "ExecutionAuthorityError",
@@ -426,4 +600,5 @@ __all__ = [
     "ResourceUsage",
     "authority_policy_digest",
     "validate_authority_attenuation",
+    "verify_authority_receipt_chain",
 ]
