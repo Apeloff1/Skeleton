@@ -25,6 +25,7 @@ def _fixture(tmp_path: Path) -> Path:
     for relative in (
         "machine/enterprise_ai_superiority.json",
         "machine/ai_master_plan.json",
+        "machine/competitive_ai_engineering_ladder.json",
     ):
         source = ROOT / relative
         target = root / relative
@@ -55,6 +56,8 @@ def test_current_enterprise_superiority_authority_is_valid() -> None:
     assert result["enterprise_qualified_profiles"] == 0
     assert result["superior_profiles"] == 0
     assert result["all_volumes_inherit_common_contract"] is True
+    assert result["competitive_engineering_family_count"] == 20
+    assert result["competitive_engineering_level_count"] == 200
 
 
 def test_core_and_advanced_serving_volumes_have_dedicated_profiles() -> None:
@@ -270,3 +273,32 @@ def test_no_profile_can_self_claim_superiority_in_design_authority() -> None:
         profile["qualification_state"] == "unqualified"
         for profile in policy["profiles"]
     )
+
+
+def test_enterprise_policy_binds_competitive_engineering_ladder() -> None:
+    policy = _load(ROOT, "machine/enterprise_ai_superiority.json")
+    ladder = _load(ROOT, "machine/competitive_ai_engineering_ladder.json")
+
+    assert (
+        policy["authority"]["competitive_engineering_ladder"]
+        == "machine/competitive_ai_engineering_ladder.json"
+    )
+    assert policy["competitive_engineering_ladder"]["family_count"] == 20
+    assert policy["competitive_engineering_ladder"]["total_levels"] == 200
+    assert len(ladder["families"]) == 20
+    assert len(ladder["levels"]) == 200
+    assert ladder["levels"][0]["id"] == "ENG-001"
+    assert ladder["levels"][-1]["id"] == "ENG-200"
+
+
+def test_rejects_competitive_ladder_binding_drift(tmp_path: Path) -> None:
+    root = _fixture(tmp_path)
+    policy = _load(root, "machine/enterprise_ai_superiority.json")
+    policy["competitive_engineering_ladder"]["total_levels"] = 199
+    _write(root, "machine/enterprise_ai_superiority.json", policy)
+
+    with pytest.raises(
+        MODULE.EnterpriseSuperiorityError,
+        match="competitive ladder topology binding drift",
+    ):
+        MODULE.validate(root)
