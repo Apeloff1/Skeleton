@@ -4,11 +4,40 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
-from .contracts import canonical_digest
+from .contracts import EvaluatorProvenance, canonical_digest
 
 
 class AtomGraphError(RuntimeError):
     pass
+
+
+@dataclass(frozen=True, slots=True)
+class AtomSourceBinding:
+    source_id: str
+    evidence_digest: str
+    authority_provenance: EvaluatorProvenance
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.source_id, str) or not self.source_id.strip():
+            raise ValueError("atom source_id must be non-empty")
+        if not isinstance(self.evidence_digest, str) or len(self.evidence_digest) < 16:
+            raise ValueError("atom source evidence must be stable")
+        if not isinstance(self.authority_provenance, EvaluatorProvenance):
+            raise TypeError("atom source authority_provenance must be EvaluatorProvenance")
+        if self.evidence_digest not in self.authority_provenance.output_evidence_refs:
+            raise AtomGraphError(
+                "atom source evidence must be referenced by lineage authority"
+            )
+
+    @property
+    def digest(self) -> str:
+        return canonical_digest(
+            {
+                "authority_provenance_digest": self.authority_provenance.digest,
+                "evidence_digest": self.evidence_digest,
+                "source_id": self.source_id,
+            }
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,6 +50,7 @@ class ArtifactAtom:
     parent_id: str | None = None
     dependency_ids: tuple[str, ...] = ()
     source_ids: tuple[str, ...] = ()
+    source_bindings: tuple[AtomSourceBinding, ...] = ()
 
     def __post_init__(self) -> None:
         for label in ("atom_id", "kind", "artifact_id"):
@@ -32,8 +62,21 @@ class ArtifactAtom:
             raise ValueError("dependency_ids must be unique")
         if len(self.source_ids) != len(set(self.source_ids)):
             raise ValueError("source_ids must be unique")
+        if any(not isinstance(row, AtomSourceBinding) for row in self.source_bindings):
+            raise TypeError("source_bindings must contain AtomSourceBinding values")
+        binding_ids = tuple(row.source_id for row in self.source_bindings)
+        if len(binding_ids) != len(set(binding_ids)):
+            raise ValueError("source binding ids must be unique")
+        if set(binding_ids) != set(self.source_ids):
+            raise AtomGraphError("every atom source_id requires exactly one lineage binding")
         if self.atom_id in self.dependency_ids:
             raise ValueError("atom cannot depend on itself")
+
+    @property
+    def source_lineage_root(self) -> str:
+        return canonical_digest(
+            [row.digest for row in sorted(self.source_bindings, key=lambda item: item.source_id)]
+        )
 
     def to_payload(self) -> dict[str, object]:
         return {
@@ -45,6 +88,16 @@ class ArtifactAtom:
             "kind": self.kind,
             "parent_id": self.parent_id,
             "source_ids": list(self.source_ids),
+            "source_bindings": [
+                {
+                    "authority_provenance_digest": row.authority_provenance.digest,
+                    "evidence_digest": row.evidence_digest,
+                    "source_id": row.source_id,
+                    "binding_digest": row.digest,
+                }
+                for row in sorted(self.source_bindings, key=lambda item: item.source_id)
+            ],
+            "source_lineage_root": self.source_lineage_root,
         }
 
 
