@@ -107,6 +107,10 @@ model authority boundaries.
 - `finite_element1d.py` — linear-element mass/stiffness assembly and Dirichlet Poisson solves.
 - `covariance_shrinkage.py` — identity/diagonal covariance shrinkage and OAS regularization evidence.
 - `low_rank.py` — truncated-SVD approximation and retained-energy rank selection.
+- `bezier.py` — de Casteljau Bezier evaluation, exact derivative curves, subdivision and control bounds.
+- `continuous_distributions.py` — regularized beta/gamma functions and Beta/Gamma/Dirichlet density-CDF references.
+- `inference_tests.py` — Welch t, Mann-Whitney U and one-way ANOVA diagnostics with explicit test evidence.
+- `derivative_free.py` — bounded golden-section and deterministic Nelder-Mead minimization references.
 - `validation.py` — parity evidence against existing optimized runtime kernels.
 
 ## Guarantees
@@ -191,6 +195,10 @@ model authority boundaries.
 - Finite-element assembly exposes mass/stiffness symmetry, exact Dirichlet boundaries and algebraic residual evidence.
 - Covariance shrinkage keeps target/intensity/eigenspectrum explicit rather than hiding regularization policy.
 - Low-rank approximations report discarded Frobenius energy and never reinterpret rank as model capacity authority.
+- Bezier geometry uses de Casteljau subdivision so curve evaluation and splitting share one deterministic construction.
+- Continuous distributions keep special-function convergence/domain checks explicit and do not create predictive authority.
+- Statistical inference reports test statistics/degrees/effect structure and keeps decision thresholds outside this layer.
+- Derivative-free solvers are bounded reference optimizers and do not own model training or parameter promotion.
 - `audit_runtime_kernels()` compares optimized runtime softmax, matmul and attention against
   this reference substrate without replacing those kernels.
 

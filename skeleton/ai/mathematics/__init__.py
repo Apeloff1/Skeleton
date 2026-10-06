@@ -28,6 +28,7 @@ from .approximation import (
     newton_interpolate,
     piecewise_linear_interpolate,
 )
+from .bezier import BezierCurve
 from .bsplines import (
     BSplineBasisReport,
     bspline_basis,
@@ -98,6 +99,16 @@ from .differentiation import (
     finite_difference_jacobian,
     richardson_derivative,
 )
+from .continuous_distributions import (
+    beta_cdf,
+    beta_log_pdf,
+    dirichlet_log_pdf,
+    gamma_cdf,
+    gamma_log_pdf,
+    log_beta,
+    regularized_beta,
+    regularized_gamma_p,
+)
 from .density import (
     EmpiricalCDF,
     HistogramReport,
@@ -105,6 +116,12 @@ from .density import (
     gaussian_kde_density,
     histogram,
     silverman_bandwidth,
+)
+from .derivative_free import (
+    GoldenSectionReport,
+    NelderMeadReport,
+    golden_section_minimize,
+    nelder_mead,
 )
 from .distances import (
     bray_curtis_distance,
@@ -199,6 +216,14 @@ from .information_geometry import (
 )
 from .interpolation_nd import bilinear_gradient, bilinear_interpolate, trilinear_interpolate
 from .interval import Interval, interval_hull, interval_intersection
+from .inference_tests import (
+    ANOVAReport,
+    MannWhitneyReport,
+    WelchTReport,
+    mann_whitney_u,
+    one_way_anova,
+    welch_t_test,
+)
 from .integration2 import AdaptiveODEPoint, AdaptiveODEReport, adaptive_rk45
 from .integration import (
     ODEPoint,
@@ -527,6 +552,7 @@ __all__ = [
     "newton_divided_differences",
     "newton_interpolate",
     "piecewise_linear_interpolate",
+    "BezierCurve",
     "BSplineBasisReport",
     "bspline_basis",
     "bspline_curve",
@@ -598,12 +624,24 @@ __all__ = [
     "check_gradient",
     "finite_difference_jacobian",
     "richardson_derivative",
+    "beta_cdf",
+    "beta_log_pdf",
+    "dirichlet_log_pdf",
+    "gamma_cdf",
+    "gamma_log_pdf",
+    "log_beta",
+    "regularized_beta",
+    "regularized_gamma_p",
     "EmpiricalCDF",
     "HistogramReport",
     "empirical_cdf",
     "gaussian_kde_density",
     "histogram",
     "silverman_bandwidth",
+    "GoldenSectionReport",
+    "NelderMeadReport",
+    "golden_section_minimize",
+    "nelder_mead",
     "bray_curtis_distance",
     "canberra_distance",
     "chebyshev_distance",
@@ -682,6 +720,12 @@ __all__ = [
     "Interval",
     "interval_hull",
     "interval_intersection",
+    "ANOVAReport",
+    "MannWhitneyReport",
+    "WelchTReport",
+    "mann_whitney_u",
+    "one_way_anova",
+    "welch_t_test",
     "AdaptiveODEPoint",
     "AdaptiveODEReport",
     "adaptive_rk45",
