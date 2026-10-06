@@ -18,9 +18,12 @@ from skeleton.automation.shift_supervisor import model_gateway
 from skeleton.automation.shift_supervisor.model_gateway import ModelGateway
 from skeleton import provider_runtime
 from skeleton.provider_runtime import (
+    OpenAIProviderAdapter,
     OpenAISyncProviderAdapter,
+    ProviderImageRequest,
     ProviderInvocationError,
     ProviderRequest,
+    ProviderSpeechRequest,
 )
 from skeleton.kernel.runtime_supervision import (
     RuntimeAdmissionMiddleware,
@@ -193,6 +196,42 @@ async def test_bounded_provider_call_cancels_slow_operation_at_timeout() -> None
             label="test provider",
         )
     assert finalized.is_set()
+
+
+@pytest.mark.asyncio
+async def test_all_provider_media_operations_reject_expired_deadline_before_io() -> None:
+    adapter = OpenAIProviderAdapter(client=object())
+    expired = datetime.now(timezone.utc) - timedelta(seconds=1)
+
+    calls = (
+        adapter.generate_image(
+            ProviderImageRequest(
+                prompt="image",
+                deadline=expired,
+            )
+        ),
+        adapter.create_image_variation(
+            b"image-bytes",
+            deadline=expired,
+        ),
+        adapter.edit_image(
+            b"image-bytes",
+            prompt="edit",
+            deadline=expired,
+        ),
+        adapter.synthesize_speech(
+            ProviderSpeechRequest(
+                text="speech",
+                deadline=expired,
+            )
+        ),
+    )
+    for call in calls:
+        with pytest.raises(
+            ProviderInvocationError,
+            match="deadline exceeded",
+        ):
+            await call
 
 
 def test_sync_provider_pre_cancelled_request_never_reaches_architecture_or_network(
