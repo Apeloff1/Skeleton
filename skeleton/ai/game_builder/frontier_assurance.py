@@ -462,6 +462,7 @@ class RegretLedger:
 class EvidenceInvalidationReceipt:
     node_id: str
     affected_ids: tuple[str, ...]
+    graph_edges: tuple[tuple[str, tuple[str, ...]], ...]
     authority_provenance: EvaluatorProvenance
     evidence_digest: str
     receipt_digest: str
@@ -475,22 +476,64 @@ class EvidenceInvalidationReceipt:
             raise FrontierAssuranceError(
                 "invalidation evidence must be referenced by invalidation authority"
             )
-        if not self.affected_ids or self.node_id not in self.affected_ids:
+        if not self.graph_edges:
+            raise FrontierAssuranceError("invalidation receipt requires graph snapshot")
+        nodes = tuple(node for node, _ in self.graph_edges)
+        if nodes != tuple(sorted(set(nodes))):
             raise FrontierAssuranceError(
-                "invalidation receipt must include the invalidated source node"
+                "invalidation graph nodes must be unique canonical order"
             )
-        if tuple(sorted(set(self.affected_ids))) != self.affected_ids:
+        graph = {node: tuple(parents) for node, parents in self.graph_edges}
+        for node, parents in self.graph_edges:
+            _stable(node, "graph node")
+            if parents != tuple(sorted(set(parents))):
+                raise FrontierAssuranceError(
+                    "invalidation graph dependencies must be unique canonical order"
+                )
+            unknown = set(parents) - set(graph)
+            if unknown:
+                raise FrontierAssuranceError(
+                    f"invalidation graph has unknown dependencies: {sorted(unknown)}"
+                )
+        if self.node_id not in graph:
             raise FrontierAssuranceError(
-                "invalidation affected ids must be unique canonical order"
+                "invalidation source node is absent from graph snapshot"
+            )
+        reverse: dict[str, set[str]] = {node: set() for node in graph}
+        for child, parents in graph.items():
+            for parent in parents:
+                reverse[parent].add(child)
+        expected: set[str] = set()
+        stack = [self.node_id]
+        while stack:
+            current = stack.pop()
+            if current in expected:
+                continue
+            expected.add(current)
+            stack.extend(reverse[current])
+        expected_ids = tuple(sorted(expected))
+        if self.affected_ids != expected_ids:
+            raise FrontierAssuranceError(
+                "invalidation affected ids do not match graph dependency closure"
             )
         if self.receipt_digest != canonical_digest(self.payload()):
             raise FrontierAssuranceError("invalidation receipt digest mismatch")
+
+    @property
+    def graph_digest(self) -> str:
+        return canonical_digest(
+            [
+                {"node_id": node, "depends_on": list(parents)}
+                for node, parents in self.graph_edges
+            ]
+        )
 
     def payload(self) -> dict[str, object]:
         return {
             "affected_ids": list(self.affected_ids),
             "authority_provenance_digest": self.authority_provenance.digest,
             "evidence_digest": self.evidence_digest,
+            "graph_digest": self.graph_digest,
             "node_id": self.node_id,
         }
 
@@ -502,6 +545,22 @@ class EvidenceInvalidationGraph:
         self._deps: dict[str, set[str]] = {}
         self._reverse: dict[str, set[str]] = {}
         self._invalid: set[str] = set()
+
+    @property
+    def graph_edges(self) -> tuple[tuple[str, tuple[str, ...]], ...]:
+        return tuple(
+            (node, tuple(sorted(self._deps[node])))
+            for node in sorted(self._deps)
+        )
+
+    @property
+    def graph_digest(self) -> str:
+        return canonical_digest(
+            [
+                {"node_id": node, "depends_on": list(parents)}
+                for node, parents in self.graph_edges
+            ]
+        )
 
     def add(self, node_id: str, *, depends_on: Iterable[str] = ()) -> None:
         node = _stable(node_id, "node_id")
@@ -543,15 +602,19 @@ class EvidenceInvalidationGraph:
             stack.extend(self._reverse.get(current, ()))
         affected_ids = tuple(sorted(affected))
         self._invalid.update(affected)
+        graph_edges = self.graph_edges
+        graph_digest = self.graph_digest
         payload = {
             "affected_ids": list(affected_ids),
             "authority_provenance_digest": authority_provenance.digest,
             "evidence_digest": evidence_digest,
+            "graph_digest": graph_digest,
             "node_id": node,
         }
         return EvidenceInvalidationReceipt(
             node_id=node,
             affected_ids=affected_ids,
+            graph_edges=graph_edges,
             authority_provenance=authority_provenance,
             evidence_digest=evidence_digest,
             receipt_digest=canonical_digest(payload),
