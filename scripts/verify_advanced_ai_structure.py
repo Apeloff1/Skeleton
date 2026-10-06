@@ -76,6 +76,7 @@ def verify(
 
     expected_files = [
         "machine/advanced_ai_structure_100.json",
+        "machine/advanced_ai_maturity_ledger.json",
         "machine/ai_app_construction.json",
         "machine/enterprise_system_architecture.json",
         "machine/architecture.json",
