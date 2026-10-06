@@ -99,6 +99,8 @@ def test_rank_one_and_cholesky_updates_reconstruct_targets() -> None:
     matrix = ((4.0, 1.0), (1.0, 3.0))
     vector = (0.5, -1.0)
     target = symmetric_rank_one_update(matrix, vector, alpha=1.0)
+    assert target[0] == pytest.approx((4.25, 0.5))
+    assert target[1] == pytest.approx((0.5, 4.0))
     report = cholesky_factor_after_rank_one_update(matrix, vector, sign=1)
     assert report.reconstruction_linf <= 1e-12
     assert report.minimum_diagonal > 0.0

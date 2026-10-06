@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from numbers import Real
 from typing import Sequence
 
-from .contracts import MathInvariantError, Matrix, Vector, finite_matrix, finite_scalar, finite_vector
+from .contracts import MathInvariantError, Matrix, Vector, finite_scalar, finite_vector
 from .eigensystems import symmetric_eigensystem
 from .linear import dot
 from .numerics import compensated_sum

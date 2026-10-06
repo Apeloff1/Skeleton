@@ -50,7 +50,10 @@ def beta_binomial_posterior(
     mean = pa / total
     variance = pa * pb / (total * total * (total + 1.0))
     log_evidence = (
-        math.lgamma(a + b)
+        math.lgamma(s + f + 1.0)
+        - math.lgamma(s + 1.0)
+        - math.lgamma(f + 1.0)
+        + math.lgamma(a + b)
         - math.lgamma(a)
         - math.lgamma(b)
         + math.lgamma(pa)
@@ -101,8 +104,11 @@ def dirichlet_multinomial_posterior(
     prior_total = compensated_sum(prior)
     posterior_total = compensated_sum(posterior)
     mean = tuple(value / posterior_total for value in posterior)
+    count_total = sum(clean_counts)
     log_evidence = (
-        math.lgamma(prior_total)
+        math.lgamma(count_total + 1.0)
+        - compensated_sum(math.lgamma(count + 1.0) for count in clean_counts)
+        + math.lgamma(prior_total)
         - math.lgamma(posterior_total)
         + compensated_sum(
             math.lgamma(post) - math.lgamma(base)
