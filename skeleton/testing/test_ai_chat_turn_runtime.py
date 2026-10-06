@@ -20,6 +20,7 @@ from skeleton.ai.assistant.turn_runtime import (
     execution_budget_from_dict,
     make_event,
     operation_digest,
+    provider_receipt_set_ref,
     start_turn,
     turn_event_from_dict,
     turn_snapshot_dict,
@@ -560,3 +561,35 @@ def test_canonical_wire_codecs_reject_schema_or_field_drift() -> None:
     raw_event["schema_version"] = 999
     with pytest.raises(TurnRuntimeError, match="unsupported turn event"):
         turn_event_from_dict(raw_event)
+
+
+def test_provider_receipt_set_ref_is_order_independent_and_deduplicated() -> None:
+    left = provider_receipt_set_ref(
+        (
+            "provider:test:receipt-b",
+            "provider:test:receipt-a",
+            "provider:test:receipt-b",
+        )
+    )
+    right = provider_receipt_set_ref(
+        (
+            "provider:test:receipt-a",
+            "provider:test:receipt-b",
+        )
+    )
+    assert left == right
+    assert left is not None
+    assert left.startswith("provider-receipt-set-sha256:")
+    assert len(left.rsplit(":", 1)[-1]) == 64
+    assert provider_receipt_set_ref(()) is None
+
+
+def test_provider_receipt_set_ref_rejects_ambiguous_or_unbounded_input() -> None:
+    with pytest.raises(TurnRuntimeError, match="iterable of refs"):
+        provider_receipt_set_ref("provider:test:receipt-1")
+    with pytest.raises(TurnRuntimeError, match="empty"):
+        provider_receipt_set_ref(("   ",))
+    with pytest.raises(TurnRuntimeError, match="hard count limit"):
+        provider_receipt_set_ref(
+            tuple(f"provider:test:receipt-{index}" for index in range(65))
+        )
