@@ -309,3 +309,48 @@ __all__ += [
     "remaining_execution_budget",
     "route_request_for_remaining_turn",
 ]
+
+
+from .salon import (
+    SALON_CITATION,
+    SALON_LAW,
+    SALON_SCHEMA_VERSION,
+    Affect,
+    BeatKind,
+    CitationChip,
+    DiscourseAct,
+    Motif,
+    PresenceLamp,
+    Reaction,
+    SalonBeat,
+    SalonCard,
+    SalonError,
+    SalonPlan,
+    SalonPolicy,
+    SalonSession,
+    classify_act,
+    classify_affect,
+    surface_contract,
+)
+
+__all__ += [
+    "SALON_CITATION",
+    "SALON_LAW",
+    "SALON_SCHEMA_VERSION",
+    "Affect",
+    "BeatKind",
+    "CitationChip",
+    "DiscourseAct",
+    "Motif",
+    "PresenceLamp",
+    "Reaction",
+    "SalonBeat",
+    "SalonCard",
+    "SalonError",
+    "SalonPlan",
+    "SalonPolicy",
+    "SalonSession",
+    "classify_act",
+    "classify_affect",
+    "surface_contract",
+]
