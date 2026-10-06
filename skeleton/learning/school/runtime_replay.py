@@ -245,15 +245,20 @@ class RuntimeReplaySnapshot:
         pipeline = (
             ""
             if not pipeline_contract_digest
-            else _sha(
+            else _text(
                 "pipeline_contract_digest",
                 pipeline_contract_digest,
+                maximum=256,
             )
         )
         provenance = (
             ""
             if not provenance_digest
-            else _sha("provenance_digest", provenance_digest)
+            else _text(
+                "provenance_digest",
+                provenance_digest,
+                maximum=256,
+            )
         )
         digest = _runtime_digest(
             session_id=normalized_session,
