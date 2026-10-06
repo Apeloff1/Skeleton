@@ -187,6 +187,12 @@ from .finite_difference import (
     second_derivative_grid,
     solve_poisson_dirichlet_1d,
 )
+from .gaussian_process import (
+    GaussianProcessEvidence,
+    GaussianProcessPosterior,
+    gaussian_process_log_marginal_likelihood,
+    gaussian_process_posterior,
+)
 from .geometry2 import (
     convex_hull,
     orientation,
@@ -261,6 +267,14 @@ from .linear import (
 from .lu import InverseReport, LUReport, determinant, lu_decompose, lu_solve, matrix_inverse
 from .krylov import ArnoldiReport, GMRESReport, arnoldi_iteration, gmres
 from .isotonic import IsotonicBlock, IsotonicReport, isotonic_regression
+from .kalman import (
+    KalmanFilterReport,
+    KalmanState,
+    KalmanStep,
+    RTSSmootherReport,
+    kalman_filter,
+    rts_smooth,
+)
 from .kernels import (
     centered_gram,
     gram_matrix,
@@ -405,6 +419,12 @@ from .rotations import (
     quaternion_slerp,
     quaternion_to_rotation_matrix,
 )
+from .sparse_iterative import (
+    SparseSolveReport,
+    bicgstab,
+    jacobi_preconditioner,
+    preconditioned_conjugate_gradient,
+)
 from .sampling import (
     MonteCarloReport,
     SplitMix64,
@@ -542,6 +562,12 @@ from .tensor import (
 )
 from .tridiagonal import TridiagonalSolveReport, solve_tridiagonal, tridiagonal_matvec
 from .transport import SinkhornReport, sinkhorn_transport, wasserstein_distance_1d
+from .fft_blocks import (
+    fft_convolution,
+    fft_cross_correlation,
+    next_power_of_two,
+    overlap_add_convolution,
+)
 from .transforms import (
     autocorrelation,
     convolution,
@@ -714,6 +740,10 @@ __all__ = [
     "first_derivative_grid",
     "second_derivative_grid",
     "solve_poisson_dirichlet_1d",
+    "GaussianProcessEvidence",
+    "GaussianProcessPosterior",
+    "gaussian_process_log_marginal_likelihood",
+    "gaussian_process_posterior",
     "convex_hull",
     "orientation",
     "point_in_polygon",
@@ -790,6 +820,12 @@ __all__ = [
     "IsotonicBlock",
     "IsotonicReport",
     "isotonic_regression",
+    "KalmanFilterReport",
+    "KalmanState",
+    "KalmanStep",
+    "RTSSmootherReport",
+    "kalman_filter",
+    "rts_smooth",
     "centered_gram",
     "gram_matrix",
     "laplacian_kernel",
@@ -905,6 +941,10 @@ __all__ = [
     "quaternion_rotate_vector",
     "quaternion_slerp",
     "quaternion_to_rotation_matrix",
+    "SparseSolveReport",
+    "bicgstab",
+    "jacobi_preconditioner",
+    "preconditioned_conjugate_gradient",
     "MonteCarloReport",
     "SplitMix64",
     "halton_point",
@@ -1023,6 +1063,10 @@ __all__ = [
     "SinkhornReport",
     "sinkhorn_transport",
     "wasserstein_distance_1d",
+    "fft_convolution",
+    "fft_cross_correlation",
+    "next_power_of_two",
+    "overlap_add_convolution",
     "autocorrelation",
     "convolution",
     "dft",

@@ -115,6 +115,10 @@ model authority boundaries.
 - `matrix_scaling.py` — deterministic row/column max-norm equilibration with explicit scaling evidence.
 - `acceleration.py` — bounded fixed-point iteration and regularized Anderson acceleration.
 - `cubature.py` — tensor-product Gauss-Legendre cubature over bounded hyperrectangles.
+- `sparse_iterative.py` — PCG/Jacobi and BiCGSTAB solvers over canonical CSR with explicit Krylov breakdown evidence.
+- `fft_blocks.py` — FFT convolution, overlap-add streaming convolution and FFT cross-correlation on canonical radix-2 transforms.
+- `gaussian_process.py` — zero-mean GP posterior covariance and log-marginal evidence over canonical kernels/Cholesky.
+- `kalman.py` — linear-Gaussian Kalman filtering and Rauch-Tung-Striebel smoothing with Joseph covariance updates.
 - `validation.py` — parity evidence against existing optimized runtime kernels.
 
 ## Guarantees
@@ -207,6 +211,10 @@ model authority boundaries.
 - Matrix equilibration exposes both diagonal scales and post-scaling row/column norm errors.
 - Anderson acceleration regularizes its residual Gram system and falls back deterministically on singular history.
 - Cubature bounds dimensionality and panel/order semantics so evaluation growth remains explicit.
+- Sparse iterative solvers reuse canonical CSR storage and fail closed on PCG symmetry/curvature or BiCGSTAB breakdown.
+- FFT block convolution reuses canonical radix-2 transforms and exposes block-size semantics instead of introducing a parallel FFT.
+- Gaussian-process helpers expose posterior covariance/evidence only; kernel learning and model promotion remain outside this layer.
+- Kalman/RTS math exposes innovations, gains and covariances without assuming runtime control or tracking authority.
 - `audit_runtime_kernels()` compares optimized runtime softmax, matmul and attention against
   this reference substrate without replacing those kernels.
 
