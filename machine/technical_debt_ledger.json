@@ -7,8 +7,7 @@
     "volume_ref": "VOL-115",
     "title": "Technical Debt Ledger",
     "required_gap_texts": [
-      "establish debt IDs and ownership",
-      "bind debt to risk/backlog/ADR"
+      "independent cleanup-compatibility evaluation remains pending"
     ]
   },
   "items": [
