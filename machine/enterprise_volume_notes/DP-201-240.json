@@ -2,7 +2,7 @@
   "schema_version": "skeleton.enterprise_ai.implementation_notes.v1",
   "standard_version": "2026.10",
   "depth_pass": "DP-201-240",
-  "generated_from_master_plan": "1.7.0",
+  "generated_from_master_plan": "2.6.0",
   "volume_count": 40,
   "dossiers": [
     {
@@ -13,7 +13,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Authenticate sender/role and preserve task/correlation identity.",
@@ -55,12 +54,7 @@
         "evaluations": [
           ".github/workflows/p1-agent-delegation-qualification.yml"
         ],
-        "existing_evidence": [
-          "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
-          "github-actions-job:109064006805",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36462413037",
-          "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -248,7 +242,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Handoff authority must be subset of delegator authority.",
@@ -290,12 +283,7 @@
         "evaluations": [
           ".github/workflows/p1-agent-delegation-qualification.yml"
         ],
-        "existing_evidence": [
-          "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
-          "github-actions-job:109064006805",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36462413037",
-          "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -483,7 +471,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Score completion, correctness, recovery, cost and human intervention separately.",
@@ -518,11 +505,7 @@
         "evaluations": [
           "skeleton/testing/test_agent_performance_evidence.py"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/d47eeb44feb4e1846d15657cefe92dd6eb725d40",
-          "skeleton/ai/agents/performance_evidence.py",
-          "skeleton/testing/test_agent_performance_evidence.py"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -710,7 +693,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Attribute costs per agent/task/delegation chain.",
@@ -745,11 +727,7 @@
         "evaluations": [
           "skeleton/testing/test_agent_economics.py"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/35170cf6cabe5bbe04cf3def3c99d0bd5a74cddc",
-          "skeleton/ai/agents/economics.py",
-          "skeleton/testing/test_agent_economics.py"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -937,7 +915,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Every child inherits stricter-or-equal authority and explicit budget.",
@@ -979,12 +956,7 @@
         "evaluations": [
           ".github/workflows/p1-agent-delegation-qualification.yml"
         ],
-        "existing_evidence": [
-          "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
-          "github-actions-job:109064006805",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36462413037",
-          "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -1172,7 +1144,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Keep independent evidence visible before aggregation.",
@@ -1207,11 +1178,7 @@
         "evaluations": [
           "skeleton/testing/test_consensus_disagreement.py"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/0fbac57d5bdd3394a23d1243c6ff72e35dd0a6a6",
-          "skeleton/ai/agents/consensus.py",
-          "skeleton/testing/test_consensus_disagreement.py"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -1399,7 +1366,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Reviewer cannot mutate target artifact while reviewing.",
@@ -1442,12 +1408,7 @@
         "evaluations": [
           ".github/workflows/p1-blast-radius-alignment.yml"
         ],
-        "existing_evidence": [
-          "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
-          "github-actions-job:109064006200",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36462412966",
-          "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -1635,7 +1596,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Verifier must consume artifact-bound evidence and declared acceptance criteria.",
@@ -1681,14 +1641,7 @@
           ".github/workflows/p1-blast-radius-alignment.yml",
           ".github/workflows/p1-safe-autonomy-bundle.yml"
         ],
-        "existing_evidence": [
-          "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
-          "github-actions-job:109064006200",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36462412966",
-          "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
-          "github-actions-job:109064006336",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36462413031"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -1876,7 +1829,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Preserve artifact version under review and review lineage.",
@@ -1910,11 +1862,7 @@
         "evaluations": [
           "skeleton/testing/test_artifact_review_workflow.py"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/2c04246776357c1d4cf6a90e9b7d6b66f035a837",
-          "skeleton/ai/artifact_review.py",
-          "skeleton/testing/test_artifact_review_workflow.py"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -2102,7 +2050,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Assign distinct research roles and evidence ownership.",
@@ -2324,7 +2271,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Track publication/version/retraction/correction identity.",
@@ -2546,7 +2492,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Represent citations, claims, replication and contradiction separately.",
@@ -2768,7 +2713,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Bind package to exact claim/result and artifact digests.",
@@ -2990,7 +2934,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Reject comparisons with material uncontrolled differences unless explicitly qualified.",
@@ -3212,7 +3155,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Declare population/sample/metric assumptions and missing-data handling.",
@@ -3434,7 +3376,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Freeze evaluation spec/environment before comparative runs.",
@@ -3656,7 +3597,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Score end-to-end task outcome and policy adherence separately.",
@@ -3878,7 +3818,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Benchmarks must include restart/checkpoint and stale-world conditions.",
@@ -4100,7 +4039,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Fingerprint exact and near-duplicate content across datasets.",
@@ -4322,7 +4260,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Protect rater privacy and separate identity from public results.",
@@ -4541,10 +4478,9 @@
       "title": "Model Card System",
       "depth_pass": "DP-201-240",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Cards reference immutable model/eval versions.",
@@ -4762,10 +4698,9 @@
       "title": "Dataset Card System",
       "depth_pass": "DP-201-240",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Cards bind to immutable dataset version/fingerprint.",
@@ -4983,10 +4918,9 @@
       "title": "Tool Card System",
       "depth_pass": "DP-201-240",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Cards cannot grant authority; they document governed contracts.",
@@ -5204,10 +5138,9 @@
       "title": "Agent Card System",
       "depth_pass": "DP-201-240",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Bind card to agent definition/version and evaluation evidence.",
@@ -5425,10 +5358,9 @@
       "title": "Component Health Scorecard",
       "depth_pass": "DP-201-240",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Show dimensions and raw blocker states, not only aggregate score.",
@@ -5646,10 +5578,9 @@
       "title": "Dependency Health",
       "depth_pass": "DP-201-240",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Differentiate direct/transitive/build/runtime dependencies.",
@@ -5867,10 +5798,9 @@
       "title": "Vendor / Provider Risk",
       "depth_pass": "DP-201-240",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Record provider-specific dependency and criticality.",
@@ -6088,10 +6018,9 @@
       "title": "Provider Failover",
       "depth_pass": "DP-201-240",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Failover requires compatible capability/data-boundary profile.",
@@ -6312,7 +6241,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Never imply remote freshness or capabilities while offline.",
@@ -6533,7 +6461,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Disable external connectors/egress by construction.",
@@ -6754,7 +6681,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Adapt capability to measured edge resources without changing security guarantees.",
@@ -6975,7 +6901,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Separate organization/tenant administration from model authority.",
@@ -7196,7 +7121,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Validate issuer/audience/signature and claim mapping fail closed.",
@@ -7417,7 +7341,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Admin actions require explicit identity/authorization and durable receipts.",
@@ -7635,10 +7558,9 @@
       "title": "Audit UI",
       "depth_pass": "DP-201-240",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "UI is a projection of append-only/canonical audit data.",
@@ -7857,10 +7779,9 @@
       "title": "Operations Dashboard",
       "depth_pass": "DP-201-240",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Expose freshness/degraded telemetry state explicitly.",
@@ -8079,10 +8000,9 @@
       "title": "Agent Operations Dashboard",
       "depth_pass": "DP-201-240",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Human controls act through governed APIs, not UI-local state.",
@@ -8301,10 +8221,9 @@
       "title": "Research Dashboard",
       "depth_pass": "DP-201-240",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Separate evidence state from generated narrative.",
@@ -8523,10 +8442,9 @@
       "title": "Model Operations",
       "depth_pass": "DP-201-240",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Every deployed model maps to immutable artifact/config/eval evidence.",
@@ -8745,10 +8663,9 @@
       "title": "Model Rollback",
       "depth_pass": "DP-201-240",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Keep rollback-compatible prior artifacts/configs available.",
