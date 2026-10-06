@@ -6,6 +6,7 @@ helpers used by observability, dense retrieval, and physics.
 """
 from __future__ import annotations
 
+import atexit
 import os
 import shutil
 import threading
@@ -469,6 +470,15 @@ def get_default_jvm_registry() -> JvmAcceleratorRegistry:
         return _default_registry
 
 
+def close_default_jvm_accelerator(name: str) -> None:
+    """Close one default-registry helper without materializing the registry."""
+    JvmAcceleratorRegistry._validate_name(name)
+    with _default_registry_lock:
+        registry = _default_registry
+    if registry is not None:
+        registry.close(name)
+
+
 def close_default_jvm_registry() -> None:
     """Close every initialized JVM helper owned by the default registry."""
     global _default_registry
@@ -479,11 +489,15 @@ def close_default_jvm_registry() -> None:
         registry.close()
 
 
+atexit.register(close_default_jvm_registry)
+
+
 __all__ = [
     "JvmAcceleratorPreflight",
     "JvmAcceleratorRegistry",
     "JvmAcceleratorRegistryError",
     "JvmAcceleratorRuntimeStatus",
+    "close_default_jvm_accelerator",
     "close_default_jvm_registry",
     "get_default_jvm_registry",
 ]
