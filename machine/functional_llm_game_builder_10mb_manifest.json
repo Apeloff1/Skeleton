@@ -50,7 +50,7 @@
     "unclear rights or suspicious similarity quarantine artifacts fail-closed",
     "runtime completion cannot be inferred from documentation volume",
     "FLGB deep-closure pass 2 requires exactly 1,296 additional normative atoms per plane (12 subsystems × 12 lifecycle stages × 9 adversarial stress profiles) and may not auto-sign implementation.",
-    "The doubled atlas minimum is 20,000,000 UTF-8 shard bytes; exact byte accounting is fail-closed and specification size never substitutes for executable evidence."
+    "The literal doubled atlas minimum is 22,953,806 UTF-8 shard bytes (2 × the original 11,476,903-byte atlas); exact byte accounting is fail-closed and specification size never substitutes for executable evidence."
   ],
   "coverage": {
     "required_planes": [
