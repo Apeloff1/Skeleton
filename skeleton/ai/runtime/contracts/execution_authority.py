@@ -503,6 +503,10 @@ class AuthorityRevocationReceipt:
         }
 
     @property
+    def aggregate_usage(self) -> ResourceUsage:
+        return self.final_usage.add(self.descendant_usage)
+
+    @property
     def digest(self) -> str:
         return hashlib.sha256(canonical_json_bytes(self.canonical_payload())).hexdigest()
 
@@ -525,6 +529,7 @@ class AuthorityEvidenceBundle:
     revoked: bool
     sealed_at: datetime
     revocation_receipt_digest: str | None = None
+    descendant_usage: ResourceUsage = ResourceUsage()
     schema_version: int = EXECUTION_AUTHORITY_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -551,6 +556,8 @@ class AuthorityEvidenceBundle:
             raise ExecutionAuthorityError("final_usage must be ResourceUsage")
         if not isinstance(self.revoked, bool):
             raise ExecutionAuthorityError("revoked must be boolean")
+        if not isinstance(self.descendant_usage, ResourceUsage):
+            raise ExecutionAuthorityError("descendant_usage must be ResourceUsage")
         if self.revocation_receipt_digest is not None:
             object.__setattr__(
                 self,
@@ -578,6 +585,8 @@ class AuthorityEvidenceBundle:
             "consumption_count": self.consumption_count,
             "latest_consumption_digest": self.latest_consumption_digest,
             "final_usage": self.final_usage.as_dict(),
+            "descendant_usage": self.descendant_usage.as_dict(),
+            "aggregate_usage": self.aggregate_usage.as_dict(),
             "revoked": self.revoked,
             "revocation_receipt_digest": self.revocation_receipt_digest,
             "sealed_at": self.sealed_at.isoformat(),
