@@ -20,6 +20,9 @@ GAME_BUILDER_DUEL = ROOT / "machine" / "ai_game_builder_dual_rival_forge.json"
 GAME_BUILDER_OVERENGINEERING = ROOT / "machine" / "ai_game_builder_overengineering.json"
 GAME_BUILDER_RUNTIME_CONTRACTS = ROOT / "skeleton" / "ai" / "game_builder" / "contracts.py"
 GAME_BUILDER_RUNTIME_FORGE = ROOT / "skeleton" / "ai" / "game_builder" / "dual_rival_forge.py"
+GAME_BUILDER_CANON = ROOT / "skeleton" / "ai" / "game_builder" / "canon.py"
+GAME_BUILDER_RIGHTS = ROOT / "skeleton" / "ai" / "game_builder" / "rights.py"
+GAME_BUILDER_ATOMS = ROOT / "skeleton" / "ai" / "game_builder" / "atomizer.py"
 DEPTH_000_040 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_000_040.md"
 DEPTH_041_080 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_041_080.md"
 DEPTH_081_120 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_081_120.md"
@@ -165,6 +168,20 @@ def validate(data: dict) -> list[str]:
             errors.append("AI game builder runtime contracts implementation is missing")
         if not GAME_BUILDER_RUNTIME_FORGE.is_file():
             errors.append("AI game builder dual-rival runtime implementation is missing")
+        if game_builder.get("governance_runtime") != {
+            "canon": "skeleton/ai/game_builder/canon.py",
+            "rights": "skeleton/ai/game_builder/rights.py",
+            "atom_lineage": "skeleton/ai/game_builder/atomizer.py",
+            "tests": "skeleton/testing/test_ai_game_builder_governance.py",
+        }:
+            errors.append("AI game builder governance runtime binding drifted")
+        for label, path in (
+            ("canon", GAME_BUILDER_CANON),
+            ("rights", GAME_BUILDER_RIGHTS),
+            ("atom lineage", GAME_BUILDER_ATOMS),
+        ):
+            if not path.is_file():
+                errors.append(f"AI game builder {label} runtime implementation is missing")
         if not GAME_BUILDER_OVERENGINEERING.is_file():
             errors.append("AI game builder overengineering authority is missing")
         else:
@@ -204,6 +221,13 @@ def validate(data: dict) -> list[str]:
                         errors.append("AI game builder authority must contain 500 levels")
                 if builder_authority.get("overengineering_authority") != "machine/ai_game_builder_overengineering.json":
                     errors.append("AI game builder authority overengineering binding drifted")
+                if builder_authority.get("governance_runtime") != {
+                    "canon": "skeleton/ai/game_builder/canon.py",
+                    "rights": "skeleton/ai/game_builder/rights.py",
+                    "atom_lineage": "skeleton/ai/game_builder/atomizer.py",
+                    "tests": "skeleton/testing/test_ai_game_builder_governance.py",
+                }:
+                    errors.append("AI game builder authority governance runtime binding drifted")
                 families = builder_authority.get("families")
                 if not isinstance(families, list) or len(families) != 50:
                     errors.append("AI game builder authority family registry must contain 50 entries")
@@ -223,6 +247,13 @@ def validate(data: dict) -> list[str]:
                     "tests": "skeleton/testing/test_ai_game_builder_contracts.py",
                 }:
                     errors.append("AI game builder dual-rival runtime binding drifted")
+                if duel_authority.get("governance_runtime") != {
+                    "canon": "skeleton/ai/game_builder/canon.py",
+                    "rights": "skeleton/ai/game_builder/rights.py",
+                    "atom_lineage": "skeleton/ai/game_builder/atomizer.py",
+                    "tests": "skeleton/testing/test_ai_game_builder_governance.py",
+                }:
+                    errors.append("AI game builder dual-rival governance runtime binding drifted")
                 modes = duel_authority.get("effort_modes", {})
                 for key, rounds in (("forge_100", 100), ("forge_1000", 1000), ("forge_10000", 10000)):
                     mode = modes.get(key) if isinstance(modes, dict) else None
