@@ -616,6 +616,10 @@ def validate_authority_attenuation(
             raise ExecutionAuthorityError(f"delegated {name} mismatch")
     if child.issuer_id != parent.actor_id:
         raise ExecutionAuthorityError("child issuer is not the parent actor")
+    if child.policy_digest != parent.policy_digest:
+        raise ExecutionAuthorityError(
+            "delegated authority cannot change policy without refinement evidence"
+        )
     if child.issued_at < parent.issued_at:
         raise ExecutionAuthorityError("child authority predates parent")
     if child.expires_at > parent.expires_at:
