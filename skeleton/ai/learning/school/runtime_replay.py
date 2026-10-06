@@ -7,11 +7,11 @@ import json
 import math
 from typing import Sequence
 
-from skeleton.learning.school.decision_ledger import (
+from skeleton.ai.learning.school.decision_ledger import (
     DecisionDisposition,
     DecisionLedger,
 )
-from skeleton.learning.school.session_runtime import (
+from skeleton.ai.learning.school.session_runtime import (
     SessionEvent,
     SessionPhase,
 )
