@@ -600,6 +600,119 @@ class AuthorityEvidenceBundle:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class AuthorityStateCheckpoint:
+    """Deterministic restart checkpoint for one admitted execution authority."""
+
+    authority: ExecutionAuthority
+    admission_receipt: AdmissionReceipt
+    consumption_receipts: tuple[AuthorityConsumptionReceipt, ...]
+    revocation_receipt: AuthorityRevocationReceipt | None
+    created_at: datetime
+    schema_version: int = EXECUTION_AUTHORITY_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.authority, ExecutionAuthority):
+            raise ExecutionAuthorityError("checkpoint authority must be ExecutionAuthority")
+        if not isinstance(self.admission_receipt, AdmissionReceipt):
+            raise ExecutionAuthorityError(
+                "checkpoint admission_receipt must be AdmissionReceipt"
+            )
+        receipts = tuple(self.consumption_receipts)
+        if any(not isinstance(item, AuthorityConsumptionReceipt) for item in receipts):
+            raise ExecutionAuthorityError(
+                "checkpoint consumption_receipts contain invalid item"
+            )
+        object.__setattr__(self, "consumption_receipts", receipts)
+        if self.revocation_receipt is not None and not isinstance(
+            self.revocation_receipt,
+            AuthorityRevocationReceipt,
+        ):
+            raise ExecutionAuthorityError(
+                "checkpoint revocation_receipt must be AuthorityRevocationReceipt"
+            )
+        created = _aware_utc(self.created_at, "created_at")
+        object.__setattr__(self, "created_at", created)
+        if self.schema_version != EXECUTION_AUTHORITY_SCHEMA_VERSION:
+            raise ExecutionAuthorityError("unsupported authority-checkpoint schema")
+
+        authority = self.authority
+        admission = self.admission_receipt
+        if admission.authority_digest != authority.digest:
+            raise ExecutionAuthorityError("checkpoint admission authority mismatch")
+        for name in ("operation_id", "execution_id"):
+            if getattr(admission, name) != getattr(authority, name):
+                raise ExecutionAuthorityError(
+                    f"checkpoint admission {name} mismatch"
+                )
+        if admission.expires_at != authority.expires_at:
+            raise ExecutionAuthorityError(
+                "checkpoint admission expiry does not match authority"
+            )
+        if not authority.active(now=admission.admitted_at):
+            raise ExecutionAuthorityError(
+                "checkpoint admission time is outside authority validity"
+            )
+        if created < admission.admitted_at:
+            raise ExecutionAuthorityError("checkpoint predates admission")
+
+        verify_authority_receipt_chain(authority, receipts)
+        latest_digest = None if not receipts else receipts[-1].digest
+        latest_time = admission.admitted_at
+        if receipts:
+            latest_time = receipts[-1].authorized_at
+        if self.revocation_receipt is not None:
+            revocation = self.revocation_receipt
+            if revocation.authority_digest != authority.digest:
+                raise ExecutionAuthorityError(
+                    "checkpoint revocation authority mismatch"
+                )
+            for name in ("operation_id", "execution_id"):
+                if getattr(revocation, name) != getattr(authority, name):
+                    raise ExecutionAuthorityError(
+                        f"checkpoint revocation {name} mismatch"
+                    )
+            if revocation.latest_consumption_digest != latest_digest:
+                raise ExecutionAuthorityError(
+                    "checkpoint revocation does not bind latest consumption"
+                )
+            if revocation.revoked_at < latest_time:
+                raise ExecutionAuthorityError(
+                    "checkpoint revocation predates latest authority event"
+                )
+            latest_time = revocation.revoked_at
+        if created < latest_time:
+            raise ExecutionAuthorityError(
+                "checkpoint creation time predates latest authority event"
+            )
+
+    @property
+    def final_usage(self) -> ResourceUsage:
+        if not self.consumption_receipts:
+            return ResourceUsage()
+        return self.consumption_receipts[-1].total_usage
+
+    def canonical_payload(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "authority": self.authority.canonical_payload(),
+            "admission_receipt": self.admission_receipt.canonical_payload(),
+            "consumption_receipts": [
+                receipt.canonical_payload() for receipt in self.consumption_receipts
+            ],
+            "revocation_receipt": (
+                None
+                if self.revocation_receipt is None
+                else self.revocation_receipt.canonical_payload()
+            ),
+            "created_at": self.created_at.isoformat(),
+        }
+
+    @property
+    def digest(self) -> str:
+        return hashlib.sha256(canonical_json_bytes(self.canonical_payload())).hexdigest()
+
+
 def bind_authority_evidence(
     result: AIExecutionResult,
     evidence: AuthorityEvidenceBundle,
@@ -714,6 +827,7 @@ __all__ = [
     "AuthorityEffect",
     "AuthorityEvidenceBundle",
     "AuthorityRevocationReceipt",
+    "AuthorityStateCheckpoint",
     "EXECUTION_AUTHORITY_SCHEMA_VERSION",
     "ExecutionAuthority",
     "ExecutionAuthorityError",
