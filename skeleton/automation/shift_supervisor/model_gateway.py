@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 from skeleton.provider_contract import ProviderArchitectureError, load_provider_architecture
+from skeleton.shells.cancellation import CancellationToken
 from skeleton.security.activation_security import enforce_bot_activation_security
 from .prompts import compose_system_prompt
 
@@ -157,8 +158,13 @@ class ModelGateway:
         correlation_id: str,
         max_output_tokens: int = 8000,
         extra_headers: Mapping[str, str] | None = None,
+        cancellation: CancellationToken | None = None,
     ) -> dict[str, Any]:
         enforce_bot_activation_security()
+        if cancellation is not None:
+            if not isinstance(cancellation, CancellationToken):
+                raise TypeError("cancellation must be CancellationToken")
+            cancellation.require_active()
         endpoint, api_key, model = self._config()
         system_prompt = compose_system_prompt(system_prompt)
         web_search = self._web_search_enabled()
@@ -189,6 +195,8 @@ class ModelGateway:
         attempts_used = 0
         saw_retryable_rate_limit = False
         for attempt in range(1, attempts + 1):
+            if cancellation is not None:
+                cancellation.require_active()
             attempts_used = attempt
             if (
                 attempt > standard_attempts
@@ -216,8 +224,12 @@ class ModelGateway:
                 method="POST",
             )
             try:
+                if cancellation is not None:
+                    cancellation.require_active()
                 with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:
                     raw = response.read(self.max_response_bytes + 1)
+                if cancellation is not None:
+                    cancellation.require_active()
                 if len(raw) > self.max_response_bytes:
                     raise ValueError("model response exceeded configured byte limit")
                 payload = json.loads(raw.decode("utf-8"))
@@ -239,6 +251,8 @@ class ModelGateway:
                 TypeError,
                 ValueError,
             ) as exc:
+                if cancellation is not None and cancellation.cancelled:
+                    cancellation.require_active()
                 if isinstance(exc, urllib.error.HTTPError):
                     error_code, error_type, request_id = self._http_error_details(exc)
                     last_error_summary = self._http_error_summary(
@@ -260,7 +274,11 @@ class ModelGateway:
                     else standard_attempts
                 )
                 if attempt < retry_limit:
-                    time.sleep(self._retry_delay(exc, attempt))
+                    delay = self._retry_delay(exc, attempt)
+                    if cancellation is None:
+                        time.sleep(delay)
+                    elif cancellation.wait(delay):
+                        cancellation.require_active()
                     continue
                 break
         raise ModelRequestError(
