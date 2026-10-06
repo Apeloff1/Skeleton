@@ -893,6 +893,48 @@ def test_gold_master_requires_unanimous_independent_quorum() -> None:
 
 
 
+def test_gold_master_verdict_rejects_acceptance_tampering() -> None:
+    bundle = _gold_bundle()
+    tribunal = GoldMasterTribunal(("gm-1", "gm-2", "gm-3"))
+    for authority in ("gm-1", "gm-2", "gm-3"):
+        evidence = f"{authority}-evidence-" + "a" * 24
+        rationale = f"{authority}-rationale-" + "b" * 24
+        tribunal.vote(
+            TribunalVote(
+                authority_id=authority,
+                bundle_digest=bundle.digest,
+                accept=False if authority == "gm-3" else True,
+                evidence_digest=evidence,
+                rationale_digest=rationale,
+                authority_provenance=_evaluator_provenance(
+                    authority,
+                    method_id="gold-master-tribunal",
+                    evidence_refs=(evidence, rationale),
+                ),
+            )
+        )
+    verdict = tribunal.decide(bundle)
+    with pytest.raises(ValueError, match="acceptance does not match recorded votes"):
+        type(verdict)(
+            bundle_digest=verdict.bundle_digest,
+            accepted=True,
+            authority_ids=verdict.authority_ids,
+            vote_digests=verdict.vote_digests,
+            vote_acceptances=verdict.vote_acceptances,
+            quorum=verdict.quorum,
+            verdict_digest=canonical_digest(
+                {
+                    "accepted": True,
+                    "authority_ids": list(verdict.authority_ids),
+                    "bundle_digest": verdict.bundle_digest,
+                    "quorum": verdict.quorum,
+                    "vote_acceptances": list(verdict.vote_acceptances),
+                    "vote_digests": list(verdict.vote_digests),
+                }
+            ),
+        )
+
+
 def test_forge_release_binding_rejects_incomplete_forge() -> None:
     forge = DualRivalForge(
         effort_mode=100,
