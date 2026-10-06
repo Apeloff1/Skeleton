@@ -1,11 +1,11 @@
 {
   "schema_version": "ai-chat-runtime/v1",
   "status": "implemented_candidate",
-  "prepared_at_utc": "2026-10-06T12:45:00Z",
+  "prepared_at_utc": "2026-10-06T13:55:00Z",
   "prepared_by": "chatgpt:gpt-5.6-sol",
   "base_main_sha": "a04fffb388317a9744d9025f4e523ac0cdc19d7f",
   "canonical_module": "skeleton/ai/assistant/turn_runtime.py",
-  "scope": "durable provider-neutral AI chat turn state, live product-route persistence, replay, reconnectable streaming, execution ownership fencing, resource admission, and crash recovery",
+  "scope": "durable provider-neutral AI chat turn state, live product-route persistence, replay, reconnectable streaming, execution ownership fencing, response acceptance, resource admission, and crash recovery",
   "authority": {
     "conversation_authority": "backend/core/conversations.py",
     "assistant_control_plane": "skeleton/ai/assistant/runtime.py",
@@ -69,7 +69,10 @@
     "heartbeat renewal invalidates the previous lease token even when the fencing epoch is unchanged",
     "lease-bound durable event append validates holder epoch digest and expiry at the atomic write boundary",
     "Mongo crash recovery discards a prepared event when its authorizing lease is stale expired or superseded",
-    "ownership acquire renew release and takeover mutations produce a digest-chained audit receipt"
+    "ownership acquire renew release and takeover mutations produce a digest-chained audit receipt",
+    "live engine output cannot enter canonical transcript state without a response-acceptance receipt bound to exact operation execution context and output",
+    "live response-acceptance receipts hash output and evidence references instead of storing response prose or provider receipt contents",
+    "engine-backed live chat requires an accepted verification identity and at least one canonical provider receipt before transcript commit"
   ],
   "budget_dimensions": [
     "wall_seconds",
@@ -120,14 +123,16 @@
     "live_route_tests": "backend/tests/test_ai_chat_turn_route_cutover.py",
     "ownership": "skeleton/ai/assistant/turn_ownership.py",
     "ownership_tests": "skeleton/testing/test_ai_chat_turn_ownership.py",
-    "ownership_repository_tests": "skeleton/testing/test_ai_chat_turn_ownership_repository.py"
+    "ownership_repository_tests": "skeleton/testing/test_ai_chat_turn_ownership_repository.py",
+    "response_acceptance": "skeleton/ai/assistant/response_acceptance.py",
+    "response_acceptance_tests": "skeleton/testing/test_ai_chat_response_acceptance.py"
   },
   "promotion_rule": "implemented candidate only; no completion or verification signoff until exact-head CI and independent verification pass",
   "next_integrations": [
     "bind model/provider execution receipts into turn events",
     "bind canonical tool receipt reconciliation into restart handling",
     "move attachment payloads to governed content-addressed references",
-    "add citation verification and high-assurance response acceptance"
+    "bind structured claim evidence receipts into the live response-acceptance gate"
   ],
   "persistence": {
     "portable": "skeleton/persistence/chat_turn_repository.py",
@@ -176,5 +181,16 @@
     "write_rule": "lease-bound append checks holder, epoch, lease digest, and expiry inside the persistence CAS",
     "crash_rule": "prepared Mongo events carry their authorizing lease and are discarded before replay if that lease is no longer current",
     "audit_rule": "acquire, renew, release, and takeover emit digest-chained ownership receipts"
+  },
+  "response_acceptance": {
+    "contract": "skeleton/ai/assistant/response_acceptance.py",
+    "live_policy": "backend.ai.chat.live-response/v1",
+    "execution_rule": "observed engine execution identity must exactly match the canonical chat execution identity",
+    "verification_rule": "verification must be canonical and explicitly accepted by the live policy",
+    "provider_rule": "engine-backed live chat requires at least one canonical provider receipt and rejects malformed or duplicate receipt identity",
+    "output_rule": "non-empty UTF-8 output is digest-bound and hard-bounded before canonical commit",
+    "minimization_rule": "acceptance receipts store hashes of output and receipt references rather than response prose or provider receipt contents",
+    "rejection_rule": "rejected engine output is terminalized and never committed as a canonical assistant message",
+    "transcript_binding": "accepted assistant messages carry response-acceptance-sha256:<digest> in canonical artifact references"
   }
 }
