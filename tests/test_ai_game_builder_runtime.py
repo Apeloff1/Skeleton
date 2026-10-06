@@ -37,9 +37,11 @@ from skeleton.ai.game_builder.contracts import (  # noqa: E402
     Challenge,
     EffortMode,
     GateResult,
+    PromotionReceipt,
     QUALITY_AXES,
     Rival,
     Stage,
+    canonical_digest,
 )
 from skeleton.ai.game_builder.dual_rival_forge import DualRivalForge, ForgeStateError  # noqa: E402
 
@@ -326,6 +328,97 @@ def test_checkpoint_round_trip_preserves_pending_attack_state() -> None:
     tampered["round_index"] = 999
     with pytest.raises(ForgeStateError, match="checkpoint digest mismatch"):
         DualRivalForge.restore(tampered)
+
+
+def test_promotion_receipt_rehashes_public_decision_evidence() -> None:
+    incumbent = _candidate("seed", "s", quality=_quality(0.4))
+    forge = DualRivalForge(effort_mode=100, champion=incumbent)
+    built = _candidate(Rival.A.value, "a", quality=_quality(0.5))
+    forge.submit_construct(built)
+    challenge = _challenge(Rival.B, built, "b")
+    forge.submit_attack(challenge)
+    receipt = forge.reconcile(
+        submitted=challenge.improved_candidate,
+        evaluator_id="independent-judge",
+        gate_results=_gates(),
+    )
+
+    assert canonical_digest(receipt.decision_payload()) == receipt.decision_digest
+    with pytest.raises(ValueError, match="decision digest mismatch"):
+        PromotionReceipt(
+            round_index=receipt.round_index,
+            effort_mode=receipt.effort_mode,
+            incumbent_digest=receipt.incumbent_digest,
+            submitted_digest=receipt.submitted_digest,
+            promoted_digest=receipt.promoted_digest,
+            evaluator_id=receipt.evaluator_id,
+            gate_results=receipt.gate_results,
+            evaluated_submitted_quality=receipt.evaluated_submitted_quality,
+            decision=receipt.decision,
+            decision_digest="tampered-" + "0" * 64,
+        )
+
+
+def test_forge_rejects_completed_round_count_without_receipt_history() -> None:
+    with pytest.raises(
+        ForgeStateError,
+        match="completed_rounds must equal promotion receipt count",
+    ):
+        DualRivalForge(
+            effort_mode=100,
+            champion=_candidate("seed", "s"),
+            completed_rounds=1,
+            round_index=2,
+        )
+
+
+def test_forge_rejects_terminal_champion_not_bound_to_receipt_chain() -> None:
+    incumbent = _candidate("seed", "s", quality=_quality(0.4))
+    forge = DualRivalForge(effort_mode=100, champion=incumbent)
+    built = _candidate(Rival.A.value, "a", quality=_quality(0.5))
+    forge.submit_construct(built)
+    challenge = _challenge(Rival.B, built, "b")
+    forge.submit_attack(challenge)
+    receipt = forge.reconcile(
+        submitted=None,
+        evaluator_id="independent-judge",
+        gate_results=_gates(),
+    )
+
+    with pytest.raises(
+        ForgeStateError,
+        match="forge champion must match terminal promotion receipt",
+    ):
+        DualRivalForge(
+            effort_mode=100,
+            champion=_candidate("seed", "different"),
+            builder=Rival.B,
+            completed_rounds=1,
+            round_index=2,
+            receipts=(receipt,),
+        )
+
+
+def test_self_consistent_forged_checkpoint_cannot_invent_completed_rounds() -> None:
+    forge = DualRivalForge(effort_mode=100, champion=_candidate("seed", "s"))
+    checkpoint = forge.checkpoint()
+    forged = {
+        key: value
+        for key, value in checkpoint.items()
+        if key != "checkpoint_digest"
+    }
+    forged["completed_rounds"] = 1
+    forged["round_index"] = 2
+    forged["receipt_digests"] = []
+    forged["checkpoint_digest"] = canonical_digest(
+        {key: value for key, value in forged.items() if key != "checkpoint_digest"}
+    )
+
+    with pytest.raises(
+        ForgeStateError,
+        match="completed_rounds must equal promotion receipt count",
+    ):
+        DualRivalForge.restore(forged)
 
 
 def test_forge_100_completes_only_after_exactly_100_three_stage_rounds() -> None:
