@@ -686,7 +686,8 @@
       "load/capacity evidence for changed hot paths",
       "canary SLO receipt",
       "rollback target and tested trigger",
-      "SBOM and artifact provenance"
+      "SBOM and artifact provenance",
+      "current architecture and security exception inventory with no unexpired P0 blockers"
     ]
   },
   "operating_model": {
