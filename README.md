@@ -48,6 +48,7 @@ python -m skeleton test
 The application assembly contract and operator commands are documented in [`docs/APP_ASSEMBLY.md`](docs/APP_ASSEMBLY.md).
 Canonical ownership, topology, change lanes, and migration boundaries are mapped in [`docs/ARCHITECTURE_MAP.md`](docs/ARCHITECTURE_MAP.md).
 The complete AI build sequence, provider rules, capability planes, acceptance gates, and open construction gaps are the mandatory manual in [`docs/AI_APP_CONSTRUCTION_MANUAL.md`](docs/AI_APP_CONSTRUCTION_MANUAL.md).
+The whole-system production target—HA topology, tenancy, security, SLOs, disaster recovery, capacity, observability, incident operations, progressive delivery, and enterprise acceptance—is governed by [`docs/ENTERPRISE_SYSTEM_ARCHITECTURE.md`](docs/ENTERPRISE_SYSTEM_ARCHITECTURE.md) and `machine/enterprise_system_architecture.json`.
 
 ### Windows installer
 
