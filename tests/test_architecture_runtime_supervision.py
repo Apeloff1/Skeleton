@@ -138,6 +138,46 @@ class RuntimeSupervisionTests(unittest.TestCase):
         ):
             MODULE.validate(root)
 
+    def test_rejects_disabled_work_lease_requirement(self) -> None:
+        root = self._fixture()
+        path = root / "machine/runtime_supervision.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["lifecycle_semantics"]["work_leases"]["required"] = False
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with self.assertRaisesRegex(
+            MODULE.RuntimeSupervisionError,
+            "work_leases.required must be true",
+        ):
+            MODULE.validate(root)
+
+    def test_rejects_backend_shared_middleware_drift(self) -> None:
+        root = self._fixture()
+        path = root / "backend/server.py"
+        text = path.read_text(encoding="utf-8").replace(
+            "RuntimeAdmissionMiddleware",
+            "RemovedRuntimeAdmissionMiddleware",
+        )
+        path.write_text(text, encoding="utf-8")
+        with self.assertRaisesRegex(
+            MODULE.RuntimeSupervisionError,
+            "required runtime symbol missing",
+        ):
+            MODULE.validate(root)
+
+    def test_rejects_engine_execution_lease_binding_drift(self) -> None:
+        root = self._fixture()
+        path = root / "skeleton/api/engine_runtime.py"
+        text = path.read_text(encoding="utf-8").replace(
+            "self.lifecycle.acquire_work(",
+            "self.lifecycle.removed_acquire_work(",
+        )
+        path.write_text(text, encoding="utf-8")
+        with self.assertRaisesRegex(
+            MODULE.RuntimeSupervisionError,
+            "required runtime symbol missing",
+        ):
+            MODULE.validate(root)
+
     def test_rejects_stale_masterplan_gap(self) -> None:
         root = self._fixture()
         path = root / "machine/runtime_supervision.json"
