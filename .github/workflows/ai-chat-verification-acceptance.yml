@@ -1,0 +1,133 @@
+name: AI Chat Verification Acceptance
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/intelligence/verification_acceptance.py"
+      - "skeleton/intelligence/verification_policy.py"
+      - "skeleton/intelligence/verification_runtime.py"
+      - "skeleton/intelligence/__init__.py"
+      - "skeleton/contracts/verification.py"
+      - "skeleton/testing/test_verification_acceptance.py"
+      - "skeleton/testing/test_verification_contract.py"
+      - "skeleton/testing/test_verification_runtime.py"
+      - "machine/ai_chat_verification_acceptance.json"
+      - "scripts/check_ai_chat_verification_acceptance.py"
+      - "scripts/verify_ai_chat_verification_acceptance.py"
+      - "docs/plan/AI_CHAT_MASTERPLAN_2026-10-06.md"
+      - ".github/workflows/ai-chat-verification-acceptance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-chat-verification-acceptance-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verification-acceptance:
+    name: AI chat verification acceptance contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: python -m pip install --disable-pip-version-check -e ".[dev]"
+
+      - name: Compile verification surfaces
+        run: >-
+          python -m compileall -q
+          skeleton/intelligence/verification_acceptance.py
+          skeleton/intelligence/verification_policy.py
+          skeleton/intelligence/verification_runtime.py
+          skeleton/contracts/verification.py
+          skeleton/testing/test_verification_acceptance.py
+          scripts/check_ai_chat_verification_acceptance.py
+          scripts/verify_ai_chat_verification_acceptance.py
+
+      - name: Validate Volume 9 structure
+        run: python scripts/check_ai_chat_verification_acceptance.py
+
+      - name: Run acceptance and existing verification regressions
+        run: >-
+          python -m pytest -q --noconftest
+          -p pytest_asyncio.plugin
+          skeleton/testing/test_verification_acceptance.py
+          skeleton/testing/test_verification_contract.py
+          skeleton/testing/test_verification_runtime.py
+
+      - name: Emit exact-head Volume 9 evidence
+        env:
+          VERIFICATION_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/check_ai_chat_verification_acceptance.py
+          --head-sha "$VERIFICATION_HEAD_SHA"
+          --evidence-out .ai-chat-verification-acceptance.json
+          --print-evidence
+
+      - name: Independently verify Volume 9 evidence
+        env:
+          VERIFICATION_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_ai_chat_verification_acceptance.py
+          .ai-chat-verification-acceptance.json
+          --head-sha "$VERIFICATION_HEAD_SHA"
+          --evidence-out .ai-chat-verification-acceptance-independent.json
+          --print-evidence
+
+      - name: Assert exact-head Volume 9 closure
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          structural = json.loads(
+              Path(".ai-chat-verification-acceptance.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          independent = json.loads(
+              Path(
+                  ".ai-chat-verification-acceptance-independent.json"
+              ).read_text(encoding="utf-8")
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if structural.get("head_sha") != expected:
+              raise SystemExit("Volume 9 structural receipt is not exact-head")
+          if structural.get("valid") is not True or structural.get("errors"):
+              raise SystemExit("Volume 9 structural validation failed")
+          if len(structural.get("digests") or {}) != 12:
+              raise SystemExit("Volume 9 structural digest coverage incomplete")
+          if independent.get("expected_head") != expected:
+              raise SystemExit("Volume 9 independent receipt is not exact-head")
+          if independent.get("valid") is not True or independent.get("errors"):
+              raise SystemExit("Volume 9 independent verification failed")
+          if (
+              independent.get("structural_evidence_digest")
+              != independent.get("recomputed_structural_evidence_digest")
+          ):
+              raise SystemExit("Volume 9 evidence was not independently rehashed")
+          print("AI chat Volume 9 exact-head closure verified:", expected)
+          PY
+
+      - name: Verify governed AI file tree
+        run: python scripts/check_ai_file_tree.py
