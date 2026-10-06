@@ -42,6 +42,32 @@ def _require_nonempty(value: str, *, field_name: str) -> str:
     return text
 
 
+def _require_int(value: object, *, field_name: str, minimum: int = 0) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+        raise ValueError(f"{field_name} must be an integer >= {minimum}")
+    return value
+
+
+def _require_number(
+    value: object,
+    *,
+    field_name: str,
+    minimum: float = 0.0,
+    strictly_positive: bool = False,
+) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{field_name} must be a finite number")
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError(f"{field_name} must be a finite number")
+    if strictly_positive:
+        if number <= minimum:
+            raise ValueError(f"{field_name} must be > {minimum}")
+    elif number < minimum:
+        raise ValueError(f"{field_name} must be >= {minimum}")
+    return number
+
+
 def digest_bytes(payload: bytes) -> str:
     if not isinstance(payload, (bytes, bytearray)):
         raise TypeError("payload must be bytes")
@@ -57,10 +83,27 @@ class ResourceLimits:
     max_frames: int = 36_000
 
     def __post_init__(self) -> None:
-        if self.max_bytes <= 0 or self.max_pixels <= 0 or self.max_frames <= 0:
-            raise ValueError("resource limits must be positive")
-        if self.max_audio_seconds <= 0 or self.max_video_seconds <= 0:
-            raise ValueError("duration limits must be positive")
+        object.__setattr__(self, "max_bytes", _require_int(self.max_bytes, field_name="max_bytes", minimum=1))
+        object.__setattr__(self, "max_pixels", _require_int(self.max_pixels, field_name="max_pixels", minimum=1))
+        object.__setattr__(self, "max_frames", _require_int(self.max_frames, field_name="max_frames", minimum=1))
+        object.__setattr__(
+            self,
+            "max_audio_seconds",
+            _require_number(
+                self.max_audio_seconds,
+                field_name="max_audio_seconds",
+                strictly_positive=True,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "max_video_seconds",
+            _require_number(
+                self.max_video_seconds,
+                field_name="max_video_seconds",
+                strictly_positive=True,
+            ),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,16 +121,27 @@ class MediaMetadata:
         object.__setattr__(self, "format", _require_nonempty(self.format, field_name="format"))
         if (self.width is None) != (self.height is None):
             raise ValueError("width and height must be supplied together")
-        if self.width is not None and (self.width <= 0 or self.height is None or self.height <= 0):
-            raise ValueError("media dimensions must be positive")
-        if self.duration_seconds is not None and (
-            not math.isfinite(self.duration_seconds) or self.duration_seconds < 0
-        ):
-            raise ValueError("duration_seconds must be finite and non-negative")
-        if self.sample_rate_hz is not None and self.sample_rate_hz <= 0:
-            raise ValueError("sample_rate_hz must be positive")
-        if self.channels is not None and self.channels <= 0:
-            raise ValueError("channels must be positive")
+        if self.width is not None:
+            object.__setattr__(self, "width", _require_int(self.width, field_name="width", minimum=1))
+            object.__setattr__(self, "height", _require_int(self.height, field_name="height", minimum=1))
+        if self.duration_seconds is not None:
+            object.__setattr__(
+                self,
+                "duration_seconds",
+                _require_number(self.duration_seconds, field_name="duration_seconds"),
+            )
+        if self.sample_rate_hz is not None:
+            object.__setattr__(
+                self,
+                "sample_rate_hz",
+                _require_int(self.sample_rate_hz, field_name="sample_rate_hz", minimum=1),
+            )
+        if self.channels is not None:
+            object.__setattr__(
+                self,
+                "channels",
+                _require_int(self.channels, field_name="channels", minimum=1),
+            )
 
     @property
     def digest(self) -> str:
@@ -120,8 +174,7 @@ class MultimodalAsset:
         object.__setattr__(self, "source_digest", _require_digest(self.source_digest, field_name="source_digest"))
         object.__setattr__(self, "trust_label", _require_nonempty(self.trust_label, field_name="trust_label"))
         object.__setattr__(self, "classification", _require_nonempty(self.classification, field_name="classification"))
-        if self.byte_size < 0:
-            raise ValueError("byte_size must be non-negative")
+        object.__setattr__(self, "byte_size", _require_int(self.byte_size, field_name="byte_size"))
         copied = dict(self.metadata)
         _canonical(copied)
         object.__setattr__(self, "metadata", copied)
@@ -188,8 +241,8 @@ class ImageAsset:
     def __post_init__(self) -> None:
         object.__setattr__(self, "asset_digest", _require_digest(self.asset_digest, field_name="asset_digest"))
         object.__setattr__(self, "format", _require_nonempty(self.format, field_name="format"))
-        if self.width <= 0 or self.height <= 0:
-            raise ValueError("image dimensions must be positive")
+        object.__setattr__(self, "width", _require_int(self.width, field_name="width", minimum=1))
+        object.__setattr__(self, "height", _require_int(self.height, field_name="height", minimum=1))
 
     @property
     def pixels(self) -> int:
@@ -206,8 +259,10 @@ class ImageRegion:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "asset_digest", _require_digest(self.asset_digest, field_name="asset_digest"))
-        if min(self.x, self.y) < 0 or self.width <= 0 or self.height <= 0:
-            raise ValueError("invalid image region geometry")
+        object.__setattr__(self, "x", _require_int(self.x, field_name="x"))
+        object.__setattr__(self, "y", _require_int(self.y, field_name="y"))
+        object.__setattr__(self, "width", _require_int(self.width, field_name="width", minimum=1))
+        object.__setattr__(self, "height", _require_int(self.height, field_name="height", minimum=1))
 
     def validate_within(self, image: ImageAsset) -> None:
         if image.asset_digest != self.asset_digest:
@@ -239,8 +294,9 @@ class DocumentPage:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "document_digest", _require_digest(self.document_digest, field_name="document_digest"))
-        if self.page_number <= 0 or self.width <= 0 or self.height <= 0:
-            raise ValueError("document page geometry must be positive")
+        object.__setattr__(self, "page_number", _require_int(self.page_number, field_name="page_number", minimum=1))
+        object.__setattr__(self, "width", _require_int(self.width, field_name="width", minimum=1))
+        object.__setattr__(self, "height", _require_int(self.height, field_name="height", minimum=1))
 
 
 @dataclass(frozen=True, slots=True)
@@ -259,8 +315,11 @@ class OCRSpan:
         object.__setattr__(self, "document_digest", _require_digest(self.document_digest, field_name="document_digest"))
         object.__setattr__(self, "text", _require_nonempty(self.text, field_name="text"))
         object.__setattr__(self, "source", _require_nonempty(self.source, field_name="source"))
-        if self.page_number <= 0 or min(self.x, self.y) < 0 or self.width <= 0 or self.height <= 0:
-            raise ValueError("invalid OCR geometry")
+        object.__setattr__(self, "page_number", _require_int(self.page_number, field_name="page_number", minimum=1))
+        object.__setattr__(self, "x", _require_int(self.x, field_name="x"))
+        object.__setattr__(self, "y", _require_int(self.y, field_name="y"))
+        object.__setattr__(self, "width", _require_int(self.width, field_name="width", minimum=1))
+        object.__setattr__(self, "height", _require_int(self.height, field_name="height", minimum=1))
         if not math.isfinite(self.confidence) or not 0.0 <= self.confidence <= 1.0:
             raise ValueError("OCR confidence must be finite in [0, 1]")
 
@@ -275,10 +334,11 @@ class LayoutRegion:
     def __post_init__(self) -> None:
         object.__setattr__(self, "document_digest", _require_digest(self.document_digest, field_name="document_digest"))
         object.__setattr__(self, "kind", _require_nonempty(self.kind, field_name="kind"))
-        if self.page_number <= 0:
-            raise ValueError("page_number must be positive")
-        for item in self.span_digests:
-            _require_digest(item, field_name="span_digest")
+        object.__setattr__(self, "page_number", _require_int(self.page_number, field_name="page_number", minimum=1))
+        spans = tuple(_require_digest(item, field_name="span_digest") for item in self.span_digests)
+        if len(spans) != len(set(spans)):
+            raise ValueError("layout region span digests must be unique")
+        object.__setattr__(self, "span_digests", spans)
 
 
 @dataclass(frozen=True, slots=True)
@@ -290,10 +350,17 @@ class AudioAsset:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "asset_digest", _require_digest(self.asset_digest, field_name="asset_digest"))
-        if self.sample_rate_hz <= 0 or self.channels <= 0:
-            raise ValueError("audio rate/channels must be positive")
-        if not math.isfinite(self.duration_seconds) or self.duration_seconds < 0:
-            raise ValueError("audio duration must be finite and non-negative")
+        object.__setattr__(
+            self,
+            "sample_rate_hz",
+            _require_int(self.sample_rate_hz, field_name="sample_rate_hz", minimum=1),
+        )
+        object.__setattr__(self, "channels", _require_int(self.channels, field_name="channels", minimum=1))
+        object.__setattr__(
+            self,
+            "duration_seconds",
+            _require_number(self.duration_seconds, field_name="duration_seconds"),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -311,8 +378,11 @@ class AudioSegment:
             and 0 <= self.start_seconds < self.end_seconds
         ):
             raise ValueError("audio segment timestamps are invalid")
-        if self.source_channel < 0:
-            raise ValueError("source_channel must be non-negative")
+        object.__setattr__(
+            self,
+            "source_channel",
+            _require_int(self.source_channel, field_name="source_channel"),
+        )
 
     def validate_within(self, asset: AudioAsset) -> None:
         if self.asset_digest != asset.asset_digest:
@@ -349,14 +419,15 @@ class TranscriptSegment:
     def __post_init__(self) -> None:
         object.__setattr__(self, "session_id", _require_nonempty(self.session_id, field_name="session_id"))
         object.__setattr__(self, "text", _require_nonempty(self.text, field_name="text"))
-        if self.sequence < 0:
-            raise ValueError("sequence must be non-negative")
-        if not (
-            math.isfinite(self.start_seconds)
-            and math.isfinite(self.end_seconds)
-            and 0 <= self.start_seconds <= self.end_seconds
-        ):
+        object.__setattr__(self, "sequence", _require_int(self.sequence, field_name="sequence"))
+        if not isinstance(self.final, bool):
+            raise ValueError("final must be boolean")
+        start = _require_number(self.start_seconds, field_name="start_seconds")
+        end = _require_number(self.end_seconds, field_name="end_seconds")
+        if start > end:
             raise ValueError("transcript timestamps are invalid")
+        object.__setattr__(self, "start_seconds", start)
+        object.__setattr__(self, "end_seconds", end)
 
 
 @dataclass(frozen=True, slots=True)
@@ -369,8 +440,12 @@ class SpeechFrame:
     def __post_init__(self) -> None:
         object.__setattr__(self, "session_id", _require_nonempty(self.session_id, field_name="session_id"))
         object.__setattr__(self, "payload_digest", _require_digest(self.payload_digest, field_name="payload_digest"))
-        if self.sequence < 0 or not math.isfinite(self.timestamp_seconds) or self.timestamp_seconds < 0:
-            raise ValueError("invalid speech frame sequence/timestamp")
+        object.__setattr__(self, "sequence", _require_int(self.sequence, field_name="sequence"))
+        object.__setattr__(
+            self,
+            "timestamp_seconds",
+            _require_number(self.timestamp_seconds, field_name="timestamp_seconds"),
+        )
 
 
 class SpeechSession:
@@ -387,9 +462,7 @@ class SpeechSession:
 
     def __init__(self, session_id: str, *, max_segments: int = 4096) -> None:
         self.session_id = _require_nonempty(session_id, field_name="session_id")
-        if max_segments <= 0:
-            raise ValueError("max_segments must be positive")
-        self.max_segments = max_segments
+        self.max_segments = _require_int(max_segments, field_name="max_segments", minimum=1)
         self.state = "new"
         self._segments: list[TranscriptSegment] = []
 
@@ -422,11 +495,31 @@ class SpeechSession:
         self._segments.append(segment)
 
     def replace_provisional(self, segment: TranscriptSegment) -> None:
+        if self.state != "active":
+            raise ValueError("transcripts may only be replaced while active")
         if not self._segments or self._segments[-1].final:
             raise ValueError("there is no provisional transcript to replace")
         previous = self._segments[-1]
         if segment.final or segment.sequence != previous.sequence or segment.session_id != self.session_id:
             raise ValueError("replacement must target the same provisional segment")
+        self._segments[-1] = segment
+
+    def finalize_provisional(self, segment: TranscriptSegment) -> None:
+        """Atomically promote the current provisional segment to authority."""
+
+        if self.state != "active":
+            raise ValueError("transcripts may only be finalized while active")
+        if not self._segments or self._segments[-1].final:
+            raise ValueError("there is no provisional transcript to finalize")
+        previous = self._segments[-1]
+        if (
+            not segment.final
+            or segment.sequence != previous.sequence
+            or segment.session_id != self.session_id
+        ):
+            raise ValueError("finalization must target the same provisional segment")
+        if segment.start_seconds < previous.start_seconds:
+            raise ValueError("final transcript cannot move before provisional start")
         self._segments[-1] = segment
 
 
@@ -440,12 +533,18 @@ class VideoAsset:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "asset_digest", _require_digest(self.asset_digest, field_name="asset_digest"))
-        if self.width <= 0 or self.height <= 0:
-            raise ValueError("video dimensions must be positive")
-        if not math.isfinite(self.duration_seconds) or self.duration_seconds < 0:
-            raise ValueError("video duration must be finite and non-negative")
-        if not math.isfinite(self.fps) or self.fps <= 0:
-            raise ValueError("fps must be finite and positive")
+        object.__setattr__(self, "width", _require_int(self.width, field_name="width", minimum=1))
+        object.__setattr__(self, "height", _require_int(self.height, field_name="height", minimum=1))
+        object.__setattr__(
+            self,
+            "duration_seconds",
+            _require_number(self.duration_seconds, field_name="duration_seconds"),
+        )
+        object.__setattr__(
+            self,
+            "fps",
+            _require_number(self.fps, field_name="fps", strictly_positive=True),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -474,10 +573,16 @@ class FrameSample:
     def __post_init__(self) -> None:
         object.__setattr__(self, "asset_digest", _require_digest(self.asset_digest, field_name="asset_digest"))
         object.__setattr__(self, "frame_digest", _require_digest(self.frame_digest, field_name="frame_digest"))
-        if self.source_frame_index < 0:
-            raise ValueError("source_frame_index must be non-negative")
-        if not math.isfinite(self.timestamp_seconds) or self.timestamp_seconds < 0:
-            raise ValueError("frame timestamp must be finite and non-negative")
+        object.__setattr__(
+            self,
+            "source_frame_index",
+            _require_int(self.source_frame_index, field_name="source_frame_index"),
+        )
+        object.__setattr__(
+            self,
+            "timestamp_seconds",
+            _require_number(self.timestamp_seconds, field_name="timestamp_seconds"),
+        )
 
 
 def detect_document_text_conflict(
@@ -532,10 +637,30 @@ class MultimodalQuery:
     def __post_init__(self) -> None:
         object.__setattr__(self, "text", _require_nonempty(self.text, field_name="text"))
         object.__setattr__(self, "tenant_id", _require_nonempty(self.tenant_id, field_name="tenant_id"))
-        if not self.modalities:
+        modalities = tuple(_require_nonempty(item, field_name="modality") for item in self.modalities)
+        if not modalities:
             raise ValueError("at least one modality is required")
-        if self.as_of_epoch is not None and self.as_of_epoch < 0:
-            raise ValueError("as_of_epoch must be non-negative")
+        if len(modalities) != len(set(modalities)):
+            raise ValueError("modalities must be unique")
+        object.__setattr__(self, "modalities", modalities)
+        classifications = frozenset(
+            _require_nonempty(item, field_name="allowed_classification")
+            for item in self.allowed_classifications
+        )
+        trust_labels = frozenset(
+            _require_nonempty(item, field_name="allowed_trust_label")
+            for item in self.allowed_trust_labels
+        )
+        if not classifications or not trust_labels:
+            raise ValueError("classification and trust filters must be explicit")
+        object.__setattr__(self, "allowed_classifications", classifications)
+        object.__setattr__(self, "allowed_trust_labels", trust_labels)
+        if self.as_of_epoch is not None:
+            object.__setattr__(
+                self,
+                "as_of_epoch",
+                _require_int(self.as_of_epoch, field_name="as_of_epoch"),
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -556,8 +681,11 @@ class MultimodalHit:
             object.__setattr__(self, name, _require_nonempty(getattr(self, name), field_name=name))
         if not math.isfinite(self.score):
             raise ValueError("score must be finite")
-        if self.indexed_epoch < 0:
-            raise ValueError("indexed_epoch must be non-negative")
+        object.__setattr__(
+            self,
+            "indexed_epoch",
+            _require_int(self.indexed_epoch, field_name="indexed_epoch"),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -600,7 +728,9 @@ class MultimodalRegistry:
         self.limits = limits or ResourceLimits()
         self._assets: dict[str, MultimodalAsset] = {}
         self._transforms: dict[str, MediaTransform] = {}
+        self._transform_outputs: dict[str, str] = {}
         self._hits: list[MultimodalHit] = []
+        self._hit_identities: dict[tuple[str, str], MultimodalHit] = {}
 
     def register_asset(self, asset: MultimodalAsset) -> str:
         if asset.byte_size > self.limits.max_bytes:
@@ -632,10 +762,21 @@ class MultimodalRegistry:
         existing = self._transforms.get(transform.digest)
         if existing is not None and existing != transform:
             raise ValueError("transform identity collision")
+        bound = self._transform_outputs.get(transform.output_digest)
+        if bound is not None and bound != transform.digest:
+            raise ValueError("transform output is already bound to different lineage")
         self._transforms[transform.digest] = transform
+        self._transform_outputs[transform.output_digest] = transform.digest
         return transform.digest
 
     def index(self, hit: MultimodalHit) -> None:
+        identity = (hit.asset_digest, hit.evidence_digest)
+        existing = self._hit_identities.get(identity)
+        if existing is not None:
+            if existing != hit:
+                raise ValueError("evidence identity is already bound to different retrieval data")
+            return
+        self._hit_identities[identity] = hit
         self._hits.append(hit)
 
     def retrieve(self, query: MultimodalQuery, *, limit: int = 20) -> CrossModalEvidence:
