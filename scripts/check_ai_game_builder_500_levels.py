@@ -188,7 +188,10 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         if token not in rights_text:
             raise GameBuilderAuthorityError(f"rights authority missing requirement: {token}")
     consistency = duel.get("longform_consistency")
-    if not isinstance(consistency, dict) or "prime" not in _text(consistency.get("prime_directive"), "longform prime directive").lower():
+    if not isinstance(consistency, dict):
+        raise GameBuilderAuthorityError("long-form consistency authority is missing")
+    prime = _text(consistency.get("prime_directive"), "longform prime directive").lower()
+    if "local improvement" not in prime or "long-form" not in prime:
         raise GameBuilderAuthorityError("long-form consistency prime directive is missing")
 
     human = (root / HUMAN).read_text(encoding="utf-8")
