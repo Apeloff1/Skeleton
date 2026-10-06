@@ -155,7 +155,15 @@ class EngineExecutionCoordinator:
             self._tasks.pop(execution_id, None)
         lease = self._lifecycle_leases.pop(task, None)
         if lease is not None and self.lifecycle is not None:
-            self.lifecycle.release_work(lease)
+            try:
+                self.lifecycle.release_work(lease)
+            except RuntimeSupervisionError:
+                try:
+                    self.lifecycle.fail(
+                        reason="engine-work-lease-release-failed"
+                    )
+                except RuntimeSupervisionError:
+                    pass
         if task.cancelled():
             return
         # Retrieve the exception so the event loop never reports an unobserved
@@ -245,12 +253,20 @@ class EngineExecutionCoordinator:
     async def shutdown(self) -> None:
         self._closed = True
         async with self._lock:
-            tasks = tuple(self._tasks.values())
+            task_items = tuple(self._tasks.items())
             self._tasks.clear()
-        for task in tasks:
+        for _, task in task_items:
             task.cancel()
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
+        if task_items:
+            await asyncio.gather(
+                *(task for _, task in task_items),
+                return_exceptions=True,
+            )
+            # Do not rely on event-loop callback scheduling for lease release.
+            # _task_done is idempotent by exact task identity, so explicitly
+            # reconcile every shutdown task before returning.
+            for execution_id, task in task_items:
+                self._task_done(execution_id, task)
 
     async def _drive(
         self,
