@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createRequire } from 'node:module';
+import Module, { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import ts from 'typescript';
@@ -16,10 +16,12 @@ const compiled = ts.transpileModule(runtimeSource, {
   },
   fileName: runtimePath,
 });
-const runtimeModule = { exports: {} };
 const localRequire = createRequire(import.meta.url);
-const evaluate = new Function('exports', 'module', 'require', compiled.outputText);
-evaluate(runtimeModule.exports, runtimeModule, localRequire);
+const runtimeModule = new Module(runtimePath);
+runtimeModule.filename = runtimePath;
+runtimeModule.paths = Module._nodeModulePaths(root);
+runtimeModule.require = localRequire;
+runtimeModule._compile(compiled.outputText, runtimePath);
 const a11y = runtimeModule.exports;
 
 function source(path) {
