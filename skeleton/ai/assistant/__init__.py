@@ -306,6 +306,14 @@ __all__ += [
     "CROSS_PLANE_RESILIENCE_SCHEMA_VERSION",
     "CrossPlaneResilienceReceipt",
     "ResilienceBindingError",
+    "TurnAttachmentBinding",
+    "TurnAuthorityFingerprint",
+    "TurnRouteBinding",
+    "TurnToolRecoveryBinding",
+    "bind_attachment_batch",
+    "bind_route_decision",
+    "bind_tool_recovery_decision",
+    "build_cross_plane_resilience_receipt",
     "remaining_execution_budget",
     "route_request_for_remaining_turn",
 ]
@@ -354,16 +362,6 @@ __all__ += [
     "classify_affect",
     "surface_contract",
 ]
-    "TurnToolRecoveryBinding",
-    "bind_attachment_batch",
-    "bind_route_decision",
-    "bind_tool_recovery_decision",
-    "build_cross_plane_resilience_receipt",
-    "remaining_execution_budget",
-    "route_request_for_remaining_turn",
-]
-
-
 from .turn_ownership import (
     TURN_OWNERSHIP_SCHEMA_VERSION,
     TurnLeaseBusy,
