@@ -2143,6 +2143,7 @@ async def cancel_ai_chat_turn(
                     operation_id,
                     tenant_id=tenant_id,
                     owner_id=owner_id,
+                    provider_receipt_refs=assistant_message.provider_receipt_refs,
                 )
             except Exception as exc:
                 raise _chat_error(exc) from exc
