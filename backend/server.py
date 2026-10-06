@@ -3240,34 +3240,12 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-@app.middleware("http")
-async def _runtime_lifecycle_admission(request, call_next):
-    """Reject new application work once the shared runtime begins draining."""
-
-    lifecycle = getattr(request.app.state, "runtime_lifecycle", None)
-    if lifecycle is None or request.url.path.startswith("/api/health"):
-        return await call_next(request)
-
-    from fastapi.responses import JSONResponse
-    from skeleton.kernel.runtime_supervision import RuntimeSupervisionError
-    from uuid import uuid4
-
-    try:
-        lease = lifecycle.acquire_work("http:" + str(uuid4()))
-    except RuntimeSupervisionError:
-        return JSONResponse(
-            status_code=503,
-            content={
-                "error": "service_unavailable",
-                "reason": "runtime_not_accepting_work",
-                "lifecycle": lifecycle.snapshot(),
-            },
-            headers={"Retry-After": "1"},
-        )
-    try:
-        return await call_next(request)
-    finally:
-        lifecycle.release_work(lease)
+from skeleton.kernel.runtime_supervision import RuntimeAdmissionMiddleware
+app.add_middleware(
+    RuntimeAdmissionMiddleware,
+    lifecycle=runtime_lifecycle,
+    exempt_prefixes=("/api/health",),
+)
 
 from core.http_errors import install_public_error_handlers as _install_public_error_handlers
 _install_public_error_handlers(app)
