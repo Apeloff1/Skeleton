@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plan_version": "1.8.0",
+  "plan_version": "1.9.0",
   "status": "active",
   "competitive_engineering_ladder": {
     "authority": "machine/competitive_ai_engineering_ladder.json",
@@ -24357,5 +24357,25 @@
     "required_for_product_claim": "A complete enterprise AI claim requires all VOL-000..VOL-420 to be enterprise_qualified on current evidence; dedicated critical profiles must additionally reach superior.",
     "implementation_dossier_authority": "machine/enterprise_ai_implementation_notes_index.json",
     "implementation_dossier_rule": "Every VOL-000..VOL-420 must carry a current 14-level October 2026 implementation dossier; enterprise qualification is invalid when dossier/masterplan drift exists."
+  },
+  "ai_game_builder_500_levels": {
+    "authority": "machine/ai_game_builder_500_levels.json",
+    "dual_rival_authority": "machine/ai_game_builder_dual_rival_forge.json",
+    "human_spec": "docs/architecture/AI_GAME_BUILDER_500_LEVELS.md",
+    "schema_version": "skeleton.ai_game_builder_500_levels.v1",
+    "family_count": 50,
+    "levels_per_family": 10,
+    "total_levels": 500,
+    "effort_modes": {
+      "forge_100": 100,
+      "forge_1000": 1000,
+      "forge_10000": 10000
+    },
+    "stages_per_round": 3,
+    "wall_clock_deadline": null,
+    "scope": "overlay-only; binds inside VOL-000..VOL-420",
+    "prime_directive": "Long-form consistency may veto any local improvement.",
+    "completion_rule": "Exact-head implementation plus deterministic/adversarial/recovery/rights evidence is required; prose, round count, elapsed time or model confidence never completes a level.",
+    "originality_rule": "Unknown incorporated rights are quarantined; reference-only sources may inform facts, techniques and abstract ideas but may not supply protected expression; ambiguous legal/similarity cases require human/legal review."
   }
 }
