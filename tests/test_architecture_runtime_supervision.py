@@ -23,7 +23,10 @@ class RuntimeSupervisionTests(unittest.TestCase):
         result = MODULE.validate(ROOT)
         self.assertEqual(result["status"], "valid")
         self.assertEqual(result["service_count"], 2)
-        self.assertGreater(result["required_symbol_count"], 10)
+        self.assertEqual(result["lifecycle_phase_count"], 5)
+        self.assertEqual(result["connector_count"], 5)
+        self.assertEqual(result["network_surface_count"], 4)
+        self.assertGreater(result["required_symbol_count"], 20)
 
     def _fixture(self) -> Path:
         temp = Path(tempfile.mkdtemp(prefix="runtime-supervision-"))
@@ -33,11 +36,16 @@ class RuntimeSupervisionTests(unittest.TestCase):
             "machine/runtime_supervision.json",
             "machine/ai_master_plan.json",
             contract["sources"]["runtime_manifest"],
+            contract["sources"]["construction_contract"],
+            contract["sources"]["shared_lifecycle"],
+            contract["sources"]["governed_lifecycle_mirror"],
         }
         for service in contract["services"]:
             for group in ("lifecycle_bindings", "connector_bindings", "cancellation_bindings"):
                 for item in service.get(group, []):
                     paths.add(item["path"])
+        for connector in contract["connectors"]:
+            paths.add(connector["owner"])
         for relative in sorted(paths):
             src = ROOT / relative
             dst = temp / relative
@@ -64,6 +72,70 @@ class RuntimeSupervisionTests(unittest.TestCase):
         )
         path.write_text(text, encoding="utf-8")
         with self.assertRaisesRegex(MODULE.RuntimeSupervisionError, "required runtime symbol missing"):
+            MODULE.validate(root)
+
+
+    def test_rejects_missing_network_transport_connector(self) -> None:
+        root = self._fixture()
+        path = root / "machine/runtime_supervision.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["connectors"] = [
+            item
+            for item in data["connectors"]
+            if item["id"] != "repository-automation"
+        ]
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with self.assertRaisesRegex(
+            MODULE.RuntimeSupervisionError,
+            "network connector coverage mismatch|connector inventory contains",
+        ):
+            MODULE.validate(root)
+
+    def test_rejects_unbounded_connector(self) -> None:
+        root = self._fixture()
+        path = root / "machine/runtime_supervision.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        connector = next(
+            item
+            for item in data["connectors"]
+            if item["id"] == "shift-supervisor-model-gateway"
+        )
+        connector["bounded_timeout"] = False
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with self.assertRaisesRegex(
+            MODULE.RuntimeSupervisionError,
+            "must have a bounded timeout",
+        ):
+            MODULE.validate(root)
+
+    def test_rejects_late_result_fencing_regression(self) -> None:
+        root = self._fixture()
+        path = root / "machine/runtime_supervision.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        connector = next(
+            item
+            for item in data["connectors"]
+            if item["id"] == "repository-automation-chatgpt-adapter"
+        )
+        connector["late_result_fencing"] = False
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with self.assertRaisesRegex(
+            MODULE.RuntimeSupervisionError,
+            "must fence late results",
+        ):
+            MODULE.validate(root)
+
+    def test_rejects_governed_lifecycle_mirror_drift(self) -> None:
+        root = self._fixture()
+        path = root / "skeleton/ai/runtime/kernel/runtime_supervision.py"
+        path.write_text(
+            path.read_text(encoding="utf-8") + "\n# drift\n",
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(
+            MODULE.RuntimeSupervisionError,
+            "governed mirror drifted",
+        ):
             MODULE.validate(root)
 
     def test_rejects_stale_masterplan_gap(self) -> None:
