@@ -457,13 +457,15 @@
         "skeleton/testing/test_architecture_map.py",
         "tests/test_architecture_boundaries.py",
         "skeleton/testing/test_architecture_map.py::test_component_fitness_covers_all_runtime_planes_and_ai_mappings",
-        "skeleton/testing/test_architecture_map.py::test_owner_lookup_resolves_future_path_without_materialization"
+        "skeleton/testing/test_architecture_map.py::test_owner_lookup_resolves_future_path_without_materialization",
+        "tests/test_vol002_architecture_independent_verifier.py"
       ],
       "evaluations": [
         ".github/workflows/vol002-architecture-fitness.yml",
         "scripts/check_architecture_map.py --json",
         "skeleton/testing/test_architecture_map.py",
-        "tests/test_architecture_boundaries.py"
+        "tests/test_architecture_boundaries.py",
+        "scripts/verify_vol002_architecture_fitness.py"
       ],
       "evidence": [
         "https://github.com/Apeloff1/Skeleton/commit/d4334086eaf1c7cbbff46890b727fc954fde1677",
@@ -472,7 +474,9 @@
         ".github/workflows/vol002-architecture-fitness.yml",
         "https://github.com/Apeloff1/Skeleton/commit/ce1a19f26c6b811c189d309440ab5b921c1ef7b8",
         "https://github.com/Apeloff1/Skeleton/commit/ce6d1736af9137dd07669ff17423ed1decf2a4c5",
-        "https://github.com/Apeloff1/Skeleton/commit/bae16164548a1cf7250c11ff00c0ce5ea970279f"
+        "https://github.com/Apeloff1/Skeleton/commit/bae16164548a1cf7250c11ff00c0ce5ea970279f",
+        "scripts/verify_vol002_architecture_fitness.py",
+        "tests/test_vol002_architecture_independent_verifier.py"
       ],
       "risks": [
         "documentation/runtime split brain",
