@@ -29,9 +29,11 @@ SKIP_DIRS = {
     ".expo",
     "__pycache__",
 }
-# Large checked-in curriculum/snapshot sources exceed 2 MiB. Keep the reader
-# bounded while scanning those tracked text corpora in full.
-MAX_FILE_BYTES = 16 * 1024 * 1024
+# Large checked-in machine indexes can exceed 16 MiB on a legacy single line.
+# Keep the reader bounded while scanning those tracked text corpora in full.
+# Producers are separately required to emit bounded physical lines; this 64 MiB
+# ceiling preserves fail-closed coverage for already-materialized legacy data.
+MAX_FILE_BYTES = 64 * 1024 * 1024
 SCAN_FRAGMENT_CHARS = 1024 * 1024
 SCAN_OVERLAP_CHARS = 1024
 TEXT_SUFFIXES = {
