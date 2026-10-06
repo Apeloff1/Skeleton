@@ -1,6 +1,6 @@
 # Skeleton AI Master Plan
 
-Plan version: **1.7.0**
+Plan version: **1.8.0**
 
 Architecture lane: `PR #1904 / integration/architecture-map-v1`
 
@@ -8,7 +8,7 @@ Index: [`MASTER_INDEX.md`](MASTER_INDEX.md)
 
 Machine mirror: [`machine/ai_master_plan.json`](../../machine/ai_master_plan.json)
 
-Exotic systems depth: [`EXOTIC_SYSTEMS_DEPTH.md`](EXOTIC_SYSTEMS_DEPTH.md) / [`machine/ai_exotic_systems_catalog.json`](../../machine/ai_exotic_systems_catalog.json)
+Exotic systems depth: [`EXOTIC_SYSTEMS_DEPTH.md`](EXOTIC_SYSTEMS_DEPTH.md) / [`machine/ai_exotic_systems_catalog.json`](../../machine/ai_exotic_systems_catalog.json)\n\nPost-enterprise Frontier-96 ladder: [`FRONTIER_96_AI_LADDER.md`](FRONTIER_96_AI_LADDER.md) / [`machine/frontier_96_ai_ladder.json`](../../machine/frontier_96_ai_ladder.json)
 
 Existing construction manual: [`docs/AI_APP_CONSTRUCTION_MANUAL.md`](../AI_APP_CONSTRUCTION_MANUAL.md)
 
@@ -742,6 +742,20 @@ This explicitly covers Stage-0 drift and the larger implementation/accountabilit
 After reconciliation of the landed Stage-0 through Stage-3 candidates, the next net-new build frontier is bounded cognitive execution -> engine boundary -> stream reconciliation -> full-stack evidence. Lower-stage evidence remains dependency-authoritative and can invalidate downstream promotion.
 
 The frontier validator `scripts/check_ai_execution_frontier.py` cross-checks the snapshot and candidate lifecycle states against `machine/ai_build_accountability.json`. Any subsequent ledger promotion therefore requires this frontier snapshot to be deliberately advanced rather than silently becoming stale.
+
+## 24.6 Frontier-96 post-enterprise qualification overlay
+
+The post-enterprise ladder is defined by [`docs/plan/FRONTIER_96_AI_LADDER.md`](FRONTIER_96_AI_LADDER.md) and [`machine/frontier_96_ai_ladder.json`](../../machine/frontier_96_ai_ladder.json).
+
+It adds **96 independently specifiable and signable capability layers** `F96-001..F96-096` above the existing enterprise-superiority grade. It is deliberately an **acceptance/depth overlay**, not a new architecture-volume family, so the `VOL-000..420` breadth freeze remains intact.
+
+The 96 layers are grouped into twelve eight-layer strata: authority/context, memory/knowledge, retrieval/evidence, reasoning/metacognition, planning/search, tools/actions, agents/delegation, multimodal/world intelligence, learning/adaptation, model/training/compute systems, verification/safety/security, and scientific-autonomy/frontier operations.
+
+Eligibility is fail-closed: a Frontier-96 layer may qualify only when its mapped prerequisite capabilities already satisfy the current enterprise `superior` grade with exact-head evidence. Each layer then requires its own implementation evidence, adversarial/boundary/recovery coverage where applicable, an implementation signature, and a distinct independent-verification signature.
+
+The `96` label is an organizational discipline inspired by the published GPT-3 175B depth; it is **not** a claim that the current ChatGPT product exposes a fixed 96-transformer-layer architecture. Skeleton uses the count to force a complete system-level ladder rather than to imitate undocumented model internals.
+
+The final `frontier_96_qualified` claim is valid only when all 96 layers are simultaneously signed complete on current evidence and `F96-096` has independent finality evidence. A stale lower-layer prerequisite automatically invalidates downstream frontier qualification.
 
 ## 25. Scope freeze and future plan evolution
 
