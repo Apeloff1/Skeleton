@@ -5628,7 +5628,8 @@
     "validator": "scripts/check_advanced_ai_structure.py",
     "independent_verifier": "scripts/verify_advanced_ai_structure.py",
     "tests": "tests/test_advanced_ai_structure.py",
-    "workflow": ".github/workflows/advanced-ai-structure.yml"
+    "workflow": ".github/workflows/advanced-ai-structure.yml",
+    "maturity_ledger": "machine/advanced_ai_maturity_ledger.json"
   },
   "completion": {
     "plan_complete": true,
