@@ -26,8 +26,9 @@ def _fixture(tmp_path: Path) -> Path:
         "docs/architecture/AI_GAME_BUILDER_500_LEVELS.md",
         "docs/plan/MASTER_PLAN.md",
         *manifest["shards"],
+        *[family["owner_binding"] for family in manifest["families"]],
     ]
-    for relative in paths:
+    for relative in dict.fromkeys(paths):
         source = ROOT / relative
         target = root / relative
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -148,4 +149,38 @@ def test_rejects_unknown_rights_becoming_permissive(tmp_path: Path) -> None:
     duel["rights_and_originality"]["default_for_unknown"] = "facts_and_ideas_reference_only"
     _write(root, "machine/ai_game_builder_dual_rival_forge.json", duel)
     with pytest.raises(MODULE.GameBuilderAuthorityError, match="fail closed to quarantine"):
+        MODULE.validate(root)
+
+
+def test_rejects_missing_family_owner_binding(tmp_path: Path) -> None:
+    root = _fixture(tmp_path)
+    manifest = _json(root, "machine/ai_game_builder_500_levels.json")
+    manifest["families"][47]["owner_binding"] = "skeleton/ai/game_builder/missing_experience_eval.py"
+    _write(root, "machine/ai_game_builder_500_levels.json", manifest)
+
+    with pytest.raises(MODULE.GameBuilderAuthorityError, match="owner_binding is missing"):
+        MODULE.validate(root)
+
+
+def test_rejects_level_owner_drift_from_family_contract(tmp_path: Path) -> None:
+    root = _fixture(tmp_path)
+    manifest = _json(root, "machine/ai_game_builder_500_levels.json")
+    first = manifest["shards"][0]
+    shard = _json(root, first)
+    shard["levels"][0]["owner_binding"] = "skeleton/ai/game_builder/canon.py"
+    _write(root, first, shard)
+
+    with pytest.raises(MODULE.GameBuilderAuthorityError, match="owner binding drifts"):
+        MODULE.validate(root)
+
+
+def test_rejects_level_batch_drift_from_family_contract(tmp_path: Path) -> None:
+    root = _fixture(tmp_path)
+    manifest = _json(root, "machine/ai_game_builder_500_levels.json")
+    first = manifest["shards"][0]
+    shard = _json(root, first)
+    shard["levels"][0]["game_creation_batches"] = ["B999"]
+    _write(root, first, shard)
+
+    with pytest.raises(MODULE.GameBuilderAuthorityError, match="batch binding drifts"):
         MODULE.validate(root)
