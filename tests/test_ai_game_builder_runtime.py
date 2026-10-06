@@ -59,6 +59,7 @@ def _producer_provenance(
     project_id: str = "project:test-game",
     run_id: str = "run:test-forge",
 ) -> ProducerProvenance:
+    suffix = (token * 32)[:32]
     return ProducerProvenance(
         project_id=project_id,
         run_id=run_id,
@@ -70,6 +71,13 @@ def _producer_provenance(
         producer_behavior_digest=canonical_digest({"behavior": token}),
         source_revision=canonical_digest({"source": token})[:40],
         provider_receipt_refs=(f"provider-receipt:{token}",),
+        output_artifact_refs=(f"artifact-{suffix}",),
+        output_evidence_refs=(
+            f"evidence-{suffix}",
+            f"assumption-{suffix}",
+            f"attack-{suffix}",
+            f"counterexample-{suffix}",
+        ),
     )
 
 
@@ -79,11 +87,17 @@ def _candidate(
     *,
     quality: dict[str, float] | None = None,
     parents: tuple[str, ...] = (),
+    project_id: str = "project:test-game",
+    run_id: str = "run:test-forge",
 ) -> Candidate:
     suffix = (token * 32)[:32]
     return Candidate.create(
         producer_id=producer,
-        producer_provenance=_producer_provenance(token),
+        producer_provenance=_producer_provenance(
+            token,
+            project_id=project_id,
+            run_id=run_id,
+        ),
         artifact=ArtifactIdentity(
             artifact_digest=f"artifact-{suffix}",
             canon_digest=f"canon-{suffix}",
@@ -235,22 +249,10 @@ def test_malformed_gate_object_is_rejected_before_promotion() -> None:
 
 def test_construct_rejects_cross_project_candidate_injection() -> None:
     forge = DualRivalForge(effort_mode=100, champion=_candidate("seed", "seed"))
-    candidate = Candidate.create(
-        producer_id=Rival.A.value,
-        producer_provenance=_producer_provenance(
-            "cross-project",
-            project_id="project:other",
-        ),
-        artifact=ArtifactIdentity(
-            artifact_digest="artifact-cross-project-0000000000000000",
-            canon_digest="canon-cross-project-000000000000000000",
-            provenance_digest="provenance-cross-project-0000000000000",
-            family_id="GB03",
-            level_id="GBL-021",
-        ),
-        quality=_quality(),
-        evidence_digests=("evidence-cross-project-000000000000000",),
-        assumption_digest="assumption-cross-project-0000000000000",
+    candidate = _candidate(
+        Rival.A.value,
+        "cross-project",
+        project_id="project:other",
     )
     with pytest.raises(ForgeStateError, match="project_id does not match forge scope"):
         forge.submit_construct(candidate)
@@ -260,22 +262,10 @@ def test_attack_rejects_cross_run_candidate_injection() -> None:
     forge = DualRivalForge(effort_mode=100, champion=_candidate("seed", "seed"))
     built = _candidate(Rival.A.value, "built")
     forge.submit_construct(built)
-    improved = Candidate.create(
-        producer_id=Rival.B.value,
-        producer_provenance=_producer_provenance(
-            "cross-run",
-            run_id="run:other-forge",
-        ),
-        artifact=ArtifactIdentity(
-            artifact_digest="artifact-cross-run-0000000000000000000",
-            canon_digest="canon-cross-run-000000000000000000000",
-            provenance_digest="provenance-cross-run-0000000000000000",
-            family_id="GB03",
-            level_id="GBL-021",
-        ),
-        quality=_quality(),
-        evidence_digests=("evidence-cross-run-000000000000000000",),
-        assumption_digest="assumption-cross-run-000000000000000",
+    improved = _candidate(
+        Rival.B.value,
+        "cross-run",
+        run_id="run:other-forge",
     )
     challenge = Challenge(
         challenger_id=Rival.B.value,
