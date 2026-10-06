@@ -359,6 +359,8 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         "resource_governor": str(RESOURCE_RUNTIME),
         "quality_debt": str(QUALITY_DEBT_RUNTIME),
         "integrated_control_plane": str(CONTROL_PLANE_RUNTIME),
+        "resilience": str(RESILIENCE_RUNTIME),
+        "gold_master": str(GOLD_MASTER_RUNTIME),
         "tests": [str(RUNTIME_TESTS), str(OVERENGINEERING_RUNTIME_TESTS)],
     }:
         raise GameBuilderAuthorityError("dual-rival runtime binding drifted")
