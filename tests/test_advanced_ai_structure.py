@@ -507,3 +507,135 @@ def test_evaluator_independence_requires_all_four_tiers() -> None:
     )
     errors = _validate(checker, payloads)
     assert "evaluator independence tier set drifted" in errors
+
+
+
+def test_maturity_ledger_starts_with_100_planned_levels() -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_ledger")
+    payloads = _payloads()
+    ledger = json.loads(
+        (ROOT / "machine" / "advanced_ai_maturity_ledger.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert len(ledger["levels"]) == 100
+    assert all(item["state"] == "PLANNED" for item in ledger["levels"])
+    assert all(
+        item["evidence_state"] == "MISSING"
+        for item in ledger["levels"]
+    )
+    assert ledger["production_maturity_level"] == 0
+    assert _validate(checker, payloads) == []
+
+
+def test_maturity_ledger_cannot_fabricate_promoted_level(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_ledger_fake")
+    payloads = _payloads()
+    ledger = json.loads(
+        (ROOT / "machine" / "advanced_ai_maturity_ledger.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    ledger["levels"][0]["state"] = "PROMOTED"
+    ledger["levels"][0]["evidence_state"] = "CURRENT"
+    ledger["levels"][0]["current_evidence_receipts"] = ["fake"]
+    ledger_path = tmp_path / "advanced_ai_maturity_ledger.json"
+    ledger_path.write_text(
+        json.dumps(ledger, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    original_load = checker._load
+
+    def fake_load(path: Path):
+        if path.name == "advanced_ai_maturity_ledger.json":
+            return json.loads(ledger_path.read_text(encoding="utf-8"))
+        return original_load(path)
+
+    monkeypatch.setattr(checker, "_load", fake_load)
+    errors = checker.validate_payloads(
+        payloads["contract"],
+        payloads["construction"],
+        payloads["enterprise"],
+        repo_root=ROOT,
+    )
+    assert "planning maturity ledger L001 must be PLANNED" in errors
+    assert "planning maturity ledger L001 evidence must be MISSING" in errors
+    assert (
+        "planning maturity ledger L001 cannot have evidence receipts"
+        in errors
+    )
+
+
+def test_maturity_ledger_owner_drift_fails_closed(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_ledger_owner")
+    payloads = _payloads()
+    ledger = json.loads(
+        (ROOT / "machine" / "advanced_ai_maturity_ledger.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    ledger["levels"][40]["primary_owner_plane"] = "memory"
+    ledger_path = tmp_path / "advanced_ai_maturity_ledger.json"
+    ledger_path.write_text(
+        json.dumps(ledger, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    original_load = checker._load
+
+    def fake_load(path: Path):
+        if path.name == "advanced_ai_maturity_ledger.json":
+            return json.loads(ledger_path.read_text(encoding="utf-8"))
+        return original_load(path)
+
+    monkeypatch.setattr(checker, "_load", fake_load)
+    errors = checker.validate_payloads(
+        payloads["contract"],
+        payloads["construction"],
+        payloads["enterprise"],
+        repo_root=ROOT,
+    )
+    assert "maturity ledger L041 owner drifted" in errors
+
+
+def test_maturity_ledger_summary_cannot_claim_progress(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_ledger_summary")
+    payloads = _payloads()
+    ledger = json.loads(
+        (ROOT / "machine" / "advanced_ai_maturity_ledger.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    ledger["summary"]["promoted"] = 100
+    ledger["summary"]["planned"] = 0
+    ledger_path = tmp_path / "advanced_ai_maturity_ledger.json"
+    ledger_path.write_text(
+        json.dumps(ledger, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    original_load = checker._load
+
+    def fake_load(path: Path):
+        if path.name == "advanced_ai_maturity_ledger.json":
+            return json.loads(ledger_path.read_text(encoding="utf-8"))
+        return original_load(path)
+
+    monkeypatch.setattr(checker, "_load", fake_load)
+    errors = checker.validate_payloads(
+        payloads["contract"],
+        payloads["construction"],
+        payloads["enterprise"],
+        repo_root=ROOT,
+    )
+    assert "planning maturity ledger summary drifted" in errors
