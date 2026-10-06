@@ -147,7 +147,7 @@ def validate(data: dict, scheduler: dict | None = None, closure: dict | None = N
         if phrase not in laws: errors.append(f"missing essential law fragment: {phrase}")
     bridge=data.get("psi_priority_bridge",{})
     if bridge.get("mapping")!="ESS1000-nnnn -> PSI1000-nnnn": errors.append("PSI mapping changed")
-    if "outrank optional polish" not in bridge.get("scheduling_rule",""): errors.append("essential priority rule missing")
+    if "above optional polish" not in bridge.get("scheduling_rule",""): errors.append("essential priority rule missing")
     if scheduler is not None:
         auth=scheduler.get("authority",{})
         if auth.get("essentials")!="machine/essentials_1000.json": errors.append("scheduler missing ESS-1000 authority")
