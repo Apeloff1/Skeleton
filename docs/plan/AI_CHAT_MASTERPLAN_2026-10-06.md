@@ -601,8 +601,31 @@ authority and sandbox extraction receipts.
 
 ### Volume 8 — evidence and citation plane
 
-Add freshness classification, source quality, claim mapping, and citation
-verification.
+Status: **implemented candidate on stacked evidence branch; exact-head
+qualification pending**.
+
+Implemented:
+
+- response claims are evaluated through the existing claim-level
+  `CitationIntegrityEngine` rather than citation proximity heuristics;
+- requirement classes distinguish synthesis-only, evidence-supported,
+  freshness-required, authoritative-source, and high-assurance claims;
+- citation provenance, source locator, evidence span, quantities, units,
+  relation/polarity, and claim-anchor integrity remain mandatory through the
+  canonical citation engine;
+- source quality thresholds are explicit hard acceptance constraints;
+- freshness-required claims reject missing, stale, or future-dated evidence;
+- authoritative-source policies fail closed for secondary/community/unknown
+  sources;
+- high-assurance policy requires multiple independent supporting groups;
+- valid contradicting evidence blocks release by default;
+- rejected source reasons remain inspectable without promoting rejected
+  evidence into support counts;
+- deterministic claim-evidence receipts bind accepted citations, rejected
+  sources, requirement class, reasons, and evaluation time.
+
+Next integration: attach claim-evidence decision digests and citation
+attestations to assistant-message provenance before final release.
 
 ### Volume 9 — verification plane
 
