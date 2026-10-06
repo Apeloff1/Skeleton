@@ -43,6 +43,11 @@ from skeleton.contracts.conversation import ConversationAuthorType, Conversation
 from skeleton.context.compiler import ContextCompiler
 from skeleton.context.instruction_policy import InstructionPolicy
 from skeleton.context.sources import artifact_segment, conversation_message_segment
+from skeleton.ai.assistant.streaming import (
+    ChatStreamError,
+    project_turn_page,
+    require_resume_cursor,
+)
 from skeleton.ai.assistant.turn_runtime import TurnState
 from skeleton.persistence.chat_turn_repository import (
     ChatTurnAuthorizationError,
@@ -394,6 +399,8 @@ def _chat_error(exc: Exception) -> HTTPException:
         return HTTPException(status_code=403, detail="Chat turn access denied")
     if isinstance(exc, ChatTurnRepositoryError):
         return HTTPException(status_code=503, detail="Chat turn storage is unavailable")
+    if isinstance(exc, ChatStreamError):
+        return HTTPException(status_code=422, detail=str(exc))
     if isinstance(exc, (ValueError, TypeError)):
         return HTTPException(status_code=422, detail="Conversation request is invalid")
     return HTTPException(status_code=500, detail="Conversation operation failed")
@@ -2047,6 +2054,85 @@ async def get_ai_chat_turn(
             "compiler_version": binding.compiler_version,
             "handoff_digest": binding.handoff_digest,
         },
+        "timestamp": _utcnow(),
+    }
+
+
+
+@router.get("/chat/turns/{thread_id}/events")
+async def get_ai_chat_turn_events(
+    thread_id: str,
+    idempotency_key: str = Query(..., min_length=1, max_length=1024),
+    after_sequence: int = Query(default=0, ge=0),
+    last_event_digest: str | None = Query(default=None, min_length=64, max_length=64),
+    limit: int = Query(default=100, ge=1, le=1000),
+    user=Depends(require_role("viewer")),
+) -> Dict[str, Any]:
+    """Return a content-minimized durable event page for reconnect/resume."""
+
+    tenant_id, owner_id = _chat_identity(user)
+    try:
+        thread = await conversation_authority.get_thread(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        transcript = await conversation_authority.active_transcript(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+    except Exception as exc:
+        raise _chat_error(exc) from exc
+
+    user_message, _assistant_message = _chat_turn_messages(
+        transcript,
+        idempotency_key,
+    )
+    if user_message is None:
+        raise HTTPException(status_code=404, detail="Chat turn not found")
+
+    operation_id, execution_id = _chat_turn_ids(
+        thread.thread_id,
+        user_message.message_id,
+    )
+    try:
+        turn = await chat_turn_lifecycle.get_if_present(
+            operation_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        if turn is None:
+            raise ChatTurnNotFound(operation_id)
+        cursor = require_resume_cursor(
+            operation_id=operation_id,
+            last_seen_sequence=after_sequence,
+            last_event_digest=last_event_digest,
+        )
+        events = await chat_turn_lifecycle.authority.list_events(
+            operation_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            after_sequence=after_sequence,
+            limit=limit,
+        )
+        page = project_turn_page(
+            events,
+            cursor=cursor,
+            limit=limit,
+        )
+    except Exception as exc:
+        raise _chat_error(exc) from exc
+
+    return {
+        "success": True,
+        "operation_id": operation_id,
+        "engine_execution_id": execution_id,
+        "turn_state": turn.snapshot.state.value,
+        "terminal": turn.snapshot.terminal,
+        "events": [event.as_dict() for event in page.events],
+        "cursor": page.cursor.as_dict(),
+        "page_digest": page.digest,
         "timestamp": _utcnow(),
     }
 
