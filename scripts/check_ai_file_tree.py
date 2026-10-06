@@ -663,7 +663,7 @@ def validate() -> list[str]:
         if owner_id in seen_native_ids or owner_id in seen_ids:
             errors.append(f"duplicate native AI owner id: {owner_id}")
         seen_native_ids.add(owner_id)
-        if not isinstance(path_value, str) or not path_value.startswith("skeleton/ai/"):
+        if not isinstance(path_value, str) or (path_value != "skeleton/ai" and not path_value.startswith("skeleton/ai/")):
             errors.append(f"{owner_id}: native path must stay under skeleton/ai")
             continue
         if path_value in seen_native_paths:
