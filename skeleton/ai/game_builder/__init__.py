@@ -51,6 +51,7 @@ from .resilience import (
     ResilienceError,
 )
 from .release import (
+    CriticalGateQualification,
     FamilyQualification,
     GoldMasterBundle,
     GoldMasterTribunal,
@@ -127,4 +128,5 @@ __all__ = [
     "GoldMasterVerdict",
     "ReleaseArbitrationError",
     "TribunalVote",
+    "CriticalGateQualification",
 ]
