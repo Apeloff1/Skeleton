@@ -2,8 +2,7 @@ name: VOL-004 Runtime Supervision Closure
 
 on:
   pull_request:
-    branches:
-      - main
+    branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "machine/runtime_supervision.json"
@@ -25,15 +24,14 @@ on:
       - "backend/server.py"
       - "backend/core/engine_client.py"
       - "tests/test_architecture_runtime_supervision.py"
-      - "tests/test_vol004_runtime_supervision_independent.py"
+      - "tests/test_vol004_runtime_supervision_independent_verifier.py"
       - "skeleton/testing/test_vol004_runtime_supervision_v2.py"
       - "skeleton/testing/test_kernel_supervisor_cancellation.py"
       - "backend/tests/test_engine_cross_service_closure.py"
       - "docs/architecture/RUNTIME_SUPERVISION.md"
       - ".github/workflows/vol004-runtime-supervision.yml"
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - "machine/runtime_supervision.json"
       - "machine/ai_app_construction.json"
@@ -52,7 +50,7 @@ on:
       - "backend/server.py"
       - "backend/core/engine_client.py"
       - "tests/test_architecture_runtime_supervision.py"
-      - "tests/test_vol004_runtime_supervision_independent.py"
+      - "tests/test_vol004_runtime_supervision_independent_verifier.py"
       - "skeleton/testing/test_vol004_runtime_supervision_v2.py"
       - "skeleton/testing/test_kernel_supervisor_cancellation.py"
       - "backend/tests/test_engine_cross_service_closure.py"
@@ -129,7 +127,7 @@ jobs:
         run: python scripts/check_ai_master_plan.py
 
   runtime-supervision-independent:
-    name: Independent exact-head runtime supervision
+    name: Independent exact-head runtime supervision verifier
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
@@ -157,15 +155,15 @@ jobs:
       - name: Run independent verifier regressions
         run: >-
           python -m pytest -q --noconftest
-          tests/test_vol004_runtime_supervision_independent.py
+          tests/test_vol004_runtime_supervision_independent_verifier.py
 
       - name: Emit independent exact-head receipt
         run: >-
           python scripts/verify_vol004_runtime_supervision.py
-          --evidence-out .vol004-runtime-supervision.json
+          --evidence-out .vol004-runtime-supervision-independent.json
           --print-evidence
 
-      - name: Assert receipt identity and coverage
+      - name: Assert exact-head receipt identity and coverage
         env:
           EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
         run: |
@@ -175,7 +173,9 @@ jobs:
           from pathlib import Path
 
           receipt = json.loads(
-              Path(".vol004-runtime-supervision.json").read_text(encoding="utf-8")
+              Path(".vol004-runtime-supervision-independent.json").read_text(
+                  encoding="utf-8"
+              )
           )
           expected = os.environ["EXPECTED_SHA"].strip()
           if receipt.get("head_sha") != expected:
@@ -186,18 +186,19 @@ jobs:
               raise SystemExit("runtime verifier bound wrong masterplan volume")
           if receipt.get("valid") is not True or receipt.get("errors"):
               raise SystemExit("independent VOL-004 verification failed")
-          if len(receipt.get("connector_digests") or {}) != 5:
-              raise SystemExit("connector coverage is incomplete")
-          if len(receipt.get("binding_digests") or {}) < 7:
-              raise SystemExit("runtime binding coverage is incomplete")
-          mirror = receipt.get("lifecycle_mirror") or {}
-          if mirror.get("canonical") != mirror.get("mirror"):
-              raise SystemExit("runtime lifecycle mirror digest drift")
+          if len(receipt.get("network_surface_ids") or []) != 4:
+              raise SystemExit("VOL-004 network surface coverage is incomplete")
+          if len(receipt.get("connector_ids") or []) != 5:
+              raise SystemExit("VOL-004 connector coverage is incomplete")
+          if len(receipt.get("source_paths") or {}) != 10:
+              raise SystemExit("VOL-004 source authority coverage is incomplete")
+          if (receipt.get("required_symbol_count") or 0) < 70:
+              raise SystemExit("VOL-004 required-symbol coverage is incomplete")
           binding = receipt.get("volume_binding") or {}
           if len(binding.get("binding_digest") or "") != 64:
               raise SystemExit("VOL-004 masterplan binding digest is missing")
           if len(receipt.get("receipt_digest") or "") != 64:
-              raise SystemExit("VOL-004 receipt digest is invalid")
+              raise SystemExit("VOL-004 closure receipt digest is invalid")
           print(
               "VOL-004 independent exact-head receipt:",
               expected,
