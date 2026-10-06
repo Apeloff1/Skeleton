@@ -307,7 +307,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
             raise ImplementationNotesError(
                 f"cannot load human notebook {human_path}: {exc}"
             ) from exc
-        authority_line = f"Machine authority: \`{path}\`"
+        authority_line = f"Machine authority: `{path}`"
         if authority_line not in human_text:
             raise ImplementationNotesError(
                 f"{human_path} does not bind machine authority {path}"
