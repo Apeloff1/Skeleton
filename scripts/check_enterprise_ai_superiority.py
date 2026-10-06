@@ -324,6 +324,53 @@ def _validate_profiles(
     return profiles
 
 
+def _validate_end_to_end(
+    policy: Mapping[str, Any],
+    master_volumes: Mapping[str, Mapping[str, Any]],
+) -> int:
+    end_to_end = _mapping(
+        policy.get("end_to_end_qualification"),
+        "end_to_end_qualification",
+    )
+    _text(end_to_end.get("rule"), "end_to_end_qualification.rule")
+    journeys = end_to_end.get("golden_journeys")
+    if not isinstance(journeys, list) or len(journeys) < 12:
+        raise EnterpriseSuperiorityError(
+            "complete enterprise AI requires at least 12 golden journeys"
+        )
+    ids: set[str] = set()
+    for index, raw in enumerate(journeys, start=1):
+        row = _mapping(raw, "golden journey")
+        journey_id = _text(row.get("id"), "golden journey id")
+        expected = f"ENT-E2E-{index:02d}"
+        if journey_id != expected:
+            raise EnterpriseSuperiorityError(
+                f"golden journey order/id drift: expected {expected}, got {journey_id}"
+            )
+        if journey_id in ids:
+            raise EnterpriseSuperiorityError(
+                f"duplicate golden journey id: {journey_id}"
+            )
+        ids.add(journey_id)
+        _text(row.get("name"), f"{journey_id}.name")
+        refs = _text_list(
+            row.get("volume_refs"),
+            f"{journey_id}.volume_refs",
+            minimum=5,
+        )
+        for ref in refs:
+            if ref not in master_volumes:
+                raise EnterpriseSuperiorityError(
+                    f"{journey_id} references unknown volume {ref}"
+                )
+        _text_list(
+            row.get("must_prove"),
+            f"{journey_id}.must_prove",
+            minimum=5,
+        )
+    return len(journeys)
+
+
 def _validate_master_bindings(
     policy: Mapping[str, Any],
     master: Mapping[str, Any],
@@ -404,6 +451,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     _validate_common(policy)
     volumes = _volume_map(master)
     profiles = _validate_profiles(policy, volumes)
+    golden_journeys = _validate_end_to_end(policy, volumes)
     _validate_master_bindings(policy, master, volumes, profiles)
 
     qualified = sum(
@@ -422,6 +470,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         "master_volume_count": len(volumes),
         "dedicated_profile_count": len(profiles),
         "archetype_count": len(policy["archetypes"]),
+        "golden_journey_count": golden_journeys,
         "enterprise_qualified_profiles": qualified,
         "superior_profiles": superior,
         "all_volumes_inherit_common_contract": True,
