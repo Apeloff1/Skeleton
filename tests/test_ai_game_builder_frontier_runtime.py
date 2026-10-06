@@ -31,7 +31,11 @@ _package("skeleton.ai.game_builder", ROOT / "skeleton" / "ai" / "game_builder")
 _load("skeleton.ai.game_builder.contracts", "skeleton/ai/game_builder/contracts.py")
 _load("skeleton.ai.game_builder.frontier_assurance", "skeleton/ai/game_builder/frontier_assurance.py")
 
-from skeleton.ai.game_builder.contracts import EffortMode  # noqa: E402
+from skeleton.ai.game_builder.contracts import (  # noqa: E402
+    EffortMode,
+    EvaluatorProvenance,
+    canonical_digest,
+)
 from skeleton.ai.game_builder.frontier_assurance import (  # noqa: E402
     ArtifactGenealogy,
     CausalObligation,
@@ -53,6 +57,24 @@ from skeleton.ai.game_builder.frontier_assurance import (  # noqa: E402
 )
 
 
+def _authority(
+    evaluator_id: str,
+    *evidence_refs: str,
+) -> EvaluatorProvenance:
+    return EvaluatorProvenance(
+        evaluator_id=evaluator_id,
+        operation_id=f"operation:{evaluator_id}",
+        execution_id=f"execution:{evaluator_id}",
+        execution_identity_digest=canonical_digest({"execution": evaluator_id}),
+        finalization_intent_digest=canonical_digest({"finalization": evaluator_id}),
+        authority_kind="deterministic_control",
+        authority_identity_digest=canonical_digest({"authority": evaluator_id}),
+        method_id="frontier-assurance",
+        source_revision=canonical_digest({"source": evaluator_id})[:40],
+        output_evidence_refs=tuple(evidence_refs),
+    )
+
+
 def test_causal_obligation_blocks_dependent_change_until_resolved() -> None:
     ledger = CausalProofLedger()
     item = CausalObligation(
@@ -60,12 +82,23 @@ def test_causal_obligation_blocks_dependent_change_until_resolved() -> None:
         premise_ids=("scene.early.promise",),
         consequence_ids=("scene.final.payoff",),
         evidence_digest="evidence-" + "a" * 32,
+        authority_provenance=_authority(
+            "causal-authority",
+            "evidence-" + "a" * 32,
+        ),
         severity=ObligationSeverity.CRITICAL,
     )
     ledger.add(item)
     assert ledger.blockers_for(("scene.final.payoff",)) == (item,)
     before = ledger.digest
-    ledger.resolve("OBL-setup-payoff", "resolution-" + "b" * 32)
+    ledger.resolve(
+        "OBL-setup-payoff",
+        "resolution-" + "b" * 32,
+        resolution_authority=_authority(
+            "causal-resolver",
+            "resolution-" + "b" * 32,
+        ),
+    )
     assert ledger.blockers_for(("scene.final.payoff",)) == ()
     assert ledger.digest != before
 
@@ -115,6 +148,70 @@ def test_horizon_probe_rejects_truthy_non_boolean_pass_state() -> None:
             minimum_distance=100,
             evidence_digest="far-" + "c" * 32,
             passed="false",
+        )
+
+
+def test_causal_obligation_rejects_unattributed_evidence() -> None:
+    with pytest.raises(
+        FrontierAssuranceError,
+        match="referenced by obligation authority",
+    ):
+        CausalObligation(
+            obligation_id="OBL-unbound",
+            premise_ids=("scene.early.promise",),
+            consequence_ids=("scene.final.payoff",),
+            evidence_digest="evidence-" + "a" * 32,
+            authority_provenance=_authority(
+                "wrong-causal-authority",
+                "other-evidence-" + "x" * 32,
+            ),
+        )
+
+
+def test_critical_causal_obligation_requires_independent_resolution() -> None:
+    ledger = CausalProofLedger()
+    item = CausalObligation(
+        obligation_id="OBL-critical",
+        premise_ids=("scene.early.promise",),
+        consequence_ids=("scene.final.payoff",),
+        evidence_digest="evidence-" + "a" * 32,
+        authority_provenance=_authority(
+            "same-causal-authority",
+            "evidence-" + "a" * 32,
+        ),
+        severity=ObligationSeverity.CRITICAL,
+    )
+    ledger.add(item)
+    with pytest.raises(
+        FrontierAssuranceError,
+        match="critical causal resolution requires independent authority",
+    ):
+        ledger.resolve(
+            "OBL-critical",
+            "resolution-" + "b" * 32,
+            resolution_authority=_authority(
+                "same-causal-authority",
+                "resolution-" + "b" * 32,
+            ),
+        )
+
+
+def test_horizon_probe_rejects_unattributed_evidence() -> None:
+    with pytest.raises(
+        FrontierAssuranceError,
+        match="referenced by evaluator authority",
+    ):
+        HorizonProbe(
+            probe_id="probe-unbound",
+            anchor_id="character.arc",
+            distant_ids=("ending",),
+            minimum_distance=100,
+            evidence_digest="far-" + "c" * 32,
+            evaluator_provenance=_authority(
+                "wrong-horizon-authority",
+                "other-horizon-" + "x" * 32,
+            ),
+            passed=True,
         )
 
 
@@ -222,7 +319,35 @@ def test_project_wisdom_rejects_truthy_non_boolean_verification_state() -> None:
             scope_ids=("GB09",),
             evidence_digests=("evidence-" + "a" * 32,),
             statement_digest="statement-" + "b" * 32,
+            evidence_authority=_authority(
+                "wisdom-malformed-authority",
+                "evidence-" + "a" * 32,
+            ),
             independently_verified="false",
+        )
+
+
+def test_project_wisdom_rejects_self_verification() -> None:
+    with pytest.raises(
+        FrontierAssuranceError,
+        match="requires independent authority",
+    ):
+        WisdomRecord(
+            lesson_id="lesson-self-verify",
+            scope_ids=("GB09",),
+            evidence_digests=("evidence-" + "a" * 32,),
+            statement_digest="statement-" + "b" * 32,
+            evidence_authority=_authority(
+                "same-wisdom-authority",
+                "evidence-" + "a" * 32,
+                "wisdom-verify-" + "c" * 32,
+            ),
+            independently_verified=True,
+            verification_evidence_digest="wisdom-verify-" + "c" * 32,
+            verifier_provenance=_authority(
+                "same-wisdom-authority",
+                "wisdom-verify-" + "c" * 32,
+            ),
         )
 
 
@@ -233,6 +358,10 @@ def test_project_wisdom_requires_independent_verification() -> None:
         scope_ids=("GB09", "quest.branching"),
         evidence_digests=("evidence-" + "a" * 32,),
         statement_digest="statement-" + "b" * 32,
+        evidence_authority=_authority(
+            "wisdom-authority",
+            "evidence-" + "a" * 32,
+        ),
         independently_verified=False,
     )
     with pytest.raises(FrontierAssuranceError, match="independent verification"):
@@ -243,7 +372,16 @@ def test_project_wisdom_requires_independent_verification() -> None:
         scope_ids=("GB09", "quest.branching"),
         evidence_digests=("evidence-" + "a" * 32,),
         statement_digest="statement-" + "b" * 32,
+        evidence_authority=_authority(
+            "wisdom-authority",
+            "evidence-" + "a" * 32,
+        ),
         independently_verified=True,
+        verification_evidence_digest="wisdom-verify-" + "c" * 32,
+        verifier_provenance=_authority(
+            "wisdom-verifier",
+            "wisdom-verify-" + "c" * 32,
+        ),
     )
     ledger.promote(verified)
     assert ledger.applicable("GB09") == (verified,)
