@@ -24386,6 +24386,12 @@
       "dual_rival_state_machine": "skeleton/ai/game_builder/dual_rival_forge.py",
       "tests": "skeleton/testing/test_ai_game_builder_contracts.py"
     },
-    "overengineering_rule": "Every GB family inherits all critical cross-cutting planes and no plane may weaken family/level hard gates."
+    "overengineering_rule": "Every GB family inherits all critical cross-cutting planes and no plane may weaken family/level hard gates.",
+    "governance_runtime": {
+      "canon": "skeleton/ai/game_builder/canon.py",
+      "rights": "skeleton/ai/game_builder/rights.py",
+      "atom_lineage": "skeleton/ai/game_builder/atomizer.py",
+      "tests": "skeleton/testing/test_ai_game_builder_governance.py"
+    }
   }
 }
