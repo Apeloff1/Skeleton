@@ -25,6 +25,19 @@ class FamilyQualification:
 
 
 @dataclass(frozen=True, slots=True)
+class CriticalGateQualification:
+    gate_id: str
+    passed: bool
+    evidence_digest: str
+
+    def __post_init__(self) -> None:
+        if not self.gate_id.strip():
+            raise ValueError("critical gate id must be non-empty")
+        if len(self.evidence_digest) < 16:
+            raise ValueError("critical gate evidence digest must be stable")
+
+
+@dataclass(frozen=True, slots=True)
 class GoldMasterBundle:
     artifact_digest: str
     build_digest: str
@@ -34,7 +47,7 @@ class GoldMasterBundle:
     rollback_target_digest: str
     red_team_digest: str
     family_qualifications: tuple[FamilyQualification, ...]
-    critical_gate_digests: tuple[tuple[str, str], ...]
+    critical_gate_qualifications: tuple[CriticalGateQualification, ...]
 
     @classmethod
     def create(
@@ -48,7 +61,7 @@ class GoldMasterBundle:
         rollback_target_digest: str,
         red_team_digest: str,
         family_qualifications: Iterable[FamilyQualification],
-        critical_gate_digests: Mapping[str, str],
+        critical_gate_results: Mapping[str, tuple[bool, str]],
     ) -> "GoldMasterBundle":
         for value in (
             artifact_digest,
@@ -64,9 +77,29 @@ class GoldMasterBundle:
         families = tuple(sorted(family_qualifications, key=lambda row: row.family_id))
         if [row.family_id for row in families] != [f"GB{i:02d}" for i in range(1, 51)]:
             raise ValueError("gold-master bundle requires exactly GB01..GB50")
-        gates = tuple(sorted((str(k), str(v)) for k, v in critical_gate_digests.items()))
-        if not gates or any(not key or len(value) < 16 for key, value in gates):
-            raise ValueError("critical gates require stable evidence digests")
+
+        gates: list[CriticalGateQualification] = []
+        for gate_id in sorted(critical_gate_results):
+            raw = critical_gate_results[gate_id]
+            if (
+                not isinstance(raw, tuple)
+                or len(raw) != 2
+                or not isinstance(raw[0], bool)
+                or not isinstance(raw[1], str)
+            ):
+                raise ValueError(
+                    "critical gate result must be a (passed, evidence_digest) tuple"
+                )
+            gates.append(
+                CriticalGateQualification(
+                    gate_id=str(gate_id),
+                    passed=raw[0],
+                    evidence_digest=raw[1],
+                )
+            )
+        if not gates:
+            raise ValueError("gold-master bundle requires critical gates")
+
         return cls(
             artifact_digest=artifact_digest,
             build_digest=build_digest,
@@ -76,12 +109,14 @@ class GoldMasterBundle:
             rollback_target_digest=rollback_target_digest,
             red_team_digest=red_team_digest,
             family_qualifications=families,
-            critical_gate_digests=gates,
+            critical_gate_qualifications=tuple(gates),
         )
 
     @property
     def eligible(self) -> bool:
-        return all(row.passed for row in self.family_qualifications)
+        return all(row.passed for row in self.family_qualifications) and all(
+            row.passed for row in self.critical_gate_qualifications
+        )
 
     @property
     def digest(self) -> str:
@@ -90,7 +125,14 @@ class GoldMasterBundle:
                 "artifact_digest": self.artifact_digest,
                 "build_digest": self.build_digest,
                 "canon_digest": self.canon_digest,
-                "critical_gate_digests": dict(self.critical_gate_digests),
+                "critical_gate_qualifications": [
+                    {
+                        "evidence_digest": row.evidence_digest,
+                        "gate_id": row.gate_id,
+                        "passed": row.passed,
+                    }
+                    for row in self.critical_gate_qualifications
+                ],
                 "family_qualifications": [
                     {
                         "evidence_digest": row.evidence_digest,
@@ -140,10 +182,14 @@ class GoldMasterTribunal:
         authority_ids: Iterable[str],
         *,
         quorum: int = 3,
+        routine_evaluator_ids: Iterable[str] = (),
         forbidden_ids: Iterable[str] = ("rival_a", "rival_b"),
     ) -> None:
         ids = tuple(str(x).strip() for x in authority_ids)
-        forbidden = set(forbidden_ids)
+        forbidden = {
+            *(str(x).strip() for x in forbidden_ids),
+            *(str(x).strip() for x in routine_evaluator_ids),
+        }
         if len(ids) != len(set(ids)) or any(not x for x in ids):
             raise ValueError("gold-master authority identities must be unique")
         if any(x in forbidden for x in ids):
@@ -164,7 +210,9 @@ class GoldMasterTribunal:
 
     def decide(self, bundle: GoldMasterBundle) -> GoldMasterVerdict:
         if not bundle.eligible:
-            raise ReleaseArbitrationError("gold-master bundle has failed family qualification")
+            raise ReleaseArbitrationError(
+                "gold-master bundle has failed family or critical-gate qualification"
+            )
         votes = tuple(
             self._votes[(bundle.digest, authority)]
             for authority in self.authority_ids
