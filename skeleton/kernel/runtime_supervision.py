@@ -1,9 +1,18 @@
 """Shared runtime lifecycle semantics for backend and engine services.
 
 VOL-004 uses this module as the single process-local lifecycle vocabulary for
-service readiness, draining, failure, restart generations and cancellation.
-The class is deliberately dependency-free so both application and engine
-processes can bind it during startup before heavier runtime wiring exists.
+service readiness, draining, failure, restart generations, work admission and
+cancellation. It is dependency-light so application and engine processes can
+bind it before heavier runtime wiring exists.
+
+The contract is intentionally stricter than a boolean ready flag:
+- lifecycle transitions are explicit and receipted;
+- work admission is generation-bound;
+- draining atomically revokes new-work authority and cancels the generation;
+- in-flight work is accounted for by immutable leases;
+- a service cannot claim STOPPED while work leases remain;
+- restart creates a fresh generation and fresh cancellation token;
+- stale leases and stale cancellation tokens cannot cross generations.
 """
 
 from __future__ import annotations
@@ -47,6 +56,7 @@ class LifecycleReceipt:
     reason: str
     at_monotonic: float
     cancellation: CancellationState
+    inflight_work: int
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -58,6 +68,25 @@ class LifecycleReceipt:
             "reason": self.reason,
             "at_monotonic": self.at_monotonic,
             "cancellation": self.cancellation.to_dict(),
+            "inflight_work": self.inflight_work,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class WorkLease:
+    service_id: str
+    work_id: str
+    generation: int
+    sequence: int
+    acquired_at_monotonic: float
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "service_id": self.service_id,
+            "work_id": self.work_id,
+            "generation": self.generation,
+            "sequence": self.sequence,
+            "acquired_at_monotonic": self.acquired_at_monotonic,
         }
 
 
@@ -72,6 +101,20 @@ def _service_id(value: object) -> str:
         or "\x00" in normalized
     ):
         raise ValueError("service_id is invalid")
+    return normalized
+
+
+def _work_id(value: object) -> str:
+    if not isinstance(value, str):
+        raise TypeError("work_id must be text")
+    normalized = value.strip()
+    if (
+        not normalized
+        or normalized != value
+        or len(normalized) > 512
+        or "\x00" in normalized
+    ):
+        raise ValueError("work_id is invalid")
     return normalized
 
 
@@ -90,17 +133,7 @@ def _reason(value: object) -> str:
 
 
 class RuntimeServiceLifecycle:
-    """Thread-safe service lifecycle with monotonic receipts and cancellation.
-
-    Rules:
-    * startup begins in STARTING and may become READY or FAILED;
-    * only READY may admit new work;
-    * shutdown begins with DRAINING, atomically cancelling the generation token;
-    * DRAINING may only become STOPPED or FAILED;
-    * STOPPED/FAILED are terminal for a generation;
-    * restart creates a fresh generation and fresh cancellation token;
-    * stale generation-specific tokens cannot be reused after restart.
-    """
+    """Thread-safe lifecycle and work-admission authority for one service."""
 
     def __init__(
         self,
@@ -114,8 +147,10 @@ class RuntimeServiceLifecycle:
         self._phase = ServicePhase.STARTING
         self._generation = 1
         self._sequence = 0
+        self._lease_sequence = 0
         self._token = CancellationToken(clock=clock)
         self._receipts: list[LifecycleReceipt] = []
+        self._leases: dict[str, WorkLease] = {}
 
     @property
     def phase(self) -> ServicePhase:
@@ -137,13 +172,69 @@ class RuntimeServiceLifecycle:
         with self._lock:
             return self._phase is ServicePhase.READY and not self._token.cancelled
 
-    def require_work_admission(self) -> None:
+    @property
+    def inflight_work(self) -> int:
         with self._lock:
-            if self._phase is not ServicePhase.READY:
+            return len(self._leases)
+
+    def require_work_admission(self, *, allow_starting: bool = False) -> None:
+        if not isinstance(allow_starting, bool):
+            raise TypeError("allow_starting must be bool")
+        with self._lock:
+            allowed = (
+                self._phase is ServicePhase.READY
+                or (allow_starting and self._phase is ServicePhase.STARTING)
+            )
+            if not allowed:
                 raise RuntimeSupervisionError(
                     f"{self.service_id} cannot admit work while {self._phase.value}"
                 )
             self._token.require_active()
+
+    def acquire_work(
+        self,
+        work_id: str,
+        *,
+        allow_starting: bool = False,
+    ) -> WorkLease:
+        normalized = _work_id(work_id)
+        with self._lock:
+            self.require_work_admission(allow_starting=allow_starting)
+            if normalized in self._leases:
+                raise RuntimeSupervisionError(
+                    f"{self.service_id} work already leased: {normalized}"
+                )
+            self._lease_sequence += 1
+            now = self._now()
+            lease = WorkLease(
+                service_id=self.service_id,
+                work_id=normalized,
+                generation=self._generation,
+                sequence=self._lease_sequence,
+                acquired_at_monotonic=now,
+            )
+            self._leases[normalized] = lease
+            return lease
+
+    def release_work(self, lease: WorkLease) -> bool:
+        if not isinstance(lease, WorkLease):
+            raise TypeError("lease must be WorkLease")
+        with self._lock:
+            if lease.service_id != self.service_id:
+                raise RuntimeSupervisionError("work lease belongs to another service")
+            current = self._leases.get(lease.work_id)
+            if current is None:
+                return False
+            if current != lease:
+                raise RuntimeSupervisionError("work lease identity mismatch")
+            if lease.generation != self._generation:
+                raise RuntimeSupervisionError("stale work lease crossed generation")
+            del self._leases[lease.work_id]
+            return True
+
+    def active_work(self) -> tuple[WorkLease, ...]:
+        with self._lock:
+            return tuple(self._leases[key] for key in sorted(self._leases))
 
     def mark_ready(self, *, reason: str = "startup-complete") -> LifecycleReceipt:
         return self._transition(
@@ -170,12 +261,25 @@ class RuntimeServiceLifecycle:
             self._token.cancel(cancellation_reason, detail=normalized)
             return self._record(old, ServicePhase.DRAINING, normalized)
 
-    def mark_stopped(self, *, reason: str = "shutdown-complete") -> LifecycleReceipt:
-        return self._transition(
-            expected=(ServicePhase.DRAINING,),
-            target=ServicePhase.STOPPED,
-            reason=reason,
-        )
+    def mark_stopped(
+        self,
+        *,
+        reason: str = "shutdown-complete",
+        require_quiescent: bool = True,
+    ) -> LifecycleReceipt:
+        if not isinstance(require_quiescent, bool):
+            raise TypeError("require_quiescent must be bool")
+        with self._lock:
+            if require_quiescent and self._leases:
+                raise RuntimeSupervisionError(
+                    f"{self.service_id} cannot stop with {len(self._leases)} "
+                    "in-flight work leases"
+                )
+            return self._transition(
+                expected=(ServicePhase.DRAINING,),
+                target=ServicePhase.STOPPED,
+                reason=reason,
+            )
 
     def fail(self, *, reason: str) -> LifecycleReceipt:
         normalized = _reason(reason)
@@ -197,6 +301,10 @@ class RuntimeServiceLifecycle:
                 raise RuntimeSupervisionError(
                     f"{self.service_id} restart requires terminal generation"
                 )
+            if self._leases:
+                raise RuntimeSupervisionError(
+                    f"{self.service_id} restart forbidden with in-flight work"
+                )
             old = self._phase
             self._generation += 1
             self._token = CancellationToken(clock=self._clock)
@@ -212,8 +320,11 @@ class RuntimeServiceLifecycle:
                     self._phase is ServicePhase.READY
                     and not self._token.cancelled
                 ),
+                "inflight_work": len(self._leases),
+                "active_work_ids": sorted(self._leases),
                 "cancellation": self._token.snapshot().to_dict(),
                 "last_sequence": self._sequence,
+                "last_lease_sequence": self._lease_sequence,
             }
 
     def receipts(self) -> tuple[LifecycleReceipt, ...]:
@@ -237,15 +348,19 @@ class RuntimeServiceLifecycle:
                 )
             return self._record(self._phase, target, normalized)
 
+    def _now(self) -> float:
+        now = float(self._clock())
+        if not math.isfinite(now):
+            raise RuntimeSupervisionError("lifecycle clock must be finite")
+        return now
+
     def _record(
         self,
         old: ServicePhase,
         target: ServicePhase,
         reason: str,
     ) -> LifecycleReceipt:
-        now = float(self._clock())
-        if not math.isfinite(now):
-            raise RuntimeSupervisionError("lifecycle clock must be finite")
+        now = self._now()
         self._phase = target
         self._sequence += 1
         receipt = LifecycleReceipt(
@@ -257,6 +372,7 @@ class RuntimeServiceLifecycle:
             reason=reason,
             at_monotonic=now,
             cancellation=self._token.snapshot(),
+            inflight_work=len(self._leases),
         )
         self._receipts.append(receipt)
         return receipt
@@ -267,4 +383,5 @@ __all__ = [
     "RuntimeServiceLifecycle",
     "RuntimeSupervisionError",
     "ServicePhase",
+    "WorkLease",
 ]
