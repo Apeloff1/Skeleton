@@ -10,8 +10,13 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = Path("machine/ai_game_builder_500_levels.json")
 DUEL = Path("machine/ai_game_builder_dual_rival_forge.json")
+OVERENGINEERING = Path("machine/ai_game_builder_overengineering.json")
 MASTER = Path("docs/plan/MASTER_PLAN.md")
 HUMAN = Path("docs/architecture/AI_GAME_BUILDER_500_LEVELS.md")
+OVERENGINEERING_HUMAN = Path("docs/architecture/AI_GAME_BUILDER_OVERENGINEERING.md")
+RUNTIME_CONTRACTS = Path("skeleton/ai/game_builder/contracts.py")
+RUNTIME_FORGE = Path("skeleton/ai/game_builder/dual_rival_forge.py")
+RUNTIME_TESTS = Path("skeleton/testing/test_ai_game_builder_contracts.py")
 
 
 class GameBuilderAuthorityError(RuntimeError):
@@ -78,6 +83,7 @@ def _effort_rounds(row: dict[str, Any]) -> list[int]:
 def validate(root: Path = ROOT) -> dict[str, Any]:
     manifest = _load(root / MANIFEST)
     duel = _load(root / DUEL)
+    overengineering = _load(root / OVERENGINEERING)
 
     if manifest.get("schema_version") != "skeleton.ai_game_builder_500_levels.v1":
         raise GameBuilderAuthorityError("unsupported game-builder manifest schema")
@@ -102,6 +108,90 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     family_ids = [_text(row.get("id"), "family.id") for row in families]
     if family_ids != [f"GB{i:02d}" for i in range(1, 51)]:
         raise GameBuilderAuthorityError("family ids must be GB01..GB50 in order")
+
+    if manifest.get("overengineering_authority") != str(OVERENGINEERING):
+        raise GameBuilderAuthorityError("game-builder overengineering authority binding drifted")
+    if manifest.get("overengineering_human_spec") != str(OVERENGINEERING_HUMAN):
+        raise GameBuilderAuthorityError("game-builder overengineering human-spec binding drifted")
+    runtime = manifest.get("runtime_contracts")
+    expected_runtime = {
+        "package": "skeleton/ai/game_builder",
+        "contracts": str(RUNTIME_CONTRACTS),
+        "dual_rival_state_machine": str(RUNTIME_FORGE),
+        "tests": str(RUNTIME_TESTS),
+    }
+    if runtime != expected_runtime:
+        raise GameBuilderAuthorityError("game-builder runtime contract binding drifted")
+    for path in (RUNTIME_CONTRACTS, RUNTIME_FORGE, RUNTIME_TESTS):
+        if not (root / path).is_file():
+            raise GameBuilderAuthorityError(f"missing game-builder runtime file: {path}")
+
+    if overengineering.get("schema_version") != "skeleton.ai_game_builder_overengineering.v1":
+        raise GameBuilderAuthorityError("unsupported game-builder overengineering schema")
+    if overengineering.get("status") != "active_design_authority":
+        raise GameBuilderAuthorityError("overengineering constitution must be active_design_authority")
+    over_topology = overengineering.get("topology")
+    if not isinstance(over_topology, dict):
+        raise GameBuilderAuthorityError("overengineering topology must be an object")
+    if over_topology.get("plane_count") != 24:
+        raise GameBuilderAuthorityError("overengineering plane_count must equal 24")
+    if over_topology.get("family_count") != 50:
+        raise GameBuilderAuthorityError("overengineering family_count must equal 50")
+    minimum_planes = over_topology.get("minimum_planes_per_family")
+    if isinstance(minimum_planes, bool) or not isinstance(minimum_planes, int) or minimum_planes < 11:
+        raise GameBuilderAuthorityError("minimum_planes_per_family must be at least 11")
+
+    critical = _list(overengineering.get("critical_planes"), "critical_planes", 11)
+    expected_critical = [
+        "OP01", "OP02", "OP04", "OP05", "OP06", "OP11",
+        "OP14", "OP15", "OP16", "OP22", "OP24",
+    ]
+    if critical != expected_critical:
+        raise GameBuilderAuthorityError("critical overengineering planes drifted")
+    if over_topology.get("critical_plane_count") != len(critical):
+        raise GameBuilderAuthorityError("critical_plane_count mismatch")
+
+    planes = _list(overengineering.get("planes"), "overengineering.planes", 24)
+    if len(planes) != 24:
+        raise GameBuilderAuthorityError("exactly 24 overengineering planes are required")
+    plane_ids = [_text(row.get("id"), "plane.id") for row in planes]
+    if plane_ids != [f"OP{i:02d}" for i in range(1, 25)]:
+        raise GameBuilderAuthorityError("overengineering plane ids must be OP01..OP24")
+    for plane in planes:
+        plane_id = plane["id"]
+        _text(plane.get("title"), f"{plane_id}.title")
+        _text(plane.get("objective"), f"{plane_id}.objective")
+        _list(plane.get("mandatory_controls"), f"{plane_id}.mandatory_controls", 4)
+        _list(plane.get("evidence_required"), f"{plane_id}.evidence_required", 3)
+        if plane.get("status") != "planned" or plane.get("signed") is not False:
+            raise GameBuilderAuthorityError(f"{plane_id} may not self-claim completion")
+
+    bindings = overengineering.get("family_bindings")
+    if not isinstance(bindings, dict) or list(bindings) != family_ids:
+        raise GameBuilderAuthorityError("overengineering family binding registry must be GB01..GB50")
+    valid_plane_ids = set(plane_ids)
+    critical_set = set(critical)
+    for family_id in family_ids:
+        bound = _list(bindings.get(family_id), f"{family_id}.overengineering_planes", minimum_planes)
+        if len(bound) != len(set(bound)):
+            raise GameBuilderAuthorityError(f"{family_id} overengineering planes must be unique")
+        if not set(bound).issubset(valid_plane_ids):
+            raise GameBuilderAuthorityError(f"{family_id} contains unknown overengineering plane")
+        if not critical_set.issubset(set(bound)):
+            raise GameBuilderAuthorityError(f"{family_id} is missing a critical overengineering plane")
+
+    laws = "\n".join(str(x).lower() for x in _list(overengineering.get("laws"), "overengineering.laws", 10))
+    for fragment in (
+        "failed non-compensable gate",
+        "private scratch state",
+        "final authority",
+        "long-form consistency",
+        "unknown incorporated rights",
+        "no-wall-clock-deadline",
+        "last known-good champion",
+    ):
+        if fragment not in laws:
+            raise GameBuilderAuthorityError(f"overengineering law missing fragment: {fragment}")
 
     shards = _list(manifest.get("shards"), "shards", 1)
     if topology.get("shard_count") != len(shards):
@@ -187,12 +277,27 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     for token in ("similarity", "human/legal", "legal determination", "project_owned"):
         if token not in rights_text:
             raise GameBuilderAuthorityError(f"rights authority missing requirement: {token}")
+    runtime_binding = duel.get("runtime_contracts")
+    if runtime_binding != {
+        "contracts": str(RUNTIME_CONTRACTS),
+        "state_machine": str(RUNTIME_FORGE),
+        "tests": str(RUNTIME_TESTS),
+    }:
+        raise GameBuilderAuthorityError("dual-rival runtime binding drifted")
+    if duel.get("overengineering_authority") != str(OVERENGINEERING):
+        raise GameBuilderAuthorityError("dual-rival overengineering binding drifted")
+
     consistency = duel.get("longform_consistency")
     if not isinstance(consistency, dict):
         raise GameBuilderAuthorityError("long-form consistency authority is missing")
     prime = _text(consistency.get("prime_directive"), "longform prime directive").lower()
     if "local improvement" not in prime or "long-form" not in prime:
         raise GameBuilderAuthorityError("long-form consistency prime directive is missing")
+
+    over_human = (root / OVERENGINEERING_HUMAN).read_text(encoding="utf-8")
+    for marker in ("24 mandatory cross-cutting planes", "Bounded-Resource Infinite-Time Discipline", "Pixel-to-Project Traceability", "Runtime kernel"):
+        if marker not in over_human:
+            raise GameBuilderAuthorityError(f"overengineering human authority missing marker: {marker}")
 
     human = (root / HUMAN).read_text(encoding="utf-8")
     for marker in ("GBL-001..GBL-500", "Forge-10000", "long-form consistency", "Unknown is quarantined"):
@@ -213,6 +318,9 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         "last_level": levels[-1]["id"],
         "signed_levels": sum(1 for row in levels if row.get("signed")),
         "effort_rounds": [100, 1000, 10000],
+        "overengineering_plane_count": len(planes),
+        "minimum_planes_per_family": minimum_planes,
+        "runtime_kernel_bound": True,
     }
 
 
