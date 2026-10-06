@@ -5,7 +5,7 @@ This depth overlay expands the canonical Skeleton AI masterplan without adding t
 ## Size and authority
 
 - Requested addition: at least 10,000,000 bytes of implementation-grade masterplan depth.
-- Shard bytes committed by this overlay: **11,176,885 bytes** across 18 shards.
+- Shard bytes committed by this overlay: **11,187,051 bytes** across 18 shards.
 - Runtime completion is **not** claimed.
 - Implementation signoff is **false**.
 - Independent verification signoff is **false**.
