@@ -352,6 +352,30 @@ def test_evidence_invalidation_propagates_to_release_qualification() -> None:
     assert not graph.is_valid("release.gold")
 
 
+def test_evidence_invalidation_receipt_rejects_false_dependency_closure() -> None:
+    graph = EvidenceInvalidationGraph()
+    graph.add("source")
+    graph.add("proof", depends_on=("source",))
+    evidence = "invalidation-proof-" + "e" * 24
+    receipt = graph.invalidate(
+        "source",
+        authority_provenance=_authority("invalidation-authority", evidence),
+        evidence_digest=evidence,
+    )
+    with pytest.raises(
+        FrontierAssuranceError,
+        match="do not match graph dependency closure",
+    ):
+        type(receipt)(
+            node_id=receipt.node_id,
+            affected_ids=("source",),
+            graph_edges=receipt.graph_edges,
+            authority_provenance=receipt.authority_provenance,
+            evidence_digest=receipt.evidence_digest,
+            receipt_digest=receipt.receipt_digest,
+        )
+
+
 def test_evidence_invalidation_requires_attributed_authority() -> None:
     graph = EvidenceInvalidationGraph()
     graph.add("source.engine-doc")
