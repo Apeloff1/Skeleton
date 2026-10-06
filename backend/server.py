@@ -2241,6 +2241,8 @@ _runtime_lifecycle = RuntimeServiceLifecycle("backend")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if _runtime_lifecycle.phase.value in {"stopped", "failed"}:
+        _runtime_lifecycle.restart(reason="backend-lifespan-restart")
     app.state.runtime_lifecycle = _runtime_lifecycle
     # ═══════════════════════════════════════════════════════════════════════
     # ★ GUARANTEED LAUNCH ENVELOPE  (2026-02 deploy fix)
