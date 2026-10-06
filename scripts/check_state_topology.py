@@ -461,6 +461,135 @@ def _validate_state_domains(
     return domains
 
 
+def _validate_authority_convergence(
+    topology: dict[str, Any],
+    stores: dict[str, dict[str, Any]],
+    domains: dict[str, dict[str, Any]],
+    repo_root: Path,
+    errors: list[str],
+) -> dict[str, int]:
+    policy = topology.get("authority_convergence")
+    if not isinstance(policy, dict):
+        errors.append("authority_convergence must be an object")
+        return {}
+
+    if policy.get("policy_version") != 1:
+        errors.append("authority_convergence.policy_version must equal 1")
+    if policy.get("unreferenced_physical_store_policy") != "forbid":
+        errors.append(
+            "authority_convergence.unreferenced_physical_store_policy must be forbid"
+        )
+    if policy.get("source_of_truth_placeholder_status_policy") != "forbid":
+        errors.append(
+            "authority_convergence.source_of_truth_placeholder_status_policy must be forbid"
+        )
+
+    forbidden = policy.get("forbidden_source_of_truth_status_tokens")
+    if (
+        not isinstance(forbidden, list)
+        or not forbidden
+        or any(not isinstance(item, str) or not item.strip() for item in forbidden)
+    ):
+        errors.append(
+            "authority_convergence.forbidden_source_of_truth_status_tokens "
+            "must be a non-empty string list"
+        )
+        forbidden = []
+    normalized_forbidden = tuple(item.strip().casefold() for item in forbidden)
+
+    store_consumers: dict[str, list[str]] = {store_id: [] for store_id in stores}
+    for domain_id, domain in domains.items():
+        store_id = domain.get("physical_store")
+        if store_id in store_consumers:
+            store_consumers[store_id].append(domain_id)
+
+        if domain.get("source_of_truth") is True:
+            status = str(domain.get("status", "")).casefold()
+            matched = sorted(
+                token for token in normalized_forbidden if token in status
+            )
+            if matched:
+                errors.append(
+                    f"source-of-truth state domain {domain_id} uses placeholder "
+                    f"status {domain.get('status')!r}: {', '.join(matched)}"
+                )
+            evidence = domain.get("evidence")
+            if not isinstance(evidence, list) or len(evidence) < 2:
+                errors.append(
+                    f"source-of-truth state domain {domain_id} requires "
+                    "multiple materialized evidence paths"
+                )
+            elif any(
+                not isinstance(ref, str)
+                or not ref.strip()
+                or ref.startswith("planned:")
+                for ref in evidence
+            ):
+                errors.append(
+                    f"source-of-truth state domain {domain_id} contains "
+                    "non-materialized evidence"
+                )
+
+    unused = sorted(
+        store_id for store_id, consumers in store_consumers.items() if not consumers
+    )
+    if unused:
+        errors.append(
+            "unreferenced physical stores are forbidden: " + ", ".join(unused)
+        )
+
+    retired = policy.get("retired_declarations")
+    if not isinstance(retired, list) or not retired:
+        errors.append("authority_convergence.retired_declarations must be non-empty")
+        retired = []
+    retired_ids: set[str] = set()
+    for index, item in enumerate(retired):
+        label = f"authority_convergence.retired_declarations[{index}]"
+        if not isinstance(item, dict):
+            errors.append(f"{label} must be an object")
+            continue
+        retired_id = item.get("id")
+        replacement = item.get("replacement_domain")
+        if not isinstance(retired_id, str) or not retired_id:
+            errors.append(f"{label}.id must be non-empty")
+            continue
+        if retired_id in retired_ids:
+            errors.append(f"duplicate retired declaration: {retired_id}")
+        retired_ids.add(retired_id)
+        if retired_id in stores or retired_id in domains:
+            errors.append(
+                f"retired state declaration {retired_id} remains active"
+            )
+        if (
+            not isinstance(replacement, str)
+            or replacement not in domains
+            or not item.get("reason")
+        ):
+            errors.append(
+                f"{label} must bind a materialized replacement domain and reason"
+            )
+
+    expected_links = {
+        "migration_qualification_contract": "machine/state_migration_qualification.json",
+        "migration_qualification_validator": "scripts/check_state_migration_qualification.py",
+    }
+    for key, expected in expected_links.items():
+        if policy.get(key) != expected:
+            errors.append(f"authority_convergence.{key} must equal {expected!r}")
+        if not (repo_root / expected).is_file():
+            errors.append(
+                f"authority convergence linked file is missing: {expected}"
+            )
+
+    return {
+        "referenced_physical_stores": len(stores) - len(unused),
+        "retired_declarations": len(retired_ids),
+        "source_of_truth_domains": sum(
+            1 for item in domains.values() if item.get("source_of_truth") is True
+        ),
+    }
+
+
 def _validate_flows(
     topology: dict[str, Any],
     domains: dict[str, dict[str, Any]],
@@ -513,6 +642,9 @@ def validate_state_topology(repo_root: Path = ROOT) -> tuple[list[str], dict[str
     stores = _validate_physical_stores(topology, repo_root, errors)
     domains = _validate_state_domains(
         topology, construction, stores, repo_root, errors
+    )
+    convergence = _validate_authority_convergence(
+        topology, stores, domains, repo_root, errors
     )
     flows = _validate_flows(topology, domains, errors)
 
@@ -591,6 +723,7 @@ def validate_state_topology(repo_root: Path = ROOT) -> tuple[list[str], dict[str
         "authoritative_domains": authoritative,
         "transitional_domains": mixed,
         "derived_or_disposable_domains": derived,
+        "authority_convergence": convergence,
         "recovery_steps": len(recovery_order),
         "invariants": len(invariants),
         "errors": errors,
