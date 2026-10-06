@@ -29,7 +29,9 @@ GAME_BUILDER_QUALITY_DEBT = ROOT / "skeleton" / "ai" / "game_builder" / "quality
 GAME_BUILDER_CONTROL_PLANE = ROOT / "skeleton" / "ai" / "game_builder" / "control_plane.py"
 GAME_BUILDER_RESILIENCE = ROOT / "skeleton" / "ai" / "game_builder" / "resilience.py"
 GAME_BUILDER_RELEASE = ROOT / "skeleton" / "ai" / "game_builder" / "release.py"
+GAME_BUILDER_FRONTIER_ASSURANCE = ROOT / "skeleton" / "ai" / "game_builder" / "frontier_assurance.py"
 GAME_BUILDER_OVERENGINEERING_TESTS = ROOT / "tests" / "test_ai_game_builder_overengineering_runtime.py"
+GAME_BUILDER_FRONTIER_TESTS = ROOT / "tests" / "test_ai_game_builder_frontier_runtime.py"
 DEPTH_000_040 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_000_040.md"
 DEPTH_041_080 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_041_080.md"
 DEPTH_081_120 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_081_120.md"
@@ -152,7 +154,7 @@ def validate(data: dict) -> list[str]:
             ("levels_per_family", 10),
             ("total_levels", 500),
             ("stages_per_round", 3),
-            ("overengineering_planes", 48),
+            ("overengineering_planes", 64),
         ):
             if game_builder.get(field) != expected_value:
                 errors.append(f"AI game builder {field} must equal {expected_value}")
@@ -174,9 +176,11 @@ def validate(data: dict) -> list[str]:
             "integrated_control_plane": "skeleton/ai/game_builder/control_plane.py",
             "resilience": "skeleton/ai/game_builder/resilience.py",
             "gold_master": "skeleton/ai/game_builder/release.py",
+            "frontier_assurance": "skeleton/ai/game_builder/frontier_assurance.py",
             "tests": [
                 "tests/test_ai_game_builder_runtime.py",
                 "tests/test_ai_game_builder_overengineering_runtime.py",
+                "tests/test_ai_game_builder_frontier_runtime.py",
             ],
         }:
             errors.append("AI game builder runtime contract binding drifted")
@@ -191,7 +195,9 @@ def validate(data: dict) -> list[str]:
             ("integrated control plane", GAME_BUILDER_CONTROL_PLANE),
             ("resilience controls", GAME_BUILDER_RESILIENCE),
             ("gold-master tribunal", GAME_BUILDER_RELEASE),
+            ("frontier assurance", GAME_BUILDER_FRONTIER_ASSURANCE),
             ("overengineering runtime tests", GAME_BUILDER_OVERENGINEERING_TESTS),
+            ("frontier assurance tests", GAME_BUILDER_FRONTIER_TESTS),
         ):
             if not path.is_file():
                 errors.append(f"AI game builder {label} implementation is missing")
@@ -223,8 +229,8 @@ def validate(data: dict) -> list[str]:
                 if not isinstance(over_topology, dict):
                     errors.append("AI game builder overengineering topology must be an object")
                 else:
-                    if over_topology.get("plane_count") != 48:
-                        errors.append("AI game builder overengineering authority must contain 48 planes")
+                    if over_topology.get("plane_count") != 64:
+                        errors.append("AI game builder overengineering authority must contain 64 planes")
                     if over_topology.get("family_count") != 50:
                         errors.append("AI game builder overengineering authority must cover 50 families")
                 bindings = overengineering.get("family_bindings")
