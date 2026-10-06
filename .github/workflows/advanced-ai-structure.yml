@@ -8,6 +8,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "machine/advanced_ai_structure_100.json"
+      - "machine/advanced_ai_maturity_ledger.json"
       - "docs/plan/ADVANCED_AI_100_LEVELS.md"
       - "machine/ai_app_construction.json"
       - "machine/enterprise_system_architecture.json"
@@ -122,7 +123,7 @@ jobs:
               raise SystemExit("100-level plan is not complete")
           if structural.get("implementation_claim") is not False:
               raise SystemExit("planning gate fabricated implementation")
-          if len(structural.get("file_digests") or {}) != 13:
+          if len(structural.get("file_digests") or {}) != 14:
               raise SystemExit("100-level digest coverage is incomplete")
 
           if independent.get("expected_head") != expected:
