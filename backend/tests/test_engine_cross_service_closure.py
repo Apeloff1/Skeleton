@@ -500,6 +500,47 @@ async def test_cross_service_cancel_fences_late_provider_result(
 
 
 @pytest.mark.asyncio
+async def test_stale_task_callback_cannot_release_newer_generation_lease(
+    tmp_path,
+) -> None:
+    service = _service(tmp_path)
+    lifecycle = RuntimeServiceLifecycle("skeleton")
+    lifecycle.mark_ready(reason="test-ready")
+    coordinator = EngineExecutionCoordinator(
+        service,
+        provider_registry=_Registry(object()),
+        lifecycle=lifecycle,
+    )
+    execution_id = "shared-execution-id"
+    work_id = "engine-execution:" + execution_id
+
+    old_task = asyncio.create_task(asyncio.sleep(0))
+    await old_task
+    old_lease = lifecycle.acquire_work(work_id)
+    coordinator._tasks[execution_id] = old_task
+    coordinator._lifecycle_leases[old_task] = old_lease
+    coordinator._task_done(execution_id, old_task)
+    assert lifecycle.inflight_work == 0
+
+    release = asyncio.Event()
+    new_task = asyncio.create_task(release.wait())
+    new_lease = lifecycle.acquire_work(work_id)
+    coordinator._tasks[execution_id] = new_task
+    coordinator._lifecycle_leases[new_task] = new_lease
+
+    # Simulate a delayed callback from the already-retired task after a new
+    # task acquired the same semantic execution identity.
+    coordinator._task_done(execution_id, old_task)
+    assert lifecycle.active_work() == (new_lease,)
+    assert coordinator._tasks[execution_id] is new_task
+
+    new_task.cancel()
+    await asyncio.gather(new_task, return_exceptions=True)
+    coordinator._task_done(execution_id, new_task)
+    assert lifecycle.inflight_work == 0
+
+
+@pytest.mark.asyncio
 async def test_engine_lifecycle_draining_fences_new_execution_and_drains_lease(
     tmp_path,
 ) -> None:
