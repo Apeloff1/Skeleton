@@ -37,3 +37,17 @@ def test_terminal_success_requires_every_step_committed():
 
 def test_compensation_order_respects_reverse_dependencies():
  p=plan();assert compensation_order(p,("a","b","c"))==("c","b","a")
+
+
+def test_compensated_terminal_requires_commit_then_compensation_history():
+ p=plan();committed=cp(p,"a");comp=cp(p,"a","compensated")
+ with pytest.raises(PermissionError):terminal_receipt(p,(committed,),"compensated")
+ assert terminal_receipt(p,(committed,comp),"compensated").outcome=="compensated"
+
+def test_compensation_without_prior_commit_is_rejected():
+ p=plan()
+ with pytest.raises(PermissionError):terminal_receipt(p,(cp(p,"a","compensated"),),"compensated")
+
+def test_noncompensatable_commit_blocks_compensated_terminal_claim():
+ p=WorkflowPlan.create("wf",100,(Step("a",1,(),False),));a=StepCheckpoint.create(p,"a",1,"committed","e:a")
+ with pytest.raises(PermissionError):terminal_receipt(p,(a,),"compensated")
