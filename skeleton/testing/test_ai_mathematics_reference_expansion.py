@@ -11,6 +11,7 @@ from skeleton.ai.mathematics import (
     barycentric_interpolate,
     binary_calibration_report,
     chebyshev_nodes,
+    autocorrelation,
     convolution,
     dft,
     fft_radix2,
@@ -54,9 +55,9 @@ def test_csr_from_coo_merges_duplicates_and_preserves_matvec() -> None:
 def test_sparse_dense_matmul_matches_dense_reference() -> None:
     left = CSRMatrix.from_dense(((1.0, 0.0, 2.0), (0.0, 3.0, 0.0)))
     right = ((2.0, 1.0), (4.0, -1.0), (5.0, 2.0))
-    assert sparse_dense_matmul(left, right) == pytest.approx(
-        ((12.0, 5.0), (12.0, -3.0))
-    )
+    result = sparse_dense_matmul(left, right)
+    assert result[0] == pytest.approx((12.0, 5.0))
+    assert result[1] == pytest.approx((12.0, -3.0))
 
 
 def test_barycentric_and_newton_interpolation_recover_cubic() -> None:
@@ -123,6 +124,14 @@ def test_convolution_reference_matches_polynomial_product() -> None:
     assert convolution((1.0, 2.0, 3.0), (4.0, 5.0)) == pytest.approx(
         (4.0, 13.0, 22.0, 15.0)
     )
+
+
+def test_normalized_autocorrelation_has_unit_zero_lag_and_symmetry_signal() -> None:
+    values = (1.0, -1.0, 1.0, -1.0)
+    result = autocorrelation(values, max_lag=3, normalized=True)
+    assert result[0] == pytest.approx(1.0)
+    assert result[1] < 0.0
+    assert result[2] > 0.0
 
 
 def test_binary_calibration_report_distinguishes_perfect_and_bad_confidence() -> None:
