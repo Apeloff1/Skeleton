@@ -74,7 +74,11 @@
     "advanced_ai_structure_100": "machine/advanced_ai_structure_100.json",
     "advanced_ai_structure_100_human": "docs/plan/ADVANCED_AI_100_LEVELS.md",
     "advanced_ai_maturity_ledger": "machine/advanced_ai_maturity_ledger.json",
-    "advanced_ai_structure_validator": "scripts/check_advanced_ai_structure.py"
+    "advanced_ai_structure_validator": "scripts/check_advanced_ai_structure.py",
+    "functional_llm_game_builder_10mb_manifest": "machine/functional_llm_game_builder_10mb_manifest.json",
+    "functional_llm_game_builder_10mb_human": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/README.md",
+    "functional_llm_game_builder_10mb_validator": "scripts/check_functional_llm_game_builder_10mb.py",
+    "functional_llm_game_builder_10mb_workflow": ".github/workflows/functional-llm-game-builder-masterplan.yml"
   },
   "laws": [
     "durable governed state is authoritative",
@@ -101,7 +105,10 @@
     "ESS-1000 closure is revocable: implementation, contract, dependency, configuration, environment, regression, incident, recovery or evidence changes can stale, regress or revoke a previously signed essential and invalidate dependent closure",
     "ESS-1000 waivers and not-applicable labels cannot mark an essential complete; bounded exceptions remain explicitly incomplete and expire fail-closed",
     "ESS-1000 execution uses severity hard-ordering before scores; E0 is reserved for active existential incidents/regressions and cannot be assigned merely because an essential is open",
-    "ESS-1000 closure work runs across 99 independent domain lanes with same-lane stage order and a 99-way whole-system finality fan-in"
+    "ESS-1000 closure work runs across 99 independent domain lanes with same-lane stage order and a 99-way whole-system finality fan-in",
+    "Functional LLM + Game Builder 10MB is a depth-only execution atlas: it preserves the VOL-420 breadth freeze and cannot create completion authority.",
+    "A functional game-building transaction spans governed LLM context/inference, bounded rival competition, authorized project mutation, executable scene/simulation/presentation, automated verification, rights screening, reproducible export and reopen/replay/recovery.",
+    "Plan size and specification coverage never imply runtime completion; implementation and independent verification remain separately signed exact-head evidence."
   ],
   "thematic_parts": [
     {
