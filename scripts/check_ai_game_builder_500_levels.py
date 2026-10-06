@@ -21,6 +21,11 @@ GOVERNANCE_CANON = Path("skeleton/ai/game_builder/canon.py")
 GOVERNANCE_RIGHTS = Path("skeleton/ai/game_builder/rights.py")
 GOVERNANCE_ATOMS = Path("skeleton/ai/game_builder/atomizer.py")
 GOVERNANCE_TESTS = Path("tests/test_ai_game_builder_governance.py")
+EVALUATION_RUNTIME = Path("skeleton/ai/game_builder/evaluation.py")
+RESOURCE_RUNTIME = Path("skeleton/ai/game_builder/resource_governor.py")
+QUALITY_DEBT_RUNTIME = Path("skeleton/ai/game_builder/quality_debt.py")
+CONTROL_PLANE_RUNTIME = Path("skeleton/ai/game_builder/control_plane.py")
+OVERENGINEERING_RUNTIME_TESTS = Path("tests/test_ai_game_builder_overengineering_runtime.py")
 
 
 class GameBuilderAuthorityError(RuntimeError):
@@ -122,11 +127,24 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         "package": "skeleton/ai/game_builder",
         "contracts": str(RUNTIME_CONTRACTS),
         "dual_rival_state_machine": str(RUNTIME_FORGE),
-        "tests": str(RUNTIME_TESTS),
+        "evaluation_panel": str(EVALUATION_RUNTIME),
+        "resource_governor": str(RESOURCE_RUNTIME),
+        "quality_debt": str(QUALITY_DEBT_RUNTIME),
+        "integrated_control_plane": str(CONTROL_PLANE_RUNTIME),
+        "tests": [str(RUNTIME_TESTS), str(OVERENGINEERING_RUNTIME_TESTS)],
     }
     if runtime != expected_runtime:
         raise GameBuilderAuthorityError("game-builder runtime contract binding drifted")
-    for path in (RUNTIME_CONTRACTS, RUNTIME_FORGE, RUNTIME_TESTS):
+    for path in (
+        RUNTIME_CONTRACTS,
+        RUNTIME_FORGE,
+        RUNTIME_TESTS,
+        EVALUATION_RUNTIME,
+        RESOURCE_RUNTIME,
+        QUALITY_DEBT_RUNTIME,
+        CONTROL_PLANE_RUNTIME,
+        OVERENGINEERING_RUNTIME_TESTS,
+    ):
         if not (root / path).is_file():
             raise GameBuilderAuthorityError(f"missing game-builder runtime file: {path}")
     expected_governance = {
@@ -141,25 +159,27 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         if not (root / path).is_file():
             raise GameBuilderAuthorityError(f"missing game-builder governance runtime file: {path}")
 
-    if overengineering.get("schema_version") != "skeleton.ai_game_builder_overengineering.v1":
+    if overengineering.get("schema_version") != "skeleton.ai_game_builder_overengineering.v2":
         raise GameBuilderAuthorityError("unsupported game-builder overengineering schema")
     if overengineering.get("status") != "active_design_authority":
         raise GameBuilderAuthorityError("overengineering constitution must be active_design_authority")
     over_topology = overengineering.get("topology")
     if not isinstance(over_topology, dict):
         raise GameBuilderAuthorityError("overengineering topology must be an object")
-    if over_topology.get("plane_count") != 24:
-        raise GameBuilderAuthorityError("overengineering plane_count must equal 24")
+    if over_topology.get("plane_count") != 48:
+        raise GameBuilderAuthorityError("overengineering plane_count must equal 48")
     if over_topology.get("family_count") != 50:
         raise GameBuilderAuthorityError("overengineering family_count must equal 50")
     minimum_planes = over_topology.get("minimum_planes_per_family")
-    if isinstance(minimum_planes, bool) or not isinstance(minimum_planes, int) or minimum_planes < 11:
-        raise GameBuilderAuthorityError("minimum_planes_per_family must be at least 11")
+    if isinstance(minimum_planes, bool) or not isinstance(minimum_planes, int) or minimum_planes < 20:
+        raise GameBuilderAuthorityError("minimum_planes_per_family must be at least 20")
 
-    critical = _list(overengineering.get("critical_planes"), "critical_planes", 11)
+    critical = _list(overengineering.get("critical_planes"), "critical_planes", 20)
     expected_critical = [
         "OP01", "OP02", "OP04", "OP05", "OP06", "OP11",
         "OP14", "OP15", "OP16", "OP22", "OP24",
+        "OP25", "OP26", "OP27", "OP28", "OP29", "OP30",
+        "OP43", "OP47", "OP48",
     ]
     if critical != expected_critical:
         raise GameBuilderAuthorityError("critical overengineering planes drifted")
@@ -175,18 +195,23 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         str(GOVERNANCE_CANON),
         str(GOVERNANCE_RIGHTS),
         str(GOVERNANCE_ATOMS),
+        str(EVALUATION_RUNTIME),
+        str(RESOURCE_RUNTIME),
+        str(QUALITY_DEBT_RUNTIME),
+        str(CONTROL_PLANE_RUNTIME),
+        str(OVERENGINEERING_RUNTIME_TESTS),
     ):
         if required_path not in json.dumps(foundations, sort_keys=True):
             raise GameBuilderAuthorityError(
                 f"overengineering implemented foundation missing: {required_path}"
             )
 
-    planes = _list(overengineering.get("planes"), "overengineering.planes", 24)
-    if len(planes) != 24:
-        raise GameBuilderAuthorityError("exactly 24 overengineering planes are required")
+    planes = _list(overengineering.get("planes"), "overengineering.planes", 48)
+    if len(planes) != 48:
+        raise GameBuilderAuthorityError("exactly 48 overengineering planes are required")
     plane_ids = [_text(row.get("id"), "plane.id") for row in planes]
-    if plane_ids != [f"OP{i:02d}" for i in range(1, 25)]:
-        raise GameBuilderAuthorityError("overengineering plane ids must be OP01..OP24")
+    if plane_ids != [f"OP{i:02d}" for i in range(1, 49)]:
+        raise GameBuilderAuthorityError("overengineering plane ids must be OP01..OP48")
     for plane in planes:
         plane_id = plane["id"]
         _text(plane.get("title"), f"{plane_id}.title")
