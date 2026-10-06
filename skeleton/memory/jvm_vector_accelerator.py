@@ -806,6 +806,6 @@ def get_default_vector_accelerator() -> JvmVectorAccelerator:
 
 def close_default_vector_accelerator() -> None:
     """Retire only the vector helper from the canonical JVM registry."""
-    from skeleton.native.jvm_registry import get_default_jvm_registry
+    from skeleton.native.jvm_registry import close_default_jvm_accelerator
 
-    get_default_jvm_registry().close("vector")
+    close_default_jvm_accelerator("vector")
