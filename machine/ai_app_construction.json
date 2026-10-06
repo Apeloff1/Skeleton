@@ -1644,6 +1644,18 @@
       "kind": "release",
       "command": "repository required checks + immutable artifact provenance",
       "required": true
+    },
+    {
+      "id": "enterprise-ai-superiority",
+      "kind": "static",
+      "command": "python scripts/check_enterprise_ai_superiority.py --json",
+      "required": true
+    },
+    {
+      "id": "enterprise-ai-implementation-notes",
+      "kind": "static",
+      "command": "python scripts/check_enterprise_ai_implementation_notes.py --json",
+      "required": true
     }
   ],
   "runtime_model_providers": [
@@ -3538,7 +3550,9 @@
     "migration/preflight evidence when persistence changes",
     "artifact/SBOM/provenance references",
     "canary/smoke evidence",
-    "rollback target and trigger criteria"
+    "rollback target and trigger criteria",
+    "enterprise AI superiority exact-head validator output",
+    "all-421-volume October 2026 implementation dossier validator output"
   ],
   "construction_work_packages": [
     {
