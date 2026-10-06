@@ -69,7 +69,7 @@
         "ACC-VOL-014"
       ],
       "source_commit": "58b5868e083646e0dbbc6326d0dca3f3e4e9e7b6",
-      "claim": "independent CI signoff to hardened maturity explicitly recorded; completion remains separate",
+      "claim": "independent CI verification and later canonical completion explicitly recorded",
       "verification": [
         {
           "run_id": 36356867896,
@@ -81,7 +81,26 @@
           "name": "P1 Plan Verification Gate",
           "record_id": "ACC-VOL-014"
         }
-      ]
+      ],
+      "record_details": {
+        "ACC-VOL-013": {
+          "verification_signer": "github-actions:P1 Reasoning Search Stop Policy Gate",
+          "signed_at_utc": "2026-09-27T22:57:02Z",
+          "evidence_head": "ff7d3e764d81c7f80bbc698516b03bd872c04961",
+          "verification_run": 36356867896,
+          "completed_at_utc": "2026-10-04T00:48:31Z",
+          "completion_commit": "fa9b64bd9f18c596d5d27f7480f2d490cf52af7e"
+        },
+        "ACC-VOL-014": {
+          "verification_signer": "github-actions:P1 Plan Verification Gate",
+          "signed_at_utc": "2026-09-28T01:22:42Z",
+          "evidence_head": "8dc9e313566284c83b2401783015fb5638536f6e",
+          "verification_run": 36365420651,
+          "completed_at_utc": "2026-10-04T00:48:31Z",
+          "completion_commit": "fa9b64bd9f18c596d5d27f7480f2d490cf52af7e"
+        }
+      },
+      "completion_source_commit": "8d74b7d3979421780d50b23fb5c10a06204a1219"
     },
     {
       "record_ids": [
