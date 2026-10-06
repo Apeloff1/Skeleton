@@ -1444,3 +1444,89 @@ def test_sealed_parent_evidence_reports_descendant_and_aggregate_usage() -> None
     payload = evidence.canonical_payload()
     assert payload["descendant_usage"]["tool_calls"] == 1
     assert payload["aggregate_usage"]["tool_calls"] == 1
+
+
+
+def test_parent_direct_use_cannot_ignore_descendant_consumption() -> None:
+    guard = ExecutionAuthorityGuard()
+    parent = _authority(budget=_budget(tool_calls=2))
+    _admit(guard, parent)
+    child = _child_authority(
+        parent,
+        budget=_budget(tool_calls=2, parallelism=1),
+    )
+    guard.admit(
+        authority=child,
+        request=_request(),
+        receipt_id="receipt-child-parent-direct",
+        replay_key="admission-child-parent-direct",
+        now=NOW + timedelta(seconds=1),
+    )
+    child_use = guard.authorize(
+        authority=child,
+        capability="repo.write",
+        delta=ResourceUsage(tool_calls=2),
+        replay_key="child-consumes-parent-budget",
+        now=NOW + timedelta(seconds=2),
+    )
+    parent_overflow = guard.authorize(
+        authority=parent,
+        capability="repo.write",
+        delta=ResourceUsage(tool_calls=1),
+        replay_key="parent-after-child-overflow",
+        now=NOW + timedelta(seconds=3),
+    )
+
+    assert child_use.allowed
+    assert parent_overflow.disposition is AuthorizationDisposition.DENY
+    assert guard.usage_for(parent).tool_calls == 0
+    assert guard.effective_usage_for(parent).tool_calls == 2
+
+
+def test_intermediate_authority_direct_use_honors_grandchild_consumption() -> None:
+    guard = ExecutionAuthorityGuard()
+    root = _authority(budget=_budget(tool_calls=3))
+    _admit(guard, root)
+    child = _child_authority(
+        root,
+        actor_id="agent.secretary",
+        budget=_budget(tool_calls=2, parallelism=1),
+    )
+    guard.admit(
+        authority=child,
+        request=_request(),
+        receipt_id="receipt-middle",
+        replay_key="admission-middle",
+        now=NOW + timedelta(seconds=1),
+    )
+    grandchild = _child_authority(
+        child,
+        actor_id="agent.worker",
+        budget=_budget(tool_calls=2, parallelism=1),
+    )
+    guard.admit(
+        authority=grandchild,
+        request=_request(),
+        receipt_id="receipt-grandchild",
+        replay_key="admission-grandchild",
+        now=NOW + timedelta(seconds=2),
+    )
+    worker_use = guard.authorize(
+        authority=grandchild,
+        capability="repo.write",
+        delta=ResourceUsage(tool_calls=2),
+        replay_key="worker-consumes-middle-budget",
+        now=NOW + timedelta(seconds=3),
+    )
+    middle_overflow = guard.authorize(
+        authority=child,
+        capability="repo.write",
+        delta=ResourceUsage(tool_calls=1),
+        replay_key="middle-after-worker-overflow",
+        now=NOW + timedelta(seconds=4),
+    )
+
+    assert worker_use.allowed
+    assert middle_overflow.disposition is AuthorizationDisposition.DENY
+    assert guard.effective_usage_for(child).tool_calls == 2
+    assert guard.effective_usage_for(root).tool_calls == 2
