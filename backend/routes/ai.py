@@ -1073,6 +1073,10 @@ async def ai_chat(
     except Exception as exc:
         raise _chat_error(exc) from exc
 
+    operation_id, execution_id = _chat_turn_ids(
+        thread.thread_id,
+        user_message.message_id,
+    )
     assistant_key = f"{request.idempotency_key}:assistant"
     existing_assistant = next(
         (
@@ -1085,6 +1089,18 @@ async def ai_chat(
         None,
     )
     if existing_assistant is not None:
+        try:
+            replay_turn = await chat_turn_lifecycle.finalize_existing_assistant(
+                operation_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+            )
+        except Exception:
+            logger.exception(
+                "failed to reconcile durable replay turn operation=%s",
+                operation_id,
+            )
+            replay_turn = None
         return {
             "success": True,
             "response": existing_assistant.content,
@@ -1101,12 +1117,36 @@ async def ai_chat(
             "latency_ms": 0.0,
             "replayed": True,
             "operation_id": existing_assistant.operation_id,
+            "turn_state": (
+                None
+                if replay_turn is None
+                else replay_turn.snapshot.state.value
+            ),
             "ai_result_id": existing_assistant.ai_result_id,
             "thread": thread.as_dict(),
             "user_message": user_message.as_dict(),
             "assistant_message": existing_assistant.as_dict(),
             "timestamp": _utcnow(),
         }
+
+    try:
+        chat_turn = await chat_turn_lifecycle.begin(
+            thread=thread,
+            user_message=user_message,
+            operation_id=operation_id,
+            request_digest=_chat_request_digest(request),
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        chat_turn = await chat_turn_lifecycle.advance(
+            chat_turn,
+            TurnState.CONTEXT_COMPILING,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            reason_code="context-compilation-started",
+        )
+    except Exception as exc:
+        raise _chat_error(exc) from exc
 
     system_prompt = CHAT_INSTRUCTION_POLICY.instructions
     sections = [request.message]
@@ -1120,10 +1160,6 @@ async def ai_chat(
         transcript,
         before_sequence=user_message.sequence,
     )
-    operation_id, execution_id = _chat_turn_ids(
-        thread.thread_id,
-        user_message.message_id,
-    )
     context_envelope = _compile_chat_context(
         thread=thread,
         transcript=transcript,
@@ -1133,6 +1169,16 @@ async def ai_chat(
         execution_id=execution_id,
         request_context=request.context,
     )
+    try:
+        chat_turn = await chat_turn_lifecycle.advance(
+            chat_turn,
+            TurnState.ROUTING,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            reason_code="context-compiled",
+        )
+    except Exception as exc:
+        raise _chat_error(exc) from exc
 
     memory_write_intent = _chat_memory_write_intent(
         request=request,
