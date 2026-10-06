@@ -177,15 +177,16 @@ class RuntimeIntegrityCapsule:
             ledger,
             self.session_id,
         )
+        violations = list(runtime_audit.violations)
         try:
             expected = RuntimeIntegrityCapsule.capture(
                 self.runtime,
                 ledger,
             )
         except ValueError as exc:
-            return RuntimeAudit(False, (str(exc),))
+            violations.append(str(exc))
+            expected = None
 
-        violations = list(runtime_audit.violations)
         if not session_audit.valid:
             violations.extend(
                 f"session audit: {item}"
@@ -206,19 +207,24 @@ class RuntimeIntegrityCapsule:
             violations.append(
                 "capsule-integrity divergence: ledger identity changed"
             )
-        if self.root_decision_id != expected.root_decision_id:
+        if (
+            expected is not None
+            and self.root_decision_id != expected.root_decision_id
+        ):
             violations.append(
                 "capsule-integrity divergence: causal root identity changed"
             )
         if (
-            self.selected_policy_decision_id
+            expected is not None
+            and self.selected_policy_decision_id
             != expected.selected_policy_decision_id
         ):
             violations.append(
                 "capsule-integrity divergence: selected policy identity changed"
             )
         if (
-            self.session_record_hashes
+            expected is not None
+            and self.session_record_hashes
             != expected.session_record_hashes
         ):
             violations.append(
@@ -229,7 +235,7 @@ class RuntimeIntegrityCapsule:
         except ValueError:
             own_digest = ""
         if (
-            self.capsule_digest != expected.capsule_digest
+            (expected is not None and self.capsule_digest != expected.capsule_digest)
             or self.capsule_digest != own_digest
         ):
             violations.append(
