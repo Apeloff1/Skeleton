@@ -5008,3 +5008,125 @@ Specify a complete implementation/evidence surface for Training Weights Adaptati
 **Quality gate.** Track correctness, verified-success, latency, resource use, reproducibility, rollback success and unresolved dependencies. No optimization can compensate for a regression in rights, security, integrity, isolation, determinism boundaries or recovery.
 
 **Status.** Specification atom only: implementation_signed=false; verification_signed=false. Closure requires exact-head executable evidence and an independent verifier.
+
+
+## Coverage Closure Matrix
+
+This matrix closes dimensional coverage that cannot be inferred from atom count. Every listed subsystem is mandatory; omission is a specification failure, not a deferred enhancement.
+
+**Required lifecycle set:** `contract`, `admission`, `compile`, `execute`, `observe`, `verify`, `recover`, `replay`, `optimize`, `promote`, `rollback`, `retire`.
+
+**Required evidence set:** `unit proof`, `property proof`, `integration proof`, `fault injection`, `determinism proof`, `security proof`, `performance proof`, `recovery proof`, `provenance proof`, `compatibility proof`.
+
+**Required stress set:** `cold start`, `warm path`, `partial failure`, `dependency timeout`, `cancellation race`, `stale state`, `concurrent mutation`, `resource pressure`, `malformed input`, `version skew`, `reconnect replay`, `cross-platform run`.
+
+**Cross-product law.** Every subsystem must have executable acceptance evidence in every lifecycle stage. Every subsystem must exercise every evidence class across its implementation and release qualification. Every stress scenario must be represented in the plane’s regression suite; security, rights, recovery, cancellation, replay, and persistent-state mutations require explicit negative-path coverage. Risk-based reduction may reduce redundant test instances, but it may not remove a named dimension or leave any subsystem without coverage.
+
+### COV-FLGB-07-01 — dataset rights
+
+- **Lifecycle closure:** contract → admission → compile → execute → observe → verify → recover → replay → optimize → promote → rollback → retire.
+- **Evidence closure:** unit proof; property proof; integration proof; fault injection; determinism proof; security proof; performance proof; recovery proof; provenance proof; compatibility proof.
+- **Stress closure:** cold start; warm path; partial failure; dependency timeout; cancellation race; stale state; concurrent mutation; resource pressure; malformed input; version skew; reconnect replay; cross-platform run.
+- **Durability invariant:** identity, schema version, authority, budget, deadline, cancellation, provenance, replay state, rollback state, and terminal outcome remain explicit across failures and restarts.
+- **LLM/game-builder invariant:** model output remains a candidate until deterministic policy/verification authorizes promotion; project state cannot be mutated through conversational text alone.
+- **Closure rule:** implementation and independent verification remain unsigned until exact-head executable evidence names this coverage ID and the concrete implementation identity.
+
+### COV-FLGB-07-02 — dataset lineage
+
+- **Lifecycle closure:** contract → admission → compile → execute → observe → verify → recover → replay → optimize → promote → rollback → retire.
+- **Evidence closure:** unit proof; property proof; integration proof; fault injection; determinism proof; security proof; performance proof; recovery proof; provenance proof; compatibility proof.
+- **Stress closure:** cold start; warm path; partial failure; dependency timeout; cancellation race; stale state; concurrent mutation; resource pressure; malformed input; version skew; reconnect replay; cross-platform run.
+- **Durability invariant:** identity, schema version, authority, budget, deadline, cancellation, provenance, replay state, rollback state, and terminal outcome remain explicit across failures and restarts.
+- **LLM/game-builder invariant:** model output remains a candidate until deterministic policy/verification authorizes promotion; project state cannot be mutated through conversational text alone.
+- **Closure rule:** implementation and independent verification remain unsigned until exact-head executable evidence names this coverage ID and the concrete implementation identity.
+
+### COV-FLGB-07-03 — deduplication
+
+- **Lifecycle closure:** contract → admission → compile → execute → observe → verify → recover → replay → optimize → promote → rollback → retire.
+- **Evidence closure:** unit proof; property proof; integration proof; fault injection; determinism proof; security proof; performance proof; recovery proof; provenance proof; compatibility proof.
+- **Stress closure:** cold start; warm path; partial failure; dependency timeout; cancellation race; stale state; concurrent mutation; resource pressure; malformed input; version skew; reconnect replay; cross-platform run.
+- **Durability invariant:** identity, schema version, authority, budget, deadline, cancellation, provenance, replay state, rollback state, and terminal outcome remain explicit across failures and restarts.
+- **LLM/game-builder invariant:** model output remains a candidate until deterministic policy/verification authorizes promotion; project state cannot be mutated through conversational text alone.
+- **Closure rule:** implementation and independent verification remain unsigned until exact-head executable evidence names this coverage ID and the concrete implementation identity.
+
+### COV-FLGB-07-04 — contamination scan
+
+- **Lifecycle closure:** contract → admission → compile → execute → observe → verify → recover → replay → optimize → promote → rollback → retire.
+- **Evidence closure:** unit proof; property proof; integration proof; fault injection; determinism proof; security proof; performance proof; recovery proof; provenance proof; compatibility proof.
+- **Stress closure:** cold start; warm path; partial failure; dependency timeout; cancellation race; stale state; concurrent mutation; resource pressure; malformed input; version skew; reconnect replay; cross-platform run.
+- **Durability invariant:** identity, schema version, authority, budget, deadline, cancellation, provenance, replay state, rollback state, and terminal outcome remain explicit across failures and restarts.
+- **LLM/game-builder invariant:** model output remains a candidate until deterministic policy/verification authorizes promotion; project state cannot be mutated through conversational text alone.
+- **Closure rule:** implementation and independent verification remain unsigned until exact-head executable evidence names this coverage ID and the concrete implementation identity.
+
+### COV-FLGB-07-05 — training manifest
+
+- **Lifecycle closure:** contract → admission → compile → execute → observe → verify → recover → replay → optimize → promote → rollback → retire.
+- **Evidence closure:** unit proof; property proof; integration proof; fault injection; determinism proof; security proof; performance proof; recovery proof; provenance proof; compatibility proof.
+- **Stress closure:** cold start; warm path; partial failure; dependency timeout; cancellation race; stale state; concurrent mutation; resource pressure; malformed input; version skew; reconnect replay; cross-platform run.
+- **Durability invariant:** identity, schema version, authority, budget, deadline, cancellation, provenance, replay state, rollback state, and terminal outcome remain explicit across failures and restarts.
+- **LLM/game-builder invariant:** model output remains a candidate until deterministic policy/verification authorizes promotion; project state cannot be mutated through conversational text alone.
+- **Closure rule:** implementation and independent verification remain unsigned until exact-head executable evidence names this coverage ID and the concrete implementation identity.
+
+### COV-FLGB-07-06 — checkpoint lineage
+
+- **Lifecycle closure:** contract → admission → compile → execute → observe → verify → recover → replay → optimize → promote → rollback → retire.
+- **Evidence closure:** unit proof; property proof; integration proof; fault injection; determinism proof; security proof; performance proof; recovery proof; provenance proof; compatibility proof.
+- **Stress closure:** cold start; warm path; partial failure; dependency timeout; cancellation race; stale state; concurrent mutation; resource pressure; malformed input; version skew; reconnect replay; cross-platform run.
+- **Durability invariant:** identity, schema version, authority, budget, deadline, cancellation, provenance, replay state, rollback state, and terminal outcome remain explicit across failures and restarts.
+- **LLM/game-builder invariant:** model output remains a candidate until deterministic policy/verification authorizes promotion; project state cannot be mutated through conversational text alone.
+- **Closure rule:** implementation and independent verification remain unsigned until exact-head executable evidence names this coverage ID and the concrete implementation identity.
+
+### COV-FLGB-07-07 — post-training
+
+- **Lifecycle closure:** contract → admission → compile → execute → observe → verify → recover → replay → optimize → promote → rollback → retire.
+- **Evidence closure:** unit proof; property proof; integration proof; fault injection; determinism proof; security proof; performance proof; recovery proof; provenance proof; compatibility proof.
+- **Stress closure:** cold start; warm path; partial failure; dependency timeout; cancellation race; stale state; concurrent mutation; resource pressure; malformed input; version skew; reconnect replay; cross-platform run.
+- **Durability invariant:** identity, schema version, authority, budget, deadline, cancellation, provenance, replay state, rollback state, and terminal outcome remain explicit across failures and restarts.
+- **LLM/game-builder invariant:** model output remains a candidate until deterministic policy/verification authorizes promotion; project state cannot be mutated through conversational text alone.
+- **Closure rule:** implementation and independent verification remain unsigned until exact-head executable evidence names this coverage ID and the concrete implementation identity.
+
+### COV-FLGB-07-08 — distillation
+
+- **Lifecycle closure:** contract → admission → compile → execute → observe → verify → recover → replay → optimize → promote → rollback → retire.
+- **Evidence closure:** unit proof; property proof; integration proof; fault injection; determinism proof; security proof; performance proof; recovery proof; provenance proof; compatibility proof.
+- **Stress closure:** cold start; warm path; partial failure; dependency timeout; cancellation race; stale state; concurrent mutation; resource pressure; malformed input; version skew; reconnect replay; cross-platform run.
+- **Durability invariant:** identity, schema version, authority, budget, deadline, cancellation, provenance, replay state, rollback state, and terminal outcome remain explicit across failures and restarts.
+- **LLM/game-builder invariant:** model output remains a candidate until deterministic policy/verification authorizes promotion; project state cannot be mutated through conversational text alone.
+- **Closure rule:** implementation and independent verification remain unsigned until exact-head executable evidence names this coverage ID and the concrete implementation identity.
+
+### COV-FLGB-07-09 — adapter training
+
+- **Lifecycle closure:** contract → admission → compile → execute → observe → verify → recover → replay → optimize → promote → rollback → retire.
+- **Evidence closure:** unit proof; property proof; integration proof; fault injection; determinism proof; security proof; performance proof; recovery proof; provenance proof; compatibility proof.
+- **Stress closure:** cold start; warm path; partial failure; dependency timeout; cancellation race; stale state; concurrent mutation; resource pressure; malformed input; version skew; reconnect replay; cross-platform run.
+- **Durability invariant:** identity, schema version, authority, budget, deadline, cancellation, provenance, replay state, rollback state, and terminal outcome remain explicit across failures and restarts.
+- **LLM/game-builder invariant:** model output remains a candidate until deterministic policy/verification authorizes promotion; project state cannot be mutated through conversational text alone.
+- **Closure rule:** implementation and independent verification remain unsigned until exact-head executable evidence names this coverage ID and the concrete implementation identity.
+
+### COV-FLGB-07-10 — candidate weights
+
+- **Lifecycle closure:** contract → admission → compile → execute → observe → verify → recover → replay → optimize → promote → rollback → retire.
+- **Evidence closure:** unit proof; property proof; integration proof; fault injection; determinism proof; security proof; performance proof; recovery proof; provenance proof; compatibility proof.
+- **Stress closure:** cold start; warm path; partial failure; dependency timeout; cancellation race; stale state; concurrent mutation; resource pressure; malformed input; version skew; reconnect replay; cross-platform run.
+- **Durability invariant:** identity, schema version, authority, budget, deadline, cancellation, provenance, replay state, rollback state, and terminal outcome remain explicit across failures and restarts.
+- **LLM/game-builder invariant:** model output remains a candidate until deterministic policy/verification authorizes promotion; project state cannot be mutated through conversational text alone.
+- **Closure rule:** implementation and independent verification remain unsigned until exact-head executable evidence names this coverage ID and the concrete implementation identity.
+
+### COV-FLGB-07-11 — mirror-room evaluation
+
+- **Lifecycle closure:** contract → admission → compile → execute → observe → verify → recover → replay → optimize → promote → rollback → retire.
+- **Evidence closure:** unit proof; property proof; integration proof; fault injection; determinism proof; security proof; performance proof; recovery proof; provenance proof; compatibility proof.
+- **Stress closure:** cold start; warm path; partial failure; dependency timeout; cancellation race; stale state; concurrent mutation; resource pressure; malformed input; version skew; reconnect replay; cross-platform run.
+- **Durability invariant:** identity, schema version, authority, budget, deadline, cancellation, provenance, replay state, rollback state, and terminal outcome remain explicit across failures and restarts.
+- **LLM/game-builder invariant:** model output remains a candidate until deterministic policy/verification authorizes promotion; project state cannot be mutated through conversational text alone.
+- **Closure rule:** implementation and independent verification remain unsigned until exact-head executable evidence names this coverage ID and the concrete implementation identity.
+
+### COV-FLGB-07-12 — promotion gate
+
+- **Lifecycle closure:** contract → admission → compile → execute → observe → verify → recover → replay → optimize → promote → rollback → retire.
+- **Evidence closure:** unit proof; property proof; integration proof; fault injection; determinism proof; security proof; performance proof; recovery proof; provenance proof; compatibility proof.
+- **Stress closure:** cold start; warm path; partial failure; dependency timeout; cancellation race; stale state; concurrent mutation; resource pressure; malformed input; version skew; reconnect replay; cross-platform run.
+- **Durability invariant:** identity, schema version, authority, budget, deadline, cancellation, provenance, replay state, rollback state, and terminal outcome remain explicit across failures and restarts.
+- **LLM/game-builder invariant:** model output remains a candidate until deterministic policy/verification authorizes promotion; project state cannot be mutated through conversational text alone.
+- **Closure rule:** implementation and independent verification remain unsigned until exact-head executable evidence names this coverage ID and the concrete implementation identity.
+
