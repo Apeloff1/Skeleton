@@ -67,6 +67,11 @@ class EngineExecutionCoordinator:
     store and resumes from canonical checkpoints.
     """
 
+    def __init__(
+        self,
+        service: EngineExecutionService,
+        *,
+        provider_registry: ProviderRegistry | None = None,
         tool_runtime: AsyncToolRuntime | None = None,
         verification_hook: VerificationHook | None = None,
         finalization_binding_hook: FinalizationBindingHook | None = None,
@@ -74,8 +79,8 @@ class EngineExecutionCoordinator:
     ) -> None:
         if not isinstance(service, EngineExecutionService):
             raise TypeError("service must be EngineExecutionService")
-        verification_hook: VerificationHook | None = None,
-        finalization_binding_hook: FinalizationBindingHook | None = None,
+        self.service = service
+        self.provider_registry = provider_registry or ProviderRegistry.from_env()
         self.tool_runtime = tool_runtime or AsyncToolRuntime()
         self.verification_hook = verification_hook
         self.finalization_binding_hook = finalization_binding_hook
@@ -88,6 +93,7 @@ class EngineExecutionCoordinator:
         self._lock = asyncio.Lock()
         self._tasks: dict[str, asyncio.Task[None]] = {}
         self._lifecycle_leases: dict[asyncio.Task[None], WorkLease] = {}
+        self._supervision_faults: list[str] = []
         self._closed = False
 
     async def ensure_started(
