@@ -351,6 +351,86 @@ claim frontier maturity:
 A profile ceiling limits what the deployment claims. It does not permit skipping
 lower levels.
 
+## Level implementation contract
+
+Every implemented level must publish an implementation contract with:
+
+- canonical owner;
+- entry conditions;
+- runtime surfaces;
+- state surfaces;
+- authority boundary;
+- resource envelope;
+- telemetry;
+- failure modes;
+- recovery;
+- focused tests;
+- adversarial tests;
+- evaluation suite;
+- rollback or safe-disable path;
+- evidence receipt;
+- deprecation path.
+
+A level is not production-operable if the operator cannot answer who owns it,
+what state it touches, how it fails, how to stop it, and how to prove its
+current health.
+
+## Operational readiness
+
+Each production level requires:
+
+- owning team/on-call;
+- health/readiness definition;
+- SLI/SLO or bounded success metric;
+- saturation signal;
+- failure taxonomy;
+- runbook or explicit no-runtime declaration;
+- kill/suspend path;
+- rollback/safe-disable path;
+- evidence freshness policy;
+- dependency inventory.
+
+Each stratum closure gate additionally requires cross-level trace continuity,
+aggregate capacity evidence, fault injection, security/authority review,
+recovery rehearsal, operator status, and a known-limitations register.
+
+## Deprecation and migration
+
+Advanced AI maturity is not allowed to accumulate undead subsystems.
+
+Runtime level contracts move through:
+
+```text
+ACTIVE -> DEPRECATED -> MIGRATING -> RETIRED
+```
+
+A deprecated contract cannot gain new dependents. Migration must preserve
+compatibility or define an atomic cutover. Retirement requires zero live
+dependents, no unresolved canonical state, and archived evidence references.
+
+Evidence that depended on a materially migrated or retired contract becomes
+non-current until rebound to the replacement.
+
+## Dependency integrity
+
+Promotion dependencies and runtime dependencies are different graphs.
+
+The promotion ladder is ordered; runtime architecture remains governed by the
+canonical construction planes and interface registry.
+
+The following are blockers:
+
+- circular authority dependencies;
+- an undeclared state writer;
+- a new policy decision maker outside canonical policy authority;
+- a second tool executor;
+- a second release promoter;
+- a second credential owner;
+- a second conversation authority.
+
+A convenience cache may not gain write authority simply because a higher
+maturity level wants lower latency.
+
 ## Risk classes and evidence freshness
 
 Promotion evidence expires.
