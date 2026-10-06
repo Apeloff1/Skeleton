@@ -164,6 +164,12 @@ async def test_live_chat_success_reaches_durable_complete(
 
     assert response["success"] is True
     assert response["turn_state"] == "complete"
+    assert response["response_acceptance_receipt"].startswith(
+        "response-acceptance-sha256:"
+    )
+    assert response["response_acceptance_receipt"] in (
+        response["assistant_message"]["artifact_refs"]
+    )
     persisted = ai_chat_turn_test_authority.repo.reconstruct(
         response["operation_id"],
         tenant_id="tenant-a",
@@ -486,3 +492,73 @@ async def test_live_owner_prevents_duplicate_engine_execution(
     current = ai_chat_turn_test_authority.repo.assert_lease(lease)
     assert current.holder_id == "existing-worker"
     assert current.epoch == 1
+
+
+
+@pytest.mark.asyncio
+async def test_live_chat_rejects_unaccepted_engine_output_before_transcript_commit(
+    monkeypatch,
+    ai_chat_turn_test_authority,
+):
+    import routes.ai as route
+
+    thread, user = _thread_and_user()
+    monkeypatch.setattr(
+        route,
+        "conversation_authority",
+        _conversation_authority(thread, user, allow_commit=False),
+    )
+    fake_client = SimpleNamespace(
+        config=SimpleNamespace(
+            service_principal="codedock-backend",
+            execution_timeout_s=30.0,
+        )
+    )
+
+    async def wait_for_terminal(**_kwargs):
+        raise EngineNotFoundError("not started")
+
+    async def execute(command):
+        return SimpleNamespace(
+            final_output="This must never be committed.",
+            execution_id=command.execution_request.execution_id,
+            verification="unverified",
+            evidence_refs=("evidence:rejected",),
+            provider_receipts=("provider:test:rejected",),
+            tool_receipts=(),
+            memory_refs=(),
+            artifact_refs=(),
+        )
+
+    fake_client.wait_for_terminal = wait_for_terminal
+    fake_client.execute = execute
+    monkeypatch.setattr(route.EngineClient, "from_env", lambda: fake_client)
+
+    response = await route.ai_chat(
+        _request(route, thread.thread_id),
+        user={"tenant_id": "tenant-a", "email": "owner-a"},
+    )
+
+    assert response["success"] is False
+    assert response["error_code"] == "response_acceptance_rejected"
+    assert response["response_acceptance_receipt"].startswith(
+        "response-acceptance-sha256:"
+    )
+    assert "verification_not_accepted" in (
+        response["response_acceptance_reasons"]
+    )
+    persisted = ai_chat_turn_test_authority.repo.reconstruct(
+        response["operation_id"],
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+    )
+    assert persisted.snapshot.state is TurnState.FAILED_TERMINAL
+    events = ai_chat_turn_test_authority.repo.list_events(
+        response["operation_id"],
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+    )
+    assert events[-1].to_state is TurnState.FAILED_TERMINAL
+    assert events[-1].reason_code.startswith(
+        "response-acceptance-rejected:"
+    )
