@@ -7,6 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PATH = ROOT / "machine" / "project_self_improvement_1000.json"
+EPOCH_PATH = ROOT / "machine" / "project_self_improvement_epoch_contract.json"
 
 MATURITY = [
     "planned","specified","implemented","integrated",
@@ -14,7 +15,122 @@ MATURITY = [
 ]
 RANK = {state: i for i, state in enumerate(MATURITY)}
 
-def validate(data: dict) -> list[str]:
+EXPECTED_EPOCH_STATES = [
+    "foreground_active","idle_eligible","baseline_freezing","mirror_gap_mining",
+    "candidate_synthesis","adversarial_challenge","sandbox_experiment",
+    "causal_evaluation","learning_consolidation","promotion_pending",
+    "closed","preempted","quarantined","failed",
+]
+
+def validate_epoch(epoch: dict) -> list[str]:
+    errors: list[str] = []
+    if epoch.get("schema_version") != "skeleton.project_self_improvement_epoch.v1":
+        errors.append("epoch: unexpected schema_version")
+    if epoch.get("initial_state") != "foreground_active":
+        errors.append("epoch: initial state must be foreground_active")
+    if epoch.get("states") != EXPECTED_EPOCH_STATES:
+        errors.append("epoch: state set/order changed")
+    if epoch.get("terminal_states") != ["closed","preempted","quarantined","failed"]:
+        errors.append("epoch: terminal states changed")
+
+    transitions = epoch.get("transitions", [])
+    expected_chain = [
+        ("foreground_active","idle_eligible","idle_predicate_true"),
+        ("idle_eligible","baseline_freezing","resource_budget_reserved_and_project_lock_nonexclusive"),
+        ("baseline_freezing","mirror_gap_mining","immutable_baseline_receipt_written"),
+        ("mirror_gap_mining","candidate_synthesis","prioritized_gap_set_nonempty"),
+        ("candidate_synthesis","adversarial_challenge","candidate_set_nonempty"),
+        ("adversarial_challenge","sandbox_experiment","at_least_one_candidate_survives_initial_challenge"),
+        ("sandbox_experiment","causal_evaluation","bounded_experiment_receipts_complete"),
+        ("causal_evaluation","learning_consolidation","baseline_candidate_comparison_complete"),
+        ("learning_consolidation","promotion_pending","project_learning_receipt_written"),
+        ("promotion_pending","closed","candidate_promoted_rejected_or_quarantined_and_epoch_receipt_written"),
+    ]
+    actual_chain = [(x.get("from"),x.get("to"),x.get("guard")) for x in transitions]
+    if actual_chain != expected_chain:
+        errors.append("epoch: deterministic happy-path transition chain changed")
+
+    pre = epoch.get("global_preemption_transitions", {})
+    active_states = EXPECTED_EPOCH_STATES[1:10]
+    if pre.get("source_states") != active_states:
+        errors.append("epoch: preemption must cover every active mirror-room state")
+    if pre.get("to") != "preempted":
+        errors.append("epoch: preemption target must be preempted")
+    required_preemption_guards = {
+        "foreground_instruction_arrived",
+        "exclusive_project_mutation_requested",
+        "mandatory_recovery_started",
+        "safety_intervention_started",
+        "protected_resource_reservation_violated",
+    }
+    if set(pre.get("guards", [])) != required_preemption_guards:
+        errors.append("epoch: preemption guards changed")
+    if "never partially promote" not in pre.get("action", ""):
+        errors.append("epoch: preemption action must forbid partial promotion")
+
+    idle = epoch.get("idle_predicate", {})
+    required_idle_terms = {
+        "foreground_runnable_queue_empty_or_external_blocked_only",
+        "no_unresolved_foreground_instruction_waiting_for_execution",
+        "no_exclusive_project_mutation_lock_owned",
+        "no_mandatory_recovery_or_safety_intervention",
+        "resource_budget_available_without_violating_foreground_reservations",
+    }
+    if set(idle.get("all", [])) != required_idle_terms:
+        errors.append("epoch: idle predicate changed")
+    if idle.get("false_on_unknown") is not True:
+        errors.append("epoch: unknown idle state must fail closed")
+    if "not to delay eligible work" not in idle.get("debounce", ""):
+        errors.append("epoch: debounce may not delay eligible work")
+
+    locks = epoch.get("locks", {})
+    if locks.get("foreground_mutation_lock", {}).get("priority") != "absolute":
+        errors.append("epoch: foreground mutation lock priority must be absolute")
+    if locks.get("foreground_mutation_lock", {}).get("mirror_room_may_hold") is not False:
+        errors.append("epoch: mirror room may not hold foreground mutation lock")
+    if locks.get("candidate_namespace_lock", {}).get("production_write") is not False:
+        errors.append("epoch: candidate namespace may not write production")
+
+    budget = epoch.get("epoch_budget_schema", {})
+    required_budgets = {
+        "epoch_id","project_id","wall_clock_limit","experiment_limit","model_compute_limit",
+        "cpu_limit","memory_limit","storage_limit","network_limit","external_api_limit",
+    }
+    if set(budget.get("required", [])) != required_budgets:
+        errors.append("epoch: required resource budgets changed")
+    if budget.get("carryover") != "none unless explicitly reauthorized by next epoch":
+        errors.append("epoch: budget carryover must require explicit reauthorization")
+
+    receipt_schemas = [
+        "baseline_receipt_schema","hypothesis_schema","candidate_receipt_schema",
+        "adversarial_receipt_schema","evaluation_receipt_schema","learning_receipt_schema",
+        "promotion_receipt_schema","epoch_receipt_schema",
+    ]
+    for name in receipt_schemas:
+        schema = epoch.get(name, {})
+        if not schema.get("required"):
+            errors.append(f"epoch: {name} missing required fields")
+
+    promotion = epoch.get("promotion_receipt_schema", {})
+    if set(promotion.get("forbidden_authority", [])) != {"proposer_room","challenger_room","verifier_room"}:
+        errors.append("epoch: mirror rooms must remain forbidden promotion authorities")
+
+    invariants = set(epoch.get("invariants", []))
+    required_invariant_fragments = [
+        "no transition may grant production authority",
+        "foreground work always preempts mirror work",
+        "partial promotion is forbidden",
+        "negative results are durable project learning",
+        "every epoch terminates before another epoch begins for the same project",
+        "unknown idle state fails closed to foreground_active",
+        "no project can satisfy another project's PSI-1000 maturity",
+    ]
+    for item in required_invariant_fragments:
+        if item not in invariants:
+            errors.append(f"epoch: missing invariant: {item}")
+    return errors
+
+def validate(data: dict, epoch: dict | None = None) -> list[str]:
     errors: list[str] = []
     levels = data.get("levels", [])
     strata = data.get("strata", [])
@@ -112,6 +228,8 @@ def validate(data: dict) -> list[str]:
         errors.append("idle predicate/preemption missing")
     if not idle.get("continuous_idle_rule"):
         errors.append("continuous idle rule missing")
+    if "debounce may prevent trigger flapping" not in idle.get("debounce_rule", ""):
+        errors.append("idle debounce rule missing")
 
     for key in ["proposer_room","challenger_room","role_reversal","verifier_room","archivist_plane","isolation","finality"]:
         if not mirror.get(key):
@@ -125,6 +243,8 @@ def validate(data: dict) -> list[str]:
         errors.append("unbounded mirror-room loops forbidden")
     if not resources.get("per_epoch_required_budgets"):
         errors.append("per-epoch budgets required")
+    if "exponentially reduce frequency" not in resources.get("no_gain_backoff", ""):
+        errors.append("no-gain backoff rule missing")
 
     if candidates.get("production_in_place_self_mutation") is not False:
         errors.append("production in-place self mutation must be false")
@@ -154,19 +274,23 @@ def validate(data: dict) -> list[str]:
     if final.get("id") != "PSI1000-1000":
         errors.append("finality identity must be PSI1000-1000")
 
+    if epoch is not None:
+        errors.extend(validate_epoch(epoch))
     return errors
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--path", type=Path, default=PATH)
+    parser.add_argument("--epoch-path", type=Path, default=EPOCH_PATH)
     args = parser.parse_args()
     data = json.loads(args.path.read_text(encoding="utf-8"))
-    errors = validate(data)
+    epoch = json.loads(args.epoch_path.read_text(encoding="utf-8"))
+    errors = validate(data, epoch)
     if errors:
         for error in errors:
             print(f"ERROR: {error}")
         return 1
-    print("PSI-1000 valid: 1000 levels / 100 strata / per-project mirror-room self-improvement enforced")
+    print("PSI-1000 valid: 1000 levels / 100 strata / deterministic preemptible mirror-room epochs enforced")
     return 0
 
 if __name__ == "__main__":
