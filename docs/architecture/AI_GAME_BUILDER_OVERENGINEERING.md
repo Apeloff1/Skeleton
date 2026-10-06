@@ -141,6 +141,8 @@ The constitution is now partially executable through four additional determinist
 - `skeleton/ai/game_builder/resource_governor.py` — atomic token/tool/artifact/retry/branch/concurrency accounting with checkpoint cadence and deliberately **no wall-clock budget field**.
 - `skeleton/ai/game_builder/quality_debt.py` — typed unresolved debt, zero-tolerance protected debt by default, critical-debt vetoes, and ceilings that may only tighten.
 - `skeleton/ai/game_builder/control_plane.py` — integrates the duel, evaluator panel, resource governor, and debt ratchet. Panel medians—not candidate self-scores—are used for promotion comparison, and a material declared-vs-adjudicated score gap becomes a hard gate.
+- `skeleton/ai/game_builder/resilience.py` — executes critical novelty/mode-collapse defense, durable dissent, transitive blast-radius prediction, and cross-granularity invariant inheritance.
+- `skeleton/ai/game_builder/release.py` — terminal 50-family gold-master evidence bundle plus an independent tribunal; failed family qualification or tribunal dissent blocks release.
 
 The integrated control plane recomputes the canonical panel decision from the bound panel before promotion. A caller cannot fabricate a favorable `PanelDecision` and bypass the judge quorum.
 
