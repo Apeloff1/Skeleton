@@ -359,6 +359,23 @@
       "recovery_granularity": "implementation_signoff_commit",
       "verification_state": "explicitly_unsigned",
       "completion_state": "explicitly_open"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-253"
+      ],
+      "source_commit": "8d74b7d3979421780d50b23fb5c10a06204a1219",
+      "claim": "independent CI verification and canonical completion explicitly recorded",
+      "recovery_granularity": "full_signature_history",
+      "verification_signer": "github-actions:P1 Reasoning Search Stop Policy Gate",
+      "signed_at_utc": "2026-09-27T22:57:02Z",
+      "evidence_head": "ff7d3e764d81c7f80bbc698516b03bd872c04961",
+      "verification_runs": [
+        36356867896
+      ],
+      "completed_at_utc": "2026-10-04T00:48:31Z",
+      "completion_commit": "fa9b64bd9f18c596d5d27f7480f2d490cf52af7e",
+      "automatic_signature_write_authorized": false
     }
   ],
   "cohorts": [
