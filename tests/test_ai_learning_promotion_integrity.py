@@ -150,6 +150,44 @@ def test_assignment_and_feedback_reject_nonhex_spec_digest() -> None:
         )
 
 
+def test_schema_version_bool_type_confusion_is_rejected() -> None:
+    spec = _spec()
+    subject = _subjects(spec, "candidate", 1)[0]
+    with pytest.raises(FeedbackPromotionError, match="unsupported feedback schema"):
+        FeedbackEvent(
+            event_id="schema-bool",
+            experiment_id=spec.experiment_id,
+            subject_id=subject,
+            variant="candidate",
+            score=0.5,
+            observed_at=1,
+            consent=True,
+            data_use_purpose=spec.data_use_purpose,
+            spec_digest=spec.digest,
+            schema_version=True,
+        )
+
+
+def test_duplicate_event_ids_in_promotion_input_fail_closed() -> None:
+    spec = _spec()
+    ledger = FeedbackLedger()
+    events = _balanced_events(ledger, spec)
+    evaluation = _evaluation(
+        spec,
+        events,
+        evaluated_at=300,
+        evidence_ref="eval:duplicate-input",
+    )
+
+    with pytest.raises(FeedbackPromotionError, match="duplicate feedback event ids"):
+        FeedbackPromotionPipeline().promote(
+            spec,
+            [*events, events[0]],
+            evaluation,
+            promoted_at=301,
+        )
+
+
 def test_promotion_rejects_evaluation_that_predates_referenced_feedback() -> None:
     spec = _spec()
     ledger = FeedbackLedger()
