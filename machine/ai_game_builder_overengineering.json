@@ -1255,5 +1255,16 @@
     ],
     "tie_policy": "retain incumbent as champion and preserve challenger branch when materially distinct",
     "appeal_policy": "retain all evidence and route disputed subjective or legal-risk decisions through OP19 independent calibration/appeal"
+  },
+  "implemented_foundations": {
+    "dual_rival_contracts": "skeleton/ai/game_builder/contracts.py",
+    "dual_rival_state_machine": "skeleton/ai/game_builder/dual_rival_forge.py",
+    "canon_causality_and_epistemic_state": "skeleton/ai/game_builder/canon.py",
+    "rights_clean_room": "skeleton/ai/game_builder/rights.py",
+    "pixel_to_project_lineage": "skeleton/ai/game_builder/atomizer.py",
+    "regression_tests": [
+      "skeleton/testing/test_ai_game_builder_contracts.py",
+      "skeleton/testing/test_ai_game_builder_governance.py"
+    ]
   }
 }
