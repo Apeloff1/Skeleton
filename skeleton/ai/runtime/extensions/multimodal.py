@@ -214,8 +214,11 @@ class MediaTransform:
         object.__setattr__(self, "parameters", params)
         if self.source_offsets is not None:
             start, end = self.source_offsets
-            if not (math.isfinite(start) and math.isfinite(end) and 0 <= start <= end):
-                raise ValueError("source_offsets must be finite ordered non-negative offsets")
+            start = _require_number(start, field_name="source_offset_start")
+            end = _require_number(end, field_name="source_offset_end")
+            if start > end:
+                raise ValueError("source_offsets must be ordered")
+            object.__setattr__(self, "source_offsets", (start, end))
 
     @property
     def digest(self) -> str:
@@ -281,8 +284,10 @@ class VisionResult:
     def __post_init__(self) -> None:
         object.__setattr__(self, "asset_digest", _require_digest(self.asset_digest, field_name="asset_digest"))
         object.__setattr__(self, "model_id", _require_nonempty(self.model_id, field_name="model_id"))
-        if not math.isfinite(self.confidence) or not 0.0 <= self.confidence <= 1.0:
+        confidence = _require_number(self.confidence, field_name="confidence")
+        if confidence > 1.0:
             raise ValueError("confidence must be finite in [0, 1]")
+        object.__setattr__(self, "confidence", confidence)
 
 
 @dataclass(frozen=True, slots=True)
@@ -320,8 +325,10 @@ class OCRSpan:
         object.__setattr__(self, "y", _require_int(self.y, field_name="y"))
         object.__setattr__(self, "width", _require_int(self.width, field_name="width", minimum=1))
         object.__setattr__(self, "height", _require_int(self.height, field_name="height", minimum=1))
-        if not math.isfinite(self.confidence) or not 0.0 <= self.confidence <= 1.0:
+        confidence = _require_number(self.confidence, field_name="OCR confidence")
+        if confidence > 1.0:
             raise ValueError("OCR confidence must be finite in [0, 1]")
+        object.__setattr__(self, "confidence", confidence)
 
 
 @dataclass(frozen=True, slots=True)
@@ -372,12 +379,12 @@ class AudioSegment:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "asset_digest", _require_digest(self.asset_digest, field_name="asset_digest"))
-        if not (
-            math.isfinite(self.start_seconds)
-            and math.isfinite(self.end_seconds)
-            and 0 <= self.start_seconds < self.end_seconds
-        ):
+        start = _require_number(self.start_seconds, field_name="start_seconds")
+        end = _require_number(self.end_seconds, field_name="end_seconds")
+        if start >= end:
             raise ValueError("audio segment timestamps are invalid")
+        object.__setattr__(self, "start_seconds", start)
+        object.__setattr__(self, "end_seconds", end)
         object.__setattr__(
             self,
             "source_channel",
@@ -403,8 +410,10 @@ class AudioResult:
         object.__setattr__(self, "asset_digest", _require_digest(self.asset_digest, field_name="asset_digest"))
         object.__setattr__(self, "model_id", _require_nonempty(self.model_id, field_name="model_id"))
         object.__setattr__(self, "task", _require_nonempty(self.task, field_name="task"))
-        if not math.isfinite(self.confidence) or not 0 <= self.confidence <= 1:
+        confidence = _require_number(self.confidence, field_name="confidence")
+        if confidence > 1.0:
             raise ValueError("confidence must be finite in [0, 1]")
+        object.__setattr__(self, "confidence", confidence)
 
 
 @dataclass(frozen=True, slots=True)
@@ -555,12 +564,12 @@ class VideoSegment:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "asset_digest", _require_digest(self.asset_digest, field_name="asset_digest"))
-        if not (
-            math.isfinite(self.start_seconds)
-            and math.isfinite(self.end_seconds)
-            and 0 <= self.start_seconds < self.end_seconds
-        ):
+        start = _require_number(self.start_seconds, field_name="start_seconds")
+        end = _require_number(self.end_seconds, field_name="end_seconds")
+        if start >= end:
             raise ValueError("video segment timestamps are invalid")
+        object.__setattr__(self, "start_seconds", start)
+        object.__setattr__(self, "end_seconds", end)
 
 
 @dataclass(frozen=True, slots=True)
@@ -609,10 +618,12 @@ def sample_video_timestamps(
 ) -> tuple[float, ...]:
     """Build a deterministic bounded temporal sampling plan before decoding frames."""
 
-    if not math.isfinite(interval_seconds) or interval_seconds <= 0:
-        raise ValueError("interval_seconds must be finite and positive")
-    if max_samples <= 0:
-        raise ValueError("max_samples must be positive")
+    interval_seconds = _require_number(
+        interval_seconds,
+        field_name="interval_seconds",
+        strictly_positive=True,
+    )
+    max_samples = _require_int(max_samples, field_name="max_samples", minimum=1)
     if asset.duration_seconds == 0:
         return (0.0,)
     timestamps: list[float] = []
@@ -679,8 +690,7 @@ class MultimodalHit:
             object.__setattr__(self, name, _require_digest(getattr(self, name), field_name=name))
         for name in ("modality", "tenant_id", "classification", "trust_label"):
             object.__setattr__(self, name, _require_nonempty(getattr(self, name), field_name=name))
-        if not math.isfinite(self.score):
-            raise ValueError("score must be finite")
+        object.__setattr__(self, "score", _require_number(self.score, field_name="score"))
         object.__setattr__(
             self,
             "indexed_epoch",
@@ -780,8 +790,7 @@ class MultimodalRegistry:
         self._hits.append(hit)
 
     def retrieve(self, query: MultimodalQuery, *, limit: int = 20) -> CrossModalEvidence:
-        if limit <= 0:
-            raise ValueError("limit must be positive")
+        limit = _require_int(limit, field_name="limit", minimum=1)
         permitted = [
             hit
             for hit in self._hits
