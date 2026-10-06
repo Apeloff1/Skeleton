@@ -156,7 +156,22 @@
       "claim": "independent verification and hardened completion explicitly recorded",
       "verification_signer": "github-actions:P1 Multi-Agent Orchestration Gate",
       "completed_at_utc": "2026-10-04T15:47:01Z",
-      "evidence_head": "a506a14df1c8b03146ffb03f1956d343efc3a4b5"
+      "evidence_head": "a506a14df1c8b03146ffb03f1956d343efc3a4b5",
+      "signed_at_utc": "2026-10-04T15:47:00Z",
+      "verification_runs": [
+        37177682773,
+        37177682705,
+        37177682768,
+        37177682821
+      ],
+      "verification_jobs": [
+        111363635935,
+        111363635774,
+        111363636080,
+        111363636497
+      ],
+      "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/37177682773",
+      "recovered_from": "machine/ai_build_accountability.json patch in source_commit"
     },
     {
       "record_ids": [
