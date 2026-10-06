@@ -87,7 +87,7 @@ jobs:
 
       - name: Run AI chat and inherited assistant regressions
         run: >-
-          python -m pytest -q --noconftest
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin --import-mode=importlib
           skeleton/testing/test_ai_chat_turn_runtime.py
           skeleton/testing/test_ai_chat_streaming.py
           skeleton/testing/test_ai_chat_turn_ownership.py
@@ -101,7 +101,7 @@ jobs:
 
       - name: Run live chat route cutover regressions
         run: >-
-          python -m pytest -q
+          python -m pytest -q -p pytest_asyncio.plugin --import-mode=importlib
           backend/tests/test_ai_chat_turn_lifecycle.py
           backend/tests/test_ai_chat_turn_route_cutover.py
           backend/tests/test_ai_chat_conversation_authority.py
