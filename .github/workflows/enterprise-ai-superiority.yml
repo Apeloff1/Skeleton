@@ -46,6 +46,7 @@ jobs:
         run: >-
           python -m py_compile
           scripts/check_enterprise_ai_superiority.py
+          scripts/report_enterprise_ai_progress.py
           tests/test_enterprise_ai_superiority.py
 
       - name: Validate machine authority
@@ -55,6 +56,9 @@ jobs:
         run: >-
           python -m pytest -q --noconftest
           tests/test_enterprise_ai_superiority.py
+
+      - name: Report enterprise AI completion
+        run: python scripts/report_enterprise_ai_progress.py --json
 
       - name: Confirm exact-head identity
         run: |
