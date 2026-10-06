@@ -2238,6 +2238,10 @@ app_start_time = time.time()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from skeleton.kernel.runtime_supervision import RuntimeServiceLifecycle
+
+    runtime_lifecycle = RuntimeServiceLifecycle("backend")
+    app.state.runtime_lifecycle = runtime_lifecycle
     # ═══════════════════════════════════════════════════════════════════════
     # ★ GUARANTEED LAUNCH ENVELOPE  (2026-02 deploy fix)
     # The entire lifespan body is wrapped so ANY unexpected exception during
@@ -3181,9 +3185,11 @@ async def lifespan(app: FastAPI):
     app.state._boot_ready_at = time.time()
     app.state._boot_ready_ms = int((app.state._boot_ready_at - _BOOT_START_TS) * 1000)
     logger.info(f"[BOOT] readiness reached in {app.state._boot_ready_ms} ms — {len(_BOOT_TASKS)} background tasks scheduled")
+    runtime_lifecycle.mark_ready(reason="backend-readiness-reached")
 
     yield
 
+    runtime_lifecycle.begin_drain(reason="backend-fastapi-lifespan-shutdown")
     # ═══════════════════════════════════════════════════════════════════════
     # ★ CLEAN SHUTDOWN (2026-02-18 upgrade)
     #   FastAPI 0.130+ enforces graceful task drain at shutdown.  Without
@@ -3224,6 +3230,7 @@ async def lifespan(app: FastAPI):
         client.close()
     except Exception:
         pass
+    runtime_lifecycle.mark_stopped(reason="backend-background-and-db-drained")
     logger.info("Shutdown complete.")
 
 app = FastAPI(
