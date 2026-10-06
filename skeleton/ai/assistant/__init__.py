@@ -211,3 +211,28 @@ __all__ += [
     "reconciliation_event",
     "tool_receipt_ref",
 ]
+
+
+from .attachments import (
+    AttachmentAdmissionError,
+    AttachmentAdmissionPlane,
+    AttachmentBatchReceipt,
+    AttachmentFormat,
+    AttachmentPolicy,
+    AttachmentReference,
+    AttachmentUpload,
+    admit_multimodal_reference,
+    attachment_context_evidence,
+)
+
+__all__ += [
+    "AttachmentAdmissionError",
+    "AttachmentAdmissionPlane",
+    "AttachmentBatchReceipt",
+    "AttachmentFormat",
+    "AttachmentPolicy",
+    "AttachmentReference",
+    "AttachmentUpload",
+    "admit_multimodal_reference",
+    "attachment_context_evidence",
+]
