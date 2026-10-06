@@ -17,6 +17,9 @@ PLAN = ROOT / "docs" / "plan" / "MASTER_PLAN.md"
 COMPETITIVE_LADDER = ROOT / "machine" / "competitive_ai_engineering_ladder.json"
 GAME_BUILDER = ROOT / "machine" / "ai_game_builder_500_levels.json"
 GAME_BUILDER_DUEL = ROOT / "machine" / "ai_game_builder_dual_rival_forge.json"
+GAME_BUILDER_OVERENGINEERING = ROOT / "machine" / "ai_game_builder_overengineering.json"
+GAME_BUILDER_RUNTIME_CONTRACTS = ROOT / "skeleton" / "ai" / "game_builder" / "contracts.py"
+GAME_BUILDER_RUNTIME_FORGE = ROOT / "skeleton" / "ai" / "game_builder" / "dual_rival_forge.py"
 DEPTH_000_040 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_000_040.md"
 DEPTH_041_080 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_041_080.md"
 DEPTH_081_120 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_081_120.md"
@@ -128,6 +131,8 @@ def validate(data: dict) -> list[str]:
             "dual_rival_authority": "machine/ai_game_builder_dual_rival_forge.json",
             "human_spec": "docs/architecture/AI_GAME_BUILDER_500_LEVELS.md",
             "schema_version": "skeleton.ai_game_builder_500_levels.v1",
+            "overengineering_authority": "machine/ai_game_builder_overengineering.json",
+            "overengineering_human_spec": "docs/architecture/AI_GAME_BUILDER_OVERENGINEERING.md",
         }
         for field, expected_value in expected_bindings.items():
             if game_builder.get(field) != expected_value:
@@ -137,6 +142,7 @@ def validate(data: dict) -> list[str]:
             ("levels_per_family", 10),
             ("total_levels", 500),
             ("stages_per_round", 3),
+            ("overengineering_planes", 24),
         ):
             if game_builder.get(field) != expected_value:
                 errors.append(f"AI game builder {field} must equal {expected_value}")
@@ -148,6 +154,38 @@ def validate(data: dict) -> list[str]:
             errors.append("AI game builder effort modes must equal 100/1000/10000")
         if game_builder.get("wall_clock_deadline") is not None:
             errors.append("AI game builder wall_clock_deadline must be null")
+        if game_builder.get("runtime_contracts") != {
+            "package": "skeleton/ai/game_builder",
+            "contracts": "skeleton/ai/game_builder/contracts.py",
+            "dual_rival_state_machine": "skeleton/ai/game_builder/dual_rival_forge.py",
+            "tests": "skeleton/testing/test_ai_game_builder_contracts.py",
+        }:
+            errors.append("AI game builder runtime contract binding drifted")
+        if not GAME_BUILDER_RUNTIME_CONTRACTS.is_file():
+            errors.append("AI game builder runtime contracts implementation is missing")
+        if not GAME_BUILDER_RUNTIME_FORGE.is_file():
+            errors.append("AI game builder dual-rival runtime implementation is missing")
+        if not GAME_BUILDER_OVERENGINEERING.is_file():
+            errors.append("AI game builder overengineering authority is missing")
+        else:
+            try:
+                overengineering = json.loads(
+                    GAME_BUILDER_OVERENGINEERING.read_text(encoding="utf-8")
+                )
+            except (OSError, json.JSONDecodeError) as exc:
+                errors.append(f"cannot parse AI game builder overengineering authority: {exc}")
+            else:
+                over_topology = overengineering.get("topology", {})
+                if not isinstance(over_topology, dict):
+                    errors.append("AI game builder overengineering topology must be an object")
+                else:
+                    if over_topology.get("plane_count") != 24:
+                        errors.append("AI game builder overengineering authority must contain 24 planes")
+                    if over_topology.get("family_count") != 50:
+                        errors.append("AI game builder overengineering authority must cover 50 families")
+                bindings = overengineering.get("family_bindings")
+                if not isinstance(bindings, dict) or len(bindings) != 50:
+                    errors.append("AI game builder overengineering bindings must cover 50 families")
         if not GAME_BUILDER.is_file():
             errors.append("AI game builder machine authority is missing")
         else:
@@ -164,6 +202,8 @@ def validate(data: dict) -> list[str]:
                         errors.append("AI game builder authority must contain 50 families")
                     if topology.get("total_levels") != 500:
                         errors.append("AI game builder authority must contain 500 levels")
+                if builder_authority.get("overengineering_authority") != "machine/ai_game_builder_overengineering.json":
+                    errors.append("AI game builder authority overengineering binding drifted")
                 families = builder_authority.get("families")
                 if not isinstance(families, list) or len(families) != 50:
                     errors.append("AI game builder authority family registry must contain 50 entries")
@@ -175,6 +215,14 @@ def validate(data: dict) -> list[str]:
             except (OSError, json.JSONDecodeError) as exc:
                 errors.append(f"cannot parse AI game builder dual-rival authority: {exc}")
             else:
+                if duel_authority.get("overengineering_authority") != "machine/ai_game_builder_overengineering.json":
+                    errors.append("AI game builder dual-rival overengineering binding drifted")
+                if duel_authority.get("runtime_contracts") != {
+                    "contracts": "skeleton/ai/game_builder/contracts.py",
+                    "state_machine": "skeleton/ai/game_builder/dual_rival_forge.py",
+                    "tests": "skeleton/testing/test_ai_game_builder_contracts.py",
+                }:
+                    errors.append("AI game builder dual-rival runtime binding drifted")
                 modes = duel_authority.get("effort_modes", {})
                 for key, rounds in (("forge_100", 100), ("forge_1000", 1000), ("forge_10000", 10000)):
                     mode = modes.get(key) if isinstance(modes, dict) else None
