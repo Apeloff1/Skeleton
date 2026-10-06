@@ -60,7 +60,12 @@
     "stream reconnect is bound to operation identity, exact sequence, and prior event digest",
     "live product chat persists durable turn state around canonical conversation and engine milestones",
     "product replay heals existing durable turn completion without synthesizing historical turn journals",
-    "public reconnect transport requires operation, sequence, and digest continuity"
+    "public reconnect transport requires operation, sequence, and digest continuity",
+    "product chat creates or resumes the durable turn only after the canonical user message commit",
+    "same-operation retries preserve the original durable conversation binding while revalidating request digest and causal user identity",
+    "transient engine or provider unavailability leaves the durable turn resumable instead of fabricating terminal completion",
+    "deferred polling and cancellation reconcile the same durable operation used by the initial chat request",
+    "public chat event replay is projected from the durable journal and never from transient streamed text"
   ],
   "budget_dimensions": [
     "wall_seconds",
@@ -108,7 +113,7 @@
     "streaming_tests": "skeleton/testing/test_ai_chat_streaming.py",
     "live_lifecycle": "backend/core/chat_turn_lifecycle.py",
     "live_route": "backend/routes/ai.py",
-    "live_route_tests": "backend/tests/test_ai_chat_turn_route_cutover.py"
+    "live_route_tests": "backend/tests/test_ai_chat_live_turn_cutover.py"
   },
   "promotion_rule": "implemented candidate only; no completion or verification signoff until exact-head CI and independent verification pass",
   "next_integrations": [
@@ -151,5 +156,21 @@
     ],
     "reconnect_endpoint": "GET /ai/chat/turns/{thread_id}/events",
     "replay_rule": "historical assistant replay does not synthesize a new journal; existing durable journals are reconciled forward"
+  },
+  "live_cutover": {
+    "lifecycle": "backend/core/chat_turn_lifecycle.py",
+    "route": "backend/routes/ai.py",
+    "authority_order": [
+      "canonical conversation user commit",
+      "durable turn begin/resume",
+      "context compilation",
+      "engine/model execution",
+      "verification/finalization",
+      "canonical assistant commit",
+      "durable complete"
+    ],
+    "retry_rule": "same operation and causal user identity resume existing durable state; transient availability failures remain resumable",
+    "deferred_rule": "polling, cancellation, and event replay bind to the same deterministic operation identity",
+    "stream_endpoint": "GET /ai/chat/turns/{thread_id}/events"
   }
 }
