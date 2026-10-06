@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plan_version": "1.7.0",
+  "plan_version": "1.8.0",
   "status": "active",
   "architecture_lane": "PR-1904",
   "architecture_branch": "integration/architecture-map-v1",
@@ -45,7 +45,10 @@
     "p1_reproducibility_contract": "skeleton/contracts/reproducibility.py",
     "p1_privileged_tool_transaction_contract": "skeleton/skills/privileged_transaction.py",
     "enterprise_ai_superiority": "machine/enterprise_ai_superiority.json",
-    "enterprise_ai_implementation_notes": "machine/enterprise_ai_implementation_notes_index.json"
+    "enterprise_ai_implementation_notes": "machine/enterprise_ai_implementation_notes_index.json",
+    "frontier_96_ladder": "machine/frontier_96_ai_ladder.json",
+    "frontier_96_ladder_human": "docs/plan/FRONTIER_96_AI_LADDER.md",
+    "frontier_96_validator": "scripts/check_frontier_96_ladder.py"
   },
   "laws": [
     "durable governed state is authoritative",
@@ -56,7 +59,8 @@
     "writes require idempotency or explicit compensation semantics",
     "self-improvement produces candidates; promotion is gated",
     "SOTA status requires reproducible comparative evidence",
-    "enterprise AI qualification requires exact-head comparator-backed superiority evidence with non-compensable security, privacy, authority, tenant-isolation, recovery and rollback gates"
+    "enterprise AI qualification requires exact-head comparator-backed superiority evidence with non-compensable security, privacy, authority, tenant-isolation, recovery and rollback gates",
+    "Frontier-96 qualification sits above enterprise superiority, preserves the VOL-420 breadth freeze, and requires all 96 F96 layers to carry current independent evidence before finality"
   ],
   "thematic_parts": [
     {
