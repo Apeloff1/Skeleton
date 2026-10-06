@@ -23,8 +23,13 @@ def _fixture(tmp_path: Path) -> Path:
     paths = [
         "machine/ai_game_builder_500_levels.json",
         "machine/ai_game_builder_dual_rival_forge.json",
+        "machine/ai_game_builder_overengineering.json",
         "docs/architecture/AI_GAME_BUILDER_500_LEVELS.md",
+        "docs/architecture/AI_GAME_BUILDER_OVERENGINEERING.md",
         "docs/plan/MASTER_PLAN.md",
+        "skeleton/ai/game_builder/contracts.py",
+        "skeleton/ai/game_builder/dual_rival_forge.py",
+        "skeleton/testing/test_ai_game_builder_contracts.py",
         *manifest["shards"],
     ]
     for relative in paths:
@@ -54,6 +59,9 @@ def test_current_500_level_authority_is_valid() -> None:
         "last_level": "GBL-500",
         "signed_levels": 0,
         "effort_rounds": [100, 1000, 10000],
+        "overengineering_plane_count": 24,
+        "minimum_planes_per_family": 11,
+        "runtime_kernel_bound": True,
     }
 
 
@@ -148,4 +156,52 @@ def test_rejects_unknown_rights_becoming_permissive(tmp_path: Path) -> None:
     duel["rights_and_originality"]["default_for_unknown"] = "facts_and_ideas_reference_only"
     _write(root, "machine/ai_game_builder_dual_rival_forge.json", duel)
     with pytest.raises(MODULE.GameBuilderAuthorityError, match="fail closed to quarantine"):
+        MODULE.validate(root)
+
+
+def test_all_families_inherit_critical_overengineering_planes() -> None:
+    over = _json(ROOT, "machine/ai_game_builder_overengineering.json")
+    critical = set(over["critical_planes"])
+    assert len(over["planes"]) == 24
+    assert list(over["family_bindings"]) == [f"GB{i:02d}" for i in range(1, 51)]
+    for family_id, bound in over["family_bindings"].items():
+        assert len(bound) >= 11, family_id
+        assert critical.issubset(bound), family_id
+
+
+def test_overengineering_planes_are_unsigned_design_authority() -> None:
+    over = _json(ROOT, "machine/ai_game_builder_overengineering.json")
+    for plane in over["planes"]:
+        assert plane["status"] == "planned"
+        assert plane["signed"] is False
+        assert len(plane["mandatory_controls"]) >= 4
+        assert len(plane["evidence_required"]) >= 3
+
+
+def test_rejects_missing_critical_family_plane(tmp_path: Path) -> None:
+    root = _fixture(tmp_path)
+    over = _json(root, "machine/ai_game_builder_overengineering.json")
+    over["family_bindings"]["GB01"].remove("OP11")
+    over["family_bindings"]["GB01"].append("OP03")
+    _write(root, "machine/ai_game_builder_overengineering.json", over)
+    with pytest.raises(MODULE.GameBuilderAuthorityError, match="missing a critical overengineering plane"):
+        MODULE.validate(root)
+
+
+def test_rejects_self_signed_overengineering_plane(tmp_path: Path) -> None:
+    root = _fixture(tmp_path)
+    over = _json(root, "machine/ai_game_builder_overengineering.json")
+    over["planes"][0]["status"] = "complete"
+    over["planes"][0]["signed"] = True
+    _write(root, "machine/ai_game_builder_overengineering.json", over)
+    with pytest.raises(MODULE.GameBuilderAuthorityError, match="may not self-claim completion"):
+        MODULE.validate(root)
+
+
+def test_rejects_runtime_binding_drift(tmp_path: Path) -> None:
+    root = _fixture(tmp_path)
+    manifest = _json(root, "machine/ai_game_builder_500_levels.json")
+    manifest["runtime_contracts"]["dual_rival_state_machine"] = "planned:wrong.py"
+    _write(root, "machine/ai_game_builder_500_levels.json", manifest)
+    with pytest.raises(MODULE.GameBuilderAuthorityError, match="runtime contract binding drifted"):
         MODULE.validate(root)
