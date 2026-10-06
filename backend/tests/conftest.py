@@ -31,51 +31,6 @@ for _candidate in (str(_BACKEND_ROOT), "/app/backend"):
 from server import app
 
 
-@pytest.fixture(autouse=True)
-def _hermetic_ai_chat_turn_lifecycle(
-    monkeypatch: pytest.MonkeyPatch,
-    request: pytest.FixtureRequest,
-):
-    """Keep AI-chat route tests durable without requiring a live Mongo server."""
-
-    if not Path(str(request.node.path)).name.startswith("test_ai_chat"):
-        yield
-        return
-
-    import routes.ai as ai_route
-    from core.chat_turn_lifecycle import ChatTurnLifecycle
-    from skeleton.persistence.chat_turn_repository import (
-        SQLiteChatTurnRepository,
-    )
-
-    class _AsyncSQLiteChatTurnAuthority:
-        def __init__(self) -> None:
-            self.repository = SQLiteChatTurnRepository()
-
-        async def create_operation(self, **kwargs):
-            return self.repository.create_operation(**kwargs)
-
-        async def get_operation(self, operation_id: str, **kwargs):
-            return self.repository.get_operation(operation_id, **kwargs)
-
-        async def append_event(self, event, **kwargs):
-            return self.repository.append_event(event, **kwargs)
-
-        async def list_events(self, operation_id: str, **kwargs):
-            return self.repository.list_events(operation_id, **kwargs)
-
-    authority = _AsyncSQLiteChatTurnAuthority()
-    monkeypatch.setattr(
-        ai_route,
-        "chat_turn_lifecycle",
-        ChatTurnLifecycle(authority),
-    )
-    try:
-        yield
-    finally:
-        authority.repository.close()
-
-
 _LIVE_ENV_KEYS = ("EXPO_PUBLIC_BACKEND_URL", "EXPO_BACKEND_URL")
 _LIVE_SOURCE_SENTINELS = (
     "EXPO_PUBLIC_BACKEND_URL",
@@ -204,6 +159,7 @@ _AI_CHAT_ROUTE_TEST_FILES = {
     "test_ai_chat_local_engine_e2e.py",
     "test_ai_chat_memory_policy.py",
     "test_ai_chat_turn_route_cutover.py",
+    "test_ai_chat_live_turn_cutover.py",
 }
 
 
