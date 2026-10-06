@@ -135,6 +135,12 @@ Machine game-builder authority: [`machine/ai_game_builder_500_levels.json`](../.
 
 Machine dual-rival forge authority: [`machine/ai_game_builder_dual_rival_forge.json`](../../machine/ai_game_builder_dual_rival_forge.json)
 
+AI Game Builder overengineering constitution: [`../architecture/AI_GAME_BUILDER_OVERENGINEERING.md`](../architecture/AI_GAME_BUILDER_OVERENGINEERING.md)
+
+Machine overengineering authority: [`machine/ai_game_builder_overengineering.json`](../../machine/ai_game_builder_overengineering.json)
+
+Dual-rival runtime kernel: [`skeleton/ai/game_builder/dual_rival_forge.py`](../../skeleton/ai/game_builder/dual_rival_forge.py)
+
 ## Purpose
 
 This index is the canonical navigation root for the full Skeleton AI architecture, research, construction, validation, release, and operations program. It incorporates the architecture-planning passes that expanded the target from a model wrapper into a complete AI platform: durable state, provider-neutral inference, context, memory, retrieval, knowledge, cognition, planning, governed tools, agents, swarms, multimodal processing, repository engineering, research, training, evaluation, security, distributed compute, installation, release, and production operations.
@@ -204,8 +210,12 @@ Repository work on this plan must respect the existing PR #1904 bootstrap stack:
 57. `docs/architecture/AI_GAME_BUILDER_500_LEVELS.md`
 58. `machine/ai_game_builder_500_levels.json`
 59. `machine/ai_game_builder_dual_rival_forge.json`
+60. `docs/architecture/AI_GAME_BUILDER_OVERENGINEERING.md`
+61. `machine/ai_game_builder_overengineering.json`
+62. `skeleton/ai/game_builder/contracts.py`
+63. `skeleton/ai/game_builder/dual_rival_forge.py`
 
-The first ten remain the present implementation/construction authority. Items 11–40 form the frozen long-range planning, risk, sequencing, depth, adversarial-closure, exotic-research and engineering-validation stack. Items 41–42 define the historical implementation-depth frontier and its machine-checkable reconciliation contract. Items 43–45 define the bounded P1 trustworthy-production maturity frontier and its dependency-ordered 44-task execution DAG. Items 46–48 define the P2 capability-expansion boundary sourced exactly from P1's 314 deferred volumes, with explicit scheduled/queued ownership and fail-closed dependency validation. Items 49–52 deepen the frozen research/provider/runtime volumes with pinned OpenAI and xAI/Grok OSS provenance and bounded interoperability; they do not add a new architecture volume or completion authority. Items 53–54 add the 200-level competitive engineering overlay; they bind to existing frozen volumes and add no new top-level architecture volume. Items 55–56 govern preregistered competitive evaluation, anti-gaming rules, independent promotion, and cross-family qualification without creating new volume authority. Items 57–59 add the 500-level dual-rival game-builder overlay, long-form consistency authority, and rights/provenance/originality gates without creating new top-level volume authority.
+The first ten remain the present implementation/construction authority. Items 11–40 form the frozen long-range planning, risk, sequencing, depth, adversarial-closure, exotic-research and engineering-validation stack. Items 41–42 define the historical implementation-depth frontier and its machine-checkable reconciliation contract. Items 43–45 define the bounded P1 trustworthy-production maturity frontier and its dependency-ordered 44-task execution DAG. Items 46–48 define the P2 capability-expansion boundary sourced exactly from P1's 314 deferred volumes, with explicit scheduled/queued ownership and fail-closed dependency validation. Items 49–52 deepen the frozen research/provider/runtime volumes with pinned OpenAI and xAI/Grok OSS provenance and bounded interoperability; they do not add a new architecture volume or completion authority. Items 53–54 add the 200-level competitive engineering overlay; they bind to existing frozen volumes and add no new top-level architecture volume. Items 55–56 govern preregistered competitive evaluation, anti-gaming rules, independent promotion, and cross-family qualification without creating new volume authority. Items 57–59 add the 500-level dual-rival game-builder overlay, long-form consistency authority, and rights/provenance/originality gates without creating new top-level volume authority. Items 60–63 add the 24-plane overengineering constitution and the first deterministic game-builder control-plane implementation; model/provider adapters remain subordinate to these runtime contracts.
 
 ## Index laws
 
