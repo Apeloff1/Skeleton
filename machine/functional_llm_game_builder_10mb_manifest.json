@@ -1,0 +1,286 @@
+{
+  "schema_version": 1,
+  "kind": "functional-llm-game-builder-execution-atlas",
+  "overlay_id": "Functional-LLM-Game-Builder-10MB",
+  "plan_version": "2.5.0",
+  "status": "active-specification",
+  "relationship_to_masterplan": "depth-only overlay; VOL-000..420 breadth freeze preserved",
+  "bytes": {
+    "requested_minimum": 10000000,
+    "shard_total": 11176885,
+    "threshold_met": true
+  },
+  "completion": {
+    "specification_surface_registered": true,
+    "runtime_completion_claim": false,
+    "implementation_signed": false,
+    "independent_verification_signed": false,
+    "rule": "Plan coverage never implies runtime completion. Exact-head implementation evidence and independent verification remain mandatory."
+  },
+  "authorities": {
+    "human_index": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/README.md",
+    "validator": "scripts/check_functional_llm_game_builder_10mb.py",
+    "test": "tests/test_functional_llm_game_builder_masterplan.py",
+    "workflow": ".github/workflows/functional-llm-game-builder-masterplan.yml"
+  },
+  "laws": [
+    "models propose; deterministic control planes authorize and commit",
+    "provider and engine native objects terminate at adapters",
+    "every operation is bounded, cancellable, replayable and provenance-bearing",
+    "game project, world, scene, entity, asset, script, narrative and build identities are durable",
+    "long-form continuity is enforced from canonical project state rather than chat recollection",
+    "rival proposer and challenger never own production promotion authority",
+    "Forge-100, Forge-1000 and Forge-10000 raise evaluation effort but never privilege",
+    "external gaming sources are untrusted reference evidence and remain rights/license/terms governed",
+    "unclear rights or suspicious similarity quarantine artifacts fail-closed",
+    "runtime completion cannot be inferred from documentation volume"
+  ],
+  "coverage": {
+    "required_planes": [
+      "FLGB-01",
+      "FLGB-02",
+      "FLGB-03",
+      "FLGB-04",
+      "FLGB-05",
+      "FLGB-06",
+      "FLGB-07",
+      "FLGB-08",
+      "FLGB-09",
+      "FLGB-10",
+      "FLGB-11",
+      "FLGB-12",
+      "FLGB-13",
+      "FLGB-14",
+      "FLGB-15",
+      "FLGB-16",
+      "FLGB-17",
+      "FLGB-18"
+    ],
+    "lifecycle": [
+      "contract",
+      "admission",
+      "compile",
+      "execute",
+      "observe",
+      "verify",
+      "recover",
+      "replay",
+      "optimize",
+      "promote",
+      "rollback",
+      "retire"
+    ],
+    "evidence": [
+      "unit",
+      "property",
+      "integration",
+      "fault-injection",
+      "determinism",
+      "security",
+      "performance",
+      "recovery",
+      "provenance",
+      "compatibility"
+    ],
+    "systemic": [
+      "identity",
+      "schema",
+      "authority",
+      "budget",
+      "deadline",
+      "cancellation",
+      "idempotency",
+      "compensation",
+      "replay",
+      "migration",
+      "observability",
+      "rollback",
+      "rights",
+      "privacy",
+      "security",
+      "performance",
+      "cross-platform"
+    ],
+    "plan_surface_no_known_unmapped_primary_domain": true,
+    "runtime_gap_status": "not inferred; tracked by implementation/evidence authorities"
+  },
+  "end_to_end_acceptance": [
+    "create or reopen a durable game project",
+    "accept a natural-language game-building objective through the provider-neutral LLM session",
+    "compile policy, project canon, memory, retrieval evidence, tools, budgets and model configuration into governed context",
+    "produce a candidate plan without granting the model execution authority",
+    "run dual-rival proposer/challenger/verifier competition at the selected Forge-100/1000/10000 effort tier",
+    "rights-screen all external references and generated assets/code/narrative before promotion",
+    "commit validated project/world/scene/entity/component/asset/script/narrative changes through editor transactions",
+    "simulate physics/gameplay and render/audio/UI paths under deterministic or tolerance-bounded contracts",
+    "run automated playtests, continuity checks, performance budgets, security checks and regression evaluation",
+    "build/export a target artifact from content-addressed governed inputs",
+    "bind the exported artifact to exact source, project, dependency, model, config and evidence identities",
+    "close and reopen the project, replay receipts, verify no duplicate side effects, then continue editing from durable state",
+    "demonstrate cancellation, rollback and recovery from an injected partial failure without corrupting project authority"
+  ],
+  "shards": [
+    {
+      "id": "FLGB-01",
+      "title": "LLM Session and Inference Runtime",
+      "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_01_FLGB-01_LLM_SESSION_AND_INFERENCE_RUNTIME.md",
+      "bytes": 620926,
+      "min_bytes": 620000,
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "id": "FLGB-02",
+      "title": "Tokenizer Model Runtime and Serving",
+      "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_02_FLGB-02_TOKENIZER_MODEL_RUNTIME_AND_SERVING.md",
+      "bytes": 620088,
+      "min_bytes": 620000,
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "id": "FLGB-03",
+      "title": "Context Memory Retrieval and Knowledge",
+      "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_03_FLGB-03_CONTEXT_MEMORY_RETRIEVAL_AND_KNOWLEDGE.md",
+      "bytes": 621585,
+      "min_bytes": 620000,
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "id": "FLGB-04",
+      "title": "Tools Agents and Long-Horizon Execution",
+      "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_04_FLGB-04_TOOLS_AGENTS_AND_LONG_HORIZON_EXECUTION.md",
+      "bytes": 621735,
+      "min_bytes": 620000,
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "id": "FLGB-05",
+      "title": "Security Safety Policy and Privacy",
+      "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_05_FLGB-05_SECURITY_SAFETY_POLICY_AND_PRIVACY.md",
+      "bytes": 621359,
+      "min_bytes": 620000,
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "id": "FLGB-06",
+      "title": "Evaluation Observability Reliability and Recovery",
+      "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_06_FLGB-06_EVALUATION_OBSERVABILITY_RELIABILITY_AND_RECOVERY.md",
+      "bytes": 620497,
+      "min_bytes": 620000,
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "id": "FLGB-07",
+      "title": "Training Weights Adaptation and Self-Improvement",
+      "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_07_FLGB-07_TRAINING_WEIGHTS_ADAPTATION_AND_SELF_IMPROVEMENT.md",
+      "bytes": 621447,
+      "min_bytes": 620000,
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "id": "FLGB-08",
+      "title": "Multimodal Vision Audio Video and Documents",
+      "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_08_FLGB-08_MULTIMODAL_VISION_AUDIO_VIDEO_AND_DOCUMENTS.md",
+      "bytes": 620154,
+      "min_bytes": 620000,
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "id": "FLGB-09",
+      "title": "Game Project Editor and World Model",
+      "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_09_FLGB-09_GAME_PROJECT_EDITOR_AND_WORLD_MODEL.md",
+      "bytes": 620823,
+      "min_bytes": 620000,
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "id": "FLGB-10",
+      "title": "Scene ECS Physics and Simulation",
+      "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_10_FLGB-10_SCENE_ECS_PHYSICS_AND_SIMULATION.md",
+      "bytes": 620177,
+      "min_bytes": 620000,
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "id": "FLGB-11",
+      "title": "Rendering Materials Lighting Cameras and VFX",
+      "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_11_FLGB-11_RENDERING_MATERIALS_LIGHTING_CAMERAS_AND_VFX.md",
+      "bytes": 621018,
+      "min_bytes": 620000,
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "id": "FLGB-12",
+      "title": "Animation Audio UI Input and Accessibility",
+      "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_12_FLGB-12_ANIMATION_AUDIO_UI_INPUT_AND_ACCESSIBILITY.md",
+      "bytes": 621673,
+      "min_bytes": 620000,
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "id": "FLGB-13",
+      "title": "Gameplay Scripting Narrative Quests and NPC AI",
+      "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_13_FLGB-13_GAMEPLAY_SCRIPTING_NARRATIVE_QUESTS_AND_NPC_AI.md",
+      "bytes": 621657,
+      "min_bytes": 620000,
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "id": "FLGB-14",
+      "title": "Procedural Generation Worldbuilding and Longform Consistency",
+      "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_14_FLGB-14_PROCEDURAL_GENERATION_WORLDBUILDING_AND_LONGFORM_CONSISTENCY.md",
+      "bytes": 620318,
+      "min_bytes": 620000,
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "id": "FLGB-15",
+      "title": "Networking Saves Mods Localization and Platform Services",
+      "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_15_FLGB-15_NETWORKING_SAVES_MODS_LOCALIZATION_AND_PLATFORM_SERVICES.md",
+      "bytes": 621428,
+      "min_bytes": 620000,
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "id": "FLGB-16",
+      "title": "Assets Build Export Performance and Automated Testing",
+      "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_16_FLGB-16_ASSETS_BUILD_EXPORT_PERFORMANCE_AND_AUTOMATED_TESTING.md",
+      "bytes": 620192,
+      "min_bytes": 620000,
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "id": "FLGB-17",
+      "title": "Dual-Rival Forge Adversarial Quality and Rights Clean Room",
+      "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_17_FLGB-17_DUAL_RIVAL_FORGE_ADVERSARIAL_QUALITY_AND_RIGHTS_CLEAN_ROOM.md",
+      "bytes": 621751,
+      "min_bytes": 620000,
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "id": "FLGB-18",
+      "title": "Integrated Product Orchestration Deployment and Gapless Closure",
+      "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_18_FLGB-18_INTEGRATED_PRODUCT_ORCHESTRATION_DEPLOYMENT_AND_GAPLESS_CLOSURE.md",
+      "bytes": 620057,
+      "min_bytes": 620000,
+      "implementation_signed": false,
+      "verification_signed": false
+    }
+  ]
+}
