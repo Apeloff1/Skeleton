@@ -19,19 +19,31 @@ The core contract is deliberately black-box-first:
 
 ## Characterization planes
 
-The lab now contains bounded analyzers for:
+The lab contains bounded analyzers for:
 
 - **context-window behavior** — success/fidelity brackets, first failure, monotonicity violations, and confidence;
 - **routing behavior** — route concentration, per-input-class route sets, and deterministic-class ratio;
 - **state and memory** — reset-controlled recall, repeated-input divergence, and cross-reset carryover signals;
 - **decoding behavior** — repeated-output diversity/collision ratios, response-length distributions, and stop-reason counts;
+- **tokenizer behavior** — token-count, token-id-space, and character/token fingerprints without persisting raw inputs;
+- **embedding geometry** — norms, pairwise cosine structure, centroid magnitude, and zero-norm accounting;
+- **KV-cache behavior** — measured bytes/token, approximate linearity, and theoretical-geometry error;
+- **attention geometry** — MHA/GQA/MQA classification, head ratios, and width-consistency checks;
+- **activation geometry** — per-layer norms, sparsity, and pairwise cosine structure while reports retain only vector digests;
+- **architecture-family scoring** — transparent evidence-weighted candidate ranking rather than opaque identity claims;
+- **authorized artifact manifests** — tensor shapes/dtypes/counts with provenance receipts but no raw tensor persistence;
+- **tensor topology** — indexed-layer and recurrent-shape inference from authorized tensor metadata;
+- **quantization** — numerical error and cosine-similarity characterization for authorized reference/quantized samples;
 - **replication** — independent-actor reproduction ledgers before a supported observation is treated as replicated;
-- **experiment design** — deterministic factorial matrices with stable protocol identities.
+- **experiment design** — deterministic factorial matrices with stable protocol identities;
+- **evidence chains** — tamper-evident append-only linkage for reports and measurements.
 
-These surfaces characterize what can be observed. They do not assert proprietary
-architecture identity, recover hidden weights, bypass access controls, or create a
-right to inspect artifacts the operator does not own or have permission to analyze.
+These surfaces characterize what can be observed or what is available in artifacts
+the operator is authorized to inspect. They do not assert proprietary architecture
+identity, recover hidden weights from inaccessible systems, bypass access controls,
+or create a right to inspect artifacts without ownership or permission.
 
-Future work can layer owned/open-weight model internals, quantization characterization,
-tool topology, activation-space experiments on authorized local models, and adversarial
-replication over these contracts while preserving the same evidence/inference boundary.
+Future work can layer tool topology, residual-stream/activation interventions on
+authorized local models, cache eviction experiments, multimodal adapter geometry,
+and adversarial replication over these contracts while preserving the same
+evidence/inference boundary.

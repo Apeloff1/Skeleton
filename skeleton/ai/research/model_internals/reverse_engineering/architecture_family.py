@@ -24,6 +24,9 @@ class ArchitectureSignals:
             raise ReverseEngineeringError("expert_tensor_count must be non-negative")
         if any(count < 0 for _, count in self.attention_mode_counts):
             raise ReverseEngineeringError("attention mode counts must be non-negative")
+        modes = [mode for mode, _ in self.attention_mode_counts]
+        if len(modes) != len(set(modes)):
+            raise ReverseEngineeringError("attention mode counts must have unique modes")
 
 
 @dataclass(frozen=True)
@@ -69,8 +72,14 @@ def classify_architecture_family(signals: ArchitectureSignals) -> ArchitectureFa
     }
     evidence: dict[str, list[str]] = {key: [] for key in scores}
 
+    transformer_families = (
+        "transformer_mha",
+        "transformer_gqa",
+        "transformer_mqa",
+        "mixture_of_experts_transformer",
+    )
     if signals.indexed_layer_count > 0:
-        for family in ("transformer_mha", "transformer_gqa", "transformer_mqa", "mixture_of_experts_transformer"):
+        for family in transformer_families:
             scores[family] += 0.15
             evidence[family].append("indexed_layer_structure")
 
@@ -87,15 +96,20 @@ def classify_architecture_family(signals: ArchitectureSignals) -> ArchitectureFa
             evidence[family].append(f"attention_mode:{mode}:{count}/{total_attention}")
 
     if signals.kv_cache_approximately_linear is True:
-        for family in ("transformer_mha", "transformer_gqa", "transformer_mqa", "mixture_of_experts_transformer"):
+        for family in transformer_families:
             scores[family] += 0.1
             evidence[family].append("linear_kv_cache_scaling")
 
     if signals.expert_tensor_count > 0:
-        scores["mixture_of_experts_transformer"] += 0.55
+        scores["mixture_of_experts_transformer"] += 0.65
         evidence["mixture_of_experts_transformer"].append(
             f"expert_tensor_count:{signals.expert_tensor_count}"
         )
+        if total_attention:
+            scores["mixture_of_experts_transformer"] += 0.1
+            evidence["mixture_of_experts_transformer"].append(
+                "expert_tensors_plus_attention_structure"
+            )
 
     if signals.state_carryover_observed:
         scores["state_space_or_recurrent"] += 0.45
