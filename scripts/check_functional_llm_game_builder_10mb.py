@@ -307,6 +307,93 @@ def main() -> int:
     if not isinstance(e2e, list) or len(e2e) < 12:
         fail("end-to-end spine incomplete")
 
+    frontier = data.get("frontier_competition")
+    if not isinstance(frontier, dict):
+        fail("frontier competition contract missing")
+    if frontier.get("status") != "specification-registered-evidence-pending":
+        fail("frontier competition status drift")
+    if frontier.get("completion_claim") is not False:
+        fail("frontier competition completion must remain fail-closed")
+    if frontier.get("implementation_signed") is not False:
+        fail("frontier competition implementation cannot be auto-signed")
+    if frontier.get("independent_verification_signed") is not False:
+        fail("frontier competition verification cannot be auto-signed")
+
+    comparator = frontier.get("comparator_policy")
+    if not isinstance(comparator, dict):
+        fail("frontier comparator policy missing")
+    if int(comparator.get("minimum_frontier_comparators", 0)) < 3:
+        fail("frontier competition requires at least three frontier comparators")
+    for key in (
+        "strongest_available_comparator_required",
+        "exact_identity_required",
+        "same_or_disclosed_budget_required",
+        "contamination_controls_required",
+        "public_and_heldout_mix_required",
+        "benchmark_cherry_picking_forbidden",
+    ):
+        if comparator.get(key) is not True:
+            fail(f"frontier comparator policy disabled: {key}")
+    max_age = comparator.get("maximum_comparator_age_days")
+    if not isinstance(max_age, int) or max_age <= 0 or max_age > 90:
+        fail("frontier comparator freshness must be bounded to 90 days")
+
+    frontier_domains = frontier.get("required_domains")
+    expected_frontier_ids = [f"FC-{index:02d}" for index in range(1, 13)]
+    if not isinstance(frontier_domains, list) or [
+        item.get("id") if isinstance(item, dict) else None
+        for item in frontier_domains
+    ] != expected_frontier_ids:
+        fail("frontier competition domain coverage drift")
+    if any(
+        not isinstance(item.get("name"), str) or not item["name"].strip()
+        or not isinstance(item.get("critical"), bool)
+        for item in frontier_domains
+    ):
+        fail("frontier competition domains malformed")
+
+    promotion = frontier.get("promotion_rules")
+    if not isinstance(promotion, dict):
+        fail("frontier promotion rules missing")
+    required_promotion_rules = (
+        "per_domain_results_required",
+        "statistical_uncertainty_required",
+        "blind_human_evaluation_required_for_subjective_quality",
+        "no_critical_domain_may_be_hidden_by_aggregate_score",
+        "safety_privacy_authority_rights_and_recovery_are_non_compensable",
+        "game_builder_target_requires_frontier_parity_or_better",
+        "long_horizon_consistency_target_requires_frontier_parity_or_better",
+        "coding_repository_engineering_target_requires_frontier_parity_or_better",
+        "dual_rival_gain_must_be_measured_against_single_pass_baseline",
+        "regressions_against_current_champion_block_promotion",
+        "exact_head_evidence_required",
+        "independent_verification_required",
+    )
+    for key in required_promotion_rules:
+        if promotion.get(key) is not True:
+            fail(f"frontier promotion rule disabled: {key}")
+
+    frontier_evidence = frontier.get("required_evidence")
+    if not isinstance(frontier_evidence, list) or len(frontier_evidence) < 10:
+        fail("frontier competition evidence bundle incomplete")
+    required_modes = frontier.get("evaluation_modes")
+    if not isinstance(required_modes, list) or len(required_modes) < 8:
+        fail("frontier competition evaluation modes incomplete")
+    for token in (
+        "frontier",
+        "blind human",
+        "heldout",
+        "exact-head",
+        "independent verification",
+    ):
+        corpus = " ".join(
+            [str(frontier.get("objective", "")), str(frontier.get("target_interpretation", ""))]
+            + [str(item) for item in frontier_evidence]
+            + [str(item) for item in required_modes]
+        ).lower()
+        if token not in corpus:
+            fail(f"frontier competition contract missing {token}")
+
     shard17 = (ROOT / shards[16]["path"]).read_text(encoding="utf-8")
     for token in ("Forge-100", "Forge-1000", "Forge-10000", "rights", "clean-room"):
         if token.lower() not in shard17.lower():
