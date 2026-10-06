@@ -283,10 +283,11 @@ The machine policy is authoritative about which statement is valid.
 
 Skeleton may be described as a complete enterprise AI only when:
 
-1. every production-path volume satisfies the common enterprise contract;
-2. every dedicated critical profile is at least `enterprise_qualified`;
-3. each dedicated profile required for competitive superiority reaches
-   `superior`;
+1. every `VOL-000` through `VOL-420` is `enterprise_qualified` on current
+   exact-head evidence;
+2. every dedicated critical profile reaches `superior` with reproducible
+   comparator-backed evidence;
+3. all 12 cross-plane enterprise golden journeys pass;
 4. the end-to-end golden journeys pass with production-like identity,
    authorization, state, provider, retrieval, tool, artifact, streaming,
    recovery and rollback behavior;
