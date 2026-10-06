@@ -1,0 +1,259 @@
+{
+  "schema_version": 1,
+  "authority": "recovery_strength_classification_only",
+  "record_count": 25,
+  "signature_fields_recoverable_count": 5,
+  "evidence_only_manual_review_count": 20,
+  "records": [
+    {
+      "record_id": "ACC-AIQ-S0-COST-01",
+      "classification": "evidence_only_manual_review",
+      "source_commit": "669b1398d00c9d37ae95ee2022181579098bd265",
+      "verifier_identity_recovered": false,
+      "exact_head_recovered": true,
+      "run_or_job_evidence_recovered": true,
+      "completion_semantics_recovered": false,
+      "automatic_signature_write_authorized": false
+    },
+    {
+      "record_id": "ACC-AIQ-S0-GOV-01",
+      "classification": "evidence_only_manual_review",
+      "source_commit": "669b1398d00c9d37ae95ee2022181579098bd265",
+      "verifier_identity_recovered": false,
+      "exact_head_recovered": true,
+      "run_or_job_evidence_recovered": true,
+      "completion_semantics_recovered": false,
+      "automatic_signature_write_authorized": false
+    },
+    {
+      "record_id": "ACC-AIQ-S0-GOV-02",
+      "classification": "evidence_only_manual_review",
+      "source_commit": "669b1398d00c9d37ae95ee2022181579098bd265",
+      "verifier_identity_recovered": false,
+      "exact_head_recovered": true,
+      "run_or_job_evidence_recovered": true,
+      "completion_semantics_recovered": false,
+      "automatic_signature_write_authorized": false
+    },
+    {
+      "record_id": "ACC-AIQ-S0-GOV-03",
+      "classification": "evidence_only_manual_review",
+      "source_commit": "669b1398d00c9d37ae95ee2022181579098bd265",
+      "verifier_identity_recovered": false,
+      "exact_head_recovered": true,
+      "run_or_job_evidence_recovered": true,
+      "completion_semantics_recovered": false,
+      "automatic_signature_write_authorized": false
+    },
+    {
+      "record_id": "ACC-AIQ-S0-STATE-01",
+      "classification": "evidence_only_manual_review",
+      "source_commit": "669b1398d00c9d37ae95ee2022181579098bd265",
+      "verifier_identity_recovered": false,
+      "exact_head_recovered": true,
+      "run_or_job_evidence_recovered": true,
+      "completion_semantics_recovered": false,
+      "automatic_signature_write_authorized": false
+    },
+    {
+      "record_id": "ACC-AIQ-S0-STATE-02",
+      "classification": "evidence_only_manual_review",
+      "source_commit": "669b1398d00c9d37ae95ee2022181579098bd265",
+      "verifier_identity_recovered": false,
+      "exact_head_recovered": true,
+      "run_or_job_evidence_recovered": true,
+      "completion_semantics_recovered": false,
+      "automatic_signature_write_authorized": false
+    },
+    {
+      "record_id": "ACC-VOL-000",
+      "classification": "evidence_only_manual_review",
+      "source_commit": "1f37192640454a439cde23c211788f185a379b81",
+      "verifier_identity_recovered": false,
+      "exact_head_recovered": false,
+      "run_or_job_evidence_recovered": false,
+      "completion_semantics_recovered": false,
+      "automatic_signature_write_authorized": false
+    },
+    {
+      "record_id": "ACC-VOL-013",
+      "classification": "evidence_only_manual_review",
+      "source_commit": "58b5868e083646e0dbbc6326d0dca3f3e4e9e7b6",
+      "verifier_identity_recovered": false,
+      "exact_head_recovered": false,
+      "run_or_job_evidence_recovered": true,
+      "completion_semantics_recovered": false,
+      "automatic_signature_write_authorized": false
+    },
+    {
+      "record_id": "ACC-VOL-014",
+      "classification": "evidence_only_manual_review",
+      "source_commit": "58b5868e083646e0dbbc6326d0dca3f3e4e9e7b6",
+      "verifier_identity_recovered": false,
+      "exact_head_recovered": false,
+      "run_or_job_evidence_recovered": true,
+      "completion_semantics_recovered": false,
+      "automatic_signature_write_authorized": false
+    },
+    {
+      "record_id": "ACC-VOL-015",
+      "classification": "signature_fields_recoverable",
+      "source_commit": "23a97e9d9e73ff08d8885bfa791ac353bedd628a",
+      "verifier_identity_recovered": true,
+      "exact_head_recovered": true,
+      "run_or_job_evidence_recovered": true,
+      "completion_semantics_recovered": true,
+      "automatic_signature_write_authorized": false
+    },
+    {
+      "record_id": "ACC-VOL-016",
+      "classification": "signature_fields_recoverable",
+      "source_commit": "23a97e9d9e73ff08d8885bfa791ac353bedd628a",
+      "verifier_identity_recovered": true,
+      "exact_head_recovered": true,
+      "run_or_job_evidence_recovered": true,
+      "completion_semantics_recovered": true,
+      "automatic_signature_write_authorized": false
+    },
+    {
+      "record_id": "ACC-VOL-017",
+      "classification": "evidence_only_manual_review",
+      "source_commit": "23a97e9d9e73ff08d8885bfa791ac353bedd628a",
+      "verifier_identity_recovered": true,
+      "exact_head_recovered": true,
+      "run_or_job_evidence_recovered": false,
+      "completion_semantics_recovered": true,
+      "automatic_signature_write_authorized": false
+    },
+    {
+      "record_id": "ACC-VOL-034",
+      "classification": "evidence_only_manual_review",
+      "source_commit": "1f37192640454a439cde23c211788f185a379b81",
+      "verifier_identity_recovered": false,
+      "exact_head_recovered": false,
+      "run_or_job_evidence_recovered": false,
+      "completion_semantics_recovered": false,
+      "automatic_signature_write_authorized": false
+    },
+    {
+      "record_id": "ACC-VOL-035",
+      "classification": "evidence_only_manual_review",
+      "source_commit": "1f37192640454a439cde23c211788f185a379b81",
+      "verifier_identity_recovered": false,
+      "exact_head_recovered": false,
+      "run_or_job_evidence_recovered": false,
+      "completion_semantics_recovered": false,
+      "automatic_signature_write_authorized": false
+    },
+    {
+      "record_id": "ACC-VOL-036",
+      "classification": "evidence_only_manual_review",
+      "source_commit": "1f37192640454a439cde23c211788f185a379b81",
+      "verifier_identity_recovered": false,
+      "exact_head_recovered": false,
+      "run_or_job_evidence_recovered": false,
+      "completion_semantics_recovered": false,
+      "automatic_signature_write_authorized": false
+    },
+    {
+      "record_id": "ACC-VOL-037",
+      "classification": "evidence_only_manual_review",
+      "source_commit": "1f37192640454a439cde23c211788f185a379b81",
+      "verifier_identity_recovered": false,
+      "exact_head_recovered": false,
+      "run_or_job_evidence_recovered": false,
+      "completion_semantics_recovered": false,
+      "automatic_signature_write_authorized": false
+    },
+    {
+      "record_id": "ACC-VOL-038",
+      "classification": "evidence_only_manual_review",
+      "source_commit": "1f37192640454a439cde23c211788f185a379b81",
+      "verifier_identity_recovered": false,
+      "exact_head_recovered": false,
+      "run_or_job_evidence_recovered": false,
+      "completion_semantics_recovered": false,
+      "automatic_signature_write_authorized": false
+    },
+    {
+      "record_id": "ACC-VOL-056",
+      "classification": "signature_fields_recoverable",
+      "source_commit": "49f6454cd20dd3b24a60b1a41fb809bf854a62e8",
+      "verifier_identity_recovered": true,
+      "exact_head_recovered": true,
+      "run_or_job_evidence_recovered": true,
+      "completion_semantics_recovered": true,
+      "automatic_signature_write_authorized": false
+    },
+    {
+      "record_id": "ACC-VOL-057",
+      "classification": "signature_fields_recoverable",
+      "source_commit": "49f6454cd20dd3b24a60b1a41fb809bf854a62e8",
+      "verifier_identity_recovered": true,
+      "exact_head_recovered": true,
+      "run_or_job_evidence_recovered": true,
+      "completion_semantics_recovered": true,
+      "automatic_signature_write_authorized": false
+    },
+    {
+      "record_id": "ACC-VOL-059",
+      "classification": "signature_fields_recoverable",
+      "source_commit": "49f6454cd20dd3b24a60b1a41fb809bf854a62e8",
+      "verifier_identity_recovered": true,
+      "exact_head_recovered": true,
+      "run_or_job_evidence_recovered": true,
+      "completion_semantics_recovered": true,
+      "automatic_signature_write_authorized": false
+    },
+    {
+      "record_id": "ACC-VOL-078",
+      "classification": "evidence_only_manual_review",
+      "source_commit": "1f37192640454a439cde23c211788f185a379b81",
+      "verifier_identity_recovered": false,
+      "exact_head_recovered": false,
+      "run_or_job_evidence_recovered": false,
+      "completion_semantics_recovered": false,
+      "automatic_signature_write_authorized": false
+    },
+    {
+      "record_id": "ACC-VOL-079",
+      "classification": "evidence_only_manual_review",
+      "source_commit": "1f37192640454a439cde23c211788f185a379b81",
+      "verifier_identity_recovered": false,
+      "exact_head_recovered": false,
+      "run_or_job_evidence_recovered": false,
+      "completion_semantics_recovered": false,
+      "automatic_signature_write_authorized": false
+    },
+    {
+      "record_id": "ACC-VOL-080",
+      "classification": "evidence_only_manual_review",
+      "source_commit": "1f37192640454a439cde23c211788f185a379b81",
+      "verifier_identity_recovered": false,
+      "exact_head_recovered": false,
+      "run_or_job_evidence_recovered": false,
+      "completion_semantics_recovered": false,
+      "automatic_signature_write_authorized": false
+    },
+    {
+      "record_id": "ACC-VOL-248",
+      "classification": "evidence_only_manual_review",
+      "source_commit": "d06925c181862f46cd6c87bdfa5401efe8f2e472",
+      "verifier_identity_recovered": false,
+      "exact_head_recovered": true,
+      "run_or_job_evidence_recovered": true,
+      "completion_semantics_recovered": false,
+      "automatic_signature_write_authorized": false
+    },
+    {
+      "record_id": "ACC-VOL-420",
+      "classification": "evidence_only_manual_review",
+      "source_commit": "1f37192640454a439cde23c211788f185a379b81",
+      "verifier_identity_recovered": false,
+      "exact_head_recovered": false,
+      "run_or_job_evidence_recovered": false,
+      "completion_semantics_recovered": false,
+      "automatic_signature_write_authorized": false
+    }
+  ]
+}
