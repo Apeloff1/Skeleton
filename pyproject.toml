@@ -34,6 +34,7 @@ version = "16.0.0"
 description = "AI game engine and agent orchestration framework"
 requires-python = ">=3.11"
 dependencies = [
+  "bcrypt>=4,<5",
   "cryptography>=50.0.1",
   "fastapi>=0.142.2",
   "motor==3.7.1",
