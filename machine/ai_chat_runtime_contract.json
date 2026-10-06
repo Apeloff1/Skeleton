@@ -5,7 +5,7 @@
   "prepared_by": "chatgpt:gpt-5.6-sol",
   "base_main_sha": "92a6dcc85976e41c3d86fcd87866e1c5d384f125",
   "canonical_module": "skeleton/ai/assistant/turn_runtime.py",
-  "scope": "durable provider-neutral AI chat turn state, replay, resource admission, and crash recovery",
+  "scope": "durable provider-neutral AI chat turn state, persistence, replay, resource admission, and crash recovery",
   "authority": {
     "conversation_authority": "backend/core/conversations.py",
     "assistant_control_plane": "skeleton/ai/assistant/runtime.py",
@@ -52,7 +52,10 @@
     "ambiguous consequential tool effects require receipt reconciliation before retry or continuation",
     "model execution may be retried after restart because it cannot directly own privileged external side effects",
     "provider receipts, tool receipts, and conversation commits remain external authoritative records",
-    "runtime stores structured reason codes and provenance rather than hidden chain-of-thought"
+    "runtime stores structured reason codes and provenance rather than hidden chain-of-thought",
+    "turn persistence stores operation state only and never duplicates canonical transcript authority",
+    "portable and production persistence decode the canonical runtime wire schema",
+    "Mongo event persistence uses prepare, atomic snapshot advance, and committed-marker recovery"
   ],
   "budget_dimensions": [
     "wall_seconds",
@@ -91,16 +94,27 @@
     "exact_head_verifier": "scripts/verify_ai_chat_runtime.py",
     "independent_tests": "tests/test_ai_chat_runtime_contract.py",
     "workflow": ".github/workflows/ai-chat-runtime-closure.yml",
-    "plan": "docs/plan/AI_CHAT_MASTERPLAN_2026-10-06.md"
+    "plan": "docs/plan/AI_CHAT_MASTERPLAN_2026-10-06.md",
+    "portable_repository": "skeleton/persistence/chat_turn_repository.py",
+    "mongo_authority": "backend/core/chat_turns.py",
+    "persistence_tests": "skeleton/testing/test_ai_chat_turn_repository.py",
+    "mongo_tests": "backend/tests/test_ai_chat_turn_persistence.py"
   },
   "promotion_rule": "implemented candidate only; no completion or verification signoff until exact-head CI and independent verification pass",
   "next_integrations": [
-    "persist turn journal beside the authoritative conversation operation",
+    "wire MongoChatTurnAuthority into product chat admission/finalization",
     "project canonical conversation version into turn admission",
     "publish turn events through the durable operation stream",
     "bind model/provider execution receipts into turn events",
     "bind canonical tool receipt reconciliation into restart handling",
     "move attachment payloads to governed content-addressed references",
     "add citation verification and high-assurance response acceptance"
-  ]
+  ],
+  "persistence": {
+    "portable": "skeleton/persistence/chat_turn_repository.py",
+    "production": "backend/core/chat_turns.py",
+    "commit_protocol": "prepare immutable event -> exact-sequence/digest operation snapshot advance -> committed marker",
+    "conversation_binding": "tenant, owner, thread, causal user message, admitted thread version",
+    "transcript_rule": "turn repositories never own or duplicate conversation message content"
+  }
 }
