@@ -425,6 +425,7 @@ class LearningAuditLedger:
             namespace,
             maximum=128,
         )
+        self._backend = backend
         self._chain = ContentAddressedEvidenceChain(
             backend,
             namespace=self._namespace,
@@ -492,10 +493,44 @@ class LearningAuditLedger:
                         "parent audit event crosses subject boundary"
                     )
 
+            binding_key = "event-id:" + _digest(
+                {"event_id": event.event_id}
+            )
+            existing_binding = self._backend.get(
+                self._namespace,
+                binding_key,
+            )
+            if existing_binding is not None:
+                raise LearningAuditError(
+                    "event_id is already committed"
+                )
+            try:
+                self._backend.put_if_absent(
+                    self._namespace,
+                    binding_key,
+                    event.event_digest,
+                )
+            except Exception as exc:
+                existing_binding = self._backend.get(
+                    self._namespace,
+                    binding_key,
+                )
+                if existing_binding is None:
+                    raise
+                raise LearningAuditError(
+                    "event_id is already committed"
+                ) from exc
+
             previous_root = self._chain.root_hash()
             payload = event.as_dict()
             payload["event_digest"] = event.event_digest
-            node = self._chain.append(event.kind, payload)
+            try:
+                node = self._chain.append(event.kind, payload)
+            except Exception:
+                # The immutable event-id claim deliberately remains in place.
+                # A failed append becomes indeterminate rather than permitting
+                # a later conflicting reuse of the same lifecycle identity.
+                raise
             return LearningAuditReceipt(
                 event_id=event.event_id,
                 event_digest=event.event_digest,
