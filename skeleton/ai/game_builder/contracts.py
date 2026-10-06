@@ -170,6 +170,7 @@ class Candidate:
     quality: tuple[tuple[str, float], ...]
     evidence_digests: tuple[str, ...]
     assumption_digest: str
+    parent_candidate_digests: tuple[str, ...] = ()
 
     @classmethod
     def create(
@@ -180,6 +181,7 @@ class Candidate:
         quality: Mapping[str, float],
         evidence_digests: Iterable[str],
         assumption_digest: str,
+        parent_candidate_digests: Iterable[str] = (),
     ) -> "Candidate":
         evidence = tuple(evidence_digests)
         if not producer_id.strip():
@@ -194,6 +196,7 @@ class Candidate:
             quality=normalize_quality(quality),
             evidence_digests=evidence,
             assumption_digest=assumption_digest,
+            parent_candidate_digests=tuple(parent_candidate_digests),
         )
 
     @property
@@ -209,6 +212,7 @@ class Candidate:
             "artifact": self.artifact.to_payload(),
             "assumption_digest": self.assumption_digest,
             "evidence_digests": list(self.evidence_digests),
+            "parent_candidate_digests": list(self.parent_candidate_digests),
             "producer_id": self.producer_id,
             "quality": {key: value for key, value in self.quality},
         }
