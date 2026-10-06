@@ -397,15 +397,21 @@
       "tests": [
         "skeleton/testing/test_research_lineage.py",
         "skeleton/testing/test_research_system_acceptance.py",
-        "scripts/check_ai_edge_case_catalog.py"
+        "scripts/check_ai_edge_case_catalog.py",
+        "tests/test_research_lineage_independent_verifier.py"
       ],
       "evaluations": [
         "planned:source-quality calibration",
-        "planned:replication-status consistency evaluation"
+        "planned:replication-status consistency evaluation",
+        "scripts/verify_research_lineage_closure.py",
+        ".github/workflows/vol001-research-lineage-closure.yml"
       ],
       "evidence": [
         "PR #2721 merged research ingestion/citation lineage implementation",
-        "PR #2950 head 6052b313b9fceacecf06ea4d6f12492c50241325 adds deterministic reconciliation qualification; independent workflow pending"
+        "PR #2950 head 6052b313b9fceacecf06ea4d6f12492c50241325 adds deterministic reconciliation qualification; independent workflow pending",
+        "scripts/verify_research_lineage_closure.py",
+        "tests/test_research_lineage_independent_verifier.py",
+        ".github/workflows/vol001-research-lineage-closure.yml"
       ],
       "risks": [
         "cargo-culting historically famous techniques",
