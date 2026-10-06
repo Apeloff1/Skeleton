@@ -191,7 +191,8 @@
       "minimum_requirement_atoms": 450,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
-      "deep_closure_required": true
+      "deep_closure_required": true,
+      "minimum_deep_closure_atoms": 1296
     },
     {
       "id": "FLGB-02",
@@ -218,7 +219,8 @@
       "minimum_requirement_atoms": 450,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
-      "deep_closure_required": true
+      "deep_closure_required": true,
+      "minimum_deep_closure_atoms": 1296
     },
     {
       "id": "FLGB-03",
@@ -245,7 +247,8 @@
       "minimum_requirement_atoms": 450,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
-      "deep_closure_required": true
+      "deep_closure_required": true,
+      "minimum_deep_closure_atoms": 1296
     },
     {
       "id": "FLGB-04",
@@ -272,7 +275,8 @@
       "minimum_requirement_atoms": 450,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
-      "deep_closure_required": true
+      "deep_closure_required": true,
+      "minimum_deep_closure_atoms": 1296
     },
     {
       "id": "FLGB-05",
@@ -299,7 +303,8 @@
       "minimum_requirement_atoms": 450,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
-      "deep_closure_required": true
+      "deep_closure_required": true,
+      "minimum_deep_closure_atoms": 1296
     },
     {
       "id": "FLGB-06",
@@ -326,7 +331,8 @@
       "minimum_requirement_atoms": 450,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
-      "deep_closure_required": true
+      "deep_closure_required": true,
+      "minimum_deep_closure_atoms": 1296
     },
     {
       "id": "FLGB-07",
@@ -353,7 +359,8 @@
       "minimum_requirement_atoms": 450,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
-      "deep_closure_required": true
+      "deep_closure_required": true,
+      "minimum_deep_closure_atoms": 1296
     },
     {
       "id": "FLGB-08",
@@ -380,7 +387,8 @@
       "minimum_requirement_atoms": 450,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
-      "deep_closure_required": true
+      "deep_closure_required": true,
+      "minimum_deep_closure_atoms": 1296
     },
     {
       "id": "FLGB-09",
@@ -407,7 +415,8 @@
       "minimum_requirement_atoms": 450,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
-      "deep_closure_required": true
+      "deep_closure_required": true,
+      "minimum_deep_closure_atoms": 1296
     },
     {
       "id": "FLGB-10",
@@ -434,7 +443,8 @@
       "minimum_requirement_atoms": 450,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
-      "deep_closure_required": true
+      "deep_closure_required": true,
+      "minimum_deep_closure_atoms": 1296
     },
     {
       "id": "FLGB-11",
@@ -461,7 +471,8 @@
       "minimum_requirement_atoms": 450,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
-      "deep_closure_required": true
+      "deep_closure_required": true,
+      "minimum_deep_closure_atoms": 1296
     },
     {
       "id": "FLGB-12",
@@ -488,7 +499,8 @@
       "minimum_requirement_atoms": 450,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
-      "deep_closure_required": true
+      "deep_closure_required": true,
+      "minimum_deep_closure_atoms": 1296
     },
     {
       "id": "FLGB-13",
@@ -515,7 +527,8 @@
       "minimum_requirement_atoms": 450,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
-      "deep_closure_required": true
+      "deep_closure_required": true,
+      "minimum_deep_closure_atoms": 1296
     },
     {
       "id": "FLGB-14",
@@ -542,7 +555,8 @@
       "minimum_requirement_atoms": 450,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
-      "deep_closure_required": true
+      "deep_closure_required": true,
+      "minimum_deep_closure_atoms": 1296
     },
     {
       "id": "FLGB-15",
@@ -569,7 +583,8 @@
       "minimum_requirement_atoms": 450,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
-      "deep_closure_required": true
+      "deep_closure_required": true,
+      "minimum_deep_closure_atoms": 1296
     },
     {
       "id": "FLGB-16",
@@ -596,7 +611,8 @@
       "minimum_requirement_atoms": 450,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
-      "deep_closure_required": true
+      "deep_closure_required": true,
+      "minimum_deep_closure_atoms": 1296
     },
     {
       "id": "FLGB-17",
@@ -623,7 +639,8 @@
       "minimum_requirement_atoms": 450,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
-      "deep_closure_required": true
+      "deep_closure_required": true,
+      "minimum_deep_closure_atoms": 1296
     },
     {
       "id": "FLGB-18",
@@ -650,7 +667,8 @@
       "minimum_requirement_atoms": 450,
       "coverage_matrix_required": true,
       "deep_closure_atoms": 1296,
-      "deep_closure_required": true
+      "deep_closure_required": true,
+      "minimum_deep_closure_atoms": 1296
     }
   ],
   "deep_closure": {
@@ -677,5 +695,32 @@
     "exact_cartesian_product_required": true,
     "independent_verification_required": true,
     "runtime_signoff_forbidden_from_specification_alone": true
+  },
+  "expansion": {
+    "id": "Functional-LLM-Game-Builder-20MB-Pass-2",
+    "pass": 2,
+    "objective": "double the prior >=10MB functional LLM + game-builder execution atlas with implementation-grade deep closure rather than breadth inflation",
+    "actual_shard_bytes": 52648747,
+    "minimum_total_bytes": 20000000,
+    "deep_closure_heading": "Deep Functional Closure Expansion — Pass 2",
+    "deep_closure_atoms_per_plane": 1296,
+    "deep_closure_atoms_total": 23328,
+    "dimensions": {
+      "subsystems_per_plane": 12,
+      "lifecycle_stages": 12,
+      "adversarial_stress_profiles": 9
+    },
+    "adversarial_stress_profiles": [
+      "dependency partition with stale-but-valid cached state",
+      "cancellation racing a durable side effect",
+      "concurrent mutation against an older project revision",
+      "resource pressure during checkpoint and evidence emission",
+      "malformed or adversarially structured untrusted input",
+      "cross-version schema skew during replay or reopen",
+      "partial commit after downstream acknowledgement loss",
+      "provider or engine failover with identity preservation",
+      "reconnect replay attempting duplicate execution"
+    ],
+    "completion_rule": "Deep specification coverage is registered, but implementation_signed and independent_verification_signed remain false until exact-head executable evidence exists."
   }
 }
