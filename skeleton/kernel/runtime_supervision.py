@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+import json
 import math
 import threading
 import time
@@ -130,6 +131,97 @@ def _reason(value: object) -> str:
     ):
         raise ValueError("lifecycle reason is invalid")
     return normalized
+
+
+class RuntimeAdmissionMiddleware:
+    """ASGI middleware enforcing lifecycle admission without framework coupling."""
+
+    def __init__(
+        self,
+        app,
+        *,
+        lifecycle: "RuntimeServiceLifecycle",
+        exempt_prefixes: tuple[str, ...] = (),
+    ) -> None:
+        if not isinstance(lifecycle, RuntimeServiceLifecycle):
+            raise TypeError("lifecycle must be RuntimeServiceLifecycle")
+        normalized: list[str] = []
+        for raw in exempt_prefixes:
+            if (
+                not isinstance(raw, str)
+                or not raw.startswith("/")
+                or "\x00" in raw
+            ):
+                raise ValueError("runtime admission exempt prefix is invalid")
+            value = raw.rstrip("/") or "/"
+            if value not in normalized:
+                normalized.append(value)
+        self.app = app
+        self.lifecycle = lifecycle
+        self.exempt_prefixes = tuple(normalized)
+
+    @staticmethod
+    def _path_matches(path: str, prefix: str) -> bool:
+        if prefix == "/":
+            return path == "/"
+        return path == prefix or path.startswith(prefix + "/")
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+
+        raw_path = scope.get("path", "")
+        path = raw_path if isinstance(raw_path, str) else ""
+        if any(
+            self._path_matches(path, prefix)
+            for prefix in self.exempt_prefixes
+        ):
+            await self.app(scope, receive, send)
+            return
+
+        work_id = (
+            "http:"
+            + str(self.lifecycle.generation)
+            + ":"
+            + str(id(scope))
+        )
+        try:
+            lease = self.lifecycle.acquire_work(work_id)
+        except RuntimeSupervisionError:
+            body = json.dumps(
+                {
+                    "error": "service_unavailable",
+                    "reason": "runtime_not_accepting_work",
+                    "lifecycle": self.lifecycle.snapshot(),
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": 503,
+                    "headers": [
+                        (b"content-type", b"application/json"),
+                        (b"retry-after", b"1"),
+                        (b"content-length", str(len(body)).encode("ascii")),
+                    ],
+                }
+            )
+            await send(
+                {
+                    "type": "http.response.body",
+                    "body": body,
+                    "more_body": False,
+                }
+            )
+            return
+
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            self.lifecycle.release_work(lease)
 
 
 class RuntimeServiceLifecycle:
@@ -380,6 +472,7 @@ class RuntimeServiceLifecycle:
 
 __all__ = [
     "LifecycleReceipt",
+    "RuntimeAdmissionMiddleware",
     "RuntimeServiceLifecycle",
     "RuntimeSupervisionError",
     "ServicePhase",
