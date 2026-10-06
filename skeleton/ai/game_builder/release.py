@@ -76,10 +76,19 @@ class ForgeReleaseBinding:
             "producer_behavior_digest",
             "champion_producer_provenance_digest",
             "champion_candidate_digest",
+            "promotion_chain_digest",
+        ):
+            value = getattr(self, name)
+            if (
+                not isinstance(value, str)
+                or len(value) != 64
+                or any(ch not in "0123456789abcdef" for ch in value)
+            ):
+                raise ValueError(f"{name} must be lowercase sha256")
+        for name in (
             "champion_artifact_digest",
             "champion_canon_digest",
             "champion_provenance_digest",
-            "promotion_chain_digest",
         ):
             value = getattr(self, name)
             if not isinstance(value, str) or len(value) < 16:
