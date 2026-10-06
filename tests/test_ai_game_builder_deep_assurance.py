@@ -246,15 +246,42 @@ def test_intent_preservation_rejects_silent_semantic_drift() -> None:
 
 def test_hermetic_transform_requires_exact_reproduction_identity() -> None:
     registry = HermeticTransformRegistry()
+    evidence = _d("transform-execution")
     receipt = TransformReceipt(
-        _d("tool"), _d("input"), _d("config"), _d("output"), _d("env")
+        _d("tool"),
+        _d("input"),
+        _d("config"),
+        _d("output"),
+        _d("env"),
+        _authority("transform-executor", evidence),
+        evidence,
     )
     registry.record(receipt)
     assert registry.reproduce(receipt.digest, receipt)
+    drift_evidence = _d("transform-drift")
     drift = TransformReceipt(
-        _d("tool"), _d("input"), _d("config"), _d("other-output"), _d("env")
+        _d("tool"),
+        _d("input"),
+        _d("config"),
+        _d("other-output"),
+        _d("env"),
+        _authority("transform-replay", drift_evidence),
+        drift_evidence,
     )
     assert registry.reproduce(receipt.digest, drift) is False
+
+
+def test_transform_receipt_rejects_unattributed_execution_evidence() -> None:
+    with pytest.raises(DeepAssuranceError, match="referenced by executor authority"):
+        TransformReceipt(
+            _d("tool"),
+            _d("input"),
+            _d("config"),
+            _d("output"),
+            _d("env"),
+            _authority("transform-wrong", _d("other-evidence")),
+            _d("transform-execution"),
+        )
 
 
 def test_knowledge_firewall_quarantines_unknown_and_separates_reference_from_incorporation() -> None:
@@ -336,13 +363,59 @@ def test_telemetry_feedback_rejects_raw_identity_and_tiny_cohorts() -> None:
 
 
 def test_project_resurrection_is_exact_and_content_addressed() -> None:
+    checkpoint_evidence = _d("checkpoint-evidence")
     point = ResurrectionPoint(
-        _d("project"), _d("canon"), _d("graph"), _d("events"), _d("rights")
+        _d("project"),
+        _d("canon"),
+        _d("graph"),
+        _d("events"),
+        _d("rights"),
+        _authority("checkpoint-authority", checkpoint_evidence),
+        checkpoint_evidence,
     )
     registry = ProjectResurrectionRegistry()
     digest = registry.register(point)
     assert len(digest) == 64
-    assert registry.verify(digest, point)
+    verification_evidence = _d("recovery-verification")
+    proof = registry.verify(
+        digest,
+        point,
+        verifier_provenance=_authority(
+            "recovery-verifier",
+            verification_evidence,
+        ),
+        verification_evidence_digest=verification_evidence,
+    )
+    assert proof.passed is True
+    assert canonical_digest(proof.proof_payload()) == proof.proof_digest
+
+
+def test_project_resurrection_proof_rejects_unattributed_verification_evidence() -> None:
+    checkpoint_evidence = _d("checkpoint-evidence")
+    point = ResurrectionPoint(
+        _d("project"),
+        _d("canon"),
+        _d("graph"),
+        _d("events"),
+        _d("rights"),
+        _authority("checkpoint-authority", checkpoint_evidence),
+        checkpoint_evidence,
+    )
+    registry = ProjectResurrectionRegistry()
+    digest = registry.register(point)
+    with pytest.raises(
+        DeepAssuranceError,
+        match="verification evidence must be referenced by verifier authority",
+    ):
+        registry.verify(
+            digest,
+            point,
+            verifier_provenance=_authority(
+                "wrong-recovery-verifier",
+                _d("other-recovery-evidence"),
+            ),
+            verification_evidence_digest=_d("recovery-verification"),
+        )
 
 
 def test_evidence_merkle_root_changes_on_append() -> None:
