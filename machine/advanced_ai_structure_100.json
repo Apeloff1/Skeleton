@@ -4209,5 +4209,478 @@
       "description": "Adds self-modeling, gap discovery, benchmarking, experiment generation, verified improvement proposals and bounded self-evolution governance.",
       "rule": "Level 100 cannot self-approve; independent promotion authority and rollback evidence remain mandatory."
     }
-  ]
+  ],
+  "maturity_dimensions": [
+    {
+      "id": "correctness",
+      "description": "Task and contract correctness under nominal and adversarial conditions",
+      "measurement": "golden tasks, property tests, deterministic validators, outcome reconciliation"
+    },
+    {
+      "id": "calibration",
+      "description": "Confidence and uncertainty match empirical correctness and evidence coverage",
+      "measurement": "ECE/Brier-style calibration, abstention quality, confidence-error slices"
+    },
+    {
+      "id": "safety",
+      "description": "Unsafe content, actions, escalation and policy violations remain bounded",
+      "measurement": "red-team suites, policy violation rate, hazardous action denial, fail-closed tests"
+    },
+    {
+      "id": "security",
+      "description": "Identity, tenant, secret, dependency and capability boundaries resist adversarial misuse",
+      "measurement": "threat-model tests, cross-tenant denial, confused-deputy tests, secret-leak tests"
+    },
+    {
+      "id": "authority_integrity",
+      "description": "Cognitive outputs never silently become privileged authority or canonical state",
+      "measurement": "authority-path invariants, promotion/approval tests, state-owner checks"
+    },
+    {
+      "id": "provenance",
+      "description": "Material inputs, transformations, evidence, actions and releases remain attributable",
+      "measurement": "receipt completeness, causal graph integrity, independent digest verification"
+    },
+    {
+      "id": "reliability",
+      "description": "The level behaves predictably through dependency faults, retries, restart and overload",
+      "measurement": "fault injection, restart/replay tests, saturation and degradation evidence"
+    },
+    {
+      "id": "recoverability",
+      "description": "State and work can return to a known good condition without duplicate or fabricated completion",
+      "measurement": "checkpoint recovery, rollback, restore, ambiguity reconciliation"
+    },
+    {
+      "id": "efficiency",
+      "description": "Capability remains bounded in latency, tokens, cost, storage, compute and external calls",
+      "measurement": "resource envelopes, regression budgets, load profiles, cost per successful journey"
+    },
+    {
+      "id": "adaptation",
+      "description": "Learning or strategy changes improve measured outcomes without uncontrolled drift",
+      "measurement": "holdouts, shadow/canary comparisons, drift monitors, rollback tests"
+    },
+    {
+      "id": "autonomy_control",
+      "description": "Unattended behavior remains revocable, budgeted, observable and scope-limited",
+      "measurement": "goal-stop tests, authority ceilings, cancellation latency, unattended incident drills"
+    },
+    {
+      "id": "human_control",
+      "description": "Users/operators retain meaningful approval, override, explanation and shutdown paths where required",
+      "measurement": "approval UX tests, break-glass/stop tests, operator runbooks, consent checks"
+    },
+    {
+      "id": "observability",
+      "description": "Operators can explain health, state, causal lineage and important failures without unsafe logging",
+      "measurement": "trace coverage, SLI completeness, audit completeness, redaction tests"
+    },
+    {
+      "id": "governance",
+      "description": "Retention, residency, policy, approvals, exceptions and release obligations are enforceable",
+      "measurement": "governance journeys, expiry tests, policy-version binding, evidence freshness"
+    },
+    {
+      "id": "generalization",
+      "description": "Capability holds across domains and distributions without hiding fragile specialization",
+      "measurement": "cross-domain suites, out-of-distribution slices, transfer tests, domain-specific vetoes"
+    }
+  ],
+  "stratum_maturity_requirements": [
+    {
+      "stratum": "S01",
+      "gate_level": "L010",
+      "required_dimensions": [
+        "correctness",
+        "safety",
+        "security",
+        "authority_integrity",
+        "provenance",
+        "reliability",
+        "recoverability",
+        "efficiency",
+        "observability",
+        "governance"
+      ],
+      "promotion_evidence_rule": "Every required maturity dimension must have fresh evidence for the stratum gate; an aggregate score cannot hide a failed critical dimension.",
+      "critical_zero_tolerance": [
+        "security",
+        "authority_integrity",
+        "tenant isolation",
+        "privileged action audit",
+        "fabricated completion"
+      ],
+      "aggregation_rule": "Report dimensions independently plus an overall summary; no weighted average can compensate for a zero-tolerance failure."
+    },
+    {
+      "stratum": "S02",
+      "gate_level": "L020",
+      "required_dimensions": [
+        "correctness",
+        "safety",
+        "security",
+        "authority_integrity",
+        "provenance",
+        "reliability",
+        "recoverability",
+        "efficiency",
+        "observability",
+        "governance",
+        "calibration"
+      ],
+      "promotion_evidence_rule": "Every required maturity dimension must have fresh evidence for the stratum gate; an aggregate score cannot hide a failed critical dimension.",
+      "critical_zero_tolerance": [
+        "security",
+        "authority_integrity",
+        "tenant isolation",
+        "privileged action audit",
+        "fabricated completion"
+      ],
+      "aggregation_rule": "Report dimensions independently plus an overall summary; no weighted average can compensate for a zero-tolerance failure."
+    },
+    {
+      "stratum": "S03",
+      "gate_level": "L030",
+      "required_dimensions": [
+        "correctness",
+        "safety",
+        "security",
+        "authority_integrity",
+        "provenance",
+        "reliability",
+        "recoverability",
+        "efficiency",
+        "observability",
+        "governance",
+        "calibration"
+      ],
+      "promotion_evidence_rule": "Every required maturity dimension must have fresh evidence for the stratum gate; an aggregate score cannot hide a failed critical dimension.",
+      "critical_zero_tolerance": [
+        "security",
+        "authority_integrity",
+        "tenant isolation",
+        "privileged action audit",
+        "fabricated completion"
+      ],
+      "aggregation_rule": "Report dimensions independently plus an overall summary; no weighted average can compensate for a zero-tolerance failure."
+    },
+    {
+      "stratum": "S04",
+      "gate_level": "L040",
+      "required_dimensions": [
+        "correctness",
+        "safety",
+        "security",
+        "authority_integrity",
+        "provenance",
+        "reliability",
+        "recoverability",
+        "efficiency",
+        "observability",
+        "governance",
+        "calibration"
+      ],
+      "promotion_evidence_rule": "Every required maturity dimension must have fresh evidence for the stratum gate; an aggregate score cannot hide a failed critical dimension.",
+      "critical_zero_tolerance": [
+        "security",
+        "authority_integrity",
+        "tenant isolation",
+        "privileged action audit",
+        "fabricated completion"
+      ],
+      "aggregation_rule": "Report dimensions independently plus an overall summary; no weighted average can compensate for a zero-tolerance failure."
+    },
+    {
+      "stratum": "S05",
+      "gate_level": "L050",
+      "required_dimensions": [
+        "correctness",
+        "safety",
+        "security",
+        "authority_integrity",
+        "provenance",
+        "reliability",
+        "recoverability",
+        "efficiency",
+        "observability",
+        "governance",
+        "calibration"
+      ],
+      "promotion_evidence_rule": "Every required maturity dimension must have fresh evidence for the stratum gate; an aggregate score cannot hide a failed critical dimension.",
+      "critical_zero_tolerance": [
+        "security",
+        "authority_integrity",
+        "tenant isolation",
+        "privileged action audit",
+        "fabricated completion"
+      ],
+      "aggregation_rule": "Report dimensions independently plus an overall summary; no weighted average can compensate for a zero-tolerance failure."
+    },
+    {
+      "stratum": "S06",
+      "gate_level": "L060",
+      "required_dimensions": [
+        "correctness",
+        "safety",
+        "security",
+        "authority_integrity",
+        "provenance",
+        "reliability",
+        "recoverability",
+        "efficiency",
+        "observability",
+        "governance",
+        "calibration",
+        "human_control"
+      ],
+      "promotion_evidence_rule": "Every required maturity dimension must have fresh evidence for the stratum gate; an aggregate score cannot hide a failed critical dimension.",
+      "critical_zero_tolerance": [
+        "security",
+        "authority_integrity",
+        "tenant isolation",
+        "privileged action audit",
+        "fabricated completion"
+      ],
+      "aggregation_rule": "Report dimensions independently plus an overall summary; no weighted average can compensate for a zero-tolerance failure."
+    },
+    {
+      "stratum": "S07",
+      "gate_level": "L070",
+      "required_dimensions": [
+        "correctness",
+        "safety",
+        "security",
+        "authority_integrity",
+        "provenance",
+        "reliability",
+        "recoverability",
+        "efficiency",
+        "observability",
+        "governance",
+        "calibration",
+        "human_control",
+        "adaptation"
+      ],
+      "promotion_evidence_rule": "Every required maturity dimension must have fresh evidence for the stratum gate; an aggregate score cannot hide a failed critical dimension.",
+      "critical_zero_tolerance": [
+        "security",
+        "authority_integrity",
+        "tenant isolation",
+        "privileged action audit",
+        "fabricated completion"
+      ],
+      "aggregation_rule": "Report dimensions independently plus an overall summary; no weighted average can compensate for a zero-tolerance failure."
+    },
+    {
+      "stratum": "S08",
+      "gate_level": "L080",
+      "required_dimensions": [
+        "correctness",
+        "safety",
+        "security",
+        "authority_integrity",
+        "provenance",
+        "reliability",
+        "recoverability",
+        "efficiency",
+        "observability",
+        "governance",
+        "calibration",
+        "human_control",
+        "adaptation",
+        "autonomy_control"
+      ],
+      "promotion_evidence_rule": "Every required maturity dimension must have fresh evidence for the stratum gate; an aggregate score cannot hide a failed critical dimension.",
+      "critical_zero_tolerance": [
+        "security",
+        "authority_integrity",
+        "tenant isolation",
+        "privileged action audit",
+        "fabricated completion"
+      ],
+      "aggregation_rule": "Report dimensions independently plus an overall summary; no weighted average can compensate for a zero-tolerance failure."
+    },
+    {
+      "stratum": "S09",
+      "gate_level": "L090",
+      "required_dimensions": [
+        "correctness",
+        "safety",
+        "security",
+        "authority_integrity",
+        "provenance",
+        "reliability",
+        "recoverability",
+        "efficiency",
+        "observability",
+        "governance",
+        "calibration",
+        "human_control",
+        "adaptation",
+        "autonomy_control",
+        "generalization"
+      ],
+      "promotion_evidence_rule": "Every required maturity dimension must have fresh evidence for the stratum gate; an aggregate score cannot hide a failed critical dimension.",
+      "critical_zero_tolerance": [
+        "security",
+        "authority_integrity",
+        "tenant isolation",
+        "privileged action audit",
+        "fabricated completion"
+      ],
+      "aggregation_rule": "Report dimensions independently plus an overall summary; no weighted average can compensate for a zero-tolerance failure."
+    },
+    {
+      "stratum": "S10",
+      "gate_level": "L100",
+      "required_dimensions": [
+        "correctness",
+        "safety",
+        "security",
+        "authority_integrity",
+        "provenance",
+        "reliability",
+        "recoverability",
+        "efficiency",
+        "observability",
+        "governance",
+        "calibration",
+        "human_control",
+        "adaptation",
+        "autonomy_control",
+        "generalization"
+      ],
+      "promotion_evidence_rule": "Every required maturity dimension must have fresh evidence for the stratum gate; an aggregate score cannot hide a failed critical dimension.",
+      "critical_zero_tolerance": [
+        "security",
+        "authority_integrity",
+        "tenant isolation",
+        "privileged action audit",
+        "fabricated completion"
+      ],
+      "aggregation_rule": "Report dimensions independently plus an overall summary; no weighted average can compensate for a zero-tolerance failure."
+    }
+  ],
+  "evidence_inheritance": {
+    "rule": "A higher-level qualification may reference lower-level evidence only when the lower evidence is exact-head compatible, current for its freshness policy, and unchanged in the relevant authority/contract surface.",
+    "immutable_links": [
+      "level id",
+      "source revision",
+      "contract digest",
+      "test/evaluation suite version",
+      "dataset/fixture digest",
+      "policy version",
+      "environment profile",
+      "result digest"
+    ],
+    "invalidators": [
+      "lower-level regression or suspension",
+      "canonical owner or interface change",
+      "security/governance policy change affecting the level",
+      "evaluation suite material change",
+      "dataset contamination or provenance failure",
+      "runtime topology change affecting the evidence claim",
+      "expired evidence freshness window"
+    ],
+    "reuse_rule": "Evidence reuse reduces duplicate testing but never permits skipping a new test required by a changed risk, authority, data-class, provider, tool, or deployment boundary."
+  },
+  "capability_ceiling_control": {
+    "sources": [
+      "deployment profile",
+      "tenant policy",
+      "principal role",
+      "risk class",
+      "data class",
+      "release maturity",
+      "operator override"
+    ],
+    "effective_ceiling": "minimum of all applicable ceilings; higher model capability cannot raise it",
+    "enforcement_points": [
+      "request admission",
+      "context/tool capability resolution",
+      "agent spawning",
+      "learning/adaptation activation",
+      "scheduled/background autonomy",
+      "self-improvement experiment execution",
+      "release/promotion"
+    ],
+    "downgrade_rule": "When a ceiling is reduced, new work is admitted at or below the new ceiling and active work above it is cancelled, suspended, or safely drained according to operation semantics.",
+    "reporting_rule": "Every admitted operation exposes its effective maturity ceiling and the policy source that constrained it."
+  },
+  "kill_and_suspend_controls": {
+    "levels": [
+      {
+        "scope": "operation",
+        "effect": "cancel or terminalize one operation with durable reason and side-effect reconciliation"
+      },
+      {
+        "scope": "tenant",
+        "effect": "suspend advanced capability for one tenant while preserving canonical data and export access"
+      },
+      {
+        "scope": "capability",
+        "effect": "disable one level/stratum capability across deployments without disabling unrelated lower-level functionality"
+      },
+      {
+        "scope": "provider-or-tool",
+        "effect": "remove one external dependency from routing/admission immediately"
+      },
+      {
+        "scope": "release",
+        "effect": "rollback or freeze a release and prevent promotion"
+      },
+      {
+        "scope": "global-frontier",
+        "effect": "disable S10 self-improvement/experiment paths while retaining lower verified operation"
+      }
+    ],
+    "invariants": [
+      "kill/suspend controls are independent of model cooperation",
+      "invocation is authenticated, authorized, audited and idempotent",
+      "shutdown never fabricates success for unfinished work",
+      "consequential side effects enter reconciliation before replay",
+      "re-enable requires explicit authority and fresh readiness checks"
+    ]
+  },
+  "anti_gaming_rules": [
+    "No benchmark or maturity claim may exclude known failing slices without declaring the exclusion and lowering the scope of the claim.",
+    "Synthetic or self-generated evaluation data cannot be the sole evidence for promotion.",
+    "A model cannot grade its own promotion as the only evaluator.",
+    "Metric optimization that degrades zero-tolerance safety/security/authority dimensions automatically blocks promotion.",
+    "Hidden retries, fallback providers, human intervention, or cached answers must be represented in evaluation provenance.",
+    "A capability demonstrated only with privileged test fixtures cannot be promoted for ordinary tenant use.",
+    "Benchmark leakage, memorization, contamination, or evaluator coupling invalidates affected evidence.",
+    "Cost or latency wins achieved by bypassing verification, provenance, safety, or recovery controls are not accepted as improvements."
+  ],
+  "frontier_experiment_boundary": {
+    "isolation": "Frontier experiments execute in non-production or explicitly shadowed environments with separate credentials, budgets, datasets and write boundaries.",
+    "allowed": [
+      "architecture analysis",
+      "code/config proposal generation",
+      "sandbox execution",
+      "offline/shadow evaluation",
+      "simulation",
+      "benchmarking",
+      "counterfactual comparison"
+    ],
+    "prohibited_without_external_authority": [
+      "production deployment",
+      "policy broadening",
+      "credential grant",
+      "tenant data scope expansion",
+      "irreversible external write",
+      "deleting safeguards",
+      "altering its own promotion criteria"
+    ],
+    "promotion_chain": [
+      "experiment receipt",
+      "independent evaluation",
+      "security/governance review",
+      "canary/shadow evidence",
+      "release authority decision",
+      "rollback-ready deployment"
+    ],
+    "recursion_rule": "Self-improvement experiments may recursively generate proposals only within bounded depth/budget and cannot recursively increase their own experiment authority."
+  }
 }
