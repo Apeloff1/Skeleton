@@ -572,6 +572,10 @@ class TemporalKnowledgeStore:
         current = self.head(claim_id)
         if expected_head_digest != current.revision_digest:
             raise KnowledgeStoreError("stale claim head digest")
+        if current.lifecycle is ClaimLifecycle.TOMBSTONED:
+            raise KnowledgeStoreError("tombstoned claim cannot be revised")
+        if normalized_recorded_at < current.recorded_at:
+            raise KnowledgeStoreError("recorded_at cannot move backward")
 
         next_claim = replace(
             current,
@@ -670,6 +674,10 @@ class TemporalKnowledgeStore:
         current = self.head(claim_id)
         if expected_head_digest != current.revision_digest:
             raise KnowledgeStoreError("stale claim head digest")
+        if current.lifecycle is ClaimLifecycle.TOMBSTONED:
+            raise KnowledgeStoreError("claim is already tombstoned")
+        if normalized_recorded_at < current.recorded_at:
+            raise KnowledgeStoreError("recorded_at cannot move backward")
         next_claim = replace(
             current,
             revision=current.revision + 1,
