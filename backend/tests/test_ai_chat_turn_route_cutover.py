@@ -143,6 +143,7 @@ async def test_live_chat_success_reaches_durable_complete(
 
     async def execute(command):
         return SimpleNamespace(
+            operation_id=command.operation.operation_id,
             final_output="Done.",
             execution_id=command.execution_request.execution_id,
             verification="verified",
@@ -298,6 +299,7 @@ async def test_live_chat_event_page_supports_digest_bound_reconnect(
 
     async def execute(command):
         return SimpleNamespace(
+            operation_id=command.operation.operation_id,
             final_output="Done.",
             execution_id=command.execution_request.execution_id,
             verification="verified",
@@ -520,6 +522,7 @@ async def test_live_chat_rejects_unaccepted_engine_output_before_transcript_comm
 
     async def execute(command):
         return SimpleNamespace(
+            operation_id=command.operation.operation_id,
             final_output="This must never be committed.",
             execution_id=command.execution_request.execution_id,
             verification="unverified",
