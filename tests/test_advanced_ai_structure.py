@@ -202,3 +202,75 @@ def test_frontier_activation_profile_cannot_lower_acceptance_ceiling() -> None:
         "activation profile frontier-governed-system target ceiling must be L100"
         in errors
     )
+
+
+
+def test_maturity_dimension_set_cannot_hide_security() -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_dimensions")
+    payloads = _payloads()
+    payloads["contract"] = copy.deepcopy(payloads["contract"])
+    payloads["contract"]["maturity_dimensions"] = [
+        item
+        for item in payloads["contract"]["maturity_dimensions"]
+        if item["id"] != "security"
+    ]
+    errors = _validate(checker, payloads)
+    assert "advanced AI maturity dimension set drifted" in errors
+
+
+def test_stratum_gate_cannot_average_away_authority_integrity() -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_maturity_gate")
+    payloads = _payloads()
+    payloads["contract"] = copy.deepcopy(payloads["contract"])
+    req = payloads["contract"]["stratum_maturity_requirements"][4]
+    req["required_dimensions"].remove("authority_integrity")
+    errors = _validate(checker, payloads)
+    assert "S05 missing mandatory maturity dimension authority_integrity" in errors
+
+
+def test_capability_ceiling_enforcement_points_are_mandatory() -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_ceiling")
+    payloads = _payloads()
+    payloads["contract"] = copy.deepcopy(payloads["contract"])
+    payloads["contract"]["capability_ceiling_control"]["enforcement_points"] = [
+        "request admission"
+    ]
+    errors = _validate(checker, payloads)
+    assert any(
+        error.startswith(
+            "capability_ceiling_control.enforcement_points must contain at least"
+        )
+        for error in errors
+    )
+
+
+def test_frontier_experiment_cannot_self_deploy() -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_frontier_boundary")
+    payloads = _payloads()
+    payloads["contract"] = copy.deepcopy(payloads["contract"])
+    payloads["contract"]["frontier_experiment_boundary"]["promotion_chain"] = [
+        "experiment receipt",
+        "independent evaluation",
+        "security/governance review",
+        "canary or shadow evidence",
+        "release-authority decision",
+        "production deployment",
+    ]
+    errors = _validate(checker, payloads)
+    assert (
+        "frontier experiment promotion chain must end in rollback-ready deployment"
+        in errors
+    )
+
+
+def test_kill_controls_include_global_frontier_stop() -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_kill")
+    payloads = _payloads()
+    payloads["contract"] = copy.deepcopy(payloads["contract"])
+    payloads["contract"]["kill_and_suspend_controls"]["levels"] = [
+        item
+        for item in payloads["contract"]["kill_and_suspend_controls"]["levels"]
+        if item["scope"] != "global-frontier"
+    ]
+    errors = _validate(checker, payloads)
+    assert "kill/suspend scope set drifted" in errors
