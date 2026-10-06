@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "construction_version": "3.7.0",
+  "construction_version": "3.8.0",
   "architecture_tag": "arch-map/v3.7",
   "status": "active",
   "title": "Skeleton SOTA AI Application Construction Contract",
@@ -1607,6 +1607,12 @@
       "id": "state-topology",
       "kind": "static",
       "command": "python scripts/check_state_topology.py",
+      "required": true
+    },
+    {
+      "id": "state-migration-qualification",
+      "kind": "release",
+      "command": "python scripts/check_state_migration_qualification.py --json",
       "required": true
     },
     {
@@ -3538,7 +3544,10 @@
     "migration/preflight evidence when persistence changes",
     "artifact/SBOM/provenance references",
     "canary/smoke evidence",
-    "rollback target and trigger criteria"
+    "rollback target and trigger criteria",
+    "source-bound state migration qualification receipt covering every state domain",
+    "mixed-version semantic compatibility and idempotent replay evidence for schema-changing persistence releases",
+    "rollback/compensation plus destructive backup/restore proof before persistent-state cutover"
   ],
   "construction_work_packages": [
     {
@@ -9740,5 +9749,12 @@
       "canonical AI runtime mirror parity",
       "independent redundancy verifier"
     ]
+  },
+  "state_migration_qualification": {
+    "contract": "machine/state_migration_qualification.json",
+    "validator": "scripts/check_state_migration_qualification.py",
+    "runtime": "skeleton/persistence/migration_compatibility.py",
+    "governed_runtime_mirror": "skeleton/ai/runtime/persistence/migration_compatibility.py",
+    "policy": "persistence-changing releases fail closed unless exact topology coverage, mixed-version compatibility, replay idempotence, rollback/compensation and restore evidence qualify"
   }
 }
