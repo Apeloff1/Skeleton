@@ -10584,7 +10584,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "unverified",
       "requirements": [
         "Simulation cannot grant real authority or execute external side effects.",
         "Compare allow/deny/abstain deltas and affected populations/workloads."
@@ -10632,7 +10632,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "unverified",
       "requirements": [
         "Map threats to concrete components and controls.",
         "Review threat model when authority/data/network boundaries change."
@@ -10745,7 +10745,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "unverified",
       "requirements": [
         "Every privileged crossing needs authenticated identity and explicit authorization.",
         "Boundary failures must degrade closed without widening access."
@@ -10907,7 +10907,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "unverified",
       "requirements": [
         "Default deny unapproved destinations for privileged sandboxes/tools.",
         "Resolve DNS/rebinding and redirect behavior within policy."
@@ -10959,7 +10959,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "unverified",
       "requirements": [
         "Secrets are referenced by handles/scopes rather than copied into general state.",
         "Detect and redact accidental secret propagation."
@@ -11010,7 +11010,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "unverified",
       "requirements": [
         "Separate key material from metadata/identifiers.",
         "Design rotation and restore so old data/evidence remains verifiable where required."
@@ -11060,7 +11060,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "unverified",
       "requirements": [
         "Attach tenant scope before lookup/ranking/execution.",
         "Test cross-tenant negative access paths continuously."
@@ -11108,7 +11108,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "unverified",
       "requirements": [
         "Propagate privacy labels into derived data and artifacts.",
         "Block incompatible processing/export based on policy and jurisdictional scope."
@@ -11156,7 +11156,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "unverified",
       "requirements": [
         "Track deletion scope through replicas, indexes, caches, artifacts and backups.",
         "Prevent restore/rebuild from resurrecting deleted data."
@@ -11209,7 +11209,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "unverified",
       "requirements": [
         "Bind SBOM to exact build artifact digest.",
         "Include direct/transitive/native/container components."
@@ -11306,7 +11306,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "unverified",
       "requirements": [
         "Specify SLI, target, window and excluded conditions explicitly.",
         "Use SLOs to drive operations and capacity rather than decorative dashboards."
@@ -11356,7 +11356,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "unverified",
       "requirements": [
         "Calculate budgets from authoritative SLI data and declared windows.",
         "Prevent budget override from silently disabling safety/reliability gates."
@@ -11406,7 +11406,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "unverified",
       "requirements": [
         "Declare allowed label sets and high-cardinality exceptions.",
         "Reject secrets/user content as uncontrolled telemetry dimensions."
@@ -11456,7 +11456,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "unverified",
       "requirements": [
         "Use stable operation/correlation identity across process boundaries.",
         "Record causal links without making telemetry authoritative state."
@@ -11506,7 +11506,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "unverified",
       "requirements": [
         "Profile before optimization and retain workload/environment identity.",
         "Separate steady-state, startup and tail-path costs."
@@ -11556,7 +11556,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "unverified",
       "requirements": [
         "Set percentile budgets per operation class and environment.",
         "Expose budget exhaustion/degradation rather than hiding latency with retries."
@@ -11606,7 +11606,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "unverified",
       "requirements": [
         "Reserve/charge/refund costs using durable accounting semantics.",
         "Budget exhaustion may reduce capability only through declared safe fallback."
@@ -11656,7 +11656,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "unverified",
       "requirements": [
         "Use hardware/workload-normalized measurements.",
         "Require quality/reliability equivalence for efficiency claims."
@@ -13506,7 +13506,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "unverified",
       "requirements": [
         "Cards reference immutable model/eval versions.",
         "Separate measured facts from qualitative claims."
@@ -13554,7 +13554,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "unverified",
       "requirements": [
         "Cards bind to immutable dataset version/fingerprint.",
         "Document excluded/unknown provenance and sensitive attributes."
@@ -13602,7 +13602,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "unverified",
       "requirements": [
         "Cards cannot grant authority; they document governed contracts.",
         "Bind to exact tool version/implementation owner."
@@ -13650,7 +13650,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "unverified",
       "requirements": [
         "Bind card to agent definition/version and evaluation evidence.",
         "Clearly distinguish default authority from optional delegated grants."
@@ -13698,7 +13698,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "unverified",
       "requirements": [
         "Show dimensions and raw blocker states, not only aggregate score.",
         "Bind observations to time/version/environment."
@@ -13746,7 +13746,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "unverified",
       "requirements": [
         "Differentiate direct/transitive/build/runtime dependencies.",
         "Require risk disposition for unmaintained or vulnerable critical packages."
@@ -13794,7 +13794,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "unverified",
       "requirements": [
         "Record provider-specific dependency and criticality.",
         "Maintain tested fallback or explicit no-fallback disposition."
@@ -13842,7 +13842,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "unverified",
       "requirements": [
         "Failover requires compatible capability/data-boundary profile.",
         "Unknown external outcome must reconcile before retry to alternate provider."
@@ -14178,7 +14178,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "UI is a projection of append-only/canonical audit data.",
         "Support correlation/search without leaking other tenants/secrets."
@@ -14227,7 +14227,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Expose freshness/degraded telemetry state explicitly.",
         "Make hard blockers and active incidents prominent."
@@ -14276,7 +14276,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Human controls act through governed APIs, not UI-local state.",
         "Surface orphan/stale lease and budget exhaustion conditions."
@@ -14325,7 +14325,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Separate evidence state from generated narrative.",
         "Preserve source/version and experiment lineage in drill-down."
@@ -14374,7 +14374,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Every deployed model maps to immutable artifact/config/eval evidence.",
         "Model changes follow staged promotion and rollback controls."
@@ -14423,7 +14423,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Keep rollback-compatible prior artifacts/configs available.",
         "Handle in-flight sessions/caches/versioned outputs explicitly."
@@ -14472,7 +14472,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Separate immutable policy/authority rules from editable prompting.",
         "Bind each prompt/instruction version to intended model/capability and regression evidence."
@@ -14521,7 +14521,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Pin model/config/tool context for comparative prompt tests.",
         "Track quality/safety/cost changes and nondeterminism envelopes."
@@ -14766,7 +14766,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Every time-sensitive claim supports scope/validity intervals where known.",
         "Corrections supersede without erasing historical lineage."
@@ -14895,7 +14895,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Preserve competing hypotheses until evidence resolves them.",
         "Separate hypothesis plausibility from verified fact."
@@ -14944,7 +14944,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Every causal edge records evidence/method/assumptions.",
         "Interventions/simulations cannot be reported as observed facts."
@@ -15565,7 +15565,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Migrations are resumable/idempotent or explicitly atomic.",
         "Mixed-version and rollback behavior declared before activation."
@@ -15614,7 +15614,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Legacy compatibility must not create second authority.",
         "Adapter removal requires consumer inventory and migration proof."
@@ -15663,7 +15663,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Deprecation state is versioned and machine-readable.",
         "Removal blocked while supported consumers remain unless explicitly broken by policy."
@@ -15712,7 +15712,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Preserve provenance and uncertainty of inferred intent.",
         "Do not promote archaeological inference into authority without confirmation/evidence."
@@ -15761,7 +15761,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Consolidation must declare source/destination owner and compatibility strategy.",
         "No source retirement before import inversion and affected-domain evidence."
@@ -15810,7 +15810,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Preserve imported/generated code source identity and licensing metadata.",
         "Refactors retain lineage links to predecessors."
@@ -15859,7 +15859,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Differentiate intentional adapters/generated mirrors from accidental duplication.",
         "Use ownership/dependency evidence before proposing removal."
@@ -15908,7 +15908,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Every production module has one canonical ownership zone.",
         "Ownership changes preserve history and dependency impact."
@@ -15957,7 +15957,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Generated rules are deterministic and reviewable.",
         "Security/authority paths can require additional fixed reviewers."
@@ -16006,7 +16006,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Documentation references to contracts/paths are validated.",
         "Normative docs identify their authority/source relationship."
@@ -16055,7 +16055,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Diagrams declare source model/version.",
         "Manual diagrams cannot silently override machine topology."
@@ -16104,7 +16104,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Snapshot includes machine manifests and relevant dependency graph identities.",
         "Allow compare/diff across snapshots for drift analysis."
@@ -16153,7 +16153,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Preserve build environment/toolchain identity.",
         "Investigate unexplained binary differences before promotion."
@@ -16202,7 +16202,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Declare all build inputs/dependencies.",
         "Fail or explicitly vendor/cache network dependencies for qualified builds."
@@ -16251,7 +16251,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Cache keys include toolchain/config/dependency inputs.",
         "Sensitive/tenant-specific data cannot enter shared cache."
@@ -16300,7 +16300,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Attestation references immutable artifact digest.",
         "Verification is required before install/deploy where policy applies."
@@ -16349,7 +16349,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Verify signatures/digests before privileged writes.",
         "Defend path/symlink/archive traversal and permission mistakes."
@@ -16398,7 +16398,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Verify signed metadata/artifacts before activation.",
         "Define authorized rollback separately from malicious downgrade."
@@ -16447,7 +16447,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Recovery path has fewer dependencies than normal bootstrap.",
         "Validate repaired artifacts before handing control to full runtime."
@@ -16496,7 +16496,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Crash collection must survive partial subsystem failure.",
         "Apply privacy/secret redaction before export."
@@ -16545,7 +16545,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Bundle contents are allowlisted/classified, not arbitrary filesystem dumps.",
         "Produce manifest/digests and expiry/retention guidance."
@@ -16594,7 +16594,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Separate diagnosis from repair and report evidence for every finding.",
         "Support machine-readable output for automation and runbooks."
@@ -16643,7 +16643,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Self-diagnosis is advisory and cannot self-certify production health.",
         "Correlate component reports with external telemetry/checks."
@@ -16692,7 +16692,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Repair plan declares affected state and rollback before mutation.",
         "Post-repair verification must prove targeted invariant restoration."
@@ -16741,7 +16741,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Twin state records freshness/uncertainty and never authorizes real effects.",
         "Synchronize from governed observations, not inferred model text alone."
@@ -16790,7 +16790,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Plans respect compatibility, blast radius, SLO and resource constraints.",
         "Planner output remains proposal until deployment policy authorizes."
@@ -16839,7 +16839,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Admission must reserve bounded resources before work starts.",
         "Scheduler handles preemption/recovery without losing ownership."
@@ -16888,7 +16888,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Track wait age/tenant/share and apply bounded anti-starvation policy.",
         "Fairness must not override security or hard safety constraints."
@@ -16937,7 +16937,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Every unbounded producer/consumer boundary must define pressure semantics.",
         "Cancellation/degradation behavior remains explicit under pressure."
@@ -16986,7 +16986,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Define shed priority/class and response semantics.",
         "Never shed required security/audit/authority operations silently."
@@ -17035,7 +17035,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Measure depth/age/service rate and enforce queue budgets.",
         "Congestion policy differentiates new work, retries and recovery work."
@@ -17084,7 +17084,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Retry only classified transient failures with idempotency safety.",
         "Shared budget prevents nested layers multiplying attempts."
@@ -17133,7 +17133,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Breaker state is scoped per dependency/failure domain.",
         "Fallback remains policy-compatible and observable."
@@ -17182,7 +17182,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Define concurrency/resource pools by critical domain.",
         "Cross-bulkhead fallback requires explicit capacity/authority policy."
@@ -17231,7 +17231,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "DLQ entries preserve original identity, attempts and failure cause.",
         "Replay requires current authorization/idempotency and compatibility checks."
@@ -17280,7 +17280,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Replay distinguishes read-only reconstruction, simulation and real side-effect retry.",
         "External effects require reconciliation/idempotency before re-execution."
@@ -17329,7 +17329,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Tests use appropriate equivalence/tolerance for each determinism class.",
         "Nondeterminism sources are recorded in reproducibility evidence."
@@ -17378,7 +17378,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Never use wall clock for elapsed-duration correctness.",
         "Represent timezone/calendar semantics explicitly at boundaries."
@@ -17427,7 +17427,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "IDs never encode mutable/display-sensitive authority data.",
         "Parsing/canonicalization reject ambiguous forms."
@@ -17476,7 +17476,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Use sequence/fencing/logical-clock semantics per domain.",
         "Never infer causality solely from timestamps."
