@@ -1133,6 +1133,19 @@ def validate() -> list[str]:
         errors.append("relocation must not create completion authority")
 
     impl = data.get("implementation_signoff", {})
+    if not isinstance(impl, dict):
+        errors.append("implementation_signoff must be an object")
+        impl = {}
+    elif not impl.get("signed"):
+        pending_statement = impl.get("statement")
+        expected_mapping_label = f"{len(mappings)}-mapping"
+        if (
+            not isinstance(pending_statement, str)
+            or expected_mapping_label not in pending_statement
+        ):
+            errors.append(
+                "pending implementation signoff statement must reference live mapping count"
+            )
     if impl.get("signed"):
         if impl.get("signature_method") not in ALLOWED_SIGNATURE_METHODS:
             errors.append("implementation signoff uses an unbound signature method")
