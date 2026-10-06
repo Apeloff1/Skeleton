@@ -78,8 +78,8 @@ class ExecutionAuthorityGuard:
         self._authorities: dict[str, _AuthorityState] = {}
         self._authority_order: list[str] = []
         self._replay_digests: dict[str, str] = {}
-        self._replay_order: list[str] = {}
-        self._admission_receipts: dict[str, AdmissionReceipt] = []
+        self._replay_order: list[str] = []
+        self._admission_receipts: dict[str, AdmissionReceipt] = {}
 
     @staticmethod
     def _aware(now: datetime | None) -> datetime:
