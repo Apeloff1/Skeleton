@@ -145,7 +145,13 @@ def validate() -> list[str]:
     if errors:
         return errors
 
-    raw_ledger = LEDGER.read_text(encoding="utf-8").strip()\n    if not raw_ledger:\n        return ["accountability ledger is empty; use the fail-closed recovery utility"]\n    try:\n        ledger = json.loads(raw_ledger)\n    except json.JSONDecodeError as exc:\n        return [f"accountability ledger is invalid JSON: {exc}"]
+    raw_ledger = LEDGER.read_text(encoding="utf-8").strip()
+    if not raw_ledger:
+        return ["accountability ledger is empty; use the fail-closed recovery utility"]
+    try:
+        ledger = json.loads(raw_ledger)
+    except json.JSONDecodeError as exc:
+        return [f"accountability ledger is invalid JSON: {exc}"]
     master = json.loads(MASTER.read_text(encoding="utf-8"))
     queue = json.loads(QUEUE.read_text(encoding="utf-8"))
     p1 = json.loads(P1.read_text(encoding="utf-8"))
