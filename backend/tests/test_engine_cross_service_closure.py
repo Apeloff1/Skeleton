@@ -27,7 +27,10 @@ from skeleton.api.engine_routes import (
     _engine_service_token,
     router,
 )
-from skeleton.api.engine_runtime import EngineExecutionCoordinator
+from skeleton.api.engine_runtime import (
+    EngineExecutionCoordinator,
+    EngineExecutionCoordinatorError,
+)
 from skeleton.api.engine_service import (
     EngineExecutionCommand,
     EngineExecutionService,
@@ -44,6 +47,7 @@ from skeleton.contracts.context import (
 from skeleton.intelligence.execution_runtime import (
     ExecutionVerificationDecision,
 )
+from skeleton.kernel.runtime_supervision import RuntimeServiceLifecycle
 from skeleton.persistence.execution_repository import SQLiteExecutionRepository
 from skeleton.provider_contract import (
     FinishReason,
@@ -490,6 +494,72 @@ async def test_cross_service_cancel_fences_late_provider_result(
         )
     assert caught.value.status == "cancelled"
     await coordinator.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_engine_lifecycle_draining_fences_new_execution_and_drains_lease(
+    tmp_path,
+) -> None:
+    service = _service(tmp_path)
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    class BlockingProvider:
+        provider_id = "fake"
+        model = "fake-model"
+
+        async def generate(self, _request):
+            started.set()
+            await release.wait()
+            return _text_response(
+                "should-not-be-needed",
+                response_id="resp-lifecycle-drain",
+            )
+
+    lifecycle = RuntimeServiceLifecycle("skeleton")
+    lifecycle.mark_ready(reason="test-ready")
+    coordinator = EngineExecutionCoordinator(
+        service,
+        provider_registry=_Registry(BlockingProvider()),
+        verification_hook=_verification,
+        lifecycle=lifecycle,
+    )
+
+    first_context = _context()
+    first = _command(first_context, idempotency_key="lifecycle-first")
+    service.submit(
+        first,
+        verified_service_principal="backend-service",
+    )
+    await coordinator.ensure_started(first)
+    await asyncio.wait_for(started.wait(), timeout=2)
+    assert lifecycle.inflight_work == 1
+    assert lifecycle.active_work()[0].work_id == (
+        "engine-execution:" + first_context.execution_id
+    )
+
+    lifecycle.begin_drain(reason="rolling-upgrade")
+    assert lifecycle.admits_work is False
+
+    second_context = _context()
+    second = _command(second_context, idempotency_key="lifecycle-second")
+    with pytest.raises(
+        EngineExecutionCoordinatorError,
+        match="lifecycle denied",
+    ):
+        await coordinator.ensure_started(second)
+
+    with pytest.raises(
+        Exception,
+        match="in-flight work leases",
+    ):
+        lifecycle.mark_stopped(reason="too-early")
+
+    await coordinator.shutdown()
+    await asyncio.sleep(0)
+    assert lifecycle.inflight_work == 0
+    lifecycle.mark_stopped(reason="coordinator-drained")
+    assert lifecycle.snapshot()["phase"] == "stopped"
 
 
 @pytest.mark.asyncio
