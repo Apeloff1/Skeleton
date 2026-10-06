@@ -122,6 +122,17 @@ def test_smbios_finds_board_and_package_memory() -> None:
     assert devices[0].capacity_bytes == 8 * GIB
 
 
+def test_unknown_future_smbios_memory_type_still_uses_system_ram() -> None:
+    devices = parse_smbios_memory_devices(
+        _type17(0x30, 0x05, 16384, "FUTURE MEMORY")
+        + bytes((127, 4, 0, 0)) + b"\0\0"
+    )
+    assert len(devices) == 1
+    assert devices[0].technology.family == "RAM"
+    assert devices[0].attachment is MemoryAttachment.BOARD
+    assert devices[0].capacity_bytes == 16 * GIB
+
+
 def test_board_and_hbm_memory_increase_hot_context_budget() -> None:
     host = ContextMemoryPlane(topology=_topology(), policy=_policy())
     dimm = ContextMemoryPlane(topology=_topology("DDR5"), policy=_policy())

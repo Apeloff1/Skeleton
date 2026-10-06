@@ -177,9 +177,13 @@ def parse_smbios_memory_devices(blob: bytes) -> tuple[MemoryDevice, ...]:
     for kind, data, strings in _dmi_structures(bytes(blob)):
         if kind != 17 or len(data) <= 0x12:
             continue
-        technology = parse_memory_technology(_SMBIOS_TYPES.get(data[0x12], "UNKNOWN"))
-        if technology.family not in _SYSTEM:
-            continue
+        type_code = data[0x12]
+        raw_type = _SMBIOS_TYPES.get(type_code)
+        technology = (
+            parse_memory_technology(raw_type)
+            if raw_type is not None
+            else MemoryTechnology(f"SMBIOS-0x{type_code:02X}", "RAM")
+        )
         size = struct.unpack_from("<H", data, 0x0C)[0]
         if size in {0, 0xFFFF}:
             continue
