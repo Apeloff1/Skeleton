@@ -102,6 +102,7 @@ from .deep_assurance import (
 )
 from .producer_provenance import (
     ProducerProvenanceBindingError,
+    candidate_from_canonical_execution,
     producer_provenance_from_canonical_execution,
 )
 from .rights import (
@@ -134,6 +135,7 @@ __all__ = [
     "PromotionReceipt",
     "ProducerProvenance",
     "ProducerProvenanceBindingError",
+    "candidate_from_canonical_execution",
     "producer_provenance_from_canonical_execution",
     "RightsError",
     "RightsLedger",
