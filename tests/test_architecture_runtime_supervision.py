@@ -248,6 +248,58 @@ class RuntimeSupervisionTests(unittest.TestCase):
         ):
             MODULE.validate(root)
 
+    def test_rejects_composite_connector_collapsed_to_one_mode(self) -> None:
+        root = self._fixture()
+        path = root / "machine/runtime_supervision.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        connector = next(
+            item for item in data["connectors"]
+            if item["id"] == "backend-engine"
+        )
+        for operation in connector["operations"]:
+            operation["cancellation_mode"] = "async_task_cancellation"
+        path.write_text(json.dumps(data), encoding="utf-8")
+
+        with self.assertRaisesRegex(
+            MODULE.RuntimeSupervisionError,
+            "must use multiple cancellation modes",
+        ):
+            MODULE.validate(root)
+
+    def test_rejects_unmapped_active_provider_capability(self) -> None:
+        root = self._fixture()
+        path = root / "machine/ai_app_construction.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        provider = next(
+            item for item in data["runtime_model_providers"]
+            if item["id"] == "openai"
+        )
+        provider["capabilities"].append("new-network-capability")
+        path.write_text(json.dumps(data), encoding="utf-8")
+
+        with self.assertRaisesRegex(
+            MODULE.RuntimeSupervisionError,
+            "lacks operation mapping for active provider capabilities",
+        ):
+            MODULE.validate(root)
+
+    def test_sync_adapter_declaration_changes_required_coverage(self) -> None:
+        root = self._fixture()
+        path = root / "machine/ai_app_construction.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        provider = next(
+            item for item in data["runtime_model_providers"]
+            if item["id"] == "openai"
+        )
+        provider.pop("sync_adapter")
+        path.write_text(json.dumps(data), encoding="utf-8")
+
+        with self.assertRaisesRegex(
+            MODULE.RuntimeSupervisionError,
+            "engine-runtime operation coverage drift",
+        ):
+            MODULE.validate(root)
+
     def test_rejects_resurrected_closed_masterplan_gap(self) -> None:
         root = self._fixture()
         contract_path = root / "machine/runtime_supervision.json"
