@@ -1,0 +1,53 @@
+{
+  "schema_version": "ai-chat-verification-acceptance/v1",
+  "status": "implemented_candidate",
+  "prepared_at_utc": "2026-10-06T01:55:00Z",
+  "prepared_by": "chatgpt:gpt-5.6-sol",
+  "scope": "AI-chat verification acceptance profiles, independent verifier identity, freshness, policy floors, and quarantine semantics",
+  "authority": {
+    "execution": false,
+    "publication": false,
+    "verification_contract": "skeleton/contracts/verification.py",
+    "verification_policy": "skeleton/intelligence/verification_policy.py",
+    "deterministic_runtime": "skeleton/intelligence/verification_runtime.py",
+    "acceptance_gate": "skeleton/intelligence/verification_acceptance.py"
+  },
+  "invariants": [
+    "canonical risk action and external-effect verification policy is an acceptance floor and cannot be weakened by a caller profile",
+    "verification checks have deterministic canonical digests",
+    "verification receipts must bind exact claim digest claim identity and tenant before acceptance",
+    "future verification receipts fail closed and can quarantine",
+    "receipt freshness is bounded by explicit acceptance profiles",
+    "a passed receipt containing authoritative contradiction is quarantined",
+    "independent verification requires identity-bound proof rather than an independent boolean alone",
+    "independence proof binds the exact verification receipt and canonical independent check digest",
+    "independent verifier actor authority domain and process must be distinct when policy requires",
+    "critical verification can require a provider distinct from the generation provider",
+    "independent checks cannot postdate the aggregate verification receipt",
+    "stale independent checks fail closed",
+    "irreversible or externally observable actions escalate verification to postcondition level",
+    "semantic verification uses structured provider-neutral requests with bounded rounds repairs and output tokens",
+    "semantic verifier outage blocks high-impact claims and abstains lower-impact claims",
+    "semantic repairs preserve lineage and cannot publish before citation rebinding",
+    "acceptance and quarantine decisions are deterministic and non-executing"
+  ],
+  "files": {
+    "acceptance": "skeleton/intelligence/verification_acceptance.py",
+    "intelligence_exports": "skeleton/intelligence/__init__.py",
+    "verification_contract": "skeleton/contracts/verification.py",
+    "verification_policy": "skeleton/intelligence/verification_policy.py",
+    "verification_runtime": "skeleton/intelligence/verification_runtime.py",
+    "acceptance_tests": "skeleton/testing/test_verification_acceptance.py",
+    "contract_tests": "skeleton/testing/test_verification_contract.py",
+    "runtime_tests": "skeleton/testing/test_verification_runtime.py",
+    "validator": "scripts/check_ai_chat_verification_acceptance.py",
+    "independent_verifier": "scripts/verify_ai_chat_verification_acceptance.py",
+    "workflow": ".github/workflows/ai-chat-verification-acceptance.yml",
+    "plan": "docs/plan/AI_CHAT_MASTERPLAN_2026-10-06.md"
+  },
+  "promotion": {
+    "completion_checkbox": false,
+    "verification_signature": null,
+    "rule": "implemented candidate only; exact-head structural validation, acceptance adversarial regressions, existing deterministic and semantic verification regressions, independent rehash, and AI-file-tree governance must pass before qualification"
+  }
+}
