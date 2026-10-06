@@ -116,7 +116,12 @@
       "VOL-419",
       "VOL-420"
     ],
-    "rule": "A volume without a dedicated profile still inherits common_contract. A production-critical volume listed in dedicated_profiles_required_for cannot be enterprise-qualified without its dedicated profile."
+    "rule": "A volume without a dedicated profile still inherits common_contract. A production-critical volume listed in dedicated_profiles_required_for cannot be enterprise-qualified without its dedicated profile.",
+    "complete_enterprise_ai_claim": {
+      "all_421_volumes_minimum_grade": "enterprise_qualified",
+      "dedicated_profile_minimum_grade": "superior",
+      "rule": "The complete enterprise AI claim is valid only when every VOL-000..VOL-420 has current enterprise qualification evidence and every dedicated critical profile additionally proves comparator-backed superiority."
+    }
   },
   "grade_model": {
     "states": [
