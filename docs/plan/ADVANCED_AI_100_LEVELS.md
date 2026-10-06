@@ -351,6 +351,37 @@ claim frontier maturity:
 A profile ceiling limits what the deployment claims. It does not permit skipping
 lower levels.
 
+## Risk classes and evidence freshness
+
+Promotion evidence expires.
+
+The ladder defines three evidence-risk classes:
+
+| Risk | Maximum evidence age | Minimum promotion posture |
+| --- | ---: | --- |
+| Standard | 30 days | contract + focused/integration tests + exact-head structure |
+| High | 14 days | standard + adversarial/failure injection + independent verification |
+| Critical | 7 days | high + security/governance review + load/resource evidence + rollback proof |
+
+The current strata intentionally use **high** or **critical** defaults because this
+ladder describes advanced AI system structure, not low-risk UI cosmetics.
+
+Evidence has one of five states:
+
+- `CURRENT`;
+- `STALE`;
+- `INVALIDATED`;
+- `MISSING`;
+- `SUPERSEDED`.
+
+Only `CURRENT` evidence can satisfy a promotion gate. Evidence becomes stale
+when its freshness window expires and is invalidated immediately by relevant
+contract, owner, security, governance, dependency, evaluator, model, policy, or
+runtime-topology changes.
+
+This means a level cannot remain "qualified forever" after the system beneath it
+has materially changed.
+
 ## Maturity dimensions
 
 A level is not considered mature because one aggregate benchmark score is high.
