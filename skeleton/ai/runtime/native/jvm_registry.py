@@ -451,9 +451,39 @@ class JvmAcceleratorRegistry:
         return (name,)
 
 
+_default_registry: JvmAcceleratorRegistry | None = None
+_default_registry_lock = threading.Lock()
+
+
+def get_default_jvm_registry() -> JvmAcceleratorRegistry:
+    """Return the single process-wide JVM accelerator lifecycle owner.
+
+    Domain compatibility getters delegate here instead of maintaining their
+    own singleton process references. The registry remains lazy: obtaining it
+    does not construct or start an accelerator.
+    """
+    global _default_registry
+    with _default_registry_lock:
+        if _default_registry is None:
+            _default_registry = JvmAcceleratorRegistry()
+        return _default_registry
+
+
+def close_default_jvm_registry() -> None:
+    """Close every initialized JVM helper owned by the default registry."""
+    global _default_registry
+    with _default_registry_lock:
+        registry = _default_registry
+        _default_registry = None
+    if registry is not None:
+        registry.close()
+
+
 __all__ = [
     "JvmAcceleratorPreflight",
     "JvmAcceleratorRegistry",
     "JvmAcceleratorRegistryError",
     "JvmAcceleratorRuntimeStatus",
+    "close_default_jvm_registry",
+    "get_default_jvm_registry",
 ]
