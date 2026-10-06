@@ -441,7 +441,7 @@ Deliver:
 
 ### Volume 2 — durable persistence adapter
 
-Status: **implemented candidate; product-route cutover pending**.
+Status: **live product-route cutover implemented candidate; exact-head qualification pending**.
 
 Implemented:
 
@@ -460,13 +460,15 @@ The turn repositories store operation metadata and transition evidence only.
 Canonical conversation messages remain solely owned by the conversation
 authority.
 
-The remaining Volume-2 cutover is to invoke the Mongo turn authority from the
-product chat admission/finalization path after this persistence surface passes
-exact-head qualification.
+Product chat now binds the Mongo turn authority around canonical user commit,
+context compilation, routing/model execution, verification/finalization,
+assistant commit, retryable failure, terminal failure, and cancellation.
+Retries reuse the same operation identity and progressed durable state instead
+of requiring a fresh RECEIVED snapshot.
 
 ### Volume 3 — durable streaming projection
 
-Status: **projection implemented candidate; transport/API cutover pending**.
+Status: **polling reconnect transport implemented candidate; exact-head qualification pending**.
 
 Implemented:
 
@@ -481,9 +483,11 @@ Implemented:
 - terminal-state projection for completion, degradation, failures,
   cancellation, and quarantine.
 
-The remaining cutover is to expose this projection through the product chat
-transport after the persistence and stream surfaces pass exact-head
-qualification.
+The product route now exposes a content-minimized reconnect endpoint at
+`GET /ai/chat/turns/{thread_id}/events`. Resume cursors are bound to the
+operation, last sequence, and last event digest; sequence gaps or digest
+mismatches fail closed. SSE/WebSocket delivery can layer over the same
+transport-neutral journal projection without creating a second event source.
 
 ### Volume 4 — context compiler v2
 
