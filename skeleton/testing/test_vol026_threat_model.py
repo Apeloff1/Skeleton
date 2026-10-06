@@ -7,7 +7,7 @@ def test_canonical_model_covers_required_security_boundaries():
  assert all(t.validation for t in m.threats)
 def test_model_digest_is_deterministic_under_order():
  m=canonical_vol026_threat_model()
- assert m.digest==ThreatModel(tuple(reversed(m.threats))).digest
+ assert m.digest==ThreatModel(tuple(reversed(m.threats)),model_version=m.model_version,impact_triggers=tuple(reversed(m.impact_triggers))).digest
 def test_missing_required_boundary_fails_closed():
  m=canonical_vol026_threat_model()
  with pytest.raises(SecurityContractError):ThreatModel(tuple(t for t in m.threats if t.asset!="secrets"))
