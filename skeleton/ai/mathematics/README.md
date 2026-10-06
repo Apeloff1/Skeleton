@@ -59,6 +59,10 @@ model authority boundaries.
 - `resampling.py` — deterministic jackknife and seeded bootstrap uncertainty reports.
 - `stochastic.py` — finite-state propagation, transition powers, hitting times and absorption probabilities.
 - `matching.py` — deterministic rectangular minimum-cost bipartite assignment.
+- `lu.py` — pivoted LU, solves, determinant and inverse with reconstruction/identity residuals.
+- `splines.py` — natural cubic splines with derivatives and exact piecewise polynomial integrals.
+- `transport.py` — weighted 1D Wasserstein distance and entropy-regularized Sinkhorn plans.
+- `rotations.py` — quaternion composition, axis-angle conversion, vector rotation, SLERP and matrices.
 - `validation.py` — parity evidence against existing optimized runtime kernels.
 
 ## Guarantees
@@ -95,6 +99,10 @@ model authority boundaries.
 - Resampling uncertainty is explicitly seeded and carries its replicate evidence.
 - Stochastic-process analysis validates row-stochastic matrices and fails closed on infinite hitting-time systems.
 - Assignment solves cover the complete smaller partition with deterministic tie handling and explicit total cost.
+- LU exposes permutation/reconstruction evidence and matrix inversion verifies the identity residual.
+- Natural splines keep interpolation, derivative and integration semantics inside the knot domain unless clamp is explicit.
+- Optimal transport normalizes marginals explicitly and records Sinkhorn marginal residuals/convergence.
+- Quaternion operations normalize rotations and reject zero-axis/zero-norm ambiguities.
 - `audit_runtime_kernels()` compares optimized runtime softmax, matmul and attention against
   this reference substrate without replacing those kernels.
 

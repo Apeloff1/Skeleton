@@ -121,6 +121,7 @@ from .linear import (
     solve_linear_system,
     transpose,
 )
+from .lu import InverseReport, LUReport, determinant, lu_decompose, lu_solve, matrix_inverse
 from .kernels import (
     centered_gram,
     gram_matrix,
@@ -182,6 +183,14 @@ from .robust import (
     trimmed_mean,
     winsorized_mean,
 )
+from .rotations import (
+    Quaternion,
+    quaternion_from_axis_angle,
+    quaternion_multiply,
+    quaternion_rotate_vector,
+    quaternion_slerp,
+    quaternion_to_rotation_matrix,
+)
 from .sampling import (
     MonteCarloReport,
     SplitMix64,
@@ -221,6 +230,7 @@ from .spectral import (
     periodogram,
     spectral_power_fraction,
 )
+from .splines import NaturalCubicSpline, natural_cubic_spline
 from .statistics import (
     MomentReport,
     correlation,
@@ -243,6 +253,7 @@ from .tensor import (
     subtract as tensor_subtract,
     tensor_zip,
 )
+from .transport import SinkhornReport, sinkhorn_transport, wasserstein_distance_1d
 from .transforms import (
     autocorrelation,
     convolution,
@@ -349,6 +360,12 @@ __all__ = [
     "matvec",
     "solve_linear_system",
     "transpose",
+    "InverseReport",
+    "LUReport",
+    "determinant",
+    "lu_decompose",
+    "lu_solve",
+    "matrix_inverse",
     "centered_gram",
     "gram_matrix",
     "laplacian_kernel",
@@ -399,6 +416,12 @@ __all__ = [
     "robust_scale_mad",
     "trimmed_mean",
     "winsorized_mean",
+    "Quaternion",
+    "quaternion_from_axis_angle",
+    "quaternion_multiply",
+    "quaternion_rotate_vector",
+    "quaternion_slerp",
+    "quaternion_to_rotation_matrix",
     "MonteCarloReport",
     "SplitMix64",
     "halton_point",
@@ -430,6 +453,8 @@ __all__ = [
     "dominant_frequency",
     "periodogram",
     "spectral_power_fraction",
+    "NaturalCubicSpline",
+    "natural_cubic_spline",
     "MomentReport",
     "correlation",
     "covariance",
@@ -448,6 +473,9 @@ __all__ = [
     "tensor_reduce_sum",
     "tensor_subtract",
     "tensor_zip",
+    "SinkhornReport",
+    "sinkhorn_transport",
+    "wasserstein_distance_1d",
     "autocorrelation",
     "convolution",
     "dft",
