@@ -395,6 +395,121 @@ level prerequisite current
 Every blueprint also defines how to back out safely. No level is allowed to have
 only a forward path.
 
+## Model, data, evaluator, and hardware lifecycle
+
+A level's maturity claim is never attached to the words "the AI" in the
+abstract. It is bound to a concrete execution identity:
+
+- model family and exact build/version;
+- provider;
+- runtime backend;
+- quantization/precision;
+- context-window profile;
+- tool-schema version;
+- policy-bundle version;
+- prompt/strategy version;
+- hardware profile;
+- deployment release.
+
+Changing one of those dimensions may require requalification.
+
+### Model fleet
+
+The architecture distinguishes:
+
+- reference/baseline models;
+- production primary models;
+- compliant fallbacks;
+- specialists;
+- evaluator/critic models;
+- embedding/reranking models;
+- experimental/shadow models.
+
+Fallback can lower the effective maturity ceiling. It can never silently
+increase permissions, privacy exposure, or claimed capability.
+
+### Data and evaluation identity
+
+Datasets carry version, digest, provenance, usage rights, classification,
+tenant scope, collection window, contamination state, and retention policy.
+
+Evaluation suites carry suite/evaluator/rubric versions, fixture digest,
+sampling policy, scoring policy, and environment profile.
+
+Training/tuning inputs remain separated from protected promotion holdouts.
+Hidden holdouts are inaccessible to candidate-generation paths. Synthetic data
+is labeled and cannot be the only basis for promotion. Benchmark contamination
+invalidates the affected evidence.
+
+### Portability
+
+Evidence portability is explicit:
+
+```text
+PORTABLE
+CONDITIONAL
+NON_PORTABLE
+UNKNOWN   <- default
+```
+
+Evidence is never assumed portable across model, provider, runtime, hardware,
+OS/architecture, tool/API schema, policy bundle, memory/retrieval schema, or
+deployment topology.
+
+If the available compatibility profile is qualified only to a lower level, the
+effective capability ceiling drops to that level.
+
+### Prompt and policy supply chain
+
+System instructions, policy bundles, tool schemas, routing strategies,
+reasoning templates, memory policies, evaluation rubrics, and safety
+configuration are versioned release artifacts.
+
+Runtime-generated prompts/strategies may exist as operation-scoped derived
+artifacts, but they may not silently become persistent global policy.
+
+Rollback restores a compatible bundle, not an arbitrary mixture of prompt,
+policy, routing, and tool-schema versions.
+
+### Hardware-aware execution
+
+The scheduler may use CPU, GPU, NPU/accelerator, or other qualified specialized
+inference hardware.
+
+Scheduling considers:
+
+- qualified model/runtime compatibility;
+- latency target;
+- memory footprint;
+- power/cost budget;
+- tenant/data policy;
+- precision;
+- batchability;
+- availability/failure domain.
+
+Large-context execution may use system RAM, accelerator memory, memory-mapped
+storage, or other qualified memory tiers. Movement between tiers preserves
+isolation, confidentiality, integrity, and deterministic eviction semantics.
+
+Hardware fallback is explicit and observable. Performance evidence is tagged
+with the exact hardware/runtime profile.
+
+### Evaluator independence
+
+Evaluation has four evidence tiers:
+
+| Tier | Evaluator | Primary use |
+| --- | --- | --- |
+| E0 | deterministic validator/oracle | schemas, invariants, exact outcomes |
+| E1 | independent test harness | runtime, integration, recovery, security |
+| E2 | independent model/critic | semantic quality and reasoning critique |
+| E3 | human/domain review | high-impact ambiguity and domain correctness |
+
+High- or critical-risk promotion cannot depend on one self-evaluating model
+path. Evaluator disagreement is retained and resolved by explicit rubric and
+authority; majority vote cannot override deterministic safety or policy
+failure.
+
 ## Level implementation contract
 
 Every implemented level must publish an implementation contract with:
