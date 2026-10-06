@@ -239,7 +239,7 @@ class ModelArtifact:
     def load_reference_model(self) -> ReferenceNGramModel:
         if self.kind != "reference_ngram":
             raise ModelProgramError("artifact is not a reference n-gram model")
-        model = ReferenceNGramModel.from_dict(self.payload)
+        model = ReferenceNGramModel.from_dict(_thaw_json(self.payload))
         if model.model_digest != self.model_digest:
             raise ModelProgramError("reloaded model identity does not match artifact")
         return model
@@ -441,7 +441,11 @@ class ModelPromotionReceipt:
         object.__setattr__(self, "model_id", _text("model_id", self.model_id))
         object.__setattr__(self, "model_digest", _sha("model_digest", self.model_digest))
         object.__setattr__(self, "training_receipt_digest", _sha("training_receipt_digest", self.training_receipt_digest))
-        object.__setattr__(self, "evaluation_refs", _unique("evaluation_ref", self.evaluation_refs, minimum=2))
+        object.__setattr__(
+            self,
+            "evaluation_refs",
+            tuple(sorted(_unique("evaluation_ref", self.evaluation_refs, minimum=2))),
+        )
         object.__setattr__(self, "verifier_id", _text("verifier_id", self.verifier_id))
 
     @property
