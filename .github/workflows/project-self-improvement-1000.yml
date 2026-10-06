@@ -46,6 +46,20 @@ jobs:
           scripts/check_project_self_improvement_1000.py
           tests/test_project_self_improvement_1000.py
 
+      - name: Parse PSI machine authorities
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for path in [
+              "machine/project_self_improvement_1000.json",
+              "machine/project_self_improvement_epoch_contract.json",
+              "machine/project_self_improvement_idle_scheduler.json",
+          ]:
+              data = json.loads(Path(path).read_text(encoding="utf-8"))
+              print(path, data["schema_version"])
+          PY
+
       - name: Validate PSI-1000 machine authority
         run: python scripts/check_project_self_improvement_1000.py
 
