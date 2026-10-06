@@ -952,118 +952,151 @@ class LearningEvidenceStore:
     def advance_clock_version(self) -> int:
         """Explicit epoch bump. Prior clock versions become stale on ingest."""
 
-        self._clock_version += 1
-        return self._clock_version
+        with self._lock:
+            self._clock_version += 1
+            return self._clock_version
 
     def record_observation(self, observation: Observation) -> UpdateRecord:
-        commit_time = self._reject_stale(observation.provenance)
-        self._reject_duplicate(observation.observation_id)
-        self._observations[observation.observation_id] = observation
-        return self._commit(
-            UpdateKind.OBSERVATION,
-            observation.observation_id,
-            timestamp=commit_time,
-        )
+        with self._lock:
+            commit_time = self._reject_stale(observation.provenance)
+            self._reject_duplicate(observation.observation_id)
+            previous_state = self._state_digest()
+            self._observations[observation.observation_id] = observation
+            return self._commit(
+                UpdateKind.OBSERVATION,
+                observation.observation_id,
+                timestamp=commit_time,
+                previous_state_digest=previous_state,
+            )
 
     def record_feature(self, feature: Feature) -> UpdateRecord:
-        commit_time = self._reject_stale(feature.provenance)
-        self._reject_duplicate(feature.feature_id)
-        self._require_existing(feature.observation_ids, self._observations, kind="observation")
-        self._reject_feature_contradiction(feature)
-        self._features[feature.feature_id] = feature
-        return self._commit(
-            UpdateKind.FEATURE,
-            feature.feature_id,
-            timestamp=commit_time,
-        )
+        with self._lock:
+            commit_time = self._reject_stale(feature.provenance)
+            self._reject_duplicate(feature.feature_id)
+            self._require_existing(
+                feature.observation_ids,
+                self._observations,
+                kind="observation",
+            )
+            self._reject_feature_contradiction(feature)
+            previous_state = self._state_digest()
+            self._features[feature.feature_id] = feature
+            return self._commit(
+                UpdateKind.FEATURE,
+                feature.feature_id,
+                timestamp=commit_time,
+                previous_state_digest=previous_state,
+            )
 
     def record_hypothesis(self, hypothesis: Hypothesis) -> UpdateRecord:
-        commit_time = self._reject_stale(hypothesis.provenance)
-        self._reject_duplicate(hypothesis.hypothesis_id)
-        self._require_existing(hypothesis.feature_ids, self._features, kind="feature")
-        mismatched = [
-            feature_id
-            for feature_id in hypothesis.feature_ids
-            if self._features[feature_id].subject_id != hypothesis.subject_id
-        ]
-        if mismatched:
-            raise LearningEvidenceError(
-                "hypothesis subject must match every cited feature",
-                context={
-                    "reason": "subject_mismatch",
-                    "hypothesis_id": hypothesis.hypothesis_id,
-                    "mismatched_features": mismatched,
-                },
+        with self._lock:
+            commit_time = self._reject_stale(hypothesis.provenance)
+            self._reject_duplicate(hypothesis.hypothesis_id)
+            self._require_existing(
+                hypothesis.feature_ids,
+                self._features,
+                kind="feature",
             )
-        self._reject_hypothesis_contradiction(hypothesis)
-        self._hypotheses[hypothesis.hypothesis_id] = hypothesis
-        return self._commit(
-            UpdateKind.HYPOTHESIS,
-            hypothesis.hypothesis_id,
-            timestamp=commit_time,
-        )
+            mismatched = [
+                feature_id
+                for feature_id in hypothesis.feature_ids
+                if self._features[feature_id].subject_id != hypothesis.subject_id
+            ]
+            if mismatched:
+                raise LearningEvidenceError(
+                    "hypothesis subject must match every cited feature",
+                    context={
+                        "reason": "subject_mismatch",
+                        "hypothesis_id": hypothesis.hypothesis_id,
+                        "mismatched_features": mismatched,
+                    },
+                )
+            self._reject_hypothesis_contradiction(hypothesis)
+            previous_state = self._state_digest()
+            self._hypotheses[hypothesis.hypothesis_id] = hypothesis
+            return self._commit(
+                UpdateKind.HYPOTHESIS,
+                hypothesis.hypothesis_id,
+                timestamp=commit_time,
+                previous_state_digest=previous_state,
+            )
 
     def record_prediction(self, prediction: Prediction) -> UpdateRecord:
-        commit_time = self._reject_stale(prediction.provenance)
-        self._reject_duplicate(prediction.prediction_id)
-        self._require_existing((prediction.hypothesis_id,), self._hypotheses, kind="hypothesis")
-        existing = [
-            item
-            for item in self._predictions.values()
-            if item.hypothesis_id == prediction.hypothesis_id
-            and not _values_equal(item.expected, prediction.expected)
-        ]
-        if existing:
-            raise LearningEvidenceError(
-                "contradictory prediction for the same hypothesis",
-                context={
-                    "reason": "contradictory_signal",
-                    "hypothesis_id": prediction.hypothesis_id,
-                    "existing": existing[0].expected,
-                    "incoming": prediction.expected,
-                },
+        with self._lock:
+            commit_time = self._reject_stale(prediction.provenance)
+            self._reject_duplicate(prediction.prediction_id)
+            self._require_existing(
+                (prediction.hypothesis_id,),
+                self._hypotheses,
+                kind="hypothesis",
             )
-        self._predictions[prediction.prediction_id] = prediction
-        return self._commit(
-            UpdateKind.PREDICTION,
-            prediction.prediction_id,
-            timestamp=commit_time,
-        )
+            existing = [
+                item
+                for item in self._predictions.values()
+                if item.hypothesis_id == prediction.hypothesis_id
+                and not _values_equal(item.expected, prediction.expected)
+            ]
+            if existing:
+                raise LearningEvidenceError(
+                    "contradictory prediction for the same hypothesis",
+                    context={
+                        "reason": "contradictory_signal",
+                        "hypothesis_id": prediction.hypothesis_id,
+                        "existing": existing[0].expected,
+                        "incoming": prediction.expected,
+                    },
+                )
+            previous_state = self._state_digest()
+            self._predictions[prediction.prediction_id] = prediction
+            return self._commit(
+                UpdateKind.PREDICTION,
+                prediction.prediction_id,
+                timestamp=commit_time,
+                previous_state_digest=previous_state,
+            )
 
     def record_outcome(self, outcome: Outcome) -> UpdateRecord:
-        commit_time = self._reject_stale(outcome.provenance)
-        self._reject_duplicate(outcome.outcome_id)
-        prediction = self._predictions.get(outcome.prediction_id)
-        if prediction is None:
-            raise LearningEvidenceError(
-                "outcome cites an unknown prediction",
-                context={"reason": "unknown_parent", "prediction_id": outcome.prediction_id},
+        with self._lock:
+            commit_time = self._reject_stale(outcome.provenance)
+            self._reject_duplicate(outcome.outcome_id)
+            prediction = self._predictions.get(outcome.prediction_id)
+            if prediction is None:
+                raise LearningEvidenceError(
+                    "outcome cites an unknown prediction",
+                    context={
+                        "reason": "unknown_parent",
+                        "prediction_id": outcome.prediction_id,
+                    },
+                )
+            derived = _values_equal(outcome.actual, prediction.expected)
+            if outcome.correct is not derived:
+                raise LearningEvidenceError(
+                    "outcome.correct contradicts the prediction comparison",
+                    context={
+                        "reason": "contradictory_signal",
+                        "outcome_id": outcome.outcome_id,
+                        "expected": prediction.expected,
+                        "actual": outcome.actual,
+                    },
+                )
+            previous_state = self._state_digest()
+            samples = self._samples.get(prediction.channel, ()) + (
+                (prediction.confidence, outcome.correct),
             )
-        derived = _values_equal(outcome.actual, prediction.expected)
-        if outcome.correct is not derived:
-            raise LearningEvidenceError(
-                "outcome.correct contradicts the prediction comparison",
-                context={
-                    "reason": "contradictory_signal",
-                    "outcome_id": outcome.outcome_id,
-                    "expected": prediction.expected,
-                    "actual": outcome.actual,
-                },
+            self._samples[prediction.channel] = samples
+            self._calibrations[prediction.channel] = _summarize_calibration(
+                prediction.channel,
+                samples,
+                last_outcome_id=outcome.outcome_id,
+                stated_confidence=prediction.confidence,
             )
-        samples = self._samples.get(prediction.channel, ()) + ((prediction.confidence, outcome.correct),)
-        self._samples[prediction.channel] = samples
-        self._calibrations[prediction.channel] = _summarize_calibration(
-            prediction.channel,
-            samples,
-            last_outcome_id=outcome.outcome_id,
-            stated_confidence=prediction.confidence,
-        )
-        self._outcomes[outcome.outcome_id] = outcome
-        return self._commit(
-            UpdateKind.OUTCOME,
-            outcome.outcome_id,
-            timestamp=commit_time,
-        )
+            self._outcomes[outcome.outcome_id] = outcome
+            return self._commit(
+                UpdateKind.OUTCOME,
+                outcome.outcome_id,
+                timestamp=commit_time,
+                previous_state_digest=previous_state,
+            )
 
     def rollback(
         self,
