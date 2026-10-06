@@ -32,6 +32,22 @@ SUMMARY_FIELDS = {
     "evaluations": 6,
     "existing_evidence": 8,
 }
+LEVEL_REQUIRED_CONCEPTS = {
+    "L00": (("canonical",), ("owner",)),
+    "L01": (("depend",), ("architecture",)),
+    "L02": (("contract",), ("migration",), ("canonical",)),
+    "L03": (("principal", "tenant"), ("budget",), ("idempotency",)),
+    "L04": (("cancel",), ("bounded",)),
+    "L05": (("authoritative",), ("derived",), ("retention", "deletion")),
+    "L06": (("untrusted", "zero-trust"), ("tenant",), ("secret", "protected")),
+    "L07": (("retry",), ("crash",), ("replay",), ("recovery",)),
+    "L08": (("telemetry",), ("p95", "p99"), ("reconstruct",)),
+    "L09": (("saturation",), ("resource",), ("baseline", "comparator")),
+    "L10": (("adversarial",), ("verification",), ("independent", "separated")),
+    "L11": (("rollback",), ("migration",), ("canary",)),
+    "L12": (("operator",), ("preflight",), ("receipt",)),
+    "L13": (("enterprise",), ("target",), ("grade",)),
+}
 
 
 class ImplementationNotesError(RuntimeError):
@@ -194,6 +210,14 @@ def _validate_dossier(
             raise ImplementationNotesError(
                 f"{ref}.{level_id} acceptance criteria are too shallow"
             )
+
+        semantic_blob = "\n".join((*notes, *acceptance)).lower()
+        for alternatives in LEVEL_REQUIRED_CONCEPTS[level_id]:
+            if not any(token in semantic_blob for token in alternatives):
+                raise ImplementationNotesError(
+                    f"{ref}.{level_id} missing required concept family "
+                    f"{alternatives!r}"
+                )
 
     _text_list(
         dossier.get("evidence_policy"),
