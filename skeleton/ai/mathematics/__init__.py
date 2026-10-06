@@ -166,6 +166,7 @@ from .linear import (
 )
 from .lu import InverseReport, LUReport, determinant, lu_decompose, lu_solve, matrix_inverse
 from .krylov import ArnoldiReport, GMRESReport, arnoldi_iteration, gmres
+from .isotonic import IsotonicBlock, IsotonicReport, isotonic_regression
 from .kernels import (
     centered_gram,
     gram_matrix,
@@ -196,6 +197,12 @@ from .numerics import (
     stable_softmax,
 )
 from .online_stats import RunningCovariance, RunningMoments
+from .hypothesis import (
+    ChiSquareReport,
+    TwoSampleKSReport,
+    chi_square_goodness_of_fit,
+    two_sample_ks,
+)
 from .optimization2 import (
     AdvancedOptimizationResult,
     AdvancedOptimizationStep,
@@ -209,6 +216,15 @@ from .optimization import (
     finite_difference_gradient,
     project,
     projected_gradient_descent,
+)
+from .proximal import (
+    group_l2_shrinkage,
+    project_l1_ball,
+    project_l2_ball,
+    project_linf_ball,
+    proximal_elastic_net,
+    soft_threshold,
+    soft_threshold_vector,
 )
 from .probability import (
     cross_entropy,
@@ -308,6 +324,12 @@ from .signal2 import (
     linear_detrend,
     moving_average,
     moving_rms,
+)
+from .smoothing import (
+    LocalPolynomialReport,
+    local_polynomial_smooth,
+    savitzky_golay_derivative,
+    savitzky_golay_smooth,
 )
 from .special_functions import (
     inverse_softplus,
@@ -499,6 +521,9 @@ __all__ = [
     "GMRESReport",
     "arnoldi_iteration",
     "gmres",
+    "IsotonicBlock",
+    "IsotonicReport",
+    "isotonic_regression",
     "centered_gram",
     "gram_matrix",
     "laplacian_kernel",
@@ -525,6 +550,10 @@ __all__ = [
     "stable_softmax",
     "RunningCovariance",
     "RunningMoments",
+    "ChiSquareReport",
+    "TwoSampleKSReport",
+    "chi_square_goodness_of_fit",
+    "two_sample_ks",
     "AdvancedOptimizationResult",
     "AdvancedOptimizationStep",
     "bfgs",
@@ -535,6 +564,13 @@ __all__ = [
     "finite_difference_gradient",
     "project",
     "projected_gradient_descent",
+    "group_l2_shrinkage",
+    "project_l1_ball",
+    "project_l2_ball",
+    "project_linf_ball",
+    "proximal_elastic_net",
+    "soft_threshold",
+    "soft_threshold_vector",
     "cross_entropy",
     "effective_sample_size",
     "entropy",
@@ -616,6 +652,10 @@ __all__ = [
     "linear_detrend",
     "moving_average",
     "moving_rms",
+    "LocalPolynomialReport",
+    "local_polynomial_smooth",
+    "savitzky_golay_derivative",
+    "savitzky_golay_smooth",
     "inverse_softplus",
     "log1mexp",
     "log_cosh",

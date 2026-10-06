@@ -79,6 +79,10 @@ model authority boundaries.
 - `tridiagonal.py` — Thomas solves and products with effective-pivot and residual diagnostics.
 - `matrix_algebra2.py` — identity/trace/Frobenius/Kronecker/powers and stable signed log determinants.
 - `matrix_functions.py` — scaling-and-squaring matrix exponential with convergence evidence.
+- `isotonic.py` — weighted pool-adjacent-violators monotone regression with explicit block evidence.
+- `proximal.py` — soft/group shrinkage plus L1/L2/L-infinity projections and elastic-net proximal maps.
+- `hypothesis.py` — two-sample KS and chi-square goodness-of-fit statistics with bounded p-values.
+- `smoothing.py` — local polynomial and Savitzky-Golay-style smoothing/derivative references.
 - `validation.py` — parity evidence against existing optimized runtime kernels.
 
 ## Guarantees
@@ -135,6 +139,10 @@ model authority boundaries.
 - Tridiagonal solves expose the smallest effective pivot and reject unstable elimination.
 - Matrix algebra separates stable signed log-determinants from overflow-prone raw determinants.
 - Matrix exponential scaling/Taylor/squaring exposes convergence, term count and scaling depth.
+- Isotonic regression keeps its pooled monotone blocks and weighted residual objective inspectable.
+- Proximal operators make norm-ball constraints and regularization weights explicit rather than hiding optimizer policy.
+- Hypothesis diagnostics expose the statistic, degrees/sample counts and bounded asymptotic probability evidence.
+- Local polynomial smoothing fits edge windows explicitly rather than silently truncating kernels.
 - `audit_runtime_kernels()` compares optimized runtime softmax, matmul and attention against
   this reference substrate without replacing those kernels.
 
