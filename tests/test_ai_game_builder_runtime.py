@@ -139,7 +139,8 @@ def _evaluator_provenance(
         execution_id=f"execution:{evaluator_id}",
         execution_identity_digest=canonical_digest({"execution": evaluator_id}),
         finalization_intent_digest=canonical_digest({"finalization": evaluator_id}),
-        model_identity_digest=canonical_digest({"model": evaluator_id}),
+        authority_kind="ai_execution",
+        authority_identity_digest=canonical_digest({"model": evaluator_id}),
         method_id=method_id,
         source_revision=canonical_digest({"source": evaluator_id})[:40],
         provider_receipt_refs=(f"provider-receipt:{evaluator_id}",),
@@ -276,6 +277,44 @@ def test_gate_result_rejects_non_boolean_authority_states(
     kwargs[field] = value
     with pytest.raises(TypeError, match=message):
         GateResult(**kwargs)
+
+
+def test_gate_rejects_evidence_not_emitted_by_evaluator_execution() -> None:
+    provenance = _evaluator_provenance(
+        "gate-substitution-judge",
+        evidence_refs=("gate-produced-evidence-0000000000000",),
+    )
+    with pytest.raises(
+        ValueError,
+        match="gate evidence must be referenced by evaluator execution output",
+    ):
+        GateResult(
+            "rights",
+            True,
+            "gate-substituted-evidence-0000000000",
+            evaluator_provenance=provenance,
+        )
+
+
+def test_promotion_rejects_authority_evidence_not_emitted_by_adjudicator() -> None:
+    incumbent = _candidate("seed", "authority-seed", quality=_quality(0.4))
+    forge = DualRivalForge(effort_mode=100, champion=incumbent)
+    built = _candidate(Rival.A.value, "authority-built", quality=_quality(0.5))
+    forge.submit_construct(built)
+    challenge = _challenge(Rival.B, built, "authority-challenge")
+    forge.submit_attack(challenge)
+    provenance, _ = _adjudicator("authority-judge")
+    with pytest.raises(
+        ValueError,
+        match="promotion authority evidence must be referenced",
+    ):
+        forge.reconcile(
+            submitted=challenge.improved_candidate,
+            evaluator_id="authority-judge",
+            evaluator_provenance=provenance,
+            authority_evidence_digest="authority-substituted-000000000000000",
+            gate_results=_gates(),
+        )
 
 
 def test_duplicate_gate_ids_are_rejected_before_promotion() -> None:
