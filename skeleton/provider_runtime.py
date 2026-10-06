@@ -280,6 +280,7 @@ class ProviderImageRequest:
     estimated_cost_usd: float = 0.0
     resource_budget: ResourceBudget = field(default_factory=ResourceBudget)
     governance_context: GovernanceContext | None = None
+    deadline: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -312,6 +313,7 @@ class ProviderSpeechRequest:
     estimated_cost_usd: float = 0.0
     resource_budget: ResourceBudget = field(default_factory=ResourceBudget)
     governance_context: GovernanceContext | None = None
+    deadline: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -424,8 +426,9 @@ class ProviderAdapter(ABC):
         data_class: str = "internal",
         tenant_id: str | None = None,
         operation_id: str | None = None,
+        deadline: datetime | None = None,
     ) -> ProviderImageResponse:
-        del image, count, size, data_class, tenant_id, operation_id
+        del image, count, size, data_class, tenant_id, operation_id, deadline
         raise ProviderUnavailableError(
             f"provider does not implement image variation: {self.provider_id}"
         )
@@ -440,6 +443,7 @@ class ProviderAdapter(ABC):
         data_class: str = "internal",
         tenant_id: str | None = None,
         operation_id: str | None = None,
+        deadline: datetime | None = None,
     ) -> ProviderImageResponse:
         del image, prompt, mask, size, data_class, tenant_id, operation_id
         raise ProviderUnavailableError(
@@ -617,6 +621,7 @@ class FailoverProviderAdapter(ProviderAdapter):
         data_class: str = "internal",
         tenant_id: str | None = None,
         operation_id: str | None = None,
+        deadline: datetime | None = None,
     ) -> ProviderImageResponse:
         return await self.primary.create_image_variation(
             image,
@@ -625,6 +630,7 @@ class FailoverProviderAdapter(ProviderAdapter):
             data_class=data_class,
             tenant_id=tenant_id,
             operation_id=operation_id,
+            deadline=deadline,
         )
 
     async def edit_image(
@@ -637,6 +643,7 @@ class FailoverProviderAdapter(ProviderAdapter):
         data_class: str = "internal",
         tenant_id: str | None = None,
         operation_id: str | None = None,
+        deadline: datetime | None = None,
     ) -> ProviderImageResponse:
         return await self.primary.edit_image(
             image,
@@ -646,6 +653,7 @@ class FailoverProviderAdapter(ProviderAdapter):
             data_class=data_class,
             tenant_id=tenant_id,
             operation_id=operation_id,
+            deadline=deadline,
         )
 
     async def synthesize_speech(
@@ -876,26 +884,80 @@ def _provider_structured_output_payload(
     }
 
 
-def _remaining_provider_timeout(
-    request: ProviderRequest,
+def _remaining_deadline_timeout(
+    deadline: datetime | None,
     configured_timeout: float,
+    *,
+    label: str,
+    now: datetime | None = None,
 ) -> float:
+    """Return a hard per-call timeout bounded by an optional absolute deadline."""
+
     timeout = float(configured_timeout)
-    if request.deadline is None:
+    if not math.isfinite(timeout) or timeout <= 0:
+        raise ProviderPolicyError(f"{label} timeout must be finite and positive")
+    if deadline is None:
         return timeout
-    deadline = request.deadline
     if (
         not isinstance(deadline, datetime)
         or deadline.tzinfo is None
         or deadline.utcoffset() is None
     ):
-        raise ProviderPolicyError("model provider deadline must be timezone-aware")
+        raise ProviderPolicyError(f"{label} deadline must be timezone-aware")
+    instant = datetime.now(timezone.utc) if now is None else now
+    if instant.tzinfo is None or instant.utcoffset() is None:
+        raise ProviderPolicyError(f"{label} clock must be timezone-aware")
     remaining = (
-        deadline.astimezone(timezone.utc) - datetime.now(timezone.utc)
+        deadline.astimezone(timezone.utc)
+        - instant.astimezone(timezone.utc)
     ).total_seconds()
     if remaining <= 0:
-        raise ProviderInvocationError("model provider deadline exceeded")
+        raise ProviderInvocationError(f"{label} deadline exceeded")
     return max(0.001, min(timeout, remaining))
+
+
+def _remaining_provider_timeout(
+    request: ProviderRequest,
+    configured_timeout: float,
+) -> float:
+    return _remaining_deadline_timeout(
+        request.deadline,
+        configured_timeout,
+        label="model provider",
+    )
+
+
+async def _await_bounded_provider_call(
+    factory: Callable[[], Any],
+    *,
+    deadline: datetime | None,
+    configured_timeout: float,
+    label: str,
+) -> Any:
+    """Execute one provider coroutine under a hard timeout/deadline fence.
+
+    The factory is invoked only after the deadline is proven live, so expired
+    work never reaches provider I/O. Timeout cancellation is translated into a
+    provider-boundary error while external task cancellation is deliberately
+    allowed to propagate unchanged.
+    """
+
+    if not callable(factory):
+        raise TypeError("provider call factory must be callable")
+    timeout = _remaining_deadline_timeout(
+        deadline,
+        configured_timeout,
+        label=label,
+    )
+    try:
+        awaitable = factory()
+        if not inspect.isawaitable(awaitable):
+            raise ProviderInvocationError(
+                f"{label} call factory did not return an awaitable"
+            )
+        return await asyncio.wait_for(awaitable, timeout=timeout)
+    except asyncio.TimeoutError as exc:
+        raise ProviderInvocationError(f"{label} deadline exceeded") from exc
 
 
 def _provider_field(value: object, key: str, default: object = None) -> object:
@@ -2211,14 +2273,12 @@ class OpenAIProviderAdapter(ProviderAdapter):
             )
             try:
                 dispatched = True
-                response = await asyncio.wait_for(
-                    client.responses.create(**kwargs),
-                    timeout=timeout_seconds,
+                response = await _await_bounded_provider_call(
+                    lambda: client.responses.create(**kwargs),
+                    deadline=request.deadline,
+                    configured_timeout=timeout_seconds,
+                    label="model provider",
                 )
-            except asyncio.TimeoutError as exc:
-                raise ProviderInvocationError(
-                    "model provider deadline exceeded"
-                ) from exc
             except ProviderError:
                 raise
             except Exception as exc:
@@ -2313,6 +2373,16 @@ class OpenAIProviderAdapter(ProviderAdapter):
         if request.quality not in {"standard", "hd", "low", "medium", "high", "auto"}:
             raise ProviderInvocationError("image provider quality is unsupported")
 
+        media_timeout = _remaining_deadline_timeout(
+            request.deadline,
+            self.timeout_seconds,
+            label="image provider",
+        )
+        media_timeout = _remaining_deadline_timeout(
+            request.deadline,
+            self.timeout_seconds,
+            label="speech provider",
+        )
         governance, lease, estimate = _require_media_policy(
             provider_id=self.provider_id,
             purpose=request.purpose,
@@ -2323,7 +2393,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
             estimated_cost_usd=request.estimated_cost_usd,
             resource_budget=request.resource_budget,
             governance_context=request.governance_context,
-            timeout_seconds=self.timeout_seconds,
+            timeout_seconds=media_timeout,
             provider_attempts=self.max_retries + 1,
             output_tokens=request.count,
             admission_runtime=self.admission_runtime,
@@ -2334,13 +2404,18 @@ class OpenAIProviderAdapter(ProviderAdapter):
             client = self._get_client()
             try:
                 dispatched = True
-                response = await client.images.generate(
-                    model=request.model,
-                    prompt=request.prompt,
-                    size=request.size,
-                    quality=request.quality,
-                    n=request.count,
-                    response_format="b64_json",
+                response = await _await_bounded_provider_call(
+                    lambda: client.images.generate(
+                        model=request.model,
+                        prompt=request.prompt,
+                        size=request.size,
+                        quality=request.quality,
+                        n=request.count,
+                        response_format="b64_json",
+                    ),
+                    deadline=request.deadline,
+                    configured_timeout=self.timeout_seconds,
+                    label="image provider",
                 )
             except ProviderError:
                 raise
@@ -2401,6 +2476,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
         data_class: str = "internal",
         tenant_id: str | None = None,
         operation_id: str | None = None,
+        deadline: datetime | None = None,
     ) -> ProviderImageResponse:
         if not isinstance(image, bytes) or not image:
             raise ProviderInvocationError("image variation source must be non-empty bytes")
@@ -2411,6 +2487,11 @@ class OpenAIProviderAdapter(ProviderAdapter):
         if size not in {"256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"}:
             raise ProviderInvocationError("image variation size is unsupported")
 
+        media_timeout = _remaining_deadline_timeout(
+            deadline,
+            self.timeout_seconds,
+            label="image variation provider",
+        )
         governance, lease, estimate = _require_media_policy(
             provider_id=self.provider_id,
             purpose="image-variation",
@@ -2420,7 +2501,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
             content=image,
             estimated_cost_usd=0.0,
             resource_budget=ResourceBudget(),
-            timeout_seconds=self.timeout_seconds,
+            timeout_seconds=media_timeout,
             provider_attempts=self.max_retries + 1,
             output_tokens=count,
             admission_runtime=self.admission_runtime,
@@ -2433,11 +2514,16 @@ class OpenAIProviderAdapter(ProviderAdapter):
             client = self._get_client()
             try:
                 dispatched = True
-                response = await client.images.create_variation(
-                    image=source,
-                    n=count,
-                    size=size,
-                    response_format="b64_json",
+                response = await _await_bounded_provider_call(
+                    lambda: client.images.create_variation(
+                        image=source,
+                        n=count,
+                        size=size,
+                        response_format="b64_json",
+                    ),
+                    deadline=deadline,
+                    configured_timeout=self.timeout_seconds,
+                    label="image variation provider",
                 )
             except Exception as exc:
                 raise ProviderInvocationError("image variation request failed") from exc
@@ -2497,6 +2583,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
         data_class: str = "internal",
         tenant_id: str | None = None,
         operation_id: str | None = None,
+        deadline: datetime | None = None,
     ) -> ProviderImageResponse:
         if not isinstance(image, bytes) or not image:
             raise ProviderInvocationError("image edit source must be non-empty bytes")
@@ -2514,6 +2601,11 @@ class OpenAIProviderAdapter(ProviderAdapter):
         if size not in {"256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"}:
             raise ProviderInvocationError("image edit size is unsupported")
 
+        media_timeout = _remaining_deadline_timeout(
+            deadline,
+            self.timeout_seconds,
+            label="image edit provider",
+        )
         governance, lease, estimate = _require_media_policy(
             provider_id=self.provider_id,
             purpose="image-edit",
@@ -2523,7 +2615,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
             content=image + prompt.encode("utf-8"),
             estimated_cost_usd=0.0,
             resource_budget=ResourceBudget(),
-            timeout_seconds=self.timeout_seconds,
+            timeout_seconds=media_timeout,
             provider_attempts=self.max_retries + 1,
             admission_runtime=self.admission_runtime,
         )
@@ -2546,7 +2638,12 @@ class OpenAIProviderAdapter(ProviderAdapter):
             client = self._get_client()
             try:
                 dispatched = True
-                response = await client.images.edit(**kwargs)
+                response = await _await_bounded_provider_call(
+                    lambda: client.images.edit(**kwargs),
+                    deadline=deadline,
+                    configured_timeout=self.timeout_seconds,
+                    label="image edit provider",
+                )
             except Exception as exc:
                 raise ProviderInvocationError("image edit request failed") from exc
             images = _extract_b64_images(response, fallback_prompt=prompt)
@@ -2625,7 +2722,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
             estimated_cost_usd=request.estimated_cost_usd,
             resource_budget=request.resource_budget,
             governance_context=request.governance_context,
-            timeout_seconds=self.timeout_seconds,
+            timeout_seconds=media_timeout,
             provider_attempts=self.max_retries + 1,
             admission_runtime=self.admission_runtime,
         )
@@ -2635,12 +2732,17 @@ class OpenAIProviderAdapter(ProviderAdapter):
             client = self._get_client()
             try:
                 dispatched = True
-                response = await client.audio.speech.create(
-                    model=request.model,
-                    voice=request.voice,
-                    input=request.text,
-                    speed=speed,
-                    response_format=request.response_format,
+                response = await _await_bounded_provider_call(
+                    lambda: client.audio.speech.create(
+                        model=request.model,
+                        voice=request.voice,
+                        input=request.text,
+                        speed=speed,
+                        response_format=request.response_format,
+                    ),
+                    deadline=request.deadline,
+                    configured_timeout=self.timeout_seconds,
+                    label="speech provider",
                 )
                 raw = getattr(response, "content", None)
                 if raw is None:
@@ -2649,7 +2751,12 @@ class OpenAIProviderAdapter(ProviderAdapter):
                         raise ProviderInvocationError("speech provider returned malformed response")
                     raw = reader()
                     if inspect.isawaitable(raw):
-                        raw = await raw
+                        raw = await _await_bounded_provider_call(
+                            lambda: raw,
+                            deadline=request.deadline,
+                            configured_timeout=self.timeout_seconds,
+                            label="speech provider response read",
+                        )
             except ProviderError:
                 raise
             except Exception as exc:
@@ -2751,8 +2858,9 @@ class OpenAICompatibleSecondaryAdapter(OpenAIProviderAdapter):
         data_class: str = "internal",
         tenant_id: str | None = None,
         operation_id: str | None = None,
+        deadline: datetime | None = None,
     ) -> ProviderImageResponse:
-        del image, count, size, data_class, tenant_id, operation_id
+        del image, count, size, data_class, tenant_id, operation_id, deadline
         raise ProviderUnavailableError(
             "secondary provider capability is not declared: image-variation"
         )
@@ -2767,8 +2875,9 @@ class OpenAICompatibleSecondaryAdapter(OpenAIProviderAdapter):
         data_class: str = "internal",
         tenant_id: str | None = None,
         operation_id: str | None = None,
+        deadline: datetime | None = None,
     ) -> ProviderImageResponse:
-        del image, prompt, mask, size, data_class, tenant_id, operation_id
+        del image, prompt, mask, size, data_class, tenant_id, operation_id, deadline
         raise ProviderUnavailableError(
             "secondary provider capability is not declared: image-editing"
         )
