@@ -35,7 +35,9 @@
     "skeleton/ai/assistant/turn_runtime.py",
     "skeleton/persistence/chat_turn_repository.py",
     "backend/core/chat_turns.py",
-    "skeleton/ai/assistant/streaming.py"
+    "skeleton/ai/assistant/streaming.py",
+    "backend/core/chat_turn_lifecycle.py",
+    "backend/routes/ai.py"
   ],
   "tests": [
     "skeleton/testing/test_ai_assistant_routing.py",
@@ -46,7 +48,8 @@
     "skeleton/testing/test_ai_chat_turn_runtime.py",
     "skeleton/testing/test_ai_chat_turn_repository.py",
     "backend/tests/test_ai_chat_turn_persistence.py",
-    "skeleton/testing/test_ai_chat_streaming.py"
+    "skeleton/testing/test_ai_chat_streaming.py",
+    "backend/tests/test_ai_chat_live_turn_cutover.py"
   ],
   "integration": {
     "existing_cognitive_runtime": "skeleton/ai/runtime/intelligence/execution_runtime.py",
@@ -64,7 +67,10 @@
     "chat_turn_rule": "digest-chained durable state coordinates assistant execution without owning provider or privileged tool authority",
     "chat_turn_portable_repository": "skeleton/persistence/chat_turn_repository.py",
     "chat_turn_production_authority": "backend/core/chat_turns.py",
-    "chat_stream_projection": "skeleton/ai/assistant/streaming.py"
+    "chat_stream_projection": "skeleton/ai/assistant/streaming.py",
+    "chat_live_lifecycle": "backend/core/chat_turn_lifecycle.py",
+    "chat_live_route": "backend/routes/ai.py",
+    "chat_live_events": "GET /ai/chat/turns/{thread_id}/events"
   },
   "explicit_exclusions": [
     "vendor model weights",
