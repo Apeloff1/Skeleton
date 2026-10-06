@@ -54,7 +54,7 @@ def _sha(name: str, value: object) -> str:
 
 def _artifact_path(name: str, value: object) -> str:
     path = _text(name, value, maximum=2048)
-    if "\\x00" in path or "\\" in path:
+    if value != path or "\x00" in path or "\\" in path:
         raise ModelIdentityError(f"{name} must be a canonical artifact-relative path")
     pure = PurePosixPath(path)
     parts = pure.parts
