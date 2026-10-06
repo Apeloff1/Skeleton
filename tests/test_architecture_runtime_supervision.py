@@ -127,6 +127,47 @@ class RuntimeSupervisionTests(unittest.TestCase):
         ):
             MODULE.validate(root)
 
+    def test_rejects_missing_capability_derived_engine_operation(self) -> None:
+        root = self._fixture()
+        path = root / "machine/runtime_supervision.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        connector = next(
+            item for item in data["connectors"]
+            if item["id"] == "engine-runtime"
+        )
+        connector["operations"] = [
+            item for item in connector["operations"]
+            if item["id"] != "speech-synthesis"
+        ]
+        path.write_text(json.dumps(data), encoding="utf-8")
+
+        with self.assertRaisesRegex(
+            MODULE.RuntimeSupervisionError,
+            "engine-runtime operation coverage drift",
+        ):
+            MODULE.validate(root)
+
+    def test_rejects_unbounded_engine_operation(self) -> None:
+        root = self._fixture()
+        path = root / "machine/runtime_supervision.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        connector = next(
+            item for item in data["connectors"]
+            if item["id"] == "engine-runtime"
+        )
+        operation = next(
+            item for item in connector["operations"]
+            if item["id"] == "image-editing"
+        )
+        operation["bounded_timeout"] = False
+        path.write_text(json.dumps(data), encoding="utf-8")
+
+        with self.assertRaisesRegex(
+            MODULE.RuntimeSupervisionError,
+            "image-editing must have a bounded timeout",
+        ):
+            MODULE.validate(root)
+
     def test_rejects_governed_lifecycle_mirror_drift(self) -> None:
         root = self._fixture()
         path = root / "skeleton/ai/runtime/kernel/runtime_supervision.py"
