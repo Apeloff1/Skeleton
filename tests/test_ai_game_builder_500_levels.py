@@ -32,8 +32,8 @@ def _fixture(tmp_path: Path) -> Path:
         "skeleton/ai/game_builder/canon.py",
         "skeleton/ai/game_builder/rights.py",
         "skeleton/ai/game_builder/atomizer.py",
-        "skeleton/testing/test_ai_game_builder_contracts.py",
-        "skeleton/testing/test_ai_game_builder_governance.py",
+        "tests/test_ai_game_builder_runtime.py",
+        "tests/test_ai_game_builder_governance.py",
         *manifest["shards"],
     ]
     for relative in paths:
@@ -218,7 +218,7 @@ def test_governance_runtime_and_protected_quality_axes_are_bound() -> None:
         "canon": "skeleton/ai/game_builder/canon.py",
         "rights": "skeleton/ai/game_builder/rights.py",
         "atom_lineage": "skeleton/ai/game_builder/atomizer.py",
-        "tests": "skeleton/testing/test_ai_game_builder_governance.py",
+        "tests": "tests/test_ai_game_builder_governance.py",
     }
     for axis in ("security/privacy", "state integrity", "reproducibility"):
         assert axis in duel["quality_vector"]
