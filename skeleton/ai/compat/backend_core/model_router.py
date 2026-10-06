@@ -171,7 +171,7 @@ class RouteRequest:
         task_type: str,
         governance: GovernanceContext,
         *,
-        budget: ResourceBudget | None = None,
+        budget: ResourceBudget | ExecutionBudget | None = None,
         context_tokens: int = 0,
         expected_output_tokens: int | None = None,
         **kwargs: Any,
@@ -193,6 +193,15 @@ class RouteRequest:
             "governance_tenant_id": governance.tenant_id,
             "governance_purpose": governance.purpose,
         }
+        if isinstance(budget, ExecutionBudget):
+            return cls.from_turn_budget(
+                task_type,
+                budget,
+                context_tokens=context_tokens,
+                expected_output_tokens=expected_output_tokens,
+                **governed,
+                **kwargs,
+            )
         if budget is not None:
             return cls.from_resource_budget(
                 task_type,
