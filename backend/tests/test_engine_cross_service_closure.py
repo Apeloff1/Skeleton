@@ -541,6 +541,51 @@ async def test_stale_task_callback_cannot_release_newer_generation_lease(
 
 
 @pytest.mark.asyncio
+async def test_coordinator_lease_integrity_fault_poisoning_is_fail_closed(
+    tmp_path,
+) -> None:
+    service = _service(tmp_path)
+    lifecycle = RuntimeServiceLifecycle("skeleton")
+    lifecycle.mark_ready(reason="test-ready")
+    coordinator = EngineExecutionCoordinator(
+        service,
+        provider_registry=_Registry(object()),
+        lifecycle=lifecycle,
+    )
+
+    task = asyncio.create_task(asyncio.sleep(0))
+    await task
+    lease = lifecycle.acquire_work("engine-execution:fault-test")
+    coordinator._lifecycle_leases[task] = lease
+
+    # Simulate external corruption of lifecycle accounting. The coordinator
+    # must detect that its exact task lease vanished and poison new admission.
+    assert lifecycle.release_work(lease) is True
+    coordinator._task_done("fault-test", task)
+
+    snapshot = coordinator.supervision_snapshot()
+    assert snapshot["faulted"] is True
+    assert snapshot["active_lease_count"] == 0
+    assert snapshot["supervision_faults"]
+
+    command = _command(
+        _context(),
+        idempotency_key="fault-poisoning",
+    )
+    with pytest.raises(
+        EngineExecutionCoordinatorError,
+        match="supervision is faulted",
+    ):
+        await coordinator.ensure_started(command)
+
+    with pytest.raises(
+        EngineExecutionCoordinatorError,
+        match="shutdown supervision failed",
+    ):
+        await coordinator.shutdown()
+
+
+@pytest.mark.asyncio
 async def test_engine_lifecycle_draining_fences_new_execution_and_drains_lease(
     tmp_path,
 ) -> None:
