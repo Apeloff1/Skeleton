@@ -605,5 +605,6 @@
     "dual_rival_state_machine": "skeleton/ai/game_builder/dual_rival_forge.py",
     "tests": "skeleton/testing/test_ai_game_builder_contracts.py"
   },
-  "overengineering_rule": "Every family must inherit the critical cross-cutting planes and at least the configured minimum plane coverage; plane evidence is additive to level-specific evidence and cannot weaken a GBL hard gate."
+  "overengineering_rule": "Every family must inherit the critical cross-cutting planes and at least the configured minimum plane coverage; plane evidence is additive to level-specific evidence and cannot weaken a GBL hard gate.",
+  "overengineering_human_spec": "docs/architecture/AI_GAME_BUILDER_OVERENGINEERING.md"
 }
