@@ -462,10 +462,87 @@ class Challenge:
 
 
 @dataclass(frozen=True, slots=True)
+class EvaluatorProvenance:
+    """Immutable execution identity for independent evaluation authority."""
+
+    evaluator_id: str
+    operation_id: str
+    execution_id: str
+    execution_identity_digest: str
+    finalization_intent_digest: str
+    model_identity_digest: str
+    method_id: str
+    source_revision: str
+    provider_receipt_refs: tuple[str, ...] = ()
+    output_evidence_refs: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        for name in ("evaluator_id", "operation_id", "execution_id", "method_id"):
+            object.__setattr__(
+                self,
+                name,
+                _normalized_identity_text(name, getattr(self, name)),
+            )
+        if self.evaluator_id in {Rival.A.value, Rival.B.value}:
+            raise ValueError("evaluator provenance must be independent from both rivals")
+        for name in (
+            "execution_identity_digest",
+            "finalization_intent_digest",
+            "model_identity_digest",
+        ):
+            object.__setattr__(
+                self,
+                name,
+                _sha256_identity(name, getattr(self, name)),
+            )
+        if (
+            not isinstance(self.source_revision, str)
+            or len(self.source_revision) not in {40, 64}
+            or any(ch not in "0123456789abcdef" for ch in self.source_revision)
+        ):
+            raise ValueError("evaluator source_revision must be a lowercase git object id")
+        provider_refs = tuple(
+            _normalized_identity_text("provider_receipt_ref", ref, maximum=2048)
+            for ref in self.provider_receipt_refs
+        )
+        evidence_refs = tuple(
+            _normalized_identity_text("output_evidence_ref", ref, maximum=2048)
+            for ref in self.output_evidence_refs
+        )
+        if len(provider_refs) != len(set(provider_refs)):
+            raise ValueError("evaluator provider receipt refs must be unique")
+        if not evidence_refs:
+            raise ValueError("evaluator provenance requires output evidence refs")
+        if len(evidence_refs) != len(set(evidence_refs)):
+            raise ValueError("evaluator output evidence refs must be unique")
+        object.__setattr__(self, "provider_receipt_refs", provider_refs)
+        object.__setattr__(self, "output_evidence_refs", evidence_refs)
+
+    def to_payload(self) -> dict[str, object]:
+        return {
+            "evaluator_id": self.evaluator_id,
+            "execution_id": self.execution_id,
+            "execution_identity_digest": self.execution_identity_digest,
+            "finalization_intent_digest": self.finalization_intent_digest,
+            "method_id": self.method_id,
+            "model_identity_digest": self.model_identity_digest,
+            "operation_id": self.operation_id,
+            "output_evidence_refs": list(self.output_evidence_refs),
+            "provider_receipt_refs": list(self.provider_receipt_refs),
+            "source_revision": self.source_revision,
+        }
+
+    @property
+    def digest(self) -> str:
+        return canonical_digest(self.to_payload())
+
+
+@dataclass(frozen=True, slots=True)
 class GateResult:
     gate_id: str
     passed: bool
     evidence_digest: str
+    evaluator_provenance: EvaluatorProvenance
     non_compensable: bool = True
 
     def __post_init__(self) -> None:
@@ -475,8 +552,26 @@ class GateResult:
             raise TypeError("gate passed state must be boolean")
         if not isinstance(self.non_compensable, bool):
             raise TypeError("gate non_compensable state must be boolean")
+        if not isinstance(self.evaluator_provenance, EvaluatorProvenance):
+            raise TypeError("gate evaluator_provenance must be EvaluatorProvenance")
         if not isinstance(self.evidence_digest, str) or len(self.evidence_digest) < 16:
             raise ValueError("gate evidence must use a stable digest")
+        if self.evidence_digest not in self.evaluator_provenance.output_evidence_refs:
+            raise ValueError(
+                "gate evidence must be referenced by evaluator execution output"
+            )
+
+    @property
+    def evidence_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "evaluator_provenance_digest": self.evaluator_provenance.digest,
+                "evidence_digest": self.evidence_digest,
+                "gate_id": self.gate_id,
+                "non_compensable": self.non_compensable,
+                "passed": self.passed,
+            }
+        )
 
 
 def _promotion_decision_payload(
@@ -487,16 +582,29 @@ def _promotion_decision_payload(
     submitted_digest: str | None,
     promoted_digest: str,
     evaluator_id: str,
+    evaluator_provenance: EvaluatorProvenance,
+    authority_evidence_digest: str,
     gate_results: Sequence[GateResult],
     evaluated_submitted_quality: tuple[tuple[str, float], ...] | None,
+    evaluation_decision_digest: str | None,
     decision: str,
 ) -> dict[str, object]:
     return {
         "decision": decision,
         "effort_mode": int(effort_mode),
         "evaluator_id": evaluator_id,
+        "evaluator_provenance_digest": evaluator_provenance.digest,
+        "authority_evidence_digest": authority_evidence_digest,
+        "evaluation_decision_digest": evaluation_decision_digest,
         "gates": [
-            (gate.gate_id, gate.passed, gate.non_compensable, gate.evidence_digest)
+            {
+                "gate_id": gate.gate_id,
+                "passed": gate.passed,
+                "non_compensable": gate.non_compensable,
+                "evidence_digest": gate.evidence_digest,
+                "evidence_binding_digest": gate.evidence_binding_digest,
+                "evaluator_provenance_digest": gate.evaluator_provenance.digest,
+            }
             for gate in gate_results
         ],
         "incumbent": incumbent_digest,
@@ -519,8 +627,11 @@ class PromotionReceipt:
     submitted_digest: str | None
     promoted_digest: str
     evaluator_id: str
+    evaluator_provenance: EvaluatorProvenance
+    authority_evidence_digest: str
     gate_results: tuple[GateResult, ...]
     evaluated_submitted_quality: tuple[tuple[str, float], ...] | None
+    evaluation_decision_digest: str | None
     decision: str
     decision_digest: str
 
@@ -541,6 +652,28 @@ class PromotionReceipt:
             raise ValueError("promotion receipt evaluator_id must be non-empty")
         if self.evaluator_id in {Rival.A.value, Rival.B.value}:
             raise ValueError("promotion receipt evaluator must be independent from both rivals")
+        if not isinstance(self.evaluator_provenance, EvaluatorProvenance):
+            raise TypeError("promotion receipt evaluator_provenance must be EvaluatorProvenance")
+        if self.evaluator_provenance.evaluator_id != self.evaluator_id:
+            raise ValueError("promotion evaluator identity does not match evaluator provenance")
+        if (
+            not isinstance(self.authority_evidence_digest, str)
+            or len(self.authority_evidence_digest) < 16
+        ):
+            raise ValueError("promotion authority evidence must use a stable digest")
+        if (
+            self.authority_evidence_digest
+            not in self.evaluator_provenance.output_evidence_refs
+        ):
+            raise ValueError(
+                "promotion authority evidence must be referenced by evaluator execution output"
+            )
+        if self.evaluation_decision_digest is not None and (
+            not isinstance(self.evaluation_decision_digest, str)
+            or len(self.evaluation_decision_digest) != 64
+            or any(ch not in "0123456789abcdef" for ch in self.evaluation_decision_digest)
+        ):
+            raise ValueError("evaluation_decision_digest must be lowercase sha256")
         if any(not isinstance(gate, GateResult) for gate in self.gate_results):
             raise TypeError("promotion receipt gate_results must contain GateResult values")
         gate_ids = [gate.gate_id for gate in self.gate_results]
@@ -569,8 +702,11 @@ class PromotionReceipt:
             submitted_digest=self.submitted_digest,
             promoted_digest=self.promoted_digest,
             evaluator_id=self.evaluator_id,
+            evaluator_provenance=self.evaluator_provenance,
+            authority_evidence_digest=self.authority_evidence_digest,
             gate_results=self.gate_results,
             evaluated_submitted_quality=self.evaluated_submitted_quality,
+            evaluation_decision_digest=self.evaluation_decision_digest,
             decision=self.decision,
         )
 
@@ -585,9 +721,14 @@ class PromotionReceipt:
                 else None
             ),
             "evaluator_id": self.evaluator_id,
+            "evaluator_provenance": self.evaluator_provenance.to_payload(),
+            "authority_evidence_digest": self.authority_evidence_digest,
+            "evaluation_decision_digest": self.evaluation_decision_digest,
             "gate_results": [
                 {
                     "evidence_digest": gate.evidence_digest,
+                    "evidence_binding_digest": gate.evidence_binding_digest,
+                    "evaluator_provenance": gate.evaluator_provenance.to_payload(),
                     "gate_id": gate.gate_id,
                     "non_compensable": gate.non_compensable,
                     "passed": gate.passed,
@@ -658,14 +799,25 @@ def promotion_receipt(
     incumbent: Candidate,
     submitted: Candidate | None,
     evaluator_id: str,
+    evaluator_provenance: EvaluatorProvenance,
+    authority_evidence_digest: str,
     gate_results: Sequence[GateResult],
     protected_axes: Iterable[str] = PROTECTED_AXES,
     submitted_quality_override: Mapping[str, float] | None = None,
+    evaluation_decision_digest: str | None = None,
 ) -> PromotionReceipt:
     if round_index < 1 or round_index > effort_mode.rounds:
         raise ValueError("round index outside effort-mode bounds")
     if evaluator_id in {Rival.A.value, Rival.B.value} or not evaluator_id.strip():
         raise ValueError("promotion evaluator must be independent from both rivals")
+    if not isinstance(evaluator_provenance, EvaluatorProvenance):
+        raise TypeError("evaluator_provenance must be EvaluatorProvenance")
+    if evaluator_provenance.evaluator_id != evaluator_id:
+        raise ValueError("promotion evaluator identity does not match evaluator provenance")
+    if authority_evidence_digest not in evaluator_provenance.output_evidence_refs:
+        raise ValueError(
+            "promotion authority evidence must be referenced by evaluator execution output"
+        )
 
     gates = tuple(gate_results)
     if any(not isinstance(gate, GateResult) for gate in gates):
@@ -702,8 +854,11 @@ def promotion_receipt(
         submitted_digest=submitted.digest if submitted else None,
         promoted_digest=promoted.digest,
         evaluator_id=evaluator_id,
+        evaluator_provenance=evaluator_provenance,
+        authority_evidence_digest=authority_evidence_digest,
         gate_results=gates,
         evaluated_submitted_quality=evaluated_quality,
+        evaluation_decision_digest=evaluation_decision_digest,
         decision=decision,
     )
     return PromotionReceipt(
@@ -713,8 +868,11 @@ def promotion_receipt(
         submitted_digest=submitted.digest if submitted else None,
         promoted_digest=promoted.digest,
         evaluator_id=evaluator_id,
+        evaluator_provenance=evaluator_provenance,
+        authority_evidence_digest=authority_evidence_digest,
         gate_results=gates,
         evaluated_submitted_quality=evaluated_quality,
+        evaluation_decision_digest=evaluation_decision_digest,
         decision=decision,
         decision_digest=canonical_digest(payload),
     )
