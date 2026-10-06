@@ -303,6 +303,7 @@ async def test_chat_retry_after_assistant_commit_failure_preserves_engine_identi
         nonlocal terminal_result
         captured_commands.append(command)
         terminal_result = SimpleNamespace(
+            operation_id=command.operation.operation_id,
             final_output="Verified terminal answer.",
             execution_id=command.execution_request.execution_id,
             verification="verification:terminal",
