@@ -4550,8 +4550,6 @@ This matrix closes dimensional coverage that cannot be inferred from atom count.
 - **LLM/game-builder invariant:** model output remains a candidate until deterministic policy/verification authorizes promotion; project state cannot be mutated through conversational text alone.
 - **Closure rule:** implementation and independent verification remain unsigned until exact-head executable evidence names this coverage ID and the concrete implementation identity.
 
-
-
 ## Deep Functional Closure Expansion — Pass 2
 
 Plane FLGB-04 (Tools Agents and Long-Horizon Execution) receives a second implementation-grade closure layer. These atoms are normative depth requirements, not runtime-completion claims. Each atom preserves model-propose/deterministic-authorize semantics, exact identity, bounded resources, replay safety, provenance, and independent proof.
