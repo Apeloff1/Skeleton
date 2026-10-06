@@ -297,6 +297,27 @@ Skeleton may be described as a complete enterprise AI only when:
 Until then the honest status is **enterprise construction in progress**.
 
 
+## 9.1 Competitive-claim engineering qualification
+
+Competitive AI claims are governed by the **200-level engineering ladder** in
+`machine/competitive_ai_engineering_ladder.json`, with the human specification
+in `docs/architecture/COMPETITIVE_AI_ENGINEERING_LADDER.md`.
+
+The ladder is intentionally stricter than a feature checklist. It converts 20
+common frontier-AI claim families into ten escalating proof stages each. A
+family cannot be called competitively superior until its stage-10 level has
+current exact-head evidence, reproducible baseline comparison, applicable
+non-compensable gates, and an independent promotion verdict.
+
+The ladder does not expand the top-level volume space. Its levels are overlays
+bound to existing `VOL-000..VOL-420` owners, contracts and implementation
+paths. This keeps competitive pressure inside the same security, tenancy,
+recovery, observability and rollback laws as the rest of the enterprise system.
+
+A marketing claim, demo, model-authored self-evaluation, isolated benchmark win
+or passing happy-path test is never sufficient evidence of competitive
+superiority.
+
 ### October 2026 per-volume implementation dossiers
 
 Every `VOL-000` through `VOL-420` has a mandatory deep implementation dossier
