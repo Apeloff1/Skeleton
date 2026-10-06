@@ -16,7 +16,7 @@ on:
 # Preserve one feedback stream per source gate while coalescing retries and
 # superseded attempts for the same immutable workflow-run + source-workflow identity.
 concurrency:
-  group: autonomous-build-feedback-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.workflow_id }}
+  group: autonomous-build-feedback-${{ github.event.workflow_run.head_sha }}-${{ github.event.workflow_run.workflow_id }}
   cancel-in-progress: true
 
 permissions:
