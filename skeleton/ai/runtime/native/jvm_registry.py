@@ -195,6 +195,21 @@ def _load_acceleration_policy(path: Path) -> dict[str, Any]:
     return payload
 
 
+def _repository_root() -> Path:
+    explicit = os.environ.get("SKELETON_REPOSITORY_ROOT")
+    if explicit:
+        return Path(explicit).expanduser().resolve()
+
+    anchors = (Path(__file__).resolve().parent, Path.cwd().resolve())
+    for anchor in anchors:
+        for candidate in (anchor, *anchor.parents):
+            if (candidate / "machine" / "acceleration_policy.json").is_file():
+                return candidate
+    # A packaged runtime without repository policy must fail closed rather than
+    # guessing that a mirrored module path is the repository root.
+    return Path.cwd().resolve()
+
+
 def _profile_evidence_from_mapping(raw: Mapping[str, Any]) -> ProfileEvidence:
     return ProfileEvidence(
         evidence_id=raw["evidence_id"],
@@ -213,11 +228,14 @@ def _profile_evidence_from_mapping(raw: Mapping[str, Any]) -> ProfileEvidence:
 
 def _default_selection_provider(name: str) -> JvmAccelerationSelection:
     candidate_id = _JVM_CANDIDATE_IDS[name]
-    root = Path(__file__).resolve().parents[2]
+    root = _repository_root()
     configured = os.environ.get("SKELETON_ACCELERATION_POLICY_PATH")
+    configured_path = Path(configured).expanduser() if configured else None
     policy_path = (
-        Path(configured).expanduser()
-        if configured
+        configured_path
+        if configured_path is not None and configured_path.is_absolute()
+        else root / configured_path
+        if configured_path is not None
         else root / "machine" / "acceleration_policy.json"
     )
     policy_path_text = str(policy_path)
