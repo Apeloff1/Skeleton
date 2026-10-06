@@ -16,9 +16,14 @@ from skeleton.ai.assistant.turn_runtime import (
     TurnJournal,
     TurnRuntimeError,
     TurnState,
+    budget_usage_from_dict,
+    execution_budget_from_dict,
     make_event,
     operation_digest,
     start_turn,
+    turn_event_from_dict,
+    turn_snapshot_dict,
+    turn_snapshot_from_dict,
 )
 
 
@@ -488,3 +493,70 @@ def test_operation_digest_changes_when_durable_state_changes() -> None:
     snapshot, _ = _advance(snapshot, TurnState.ADMITTED, 1)
     assert operation_digest(snapshot) != initial_digest
     assert len(operation_digest(snapshot)) == 64
+
+
+def test_canonical_wire_codecs_round_trip_runtime_contracts() -> None:
+    budget = ExecutionBudget(
+        max_wall_seconds=90,
+        max_input_tokens=4096,
+        max_output_tokens=1024,
+        max_model_calls=4,
+        max_tool_calls=8,
+        max_agent_depth=2,
+        max_parallel_workers=3,
+        max_retrieval_queries=5,
+        max_external_writes=1,
+        max_cost_usd=3.5,
+    )
+    usage = BudgetUsage(
+        wall_seconds=2.5,
+        input_tokens=300,
+        output_tokens=40,
+        model_calls=1,
+        tool_calls=1,
+        retrieval_queries=1,
+        cost_usd=0.2,
+    )
+    assert execution_budget_from_dict(budget.as_dict()) == budget
+    assert budget_usage_from_dict(usage.as_dict()) == usage
+
+    snapshot = _initial(budget=budget)
+    event = make_event(
+        snapshot,
+        TurnState.ADMITTED,
+        observed_at=NOW + timedelta(seconds=1),
+        usage=usage,
+        payload={"admission": "accepted"},
+    )
+    assert turn_event_from_dict(event.as_dict()) == event
+
+    advanced = snapshot.apply(event)
+    encoded = turn_snapshot_dict(advanced)
+    assert turn_snapshot_from_dict(encoded) == advanced
+    assert operation_digest(turn_snapshot_from_dict(encoded)) == operation_digest(
+        advanced
+    )
+
+
+def test_canonical_wire_codecs_reject_schema_or_field_drift() -> None:
+    budget = ExecutionBudget()
+    malformed_budget = budget.as_dict()
+    malformed_budget["unexpected"] = 1
+    with pytest.raises(TurnRuntimeError, match="fields drifted"):
+        execution_budget_from_dict(malformed_budget)
+
+    snapshot = _initial()
+    encoded = turn_snapshot_dict(snapshot)
+    encoded["schema_version"] = 999
+    with pytest.raises(TurnRuntimeError, match="unsupported turn snapshot"):
+        turn_snapshot_from_dict(encoded)
+
+    event = make_event(
+        snapshot,
+        TurnState.ADMITTED,
+        observed_at=NOW + timedelta(seconds=1),
+    )
+    raw_event = event.as_dict()
+    raw_event["schema_version"] = 999
+    with pytest.raises(TurnRuntimeError, match="unsupported turn event"):
+        turn_event_from_dict(raw_event)
