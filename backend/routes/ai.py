@@ -1523,6 +1523,7 @@ async def ai_chat(
             "model": "engine-routed",
             "provider_request_id": None,
             "latency_ms": (time.monotonic() - engine_started) * 1000.0,
+            "engine_operation_id": engine_result.operation_id,
             "engine_execution_id": engine_result.execution_id,
             "engine_verification": engine_result.verification,
             "engine_evidence_refs": list(
@@ -1587,6 +1588,7 @@ async def ai_chat(
     if engine_client is not None:
         response_acceptance = evaluate_live_response_acceptance(
             operation_id=operation_id,
+            observed_operation_id=result.get("engine_operation_id"),
             expected_execution_id=execution_id,
             observed_execution_id=result.get("engine_execution_id"),
             context_digest=context_envelope.context_digest,
@@ -1783,6 +1785,7 @@ async def ai_chat(
         "provider": result["provider"],
         "model": result["model"],
         "provider_request_id": result.get("provider_request_id"),
+        "engine_operation_id": result.get("engine_operation_id"),
         "engine_execution_id": result.get("engine_execution_id"),
         "engine_verification": result.get("engine_verification"),
         "engine_evidence_refs": result.get("engine_evidence_refs", []),
@@ -2133,6 +2136,7 @@ async def get_ai_chat_turn(
 
     deferred_response_acceptance = evaluate_live_response_acceptance(
         operation_id=operation_id,
+        observed_operation_id=engine_result.operation_id,
         expected_execution_id=execution_id,
         observed_execution_id=engine_result.execution_id,
         context_digest=binding.context_digest,
@@ -2373,6 +2377,7 @@ async def get_ai_chat_turn(
         "turn_state": (
             None if chat_turn is None else chat_turn.snapshot.state.value
         ),
+        "engine_operation_id": engine_result.operation_id,
         "engine_execution_id": execution_id,
         "ai_result_id": ai_result_id,
         "engine_verification": engine_result.verification,
