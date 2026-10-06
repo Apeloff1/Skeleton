@@ -122,7 +122,7 @@ jobs:
               raise SystemExit("100-level plan is not complete")
           if structural.get("implementation_claim") is not False:
               raise SystemExit("planning gate fabricated implementation")
-          if len(structural.get("file_digests") or {}) != 8:
+          if len(structural.get("file_digests") or {}) != 13:
               raise SystemExit("100-level digest coverage is incomplete")
 
           if independent.get("expected_head") != expected:
