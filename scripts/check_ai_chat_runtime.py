@@ -56,6 +56,7 @@ REQUIRED_INVARIANTS = (
     "live response-acceptance receipts hash output and evidence references instead of storing response prose or provider receipt contents",
     "engine-backed live chat requires an accepted verification identity and at least one canonical provider receipt before transcript commit",
     "synchronous and deferred engine results must pass the same canonical response-acceptance policy before transcript commit",
+    "live response acceptance binds both engine operation identity and execution identity before transcript promotion",
 )
 
 
@@ -267,6 +268,7 @@ def validate() -> list[str]:
                 "LiveResponseAcceptancePolicy",
                 "LiveResponseAcceptanceReceipt",
                 "evaluate_live_response_acceptance",
+                "operation_identity_mismatch",
                 "execution_identity_mismatch",
                 "provider_receipt_missing",
                 "verification_not_accepted",
