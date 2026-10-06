@@ -91,6 +91,10 @@ model authority boundaries.
 - `conditioning.py` — matrix norms, 1/inf condition numbers and linear backward-error reports.
 - `matrix_structures.py` — Toeplitz/circulant constructors, Gershgorin discs and dominance diagnostics.
 - `cosine_transforms.py` — orthonormal DCT-II/DCT-IV plus separable 2-D DCT round trips.
+- `bayes.py` — conjugate Beta/Binomial, Dirichlet/Multinomial, Normal/Normal and Normal-Inverse-Gamma posterior math.
+- `interval.py` — finite conservative interval arithmetic with outward rounding and domain checks.
+- `orthogonal.py` — Givens rotations and Householder reflectors with explicit orthogonal transforms.
+- `ldlt.py` — symmetric LDL^T factorization/solve with inertia and reconstruction evidence.
 - `validation.py` — parity evidence against existing optimized runtime kernels.
 
 ## Guarantees
@@ -159,6 +163,10 @@ model authority boundaries.
 - Conditioning diagnostics distinguish matrix norm growth from actual backward error and verify inverse residuals.
 - Structured-matrix helpers keep Toeplitz/circulant indexing and Gershgorin radii deterministic.
 - Cosine transforms use orthonormal conventions so inverse and energy semantics are explicit.
+- Conjugate Bayesian helpers return posterior/evidence math only and never own learned state or promotion.
+- Interval arithmetic rounds outward and rejects zero-divisor/domain-crossing intervals rather than pretending point precision.
+- Orthogonal primitives expose the exact reflector/rotation parameters used by higher-level decomposition oracles.
+- LDL^T reports reconstruction and pivot-sign inertia and fails closed when unpivoted factorization is unsafe.
 - `audit_runtime_kernels()` compares optimized runtime softmax, matmul and attention against
   this reference substrate without replacing those kernels.
 

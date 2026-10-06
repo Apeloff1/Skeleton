@@ -35,6 +35,16 @@ from .calculus2 import (
     hessian_vector_product,
     quadratic_model_change,
 )
+from .bayes import (
+    BetaBinomialPosterior,
+    DirichletMultinomialPosterior,
+    NormalInverseGammaPosterior,
+    NormalNormalPosterior,
+    beta_binomial_posterior,
+    dirichlet_multinomial_posterior,
+    normal_inverse_gamma_posterior,
+    normal_normal_posterior,
+)
 from .calibration_metrics import (
     CalibrationBin,
     CalibrationMetricReport,
@@ -170,6 +180,7 @@ from .information_geometry import (
     total_variation_distance,
 )
 from .interpolation_nd import bilinear_gradient, bilinear_interpolate, trilinear_interpolate
+from .interval import Interval, interval_hull, interval_intersection
 from .integration2 import AdaptiveODEPoint, AdaptiveODEReport, adaptive_rk45
 from .integration import (
     ODEPoint,
@@ -179,6 +190,7 @@ from .integration import (
     rk4_integrate,
     rk4_step,
 )
+from .ldlt import LDLTReport, ldlt_decompose, ldlt_solve
 from .linear import (
     LinearSolveReport,
     cosine_similarity,
@@ -260,6 +272,16 @@ from .polynomials import (
     polynomial_integral,
     polynomial_multiply,
     polynomial_roots,
+)
+from .orthogonal import (
+    GivensRotation,
+    HouseholderReflection,
+    apply_givens_pair,
+    apply_householder_left,
+    apply_householder_vector,
+    givens_rotation,
+    householder_reflection,
+    orthogonal_reflection_matrix,
 )
 from .probability import (
     cross_entropy,
@@ -446,6 +468,14 @@ __all__ = [
     "gradient_norm",
     "hessian_vector_product",
     "quadratic_model_change",
+    "BetaBinomialPosterior",
+    "DirichletMultinomialPosterior",
+    "NormalInverseGammaPosterior",
+    "NormalNormalPosterior",
+    "beta_binomial_posterior",
+    "dirichlet_multinomial_posterior",
+    "normal_inverse_gamma_posterior",
+    "normal_normal_posterior",
     "CalibrationBin",
     "CalibrationMetricReport",
     "binary_calibration_report",
@@ -570,6 +600,9 @@ __all__ = [
     "bilinear_gradient",
     "bilinear_interpolate",
     "trilinear_interpolate",
+    "Interval",
+    "interval_hull",
+    "interval_intersection",
     "AdaptiveODEPoint",
     "AdaptiveODEReport",
     "adaptive_rk45",
@@ -579,6 +612,9 @@ __all__ = [
     "adaptive_simpson",
     "rk4_integrate",
     "rk4_step",
+    "LDLTReport",
+    "ldlt_decompose",
+    "ldlt_solve",
     "LinearSolveReport",
     "cosine_similarity",
     "dot",
@@ -655,6 +691,14 @@ __all__ = [
     "polynomial_integral",
     "polynomial_multiply",
     "polynomial_roots",
+    "GivensRotation",
+    "HouseholderReflection",
+    "apply_givens_pair",
+    "apply_householder_left",
+    "apply_householder_vector",
+    "givens_rotation",
+    "householder_reflection",
+    "orthogonal_reflection_matrix",
     "cross_entropy",
     "effective_sample_size",
     "entropy",
