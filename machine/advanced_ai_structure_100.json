@@ -1,0 +1,3985 @@
+{
+  "schema_version": "advanced-ai-structure/v1",
+  "structure_version": "1.0.0",
+  "status": "active_plan",
+  "prepared_at_utc": "2026-10-06T13:30:00Z",
+  "title": "Skeleton 100-Level Advanced AI Structure",
+  "purpose": "Define a machine-verifiable promotion ladder of 100 advanced AI structural levels above the enterprise system baseline without creating 100 runtime services or duplicating canonical capability ownership.",
+  "base_requirement": {
+    "level_zero": "enterprise-system-baseline",
+    "enterprise_contract": "machine/enterprise_system_architecture.json",
+    "enterprise_manual": "docs/ENTERPRISE_SYSTEM_ARCHITECTURE.md",
+    "ai_construction_contract": "machine/ai_app_construction.json",
+    "architecture_contract": "machine/architecture.json",
+    "rule": "The 100-level ladder starts above the enterprise operational substrate. Higher cognitive maturity may never weaken enterprise security, tenancy, durability, recovery, or evidence requirements."
+  },
+  "semantics": {
+    "ordinal_rule": "Level number expresses promotion maturity and integration order, not a mandatory runtime call chain.",
+    "runtime_rule": "Runtime dependencies remain owned by canonical AI construction planes and capability interfaces; the ladder cannot create shadow services or owners.",
+    "promotion_rule": "A level may be promoted only when its prerequisites and evidence are satisfied. Each tenth level is a stratum closure gate.",
+    "inheritance_rule": "Higher levels inherit every lower non-negotiable authority, safety, provenance, budget, tenant, and recovery invariant.",
+    "rollback_rule": "Regression at a lower promoted level invalidates dependent higher-level promotion evidence until requalified.",
+    "implementation_rule": "planned_target is not implementation evidence; no level is complete merely because it exists in this plan."
+  },
+  "invariants": [
+    "exactly 100 levels exist with contiguous ordinals 1 through 100",
+    "level IDs are exactly L001 through L100",
+    "exactly ten strata exist and each contains ten contiguous levels",
+    "every tenth level is the closure gate for its stratum",
+    "promotion prerequisites only reference the enterprise baseline or lower-numbered levels",
+    "every referenced capability plane exists in machine/ai_app_construction.json",
+    "every one of the 27 canonical AI construction planes is referenced by at least one advanced stratum",
+    "no advanced level can own credentials, canonical conversation state, privileged tool execution, release promotion, or policy merely because it is cognitively advanced",
+    "self-improvement levels can propose and evaluate changes but cannot self-approve production promotion",
+    "simulation, self-assessment, memory, retrieved evidence, and model output remain non-authoritative unless accepted by their canonical authority",
+    "all promoted levels require exact-head evidence and independent verification appropriate to impact"
+  ],
+  "maturity_bands": [
+    {
+      "band": "A1",
+      "levels": "001-010",
+      "name": "Assured cognitive substrate"
+    },
+    {
+      "band": "A2",
+      "levels": "011-020",
+      "name": "Contextual intelligence"
+    },
+    {
+      "band": "A3",
+      "levels": "021-030",
+      "name": "Persistent knowledge intelligence"
+    },
+    {
+      "band": "A4",
+      "levels": "031-040",
+      "name": "Deliberative intelligence"
+    },
+    {
+      "band": "A5",
+      "levels": "041-050",
+      "name": "Governed agency"
+    },
+    {
+      "band": "A6",
+      "levels": "051-060",
+      "name": "Organizational intelligence"
+    },
+    {
+      "band": "A7",
+      "levels": "061-070",
+      "name": "Adaptive intelligence"
+    },
+    {
+      "band": "A8",
+      "levels": "071-080",
+      "name": "Bounded autonomous operations"
+    },
+    {
+      "band": "A9",
+      "levels": "081-090",
+      "name": "Advanced scientific/metacognitive intelligence"
+    },
+    {
+      "band": "A10",
+      "levels": "091-100",
+      "name": "Frontier governed evolution"
+    }
+  ],
+  "strata": [
+    {
+      "id": "S01",
+      "title": "Assured Cognitive Substrate",
+      "start": 1,
+      "end": 10,
+      "purpose": "Make every higher cognitive function typed, attributable, replayable, budgeted, permission-bound, and fail-closed.",
+      "planes": [
+        "foundation",
+        "identity",
+        "data-persistence",
+        "governance",
+        "security-safety",
+        "observability"
+      ],
+      "authority": "Deterministic contracts and canonical state outrank model inference; no learned component may redefine identity, authority, provenance, or durability.",
+      "failure": "Reject, quarantine, or degrade before allowing ambiguous identity, state, permission, provenance, or budget semantics.",
+      "gate_level": "L010"
+    },
+    {
+      "id": "S02",
+      "title": "Perception and Context Intelligence",
+      "start": 11,
+      "end": 20,
+      "purpose": "Convert multimodal, heterogeneous, partially untrusted inputs into a bounded trust-aware context representation.",
+      "planes": [
+        "prompt-context",
+        "retrieval",
+        "artifact-files",
+        "model-provider",
+        "security-safety"
+      ],
+      "authority": "Input interpretation may classify and transform evidence but cannot promote evidence into policy or canonical authority.",
+      "failure": "Drop, quarantine, externalize, or mark insufficient context rather than silently trusting malformed, oversized, or low-integrity input.",
+      "gate_level": "L020"
+    },
+    {
+      "id": "S03",
+      "title": "Memory and Knowledge Intelligence",
+      "start": 21,
+      "end": 30,
+      "purpose": "Provide persistent, temporal, semantic, episodic, procedural, and graph knowledge with governed lifecycle and provenance.",
+      "planes": [
+        "memory",
+        "retrieval",
+        "data-persistence",
+        "governance",
+        "observability"
+      ],
+      "authority": "Memory is evidence and continuity state, never capability authority; canonical source records outrank derived indexes and summaries.",
+      "failure": "Degrade to bounded stateless operation or explicit knowledge insufficiency; never cross tenant, resurrect deleted data, or treat stale projection as truth.",
+      "gate_level": "L030"
+    },
+    {
+      "id": "S04",
+      "title": "Deliberative Reasoning and Planning",
+      "start": 31,
+      "end": 40,
+      "purpose": "Build inspectable problem framing, decomposition, search, causal/quantitative reasoning, uncertainty, and verification.",
+      "planes": [
+        "orchestration",
+        "reasoning-verification",
+        "model-routing",
+        "evaluation",
+        "prompt-context"
+      ],
+      "authority": "Reasoning proposes hypotheses and plans; deterministic policy, canonical evidence, and explicit verification decide what may be accepted or acted upon.",
+      "failure": "Abstain, branch, repair, or escalate when constraints, evidence, calibration, or verification are insufficient.",
+      "gate_level": "L040"
+    },
+    {
+      "id": "S05",
+      "title": "Governed Agency and Tool Action",
+      "start": 41,
+      "end": 50,
+      "purpose": "Translate intent into bounded, authorized, transactional actions with approvals, sandboxing, receipts, and outcome verification.",
+      "planes": [
+        "tool-runtime",
+        "identity",
+        "security-safety",
+        "governance",
+        "jobs-durability",
+        "artifact-files"
+      ],
+      "authority": "Models propose actions only; canonical capability policy, user approval where required, and tool runtime own privileged execution.",
+      "failure": "Deny, await approval, reconcile ambiguous effects, or terminalize safely; never blindly replay consequential writes.",
+      "gate_level": "L050"
+    },
+    {
+      "id": "S06",
+      "title": "Organizational and Multi-Agent Intelligence",
+      "start": 51,
+      "end": 60,
+      "purpose": "Coordinate specialized agents, roles, shared work, consensus, conflict resolution, and hierarchical delegation under bounded authority.",
+      "planes": [
+        "orchestration",
+        "jobs-durability",
+        "operator-control",
+        "observability",
+        "cost-capacity"
+      ],
+      "authority": "Delegation can only reduce or partition parent authority and budget; child workers cannot mint permissions, budget, or canonical state ownership.",
+      "failure": "Collapse to fewer workers, serialize, escalate conflict, or stop; never amplify recursion, spending, permissions, or side effects.",
+      "gate_level": "L060"
+    },
+    {
+      "id": "S07",
+      "title": "Adaptive Learning and Evaluation",
+      "start": 61,
+      "end": 70,
+      "purpose": "Learn from governed feedback and evaluation while separating experimentation from production promotion.",
+      "planes": [
+        "evaluation",
+        "feedback-learning",
+        "observability",
+        "model-routing",
+        "memory",
+        "governance"
+      ],
+      "authority": "Learning produces proposals and evidence; release/evaluation policy owns promotion. Online feedback cannot directly rewrite production policy or behavior.",
+      "failure": "Retain or roll back to the last verified baseline when evidence is weak, distribution shifts, safety regresses, or metrics conflict.",
+      "gate_level": "L070"
+    },
+    {
+      "id": "S08",
+      "title": "Autonomous Operations and Resilience",
+      "start": 71,
+      "end": 80,
+      "purpose": "Support bounded goals, scheduled work, interruption recovery, self-diagnosis, resilience, governance reasoning, and risk-aware escalation.",
+      "planes": [
+        "resilience",
+        "cost-capacity",
+        "governance",
+        "security-safety",
+        "deployment-release",
+        "jobs-durability",
+        "operator-control"
+      ],
+      "authority": "Autonomy is policy-bounded execution over explicit goals and budgets; it never grants itself broader authority or silently converts recommendation into mutation.",
+      "failure": "Pause, defer, isolate, rollback, request human authority, or enter safe degraded mode when risk, budget, dependencies, or confidence cross policy.",
+      "gate_level": "L080"
+    },
+    {
+      "id": "S09",
+      "title": "Advanced World, Scientific, and Metacognitive Intelligence",
+      "start": 81,
+      "end": 90,
+      "purpose": "Build world models, simulation, long-horizon reasoning, metacognition, epistemic tracking, stakeholder modeling, creativity, and scientific discovery loops.",
+      "planes": [
+        "orchestration",
+        "reasoning-verification",
+        "retrieval",
+        "memory",
+        "evaluation",
+        "model-routing",
+        "observability"
+      ],
+      "authority": "Internal models remain hypotheses. Simulations, self-assessments, and stakeholder models cannot override real evidence, consent, policy, or measured outcomes.",
+      "failure": "Expose uncertainty, compare alternative models, seek evidence, or abstain; never present simulation confidence as observed reality.",
+      "gate_level": "L090"
+    },
+    {
+      "id": "S10",
+      "title": "Frontier Meta-Intelligence and Governed Evolution",
+      "start": 91,
+      "end": 100,
+      "purpose": "Let the system inspect its architecture, discover gaps, benchmark itself, explore designs, run experiments, propose verified improvements, transfer knowledge, and evolve only through governed promotion.",
+      "planes": [
+        "evaluation",
+        "feedback-learning",
+        "deployment-release",
+        "governance",
+        "security-safety",
+        "observability",
+        "orchestration",
+        "foundation"
+      ],
+      "authority": "Self-improvement is proposal-generation plus evidence. The system cannot self-approve code, model, policy, authority, or production promotion.",
+      "failure": "Freeze evolution, revert to verified baseline, quarantine experiments, or require independent approval whenever evidence, reproducibility, safety, or governance is incomplete.",
+      "gate_level": "L100"
+    }
+  ],
+  "levels": [
+    {
+      "id": "L001",
+      "ordinal": 1,
+      "stratum": "S01",
+      "title": "Typed Cognitive Contracts",
+      "objective": "Define canonical typed envelopes for goals, observations, beliefs, plans, actions, evidence, results, and errors.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "ENTERPRISE-BASELINE"
+      ],
+      "required_planes": [
+        "foundation",
+        "identity",
+        "data-persistence",
+        "governance",
+        "security-safety",
+        "observability"
+      ],
+      "authority_rule": "Deterministic contracts and canonical state outrank model inference; no learned component may redefine identity, authority, provenance, or durability.",
+      "failure_mode": "Reject, quarantine, or degrade before allowing ambiguous identity, state, permission, provenance, or budget semantics.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Typed Cognitive Contracts: structural contract validation",
+        "Typed Cognitive Contracts: focused runtime or simulation evidence",
+        "Typed Cognitive Contracts: adversarial/failure-mode evidence",
+        "Typed Cognitive Contracts: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L002",
+      "ordinal": 2,
+      "stratum": "S01",
+      "title": "Identity and Causality Fabric",
+      "objective": "Bind tenant, principal, operation, execution, turn, artifact, tool call, and causal parent identities across every cognitive event.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L001"
+      ],
+      "required_planes": [
+        "foundation",
+        "identity",
+        "data-persistence",
+        "governance",
+        "security-safety",
+        "observability"
+      ],
+      "authority_rule": "Deterministic contracts and canonical state outrank model inference; no learned component may redefine identity, authority, provenance, or durability.",
+      "failure_mode": "Reject, quarantine, or degrade before allowing ambiguous identity, state, permission, provenance, or budget semantics.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Identity and Causality Fabric: structural contract validation",
+        "Identity and Causality Fabric: focused runtime or simulation evidence",
+        "Identity and Causality Fabric: adversarial/failure-mode evidence",
+        "Identity and Causality Fabric: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L003",
+      "ordinal": 3,
+      "stratum": "S01",
+      "title": "Temporal and Sequence Semantics",
+      "objective": "Give cognition monotonic ordering, deadlines, freshness, replay positions, causal clocks, and explicit wall-clock versus monotonic-time rules.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L002"
+      ],
+      "required_planes": [
+        "foundation",
+        "identity",
+        "data-persistence",
+        "governance",
+        "security-safety",
+        "observability"
+      ],
+      "authority_rule": "Deterministic contracts and canonical state outrank model inference; no learned component may redefine identity, authority, provenance, or durability.",
+      "failure_mode": "Reject, quarantine, or degrade before allowing ambiguous identity, state, permission, provenance, or budget semantics.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Temporal and Sequence Semantics: structural contract validation",
+        "Temporal and Sequence Semantics: focused runtime or simulation evidence",
+        "Temporal and Sequence Semantics: adversarial/failure-mode evidence",
+        "Temporal and Sequence Semantics: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L004",
+      "ordinal": 4,
+      "stratum": "S01",
+      "title": "Budget and Constraint Calculus",
+      "objective": "Represent tokens, cost, latency, workers, tools, writes, storage, risk, and depth as enforceable composable budgets.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L003"
+      ],
+      "required_planes": [
+        "foundation",
+        "identity",
+        "data-persistence",
+        "governance",
+        "security-safety",
+        "observability"
+      ],
+      "authority_rule": "Deterministic contracts and canonical state outrank model inference; no learned component may redefine identity, authority, provenance, or durability.",
+      "failure_mode": "Reject, quarantine, or degrade before allowing ambiguous identity, state, permission, provenance, or budget semantics.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Budget and Constraint Calculus: structural contract validation",
+        "Budget and Constraint Calculus: focused runtime or simulation evidence",
+        "Budget and Constraint Calculus: adversarial/failure-mode evidence",
+        "Budget and Constraint Calculus: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L005",
+      "ordinal": 5,
+      "stratum": "S01",
+      "title": "State Authority Partitioning",
+      "objective": "Separate canonical, derived, scratch, recovery, telemetry, and experimental state with singular owners and promotion rules.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L004"
+      ],
+      "required_planes": [
+        "foundation",
+        "identity",
+        "data-persistence",
+        "governance",
+        "security-safety",
+        "observability"
+      ],
+      "authority_rule": "Deterministic contracts and canonical state outrank model inference; no learned component may redefine identity, authority, provenance, or durability.",
+      "failure_mode": "Reject, quarantine, or degrade before allowing ambiguous identity, state, permission, provenance, or budget semantics.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "State Authority Partitioning: structural contract validation",
+        "State Authority Partitioning: focused runtime or simulation evidence",
+        "State Authority Partitioning: adversarial/failure-mode evidence",
+        "State Authority Partitioning: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L006",
+      "ordinal": 6,
+      "stratum": "S01",
+      "title": "Provenance and Evidence Graph",
+      "objective": "Bind every material inference, transformation, source, tool result, model result, and artifact to tamper-evident provenance.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L005"
+      ],
+      "required_planes": [
+        "foundation",
+        "identity",
+        "data-persistence",
+        "governance",
+        "security-safety",
+        "observability"
+      ],
+      "authority_rule": "Deterministic contracts and canonical state outrank model inference; no learned component may redefine identity, authority, provenance, or durability.",
+      "failure_mode": "Reject, quarantine, or degrade before allowing ambiguous identity, state, permission, provenance, or budget semantics.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Provenance and Evidence Graph: structural contract validation",
+        "Provenance and Evidence Graph: focused runtime or simulation evidence",
+        "Provenance and Evidence Graph: adversarial/failure-mode evidence",
+        "Provenance and Evidence Graph: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L007",
+      "ordinal": 7,
+      "stratum": "S01",
+      "title": "Capability and Permission Lattice",
+      "objective": "Model capabilities, scopes, risk classes, approvals, delegation, and revocation as deterministic authority independent of model text.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L006"
+      ],
+      "required_planes": [
+        "foundation",
+        "identity",
+        "data-persistence",
+        "governance",
+        "security-safety",
+        "observability"
+      ],
+      "authority_rule": "Deterministic contracts and canonical state outrank model inference; no learned component may redefine identity, authority, provenance, or durability.",
+      "failure_mode": "Reject, quarantine, or degrade before allowing ambiguous identity, state, permission, provenance, or budget semantics.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Capability and Permission Lattice: structural contract validation",
+        "Capability and Permission Lattice: focused runtime or simulation evidence",
+        "Capability and Permission Lattice: adversarial/failure-mode evidence",
+        "Capability and Permission Lattice: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L008",
+      "ordinal": 8,
+      "stratum": "S01",
+      "title": "Deterministic Replay and Checkpointing",
+      "objective": "Make admitted cognitive operations reconstructable after crash without fabricating completion or repeating ambiguous effects.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L007"
+      ],
+      "required_planes": [
+        "foundation",
+        "identity",
+        "data-persistence",
+        "governance",
+        "security-safety",
+        "observability"
+      ],
+      "authority_rule": "Deterministic contracts and canonical state outrank model inference; no learned component may redefine identity, authority, provenance, or durability.",
+      "failure_mode": "Reject, quarantine, or degrade before allowing ambiguous identity, state, permission, provenance, or budget semantics.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Deterministic Replay and Checkpointing: structural contract validation",
+        "Deterministic Replay and Checkpointing: focused runtime or simulation evidence",
+        "Deterministic Replay and Checkpointing: adversarial/failure-mode evidence",
+        "Deterministic Replay and Checkpointing: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L009",
+      "ordinal": 9,
+      "stratum": "S01",
+      "title": "Safety and Interlock Substrate",
+      "objective": "Install non-bypassable policy, content, side-effect, data-governance, and emergency-stop interlocks beneath learned behavior.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L008"
+      ],
+      "required_planes": [
+        "foundation",
+        "identity",
+        "data-persistence",
+        "governance",
+        "security-safety",
+        "observability"
+      ],
+      "authority_rule": "Deterministic contracts and canonical state outrank model inference; no learned component may redefine identity, authority, provenance, or durability.",
+      "failure_mode": "Reject, quarantine, or degrade before allowing ambiguous identity, state, permission, provenance, or budget semantics.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Safety and Interlock Substrate: structural contract validation",
+        "Safety and Interlock Substrate: focused runtime or simulation evidence",
+        "Safety and Interlock Substrate: adversarial/failure-mode evidence",
+        "Safety and Interlock Substrate: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L010",
+      "ordinal": 10,
+      "stratum": "S01",
+      "title": "Cognitive Substrate Closure",
+      "objective": "Prove the complete substrate composes without shadow authority, replay gaps, budget amplification, provenance loss, or fail-open safety.",
+      "state": "planned_target",
+      "gate": true,
+      "promotion_prerequisites": [
+        "L009"
+      ],
+      "required_planes": [
+        "foundation",
+        "identity",
+        "data-persistence",
+        "governance",
+        "security-safety",
+        "observability"
+      ],
+      "authority_rule": "Deterministic contracts and canonical state outrank model inference; no learned component may redefine identity, authority, provenance, or durability.",
+      "failure_mode": "Reject, quarantine, or degrade before allowing ambiguous identity, state, permission, provenance, or budget semantics.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Cognitive Substrate Closure: structural contract validation",
+        "Cognitive Substrate Closure: focused runtime or simulation evidence",
+        "Cognitive Substrate Closure: adversarial/failure-mode evidence",
+        "Cognitive Substrate Closure: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L011",
+      "ordinal": 11,
+      "stratum": "S02",
+      "title": "Multimodal Ingestion Fabric",
+      "objective": "Normalize text, image, audio, video, document, sensor, and structured inputs through typed bounded ingestion paths.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L010"
+      ],
+      "required_planes": [
+        "prompt-context",
+        "retrieval",
+        "artifact-files",
+        "model-provider",
+        "security-safety"
+      ],
+      "authority_rule": "Input interpretation may classify and transform evidence but cannot promote evidence into policy or canonical authority.",
+      "failure_mode": "Drop, quarantine, externalize, or mark insufficient context rather than silently trusting malformed, oversized, or low-integrity input.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Multimodal Ingestion Fabric: structural contract validation",
+        "Multimodal Ingestion Fabric: focused runtime or simulation evidence",
+        "Multimodal Ingestion Fabric: adversarial/failure-mode evidence",
+        "Multimodal Ingestion Fabric: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L012",
+      "ordinal": 12,
+      "stratum": "S02",
+      "title": "Content-Type and Integrity Verification",
+      "objective": "Verify media/container type, size, hashes, malware status, parser safety, and source integrity before semantic interpretation.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L011"
+      ],
+      "required_planes": [
+        "prompt-context",
+        "retrieval",
+        "artifact-files",
+        "model-provider",
+        "security-safety"
+      ],
+      "authority_rule": "Input interpretation may classify and transform evidence but cannot promote evidence into policy or canonical authority.",
+      "failure_mode": "Drop, quarantine, externalize, or mark insufficient context rather than silently trusting malformed, oversized, or low-integrity input.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Content-Type and Integrity Verification: structural contract validation",
+        "Content-Type and Integrity Verification: focused runtime or simulation evidence",
+        "Content-Type and Integrity Verification: adversarial/failure-mode evidence",
+        "Content-Type and Integrity Verification: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L013",
+      "ordinal": 13,
+      "stratum": "S02",
+      "title": "Semantic Segmentation",
+      "objective": "Split complex inputs into addressable semantic units while preserving source offsets, modality, chronology, and provenance.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L012"
+      ],
+      "required_planes": [
+        "prompt-context",
+        "retrieval",
+        "artifact-files",
+        "model-provider",
+        "security-safety"
+      ],
+      "authority_rule": "Input interpretation may classify and transform evidence but cannot promote evidence into policy or canonical authority.",
+      "failure_mode": "Drop, quarantine, externalize, or mark insufficient context rather than silently trusting malformed, oversized, or low-integrity input.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Semantic Segmentation: structural contract validation",
+        "Semantic Segmentation: focused runtime or simulation evidence",
+        "Semantic Segmentation: adversarial/failure-mode evidence",
+        "Semantic Segmentation: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L014",
+      "ordinal": 14,
+      "stratum": "S02",
+      "title": "Trust Classification",
+      "objective": "Assign immutable trust/data classes to control, user, memory, retrieval, tool, artifact, provider, and model-derived segments.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L013"
+      ],
+      "required_planes": [
+        "prompt-context",
+        "retrieval",
+        "artifact-files",
+        "model-provider",
+        "security-safety"
+      ],
+      "authority_rule": "Input interpretation may classify and transform evidence but cannot promote evidence into policy or canonical authority.",
+      "failure_mode": "Drop, quarantine, externalize, or mark insufficient context rather than silently trusting malformed, oversized, or low-integrity input.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Trust Classification: structural contract validation",
+        "Trust Classification: focused runtime or simulation evidence",
+        "Trust Classification: adversarial/failure-mode evidence",
+        "Trust Classification: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L015",
+      "ordinal": 15,
+      "stratum": "S02",
+      "title": "Context Normalization",
+      "objective": "Canonicalize heterogeneous observations into a common context schema without erasing uncertainty, source identity, or modality.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L014"
+      ],
+      "required_planes": [
+        "prompt-context",
+        "retrieval",
+        "artifact-files",
+        "model-provider",
+        "security-safety"
+      ],
+      "authority_rule": "Input interpretation may classify and transform evidence but cannot promote evidence into policy or canonical authority.",
+      "failure_mode": "Drop, quarantine, externalize, or mark insufficient context rather than silently trusting malformed, oversized, or low-integrity input.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Context Normalization: structural contract validation",
+        "Context Normalization: focused runtime or simulation evidence",
+        "Context Normalization: adversarial/failure-mode evidence",
+        "Context Normalization: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L016",
+      "ordinal": 16,
+      "stratum": "S02",
+      "title": "Salience and Relevance Modeling",
+      "objective": "Rank candidate context by task relevance, trust, recency, novelty, causal importance, and user intent under deterministic bounds.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L015"
+      ],
+      "required_planes": [
+        "prompt-context",
+        "retrieval",
+        "artifact-files",
+        "model-provider",
+        "security-safety"
+      ],
+      "authority_rule": "Input interpretation may classify and transform evidence but cannot promote evidence into policy or canonical authority.",
+      "failure_mode": "Drop, quarantine, externalize, or mark insufficient context rather than silently trusting malformed, oversized, or low-integrity input.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Salience and Relevance Modeling: structural contract validation",
+        "Salience and Relevance Modeling: focused runtime or simulation evidence",
+        "Salience and Relevance Modeling: adversarial/failure-mode evidence",
+        "Salience and Relevance Modeling: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L017",
+      "ordinal": 17,
+      "stratum": "S02",
+      "title": "Context Compression and Distillation",
+      "objective": "Compress long histories and evidence while retaining source links, uncertainty, obligations, unresolved conflicts, and control invariants.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L016"
+      ],
+      "required_planes": [
+        "prompt-context",
+        "retrieval",
+        "artifact-files",
+        "model-provider",
+        "security-safety"
+      ],
+      "authority_rule": "Input interpretation may classify and transform evidence but cannot promote evidence into policy or canonical authority.",
+      "failure_mode": "Drop, quarantine, externalize, or mark insufficient context rather than silently trusting malformed, oversized, or low-integrity input.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Context Compression and Distillation: structural contract validation",
+        "Context Compression and Distillation: focused runtime or simulation evidence",
+        "Context Compression and Distillation: adversarial/failure-mode evidence",
+        "Context Compression and Distillation: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L018",
+      "ordinal": 18,
+      "stratum": "S02",
+      "title": "Long-Context Paging and Recall",
+      "objective": "Page context across large projects using stable references, resumable windows, eviction policy, and high-trust non-evictable controls.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L017"
+      ],
+      "required_planes": [
+        "prompt-context",
+        "retrieval",
+        "artifact-files",
+        "model-provider",
+        "security-safety"
+      ],
+      "authority_rule": "Input interpretation may classify and transform evidence but cannot promote evidence into policy or canonical authority.",
+      "failure_mode": "Drop, quarantine, externalize, or mark insufficient context rather than silently trusting malformed, oversized, or low-integrity input.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Long-Context Paging and Recall: structural contract validation",
+        "Long-Context Paging and Recall: focused runtime or simulation evidence",
+        "Long-Context Paging and Recall: adversarial/failure-mode evidence",
+        "Long-Context Paging and Recall: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L019",
+      "ordinal": 19,
+      "stratum": "S02",
+      "title": "Cross-Modal Alignment",
+      "objective": "Align entities, events, quantities, timestamps, speakers, regions, and claims across text, image, audio, video, and structured evidence.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L018"
+      ],
+      "required_planes": [
+        "prompt-context",
+        "retrieval",
+        "artifact-files",
+        "model-provider",
+        "security-safety"
+      ],
+      "authority_rule": "Input interpretation may classify and transform evidence but cannot promote evidence into policy or canonical authority.",
+      "failure_mode": "Drop, quarantine, externalize, or mark insufficient context rather than silently trusting malformed, oversized, or low-integrity input.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Cross-Modal Alignment: structural contract validation",
+        "Cross-Modal Alignment: focused runtime or simulation evidence",
+        "Cross-Modal Alignment: adversarial/failure-mode evidence",
+        "Cross-Modal Alignment: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L020",
+      "ordinal": 20,
+      "stratum": "S02",
+      "title": "Context Intelligence Closure",
+      "objective": "Prove context construction resists injection, starvation, provenance loss, modality confusion, overflow, and trust inversion.",
+      "state": "planned_target",
+      "gate": true,
+      "promotion_prerequisites": [
+        "L019"
+      ],
+      "required_planes": [
+        "prompt-context",
+        "retrieval",
+        "artifact-files",
+        "model-provider",
+        "security-safety"
+      ],
+      "authority_rule": "Input interpretation may classify and transform evidence but cannot promote evidence into policy or canonical authority.",
+      "failure_mode": "Drop, quarantine, externalize, or mark insufficient context rather than silently trusting malformed, oversized, or low-integrity input.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Context Intelligence Closure: structural contract validation",
+        "Context Intelligence Closure: focused runtime or simulation evidence",
+        "Context Intelligence Closure: adversarial/failure-mode evidence",
+        "Context Intelligence Closure: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L021",
+      "ordinal": 21,
+      "stratum": "S03",
+      "title": "Working Memory",
+      "objective": "Maintain bounded task-local active state, unresolved obligations, intermediate facts, and execution scratch without confusing it with durable memory.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L020"
+      ],
+      "required_planes": [
+        "memory",
+        "retrieval",
+        "data-persistence",
+        "governance",
+        "observability"
+      ],
+      "authority_rule": "Memory is evidence and continuity state, never capability authority; canonical source records outrank derived indexes and summaries.",
+      "failure_mode": "Degrade to bounded stateless operation or explicit knowledge insufficiency; never cross tenant, resurrect deleted data, or treat stale projection as truth.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Working Memory: structural contract validation",
+        "Working Memory: focused runtime or simulation evidence",
+        "Working Memory: adversarial/failure-mode evidence",
+        "Working Memory: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L022",
+      "ordinal": 22,
+      "stratum": "S03",
+      "title": "Episodic Memory",
+      "objective": "Store governed event episodes with time, actors, outcomes, provenance, confidence, sensitivity, and supersession.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L021"
+      ],
+      "required_planes": [
+        "memory",
+        "retrieval",
+        "data-persistence",
+        "governance",
+        "observability"
+      ],
+      "authority_rule": "Memory is evidence and continuity state, never capability authority; canonical source records outrank derived indexes and summaries.",
+      "failure_mode": "Degrade to bounded stateless operation or explicit knowledge insufficiency; never cross tenant, resurrect deleted data, or treat stale projection as truth.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Episodic Memory: structural contract validation",
+        "Episodic Memory: focused runtime or simulation evidence",
+        "Episodic Memory: adversarial/failure-mode evidence",
+        "Episodic Memory: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L023",
+      "ordinal": 23,
+      "stratum": "S03",
+      "title": "Semantic Memory",
+      "objective": "Maintain durable facts/concepts with source lineage, confidence, freshness, contradiction, tenant scope, and lifecycle policy.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L022"
+      ],
+      "required_planes": [
+        "memory",
+        "retrieval",
+        "data-persistence",
+        "governance",
+        "observability"
+      ],
+      "authority_rule": "Memory is evidence and continuity state, never capability authority; canonical source records outrank derived indexes and summaries.",
+      "failure_mode": "Degrade to bounded stateless operation or explicit knowledge insufficiency; never cross tenant, resurrect deleted data, or treat stale projection as truth.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Semantic Memory: structural contract validation",
+        "Semantic Memory: focused runtime or simulation evidence",
+        "Semantic Memory: adversarial/failure-mode evidence",
+        "Semantic Memory: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L024",
+      "ordinal": 24,
+      "stratum": "S03",
+      "title": "Procedural Memory",
+      "objective": "Represent reusable procedures, workflows, heuristics, and skill knowledge separately from privileged executable authority.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L023"
+      ],
+      "required_planes": [
+        "memory",
+        "retrieval",
+        "data-persistence",
+        "governance",
+        "observability"
+      ],
+      "authority_rule": "Memory is evidence and continuity state, never capability authority; canonical source records outrank derived indexes and summaries.",
+      "failure_mode": "Degrade to bounded stateless operation or explicit knowledge insufficiency; never cross tenant, resurrect deleted data, or treat stale projection as truth.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Procedural Memory: structural contract validation",
+        "Procedural Memory: focused runtime or simulation evidence",
+        "Procedural Memory: adversarial/failure-mode evidence",
+        "Procedural Memory: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L025",
+      "ordinal": 25,
+      "stratum": "S03",
+      "title": "Temporal Memory",
+      "objective": "Reason over changing facts, validity intervals, event sequences, recency, decay, and historical snapshots.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L024"
+      ],
+      "required_planes": [
+        "memory",
+        "retrieval",
+        "data-persistence",
+        "governance",
+        "observability"
+      ],
+      "authority_rule": "Memory is evidence and continuity state, never capability authority; canonical source records outrank derived indexes and summaries.",
+      "failure_mode": "Degrade to bounded stateless operation or explicit knowledge insufficiency; never cross tenant, resurrect deleted data, or treat stale projection as truth.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Temporal Memory: structural contract validation",
+        "Temporal Memory: focused runtime or simulation evidence",
+        "Temporal Memory: adversarial/failure-mode evidence",
+        "Temporal Memory: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L026",
+      "ordinal": 26,
+      "stratum": "S03",
+      "title": "Knowledge Graph Intelligence",
+      "objective": "Build typed entity/relation graphs with provenance, temporal edges, contradiction handling, and graph-query authorization.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L025"
+      ],
+      "required_planes": [
+        "memory",
+        "retrieval",
+        "data-persistence",
+        "governance",
+        "observability"
+      ],
+      "authority_rule": "Memory is evidence and continuity state, never capability authority; canonical source records outrank derived indexes and summaries.",
+      "failure_mode": "Degrade to bounded stateless operation or explicit knowledge insufficiency; never cross tenant, resurrect deleted data, or treat stale projection as truth.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Knowledge Graph Intelligence: structural contract validation",
+        "Knowledge Graph Intelligence: focused runtime or simulation evidence",
+        "Knowledge Graph Intelligence: adversarial/failure-mode evidence",
+        "Knowledge Graph Intelligence: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L027",
+      "ordinal": 27,
+      "stratum": "S03",
+      "title": "Retrieval Fusion",
+      "objective": "Fuse lexical, vector, graph, structured, temporal, and private/public retrieval with ACL-first filtering and calibrated reranking.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L026"
+      ],
+      "required_planes": [
+        "memory",
+        "retrieval",
+        "data-persistence",
+        "governance",
+        "observability"
+      ],
+      "authority_rule": "Memory is evidence and continuity state, never capability authority; canonical source records outrank derived indexes and summaries.",
+      "failure_mode": "Degrade to bounded stateless operation or explicit knowledge insufficiency; never cross tenant, resurrect deleted data, or treat stale projection as truth.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Retrieval Fusion: structural contract validation",
+        "Retrieval Fusion: focused runtime or simulation evidence",
+        "Retrieval Fusion: adversarial/failure-mode evidence",
+        "Retrieval Fusion: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L028",
+      "ordinal": 28,
+      "stratum": "S03",
+      "title": "Memory Consolidation and Supersession",
+      "objective": "Merge redundant memories, preserve contradictions, supersede stale records, and maintain reversible provenance-aware consolidation.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L027"
+      ],
+      "required_planes": [
+        "memory",
+        "retrieval",
+        "data-persistence",
+        "governance",
+        "observability"
+      ],
+      "authority_rule": "Memory is evidence and continuity state, never capability authority; canonical source records outrank derived indexes and summaries.",
+      "failure_mode": "Degrade to bounded stateless operation or explicit knowledge insufficiency; never cross tenant, resurrect deleted data, or treat stale projection as truth.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Memory Consolidation and Supersession: structural contract validation",
+        "Memory Consolidation and Supersession: focused runtime or simulation evidence",
+        "Memory Consolidation and Supersession: adversarial/failure-mode evidence",
+        "Memory Consolidation and Supersession: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L029",
+      "ordinal": 29,
+      "stratum": "S03",
+      "title": "Forgetting, Privacy, and Lifecycle",
+      "objective": "Apply deletion, retention, legal hold, sensitivity, minimization, and derived-projection purge semantics across memory systems.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L028"
+      ],
+      "required_planes": [
+        "memory",
+        "retrieval",
+        "data-persistence",
+        "governance",
+        "observability"
+      ],
+      "authority_rule": "Memory is evidence and continuity state, never capability authority; canonical source records outrank derived indexes and summaries.",
+      "failure_mode": "Degrade to bounded stateless operation or explicit knowledge insufficiency; never cross tenant, resurrect deleted data, or treat stale projection as truth.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Forgetting, Privacy, and Lifecycle: structural contract validation",
+        "Forgetting, Privacy, and Lifecycle: focused runtime or simulation evidence",
+        "Forgetting, Privacy, and Lifecycle: adversarial/failure-mode evidence",
+        "Forgetting, Privacy, and Lifecycle: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L030",
+      "ordinal": 30,
+      "stratum": "S03",
+      "title": "Memory and Knowledge Closure",
+      "objective": "Prove continuity, retrieval quality, isolation, deletion, provenance, freshness, contradiction, rebuild, and degraded stateless operation.",
+      "state": "planned_target",
+      "gate": true,
+      "promotion_prerequisites": [
+        "L029"
+      ],
+      "required_planes": [
+        "memory",
+        "retrieval",
+        "data-persistence",
+        "governance",
+        "observability"
+      ],
+      "authority_rule": "Memory is evidence and continuity state, never capability authority; canonical source records outrank derived indexes and summaries.",
+      "failure_mode": "Degrade to bounded stateless operation or explicit knowledge insufficiency; never cross tenant, resurrect deleted data, or treat stale projection as truth.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Memory and Knowledge Closure: structural contract validation",
+        "Memory and Knowledge Closure: focused runtime or simulation evidence",
+        "Memory and Knowledge Closure: adversarial/failure-mode evidence",
+        "Memory and Knowledge Closure: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L031",
+      "ordinal": 31,
+      "stratum": "S04",
+      "title": "Problem Framing",
+      "objective": "Convert ambiguous user goals into explicit objective, scope, constraints, success criteria, assumptions, unknowns, and risk.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L030"
+      ],
+      "required_planes": [
+        "orchestration",
+        "reasoning-verification",
+        "model-routing",
+        "evaluation",
+        "prompt-context"
+      ],
+      "authority_rule": "Reasoning proposes hypotheses and plans; deterministic policy, canonical evidence, and explicit verification decide what may be accepted or acted upon.",
+      "failure_mode": "Abstain, branch, repair, or escalate when constraints, evidence, calibration, or verification are insufficient.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Problem Framing: structural contract validation",
+        "Problem Framing: focused runtime or simulation evidence",
+        "Problem Framing: adversarial/failure-mode evidence",
+        "Problem Framing: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L032",
+      "ordinal": 32,
+      "stratum": "S04",
+      "title": "Task Decomposition",
+      "objective": "Build dependency-aware task DAGs with bounded subtasks, owners, budgets, checkpoints, and recomposition criteria.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L031"
+      ],
+      "required_planes": [
+        "orchestration",
+        "reasoning-verification",
+        "model-routing",
+        "evaluation",
+        "prompt-context"
+      ],
+      "authority_rule": "Reasoning proposes hypotheses and plans; deterministic policy, canonical evidence, and explicit verification decide what may be accepted or acted upon.",
+      "failure_mode": "Abstain, branch, repair, or escalate when constraints, evidence, calibration, or verification are insufficient.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Task Decomposition: structural contract validation",
+        "Task Decomposition: focused runtime or simulation evidence",
+        "Task Decomposition: adversarial/failure-mode evidence",
+        "Task Decomposition: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L033",
+      "ordinal": 33,
+      "stratum": "S04",
+      "title": "Hypothesis Generation",
+      "objective": "Generate competing explanations or solution candidates while labeling assumptions, priors, expected evidence, and falsifiers.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L032"
+      ],
+      "required_planes": [
+        "orchestration",
+        "reasoning-verification",
+        "model-routing",
+        "evaluation",
+        "prompt-context"
+      ],
+      "authority_rule": "Reasoning proposes hypotheses and plans; deterministic policy, canonical evidence, and explicit verification decide what may be accepted or acted upon.",
+      "failure_mode": "Abstain, branch, repair, or escalate when constraints, evidence, calibration, or verification are insufficient.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Hypothesis Generation: structural contract validation",
+        "Hypothesis Generation: focused runtime or simulation evidence",
+        "Hypothesis Generation: adversarial/failure-mode evidence",
+        "Hypothesis Generation: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L034",
+      "ordinal": 34,
+      "stratum": "S04",
+      "title": "Search and Branching",
+      "objective": "Explore alternative reasoning branches with bounded beam/tree search, pruning, diversity control, and branch provenance.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L033"
+      ],
+      "required_planes": [
+        "orchestration",
+        "reasoning-verification",
+        "model-routing",
+        "evaluation",
+        "prompt-context"
+      ],
+      "authority_rule": "Reasoning proposes hypotheses and plans; deterministic policy, canonical evidence, and explicit verification decide what may be accepted or acted upon.",
+      "failure_mode": "Abstain, branch, repair, or escalate when constraints, evidence, calibration, or verification are insufficient.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Search and Branching: structural contract validation",
+        "Search and Branching: focused runtime or simulation evidence",
+        "Search and Branching: adversarial/failure-mode evidence",
+        "Search and Branching: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L035",
+      "ordinal": 35,
+      "stratum": "S04",
+      "title": "Constraint Solving",
+      "objective": "Apply hard/soft constraints, optimization objectives, feasibility checks, and conflict explanations before accepting plans.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L034"
+      ],
+      "required_planes": [
+        "orchestration",
+        "reasoning-verification",
+        "model-routing",
+        "evaluation",
+        "prompt-context"
+      ],
+      "authority_rule": "Reasoning proposes hypotheses and plans; deterministic policy, canonical evidence, and explicit verification decide what may be accepted or acted upon.",
+      "failure_mode": "Abstain, branch, repair, or escalate when constraints, evidence, calibration, or verification are insufficient.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Constraint Solving: structural contract validation",
+        "Constraint Solving: focused runtime or simulation evidence",
+        "Constraint Solving: adversarial/failure-mode evidence",
+        "Constraint Solving: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L036",
+      "ordinal": 36,
+      "stratum": "S04",
+      "title": "Quantitative and Symbolic Reasoning",
+      "objective": "Route mathematics, logic, code, formal rules, and structured computation through verifiable representations and tools.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L035"
+      ],
+      "required_planes": [
+        "orchestration",
+        "reasoning-verification",
+        "model-routing",
+        "evaluation",
+        "prompt-context"
+      ],
+      "authority_rule": "Reasoning proposes hypotheses and plans; deterministic policy, canonical evidence, and explicit verification decide what may be accepted or acted upon.",
+      "failure_mode": "Abstain, branch, repair, or escalate when constraints, evidence, calibration, or verification are insufficient.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Quantitative and Symbolic Reasoning: structural contract validation",
+        "Quantitative and Symbolic Reasoning: focused runtime or simulation evidence",
+        "Quantitative and Symbolic Reasoning: adversarial/failure-mode evidence",
+        "Quantitative and Symbolic Reasoning: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L037",
+      "ordinal": 37,
+      "stratum": "S04",
+      "title": "Causal Reasoning",
+      "objective": "Distinguish correlation, intervention, mechanism, confounders, counterfactuals, and causal uncertainty in planning and explanation.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L036"
+      ],
+      "required_planes": [
+        "orchestration",
+        "reasoning-verification",
+        "model-routing",
+        "evaluation",
+        "prompt-context"
+      ],
+      "authority_rule": "Reasoning proposes hypotheses and plans; deterministic policy, canonical evidence, and explicit verification decide what may be accepted or acted upon.",
+      "failure_mode": "Abstain, branch, repair, or escalate when constraints, evidence, calibration, or verification are insufficient.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Causal Reasoning: structural contract validation",
+        "Causal Reasoning: focused runtime or simulation evidence",
+        "Causal Reasoning: adversarial/failure-mode evidence",
+        "Causal Reasoning: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L038",
+      "ordinal": 38,
+      "stratum": "S04",
+      "title": "Uncertainty Calibration",
+      "objective": "Track epistemic/aleatoric uncertainty, confidence intervals, evidence coverage, disagreement, and abstention thresholds.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L037"
+      ],
+      "required_planes": [
+        "orchestration",
+        "reasoning-verification",
+        "model-routing",
+        "evaluation",
+        "prompt-context"
+      ],
+      "authority_rule": "Reasoning proposes hypotheses and plans; deterministic policy, canonical evidence, and explicit verification decide what may be accepted or acted upon.",
+      "failure_mode": "Abstain, branch, repair, or escalate when constraints, evidence, calibration, or verification are insufficient.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Uncertainty Calibration: structural contract validation",
+        "Uncertainty Calibration: focused runtime or simulation evidence",
+        "Uncertainty Calibration: adversarial/failure-mode evidence",
+        "Uncertainty Calibration: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L039",
+      "ordinal": 39,
+      "stratum": "S04",
+      "title": "Independent Critique and Verification",
+      "objective": "Separate generation from deterministic checks and optional independent critics, adversarial review, simulation, and evidence validation.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L038"
+      ],
+      "required_planes": [
+        "orchestration",
+        "reasoning-verification",
+        "model-routing",
+        "evaluation",
+        "prompt-context"
+      ],
+      "authority_rule": "Reasoning proposes hypotheses and plans; deterministic policy, canonical evidence, and explicit verification decide what may be accepted or acted upon.",
+      "failure_mode": "Abstain, branch, repair, or escalate when constraints, evidence, calibration, or verification are insufficient.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Independent Critique and Verification: structural contract validation",
+        "Independent Critique and Verification: focused runtime or simulation evidence",
+        "Independent Critique and Verification: adversarial/failure-mode evidence",
+        "Independent Critique and Verification: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L040",
+      "ordinal": 40,
+      "stratum": "S04",
+      "title": "Deliberative Intelligence Closure",
+      "objective": "Prove framing, decomposition, search, constraint, causal, quantitative, uncertainty, and verification layers compose under bounded resources.",
+      "state": "planned_target",
+      "gate": true,
+      "promotion_prerequisites": [
+        "L039"
+      ],
+      "required_planes": [
+        "orchestration",
+        "reasoning-verification",
+        "model-routing",
+        "evaluation",
+        "prompt-context"
+      ],
+      "authority_rule": "Reasoning proposes hypotheses and plans; deterministic policy, canonical evidence, and explicit verification decide what may be accepted or acted upon.",
+      "failure_mode": "Abstain, branch, repair, or escalate when constraints, evidence, calibration, or verification are insufficient.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Deliberative Intelligence Closure: structural contract validation",
+        "Deliberative Intelligence Closure: focused runtime or simulation evidence",
+        "Deliberative Intelligence Closure: adversarial/failure-mode evidence",
+        "Deliberative Intelligence Closure: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L041",
+      "ordinal": 41,
+      "stratum": "S05",
+      "title": "Intent-to-Action Proposal",
+      "objective": "Translate plans into explicit action proposals with target, arguments, expected effect, risk, reversibility, and evidence needs.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L040"
+      ],
+      "required_planes": [
+        "tool-runtime",
+        "identity",
+        "security-safety",
+        "governance",
+        "jobs-durability",
+        "artifact-files"
+      ],
+      "authority_rule": "Models propose actions only; canonical capability policy, user approval where required, and tool runtime own privileged execution.",
+      "failure_mode": "Deny, await approval, reconcile ambiguous effects, or terminalize safely; never blindly replay consequential writes.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Intent-to-Action Proposal: structural contract validation",
+        "Intent-to-Action Proposal: focused runtime or simulation evidence",
+        "Intent-to-Action Proposal: adversarial/failure-mode evidence",
+        "Intent-to-Action Proposal: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L042",
+      "ordinal": 42,
+      "stratum": "S05",
+      "title": "Capability Admission",
+      "objective": "Resolve whether the principal and operation may attempt an action under tenant, policy, budget, risk, and data-class constraints.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L041"
+      ],
+      "required_planes": [
+        "tool-runtime",
+        "identity",
+        "security-safety",
+        "governance",
+        "jobs-durability",
+        "artifact-files"
+      ],
+      "authority_rule": "Models propose actions only; canonical capability policy, user approval where required, and tool runtime own privileged execution.",
+      "failure_mode": "Deny, await approval, reconcile ambiguous effects, or terminalize safely; never blindly replay consequential writes.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Capability Admission: structural contract validation",
+        "Capability Admission: focused runtime or simulation evidence",
+        "Capability Admission: adversarial/failure-mode evidence",
+        "Capability Admission: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L043",
+      "ordinal": 43,
+      "stratum": "S05",
+      "title": "Tool Schema Grounding",
+      "objective": "Ground model proposals into exact typed tool contracts, enumerated resources, validated arguments, and provider-neutral call identities.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L042"
+      ],
+      "required_planes": [
+        "tool-runtime",
+        "identity",
+        "security-safety",
+        "governance",
+        "jobs-durability",
+        "artifact-files"
+      ],
+      "authority_rule": "Models propose actions only; canonical capability policy, user approval where required, and tool runtime own privileged execution.",
+      "failure_mode": "Deny, await approval, reconcile ambiguous effects, or terminalize safely; never blindly replay consequential writes.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Tool Schema Grounding: structural contract validation",
+        "Tool Schema Grounding: focused runtime or simulation evidence",
+        "Tool Schema Grounding: adversarial/failure-mode evidence",
+        "Tool Schema Grounding: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L044",
+      "ordinal": 44,
+      "stratum": "S05",
+      "title": "Side-Effect Classification",
+      "objective": "Classify actions as read-only, reversible, consequential, destructive, security-sensitive, financial, external-write, or other governed classes.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L043"
+      ],
+      "required_planes": [
+        "tool-runtime",
+        "identity",
+        "security-safety",
+        "governance",
+        "jobs-durability",
+        "artifact-files"
+      ],
+      "authority_rule": "Models propose actions only; canonical capability policy, user approval where required, and tool runtime own privileged execution.",
+      "failure_mode": "Deny, await approval, reconcile ambiguous effects, or terminalize safely; never blindly replay consequential writes.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Side-Effect Classification: structural contract validation",
+        "Side-Effect Classification: focused runtime or simulation evidence",
+        "Side-Effect Classification: adversarial/failure-mode evidence",
+        "Side-Effect Classification: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L045",
+      "ordinal": 45,
+      "stratum": "S05",
+      "title": "Approval and Consent Orchestration",
+      "objective": "Acquire, bind, expire, revoke, and revalidate approvals against exact operation, arguments, risk, and acting principal.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L044"
+      ],
+      "required_planes": [
+        "tool-runtime",
+        "identity",
+        "security-safety",
+        "governance",
+        "jobs-durability",
+        "artifact-files"
+      ],
+      "authority_rule": "Models propose actions only; canonical capability policy, user approval where required, and tool runtime own privileged execution.",
+      "failure_mode": "Deny, await approval, reconcile ambiguous effects, or terminalize safely; never blindly replay consequential writes.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Approval and Consent Orchestration: structural contract validation",
+        "Approval and Consent Orchestration: focused runtime or simulation evidence",
+        "Approval and Consent Orchestration: adversarial/failure-mode evidence",
+        "Approval and Consent Orchestration: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L046",
+      "ordinal": 46,
+      "stratum": "S05",
+      "title": "Sandboxed Execution",
+      "objective": "Run executable/untrusted workloads in isolated resource-, filesystem-, process-, and network-bounded environments.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L045"
+      ],
+      "required_planes": [
+        "tool-runtime",
+        "identity",
+        "security-safety",
+        "governance",
+        "jobs-durability",
+        "artifact-files"
+      ],
+      "authority_rule": "Models propose actions only; canonical capability policy, user approval where required, and tool runtime own privileged execution.",
+      "failure_mode": "Deny, await approval, reconcile ambiguous effects, or terminalize safely; never blindly replay consequential writes.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Sandboxed Execution: structural contract validation",
+        "Sandboxed Execution: focused runtime or simulation evidence",
+        "Sandboxed Execution: adversarial/failure-mode evidence",
+        "Sandboxed Execution: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L047",
+      "ordinal": 47,
+      "stratum": "S05",
+      "title": "Transactional External Integration",
+      "objective": "Use idempotency, outbox/saga, receipts, retries, compensation, and reconciliation for actions across external systems.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L046"
+      ],
+      "required_planes": [
+        "tool-runtime",
+        "identity",
+        "security-safety",
+        "governance",
+        "jobs-durability",
+        "artifact-files"
+      ],
+      "authority_rule": "Models propose actions only; canonical capability policy, user approval where required, and tool runtime own privileged execution.",
+      "failure_mode": "Deny, await approval, reconcile ambiguous effects, or terminalize safely; never blindly replay consequential writes.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Transactional External Integration: structural contract validation",
+        "Transactional External Integration: focused runtime or simulation evidence",
+        "Transactional External Integration: adversarial/failure-mode evidence",
+        "Transactional External Integration: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L048",
+      "ordinal": 48,
+      "stratum": "S05",
+      "title": "Ambiguous Effect Reconciliation",
+      "objective": "Detect uncertain side effects after timeout/crash and reconcile external status before any retry or model continuation.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L047"
+      ],
+      "required_planes": [
+        "tool-runtime",
+        "identity",
+        "security-safety",
+        "governance",
+        "jobs-durability",
+        "artifact-files"
+      ],
+      "authority_rule": "Models propose actions only; canonical capability policy, user approval where required, and tool runtime own privileged execution.",
+      "failure_mode": "Deny, await approval, reconcile ambiguous effects, or terminalize safely; never blindly replay consequential writes.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Ambiguous Effect Reconciliation: structural contract validation",
+        "Ambiguous Effect Reconciliation: focused runtime or simulation evidence",
+        "Ambiguous Effect Reconciliation: adversarial/failure-mode evidence",
+        "Ambiguous Effect Reconciliation: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L049",
+      "ordinal": 49,
+      "stratum": "S05",
+      "title": "Action Outcome Verification",
+      "objective": "Verify observed outcome against intended effect, tool receipt, external state, policy, and user-visible claim before completion.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L048"
+      ],
+      "required_planes": [
+        "tool-runtime",
+        "identity",
+        "security-safety",
+        "governance",
+        "jobs-durability",
+        "artifact-files"
+      ],
+      "authority_rule": "Models propose actions only; canonical capability policy, user approval where required, and tool runtime own privileged execution.",
+      "failure_mode": "Deny, await approval, reconcile ambiguous effects, or terminalize safely; never blindly replay consequential writes.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Action Outcome Verification: structural contract validation",
+        "Action Outcome Verification: focused runtime or simulation evidence",
+        "Action Outcome Verification: adversarial/failure-mode evidence",
+        "Action Outcome Verification: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L050",
+      "ordinal": 50,
+      "stratum": "S05",
+      "title": "Governed Agency Closure",
+      "objective": "Prove proposals cannot bypass authority, approvals cannot drift, external effects are replay-safe, and claimed outcomes are receipt-backed.",
+      "state": "planned_target",
+      "gate": true,
+      "promotion_prerequisites": [
+        "L049"
+      ],
+      "required_planes": [
+        "tool-runtime",
+        "identity",
+        "security-safety",
+        "governance",
+        "jobs-durability",
+        "artifact-files"
+      ],
+      "authority_rule": "Models propose actions only; canonical capability policy, user approval where required, and tool runtime own privileged execution.",
+      "failure_mode": "Deny, await approval, reconcile ambiguous effects, or terminalize safely; never blindly replay consequential writes.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Governed Agency Closure: structural contract validation",
+        "Governed Agency Closure: focused runtime or simulation evidence",
+        "Governed Agency Closure: adversarial/failure-mode evidence",
+        "Governed Agency Closure: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L051",
+      "ordinal": 51,
+      "stratum": "S06",
+      "title": "Agent Role and Responsibility Models",
+      "objective": "Define specialist roles, responsibilities, allowed context, budgets, capabilities, and escalation boundaries.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L050"
+      ],
+      "required_planes": [
+        "orchestration",
+        "jobs-durability",
+        "operator-control",
+        "observability",
+        "cost-capacity"
+      ],
+      "authority_rule": "Delegation can only reduce or partition parent authority and budget; child workers cannot mint permissions, budget, or canonical state ownership.",
+      "failure_mode": "Collapse to fewer workers, serialize, escalate conflict, or stop; never amplify recursion, spending, permissions, or side effects.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Agent Role and Responsibility Models: structural contract validation",
+        "Agent Role and Responsibility Models: focused runtime or simulation evidence",
+        "Agent Role and Responsibility Models: adversarial/failure-mode evidence",
+        "Agent Role and Responsibility Models: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L052",
+      "ordinal": 52,
+      "stratum": "S06",
+      "title": "Delegation Graph",
+      "objective": "Create explicit parent-child delegation edges carrying reduced authority, sub-budgets, task contracts, deadlines, and expected evidence.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L051"
+      ],
+      "required_planes": [
+        "orchestration",
+        "jobs-durability",
+        "operator-control",
+        "observability",
+        "cost-capacity"
+      ],
+      "authority_rule": "Delegation can only reduce or partition parent authority and budget; child workers cannot mint permissions, budget, or canonical state ownership.",
+      "failure_mode": "Collapse to fewer workers, serialize, escalate conflict, or stop; never amplify recursion, spending, permissions, or side effects.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Delegation Graph: structural contract validation",
+        "Delegation Graph: focused runtime or simulation evidence",
+        "Delegation Graph: adversarial/failure-mode evidence",
+        "Delegation Graph: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L053",
+      "ordinal": 53,
+      "stratum": "S06",
+      "title": "Bounded Worker Spawning",
+      "objective": "Control worker count, recursion depth, fan-out, lifetime, token/cost budgets, and cancellation propagation.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L052"
+      ],
+      "required_planes": [
+        "orchestration",
+        "jobs-durability",
+        "operator-control",
+        "observability",
+        "cost-capacity"
+      ],
+      "authority_rule": "Delegation can only reduce or partition parent authority and budget; child workers cannot mint permissions, budget, or canonical state ownership.",
+      "failure_mode": "Collapse to fewer workers, serialize, escalate conflict, or stop; never amplify recursion, spending, permissions, or side effects.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Bounded Worker Spawning: structural contract validation",
+        "Bounded Worker Spawning: focused runtime or simulation evidence",
+        "Bounded Worker Spawning: adversarial/failure-mode evidence",
+        "Bounded Worker Spawning: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L054",
+      "ordinal": 54,
+      "stratum": "S06",
+      "title": "Shared Workspace Coordination",
+      "objective": "Coordinate artifacts, hypotheses, task state, locks, versions, and provenance in a canonical collaboration workspace.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L053"
+      ],
+      "required_planes": [
+        "orchestration",
+        "jobs-durability",
+        "operator-control",
+        "observability",
+        "cost-capacity"
+      ],
+      "authority_rule": "Delegation can only reduce or partition parent authority and budget; child workers cannot mint permissions, budget, or canonical state ownership.",
+      "failure_mode": "Collapse to fewer workers, serialize, escalate conflict, or stop; never amplify recursion, spending, permissions, or side effects.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Shared Workspace Coordination: structural contract validation",
+        "Shared Workspace Coordination: focused runtime or simulation evidence",
+        "Shared Workspace Coordination: adversarial/failure-mode evidence",
+        "Shared Workspace Coordination: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L055",
+      "ordinal": 55,
+      "stratum": "S06",
+      "title": "Negotiation and Consensus",
+      "objective": "Aggregate competing agent proposals through evidence-weighted voting, debate, ranking, confidence, and consensus rules.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L054"
+      ],
+      "required_planes": [
+        "orchestration",
+        "jobs-durability",
+        "operator-control",
+        "observability",
+        "cost-capacity"
+      ],
+      "authority_rule": "Delegation can only reduce or partition parent authority and budget; child workers cannot mint permissions, budget, or canonical state ownership.",
+      "failure_mode": "Collapse to fewer workers, serialize, escalate conflict, or stop; never amplify recursion, spending, permissions, or side effects.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Negotiation and Consensus: structural contract validation",
+        "Negotiation and Consensus: focused runtime or simulation evidence",
+        "Negotiation and Consensus: adversarial/failure-mode evidence",
+        "Negotiation and Consensus: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L056",
+      "ordinal": 56,
+      "stratum": "S06",
+      "title": "Conflict Detection and Resolution",
+      "objective": "Detect incompatible plans, writes, claims, locks, goals, or resource needs and resolve through policy, arbitration, or escalation.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L055"
+      ],
+      "required_planes": [
+        "orchestration",
+        "jobs-durability",
+        "operator-control",
+        "observability",
+        "cost-capacity"
+      ],
+      "authority_rule": "Delegation can only reduce or partition parent authority and budget; child workers cannot mint permissions, budget, or canonical state ownership.",
+      "failure_mode": "Collapse to fewer workers, serialize, escalate conflict, or stop; never amplify recursion, spending, permissions, or side effects.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Conflict Detection and Resolution: structural contract validation",
+        "Conflict Detection and Resolution: focused runtime or simulation evidence",
+        "Conflict Detection and Resolution: adversarial/failure-mode evidence",
+        "Conflict Detection and Resolution: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L057",
+      "ordinal": 57,
+      "stratum": "S06",
+      "title": "Supervisor-Secretary-Worker Hierarchy",
+      "objective": "Formalize scheduling/delegation, decomposition/coordination, and bounded execution roles without collapsing authority separation.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L056"
+      ],
+      "required_planes": [
+        "orchestration",
+        "jobs-durability",
+        "operator-control",
+        "observability",
+        "cost-capacity"
+      ],
+      "authority_rule": "Delegation can only reduce or partition parent authority and budget; child workers cannot mint permissions, budget, or canonical state ownership.",
+      "failure_mode": "Collapse to fewer workers, serialize, escalate conflict, or stop; never amplify recursion, spending, permissions, or side effects.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Supervisor-Secretary-Worker Hierarchy: structural contract validation",
+        "Supervisor-Secretary-Worker Hierarchy: focused runtime or simulation evidence",
+        "Supervisor-Secretary-Worker Hierarchy: adversarial/failure-mode evidence",
+        "Supervisor-Secretary-Worker Hierarchy: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L058",
+      "ordinal": 58,
+      "stratum": "S06",
+      "title": "Swarm and Parallel Coordination",
+      "objective": "Execute large parallel workloads with shard identity, deterministic joins, straggler policy, fairness, duplicate suppression, and bounded concurrency.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L057"
+      ],
+      "required_planes": [
+        "orchestration",
+        "jobs-durability",
+        "operator-control",
+        "observability",
+        "cost-capacity"
+      ],
+      "authority_rule": "Delegation can only reduce or partition parent authority and budget; child workers cannot mint permissions, budget, or canonical state ownership.",
+      "failure_mode": "Collapse to fewer workers, serialize, escalate conflict, or stop; never amplify recursion, spending, permissions, or side effects.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Swarm and Parallel Coordination: structural contract validation",
+        "Swarm and Parallel Coordination: focused runtime or simulation evidence",
+        "Swarm and Parallel Coordination: adversarial/failure-mode evidence",
+        "Swarm and Parallel Coordination: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L059",
+      "ordinal": 59,
+      "stratum": "S06",
+      "title": "Cross-Agent Provenance",
+      "objective": "Preserve which agent produced, consumed, transformed, challenged, or approved every material claim, action, and artifact.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L058"
+      ],
+      "required_planes": [
+        "orchestration",
+        "jobs-durability",
+        "operator-control",
+        "observability",
+        "cost-capacity"
+      ],
+      "authority_rule": "Delegation can only reduce or partition parent authority and budget; child workers cannot mint permissions, budget, or canonical state ownership.",
+      "failure_mode": "Collapse to fewer workers, serialize, escalate conflict, or stop; never amplify recursion, spending, permissions, or side effects.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Cross-Agent Provenance: structural contract validation",
+        "Cross-Agent Provenance: focused runtime or simulation evidence",
+        "Cross-Agent Provenance: adversarial/failure-mode evidence",
+        "Cross-Agent Provenance: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L060",
+      "ordinal": 60,
+      "stratum": "S06",
+      "title": "Organizational Intelligence Closure",
+      "objective": "Prove multi-agent work cannot amplify authority/budget, lose provenance, deadlock indefinitely, duplicate effects, or silently override conflicts.",
+      "state": "planned_target",
+      "gate": true,
+      "promotion_prerequisites": [
+        "L059"
+      ],
+      "required_planes": [
+        "orchestration",
+        "jobs-durability",
+        "operator-control",
+        "observability",
+        "cost-capacity"
+      ],
+      "authority_rule": "Delegation can only reduce or partition parent authority and budget; child workers cannot mint permissions, budget, or canonical state ownership.",
+      "failure_mode": "Collapse to fewer workers, serialize, escalate conflict, or stop; never amplify recursion, spending, permissions, or side effects.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Organizational Intelligence Closure: structural contract validation",
+        "Organizational Intelligence Closure: focused runtime or simulation evidence",
+        "Organizational Intelligence Closure: adversarial/failure-mode evidence",
+        "Organizational Intelligence Closure: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L061",
+      "ordinal": 61,
+      "stratum": "S07",
+      "title": "Feedback Capture",
+      "objective": "Collect explicit user feedback, implicit outcome signals, tool results, evaluator labels, incidents, and corrections with provenance and consent.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L060"
+      ],
+      "required_planes": [
+        "evaluation",
+        "feedback-learning",
+        "observability",
+        "model-routing",
+        "memory",
+        "governance"
+      ],
+      "authority_rule": "Learning produces proposals and evidence; release/evaluation policy owns promotion. Online feedback cannot directly rewrite production policy or behavior.",
+      "failure_mode": "Retain or roll back to the last verified baseline when evidence is weak, distribution shifts, safety regresses, or metrics conflict.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Feedback Capture: structural contract validation",
+        "Feedback Capture: focused runtime or simulation evidence",
+        "Feedback Capture: adversarial/failure-mode evidence",
+        "Feedback Capture: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L062",
+      "ordinal": 62,
+      "stratum": "S07",
+      "title": "Offline Evaluation",
+      "objective": "Run reproducible datasets, golden tasks, safety suites, regressions, stress cases, and counterexamples outside production serving.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L061"
+      ],
+      "required_planes": [
+        "evaluation",
+        "feedback-learning",
+        "observability",
+        "model-routing",
+        "memory",
+        "governance"
+      ],
+      "authority_rule": "Learning produces proposals and evidence; release/evaluation policy owns promotion. Online feedback cannot directly rewrite production policy or behavior.",
+      "failure_mode": "Retain or roll back to the last verified baseline when evidence is weak, distribution shifts, safety regresses, or metrics conflict.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Offline Evaluation: structural contract validation",
+        "Offline Evaluation: focused runtime or simulation evidence",
+        "Offline Evaluation: adversarial/failure-mode evidence",
+        "Offline Evaluation: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L063",
+      "ordinal": 63,
+      "stratum": "S07",
+      "title": "Online Evaluation",
+      "objective": "Measure quality, latency, cost, safety, user success, calibration, and failure modes on governed production-like or shadow traffic.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L062"
+      ],
+      "required_planes": [
+        "evaluation",
+        "feedback-learning",
+        "observability",
+        "model-routing",
+        "memory",
+        "governance"
+      ],
+      "authority_rule": "Learning produces proposals and evidence; release/evaluation policy owns promotion. Online feedback cannot directly rewrite production policy or behavior.",
+      "failure_mode": "Retain or roll back to the last verified baseline when evidence is weak, distribution shifts, safety regresses, or metrics conflict.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Online Evaluation: structural contract validation",
+        "Online Evaluation: focused runtime or simulation evidence",
+        "Online Evaluation: adversarial/failure-mode evidence",
+        "Online Evaluation: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L064",
+      "ordinal": 64,
+      "stratum": "S07",
+      "title": "Counterfactual Analysis",
+      "objective": "Estimate alternative routing, prompting, tool, memory, and policy outcomes without mutating production authority.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L063"
+      ],
+      "required_planes": [
+        "evaluation",
+        "feedback-learning",
+        "observability",
+        "model-routing",
+        "memory",
+        "governance"
+      ],
+      "authority_rule": "Learning produces proposals and evidence; release/evaluation policy owns promotion. Online feedback cannot directly rewrite production policy or behavior.",
+      "failure_mode": "Retain or roll back to the last verified baseline when evidence is weak, distribution shifts, safety regresses, or metrics conflict.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Counterfactual Analysis: structural contract validation",
+        "Counterfactual Analysis: focused runtime or simulation evidence",
+        "Counterfactual Analysis: adversarial/failure-mode evidence",
+        "Counterfactual Analysis: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L065",
+      "ordinal": 65,
+      "stratum": "S07",
+      "title": "Preference and Reward Learning",
+      "objective": "Learn bounded preferences or reward models from governed signals while controlling bias, drift, poisoning, and tenant leakage.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L064"
+      ],
+      "required_planes": [
+        "evaluation",
+        "feedback-learning",
+        "observability",
+        "model-routing",
+        "memory",
+        "governance"
+      ],
+      "authority_rule": "Learning produces proposals and evidence; release/evaluation policy owns promotion. Online feedback cannot directly rewrite production policy or behavior.",
+      "failure_mode": "Retain or roll back to the last verified baseline when evidence is weak, distribution shifts, safety regresses, or metrics conflict.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Preference and Reward Learning: structural contract validation",
+        "Preference and Reward Learning: focused runtime or simulation evidence",
+        "Preference and Reward Learning: adversarial/failure-mode evidence",
+        "Preference and Reward Learning: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L066",
+      "ordinal": 66,
+      "stratum": "S07",
+      "title": "Curriculum and Self-Training",
+      "objective": "Sequence learning tasks and synthetic practice under provenance, holdouts, contamination controls, and independent evaluation.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L065"
+      ],
+      "required_planes": [
+        "evaluation",
+        "feedback-learning",
+        "observability",
+        "model-routing",
+        "memory",
+        "governance"
+      ],
+      "authority_rule": "Learning produces proposals and evidence; release/evaluation policy owns promotion. Online feedback cannot directly rewrite production policy or behavior.",
+      "failure_mode": "Retain or roll back to the last verified baseline when evidence is weak, distribution shifts, safety regresses, or metrics conflict.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Curriculum and Self-Training: structural contract validation",
+        "Curriculum and Self-Training: focused runtime or simulation evidence",
+        "Curriculum and Self-Training: adversarial/failure-mode evidence",
+        "Curriculum and Self-Training: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L067",
+      "ordinal": 67,
+      "stratum": "S07",
+      "title": "Adaptive Routing",
+      "objective": "Continuously optimize model/provider/tool/strategy selection using current telemetry while preserving hard privacy, quality, and capability constraints.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L066"
+      ],
+      "required_planes": [
+        "evaluation",
+        "feedback-learning",
+        "observability",
+        "model-routing",
+        "memory",
+        "governance"
+      ],
+      "authority_rule": "Learning produces proposals and evidence; release/evaluation policy owns promotion. Online feedback cannot directly rewrite production policy or behavior.",
+      "failure_mode": "Retain or roll back to the last verified baseline when evidence is weak, distribution shifts, safety regresses, or metrics conflict.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Adaptive Routing: structural contract validation",
+        "Adaptive Routing: focused runtime or simulation evidence",
+        "Adaptive Routing: adversarial/failure-mode evidence",
+        "Adaptive Routing: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L068",
+      "ordinal": 68,
+      "stratum": "S07",
+      "title": "Memory and Strategy Adaptation",
+      "objective": "Adapt retrieval, memory use, planning heuristics, and cognitive strategies using measured outcomes without silently rewriting policy.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L067"
+      ],
+      "required_planes": [
+        "evaluation",
+        "feedback-learning",
+        "observability",
+        "model-routing",
+        "memory",
+        "governance"
+      ],
+      "authority_rule": "Learning produces proposals and evidence; release/evaluation policy owns promotion. Online feedback cannot directly rewrite production policy or behavior.",
+      "failure_mode": "Retain or roll back to the last verified baseline when evidence is weak, distribution shifts, safety regresses, or metrics conflict.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Memory and Strategy Adaptation: structural contract validation",
+        "Memory and Strategy Adaptation: focused runtime or simulation evidence",
+        "Memory and Strategy Adaptation: adversarial/failure-mode evidence",
+        "Memory and Strategy Adaptation: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L069",
+      "ordinal": 69,
+      "stratum": "S07",
+      "title": "Safe Promotion and Rollback",
+      "objective": "Promote learned changes through experiment, evaluation, canary, approval, provenance, rollback, and baseline comparison.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L068"
+      ],
+      "required_planes": [
+        "evaluation",
+        "feedback-learning",
+        "observability",
+        "model-routing",
+        "memory",
+        "governance"
+      ],
+      "authority_rule": "Learning produces proposals and evidence; release/evaluation policy owns promotion. Online feedback cannot directly rewrite production policy or behavior.",
+      "failure_mode": "Retain or roll back to the last verified baseline when evidence is weak, distribution shifts, safety regresses, or metrics conflict.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Safe Promotion and Rollback: structural contract validation",
+        "Safe Promotion and Rollback: focused runtime or simulation evidence",
+        "Safe Promotion and Rollback: adversarial/failure-mode evidence",
+        "Safe Promotion and Rollback: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L070",
+      "ordinal": 70,
+      "stratum": "S07",
+      "title": "Adaptive Intelligence Closure",
+      "objective": "Prove learning cannot poison authority, bypass holdouts, leak tenants, overfit hidden tests, or promote regressions without rollback.",
+      "state": "planned_target",
+      "gate": true,
+      "promotion_prerequisites": [
+        "L069"
+      ],
+      "required_planes": [
+        "evaluation",
+        "feedback-learning",
+        "observability",
+        "model-routing",
+        "memory",
+        "governance"
+      ],
+      "authority_rule": "Learning produces proposals and evidence; release/evaluation policy owns promotion. Online feedback cannot directly rewrite production policy or behavior.",
+      "failure_mode": "Retain or roll back to the last verified baseline when evidence is weak, distribution shifts, safety regresses, or metrics conflict.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Adaptive Intelligence Closure: structural contract validation",
+        "Adaptive Intelligence Closure: focused runtime or simulation evidence",
+        "Adaptive Intelligence Closure: adversarial/failure-mode evidence",
+        "Adaptive Intelligence Closure: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L071",
+      "ordinal": 71,
+      "stratum": "S08",
+      "title": "Goal Lifecycle Management",
+      "objective": "Represent goals with origin, authority, priority, deadlines, stop conditions, dependencies, satisfaction evidence, and revocation.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L070"
+      ],
+      "required_planes": [
+        "resilience",
+        "cost-capacity",
+        "governance",
+        "security-safety",
+        "deployment-release",
+        "jobs-durability",
+        "operator-control"
+      ],
+      "authority_rule": "Autonomy is policy-bounded execution over explicit goals and budgets; it never grants itself broader authority or silently converts recommendation into mutation.",
+      "failure_mode": "Pause, defer, isolate, rollback, request human authority, or enter safe degraded mode when risk, budget, dependencies, or confidence cross policy.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Goal Lifecycle Management: structural contract validation",
+        "Goal Lifecycle Management: focused runtime or simulation evidence",
+        "Goal Lifecycle Management: adversarial/failure-mode evidence",
+        "Goal Lifecycle Management: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L072",
+      "ordinal": 72,
+      "stratum": "S08",
+      "title": "Autonomy Policy Engine",
+      "objective": "Determine what may run unattended, what requires confirmation, what must escalate, and what is prohibited by capability/risk/data policy.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L071"
+      ],
+      "required_planes": [
+        "resilience",
+        "cost-capacity",
+        "governance",
+        "security-safety",
+        "deployment-release",
+        "jobs-durability",
+        "operator-control"
+      ],
+      "authority_rule": "Autonomy is policy-bounded execution over explicit goals and budgets; it never grants itself broader authority or silently converts recommendation into mutation.",
+      "failure_mode": "Pause, defer, isolate, rollback, request human authority, or enter safe degraded mode when risk, budget, dependencies, or confidence cross policy.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Autonomy Policy Engine: structural contract validation",
+        "Autonomy Policy Engine: focused runtime or simulation evidence",
+        "Autonomy Policy Engine: adversarial/failure-mode evidence",
+        "Autonomy Policy Engine: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L073",
+      "ordinal": 73,
+      "stratum": "S08",
+      "title": "Scheduled and Background Cognition",
+      "objective": "Run recurring or deferred cognitive work with durable schedules, deduplication, missed-run policy, budgets, and owner-visible state.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L072"
+      ],
+      "required_planes": [
+        "resilience",
+        "cost-capacity",
+        "governance",
+        "security-safety",
+        "deployment-release",
+        "jobs-durability",
+        "operator-control"
+      ],
+      "authority_rule": "Autonomy is policy-bounded execution over explicit goals and budgets; it never grants itself broader authority or silently converts recommendation into mutation.",
+      "failure_mode": "Pause, defer, isolate, rollback, request human authority, or enter safe degraded mode when risk, budget, dependencies, or confidence cross policy.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Scheduled and Background Cognition: structural contract validation",
+        "Scheduled and Background Cognition: focused runtime or simulation evidence",
+        "Scheduled and Background Cognition: adversarial/failure-mode evidence",
+        "Scheduled and Background Cognition: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L074",
+      "ordinal": 74,
+      "stratum": "S08",
+      "title": "Interruption, Resume, and Handoff",
+      "objective": "Checkpoint and transfer long-running work across process/device/agent boundaries without duplicate side effects or context corruption.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L073"
+      ],
+      "required_planes": [
+        "resilience",
+        "cost-capacity",
+        "governance",
+        "security-safety",
+        "deployment-release",
+        "jobs-durability",
+        "operator-control"
+      ],
+      "authority_rule": "Autonomy is policy-bounded execution over explicit goals and budgets; it never grants itself broader authority or silently converts recommendation into mutation.",
+      "failure_mode": "Pause, defer, isolate, rollback, request human authority, or enter safe degraded mode when risk, budget, dependencies, or confidence cross policy.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Interruption, Resume, and Handoff: structural contract validation",
+        "Interruption, Resume, and Handoff: focused runtime or simulation evidence",
+        "Interruption, Resume, and Handoff: adversarial/failure-mode evidence",
+        "Interruption, Resume, and Handoff: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L075",
+      "ordinal": 75,
+      "stratum": "S08",
+      "title": "Fault Diagnosis",
+      "objective": "Diagnose provider, tool, state, network, configuration, data, model, capacity, and policy failures using evidence rather than guesswork.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L074"
+      ],
+      "required_planes": [
+        "resilience",
+        "cost-capacity",
+        "governance",
+        "security-safety",
+        "deployment-release",
+        "jobs-durability",
+        "operator-control"
+      ],
+      "authority_rule": "Autonomy is policy-bounded execution over explicit goals and budgets; it never grants itself broader authority or silently converts recommendation into mutation.",
+      "failure_mode": "Pause, defer, isolate, rollback, request human authority, or enter safe degraded mode when risk, budget, dependencies, or confidence cross policy.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Fault Diagnosis: structural contract validation",
+        "Fault Diagnosis: focused runtime or simulation evidence",
+        "Fault Diagnosis: adversarial/failure-mode evidence",
+        "Fault Diagnosis: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L076",
+      "ordinal": 76,
+      "stratum": "S08",
+      "title": "Self-Healing Proposal Engine",
+      "objective": "Generate bounded remediation proposals, rollback options, reconfiguration, reroutes, or repairs subject to independent authority.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L075"
+      ],
+      "required_planes": [
+        "resilience",
+        "cost-capacity",
+        "governance",
+        "security-safety",
+        "deployment-release",
+        "jobs-durability",
+        "operator-control"
+      ],
+      "authority_rule": "Autonomy is policy-bounded execution over explicit goals and budgets; it never grants itself broader authority or silently converts recommendation into mutation.",
+      "failure_mode": "Pause, defer, isolate, rollback, request human authority, or enter safe degraded mode when risk, budget, dependencies, or confidence cross policy.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Self-Healing Proposal Engine: structural contract validation",
+        "Self-Healing Proposal Engine: focused runtime or simulation evidence",
+        "Self-Healing Proposal Engine: adversarial/failure-mode evidence",
+        "Self-Healing Proposal Engine: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L077",
+      "ordinal": 77,
+      "stratum": "S08",
+      "title": "Chaos and Resilience Intelligence",
+      "objective": "Exercise controlled failure injection, dependency loss, corruption detection, overload, restart, and recovery to harden runtime behavior.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L076"
+      ],
+      "required_planes": [
+        "resilience",
+        "cost-capacity",
+        "governance",
+        "security-safety",
+        "deployment-release",
+        "jobs-durability",
+        "operator-control"
+      ],
+      "authority_rule": "Autonomy is policy-bounded execution over explicit goals and budgets; it never grants itself broader authority or silently converts recommendation into mutation.",
+      "failure_mode": "Pause, defer, isolate, rollback, request human authority, or enter safe degraded mode when risk, budget, dependencies, or confidence cross policy.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Chaos and Resilience Intelligence: structural contract validation",
+        "Chaos and Resilience Intelligence: focused runtime or simulation evidence",
+        "Chaos and Resilience Intelligence: adversarial/failure-mode evidence",
+        "Chaos and Resilience Intelligence: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L078",
+      "ordinal": 78,
+      "stratum": "S08",
+      "title": "Policy and Governance Reasoning",
+      "objective": "Interpret applicable policy, data classification, residency, retention, approval, and control obligations without becoming the policy authority.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L077"
+      ],
+      "required_planes": [
+        "resilience",
+        "cost-capacity",
+        "governance",
+        "security-safety",
+        "deployment-release",
+        "jobs-durability",
+        "operator-control"
+      ],
+      "authority_rule": "Autonomy is policy-bounded execution over explicit goals and budgets; it never grants itself broader authority or silently converts recommendation into mutation.",
+      "failure_mode": "Pause, defer, isolate, rollback, request human authority, or enter safe degraded mode when risk, budget, dependencies, or confidence cross policy.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Policy and Governance Reasoning: structural contract validation",
+        "Policy and Governance Reasoning: focused runtime or simulation evidence",
+        "Policy and Governance Reasoning: adversarial/failure-mode evidence",
+        "Policy and Governance Reasoning: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L079",
+      "ordinal": 79,
+      "stratum": "S08",
+      "title": "Risk-Aware Escalation",
+      "objective": "Escalate based on impact, uncertainty, irreversibility, novelty, security, legal/governance triggers, and evidence insufficiency.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L078"
+      ],
+      "required_planes": [
+        "resilience",
+        "cost-capacity",
+        "governance",
+        "security-safety",
+        "deployment-release",
+        "jobs-durability",
+        "operator-control"
+      ],
+      "authority_rule": "Autonomy is policy-bounded execution over explicit goals and budgets; it never grants itself broader authority or silently converts recommendation into mutation.",
+      "failure_mode": "Pause, defer, isolate, rollback, request human authority, or enter safe degraded mode when risk, budget, dependencies, or confidence cross policy.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Risk-Aware Escalation: structural contract validation",
+        "Risk-Aware Escalation: focused runtime or simulation evidence",
+        "Risk-Aware Escalation: adversarial/failure-mode evidence",
+        "Risk-Aware Escalation: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L080",
+      "ordinal": 80,
+      "stratum": "S08",
+      "title": "Bounded Autonomy Closure",
+      "objective": "Prove unattended work remains revocable, observable, budgeted, policy-bound, recoverable, and incapable of self-escalating privilege.",
+      "state": "planned_target",
+      "gate": true,
+      "promotion_prerequisites": [
+        "L079"
+      ],
+      "required_planes": [
+        "resilience",
+        "cost-capacity",
+        "governance",
+        "security-safety",
+        "deployment-release",
+        "jobs-durability",
+        "operator-control"
+      ],
+      "authority_rule": "Autonomy is policy-bounded execution over explicit goals and budgets; it never grants itself broader authority or silently converts recommendation into mutation.",
+      "failure_mode": "Pause, defer, isolate, rollback, request human authority, or enter safe degraded mode when risk, budget, dependencies, or confidence cross policy.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Bounded Autonomy Closure: structural contract validation",
+        "Bounded Autonomy Closure: focused runtime or simulation evidence",
+        "Bounded Autonomy Closure: adversarial/failure-mode evidence",
+        "Bounded Autonomy Closure: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L081",
+      "ordinal": 81,
+      "stratum": "S09",
+      "title": "World Model Construction",
+      "objective": "Maintain explicit models of entities, environments, systems, constraints, dynamics, and uncertainty tied to observed evidence.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L080"
+      ],
+      "required_planes": [
+        "orchestration",
+        "reasoning-verification",
+        "retrieval",
+        "memory",
+        "evaluation",
+        "model-routing",
+        "observability"
+      ],
+      "authority_rule": "Internal models remain hypotheses. Simulations, self-assessments, and stakeholder models cannot override real evidence, consent, policy, or measured outcomes.",
+      "failure_mode": "Expose uncertainty, compare alternative models, seek evidence, or abstain; never present simulation confidence as observed reality.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "World Model Construction: structural contract validation",
+        "World Model Construction: focused runtime or simulation evidence",
+        "World Model Construction: adversarial/failure-mode evidence",
+        "World Model Construction: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L082",
+      "ordinal": 82,
+      "stratum": "S09",
+      "title": "Simulation and Digital Twin Reasoning",
+      "objective": "Run counterfactual simulations or digital twins with stated assumptions, calibration, uncertainty, and separation from observed reality.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L081"
+      ],
+      "required_planes": [
+        "orchestration",
+        "reasoning-verification",
+        "retrieval",
+        "memory",
+        "evaluation",
+        "model-routing",
+        "observability"
+      ],
+      "authority_rule": "Internal models remain hypotheses. Simulations, self-assessments, and stakeholder models cannot override real evidence, consent, policy, or measured outcomes.",
+      "failure_mode": "Expose uncertainty, compare alternative models, seek evidence, or abstain; never present simulation confidence as observed reality.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Simulation and Digital Twin Reasoning: structural contract validation",
+        "Simulation and Digital Twin Reasoning: focused runtime or simulation evidence",
+        "Simulation and Digital Twin Reasoning: adversarial/failure-mode evidence",
+        "Simulation and Digital Twin Reasoning: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L083",
+      "ordinal": 83,
+      "stratum": "S09",
+      "title": "Long-Horizon Planning",
+      "objective": "Plan across extended time horizons with milestones, contingencies, dependency uncertainty, resource curves, and re-planning triggers.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L082"
+      ],
+      "required_planes": [
+        "orchestration",
+        "reasoning-verification",
+        "retrieval",
+        "memory",
+        "evaluation",
+        "model-routing",
+        "observability"
+      ],
+      "authority_rule": "Internal models remain hypotheses. Simulations, self-assessments, and stakeholder models cannot override real evidence, consent, policy, or measured outcomes.",
+      "failure_mode": "Expose uncertainty, compare alternative models, seek evidence, or abstain; never present simulation confidence as observed reality.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Long-Horizon Planning: structural contract validation",
+        "Long-Horizon Planning: focused runtime or simulation evidence",
+        "Long-Horizon Planning: adversarial/failure-mode evidence",
+        "Long-Horizon Planning: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L084",
+      "ordinal": 84,
+      "stratum": "S09",
+      "title": "Hierarchical Planning",
+      "objective": "Compose strategy, programs, projects, tasks, and actions across abstraction levels while preserving traceable goal decomposition.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L083"
+      ],
+      "required_planes": [
+        "orchestration",
+        "reasoning-verification",
+        "retrieval",
+        "memory",
+        "evaluation",
+        "model-routing",
+        "observability"
+      ],
+      "authority_rule": "Internal models remain hypotheses. Simulations, self-assessments, and stakeholder models cannot override real evidence, consent, policy, or measured outcomes.",
+      "failure_mode": "Expose uncertainty, compare alternative models, seek evidence, or abstain; never present simulation confidence as observed reality.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Hierarchical Planning: structural contract validation",
+        "Hierarchical Planning: focused runtime or simulation evidence",
+        "Hierarchical Planning: adversarial/failure-mode evidence",
+        "Hierarchical Planning: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L085",
+      "ordinal": 85,
+      "stratum": "S09",
+      "title": "Metacognitive Control",
+      "objective": "Estimate when reasoning is stuck, shallow, overconfident, underspecified, or using the wrong strategy and trigger bounded strategy changes.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L084"
+      ],
+      "required_planes": [
+        "orchestration",
+        "reasoning-verification",
+        "retrieval",
+        "memory",
+        "evaluation",
+        "model-routing",
+        "observability"
+      ],
+      "authority_rule": "Internal models remain hypotheses. Simulations, self-assessments, and stakeholder models cannot override real evidence, consent, policy, or measured outcomes.",
+      "failure_mode": "Expose uncertainty, compare alternative models, seek evidence, or abstain; never present simulation confidence as observed reality.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Metacognitive Control: structural contract validation",
+        "Metacognitive Control: focused runtime or simulation evidence",
+        "Metacognitive Control: adversarial/failure-mode evidence",
+        "Metacognitive Control: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L086",
+      "ordinal": 86,
+      "stratum": "S09",
+      "title": "Epistemic State Tracking",
+      "objective": "Track known, inferred, disputed, unknown, stale, impossible-to-know, and evidence-needed states explicitly across a project.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L085"
+      ],
+      "required_planes": [
+        "orchestration",
+        "reasoning-verification",
+        "retrieval",
+        "memory",
+        "evaluation",
+        "model-routing",
+        "observability"
+      ],
+      "authority_rule": "Internal models remain hypotheses. Simulations, self-assessments, and stakeholder models cannot override real evidence, consent, policy, or measured outcomes.",
+      "failure_mode": "Expose uncertainty, compare alternative models, seek evidence, or abstain; never present simulation confidence as observed reality.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Epistemic State Tracking: structural contract validation",
+        "Epistemic State Tracking: focused runtime or simulation evidence",
+        "Epistemic State Tracking: adversarial/failure-mode evidence",
+        "Epistemic State Tracking: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L087",
+      "ordinal": 87,
+      "stratum": "S09",
+      "title": "Stakeholder and Theory-of-Mind Modeling",
+      "objective": "Model likely stakeholder goals, knowledge, constraints, and interpretations with uncertainty, consent boundaries, and no claim of mind-reading.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L086"
+      ],
+      "required_planes": [
+        "orchestration",
+        "reasoning-verification",
+        "retrieval",
+        "memory",
+        "evaluation",
+        "model-routing",
+        "observability"
+      ],
+      "authority_rule": "Internal models remain hypotheses. Simulations, self-assessments, and stakeholder models cannot override real evidence, consent, policy, or measured outcomes.",
+      "failure_mode": "Expose uncertainty, compare alternative models, seek evidence, or abstain; never present simulation confidence as observed reality.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Stakeholder and Theory-of-Mind Modeling: structural contract validation",
+        "Stakeholder and Theory-of-Mind Modeling: focused runtime or simulation evidence",
+        "Stakeholder and Theory-of-Mind Modeling: adversarial/failure-mode evidence",
+        "Stakeholder and Theory-of-Mind Modeling: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L088",
+      "ordinal": 88,
+      "stratum": "S09",
+      "title": "Creative Synthesis",
+      "objective": "Generate novel combinations, abstractions, analogies, designs, and hypotheses while preserving provenance and downstream verification.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L087"
+      ],
+      "required_planes": [
+        "orchestration",
+        "reasoning-verification",
+        "retrieval",
+        "memory",
+        "evaluation",
+        "model-routing",
+        "observability"
+      ],
+      "authority_rule": "Internal models remain hypotheses. Simulations, self-assessments, and stakeholder models cannot override real evidence, consent, policy, or measured outcomes.",
+      "failure_mode": "Expose uncertainty, compare alternative models, seek evidence, or abstain; never present simulation confidence as observed reality.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Creative Synthesis: structural contract validation",
+        "Creative Synthesis: focused runtime or simulation evidence",
+        "Creative Synthesis: adversarial/failure-mode evidence",
+        "Creative Synthesis: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L089",
+      "ordinal": 89,
+      "stratum": "S09",
+      "title": "Scientific Discovery Loop",
+      "objective": "Automate hypothesis, experiment design, evidence acquisition, analysis, falsification, replication, and knowledge-update proposals under governance.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L088"
+      ],
+      "required_planes": [
+        "orchestration",
+        "reasoning-verification",
+        "retrieval",
+        "memory",
+        "evaluation",
+        "model-routing",
+        "observability"
+      ],
+      "authority_rule": "Internal models remain hypotheses. Simulations, self-assessments, and stakeholder models cannot override real evidence, consent, policy, or measured outcomes.",
+      "failure_mode": "Expose uncertainty, compare alternative models, seek evidence, or abstain; never present simulation confidence as observed reality.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Scientific Discovery Loop: structural contract validation",
+        "Scientific Discovery Loop: focused runtime or simulation evidence",
+        "Scientific Discovery Loop: adversarial/failure-mode evidence",
+        "Scientific Discovery Loop: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L090",
+      "ordinal": 90,
+      "stratum": "S09",
+      "title": "Advanced Cognition Closure",
+      "objective": "Prove world models, simulation, long-horizon planning, metacognition, stakeholder models, creativity, and science remain evidence-calibrated.",
+      "state": "planned_target",
+      "gate": true,
+      "promotion_prerequisites": [
+        "L089"
+      ],
+      "required_planes": [
+        "orchestration",
+        "reasoning-verification",
+        "retrieval",
+        "memory",
+        "evaluation",
+        "model-routing",
+        "observability"
+      ],
+      "authority_rule": "Internal models remain hypotheses. Simulations, self-assessments, and stakeholder models cannot override real evidence, consent, policy, or measured outcomes.",
+      "failure_mode": "Expose uncertainty, compare alternative models, seek evidence, or abstain; never present simulation confidence as observed reality.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Advanced Cognition Closure: structural contract validation",
+        "Advanced Cognition Closure: focused runtime or simulation evidence",
+        "Advanced Cognition Closure: adversarial/failure-mode evidence",
+        "Advanced Cognition Closure: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L091",
+      "ordinal": 91,
+      "stratum": "S10",
+      "title": "Architecture Introspection",
+      "objective": "Build machine-readable self-models of capabilities, dependencies, contracts, state authorities, performance, limits, and unresolved gaps.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L090"
+      ],
+      "required_planes": [
+        "evaluation",
+        "feedback-learning",
+        "deployment-release",
+        "governance",
+        "security-safety",
+        "observability",
+        "orchestration",
+        "foundation"
+      ],
+      "authority_rule": "Self-improvement is proposal-generation plus evidence. The system cannot self-approve code, model, policy, authority, or production promotion.",
+      "failure_mode": "Freeze evolution, revert to verified baseline, quarantine experiments, or require independent approval whenever evidence, reproducibility, safety, or governance is incomplete.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Architecture Introspection: structural contract validation",
+        "Architecture Introspection: focused runtime or simulation evidence",
+        "Architecture Introspection: adversarial/failure-mode evidence",
+        "Architecture Introspection: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L092",
+      "ordinal": 92,
+      "stratum": "S10",
+      "title": "Capability Gap Discovery",
+      "objective": "Compare objectives and observed failures against the self-model to identify missing, weak, redundant, unsafe, or misowned capabilities.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L091"
+      ],
+      "required_planes": [
+        "evaluation",
+        "feedback-learning",
+        "deployment-release",
+        "governance",
+        "security-safety",
+        "observability",
+        "orchestration",
+        "foundation"
+      ],
+      "authority_rule": "Self-improvement is proposal-generation plus evidence. The system cannot self-approve code, model, policy, authority, or production promotion.",
+      "failure_mode": "Freeze evolution, revert to verified baseline, quarantine experiments, or require independent approval whenever evidence, reproducibility, safety, or governance is incomplete.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Capability Gap Discovery: structural contract validation",
+        "Capability Gap Discovery: focused runtime or simulation evidence",
+        "Capability Gap Discovery: adversarial/failure-mode evidence",
+        "Capability Gap Discovery: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L093",
+      "ordinal": 93,
+      "stratum": "S10",
+      "title": "Continuous Self-Benchmarking",
+      "objective": "Run current capability, safety, reliability, efficiency, calibration, and regression benchmarks against baselines and declared targets.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L092"
+      ],
+      "required_planes": [
+        "evaluation",
+        "feedback-learning",
+        "deployment-release",
+        "governance",
+        "security-safety",
+        "observability",
+        "orchestration",
+        "foundation"
+      ],
+      "authority_rule": "Self-improvement is proposal-generation plus evidence. The system cannot self-approve code, model, policy, authority, or production promotion.",
+      "failure_mode": "Freeze evolution, revert to verified baseline, quarantine experiments, or require independent approval whenever evidence, reproducibility, safety, or governance is incomplete.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Continuous Self-Benchmarking: structural contract validation",
+        "Continuous Self-Benchmarking: focused runtime or simulation evidence",
+        "Continuous Self-Benchmarking: adversarial/failure-mode evidence",
+        "Continuous Self-Benchmarking: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L094",
+      "ordinal": 94,
+      "stratum": "S10",
+      "title": "Design-Space Exploration",
+      "objective": "Generate and rank alternative architectures, algorithms, prompts, tools, memory strategies, and execution plans under explicit constraints.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L093"
+      ],
+      "required_planes": [
+        "evaluation",
+        "feedback-learning",
+        "deployment-release",
+        "governance",
+        "security-safety",
+        "observability",
+        "orchestration",
+        "foundation"
+      ],
+      "authority_rule": "Self-improvement is proposal-generation plus evidence. The system cannot self-approve code, model, policy, authority, or production promotion.",
+      "failure_mode": "Freeze evolution, revert to verified baseline, quarantine experiments, or require independent approval whenever evidence, reproducibility, safety, or governance is incomplete.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Design-Space Exploration: structural contract validation",
+        "Design-Space Exploration: focused runtime or simulation evidence",
+        "Design-Space Exploration: adversarial/failure-mode evidence",
+        "Design-Space Exploration: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L095",
+      "ordinal": 95,
+      "stratum": "S10",
+      "title": "Automated Experiment Generation",
+      "objective": "Design controlled experiments with hypotheses, variables, baselines, metrics, stopping rules, reproducibility, and contamination defenses.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L094"
+      ],
+      "required_planes": [
+        "evaluation",
+        "feedback-learning",
+        "deployment-release",
+        "governance",
+        "security-safety",
+        "observability",
+        "orchestration",
+        "foundation"
+      ],
+      "authority_rule": "Self-improvement is proposal-generation plus evidence. The system cannot self-approve code, model, policy, authority, or production promotion.",
+      "failure_mode": "Freeze evolution, revert to verified baseline, quarantine experiments, or require independent approval whenever evidence, reproducibility, safety, or governance is incomplete.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Automated Experiment Generation: structural contract validation",
+        "Automated Experiment Generation: focused runtime or simulation evidence",
+        "Automated Experiment Generation: adversarial/failure-mode evidence",
+        "Automated Experiment Generation: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L096",
+      "ordinal": 96,
+      "stratum": "S10",
+      "title": "Verified Improvement Proposals",
+      "objective": "Produce code, configuration, policy-neutral strategy, or model-change proposals with tests, proofs/evidence, rollback, and blast-radius analysis.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L095"
+      ],
+      "required_planes": [
+        "evaluation",
+        "feedback-learning",
+        "deployment-release",
+        "governance",
+        "security-safety",
+        "observability",
+        "orchestration",
+        "foundation"
+      ],
+      "authority_rule": "Self-improvement is proposal-generation plus evidence. The system cannot self-approve code, model, policy, authority, or production promotion.",
+      "failure_mode": "Freeze evolution, revert to verified baseline, quarantine experiments, or require independent approval whenever evidence, reproducibility, safety, or governance is incomplete.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Verified Improvement Proposals: structural contract validation",
+        "Verified Improvement Proposals: focused runtime or simulation evidence",
+        "Verified Improvement Proposals: adversarial/failure-mode evidence",
+        "Verified Improvement Proposals: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L097",
+      "ordinal": 97,
+      "stratum": "S10",
+      "title": "Cross-Domain Transfer",
+      "objective": "Transfer validated patterns and representations across domains while detecting distribution shift, invalid analogy, and domain-specific constraints.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L096"
+      ],
+      "required_planes": [
+        "evaluation",
+        "feedback-learning",
+        "deployment-release",
+        "governance",
+        "security-safety",
+        "observability",
+        "orchestration",
+        "foundation"
+      ],
+      "authority_rule": "Self-improvement is proposal-generation plus evidence. The system cannot self-approve code, model, policy, authority, or production promotion.",
+      "failure_mode": "Freeze evolution, revert to verified baseline, quarantine experiments, or require independent approval whenever evidence, reproducibility, safety, or governance is incomplete.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Cross-Domain Transfer: structural contract validation",
+        "Cross-Domain Transfer: focused runtime or simulation evidence",
+        "Cross-Domain Transfer: adversarial/failure-mode evidence",
+        "Cross-Domain Transfer: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L098",
+      "ordinal": 98,
+      "stratum": "S10",
+      "title": "Strategic Meta-Orchestration",
+      "objective": "Allocate cognitive methods, models, agents, tools, experiments, budgets, and time across portfolios of goals using measured value and risk.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L097"
+      ],
+      "required_planes": [
+        "evaluation",
+        "feedback-learning",
+        "deployment-release",
+        "governance",
+        "security-safety",
+        "observability",
+        "orchestration",
+        "foundation"
+      ],
+      "authority_rule": "Self-improvement is proposal-generation plus evidence. The system cannot self-approve code, model, policy, authority, or production promotion.",
+      "failure_mode": "Freeze evolution, revert to verified baseline, quarantine experiments, or require independent approval whenever evidence, reproducibility, safety, or governance is incomplete.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Strategic Meta-Orchestration: structural contract validation",
+        "Strategic Meta-Orchestration: focused runtime or simulation evidence",
+        "Strategic Meta-Orchestration: adversarial/failure-mode evidence",
+        "Strategic Meta-Orchestration: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L099",
+      "ordinal": 99,
+      "stratum": "S10",
+      "title": "Bounded Self-Evolution Governance",
+      "objective": "Govern iterative self-improvement with independent approval, immutable baselines, capability ceilings, rollback, audit, and anti-self-approval rules.",
+      "state": "planned_target",
+      "gate": false,
+      "promotion_prerequisites": [
+        "L098"
+      ],
+      "required_planes": [
+        "evaluation",
+        "feedback-learning",
+        "deployment-release",
+        "governance",
+        "security-safety",
+        "observability",
+        "orchestration",
+        "foundation"
+      ],
+      "authority_rule": "Self-improvement is proposal-generation plus evidence. The system cannot self-approve code, model, policy, authority, or production promotion.",
+      "failure_mode": "Freeze evolution, revert to verified baseline, quarantine experiments, or require independent approval whenever evidence, reproducibility, safety, or governance is incomplete.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Bounded Self-Evolution Governance: structural contract validation",
+        "Bounded Self-Evolution Governance: focused runtime or simulation evidence",
+        "Bounded Self-Evolution Governance: adversarial/failure-mode evidence",
+        "Bounded Self-Evolution Governance: exact-head provenance-bound closure receipt"
+      ]
+    },
+    {
+      "id": "L100",
+      "ordinal": 100,
+      "stratum": "S10",
+      "title": "Frontier System Acceptance",
+      "objective": "Integrate all 100 levels under exact-head evidence, adversarial evaluation, safety/security/governance, performance, recovery, and independent promotion authority.",
+      "state": "planned_target",
+      "gate": true,
+      "promotion_prerequisites": [
+        "L099"
+      ],
+      "required_planes": [
+        "evaluation",
+        "feedback-learning",
+        "deployment-release",
+        "governance",
+        "security-safety",
+        "observability",
+        "orchestration",
+        "foundation"
+      ],
+      "authority_rule": "Self-improvement is proposal-generation plus evidence. The system cannot self-approve code, model, policy, authority, or production promotion.",
+      "failure_mode": "Freeze evolution, revert to verified baseline, quarantine experiments, or require independent approval whenever evidence, reproducibility, safety, or governance is incomplete.",
+      "deliverables": [
+        "typed contract and canonical owner",
+        "runtime integration or explicit non-runtime plan surface",
+        "observability and bounded resource semantics",
+        "focused regression tests",
+        "adversarial/failure-mode tests",
+        "recovery/degraded-mode behavior"
+      ],
+      "acceptance_evidence": [
+        "Frontier System Acceptance: structural contract validation",
+        "Frontier System Acceptance: focused runtime or simulation evidence",
+        "Frontier System Acceptance: adversarial/failure-mode evidence",
+        "Frontier System Acceptance: exact-head provenance-bound closure receipt"
+      ]
+    }
+  ],
+  "cross_cutting_requirements": {
+    "every_level": [
+      "tenant isolation",
+      "data classification and privacy ceiling",
+      "resource budgets and backpressure",
+      "provenance and causal identity",
+      "typed errors and degraded behavior",
+      "security and safety policy",
+      "observability without default sensitive-content capture",
+      "replay/idempotency semantics where mutation or durable progression exists",
+      "focused and adversarial validation",
+      "rollback or safe-disable strategy"
+    ],
+    "high_impact_levels": [
+      "independent verifier or deterministic acceptance authority",
+      "explicit approval/authority separation",
+      "chaos or fault-injection evidence",
+      "current security review",
+      "production-like load/resource evidence",
+      "canary or shadow promotion before broad activation"
+    ],
+    "frontier_levels": [
+      "immutable pre-change baseline",
+      "experiment isolation",
+      "independent promotion authority",
+      "anti-self-approval invariant",
+      "reproducibility evidence",
+      "rollback proof",
+      "capability-ceiling enforcement"
+    ]
+  },
+  "implementation_program": {
+    "strategy": "Implement by stratum slices and vertical golden journeys, not by creating one package or service per level.",
+    "work_packages": [
+      {
+        "id": "ADV-S01",
+        "levels": "001-010",
+        "priority": "P0",
+        "exit": "substrate closure gate green"
+      },
+      {
+        "id": "ADV-S02",
+        "levels": "011-020",
+        "priority": "P0",
+        "exit": "context intelligence closure gate green"
+      },
+      {
+        "id": "ADV-S03",
+        "levels": "021-030",
+        "priority": "P0",
+        "exit": "memory/knowledge closure gate green"
+      },
+      {
+        "id": "ADV-S04",
+        "levels": "031-040",
+        "priority": "P0",
+        "exit": "deliberative intelligence closure gate green"
+      },
+      {
+        "id": "ADV-S05",
+        "levels": "041-050",
+        "priority": "P0",
+        "exit": "governed agency closure gate green"
+      },
+      {
+        "id": "ADV-S06",
+        "levels": "051-060",
+        "priority": "P1",
+        "exit": "organizational intelligence closure gate green"
+      },
+      {
+        "id": "ADV-S07",
+        "levels": "061-070",
+        "priority": "P1",
+        "exit": "adaptive intelligence closure gate green"
+      },
+      {
+        "id": "ADV-S08",
+        "levels": "071-080",
+        "priority": "P1",
+        "exit": "bounded autonomy closure gate green"
+      },
+      {
+        "id": "ADV-S09",
+        "levels": "081-090",
+        "priority": "P2",
+        "exit": "advanced cognition closure gate green"
+      },
+      {
+        "id": "ADV-S10",
+        "levels": "091-100",
+        "priority": "P2",
+        "exit": "frontier system acceptance green"
+      }
+    ],
+    "concurrency_rule": "Adjacent implementation work may overlap only where canonical owners and lower-level invariants are already stable; promotion remains ordered by closure evidence.",
+    "completion_rule": "The plan is complete when all 100 levels and gates are structurally validated. The AI system is complete only when each level intended for production has implementation and exact-head evidence."
+  },
+  "evidence": {
+    "human_plan": "docs/plan/ADVANCED_AI_100_LEVELS.md",
+    "validator": "scripts/check_advanced_ai_structure.py",
+    "independent_verifier": "scripts/verify_advanced_ai_structure.py",
+    "tests": "tests/test_advanced_ai_structure.py",
+    "workflow": ".github/workflows/advanced-ai-structure.yml"
+  },
+  "completion": {
+    "plan_complete": true,
+    "implementation_claim": false,
+    "promoted_levels": [],
+    "signed_levels": [],
+    "rule": "No level is signed or promoted by this planning change."
+  }
+}
