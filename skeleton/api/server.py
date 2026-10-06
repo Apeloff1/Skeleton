@@ -980,6 +980,37 @@ def create_app() -> Any:
     app.state.runtime_lifecycle = runtime_lifecycle
     install_error_handlers(app)
 
+    @app.middleware("http")
+    async def runtime_lifecycle_admission(request, call_next):
+        """Fence new engine HTTP work while lifecycle authority is draining."""
+
+        if request.url.path.startswith("/api/v1/health"):
+            return await call_next(request)
+
+        from fastapi.responses import JSONResponse
+        from skeleton.kernel.runtime_supervision import RuntimeSupervisionError
+        from uuid import uuid4
+
+        try:
+            lease = runtime_lifecycle.acquire_work(
+                "http:" + str(uuid4()),
+                allow_starting=False,
+            )
+        except RuntimeSupervisionError:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": "service_unavailable",
+                    "reason": "runtime_not_accepting_work",
+                    "lifecycle": runtime_lifecycle.snapshot(),
+                },
+                headers={"Retry-After": "1"},
+            )
+        try:
+            return await call_next(request)
+        finally:
+            runtime_lifecycle.release_work(lease)
+
     from skeleton.api.routes import router
     from skeleton.api.command_routes import router as command_router
     from skeleton.api.cockpit import router as cockpit_router
