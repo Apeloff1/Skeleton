@@ -112,9 +112,9 @@
       "move_tags": [
         "ai-tree:mapped",
         "migration:staged-mirror",
-        "cutover:parity-ready"
+        "cutover:owner-sensitive"
       ],
-      "move_batch": "B1-core-runtime",
+      "move_batch": "B3-owner-sensitive",
       "source_disposition": "retain_until_import_inversion_and_regression_gates",
       "volume_refs": [
         "VOL-000",
@@ -164,12 +164,13 @@
       "overlay_children": [
         "execution_authority.py"
       ],
-      "parity_exceptions": {
-        "__init__.py": {
+      "parity_exceptions": [
+        {
+          "path": "__init__.py",
           "mode": "compatibility_facade",
           "facade_required_import": "from .execution_authority import ("
         }
-      }
+      ]
     },
     {
       "id": "AIFT-PERSISTENCE",
@@ -7678,6 +7679,31 @@
         "VOL-411",
         "VOL-412",
         "VOL-413"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-CONTRACT-EXECUTION-AUTHORITY",
+      "path": "skeleton/ai/runtime/contracts/execution_authority.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI-native execution authority contract overlaid into the mirrored contracts tree.",
+      "volume_refs": [
+        "VOL-003",
+        "VOL-034",
+        "VOL-037"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-CORE-EXECUTION-AUTHORITY",
+      "path": "skeleton/ai/runtime/core/execution_authority.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI-native execution authority runtime overlaid into the mirrored core tree.",
+      "volume_refs": [
+        "VOL-004",
+        "VOL-029"
       ]
     }
   ]

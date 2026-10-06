@@ -570,9 +570,16 @@ def validate() -> list[str]:
                             for other in declared_sources
                             if other != src
                         )
+                        native_overlay_governed = any(
+                            isinstance(owner, dict)
+                            and owner.get("path") == full_destination
+                            and owner.get("ownership_mode") == "canonical_native"
+                            for owner in data.get("native_ai_owners", [])
+                        )
                         if (
                             full_destination not in declared_destinations
                             and not source_governed
+                            and not native_overlay_governed
                         ):
                             errors.append(
                                 f"{mid}: overlay child is not independently governed: "
@@ -677,7 +684,17 @@ def validate() -> list[str]:
             errors.append(f"{owner_id}: native tree missing: {path_value}")
         if kind == "file" and residual_only:
             errors.append(f"{owner_id}: file owner cannot be residual_only")
-        if any(_path_within(path_value, destination) for destination in declared_destinations):
+        governed_overlay_paths = {
+            f"{mapping.get('destination', '').rstrip('/')}/{overlay}"
+            for mapping in mappings
+            if isinstance(mapping, dict)
+            for overlay in mapping.get("overlay_children", [])
+            if isinstance(overlay, str) and overlay
+        }
+        if (
+            any(_path_within(path_value, destination) for destination in declared_destinations)
+            and path_value not in governed_overlay_paths
+        ):
             errors.append(f"{owner_id}: native owner overlaps a more-authoritative mapping destination")
         mapped_children = [
             destination
