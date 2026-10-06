@@ -8,10 +8,12 @@ training framework.
 
 from __future__ import annotations
 
+from collections.abc import Mapping as MappingABC
 from dataclasses import dataclass, field
 from fractions import Fraction
 import hashlib
 import json
+from types import MappingProxyType
 from typing import Mapping, Sequence
 
 
@@ -55,6 +57,30 @@ def _sha(name: str, value: object) -> str:
 def _positive_int(name: str, value: object) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
         raise TrainingLineageError(f"{name} must be a positive integer")
+    return value
+
+
+def _freeze_json(value: object) -> object:
+    if value is None or isinstance(value, (str, bool, int, float)):
+        _stable_json(value)
+        return value
+    if isinstance(value, MappingABC):
+        frozen: dict[str, object] = {}
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise TrainingLineageError("metadata object keys must be strings")
+            frozen[key] = _freeze_json(item)
+        return MappingProxyType(dict(sorted(frozen.items())))
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze_json(item) for item in value)
+    raise TrainingLineageError("metadata contains non-JSON value")
+
+
+def _thaw_json(value: object) -> object:
+    if isinstance(value, MappingABC):
+        return {key: _thaw_json(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_thaw_json(item) for item in value]
     return value
 
 
@@ -168,11 +194,13 @@ class MixtureManifest:
         object.__setattr__(self, "mixture_id", _text("mixture_id", self.mixture_id))
         if isinstance(self.seed, bool) or not isinstance(self.seed, int):
             raise TrainingLineageError("seed must be an integer")
-        if not self.components:
+        components = tuple(self.components)
+        if not components:
             raise TrainingLineageError("mixture requires at least one component")
-        if any(not isinstance(item, MixtureComponent) for item in self.components):
+        if any(not isinstance(item, MixtureComponent) for item in components):
             raise TypeError("components must contain MixtureComponent values")
-        ids = [item.dataset_id for item in self.components]
+        object.__setattr__(self, "components", components)
+        ids = [item.dataset_id for item in components]
         if len(ids) != len(set(ids)):
             raise TrainingLineageError("mixture dataset_ids must be unique")
         if sum((item.weight for item in self.components), Fraction()) <= 0:
@@ -268,18 +296,22 @@ class TrainingDataManifest:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "manifest_id", _text("manifest_id", self.manifest_id))
-        if not self.sources:
+        sources = tuple(self.sources)
+        shards = tuple(self.shards)
+        if not sources:
             raise TrainingLineageError("training manifest requires sources")
-        if not self.shards:
+        if not shards:
             raise TrainingLineageError("training manifest requires shards")
-        if any(not isinstance(item, SourceRecord) for item in self.sources):
+        if any(not isinstance(item, SourceRecord) for item in sources):
             raise TypeError("sources must contain SourceRecord values")
-        if any(not isinstance(item, DatasetShardManifest) for item in self.shards):
+        if any(not isinstance(item, DatasetShardManifest) for item in shards):
             raise TypeError("shards must contain DatasetShardManifest values")
+        object.__setattr__(self, "sources", sources)
+        object.__setattr__(self, "shards", shards)
         if not isinstance(self.mixture, MixtureManifest):
             raise TypeError("mixture must be MixtureManifest")
 
-        source_ids = [item.source_id for item in self.sources]
+        source_ids = [item.source_id for item in sources]
         if len(source_ids) != len(set(source_ids)):
             raise TrainingLineageError("source ids must be unique")
         source_set = set(source_ids)
@@ -310,9 +342,9 @@ class TrainingDataManifest:
                 raise TrainingLineageError(f"{field_name} must be unique")
             object.__setattr__(self, field_name, values)
 
-        frozen = dict(self.metadata)
-        _stable_json(frozen)
-        object.__setattr__(self, "metadata", frozen)
+        raw_metadata = dict(self.metadata)
+        _stable_json(raw_metadata)
+        object.__setattr__(self, "metadata", _freeze_json(raw_metadata))
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -331,7 +363,7 @@ class TrainingDataManifest:
             "mixture": self.mixture.as_dict(),
             "transform_refs": list(self.transform_refs),
             "holdout_refs": list(self.holdout_refs),
-            "metadata": dict(self.metadata),
+            "metadata": _thaw_json(self.metadata),
         }
 
     @property
@@ -393,7 +425,11 @@ class TrainingCursor:
             if isinstance(raw, bool) or not isinstance(raw, int) or raw < 0:
                 raise TrainingLineageError("dataset offsets must be non-negative integers")
             offsets[key] = raw
-        object.__setattr__(self, "dataset_offsets", dict(sorted(offsets.items())))
+        object.__setattr__(
+            self,
+            "dataset_offsets",
+            MappingProxyType(dict(sorted(offsets.items()))),
+        )
 
     def as_dict(self) -> dict[str, object]:
         return {
