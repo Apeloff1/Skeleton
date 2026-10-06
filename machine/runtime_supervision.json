@@ -1,6 +1,6 @@
 {
   "schema_version": "skeleton.architecture.runtime_supervision.v2",
-  "contract_version": "1.0.0",
+  "contract_version": "1.1.0",
   "status": "active",
   "purpose": "One executable backend/engine lifecycle and connector-cancellation contract covering readiness, draining, recovery, deadlines, cancellation propagation, retry interruption, late-result fencing and operation identity.",
   "masterplan_binding": {
@@ -26,16 +26,19 @@
   "invariants": [
     "backend depends on skeleton and mongo; skeleton depends on mongo",
     "backend and skeleton use the same RuntimeServiceLifecycle state machine",
-    "only READY services admit new work; DRAINING atomically revokes work admission",
     "shutdown cancellation is generation-bound and restart creates a fresh cancellation token",
-    "shutdown cancels/drains background execution before closing durable dependencies",
     "backend cancellation delegates to the engine cancel endpoint rather than inventing local terminal truth",
     "engine cancellation is persisted through the execution repository and is idempotent around terminal state",
     "engine coordinator supports restart recovery and bounded shutdown",
     "operation and provider deadlines are explicit and cannot be created already expired",
     "operation identity is preserved across backend client and engine service boundaries",
     "every declared network-transport owner has explicit bounded cancellation semantics",
-    "late connector results are fenced after cancellation and cannot become authoritative output"
+    "late connector results are fenced after cancellation and cannot become authoritative output",
+    "only READY services admit new external work; startup recovery is the only explicit STARTING admission exception",
+    "every admitted HTTP request and engine execution is generation-bound by a work lease",
+    "DRAINING atomically revokes new-work authority while preserving accountability for already admitted work",
+    "STOPPED cannot be asserted while in-flight work leases remain",
+    "shutdown cancels/drains background execution before closing durable dependencies"
   ],
   "services": [
     {
@@ -58,7 +61,12 @@
             "runtime_lifecycle.mark_stopped(",
             "t.cancel()",
             "client.close()",
-            "@api_router.get(\"/health/ready\")"
+            "@api_router.get(\"/health/ready\")",
+            "@app.middleware(\"http\")",
+            "lifecycle.acquire_work(\"http:\"",
+            "lifecycle.release_work(lease)",
+            "\"runtime_not_accepting_work\"",
+            "\"Retry-After\": \"1\""
           ]
         }
       ],
@@ -92,7 +100,12 @@
             "runtime_lifecycle.mark_stopped(",
             "async def close_engine_execution_service",
             "await coordinator.shutdown()",
-            "def close_operation_runtime"
+            "def close_operation_runtime",
+            "@app.middleware(\"http\")",
+            "runtime_lifecycle.acquire_work(",
+            "runtime_lifecycle.release_work(lease)",
+            "runtime_lifecycle=runtime_lifecycle",
+            "\"runtime_not_accepting_work\""
           ]
         },
         {
@@ -100,7 +113,12 @@
           "required_symbols": [
             "async def recover(",
             "async def shutdown(",
-            "task.cancel()"
+            "task.cancel()",
+            "lifecycle: RuntimeServiceLifecycle | None = None",
+            "self.lifecycle.acquire_work(",
+            "self.lifecycle.release_work(lease)",
+            "allow_starting=True",
+            "self._lifecycle_leases"
           ]
         },
         {
@@ -152,8 +170,22 @@
       "to_phase",
       "reason",
       "at_monotonic",
-      "cancellation"
-    ]
+      "cancellation",
+      "inflight_work"
+    ],
+    "work_leases": {
+      "required": true,
+      "generation_bound": true,
+      "duplicate_work_id_policy": "deny",
+      "stale_generation_release_policy": "deny",
+      "stop_requires_quiescence": true,
+      "startup_recovery_exception": "engine durable recovery only",
+      "snapshot_fields": [
+        "inflight_work",
+        "active_work_ids",
+        "last_lease_sequence"
+      ]
+    }
   },
   "connector_inventory": {
     "construction_source": "machine/ai_app_construction.json:provider_surfaces",
