@@ -1,0 +1,68 @@
+name: Competitive AI Engineering Ladder
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: competitive-ai-engineering-ladder-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-ladder:
+    name: Validate 200-level engineering ladder
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused test dependency
+        run: python -m pip install --disable-pip-version-check --no-input "pytest>=8,<9"
+
+      - name: Compile validator and tests
+        run: python -m py_compile scripts/check_competitive_ai_engineering_ladder.py tests/test_competitive_ai_engineering_ladder.py
+
+      - name: Validate ladder authority
+        run: python scripts/check_competitive_ai_engineering_ladder.py --json
+
+      - name: Validate regression suite
+        run: python -m pytest -q --noconftest tests/test_competitive_ai_engineering_ladder.py
+
+      - name: Validate repaired masterplan JSON
+        run: python -m json.tool machine/ai_master_plan.json >/dev/null
+
+      - name: Confirm exact-head identity
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_SHA"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          ladder = json.loads(Path("machine/competitive_ai_engineering_ladder.json").read_text())
+          assert len(ladder["levels"]) == 200
+          assert ladder["levels"][0]["id"] == "ENG-001"
+          assert ladder["levels"][-1]["id"] == "ENG-200"
+          print("competitive-ai-engineering-ladder", "levels=200", "head=", __import__("os").environ["EXPECTED_SHA"])
+          PY
