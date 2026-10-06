@@ -143,6 +143,16 @@ Learning-400 validator: [`scripts/check_learning_400_adversarial_400.py`](../../
 
 Learning-400 exact-head workflow: [`.github/workflows/learning-400-adversarial-400.yml`](../../.github/workflows/learning-400-adversarial-400.yml)
 
+Project Self-Improvement-1000 plan: [`PROJECT_SELF_IMPROVEMENT_1000.md`](PROJECT_SELF_IMPROVEMENT_1000.md)
+
+Machine PSI-1000 authority: [`machine/project_self_improvement_1000.json`](../../machine/project_self_improvement_1000.json)
+
+Mirror-room epoch state machine: [`machine/project_self_improvement_epoch_contract.json`](../../machine/project_self_improvement_epoch_contract.json)
+
+PSI-1000 validator: [`scripts/check_project_self_improvement_1000.py`](../../scripts/check_project_self_improvement_1000.py)
+
+PSI-1000 exact-head workflow: [`.github/workflows/project-self-improvement-1000.yml`](../../.github/workflows/project-self-improvement-1000.yml)
+
 ## Purpose
 
 This index is the canonical navigation root for the full Skeleton AI architecture, research, construction, validation, release, and operations program. It incorporates the architecture-planning passes that expanded the target from a model wrapper into a complete AI platform: durable state, provider-neutral inference, context, memory, retrieval, knowledge, cognition, planning, governed tools, agents, swarms, multimodal processing, repository engineering, research, training, evaluation, security, distributed compute, installation, release, and production operations.
@@ -216,8 +226,13 @@ Repository work on this plan must respect the existing PR #1904 bootstrap stack:
 61. `machine/learning_400_adversarial_400.json`
 62. `scripts/check_learning_400_adversarial_400.py`
 63. `.github/workflows/learning-400-adversarial-400.yml`
+64. `docs/plan/PROJECT_SELF_IMPROVEMENT_1000.md`
+65. `machine/project_self_improvement_1000.json`
+66. `machine/project_self_improvement_epoch_contract.json`
+67. `scripts/check_project_self_improvement_1000.py`
+68. `.github/workflows/project-self-improvement-1000.yml`
 
-The first ten remain the present implementation/construction authority. Items 11–40 form the frozen long-range planning, risk, sequencing, depth, adversarial-closure, exotic-research and engineering-validation stack. Items 41–42 define the historical implementation-depth frontier and its machine-checkable reconciliation contract. Items 43–45 define the bounded P1 trustworthy-production maturity frontier and its dependency-ordered 44-task execution DAG. Items 46–48 define the P2 capability-expansion boundary sourced exactly from P1's 314 deferred volumes, with explicit scheduled/queued ownership and fail-closed dependency validation. Items 49–52 deepen the frozen research/provider/runtime volumes with pinned OpenAI and xAI/Grok OSS provenance and bounded interoperability. Items 53–55 define and validate the post-enterprise Frontier-96 qualification overlay. Items 56–59 define and validate the CS-300 cutting-edge computer-science overlay above Frontier-96, including its exact-head CI authority. Items 60–63 define and enforce the paired Learning-400 + Adversarial-400 program for knowledge acquisition, web/video/document learning, project-derived learning, native weight creation, continual candidate improvement and equal-size adversarial qualification. None of these overlays adds a new architecture volume; they raise depth and evidence requirements while preserving the VOL-420 breadth freeze.
+The first ten remain the present implementation/construction authority. Items 11–40 form the frozen long-range planning, risk, sequencing, depth, adversarial-closure, exotic-research and engineering-validation stack. Items 41–42 define the historical implementation-depth frontier and its machine-checkable reconciliation contract. Items 43–45 define the bounded P1 trustworthy-production maturity frontier and its dependency-ordered 44-task execution DAG. Items 46–48 define the P2 capability-expansion boundary sourced exactly from P1's 314 deferred volumes, with explicit scheduled/queued ownership and fail-closed dependency validation. Items 49–52 deepen the frozen research/provider/runtime volumes with pinned OpenAI and xAI/Grok OSS provenance and bounded interoperability. Items 53–55 define and validate the post-enterprise Frontier-96 qualification overlay. Items 56–59 define and validate the CS-300 cutting-edge computer-science overlay above Frontier-96, including its exact-head CI authority. Items 60–63 define and enforce the paired Learning-400 + Adversarial-400 program for knowledge acquisition, web/video/document learning, project-derived learning, native weight creation, continual candidate improvement and equal-size adversarial qualification. Items 64–68 define PSI-1000: a per-project 1000-level self-improvement template with immediate foreground-idle mirror-room activation, strict preemption, bounded epochs, candidate-only mutation and receipt-backed promotion. None of these overlays adds a new architecture volume; they raise depth and evidence requirements while preserving the VOL-420 breadth freeze.
 
 ## Index laws
 
