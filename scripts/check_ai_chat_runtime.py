@@ -43,6 +43,9 @@ REQUIRED_INVARIANTS = (
     "live product chat persists durable turn state around canonical conversation and engine milestones",
     "product replay heals existing durable turn completion without synthesizing historical turn journals",
     "public reconnect transport requires operation, sequence, and digest continuity",
+    "same-operation retries preserve the original durable conversation binding while revalidating request digest and causal user identity",
+    "transient engine or provider unavailability leaves the durable turn resumable instead of fabricating terminal completion",
+    "cancellation request acknowledgement is non-terminal until the engine confirms a terminal cancelled state",
 )
 
 
@@ -226,7 +229,7 @@ def validate() -> list[str]:
         "live_lifecycle": (
             "ChatTurnLifecycle",
             "finalize_existing_assistant",
-            "FAILED_RETRYABLE",
+            "existing durable turn does not match canonical retry identity",
             "conversation-assistant-already-committed",
         ),
         "live_route": (
@@ -237,6 +240,8 @@ def validate() -> list[str]:
             "TurnState.COMPLETE",
             '"/chat/turns/{thread_id}/events"',
             "require_resume_cursor",
+            "terminal_engine_state",
+            "\"cancellation_requested\"",
         ),
     }
     for role, markers in live_checks.items():
@@ -258,6 +263,14 @@ def validate() -> list[str]:
             errors.append(
                 f"AI chat live route lost durable cutover markers: {role}: "
                 + ", ".join(missing_live)
+            )
+
+    live_route_path = files.get("live_route")
+    if isinstance(live_route_path, str) and (ROOT / live_route_path).is_file():
+        live_route_source = (ROOT / live_route_path).read_text(encoding="utf-8")
+        if "retryable=True" in live_route_source:
+            errors.append(
+                "live AI chat route must not terminalize transient failures as FAILED_RETRYABLE"
             )
 
     required_states = contract.get("required_states")
