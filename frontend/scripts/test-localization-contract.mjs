@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createRequire } from 'node:module';
+import Module, { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import ts from 'typescript';
@@ -21,28 +21,25 @@ function transpile(path) {
   }).outputText;
 }
 
+function compileCommonJS(path, requireFn = localRequire) {
+  const mod = new Module(path);
+  mod.filename = path;
+  mod.paths = Module._nodeModulePaths(root);
+  mod.require = requireFn;
+  mod._compile(transpile(path), path);
+  return mod.exports;
+}
+
 const runtimePath = resolve(root, 'src/i18n/runtime.ts');
-const runtimeModule = { exports: {} };
-new Function('exports', 'module', 'require', transpile(runtimePath))(
-  runtimeModule.exports,
-  runtimeModule,
-  localRequire,
-);
-const i18n = runtimeModule.exports;
+const i18n = compileCommonJS(runtimePath);
 
 function loadCatalog(relativePath) {
   const path = resolve(root, relativePath);
-  const mod = { exports: {} };
   const customRequire = (id) => {
     if (id === '../runtime') return i18n;
     return localRequire(id);
   };
-  new Function('exports', 'module', 'require', transpile(path))(
-    mod.exports,
-    mod,
-    customRequire,
-  );
-  return mod.exports;
+  return compileCommonJS(path, customRequire);
 }
 
 const en = loadCatalog('src/i18n/catalogs/en.ts');
