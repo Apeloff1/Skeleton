@@ -95,6 +95,68 @@
       "source_commit": "08874cbc93a8014d53a95ee2022181579098bd265",
       "artifact": "machine/accountability_events/P1-L0/implementation_reconciliation.json",
       "claim": "implementation signoff only; verification explicitly unsigned"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-056",
+        "ACC-VOL-057",
+        "ACC-VOL-059"
+      ],
+      "source_commit": "49f6454cd20dd3b24a60b1a41fb809bf854a62e8",
+      "claim": "independent CI verification and canonical completion explicitly recorded",
+      "verification_signer": "github-actions:P1 Evidence Identity Gate",
+      "completed_at_utc": "2026-10-04T04:32:01Z",
+      "evidence_head": "de1c7870e4c231eaa4d74b25f79b88c09af75fbc",
+      "corroborating_runs": [
+        37175244818,
+        37175244907,
+        37175244918,
+        37175244962
+      ]
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-015"
+      ],
+      "source_commit": "23a97e9d9e73ff08d8885bfa791ac353bedd628a",
+      "claim": "independent verification and hardened completion explicitly recorded",
+      "verification_signer": "github-actions:Tool Runtime Closure Gate",
+      "completed_at_utc": "2026-10-04T15:47:01Z",
+      "evidence_head": "a506a14df1c8b03146ffb03f1956d343efc3a4b5",
+      "verification_runs": [
+        37177682751,
+        37177682750,
+        37177682705,
+        37177682768,
+        37177682821
+      ]
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-016"
+      ],
+      "source_commit": "23a97e9d9e73ff08d8885bfa791ac353bedd628a",
+      "claim": "independent verification and hardened completion explicitly recorded",
+      "verification_signer": "github-actions:Agent Runtime Closure Gate",
+      "completed_at_utc": "2026-10-04T15:47:01Z",
+      "evidence_head": "a506a14df1c8b03146ffb03f1956d343efc3a4b5",
+      "verification_runs": [
+        37177682843,
+        37177682746,
+        37177682705,
+        37177682768,
+        37177682821
+      ]
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-017"
+      ],
+      "source_commit": "23a97e9d9e73ff08d8885bfa791ac353bedd628a",
+      "claim": "independent verification and hardened completion explicitly recorded",
+      "verification_signer": "github-actions:P1 Multi-Agent Orchestration Gate",
+      "completed_at_utc": "2026-10-04T15:47:01Z",
+      "evidence_head": "a506a14df1c8b03146ffb03f1956d343efc3a4b5"
     }
   ]
 }
