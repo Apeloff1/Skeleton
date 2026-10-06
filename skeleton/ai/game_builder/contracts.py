@@ -284,6 +284,38 @@ class GateResult:
             raise ValueError("gate evidence must use a stable digest")
 
 
+def _promotion_decision_payload(
+    *,
+    round_index: int,
+    effort_mode: EffortMode,
+    incumbent_digest: str,
+    submitted_digest: str | None,
+    promoted_digest: str,
+    evaluator_id: str,
+    gate_results: Sequence[GateResult],
+    evaluated_submitted_quality: tuple[tuple[str, float], ...] | None,
+    decision: str,
+) -> dict[str, object]:
+    return {
+        "decision": decision,
+        "effort_mode": int(effort_mode),
+        "evaluator_id": evaluator_id,
+        "gates": [
+            (gate.gate_id, gate.passed, gate.non_compensable, gate.evidence_digest)
+            for gate in gate_results
+        ],
+        "incumbent": incumbent_digest,
+        "promoted": promoted_digest,
+        "evaluated_submitted_quality": (
+            dict(evaluated_submitted_quality)
+            if evaluated_submitted_quality is not None
+            else None
+        ),
+        "round_index": round_index,
+        "submitted": submitted_digest,
+    }
+
+
 @dataclass(frozen=True, slots=True)
 class PromotionReceipt:
     round_index: int
@@ -293,14 +325,70 @@ class PromotionReceipt:
     promoted_digest: str
     evaluator_id: str
     gate_results: tuple[GateResult, ...]
+    evaluated_submitted_quality: tuple[tuple[str, float], ...] | None
     decision: str
     decision_digest: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.effort_mode, EffortMode):
+            raise TypeError("promotion receipt effort_mode must be EffortMode")
+        if self.round_index < 1 or self.round_index > self.effort_mode.rounds:
+            raise ValueError("promotion receipt round index outside effort-mode bounds")
+        for name in ("incumbent_digest", "promoted_digest", "decision_digest"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or len(value) < 16:
+                raise ValueError(f"{name} must be a stable digest")
+        if self.submitted_digest is not None and (
+            not isinstance(self.submitted_digest, str) or len(self.submitted_digest) < 16
+        ):
+            raise ValueError("submitted_digest must be a stable digest when present")
+        if not isinstance(self.evaluator_id, str) or not self.evaluator_id.strip():
+            raise ValueError("promotion receipt evaluator_id must be non-empty")
+        if self.evaluator_id in {Rival.A.value, Rival.B.value}:
+            raise ValueError("promotion receipt evaluator must be independent from both rivals")
+        if any(not isinstance(gate, GateResult) for gate in self.gate_results):
+            raise TypeError("promotion receipt gate_results must contain GateResult values")
+        gate_ids = [gate.gate_id for gate in self.gate_results]
+        if len(gate_ids) != len(set(gate_ids)):
+            raise ValueError("promotion receipt gate ids must be unique")
+        quality = self.evaluated_submitted_quality
+        if quality is not None:
+            quality = normalize_quality(dict(quality))
+            object.__setattr__(self, "evaluated_submitted_quality", quality)
+        if self.decision not in {"promote", "retain_incumbent"}:
+            raise ValueError("promotion receipt decision is invalid")
+        if self.decision == "promote":
+            if self.submitted_digest is None or self.promoted_digest != self.submitted_digest:
+                raise ValueError("promote receipt must promote the submitted candidate")
+        elif self.promoted_digest != self.incumbent_digest:
+            raise ValueError("retain receipt must preserve the incumbent")
+        expected_digest = canonical_digest(self.decision_payload())
+        if self.decision_digest != expected_digest:
+            raise ValueError("promotion receipt decision digest mismatch")
+
+    def decision_payload(self) -> dict[str, object]:
+        return _promotion_decision_payload(
+            round_index=self.round_index,
+            effort_mode=self.effort_mode,
+            incumbent_digest=self.incumbent_digest,
+            submitted_digest=self.submitted_digest,
+            promoted_digest=self.promoted_digest,
+            evaluator_id=self.evaluator_id,
+            gate_results=self.gate_results,
+            evaluated_submitted_quality=self.evaluated_submitted_quality,
+            decision=self.decision,
+        )
 
     def to_payload(self) -> dict[str, object]:
         return {
             "decision": self.decision,
             "decision_digest": self.decision_digest,
             "effort_mode": int(self.effort_mode),
+            "evaluated_submitted_quality": (
+                dict(self.evaluated_submitted_quality)
+                if self.evaluated_submitted_quality is not None
+                else None
+            ),
             "evaluator_id": self.evaluator_id,
             "gate_results": [
                 {
@@ -407,24 +495,22 @@ def promotion_receipt(
     )
     promoted = submitted if promote else incumbent
     decision = "promote" if promote else "retain_incumbent"
-    payload = {
-        "decision": decision,
-        "effort_mode": int(effort_mode),
-        "evaluator_id": evaluator_id,
-        "gates": [
-            (gate.gate_id, gate.passed, gate.non_compensable, gate.evidence_digest)
-            for gate in gates
-        ],
-        "incumbent": incumbent.digest,
-        "promoted": promoted.digest,
-        "evaluated_submitted_quality": (
-            dict(normalize_quality(proposed_quality))
-            if proposed_quality is not None
-            else None
-        ),
-        "round_index": round_index,
-        "submitted": submitted.digest if submitted else None,
-    }
+    evaluated_quality = (
+        normalize_quality(proposed_quality)
+        if proposed_quality is not None
+        else None
+    )
+    payload = _promotion_decision_payload(
+        round_index=round_index,
+        effort_mode=effort_mode,
+        incumbent_digest=incumbent.digest,
+        submitted_digest=submitted.digest if submitted else None,
+        promoted_digest=promoted.digest,
+        evaluator_id=evaluator_id,
+        gate_results=gates,
+        evaluated_submitted_quality=evaluated_quality,
+        decision=decision,
+    )
     return PromotionReceipt(
         round_index=round_index,
         effort_mode=effort_mode,
@@ -433,6 +519,7 @@ def promotion_receipt(
         promoted_digest=promoted.digest,
         evaluator_id=evaluator_id,
         gate_results=gates,
+        evaluated_submitted_quality=evaluated_quality,
         decision=decision,
         decision_digest=canonical_digest(payload),
     )
