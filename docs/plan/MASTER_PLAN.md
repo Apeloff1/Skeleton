@@ -757,6 +757,28 @@ The `96` label is an organizational discipline inspired by the published GPT-3 1
 
 The final `frontier_96_qualified` claim is valid only when all 96 layers are simultaneously signed complete on current evidence and `F96-096` has independent finality evidence. A stale lower-layer prerequisite automatically invalidates downstream frontier qualification.
 
+## 24.6 Competitive AI engineering ladder — 200 proof-bearing levels
+
+The masterplan carries a second depth axis for areas where frontier AI systems are commonly marketed as exceptional. This axis is authoritative in `machine/competitive_ai_engineering_ladder.json` and documented in `docs/architecture/COMPETITIVE_AI_ENGINEERING_LADDER.md`.
+
+Competitive promotion evidence is separately governed by `machine/competitive_ai_benchmark_governance.json` / `docs/architecture/COMPETITIVE_AI_BENCHMARK_GOVERNANCE.md`. Benchmark targets, effect thresholds, exclusions, uncertainty methods, multiplicity handling and stopping rules are frozen before challenger results are visible; material protocol changes restart qualification.
+
+It contains **200 explicit engineering levels** constructed as **20 competitive claim families × 10 escalation stages**. The families cover reasoning, long context, memory, autonomous agents, tools/computer use, coding, retrieval/research, multimodality, realtime interaction, math/science verification, long-horizon planning, routing/ensembles, learning/self-improvement, safety, security/privacy/tenancy, reliability/recovery, advanced serving, hardware/resource scale, enterprise governance, and benchmark/evaluation integrity.
+
+This is an **overlay**, not a breadth expansion. Every `ENG-001` through `ENG-200` binds to existing `VOL-000..VOL-420` ownership and therefore does not violate the Volume-420 scope freeze.
+
+Each ten-level family escalates through claim/comparator contract, architecture ownership, typed contracts, deterministic admission/control, durable state/provenance, adversarial hardening, performance/economics, recovery/migration/rollback, independent comparator evaluation, and continuous superiority qualification.
+
+No competitive level is complete because prose, a demo, a class, or a passing happy-path test exists. Completion requires exact-head implementation evidence, negative/adversarial coverage, the declared hard gates, and the level-specific exit criteria. Family level 10 additionally requires reproducible Pareto-safe evidence against the declared baseline and independent promotion authority. Material drift in source, model/provider, policy, workload, scorer, environment, or budget expires the superiority claim.
+
+Required validation:
+
+```bash
+python scripts/check_competitive_ai_engineering_ladder.py --json
+python scripts/check_competitive_ai_benchmark_governance.py --json
+python -m pytest -q --noconftest tests/test_competitive_ai_engineering_ladder.py tests/test_competitive_ai_benchmark_governance.py
+```
+
 ## 25. Scope freeze and future plan evolution
 
 Volume 420 freezes breadth. New discoveries should be inserted as chapters/subchapters under an existing volume. A new top-level volume requires an ADR showing that the requirement cannot be represented cleanly within the frozen domains.
