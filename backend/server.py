@@ -2236,25 +2236,11 @@ from services.ai_assistant_svc import AIAssistantService, ai_service  # noqa: E4
 executor_factory = ExecutorFactory()
 app_start_time = time.time()
 
-from skeleton.kernel.runtime_supervision import (
-    RuntimeServiceLifecycle,
-    RuntimeSupervisionError,
-    ServicePhase,
-)
+from skeleton.kernel.runtime_supervision import RuntimeServiceLifecycle
 _runtime_lifecycle = RuntimeServiceLifecycle("backend")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if _runtime_lifecycle.phase in (ServicePhase.STOPPED, ServicePhase.FAILED):
-        _runtime_lifecycle.restart(reason="backend-lifespan-restart")
-    elif _runtime_lifecycle.phase is not ServicePhase.STARTING:
-        raise RuntimeSupervisionError(
-            "backend lifespan cannot overlap an active lifecycle generation"
-        )
-    app.state.runtime_lifecycle = _runtime_lifecycle
-    # ═══════════════════════════════════════════════════════════════════════
-    # ★ GUARANTEED LAUNCH ENVELOPE  (2026-02 deploy fix)
-    # The entire lifespan body is wrapped so ANY unexpected exception during
     if _runtime_lifecycle.phase.value in {"stopped", "failed"}:
         _runtime_lifecycle.restart(reason="backend-lifespan-restart")
     app.state.runtime_lifecycle = _runtime_lifecycle
@@ -3192,17 +3178,15 @@ async def lifespan(app: FastAPI):
                     return
                 if nm in protected:
                     skipped_protected += 1
-    app.state._boot_ready_at = time.time()
-    app.state._boot_ready_ms = int((app.state._boot_ready_at - _BOOT_START_TS) * 1000)
-    logger.info(f"[BOOT] readiness reached in {app.state._boot_ready_ms} ms — {len(_BOOT_TASKS)} background tasks scheduled")
-    _runtime_lifecycle.mark_ready(reason="backend-readiness-reached")
-
-    yield
-
-    _runtime_lifecycle.begin_drain(reason="backend-fastapi-lifespan-shutdown")
-    # ═══════════════════════════════════════════════════════════════════════
-    # ★ CLEAN SHUTDOWN (2026-02-18 upgrade)
-    #   FastAPI 0.130+ enforces graceful task drain at shutdown.  Without
+                    continue
+                if nm in frozen_names:
+                    try:
+                        _cs.freeze(nm, drop_after=True, compact=False, force=True)
+                        resealed += 1
+                    except Exception:
+                        pass
+            logger.info(f"[cold] auto-reseal: re-froze {resealed} collections that startup seeders rehydrated; skipped {skipped_protected} PROTECTED")
+        except Exception as _ex:
             logger.warning(f"[cold] auto-reseal failed: {_ex}")
     _start_lifecycle_thread("cold-auto-reseal", _kick_auto_reseal)
 
@@ -3237,29 +3221,20 @@ async def lifespan(app: FastAPI):
                     logger.warning(f"[academy-thaw] {nm} failed: {_te}")
             if thawed:
                 logger.info(f"[academy-thaw] restored {thawed} frozen user-facing collections ({total_rows} total rows)")
-        client.close()
-    except Exception:
-        pass
-    _runtime_lifecycle.mark_stopped(reason="backend-background-and-db-drained")
-    logger.info("Shutdown complete.")
+        except Exception as _ex:
+            logger.warning(f"[academy-thaw] failed: {_ex}")
+    _start_lifecycle_thread("academy-thaw", _kick_academy_thaw)
 
-app = FastAPI(
+    logger.info(f"CodeDock Quantum Nexus v{SYSTEM_VERSION} ready to serve requests")
+    # Stage E — start the autonomic background scheduler (self-learning sweeps,
     # legion drills, fabric snapshots). Fail-soft: never blocks readiness.
     try:
-    version=SYSTEM_VERSION,
-    lifespan=lifespan
-)
-
-from skeleton.kernel.runtime_supervision import RuntimeAdmissionMiddleware
-app.add_middleware(
-    RuntimeAdmissionMiddleware,
-    lifecycle=_runtime_lifecycle,
-    exempt_prefixes=("/api/health",),
-)
-
-from core.http_errors import install_public_error_handlers as _install_public_error_handlers
-_install_public_error_handlers(app)
-
+        from core.scheduler import start_scheduler
+        if start_scheduler():
+            logger.info("[BOOT] Stage-E scheduler started (lafs_sweep · legion_drill · fabric_snapshot)")
+    except Exception as _sch_ex:  # noqa: BLE001
+        logger.warning(f"[BOOT] scheduler start failed: {_sch_ex}")
+    # Snapshot boot duration to readiness time so observability tools can
     # surface it without scraping logs.
     app.state._boot_ready_at = time.time()
     app.state._boot_ready_ms = int((app.state._boot_ready_at - _BOOT_START_TS) * 1000)
