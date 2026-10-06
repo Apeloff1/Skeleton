@@ -48,7 +48,10 @@
     "recoverability from process, node, provider, database, region, and operator failure",
     "repeatable deployment, backup, restore, incident response, and change management",
     "compliance-ready data lifecycle controls without claiming unearned certification",
-    "machine-verifiable architecture evidence at exact repository head"
+    "machine-verifiable architecture evidence at exact repository head",
+    "enterprise identity federation feeds authenticated subjects into Skeleton-owned authorization without outsourcing runtime policy authority",
+    "configuration, external dependencies and architecture exceptions are governed as production control surfaces",
+    "canonical consistency and cross-service mutation semantics are explicit before horizontal or regional scaling"
   ],
   "invariants": [
     "production authority is explicit and singular for every canonical state domain",
@@ -1017,7 +1020,14 @@
       "observability model",
       "release model",
       "operating model",
-      "implementation workstream DAG"
+      "implementation workstream DAG",
+      "consistency and cross-service transaction model",
+      "regional and residency strategy",
+      "configuration and feature-flag governance",
+      "enterprise identity federation boundary",
+      "external dependency registration policy",
+      "expiring architecture exception policy",
+      "API and contract governance"
     ],
     "not_signable_without_runtime_evidence": [
       "production availability",
@@ -1041,5 +1051,84 @@
     "scripts/verify_enterprise_system_architecture.py",
     "tests/test_enterprise_system_architecture.py",
     ".github/workflows/enterprise-system-architecture.yml"
-  ]
+  ],
+  "consistency_model": {
+    "canonical_writes": "strong/transactional according to the canonical repository contract; acknowledgement only after the declared durability point",
+    "operation_coordination": "monotonic durable state with idempotency, leases/fencing, and compare-and-swap where concurrent progression is possible",
+    "derived_state": "eventually consistent and rebuildable; freshness is explicit and stale projection cannot self-promote",
+    "cross_service_mutation": "saga/outbox/receipt semantics when one ACID transaction cannot span owners; ambiguity is reconciled before retry",
+    "read_policy": "strong reads for authorization, governance, irreversible side effects and completion claims; bounded-stale reads only where policy explicitly permits",
+    "clock_policy": "UTC wall-clock timestamps for audit plus monotonic timers for local deadlines; correctness must not depend on unsynchronized wall clocks"
+  },
+  "regional_strategy": {
+    "initial_enterprise_target": "single active production region distributed across multiple failure domains with encrypted cross-region recovery copies",
+    "disaster_recovery": "warm-standby or restore-driven secondary region satisfying declared region-loss RPO/RTO",
+    "active_active_rule": "multi-region active-active is forbidden until canonical write conflict, tenant routing, global idempotency, provider residency and failover semantics are independently proven",
+    "residency": "tenant/jurisdiction placement policy constrains storage, backup, retrieval, provider and tool egress before execution"
+  },
+  "configuration_management": {
+    "source_of_truth": "versioned non-secret configuration plus external secret references",
+    "production_rules": [
+      "configuration schema validates before process readiness",
+      "secret values are never committed to repository configuration",
+      "environment-specific values cannot change authority semantics",
+      "feature flags have owner, purpose, expiry or review date, safe default and rollback behavior",
+      "configuration changes receive the same provenance and rollout controls as code when they can affect production behavior",
+      "configuration snapshots are attached to release/incident evidence without secret values"
+    ]
+  },
+  "enterprise_identity_federation": {
+    "human_authentication": "OIDC is the baseline federation target; SAML may be supported through an identity broker where customer requirements demand it",
+    "lifecycle": "enterprise user/group provisioning may use SCIM or an equivalent governed directory sync without making the external directory a runtime authorization authority",
+    "strong_auth": "MFA or equivalent phishing-resistant strong authentication is required for privileged production access",
+    "session_policy": "bounded session lifetime, revocation, device/risk policy where available, and re-authentication for high-impact actions",
+    "authorization_rule": "external identity asserts authenticated subject/group attributes; Skeleton policy remains authoritative for resource/capability authorization"
+  },
+  "external_dependency_policy": {
+    "registry_required": true,
+    "required_fields": [
+      "owner",
+      "purpose",
+      "authentication",
+      "data classes",
+      "regions/residency",
+      "timeout",
+      "retry safety",
+      "rate/concurrency limits",
+      "SLO/health signal",
+      "fallback/degraded behavior",
+      "audit/provenance",
+      "exit/replacement plan"
+    ],
+    "rule": "undeclared production external dependencies are prohibited; adding a dependency requires failure semantics and data-governance review before activation"
+  },
+  "exception_policy": {
+    "allowed_only_when": "a safer design is not currently feasible and the exception does not violate a non-overridable tenant, security, canonical-state, or audit invariant",
+    "required_fields": [
+      "exception id",
+      "owner",
+      "scope",
+      "risk",
+      "compensating controls",
+      "approval",
+      "created_at",
+      "expires_at",
+      "remediation plan"
+    ],
+    "non_overridable": [
+      "cross-tenant isolation",
+      "production secret exposure",
+      "accepted canonical write durability",
+      "privileged mutation audit",
+      "model output cannot be authorization"
+    ],
+    "expiry_rule": "expired exceptions fail architecture/release acceptance until removed or formally renewed with fresh evidence"
+  },
+  "api_and_contract_governance": {
+    "public_api": "versioned, authenticated where protected, bounded, documented and compatibility-tested",
+    "internal_api": "typed or schema-governed with explicit owner and failure contract",
+    "compatibility": "breaking changes use versioned or expand/migrate/contract rollout; silent wire-shape breakage is prohibited",
+    "idempotency": "required for externally retried mutations where duplicate effects are possible",
+    "error_contract": "stable machine-readable error classes with sanitized public detail and internal correlation identity"
+  }
 }
