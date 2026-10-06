@@ -265,7 +265,14 @@ def validate(data: dict) -> list[str]:
                 if duel_authority.get("runtime_contracts") != {
                     "contracts": "skeleton/ai/game_builder/contracts.py",
                     "state_machine": "skeleton/ai/game_builder/dual_rival_forge.py",
-                    "tests": "tests/test_ai_game_builder_runtime.py",
+                    "evaluation_panel": "skeleton/ai/game_builder/evaluation.py",
+                    "resource_governor": "skeleton/ai/game_builder/resource_governor.py",
+                    "quality_debt": "skeleton/ai/game_builder/quality_debt.py",
+                    "integrated_control_plane": "skeleton/ai/game_builder/control_plane.py",
+                    "tests": [
+                        "tests/test_ai_game_builder_runtime.py",
+                        "tests/test_ai_game_builder_overengineering_runtime.py",
+                    ],
                 }:
                     errors.append("AI game builder dual-rival runtime binding drifted")
                 if duel_authority.get("governance_runtime") != {
