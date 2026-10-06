@@ -68,7 +68,9 @@ jobs:
           python-version: "3.11.16"
 
       - name: Install runtime test dependencies
-        run: python -m pip install --disable-pip-version-check . "pytest>=8,<9" httpx fastapi
+        run: >-
+          python -m pip install --disable-pip-version-check .
+          "pytest>=8,<9" "pytest-asyncio>=0.24,<1" httpx fastapi
 
       - name: Compile changed supervision surfaces
         run: >-
@@ -80,6 +82,7 @@ jobs:
           skeleton/automation/chatgpt_adapter.py
           skeleton/automation/shift_supervisor/model_gateway.py
           skeleton/api/server.py
+          skeleton/api/engine_runtime.py
           backend/server.py
 
       - name: Validate semantic supervision and connector inventory
@@ -90,12 +93,11 @@ jobs:
 
       - name: Run lifecycle and cancellation adversarial tests
         run: >-
-          python -m pytest -q --noconftest
+          python -m pytest -q -p pytest_asyncio.plugin --noconftest
           tests/test_architecture_runtime_supervision.py
           skeleton/testing/test_vol004_runtime_supervision_v2.py
           skeleton/testing/test_kernel_supervisor_cancellation.py
+          backend/tests/test_engine_cross_service_closure.py
 
-      - name: Re-run cross-service cancellation fence
-        run: >-
-          python -m pytest -q
-          backend/tests/test_engine_cross_service_closure.py::test_cross_service_cancel_fences_late_provider_result
+      - name: Validate masterplan consistency
+        run: python scripts/check_ai_master_plan.py
