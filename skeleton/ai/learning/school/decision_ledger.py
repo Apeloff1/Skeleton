@@ -196,7 +196,7 @@ class DecisionRecord:
             object.__setattr__(
                 self,
                 "record_hash",
-                _sha("record_hash", self.record_hash),
+                _text("record_hash", self.record_hash),
             )
         digests = tuple(_sha("evidence_digest", item) for item in self.evidence_digests)
         if digests and len(digests) != len(evidence):
