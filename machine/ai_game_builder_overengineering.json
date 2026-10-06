@@ -1,6 +1,6 @@
 {
-  "schema_version": "skeleton.ai_game_builder_overengineering.v3",
-  "version": "3.0.0",
+  "schema_version": "skeleton.ai_game_builder_overengineering.v4",
+  "version": "4.0.0",
   "status": "active_design_authority",
   "purpose": "Cross-cutting overengineering constitution applied to the 500-level dual-rival AI game builder.",
   "parent_authorities": [
@@ -8,10 +8,10 @@
     "machine/ai_game_builder_dual_rival_forge.json"
   ],
   "topology": {
-    "plane_count": 64,
+    "plane_count": 80,
     "family_count": 50,
-    "minimum_planes_per_family": 28,
-    "critical_plane_count": 28
+    "minimum_planes_per_family": 38,
+    "critical_plane_count": 38
   },
   "laws": [
     "No quality score may compensate for a failed non-compensable gate.",
@@ -33,7 +33,12 @@
     "Unresolved causal obligations remain promotion blockers until exact dependent state is repaired or the obligation is explicitly and evidentially retired.",
     "Critical evidence becomes stale transitively when any material source, canon, model, tool, evaluator, artifact, or dependency identity changes.",
     "Apparent evaluator quorum does not count as independence when judges share a correlated failure root.",
-    "Stagnation or convergence never proves completion; cyclic or low-gain runs require orthogonal hypothesis injection while preserving the selected round budget."
+    "Stagnation or convergence never proves completion; cyclic or low-gain runs require orthogonal hypothesis injection while preserving the selected round budget.",
+    "Complexity is a cost, not a virtue: new state, rules, dependencies and artifact mass must earn measurable marginal quality or be removed.",
+    "Every declared requirement must terminate in artifact-bound evidence or remain an explicit blocker; status prose never closes proof obligations.",
+    "External game knowledge is admitted only through immutable provenance and rights-classified snapshots, with reference permission separated from expressive incorporation.",
+    "Critical cross-system interactions and catastrophic rare-event tails cannot be averaged away by strong aggregate quality.",
+    "Terminal completion requires a tamper-evident evidence root, all 50 family qualifications, all critical assurance planes, zero unresolved critical gaps, and independent verification."
   ],
   "critical_planes": [
     "OP01",
@@ -63,7 +68,17 @@
     "OP55",
     "OP60",
     "OP63",
-    "OP64"
+    "OP64",
+    "OP65",
+    "OP66",
+    "OP67",
+    "OP69",
+    "OP70",
+    "OP75",
+    "OP76",
+    "OP78",
+    "OP79",
+    "OP80"
   ],
   "planes": [
     {
@@ -1217,6 +1232,294 @@
       ],
       "status": "planned",
       "signed": false
+    },
+    {
+      "id": "OP65",
+      "title": "Minimal Sufficient Complexity & Quality Density",
+      "objective": "Force every added state, rule, dependency, artifact byte, and subsystem to earn measurable player or engineering value so the forge converges toward the smallest system that preserves frontier quality.",
+      "mandatory_controls": [
+        "weighted complexity ledger",
+        "marginal quality-per-complexity threshold",
+        "hard complexity ceilings by target",
+        "prefer simpler Pareto-equivalent champion"
+      ],
+      "evidence_required": [
+        "before/after complexity snapshot",
+        "quality-density decision",
+        "simplification counterfactual"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP66",
+      "title": "Requirement-to-Artifact Proof Closure",
+      "objective": "Require every declared requirement, game pillar, acceptance rule, and release promise to terminate in exact artifact and evidence identities rather than narrative status claims.",
+      "mandatory_controls": [
+        "immutable requirement IDs",
+        "artifact-to-requirement links",
+        "evidence closure ledger",
+        "critical missing/failed requirement veto"
+      ],
+      "evidence_required": [
+        "requirement closure digest",
+        "missing/failed proof report",
+        "artifact evidence links"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP67",
+      "title": "Constraint Satisfiability & Conflict-Core Extraction",
+      "objective": "Compile hard game, story, platform, accessibility, rights, performance, and system constraints into proof results that expose the smallest contradictory core instead of allowing silent compromise.",
+      "mandatory_controls": [
+        "typed hard/soft constraints",
+        "critical constraint veto",
+        "conflict-core extraction",
+        "repair plans target the core rather than symptoms"
+      ],
+      "evidence_required": [
+        "constraint proof set",
+        "minimal conflict core",
+        "repair verification receipt"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP68",
+      "title": "Semantic Intent Preservation Under Edits",
+      "objective": "Prevent generated refactors, rewrites, optimizations, localization, and asset edits from silently changing protected player fantasy, narrative intent, mechanic semantics, or design promises.",
+      "mandatory_controls": [
+        "protected semantic invariants",
+        "before/after intent digests",
+        "explicit intentional-change annotation",
+        "silent semantic drift veto"
+      ],
+      "evidence_required": [
+        "intent-invariant diff",
+        "approved intent-change receipt",
+        "semantic preservation report"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP69",
+      "title": "Hermetic Transform Sandbox & Reproduction",
+      "objective": "Make every material generated transform reproducible from exact tool, input, configuration, environment, and output identities so nondeterministic asset/code mutation cannot hide inside the forge.",
+      "mandatory_controls": [
+        "content-addressed transform receipts",
+        "pinned tool/environment identity",
+        "isolated transform sandbox",
+        "exact reproduction or declared nondeterminism budget"
+      ],
+      "evidence_required": [
+        "transform receipt",
+        "reproduction match report",
+        "environment attestation"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP70",
+      "title": "External Game-Knowledge Ingestion Firewall",
+      "objective": "Allow broad use of engine docs, standards, research, videos, postmortems, tutorials, community material, and factual game metadata only through frozen provenance and rights-classified source snapshots.",
+      "mandatory_controls": [
+        "source snapshot digests",
+        "rights/source-class admission",
+        "unknown/forbidden quarantine",
+        "separate reference permission from expressive incorporation"
+      ],
+      "evidence_required": [
+        "knowledge snapshot manifest",
+        "rights admission log",
+        "reference-vs-incorporation audit"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP71",
+      "title": "Reference Abstraction & Anti-Imitation Compiler",
+      "objective": "Extract techniques, constraints, patterns, and facts from references while actively preventing franchise/style/level/character/music/code imitation from becoming project expression.",
+      "mandatory_controls": [
+        "reference-only abstraction layer",
+        "named-work/style imitation probes",
+        "project-DNA re-grounding",
+        "high similarity escalation"
+      ],
+      "evidence_required": [
+        "abstraction trace",
+        "anti-imitation probe report",
+        "project-DNA originality comparison"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP72",
+      "title": "Multi-Resolution Visual Coverage",
+      "objective": "Prove visual quality from pixel and texel atoms through frames, shots, scenes, sequences, UI states, camera conditions, LODs, and whole-game visual language.",
+      "mandatory_controls": [
+        "declared visual scales",
+        "evidence per required scale",
+        "temporal and spatial salience sampling",
+        "atom-to-scene-to-release lineage"
+      ],
+      "evidence_required": [
+        "visual coverage matrix",
+        "missing-scale report",
+        "salience-weighted capture corpus"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP73",
+      "title": "Multi-Resolution Narrative Coverage",
+      "objective": "Prove narrative quality from token/line/beat through scenes, sequences, acts, character and quest arcs, branches, campaign state, and endings without losing compressed long-horizon facts.",
+      "mandatory_controls": [
+        "declared narrative scales",
+        "evidence per required scale",
+        "compression round-trip checks",
+        "arc/branch/end-state coverage"
+      ],
+      "evidence_required": [
+        "narrative coverage matrix",
+        "compression fidelity report",
+        "arc/ending closure report"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP74",
+      "title": "Player Mental Model & Tutorial Truth",
+      "objective": "Ensure tutorials, UI, feedback, affordances, tooltips, difficulty cues, and observed mechanics teach the true underlying game rules rather than a misleading approximation.",
+      "mandatory_controls": [
+        "expected player concept ledger",
+        "observed-understanding probes",
+        "critical misconception veto",
+        "tutorial and mechanic state share authority"
+      ],
+      "evidence_required": [
+        "mental-model probe set",
+        "critical misconception report",
+        "tutorial-to-rule trace"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP75",
+      "title": "Combinatorial Systems Interaction Matrix",
+      "objective": "Exercise pairwise and risk-selected higher-order interactions across gameplay, economy, quests, world simulation, AI, physics, networking, saves, UI, audio, and content systems before release.",
+      "mandatory_controls": [
+        "system interaction registry",
+        "complete critical pair coverage",
+        "risk-selected t-wise scenarios",
+        "uncovered interaction veto for critical systems"
+      ],
+      "evidence_required": [
+        "interaction coverage matrix",
+        "missing critical pairs",
+        "higher-order scenario results"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP76",
+      "title": "Rare-Event & Tail-Risk Simulation",
+      "objective": "Keep catastrophic low-frequency failures visible even when averages and ordinary playtests are excellent, using conservative bounds for corruption, softlocks, exploits, crashes, desync, and rights/security failures.",
+      "mandatory_controls": [
+        "critical rare-event scenario registry",
+        "minimum sample evidence",
+        "conservative upper-bound decision",
+        "zero averaging-away of catastrophic tails"
+      ],
+      "evidence_required": [
+        "tail-risk observation set",
+        "conservative bound report",
+        "critical rare-event blocker list"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP77",
+      "title": "Privacy-Preserving Telemetry Causal Feedback",
+      "objective": "Use real or simulated player telemetry to improve the game only through privacy-minimized aggregates and explicit causal hypotheses rather than raw surveillance or correlation worship.",
+      "mandatory_controls": [
+        "minimum cohort sizes",
+        "no raw identifiers in design feedback",
+        "hypothesis-before-tuning rule",
+        "holdout or counterfactual validation where practical"
+      ],
+      "evidence_required": [
+        "privacy-safe aggregate set",
+        "causal hypothesis receipt",
+        "before/after holdout report"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP78",
+      "title": "Project Resurrection & Catastrophic Recovery",
+      "objective": "Prove the entire game project can be reconstructed after catastrophic workspace loss or corruption from content-addressed project, canon, artifact graph, event chain, and rights snapshots.",
+      "mandatory_controls": [
+        "whole-project resurrection points",
+        "independent restore environment",
+        "rights/provenance restored with content",
+        "periodic destructive recovery drill"
+      ],
+      "evidence_required": [
+        "resurrection-point digest",
+        "clean-environment restore proof",
+        "post-restore equivalence report"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP79",
+      "title": "Tamper-Evident Evidence Merkle Transparency",
+      "objective": "Bind promotion, rejection, dissent, tests, source decisions, and release evidence into an append-only content-addressed root so retrospective evidence rewriting becomes detectable.",
+      "mandatory_controls": [
+        "append-only evidence leaves",
+        "deterministic Merkle root",
+        "receipt root attached to promotions",
+        "root mismatch blocks qualification"
+      ],
+      "evidence_required": [
+        "evidence Merkle root",
+        "leaf inclusion sample",
+        "tamper-detection drill"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "OP80",
+      "title": "Zero-Critical-Gap Terminal Closure Certificate",
+      "objective": "Permit terminal whole-game completion only when all 50 families, every critical overengineering plane, exact artifact/canon/provenance identities, and the evidence root are bound with zero unresolved critical gaps and independent verification.",
+      "mandatory_controls": [
+        "all GB01..GB50 family qualifications",
+        "all critical OP plane qualifications",
+        "zero unresolved critical gaps",
+        "independent terminal verifier outside rival/evaluator routine"
+      ],
+      "evidence_required": [
+        "terminal closure certificate",
+        "critical-plane coverage proof",
+        "independent zero-gap verdict"
+      ],
+      "status": "planned",
+      "signed": false
     }
   ],
   "family_bindings": {
@@ -1251,7 +1554,19 @@
       "OP56",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP68",
+      "OP69",
+      "OP70",
+      "OP74",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB02": [
       "OP01",
@@ -1284,7 +1599,20 @@
       "OP56",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP68",
+      "OP69",
+      "OP70",
+      "OP71",
+      "OP74",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB03": [
       "OP01",
@@ -1320,7 +1648,17 @@
       "OP61",
       "OP62",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB04": [
       "OP01",
@@ -1352,7 +1690,17 @@
       "OP55",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB05": [
       "OP01",
@@ -1387,7 +1735,17 @@
       "OP58",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB06": [
       "OP01",
@@ -1421,7 +1779,20 @@
       "OP58",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP68",
+      "OP69",
+      "OP70",
+      "OP71",
+      "OP73",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB07": [
       "OP01",
@@ -1454,7 +1825,20 @@
       "OP58",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP68",
+      "OP69",
+      "OP70",
+      "OP71",
+      "OP73",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB08": [
       "OP01",
@@ -1488,7 +1872,21 @@
       "OP59",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP68",
+      "OP69",
+      "OP70",
+      "OP71",
+      "OP73",
+      "OP74",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB09": [
       "OP01",
@@ -1522,7 +1920,21 @@
       "OP58",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP68",
+      "OP69",
+      "OP70",
+      "OP71",
+      "OP73",
+      "OP74",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB10": [
       "OP01",
@@ -1555,7 +1967,20 @@
       "OP58",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP68",
+      "OP69",
+      "OP70",
+      "OP71",
+      "OP73",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB11": [
       "OP01",
@@ -1590,7 +2015,19 @@
       "OP58",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP71",
+      "OP73",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB12": [
       "OP01",
@@ -1622,7 +2059,19 @@
       "OP55",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP71",
+      "OP72",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB13": [
       "OP01",
@@ -1654,7 +2103,20 @@
       "OP55",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP71",
+      "OP72",
+      "OP74",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB14": [
       "OP01",
@@ -1687,7 +2149,18 @@
       "OP55",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP71",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB15": [
       "OP01",
@@ -1721,7 +2194,20 @@
       "OP59",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP71",
+      "OP72",
+      "OP73",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB16": [
       "OP01",
@@ -1755,7 +2241,20 @@
       "OP57",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP68",
+      "OP69",
+      "OP70",
+      "OP74",
+      "OP75",
+      "OP76",
+      "OP77",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB17": [
       "OP01",
@@ -1787,7 +2286,20 @@
       "OP57",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP68",
+      "OP69",
+      "OP70",
+      "OP74",
+      "OP75",
+      "OP76",
+      "OP77",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB18": [
       "OP01",
@@ -1822,7 +2334,20 @@
       "OP59",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP68",
+      "OP69",
+      "OP70",
+      "OP74",
+      "OP75",
+      "OP76",
+      "OP77",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB19": [
       "OP01",
@@ -1854,7 +2379,19 @@
       "OP55",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP74",
+      "OP75",
+      "OP76",
+      "OP77",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB20": [
       "OP01",
@@ -1887,7 +2424,19 @@
       "OP56",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP74",
+      "OP75",
+      "OP76",
+      "OP77",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB21": [
       "OP01",
@@ -1921,7 +2470,19 @@
       "OP57",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP74",
+      "OP75",
+      "OP76",
+      "OP77",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB22": [
       "OP01",
@@ -1953,7 +2514,18 @@
       "OP57",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP75",
+      "OP76",
+      "OP77",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB23": [
       "OP01",
@@ -1987,7 +2559,18 @@
       "OP57",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP75",
+      "OP76",
+      "OP77",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB24": [
       "OP01",
@@ -2021,7 +2604,19 @@
       "OP57",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP74",
+      "OP75",
+      "OP76",
+      "OP77",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB25": [
       "OP01",
@@ -2056,7 +2651,18 @@
       "OP58",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP75",
+      "OP76",
+      "OP77",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB26": [
       "OP01",
@@ -2089,7 +2695,17 @@
       "OP57",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB27": [
       "OP01",
@@ -2123,7 +2739,18 @@
       "OP59",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP72",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB28": [
       "OP01",
@@ -2158,7 +2785,19 @@
       "OP59",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP71",
+      "OP72",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB29": [
       "OP01",
@@ -2191,7 +2830,19 @@
       "OP55",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP71",
+      "OP72",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB30": [
       "OP01",
@@ -2225,7 +2876,19 @@
       "OP59",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP71",
+      "OP72",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB31": [
       "OP01",
@@ -2258,7 +2921,20 @@
       "OP59",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP71",
+      "OP72",
+      "OP74",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB32": [
       "OP01",
@@ -2293,7 +2969,20 @@
       "OP59",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP72",
+      "OP74",
+      "OP75",
+      "OP76",
+      "OP77",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB33": [
       "OP01",
@@ -2327,7 +3016,18 @@
       "OP59",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP71",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB34": [
       "OP01",
@@ -2360,7 +3060,19 @@
       "OP59",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP71",
+      "OP73",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB35": [
       "OP01",
@@ -2395,7 +3107,19 @@
       "OP59",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP71",
+      "OP73",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB36": [
       "OP01",
@@ -2429,7 +3153,19 @@
       "OP56",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP74",
+      "OP75",
+      "OP76",
+      "OP77",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB37": [
       "OP01",
@@ -2462,7 +3198,18 @@
       "OP57",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP75",
+      "OP76",
+      "OP77",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB38": [
       "OP01",
@@ -2495,7 +3242,18 @@
       "OP60",
       "OP61",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP75",
+      "OP76",
+      "OP77",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB39": [
       "OP01",
@@ -2528,7 +3286,18 @@
       "OP60",
       "OP61",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP75",
+      "OP76",
+      "OP77",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB40": [
       "OP01",
@@ -2560,7 +3329,18 @@
       "OP60",
       "OP61",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP75",
+      "OP76",
+      "OP77",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB41": [
       "OP01",
@@ -2597,7 +3377,18 @@
       "OP60",
       "OP62",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP75",
+      "OP76",
+      "OP77",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB42": [
       "OP01",
@@ -2631,7 +3422,19 @@
       "OP57",
       "OP60",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP74",
+      "OP75",
+      "OP76",
+      "OP77",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB43": [
       "OP01",
@@ -2666,7 +3469,18 @@
       "OP61",
       "OP62",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP68",
+      "OP69",
+      "OP70",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB44": [
       "OP01",
@@ -2700,7 +3514,18 @@
       "OP61",
       "OP62",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP71",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB45": [
       "OP01",
@@ -2735,7 +3560,18 @@
       "OP61",
       "OP62",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP71",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB46": [
       "OP01",
@@ -2773,7 +3609,19 @@
       "OP61",
       "OP62",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP69",
+      "OP70",
+      "OP71",
+      "OP72",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB47": [
       "OP01",
@@ -2811,7 +3659,20 @@
       "OP61",
       "OP62",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP68",
+      "OP69",
+      "OP70",
+      "OP71",
+      "OP73",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB48": [
       "OP01",
@@ -2848,7 +3709,21 @@
       "OP61",
       "OP62",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP68",
+      "OP69",
+      "OP70",
+      "OP73",
+      "OP74",
+      "OP75",
+      "OP76",
+      "OP77",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB49": [
       "OP01",
@@ -2882,7 +3757,19 @@
       "OP60",
       "OP61",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP68",
+      "OP69",
+      "OP70",
+      "OP72",
+      "OP75",
+      "OP76",
+      "OP78",
+      "OP79",
+      "OP80"
     ],
     "GB50": [
       "OP01",
@@ -2921,7 +3808,23 @@
       "OP61",
       "OP62",
       "OP63",
-      "OP64"
+      "OP64",
+      "OP65",
+      "OP66",
+      "OP67",
+      "OP68",
+      "OP69",
+      "OP70",
+      "OP71",
+      "OP72",
+      "OP73",
+      "OP74",
+      "OP75",
+      "OP76",
+      "OP77",
+      "OP78",
+      "OP79",
+      "OP80"
     ]
   },
   "promotion": {
@@ -2965,6 +3868,10 @@
     "third_generation": {
       "frontier_assurance": "skeleton/ai/game_builder/frontier_assurance.py",
       "regression_tests": "tests/test_ai_game_builder_frontier_runtime.py"
+    },
+    "fourth_generation": {
+      "deep_assurance": "skeleton/ai/game_builder/deep_assurance.py",
+      "regression_tests": "tests/test_ai_game_builder_deep_assurance.py"
     }
   },
   "second_generation_runtime": {
@@ -2989,6 +3896,26 @@
       "evidence invalidation",
       "convergence/cycle detection",
       "verified project wisdom"
+    ]
+  },
+  "fourth_generation_runtime": {
+    "deep_assurance": "skeleton/ai/game_builder/deep_assurance.py",
+    "tests": "tests/test_ai_game_builder_deep_assurance.py",
+    "controls": [
+      "minimal sufficient complexity and quality density",
+      "requirement-to-artifact proof closure",
+      "constraint conflict-core extraction",
+      "semantic intent preservation",
+      "hermetic transform reproduction",
+      "external knowledge ingestion firewall",
+      "multi-resolution visual and narrative coverage",
+      "player mental-model truth",
+      "combinatorial interaction coverage",
+      "rare-event tail-risk simulation",
+      "privacy-preserving telemetry feedback",
+      "whole-project resurrection",
+      "tamper-evident evidence Merkle root",
+      "zero-critical-gap terminal closure"
     ]
   }
 }
