@@ -113,9 +113,9 @@
       "move_tags": [
         "ai-tree:mapped",
         "migration:staged-mirror",
-        "cutover:parity-ready"
+        "cutover:owner-sensitive"
       ],
-      "move_batch": "B1-core-runtime",
+      "move_batch": "B3-owner-sensitive",
       "source_disposition": "retain_until_import_inversion_and_regression_gates",
       "volume_refs": [
         "VOL-000",
@@ -165,12 +165,13 @@
       "overlay_children": [
         "execution_authority.py"
       ],
-      "parity_exceptions": {
-        "__init__.py": {
+      "parity_exceptions": [
+        {
+          "path": "__init__.py",
           "mode": "compatibility_facade",
           "facade_required_import": "from .execution_authority import ("
         }
-      }
+      ]
     },
     {
       "id": "AIFT-PERSISTENCE",
@@ -7730,6 +7731,34 @@
         "VOL-412",
         "VOL-413",
         "VOL-414"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-EXECUTION-AUTHORITY-CONTRACTS",
+      "path": "skeleton/ai/runtime/contracts/execution_authority.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "volume_refs": [
+        "VOL-084",
+        "VOL-097",
+        "VOL-131",
+        "VOL-164",
+        "VOL-300"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-EXECUTION-AUTHORITY-CORE",
+      "path": "skeleton/ai/runtime/core/execution_authority.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "volume_refs": [
+        "VOL-084",
+        "VOL-097",
+        "VOL-131",
+        "VOL-164",
+        "VOL-300"
       ]
     }
   ]
