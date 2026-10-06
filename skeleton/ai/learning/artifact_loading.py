@@ -41,7 +41,7 @@ def _non_negative_int(name: str, value: object) -> int:
 
 def _artifact_path(name: str, value: object) -> str:
     path = _text(name, value, maximum=2048)
-    if "\x00" in path or "\\" in path:
+    if value != path or "\x00" in path or "\\" in path:
         raise ArtifactLoadError(f"{name} must be a canonical artifact-relative path")
     pure = PurePosixPath(path)
     parts = pure.parts
