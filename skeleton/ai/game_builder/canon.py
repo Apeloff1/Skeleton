@@ -37,8 +37,8 @@ class CanonAssertion:
     value: Any
     branch_id: str
     valid_from_tick: int
-    valid_to_tick: int | None = None
     evaluator_provenance: EvaluatorProvenance
+    valid_to_tick: int | None = None
     intentional_contradiction: bool = False
     evidence_digests: tuple[str, ...] = ()
 
