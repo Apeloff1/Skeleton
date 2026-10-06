@@ -22,6 +22,7 @@ operation.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import threading
@@ -32,7 +33,6 @@ from types import MappingProxyType
 from typing import Any
 
 from skeleton.kernel.errors import KernelError
-from skeleton.retrieval.provenance import ProvenanceEntry
 
 MAX_ID_CHARS = 128
 MAX_CLAIM_CHARS = 4_096
@@ -200,7 +200,7 @@ def canonical_fingerprint(payload: Mapping[str, object] | object) -> str:
             "fingerprint payload is not deterministic JSON",
             context={"reason": "invalid_payload"},
         ) from exc
-    return ProvenanceEntry.hash_data(encoded)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
 def _freeze_payload(payload: Mapping[str, object]) -> Mapping[str, object]:
