@@ -281,6 +281,10 @@ class ExecutionAuthority:
         instant = _aware_utc(now or datetime.now(timezone.utc), "now")
         return instant >= self.expires_at
 
+    def active(self, *, now: datetime | None = None) -> bool:
+        instant = _aware_utc(now or datetime.now(timezone.utc), "now")
+        return self.issued_at <= instant < self.expires_at
+
     def permits(
         self,
         capability: str,
@@ -290,7 +294,7 @@ class ExecutionAuthority:
     ) -> bool:
         if not isinstance(capability, str) or _CAPABILITY.fullmatch(capability) is None:
             return False
-        if self.effect is not AuthorityEffect.ALLOW or self.expired(now=now):
+        if self.effect is not AuthorityEffect.ALLOW or not self.active(now=now):
             return False
         if capability not in self.capabilities:
             return False
@@ -526,6 +530,7 @@ def verify_authority_receipt_chain(
 
     total = ResourceUsage()
     previous_digest: str | None = None
+    previous_authorized_at: datetime | None = None
     expected_sequence = 1
     for receipt in receipts:
         if not isinstance(receipt, AuthorityConsumptionReceipt):
@@ -541,12 +546,18 @@ def verify_authority_receipt_chain(
             raise ExecutionAuthorityError("receipt sequence is not contiguous")
         if receipt.previous_receipt_digest != previous_digest:
             raise ExecutionAuthorityError("receipt hash chain is discontinuous")
+        if (
+            previous_authorized_at is not None
+            and receipt.authorized_at < previous_authorized_at
+        ):
+            raise ExecutionAuthorityError("receipt authorization time regressed")
         total = total.add(receipt.delta_usage)
         if receipt.total_usage != total:
             raise ExecutionAuthorityError("receipt cumulative usage mismatch")
         if not authority.budget.permits(total):
             raise ExecutionAuthorityError("receipt chain exceeds authority budget")
         previous_digest = receipt.digest
+        previous_authorized_at = receipt.authorized_at
         expected_sequence += 1
     return total
 
