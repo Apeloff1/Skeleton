@@ -31,7 +31,64 @@
           "name": "Cost Admission Closure Gate"
         }
       ],
-      "exact_head": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931"
+      "exact_head": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+      "record_details": {
+        "ACC-AIQ-S0-STATE-01": {
+          "verification_signer": "github-actions:State Recovery Drill",
+          "signed_at_utc": "2026-09-27T01:14:27Z",
+          "evidence_head": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+          "verification_run": 36284789226,
+          "verification_job": 108523369309,
+          "completed_at_utc": "2026-09-27T05:06:47Z",
+          "completion_commit": "4569245fa1bc921a759eb109f0020b202c3b6a33"
+        },
+        "ACC-AIQ-S0-STATE-02": {
+          "verification_signer": "github-actions:State Recovery Drill",
+          "signed_at_utc": "2026-09-27T01:14:27Z",
+          "evidence_head": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+          "verification_run": 36284789226,
+          "verification_job": 108523369309,
+          "completed_at_utc": "2026-09-27T05:06:47Z",
+          "completion_commit": "4569245fa1bc921a759eb109f0020b202c3b6a33"
+        },
+        "ACC-AIQ-S0-GOV-01": {
+          "verification_signer": "github-actions:Governance Closure Gate",
+          "signed_at_utc": "2026-09-27T01:18:24Z",
+          "evidence_head": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+          "verification_run": 36284789145,
+          "verification_job": 108523368586,
+          "completed_at_utc": "2026-09-27T05:06:47Z",
+          "completion_commit": "4569245fa1bc921a759eb109f0020b202c3b6a33"
+        },
+        "ACC-AIQ-S0-GOV-02": {
+          "verification_signer": "github-actions:Governance Closure Gate",
+          "signed_at_utc": "2026-09-27T01:18:24Z",
+          "evidence_head": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+          "verification_run": 36284789145,
+          "verification_job": 108523368586,
+          "completed_at_utc": "2026-09-27T05:06:47Z",
+          "completion_commit": "4569245fa1bc921a759eb109f0020b202c3b6a33"
+        },
+        "ACC-AIQ-S0-GOV-03": {
+          "verification_signer": "github-actions:Governance Closure Gate",
+          "signed_at_utc": "2026-09-27T01:18:24Z",
+          "evidence_head": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+          "verification_run": 36284789145,
+          "verification_job": 108523368586,
+          "completed_at_utc": "2026-09-27T05:06:47Z",
+          "completion_commit": "4569245fa1bc921a759eb109f0020b202c3b6a33"
+        },
+        "ACC-AIQ-S0-COST-01": {
+          "verification_signer": "github-actions:Cost Admission Closure Gate",
+          "signed_at_utc": "2026-09-27T01:14:42Z",
+          "evidence_head": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+          "verification_run": 36284789200,
+          "verification_job": 108523367880,
+          "completed_at_utc": "2026-09-27T05:06:47Z",
+          "completion_commit": "4569245fa1bc921a759eb109f0020b202c3b6a33"
+        }
+      },
+      "recovery_granularity": "full_signature_history"
     },
     {
       "record_ids": [
@@ -61,7 +118,12 @@
           "name": "P1 Reproducibility Bundle"
         }
       ],
-      "exact_head": "31d7ea22706a83a4c46e9aa95e5700a68a69f902"
+      "exact_head": "31d7ea22706a83a4c46e9aa95e5700a68a69f902",
+      "recovery_granularity": "full_signature_history",
+      "verification_signer": "github-actions:P1 Reasoning Search Stop Policy Gate",
+      "signed_at_utc": "2026-10-04T04:16:00Z",
+      "completed_at_utc": "2026-10-04T04:16:01Z",
+      "completion_commit": "30b49c289ccdec43bda819ccddba0a5909139b2c"
     },
     {
       "record_ids": [
