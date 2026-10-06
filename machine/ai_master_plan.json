@@ -404,14 +404,14 @@
         "planned:source-quality calibration",
         "planned:replication-status consistency evaluation",
         "scripts/verify_research_lineage_closure.py",
-        ".github/workflows/vol001-research-lineage-closure.yml"
+        ".github/workflows/ai-research-lineage.yml"
       ],
       "evidence": [
         "PR #2721 merged research ingestion/citation lineage implementation",
         "PR #2950 head 6052b313b9fceacecf06ea4d6f12492c50241325 adds deterministic reconciliation qualification; independent workflow pending",
         "scripts/verify_research_lineage_closure.py",
         "tests/test_research_lineage_independent_verifier.py",
-        ".github/workflows/vol001-research-lineage-closure.yml"
+        ".github/workflows/ai-research-lineage.yml"
       ],
       "risks": [
         "cargo-culting historically famous techniques",
