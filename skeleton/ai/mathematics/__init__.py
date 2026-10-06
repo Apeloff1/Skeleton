@@ -165,6 +165,7 @@ from .linear import (
     transpose,
 )
 from .lu import InverseReport, LUReport, determinant, lu_decompose, lu_solve, matrix_inverse
+from .krylov import ArnoldiReport, GMRESReport, arnoldi_iteration, gmres
 from .kernels import (
     centered_gram,
     gram_matrix,
@@ -272,6 +273,16 @@ from .stochastic import (
     propagate_distribution,
     transition_power,
 )
+from .matrix_algebra2 import (
+    SLogDetReport,
+    frobenius_norm,
+    identity_matrix,
+    kronecker_product,
+    matrix_power,
+    matrix_trace,
+    slogdet,
+)
+from .matrix_functions import MatrixExponentialReport, matrix_exponential
 from .matching import AssignmentReport, minimum_cost_assignment
 from .solvers import (
     ConjugateGradientReport,
@@ -331,6 +342,7 @@ from .tensor import (
     subtract as tensor_subtract,
     tensor_zip,
 )
+from .tridiagonal import TridiagonalSolveReport, solve_tridiagonal, tridiagonal_matvec
 from .transport import SinkhornReport, sinkhorn_transport, wasserstein_distance_1d
 from .transforms import (
     autocorrelation,
@@ -483,6 +495,10 @@ __all__ = [
     "lu_decompose",
     "lu_solve",
     "matrix_inverse",
+    "ArnoldiReport",
+    "GMRESReport",
+    "arnoldi_iteration",
+    "gmres",
     "centered_gram",
     "gram_matrix",
     "laplacian_kernel",
@@ -570,6 +586,15 @@ __all__ = [
     "expected_hitting_times",
     "propagate_distribution",
     "transition_power",
+    "SLogDetReport",
+    "frobenius_norm",
+    "identity_matrix",
+    "kronecker_product",
+    "matrix_power",
+    "matrix_trace",
+    "slogdet",
+    "MatrixExponentialReport",
+    "matrix_exponential",
     "AssignmentReport",
     "minimum_cost_assignment",
     "ConjugateGradientReport",
@@ -619,6 +644,9 @@ __all__ = [
     "tensor_reduce_sum",
     "tensor_subtract",
     "tensor_zip",
+    "TridiagonalSolveReport",
+    "solve_tridiagonal",
+    "tridiagonal_matvec",
     "SinkhornReport",
     "sinkhorn_transport",
     "wasserstein_distance_1d",

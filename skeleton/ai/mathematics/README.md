@@ -75,6 +75,10 @@ model authority boundaries.
 - `wavelets.py` — orthonormal Haar and normalized Walsh-Hadamard transforms with exact inverse semantics.
 - `monotone.py` — shape-preserving monotone cubic Hermite interpolation.
 - `geometry2.py` — planar orientation, convex hull, polygon area/centroid and containment references.
+- `krylov.py` — re-orthogonalized Arnoldi and unrestarted GMRES with explicit residual evidence.
+- `tridiagonal.py` — Thomas solves and products with effective-pivot and residual diagnostics.
+- `matrix_algebra2.py` — identity/trace/Frobenius/Kronecker/powers and stable signed log determinants.
+- `matrix_functions.py` — scaling-and-squaring matrix exponential with convergence evidence.
 - `validation.py` — parity evidence against existing optimized runtime kernels.
 
 ## Guarantees
@@ -127,6 +131,10 @@ model authority boundaries.
 - Haar and Hadamard transforms are orthonormal and expose explicit inverse operations.
 - Monotone cubic interpolation applies slope limiting so monotonic samples do not acquire overshoot.
 - Planar geometry uses deterministic hull ordering and explicit boundary-inclusion semantics.
+- Krylov methods re-orthogonalize explicitly and report residual-based convergence rather than trusting iteration count.
+- Tridiagonal solves expose the smallest effective pivot and reject unstable elimination.
+- Matrix algebra separates stable signed log-determinants from overflow-prone raw determinants.
+- Matrix exponential scaling/Taylor/squaring exposes convergence, term count and scaling depth.
 - `audit_runtime_kernels()` compares optimized runtime softmax, matmul and attention against
   this reference substrate without replacing those kernels.
 
