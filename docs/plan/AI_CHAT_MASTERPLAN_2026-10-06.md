@@ -542,8 +542,34 @@ health/circuit-breaker observations back into quarantine/telemetry updates.
 
 ### Volume 6 — tool recovery integration
 
-Bind the turn runtime directly to canonical tool receipt reconciliation and
-approval state.
+Status: **implemented candidate on stacked tool-recovery branch; exact-head
+qualification pending**.
+
+Implemented:
+
+- canonical tool effects/risk/authority map conservatively into chat side-effect
+  classes;
+- approval-required tools become durable `AWAITING_USER` turn state before
+  privileged execution;
+- consequential tools enter `TOOL_EXECUTING` with conservative
+  effect-started semantics before the handler can escape the journal;
+- committed durable reservations bypass handler re-execution;
+- in-doubt reservations force reconciliation and are never blindly replayed;
+- durable tool events carry an explicit `tool_reconciliation_ref`;
+- a confirmed no-effect reconciliation is the only legal
+  `TOOL_EXECUTING -> TOOL_REQUIRED` retry escape;
+- confirmed committed effects bind both reconciliation and canonical tool
+  receipt references before model continuation;
+- canonical receipt storage now persists auditable reconciliation evidence;
+- no-effect reconciliation releases exactly one reservation fence;
+- reconciliation evidence cannot be reused to release a later crash/retry
+  incident;
+- committed executions cannot be relabeled as no-effect;
+- canonical and AI-runtime tool receipt stores remain byte-identical.
+
+Next integration: expose reconciliation as an operator/automated verifier
+workflow for external systems that can prove whether an in-doubt effect
+actually committed.
 
 ### Volume 7 — governed attachment plane
 
