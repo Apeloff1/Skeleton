@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from math import sqrt
 from typing import Iterable, Mapping, Sequence
 
-from .contracts import canonical_digest
+from .contracts import EvaluatorProvenance, canonical_digest
 
 
 class ResilienceError(RuntimeError):
@@ -151,20 +151,71 @@ class Objection:
     evidence_digest: str
     summary: str
     severity: int
+    authority_provenance: EvaluatorProvenance
     dependency_ids: tuple[str, ...] = ()
     resolved_by_digest: str | None = None
+    resolution_authority: EvaluatorProvenance | None = None
 
     def __post_init__(self) -> None:
         _stable_id(self.objection_id, "objection_id")
         _stable_digest(self.artifact_digest, "artifact_digest")
         _stable_digest(self.evidence_digest, "evidence_digest")
         _stable_id(self.summary, "summary")
+        if not isinstance(self.authority_provenance, EvaluatorProvenance):
+            raise TypeError("objection authority_provenance must be EvaluatorProvenance")
+        if self.evidence_digest not in self.authority_provenance.output_evidence_refs:
+            raise ResilienceError(
+                "objection evidence must be referenced by dissent authority"
+            )
         if self.severity not in (1, 2, 4, 8):
             raise ValueError("severity must be one of 1,2,4,8")
         if len(self.dependency_ids) != len(set(self.dependency_ids)):
             raise ValueError("objection dependency ids must be unique")
-        if self.resolved_by_digest is not None:
+        if self.resolved_by_digest is None:
+            if self.resolution_authority is not None:
+                raise ValueError("unresolved objection cannot carry resolution authority")
+        else:
             _stable_digest(self.resolved_by_digest, "resolved_by_digest")
+            if not isinstance(self.resolution_authority, EvaluatorProvenance):
+                raise TypeError("resolved objection requires resolution authority")
+            if self.resolved_by_digest not in self.resolution_authority.output_evidence_refs:
+                raise ResilienceError(
+                    "objection resolution evidence must be referenced by resolution authority"
+                )
+            if (
+                self.severity >= 8
+                and self.resolution_authority.evaluator_id
+                == self.authority_provenance.evaluator_id
+            ):
+                raise ResilienceError(
+                    "critical objection resolution requires independent authority"
+                )
+
+    @property
+    def evidence_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "artifact_digest": self.artifact_digest,
+                "authority_provenance_digest": self.authority_provenance.digest,
+                "dependency_ids": list(self.dependency_ids),
+                "evidence_digest": self.evidence_digest,
+                "objection_id": self.objection_id,
+                "severity": self.severity,
+                "summary": self.summary,
+            }
+        )
+
+    @property
+    def resolution_binding_digest(self) -> str | None:
+        if self.unresolved or self.resolution_authority is None:
+            return None
+        return canonical_digest(
+            {
+                "evidence_binding_digest": self.evidence_binding_digest,
+                "resolution_authority_digest": self.resolution_authority.digest,
+                "resolution_evidence_digest": self.resolved_by_digest,
+            }
+        )
 
     @property
     def unresolved(self) -> bool:
@@ -182,7 +233,13 @@ class DissentLedger:
             raise ResilienceError("duplicate objection identity")
         self._items[objection.objection_id] = objection
 
-    def resolve(self, objection_id: str, *, resolution_digest: str) -> Objection:
+    def resolve(
+        self,
+        objection_id: str,
+        *,
+        resolution_digest: str,
+        resolution_authority: EvaluatorProvenance,
+    ) -> Objection:
         item = self._items.get(objection_id)
         if item is None:
             raise ResilienceError("unknown objection identity")
@@ -194,8 +251,10 @@ class DissentLedger:
             evidence_digest=item.evidence_digest,
             summary=item.summary,
             severity=item.severity,
+            authority_provenance=item.authority_provenance,
             dependency_ids=item.dependency_ids,
             resolved_by_digest=_stable_digest(resolution_digest, "resolution_digest"),
+            resolution_authority=resolution_authority,
         )
         self._items[objection_id] = resolved
         return resolved
@@ -225,8 +284,11 @@ class DissentLedger:
                 "artifact_digest": item.artifact_digest,
                 "dependency_ids": list(item.dependency_ids),
                 "evidence_digest": item.evidence_digest,
+                "evidence_binding_digest": item.evidence_binding_digest,
+                "authority_provenance_digest": item.authority_provenance.digest,
                 "objection_id": item.objection_id,
                 "resolved_by_digest": item.resolved_by_digest,
+                "resolution_binding_digest": item.resolution_binding_digest,
                 "severity": item.severity,
                 "summary": item.summary,
             }
@@ -234,6 +296,46 @@ class DissentLedger:
         ]
         core = {"items": rows, "schema": "skeleton.ai_game_builder.dissent.v1"}
         return {**core, "digest": canonical_digest(core)}
+
+
+@dataclass(frozen=True, slots=True)
+class ImpactCalibrationReceipt:
+    predicted_ids: tuple[str, ...]
+    observed_ids: tuple[str, ...]
+    precision: float
+    recall: float
+    evaluator_provenance: EvaluatorProvenance
+    evidence_digest: str
+    receipt_digest: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.evaluator_provenance, EvaluatorProvenance):
+            raise TypeError("impact calibration evaluator_provenance must be EvaluatorProvenance")
+        _stable_digest(self.evidence_digest, "evidence_digest")
+        if self.evidence_digest not in self.evaluator_provenance.output_evidence_refs:
+            raise ResilienceError(
+                "impact calibration evidence must be referenced by evaluator authority"
+            )
+        if any(
+            isinstance(value, bool) or not isinstance(value, (int, float))
+            for value in (self.precision, self.recall)
+        ):
+            raise TypeError("impact calibration scores must be numeric")
+        if not 0.0 <= float(self.precision) <= 1.0 or not 0.0 <= float(self.recall) <= 1.0:
+            raise ValueError("impact calibration scores must be within [0,1]")
+        expected = canonical_digest(self.payload())
+        if self.receipt_digest != expected:
+            raise ResilienceError("impact calibration receipt digest mismatch")
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "evaluator_provenance_digest": self.evaluator_provenance.digest,
+            "evidence_digest": self.evidence_digest,
+            "observed_ids": list(self.observed_ids),
+            "precision": float(self.precision),
+            "predicted_ids": list(self.predicted_ids),
+            "recall": float(self.recall),
+        }
 
 
 class ImpactGraph:
@@ -300,6 +402,36 @@ class ImpactGraph:
         precision = tp / len(p) if p else (1.0 if not o else 0.0)
         recall = tp / len(o) if o else 1.0
         return {"precision": precision, "recall": recall}
+
+    @classmethod
+    def calibration_receipt(
+        cls,
+        predicted: Sequence[str],
+        observed: Sequence[str],
+        *,
+        evaluator_provenance: EvaluatorProvenance,
+        evidence_digest: str,
+    ) -> ImpactCalibrationReceipt:
+        predicted_ids = tuple(sorted({_stable_id(item, "predicted impact") for item in predicted}))
+        observed_ids = tuple(sorted({_stable_id(item, "observed impact") for item in observed}))
+        scores = cls.calibration(predicted_ids, observed_ids)
+        payload = {
+            "evaluator_provenance_digest": evaluator_provenance.digest,
+            "evidence_digest": evidence_digest,
+            "observed_ids": list(observed_ids),
+            "precision": scores["precision"],
+            "predicted_ids": list(predicted_ids),
+            "recall": scores["recall"],
+        }
+        return ImpactCalibrationReceipt(
+            predicted_ids=predicted_ids,
+            observed_ids=observed_ids,
+            precision=scores["precision"],
+            recall=scores["recall"],
+            evaluator_provenance=evaluator_provenance,
+            evidence_digest=evidence_digest,
+            receipt_digest=canonical_digest(payload),
+        )
 
 
 @dataclass(frozen=True, slots=True)
