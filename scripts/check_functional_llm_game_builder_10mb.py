@@ -127,6 +127,10 @@ def main() -> int:
             fail(f"{shard_id} deep closure not required")
         if int(shard.get("deep_closure_atoms", 0)) != required_deep:
             fail(f"{shard_id} deep-closure manifest count drift")
+        if shard.get("deep_closure_pass2_required") is not True:
+            fail(f"{shard_id} pass-2 deep closure not required")
+        if int(shard.get("deep_closure_pass2_atoms", 0)) != required_deep:
+            fail(f"{shard_id} pass-2 deep-closure manifest count drift")
         if "## Deep Functional Closure Expansion — Pass 2" not in text:
             fail(f"{shard_id} missing deep-closure pass marker")
 
@@ -173,7 +177,8 @@ def main() -> int:
     deep = data.get("deep_closure", {})
     if deep.get("pass_id") != "FLGB-DEEP-CLOSURE-PASS-2":
         fail("missing deep-closure pass identity")
-    if int(deep.get("required_atoms_total", 0)) != 23328:
+    expected_deep_total = 1296 * len(shards)
+    if int(deep.get("required_atoms_total", 0)) != expected_deep_total:
         fail("deep-closure total atom contract drift")
     if deep.get("exact_cartesian_product_required") is not True:
         fail("deep-closure exact cartesian requirement disabled")
@@ -182,20 +187,34 @@ def main() -> int:
 
     bytes_cfg = data.get("bytes", {})
     previous_total = int(bytes_cfg.get("previous_shard_total", 0))
+    original_total = int(bytes_cfg.get("original_shard_total", 0))
     exact_double = previous_total * 2
     if previous_total <= 0:
         fail("missing previous atlas byte baseline")
+    if original_total != previous_total:
+        fail("original/previous atlas byte baseline drift")
     if int(bytes_cfg.get("double_baseline_target", 0)) != exact_double:
         fail("literal doubled baseline target drift")
     requested_minimum = int(bytes_cfg.get("requested_minimum", 0))
     if requested_minimum < exact_double:
         fail(f"atlas minimum is below literal doubled baseline: {requested_minimum} < {exact_double}")
-    if bytes_cfg.get("doubled_target_met") is not True:
-        fail("doubled target marker is not true")
+    per_shard_floor = int(bytes_cfg.get("per_shard_minimum", 0))
+    if int(bytes_cfg.get("per_shard_minimum_total", -1)) != per_shard_floor * len(shards):
+        fail("aggregate per-shard floor accounting drift")
+    if int(bytes_cfg.get("expansion_generation", 0)) != 2:
+        fail("pass-2 expansion generation drift")
+    for flag in ("threshold_met", "doubled_target_met", "doubled_original_surface"):
+        if bytes_cfg.get(flag) is not True:
+            fail(f"byte-accounting completion flag disabled: {flag}")
     if total < requested_minimum:
         fail(f"aggregate specification bytes below doubled minimum: {total}")
     if total != int(bytes_cfg["shard_total"]):
         fail("aggregate byte total stale")
+    if int(bytes_cfg.get("pass2_net_growth", -1)) != total - previous_total:
+        fail("pass-2 net-growth accounting stale")
+    expected_factor = round(total / previous_total, 4)
+    if round(float(bytes_cfg.get("expansion_factor", 0.0)), 4) != expected_factor:
+        fail("expansion-factor accounting stale")
     if bytes_cfg.get("human_index_sync_required") is not True:
         fail("human index byte-ledger synchronization disabled")
     if int(bytes_cfg.get("human_index_shard_total", -1)) != total:
@@ -206,6 +225,8 @@ def main() -> int:
     human_text = human_index.read_text(encoding="utf-8")
     if f"{total:,}" not in human_text:
         fail("human index byte ledger stale")
+    if f"{exact_double:,}" not in human_text:
+        fail("human index literal doubled target stale")
     if data["completion"].get("runtime_completion_claim") is not False:
         fail("runtime completion must remain fail-closed")
     if data["completion"].get("implementation_signed") is not False:
