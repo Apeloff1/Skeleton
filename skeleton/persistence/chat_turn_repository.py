@@ -39,8 +39,12 @@ from skeleton.ai.assistant.turn_runtime import (
     TurnRuntimeError,
     TurnSnapshot,
     TurnState,
+    budget_usage_from_dict,
+    execution_budget_from_dict,
     operation_digest,
     start_turn,
+    turn_event_from_dict,
+    turn_snapshot_from_dict,
 )
 from skeleton.contracts.conversation import (
     ConversationAuthorType,
@@ -149,93 +153,6 @@ def _parse_time(raw: object, field_name: str) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
         raise ChatTurnCorruption(f"{field_name} must be timezone-aware")
     return value.astimezone(timezone.utc)
-
-
-def _budget_from_dict(raw: object) -> ExecutionBudget:
-    if not isinstance(raw, dict):
-        raise ChatTurnCorruption("budget must be an object")
-    try:
-        return ExecutionBudget(
-            max_wall_seconds=raw["max_wall_seconds"],
-            max_input_tokens=raw["max_input_tokens"],
-            max_output_tokens=raw["max_output_tokens"],
-            max_model_calls=raw["max_model_calls"],
-            max_tool_calls=raw["max_tool_calls"],
-            max_agent_depth=raw["max_agent_depth"],
-            max_parallel_workers=raw["max_parallel_workers"],
-            max_retrieval_queries=raw["max_retrieval_queries"],
-            max_external_writes=raw["max_external_writes"],
-            max_cost_usd=raw["max_cost_usd"],
-        )
-    except (KeyError, TypeError, ValueError, TurnRuntimeError) as exc:
-        raise ChatTurnCorruption("persisted budget is invalid") from exc
-
-
-def _usage_from_dict(raw: object) -> BudgetUsage:
-    if not isinstance(raw, dict):
-        raise ChatTurnCorruption("usage must be an object")
-    try:
-        return BudgetUsage(
-            wall_seconds=raw["wall_seconds"],
-            input_tokens=raw["input_tokens"],
-            output_tokens=raw["output_tokens"],
-            model_calls=raw["model_calls"],
-            tool_calls=raw["tool_calls"],
-            agent_depth=raw["agent_depth"],
-            parallel_workers=raw["parallel_workers"],
-            retrieval_queries=raw["retrieval_queries"],
-            external_writes=raw["external_writes"],
-            cost_usd=raw["cost_usd"],
-        )
-    except (KeyError, TypeError, ValueError, TurnRuntimeError) as exc:
-        raise ChatTurnCorruption("persisted usage is invalid") from exc
-
-
-def _event_from_dict(raw: object) -> TurnEvent:
-    if not isinstance(raw, dict):
-        raise ChatTurnCorruption("turn event must be an object")
-    try:
-        usage_raw = raw.get("usage")
-        return TurnEvent(
-            operation_id=raw["operation_id"],
-            request_digest=raw["request_digest"],
-            sequence=raw["sequence"],
-            from_state=TurnState(raw["from_state"]),
-            to_state=TurnState(raw["to_state"]),
-            observed_at=_parse_time(raw["observed_at"], "event observed_at"),
-            previous_event_digest=raw.get("previous_event_digest"),
-            reason_code=raw["reason_code"],
-            failure_class=(
-                None
-                if raw.get("failure_class") is None
-                else FailureClass(raw["failure_class"])
-            ),
-            tool_call_id=raw.get("tool_call_id"),
-            tool_side_effect=(
-                None
-                if raw.get("tool_side_effect") is None
-                else SideEffectClass(raw["tool_side_effect"])
-            ),
-            tool_receipt_ref=raw.get("tool_receipt_ref"),
-            external_effect_started=bool(raw.get("external_effect_started")),
-            provider_receipt_ref=raw.get("provider_receipt_ref"),
-            usage=(
-                None
-                if usage_raw is None
-                else _usage_from_dict(usage_raw)
-            ),
-            payload=raw.get("payload") or {},
-        )
-    except (
-        KeyError,
-        TypeError,
-        ValueError,
-        TurnRuntimeError,
-        ChatTurnCorruption,
-    ) as exc:
-        if isinstance(exc, ChatTurnCorruption):
-            raise
-        raise ChatTurnCorruption("persisted turn event is invalid") from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -455,36 +372,31 @@ class SQLiteChatTurnRepository:
     @staticmethod
     def _snapshot_from_row(row: sqlite3.Row) -> TurnSnapshot:
         try:
-            budget = _budget_from_dict(
+            budget = execution_budget_from_dict(
                 _parse_json(row["initial_budget_json"], "initial_budget_json")
             )
-            usage = _usage_from_dict(
+            usage = budget_usage_from_dict(
                 _parse_json(row["usage_json"], "usage_json")
             )
-            return TurnSnapshot(
-                operation_id=row["operation_id"],
-                request_digest=row["request_digest"],
-                thread_id=row["thread_id"],
-                causal_user_message_id=row["causal_user_message_id"],
-                state=TurnState(row["state"]),
-                budget=budget,
-                usage=usage,
-                next_sequence=int(row["next_sequence"]),
-                last_event_digest=row["last_event_digest"],
-                pending_tool_call_id=row["pending_tool_call_id"],
-                pending_tool_side_effect=(
-                    None
-                    if row["pending_tool_side_effect"] is None
-                    else SideEffectClass(row["pending_tool_side_effect"])
-                ),
-                pending_tool_receipt_ref=row["pending_tool_receipt_ref"],
-                external_effect_started=bool(row["external_effect_started"]),
-                provider_receipt_ref=row["provider_receipt_ref"],
-                failure_class=(
-                    None
-                    if row["failure_class"] is None
-                    else FailureClass(row["failure_class"])
-                ),
+            return turn_snapshot_from_dict(
+                {
+                    "schema_version": CHAT_TURN_SCHEMA_VERSION,
+                    "operation_id": row["operation_id"],
+                    "request_digest": row["request_digest"],
+                    "thread_id": row["thread_id"],
+                    "causal_user_message_id": row["causal_user_message_id"],
+                    "state": row["state"],
+                    "budget": budget.as_dict(),
+                    "usage": usage.as_dict(),
+                    "next_sequence": int(row["next_sequence"]),
+                    "last_event_digest": row["last_event_digest"],
+                    "pending_tool_call_id": row["pending_tool_call_id"],
+                    "pending_tool_side_effect": row["pending_tool_side_effect"],
+                    "pending_tool_receipt_ref": row["pending_tool_receipt_ref"],
+                    "external_effect_started": bool(row["external_effect_started"]),
+                    "provider_receipt_ref": row["provider_receipt_ref"],
+                    "failure_class": row["failure_class"],
+                }
             )
         except (
             KeyError,
@@ -736,9 +648,13 @@ class SQLiteChatTurnRepository:
             ).fetchall()
         events: list[TurnEvent] = []
         for row in rows:
-            event = _event_from_dict(
-                _parse_json(row["event_json"], "event_json")
-            )
+            event_raw = _parse_json(row["event_json"], "event_json")
+            if not isinstance(event_raw, dict):
+                raise ChatTurnCorruption("event_json must contain an object")
+            try:
+                event = turn_event_from_dict(event_raw)
+            except TurnRuntimeError as exc:
+                raise ChatTurnCorruption("persisted turn event is invalid") from exc
             events.append(event)
         return tuple(events)
 
@@ -782,12 +698,20 @@ class SQLiteChatTurnRepository:
                         raise ChatTurnConflict(
                             "turn event sequence was reused with different content"
                         )
-                    persisted_event = _event_from_dict(
-                        _parse_json(
-                            duplicate["event_json"],
-                            "event_json",
-                        )
+                    persisted_raw = _parse_json(
+                        duplicate["event_json"],
+                        "event_json",
                     )
+                    if not isinstance(persisted_raw, dict):
+                        raise ChatTurnCorruption(
+                            "event_json must contain an object"
+                        )
+                    try:
+                        persisted_event = turn_event_from_dict(persisted_raw)
+                    except TurnRuntimeError as exc:
+                        raise ChatTurnCorruption(
+                            "persisted turn event is invalid"
+                        ) from exc
                     if persisted_event.digest != event.digest:
                         raise ChatTurnCorruption(
                             "persisted event digest does not match event payload"
@@ -897,14 +821,23 @@ class SQLiteChatTurnRepository:
             tenant_id=tenant_id,
             owner_id=owner_id,
         )
-        events = self.list_events(
-            operation_id,
-            tenant_id=tenant_id,
-            owner_id=owner_id,
-            after_sequence=0,
-            limit=max(1, persisted.snapshot.next_sequence),
-        )
-        if len(events) != persisted.snapshot.next_sequence - 1:
+        events_list: list[TurnEvent] = []
+        after_sequence = 0
+        expected_count = persisted.snapshot.next_sequence - 1
+        while len(events_list) < expected_count:
+            page = self.list_events(
+                operation_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+                after_sequence=after_sequence,
+                limit=min(2000, expected_count - len(events_list)),
+            )
+            if not page:
+                break
+            events_list.extend(page)
+            after_sequence = page[-1].sequence
+        events = tuple(events_list)
+        if len(events) != expected_count:
             raise ChatTurnCorruption(
                 "turn event journal has a sequence gap"
             )
