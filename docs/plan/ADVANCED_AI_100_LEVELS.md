@@ -290,6 +290,67 @@ Let the system inspect its architecture, discover gaps, benchmark itself, explor
 | 099 | **Bounded Self-Evolution Governance** | Govern iterative self-improvement with independent approval, immutable baselines, capability ceilings, rollback, audit, and anti-self-approval rules. | `L098` |
 | 100 | **Frontier System Acceptance** — closure gate | Integrate all 100 levels under exact-head evidence, adversarial evaluation, safety/security/governance, performance, recovery, and independent promotion authority. | `L099` |
 
+## Promotion lifecycle
+
+A level does not jump directly from "planned" to "done."
+
+The canonical lifecycle is:
+
+```text
+PLANNED
+  -> CONTRACT_READY
+  -> IMPLEMENTED_CANDIDATE
+  -> QUALIFIED
+  -> PROMOTED
+       |
+       v
+   SUSPENDED
+    /      \
+   v        v
+QUALIFIED  ROLLED_BACK
+              |
+              v
+      IMPLEMENTED_CANDIDATE
+```
+
+The highest maturity claim is the highest **contiguous promoted level** starting
+at L001. A system cannot claim L080 while quietly marking L043 "not applicable."
+
+If a lower promoted prerequisite is suspended or rolled back, dependent higher
+levels lose current promotion status until they are requalified.
+
+## Cross-stratum handoff law
+
+Each stratum has a controlled handoff to the next:
+
+| Bridge | From | To | Law |
+| --- | --- | --- | --- |
+| B01 | S01 | S02 | Typed identity/trust/budget/provenance envelopes enter context; untyped material is rejected or quarantined. |
+| B02 | S02 | S03 | Context may propose memory; persistence still requires memory/governance admission. |
+| B03 | S03 | S04 | Memory/retrieval are evidence for reasoning, never instruction or authorization. |
+| B04 | S04 | S05 | Reasoning emits action proposals; agency/tool authorities admit effects. |
+| B05 | S05 | S06 | Multi-agent work may distribute proposals, but privileged effects stay in canonical action authority. |
+| B06 | S06 | S07 | Agent traces may become learning/evaluation data, not direct production policy. |
+| B07 | S07 | S08 | Learned strategy may influence autonomy only after qualification; it cannot expand autonomous authority. |
+| B08 | S08 | S09 | Autonomous observations may update world/scientific models through evidence admission; simulation stays non-authoritative. |
+| B09 | S09 | S10 | Scientific/metacognitive evidence may drive improvement hypotheses, never self-promotion. |
+| B10 | S10 | S01 | Accepted improvements re-enter through ordinary contracts/tests/release; frontier code cannot patch the substrate out-of-band. |
+
+## Activation profiles
+
+The ladder supports explicit ceilings rather than forcing every deployment to
+claim frontier maturity:
+
+| Profile | Ceiling | Meaning |
+| --- | --- | --- |
+| Advanced assistant | L050 | Context, memory, reasoning, verification, and governed tool agency |
+| Enterprise agent system | L080 | Adds multi-agent organization, learning, scheduled work, resilience, and revocable autonomy |
+| Scientific intelligence | L090 | Adds world models, simulation, long-horizon/metacognitive reasoning, creativity, and discovery loops |
+| Frontier governed system | L100 | Adds self-modeling, gap discovery, experiments, verified improvement proposals, and bounded self-evolution |
+
+A profile ceiling limits what the deployment claims. It does not permit skipping
+lower levels.
+
 ## Cross-cutting requirements
 
 Every level inherits the same enterprise controls regardless of cognitive
