@@ -28,6 +28,12 @@ from .approximation import (
     newton_interpolate,
     piecewise_linear_interpolate,
 )
+from .bsplines import (
+    BSplineBasisReport,
+    bspline_basis,
+    bspline_curve,
+    clamped_uniform_knots,
+)
 from .calculus2 import (
     HessianReport,
     finite_difference_hessian,
@@ -131,6 +137,7 @@ from .eigensystems import (
     principal_components,
     symmetric_eigensystem,
 )
+from .finite_difference2d import curl_z_2d, divergence_2d, gradient_2d, laplacian_2d
 from .finite_difference import (
     Poisson1DReport,
     explicit_diffusion_stable_step,
@@ -372,6 +379,12 @@ from .matrix_structures import (
     symmetrize,
     toeplitz,
 )
+from .matrix_updates import (
+    CholeskyUpdateReport,
+    cholesky_factor_after_rank_one_update,
+    cholesky_rank_one_update,
+    symmetric_rank_one_update,
+)
 from .matching import AssignmentReport, minimum_cost_assignment
 from .solvers import (
     ConjugateGradientReport,
@@ -447,6 +460,7 @@ from .transforms import (
     inverse_dft,
     inverse_fft_radix2,
 )
+from .whitening import WhiteningReport, whiten
 from .wavelets import (
     haar_transform,
     hadamard_transform,
@@ -463,6 +477,10 @@ __all__ = [
     "newton_divided_differences",
     "newton_interpolate",
     "piecewise_linear_interpolate",
+    "BSplineBasisReport",
+    "bspline_basis",
+    "bspline_curve",
+    "clamped_uniform_knots",
     "HessianReport",
     "finite_difference_hessian",
     "gradient_norm",
@@ -561,6 +579,10 @@ __all__ = [
     "SymmetricEigensystemReport",
     "principal_components",
     "symmetric_eigensystem",
+    "curl_z_2d",
+    "divergence_2d",
+    "gradient_2d",
+    "laplacian_2d",
     "Poisson1DReport",
     "explicit_diffusion_stable_step",
     "first_derivative_grid",
@@ -771,6 +793,10 @@ __all__ = [
     "is_strictly_diagonally_dominant",
     "symmetrize",
     "toeplitz",
+    "CholeskyUpdateReport",
+    "cholesky_factor_after_rank_one_update",
+    "cholesky_rank_one_update",
+    "symmetric_rank_one_update",
     "AssignmentReport",
     "minimum_cost_assignment",
     "ConjugateGradientReport",
@@ -836,6 +862,8 @@ __all__ = [
     "fft_radix2",
     "inverse_dft",
     "inverse_fft_radix2",
+    "WhiteningReport",
+    "whiten",
     "haar_transform",
     "hadamard_transform",
     "inverse_haar_transform",

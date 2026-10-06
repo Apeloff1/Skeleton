@@ -95,6 +95,10 @@ model authority boundaries.
 - `interval.py` — finite conservative interval arithmetic with outward rounding and domain checks.
 - `orthogonal.py` — Givens rotations and Householder reflectors with explicit orthogonal transforms.
 - `ldlt.py` — symmetric LDL^T factorization/solve with inertia and reconstruction evidence.
+- `bsplines.py` — Cox-de Boor B-spline bases, clamped uniform knots and vector-valued curves.
+- `whitening.py` — PCA/ZCA covariance whitening with eigenvalue and covariance-residual evidence.
+- `finite_difference2d.py` — 2-D gradient, divergence, Laplacian and scalar curl finite differences.
+- `matrix_updates.py` — symmetric rank-one updates plus Cholesky update/downdate reconstruction evidence.
 - `validation.py` — parity evidence against existing optimized runtime kernels.
 
 ## Guarantees
@@ -167,6 +171,10 @@ model authority boundaries.
 - Interval arithmetic rounds outward and rejects zero-divisor/domain-crossing intervals rather than pretending point precision.
 - Orthogonal primitives expose the exact reflector/rotation parameters used by higher-level decomposition oracles.
 - LDL^T reports reconstruction and pivot-sign inertia and fails closed when unpivoted factorization is unsafe.
+- B-spline evaluation exposes partition-of-unity and active-basis evidence and forbids hidden extrapolation.
+- Whitening distinguishes PCA/ZCA semantics and verifies the transformed covariance against the regularized target.
+- 2-D finite differences make grid orientation, spacing and boundary stencils explicit.
+- Rank-one Cholesky updates verify reconstructed targets and fail closed when a downdate would lose positive definiteness.
 - `audit_runtime_kernels()` compares optimized runtime softmax, matmul and attention against
   this reference substrate without replacing those kernels.
 
