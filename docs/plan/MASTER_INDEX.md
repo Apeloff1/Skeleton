@@ -129,6 +129,12 @@ Competitive benchmark governance: [`../architecture/COMPETITIVE_AI_BENCHMARK_GOV
 
 Machine benchmark-governance authority: [`machine/competitive_ai_benchmark_governance.json`](../../machine/competitive_ai_benchmark_governance.json)
 
+AI Game Builder 500-level authority: [`../architecture/AI_GAME_BUILDER_500_LEVELS.md`](../architecture/AI_GAME_BUILDER_500_LEVELS.md)
+
+Machine game-builder authority: [`machine/ai_game_builder_500_levels.json`](../../machine/ai_game_builder_500_levels.json)
+
+Machine dual-rival forge authority: [`machine/ai_game_builder_dual_rival_forge.json`](../../machine/ai_game_builder_dual_rival_forge.json)
+
 ## Purpose
 
 This index is the canonical navigation root for the full Skeleton AI architecture, research, construction, validation, release, and operations program. It incorporates the architecture-planning passes that expanded the target from a model wrapper into a complete AI platform: durable state, provider-neutral inference, context, memory, retrieval, knowledge, cognition, planning, governed tools, agents, swarms, multimodal processing, repository engineering, research, training, evaluation, security, distributed compute, installation, release, and production operations.
@@ -195,8 +201,11 @@ Repository work on this plan must respect the existing PR #1904 bootstrap stack:
 54. `machine/competitive_ai_engineering_ladder.json`
 55. `docs/architecture/COMPETITIVE_AI_BENCHMARK_GOVERNANCE.md`
 56. `machine/competitive_ai_benchmark_governance.json`
+57. `docs/architecture/AI_GAME_BUILDER_500_LEVELS.md`
+58. `machine/ai_game_builder_500_levels.json`
+59. `machine/ai_game_builder_dual_rival_forge.json`
 
-The first ten remain the present implementation/construction authority. Items 11–40 form the frozen long-range planning, risk, sequencing, depth, adversarial-closure, exotic-research and engineering-validation stack. Items 41–42 define the historical implementation-depth frontier and its machine-checkable reconciliation contract. Items 43–45 define the bounded P1 trustworthy-production maturity frontier and its dependency-ordered 44-task execution DAG. Items 46–48 define the P2 capability-expansion boundary sourced exactly from P1's 314 deferred volumes, with explicit scheduled/queued ownership and fail-closed dependency validation. Items 49–52 deepen the frozen research/provider/runtime volumes with pinned OpenAI and xAI/Grok OSS provenance and bounded interoperability; they do not add a new architecture volume or completion authority. Items 53–54 add the 200-level competitive engineering overlay; they bind to existing frozen volumes and add no new top-level architecture volume. Items 55–56 govern preregistered competitive evaluation, anti-gaming rules, independent promotion, and cross-family qualification without creating new volume authority.
+The first ten remain the present implementation/construction authority. Items 11–40 form the frozen long-range planning, risk, sequencing, depth, adversarial-closure, exotic-research and engineering-validation stack. Items 41–42 define the historical implementation-depth frontier and its machine-checkable reconciliation contract. Items 43–45 define the bounded P1 trustworthy-production maturity frontier and its dependency-ordered 44-task execution DAG. Items 46–48 define the P2 capability-expansion boundary sourced exactly from P1's 314 deferred volumes, with explicit scheduled/queued ownership and fail-closed dependency validation. Items 49–52 deepen the frozen research/provider/runtime volumes with pinned OpenAI and xAI/Grok OSS provenance and bounded interoperability; they do not add a new architecture volume or completion authority. Items 53–54 add the 200-level competitive engineering overlay; they bind to existing frozen volumes and add no new top-level architecture volume. Items 55–56 govern preregistered competitive evaluation, anti-gaming rules, independent promotion, and cross-family qualification without creating new volume authority. Items 57–59 add the 500-level dual-rival game-builder overlay, long-form consistency authority, and rights/provenance/originality gates without creating new top-level volume authority.
 
 ## Index laws
 
