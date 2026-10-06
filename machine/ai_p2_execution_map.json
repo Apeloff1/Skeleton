@@ -787,7 +787,7 @@
   },
   "masterplan_alignment": {
     "master_plan": "machine/ai_master_plan.json",
-    "required_plan_version": "1.6.0",
+    "required_plan_version": "1.7.0",
     "required_master_status": "active",
     "breadth_freeze": {
       "required_enabled": true,

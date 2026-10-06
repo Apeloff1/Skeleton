@@ -3492,3 +3492,88 @@ An enabled capability is not automatically ready. Readiness is resolved from its
 `machine/ai_closure_evidence.json` separately tracks closure proof. Implementation progress and closure decision are intentionally different concepts. A P0 closes only after dependency closure, executable evidence, blueprint promotion, focused tests, and canonical gap-state update. A regression in a lower-stage contract can reopen dependent evidence.
 
 These three files are mandatory provider-bootstrap material and are linked from the architecture and runtime manifests.
+
+
+## Enterprise AI superiority authority
+
+The canonical competitive/enterprise acceptance authority is
+`machine/enterprise_ai_superiority.json`; its human explanation is
+`docs/architecture/ENTERPRISE_AI_SUPERIORITY.md`.
+
+This authority changes the definition of completion:
+
+- `implemented` means runtime behavior exists; it is not an enterprise claim;
+- `hardened` means negative/recovery/concurrency behavior is covered; it is
+  still not an enterprise claim;
+- `enterprise_qualified` requires current exact-head SLO, security, privacy,
+  tenant-isolation, recovery, rollback and operability evidence;
+- `superior` additionally requires a reproducible comparator-backed Pareto
+  improvement against the baseline declared by that volume's superiority
+  profile.
+
+All masterplan volumes inherit the common enterprise contract. Critical
+production and advanced serving volumes additionally bind
+`enterprise_superiority_profile` to a dedicated `ENT-VOL-xxx` profile.
+
+Builders MUST NOT:
+
+- promote an enterprise grade from implementation status, LOC, documentation,
+  or happy-path tests;
+- trade a security/privacy/authority/tenant/state-loss regression for quality,
+  speed, throughput or cost;
+- compare against an unbound or materially different workload/environment and
+  call the result superiority;
+- use median-only performance wins while ignoring tail latency, saturation,
+  failure recovery or resource pressure;
+- allow the implementation under test to self-promote from its own benchmark;
+- leave optimized paths without a tested reference/rollback path unless a
+  signed architecture exception proves that rollback is impossible.
+
+For a dedicated profile, construction starts from the declared conventional
+baseline and primary outcome. The implementation must then satisfy at least the
+declared dominance targets and all non-compensable gates. The evidence bundle
+binds source/head, baseline, policy/contracts, workload, model/provider,
+environment, scorer, budget, raw result digest and verifier verdict.
+
+Before signing a critical volume, run:
+
+```bash
+python scripts/check_enterprise_ai_superiority.py --json
+python -m pytest -q tests/test_enterprise_ai_superiority.py
+```
+
+The repository-wide workflow
+`.github/workflows/enterprise-ai-superiority.yml` validates the authority at
+the exact PR head. A complete enterprise-AI claim is prohibited until every `VOL-000` through
+`VOL-420` is enterprise-qualified, every dedicated critical profile is
+evidence-backed `superior`, and the cross-plane enterprise golden journeys
+pass on the exact head.
+
+
+### October 2026 per-volume implementation dossiers
+
+Every `VOL-000` through `VOL-420` has a mandatory deep implementation dossier
+indexed by `machine/enterprise_ai_implementation_notes_index.json`. Human
+notebooks are under `docs/architecture/enterprise-volume-notes/`.
+
+Each volume must be implemented and reviewed through all fourteen levels:
+
+`L00` ownership, `L01` architecture/dependencies, `L02` contracts,
+`L03` admission/authority, `L04` runtime control flow, `L05` state/data,
+`L06` security/privacy/tenancy, `L07` resilience/recovery, `L08`
+observability/operability, `L09` performance/capacity/economics, `L10`
+verification/adversarial evaluation, `L11` deployment/migration/rollback,
+`L12` operator controls/runbooks, and `L13` enterprise superiority/exit.
+
+The dossiers are governed implementation obligations. They do not create
+completion evidence by themselves. A volume cannot be enterprise-qualified
+when its dossier is missing, shallow, stale versus the masterplan, inconsistent
+with its enterprise grade/target/profile, or missing current exact-head
+implementation and acceptance evidence.
+
+Required validation:
+
+```bash
+python scripts/check_enterprise_ai_implementation_notes.py --json
+python -m pytest -q tests/test_enterprise_ai_implementation_notes.py
+```

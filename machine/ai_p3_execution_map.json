@@ -623,7 +623,7 @@
     "p3_full_completion_requires_all_257_source_volumes_resolved": true
   },
   "masterplan_alignment": {
-    "required_plan_version": "1.6.0",
+    "required_plan_version": "1.7.0",
     "required_master_status": "active",
     "breadth_freeze": {
       "enabled": true,
