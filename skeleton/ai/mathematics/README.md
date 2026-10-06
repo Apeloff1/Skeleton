@@ -123,6 +123,8 @@ model authority boundaries.
 - `spherical.py` — unit-sphere geodesic distance, log/exp maps and shortest-arc interpolation.
 - `markov_diagnostics.py` — total variation, Dobrushin contraction, detailed balance and finite-step mixing profiles.
 - `design_sampling.py` — deterministic Latin-hypercube designs, centered L2 discrepancy and bounded rescaling.
+- `sde.py` — seeded Euler-Maruyama/Milstein scalar SDE paths plus closed-form geometric-Brownian moments.
+- `matrix_frechet.py` — block-exponential Fréchet derivatives with centered finite-difference evidence and condition proxies.
 - `validation.py` — parity evidence against existing optimized runtime kernels.
 
 ## Guarantees
@@ -223,6 +225,8 @@ model authority boundaries.
 - Spherical geometry rejects antipodal ambiguity and non-tangent exponential-map inputs explicitly.
 - Markov diagnostics reuse canonical transition/stationary semantics and expose contraction/reversibility rather than redefining graph authority.
 - Latin-hypercube design complements canonical Halton sampling and reports spacing/discrepancy evidence deterministically.
+- SDE references use the canonical seeded generator and expose every Brownian increment; no stochastic runtime authority is introduced.
+- Matrix-exponential Fréchet derivatives use the exact block identity and carry an independent centered-difference residual.
 - `audit_runtime_kernels()` compares optimized runtime softmax, matmul and attention against
   this reference substrate without replacing those kernels.
 

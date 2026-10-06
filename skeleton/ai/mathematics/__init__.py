@@ -489,6 +489,11 @@ from .matrix_equations import (
     solve_continuous_lyapunov,
     solve_sylvester,
 )
+from .matrix_frechet import (
+    MatrixFrechetReport,
+    matrix_exponential_frechet,
+    matrix_exponential_relative_condition_proxy,
+)
 from .matrix_functions import MatrixExponentialReport, matrix_exponential
 from .matrix_structures import (
     GershgorinDisc,
@@ -537,6 +542,13 @@ from .spectral import (
     dominant_frequency,
     periodogram,
     spectral_power_fraction,
+)
+from .sde import (
+    GBMMomentReport,
+    SDEPathReport,
+    euler_maruyama,
+    geometric_brownian_moments,
+    milstein_scalar,
 )
 from .signal2 import (
     CrossCorrelationReport,
@@ -1020,6 +1032,9 @@ __all__ = [
     "SylvesterReport",
     "solve_continuous_lyapunov",
     "solve_sylvester",
+    "MatrixFrechetReport",
+    "matrix_exponential_frechet",
+    "matrix_exponential_relative_condition_proxy",
     "MatrixExponentialReport",
     "matrix_exponential",
     "GershgorinDisc",
@@ -1061,6 +1076,11 @@ __all__ = [
     "dominant_frequency",
     "periodogram",
     "spectral_power_fraction",
+    "GBMMomentReport",
+    "SDEPathReport",
+    "euler_maruyama",
+    "geometric_brownian_moments",
+    "milstein_scalar",
     "CrossCorrelationReport",
     "blackman_window",
     "cross_correlation",
