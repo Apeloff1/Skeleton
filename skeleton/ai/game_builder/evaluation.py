@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from statistics import median
-from typing import Iterable, Mapping, Sequence
+from typing import Iterable, Mapping
 
 from .contracts import QUALITY_AXES, Rival, canonical_digest, normalize_quality
 
