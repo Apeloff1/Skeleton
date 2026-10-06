@@ -70,6 +70,8 @@ jobs:
           "pytest>=8,<9"
           "pydantic>=2,<3"
           "pydantic-settings>=2,<3"
+          "httpx>=0.28,<0.29"
+          "pytest-asyncio>=0.24,<2"
 
       - name: Compile resilience surfaces
         run: >-
@@ -95,7 +97,7 @@ jobs:
 
       - name: Run focused cross-plane regressions
         run: >-
-          python -m pytest -q
+          python -m pytest -q -p pytest_asyncio.plugin --import-mode=importlib
           skeleton/testing/test_ai_chat_cross_plane_resilience.py
           backend/tests/test_model_router.py
           skeleton/testing/test_ai_chat_tool_recovery.py
