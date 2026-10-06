@@ -20,6 +20,11 @@ import json
 import re
 from typing import Iterable
 
+from skeleton.artifacts.multimodal_ingestion import (
+    IngestReceipt,
+    MediaProbe,
+    MultimodalIngestionCore,
+)
 from skeleton.context.sources.artifact import artifact_segment
 from skeleton.contracts.context import ContextSegment, ContextTrust
 
@@ -581,6 +586,69 @@ class AttachmentAdmissionPlane:
         )
 
 
+def admit_multimodal_reference(
+    reference: AttachmentReference,
+    *,
+    payload: bytes,
+    probe: MediaProbe,
+    ingestion: MultimodalIngestionCore,
+    trust_label: str = "untrusted",
+) -> IngestReceipt:
+    """Bind an admitted image reference into canonical multimodal ingestion."""
+
+    if not isinstance(reference, AttachmentReference):
+        raise TypeError("reference must be AttachmentReference")
+    if not isinstance(probe, MediaProbe):
+        raise TypeError("probe must be MediaProbe")
+    if not isinstance(ingestion, MultimodalIngestionCore):
+        raise TypeError("ingestion must be MultimodalIngestionCore")
+    if not reference.ready_for_context:
+        raise AttachmentAdmissionError(
+            "quarantined attachment cannot enter multimodal ingestion"
+        )
+    if reference.media_type != "image":
+        raise AttachmentAdmissionError(
+            "attachment is not a supported multimodal image reference"
+        )
+    source = bytes(payload)
+    if _sha256(source) != reference.source_digest:
+        raise AttachmentAdmissionError(
+            "multimodal payload does not match attachment digest"
+        )
+    if len(source) != reference.byte_size:
+        raise AttachmentAdmissionError(
+            "multimodal payload size does not match attachment reference"
+        )
+    if probe.media_type != reference.media_type:
+        raise AttachmentAdmissionError(
+            "multimodal probe media type differs from attachment reference"
+        )
+    if probe.format != reference.format.value:
+        raise AttachmentAdmissionError(
+            "multimodal probe format differs from attachment reference"
+        )
+    try:
+        asset, receipt = ingestion.admit_predecode(
+            source,
+            probe,
+            trust_label=trust_label,
+            classification=reference.data_class,
+            asset_id=reference.attachment_id,
+        )
+    except Exception as exc:
+        raise AttachmentAdmissionError(
+            "canonical multimodal ingestion rejected attachment"
+        ) from exc
+    if (
+        asset.source_digest != reference.source_digest
+        or receipt.source_digest != reference.source_digest
+    ):
+        raise AttachmentAdmissionError(
+            "multimodal ingestion source digest drifted"
+        )
+    return receipt
+
+
 def attachment_context_evidence(
     reference: AttachmentReference,
     *,
@@ -660,5 +728,6 @@ __all__ = [
     "AttachmentPolicy",
     "AttachmentReference",
     "AttachmentUpload",
+    "admit_multimodal_reference",
     "attachment_context_evidence",
 ]
