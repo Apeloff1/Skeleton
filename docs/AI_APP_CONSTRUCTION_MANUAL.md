@@ -3605,3 +3605,49 @@ away from the canonical AI plane merely to satisfy an operational target.
 The final production promotion is evidence-only and requires current runtime
 proof. The architectural plan can be complete while `production_claim` remains
 false.
+
+
+## 100-level advanced AI structure
+
+The complete AI construction program now has a formal maturity ladder above the
+enterprise operational baseline:
+
+- machine contract: `machine/advanced_ai_structure_100.json`;
+- human plan: `docs/plan/ADVANCED_AI_100_LEVELS.md`;
+- validator: `scripts/check_advanced_ai_structure.py`;
+- independent verifier: `scripts/verify_advanced_ai_structure.py`;
+- exact-head workflow: `.github/workflows/advanced-ai-structure.yml`.
+
+Enterprise architecture is **Level 0**. It supplies identity, tenancy, canonical
+state, security, reliability, disaster recovery, observability, capacity, release
+control, and operational governance. The 100 levels above it add increasingly
+advanced AI structure without being allowed to weaken Level-0 guarantees.
+
+The ten strata are:
+
+1. L001-L010 — assured cognitive substrate;
+2. L011-L020 — perception and context intelligence;
+3. L021-L030 — memory and knowledge intelligence;
+4. L031-L040 — deliberative reasoning and planning;
+5. L041-L050 — governed agency and tool action;
+6. L051-L060 — organizational and multi-agent intelligence;
+7. L061-L070 — adaptive learning and evaluation;
+8. L071-L080 — autonomous operations and resilience;
+9. L081-L090 — advanced world/scientific/metacognitive intelligence;
+10. L091-L100 — frontier meta-intelligence and governed evolution.
+
+Every tenth level is a closure gate. The ordinal ladder is a promotion sequence,
+not a runtime request chain and not a request to create one service/package per
+level.
+
+Every level must attach to existing canonical capability-plane owners. A level
+that needs a new runtime owner must first change the architecture/construction
+contracts and pass the normal ownership review.
+
+The frontier rule is strict: Levels 091-100 may inspect architecture, identify
+gaps, design experiments, generate improvement proposals, and benchmark
+alternatives. They may not self-approve code, model, policy, authority, or
+production promotion.
+
+The planning contract deliberately starts with zero promoted and zero signed
+levels. Promotion requires implementation plus exact-head evidence.
