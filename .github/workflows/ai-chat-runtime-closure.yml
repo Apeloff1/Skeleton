@@ -9,6 +9,10 @@ on:
       - "skeleton/ai/assistant/turn_runtime.py"
       - "skeleton/ai/assistant/__init__.py"
       - "skeleton/testing/test_ai_chat_turn_runtime.py"
+      - "skeleton/persistence/chat_turn_repository.py"
+      - "skeleton/testing/test_ai_chat_turn_repository.py"
+      - "backend/core/chat_turns.py"
+      - "backend/tests/test_ai_chat_turn_persistence.py"
       - "skeleton/testing/test_ai_assistant_runtime.py"
       - "skeleton/testing/test_ai_assistant_manifest.py"
       - "machine/ai_chat_runtime_contract.json"
@@ -33,7 +37,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
-      PYTHONPATH: "."
+      PYTHONPATH: ".:backend"
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
       OPENAI_API_KEY: ""
       ANTHROPIC_API_KEY: ""
@@ -58,10 +62,20 @@ jobs:
       - name: Validate AI chat runtime structure
         run: python scripts/check_ai_chat_runtime.py
 
+      - name: Compile AI chat and repaired deferred runtime
+        run: >-
+          python -m compileall -q
+          skeleton/ai/assistant
+          skeleton/persistence/chat_turn_repository.py
+          backend/core/chat_turns.py
+          skeleton/ai/runtime/deferred
+
       - name: Run AI chat and inherited assistant regressions
         run: >-
           python -m pytest -q --noconftest
           skeleton/testing/test_ai_chat_turn_runtime.py
+          skeleton/testing/test_ai_chat_turn_repository.py
+          backend/tests/test_ai_chat_turn_persistence.py
           skeleton/testing/test_ai_assistant_runtime.py
           skeleton/testing/test_ai_assistant_manifest.py
           tests/test_ai_chat_runtime_contract.py
@@ -106,7 +120,7 @@ jobs:
               raise SystemExit("AI chat structural receipt is not exact-head")
           if structural.get("valid") is not True or structural.get("errors"):
               raise SystemExit("AI chat structural verifier failed")
-          if len(structural.get("digests") or {}) != 7:
+          if len(structural.get("digests") or {}) != 11:
               raise SystemExit("AI chat structural digest coverage is incomplete")
           if len(structural.get("evidence_digest") or "") != 64:
               raise SystemExit("AI chat structural evidence digest is missing")
