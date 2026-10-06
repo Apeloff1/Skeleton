@@ -136,6 +136,22 @@ class CanonLedger:
             current = self._branches[current].parent_id
         return tuple(reversed(chain))
 
+    def _visible_ticks(self, branch_id: str, tick: int) -> tuple[tuple[str, int], ...]:
+        if tick < 0:
+            raise ValueError("tick must be non-negative")
+        lineage = self.lineage(branch_id)
+        target = self._branches[branch_id]
+        if tick < target.fork_tick:
+            raise CanonError("branch queried before its fork")
+        visible: list[tuple[str, int]] = []
+        for index, current in enumerate(lineage):
+            if index + 1 < len(lineage):
+                child = self._branches[lineage[index + 1]]
+                visible.append((current, min(tick, child.fork_tick)))
+            else:
+                visible.append((current, tick))
+        return tuple(visible)
+
     def add_assertion(self, assertion: CanonAssertion) -> None:
         if assertion.assertion_id in self._assertions:
             raise CanonError(f"assertion already exists: {assertion.assertion_id}")
@@ -186,17 +202,15 @@ class CanonLedger:
         branch_id: str,
         tick: int,
     ) -> CanonAssertion | None:
-        if tick < 0:
-            raise ValueError("tick must be non-negative")
-        lineage = self.lineage(branch_id)
-        for candidate_branch in reversed(lineage):
+        visible = self._visible_ticks(branch_id, tick)
+        for candidate_branch, visible_tick in reversed(visible):
             matches = [
                 row
                 for row in self._assertions.values()
                 if row.branch_id == candidate_branch
                 and row.subject == subject
                 and row.predicate == predicate
-                and row.active_at(tick)
+                and row.active_at(visible_tick)
                 and not row.intentional_contradiction
             ]
             if not matches:
@@ -215,12 +229,12 @@ class CanonLedger:
         branch_id: str,
         tick: int,
     ) -> bool:
-        lineage = set(self.lineage(branch_id))
+        visible = dict(self._visible_ticks(branch_id, tick))
         return any(
             item.character_id == character_id
             and item.assertion_id == assertion_id
-            and item.branch_id in lineage
-            and item.learned_tick <= tick
+            and item.branch_id in visible
+            and item.learned_tick <= visible[item.branch_id]
             for item in self._knowledge
         )
 
