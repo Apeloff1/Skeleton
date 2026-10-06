@@ -141,7 +141,7 @@ class AtomGraph:
         lineage = self.trace_to_root(atom_id)
         if len(lineage) < 2:
             raise AtomGraphError("non-root atom lost parent context")
-        if self.require(lineage[-1]).artifact_id != atom.artifact_id:
+        if any(self.require(item).artifact_id != atom.artifact_id for item in lineage):
             raise AtomGraphError("atom lineage crossed artifact identity")
 
     def snapshot(self) -> dict[str, object]:
