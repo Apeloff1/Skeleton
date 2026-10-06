@@ -9,6 +9,8 @@ Independent verification signed: false
 ## Plane objective
 Specify a complete implementation/evidence surface for Game Project Editor and World Model. Requirements are shared by the conversational LLM plane and the AI game-builder plane wherever the capability crosses project boundaries.
 
+**Plane acceptance.** Every requirement atom below participates in the plane acceptance boundary; closure requires nominal, adversarial, replay, cancellation, provenance, recovery and compatibility evidence with no unresolved non-compensable failure.
+
 ## FLGB-09-00001 — project manifest / contract / unit proof
 **Objective.** Make project manifest production-functional through contract under cold start, with finite execution, explicit authority, durable state, deterministic contract semantics and recovery behavior.
 
