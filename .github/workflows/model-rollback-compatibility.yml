@@ -8,6 +8,7 @@ on:
       - "skeleton/ai/learning/model_rollback.py"
       - "skeleton/learning/model_rollback.py"
       - "skeleton/testing/test_model_rollback_compatibility.py"
+      - "tests/test_ai_learning_rollback_evidence.py"
       - ".github/workflows/model-rollback-compatibility.yml"
   push:
     branches:
@@ -16,6 +17,7 @@ on:
       - "skeleton/ai/learning/model_rollback.py"
       - "skeleton/learning/model_rollback.py"
       - "skeleton/testing/test_model_rollback_compatibility.py"
+      - "tests/test_ai_learning_rollback_evidence.py"
       - ".github/workflows/model-rollback-compatibility.yml"
   workflow_dispatch:
 
@@ -48,5 +50,24 @@ jobs:
           python -m pip install --disable-pip-version-check
           "pydantic==2.13.5"
           "pydantic-settings==2.15.0"
+      - name: Compile rollback surfaces
+        run: >-
+          python -m py_compile
+          skeleton/ai/learning/model_rollback.py
+          skeleton/learning/model_rollback.py
+          skeleton/testing/test_model_rollback_compatibility.py
+          tests/test_ai_learning_rollback_evidence.py
+      - name: Verify rollback namespace parity
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          canonical = Path("skeleton/ai/learning/model_rollback.py").read_bytes()
+          compatibility = Path("skeleton/learning/model_rollback.py").read_bytes()
+          assert canonical == compatibility, "rollback namespaces drifted"
+          print("rollback namespace parity", len(canonical), "bytes")
+          PY
       - name: Run rollback compatibility contract
-        run: python -m unittest -q skeleton.testing.test_model_rollback_compatibility
+        run: >-
+          python -m unittest -q
+          skeleton.testing.test_model_rollback_compatibility
+          tests.test_ai_learning_rollback_evidence
