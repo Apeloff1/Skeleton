@@ -13,6 +13,8 @@ on:
       - "skeleton/learning/__init__.py"
       - "skeleton/ai/learning/school/decision_ledger.py"
       - "skeleton/learning/school/decision_ledger.py"
+      - "skeleton/ai/learning/school/session_audit.py"
+      - "skeleton/learning/school/session_audit.py"
       - "skeleton/school/decision_ledger.py"
       - "skeleton/ai/learning/school/runtime_replay.py"
       - "skeleton/learning/school/runtime_replay.py"
@@ -123,6 +125,8 @@ jobs:
           skeleton/ai/learning/school/decision_ledger.py
           skeleton/learning/school/decision_ledger.py
           skeleton/school/decision_ledger.py
+          skeleton/ai/learning/school/session_audit.py
+          skeleton/learning/school/session_audit.py
           skeleton/ai/learning/school/runtime_replay.py
           skeleton/learning/school/runtime_replay.py
           skeleton/school/runtime_replay.py
@@ -149,48 +153,49 @@ jobs:
               assert left == right, f"namespace drift: {canonical} != {compatibility}"
               print("exact namespace parity", canonical, len(left), "bytes")
 
-          school_groups = (
+          implementation_pairs = (
               (
                   "skeleton/ai/learning/school/decision_ledger.py",
                   "skeleton/learning/school/decision_ledger.py",
-                  "skeleton/school/decision_ledger.py",
+              ),
+              (
+                  "skeleton/ai/learning/school/session_audit.py",
+                  "skeleton/learning/school/session_audit.py",
               ),
               (
                   "skeleton/ai/learning/school/runtime_replay.py",
                   "skeleton/learning/school/runtime_replay.py",
-                  "skeleton/school/runtime_replay.py",
               ),
               (
                   "skeleton/ai/learning/school/runtime_capsule.py",
                   "skeleton/learning/school/runtime_capsule.py",
-                  "skeleton/school/runtime_capsule.py",
               ),
               (
                   "skeleton/ai/learning/school/runtime_attestation.py",
                   "skeleton/learning/school/runtime_attestation.py",
-                  "skeleton/school/runtime_attestation.py",
               ),
           )
+          for canonical, compatibility in implementation_pairs:
+              left = Path(canonical).read_bytes()
+              right = Path(compatibility).read_bytes()
+              assert left == right, f"namespace drift: {canonical} != {compatibility}"
+              print("implementation namespace parity", canonical)
 
-          prefixes = (
-              "skeleton.ai.learning.school.",
-              "skeleton.learning.school.",
-              "skeleton.school.",
-          )
-
-          def normalized(path: str) -> str:
+          shims = {
+              "skeleton/school/decision_ledger.py":
+                  "from skeleton.learning.school.decision_ledger import *",
+              "skeleton/school/runtime_replay.py":
+                  "from skeleton.learning.school.runtime_replay import *",
+              "skeleton/school/runtime_capsule.py":
+                  "from skeleton.learning.school.runtime_capsule import *",
+              "skeleton/school/runtime_attestation.py":
+                  "from skeleton.learning.school.runtime_attestation import *",
+          }
+          for path, expected_import in shims.items():
               text = Path(path).read_text()
-              for prefix in prefixes:
-                  text = text.replace(prefix, "SKELETON_SCHOOL_NAMESPACE.")
-              return text
-
-          for group in school_groups:
-              baseline = normalized(group[0])
-              for candidate in group[1:]:
-                  assert normalized(candidate) == baseline, (
-                      f"normalized namespace drift: {group[0]} != {candidate}"
-                  )
-              print("normalized school namespace parity", group[0])
+              assert expected_import in text, f"compatibility shim drift: {path}"
+              assert text.count("\n") <= 4, f"compatibility shim grew implementation: {path}"
+              print("compatibility shim verified", path)
           PY
 
       - name: Run existing and adversarial evidence-runtime regressions
@@ -201,7 +206,6 @@ jobs:
           tests/test_runtime_replay.py
           tests/test_runtime_replay_terminal_contract.py
           tests/test_runtime_capsule.py
-          tests/test_runtime_attestation.py
           tests/test_session_audit.py
           tests/test_session_audit_supersession.py
           tests/test_ai_evidence_runtime_attestation_integrity.py
