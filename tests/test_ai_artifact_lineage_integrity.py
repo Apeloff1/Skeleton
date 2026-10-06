@@ -477,6 +477,172 @@ class ArtifactLineageIntegrityTests(unittest.TestCase):
                 dataset_offsets={"ds-a": 1, " ds-a": 0, "ds-b": 0, "ds-c": 0},
             )
 
+    def test_model_identity_detaches_from_caller_owned_token_map(self) -> None:
+        tokens = {"<bos>": 1, "<eos>": 2}
+        representation = RepresentationSpec(
+            tokenizer_family="byte-bpe",
+            tokenizer_version="1",
+            vocabulary_digest=sha("mutable-vocab"),
+            normalization_spec="NFC",
+            byte_fallback_policy="lossless",
+            special_token_map=tokens,
+            bos_token="<bos>",
+            eos_token="<eos>",
+        )
+        identity = representation.representation_id
+        tokens["<pad>"] = 3
+
+        self.assertEqual(representation.representation_id, identity)
+        self.assertNotIn("<pad>", representation.special_token_map)
+        with self.assertRaises(TypeError):
+            representation.special_token_map["<pad>"] = 3  # type: ignore[index]
+
+    def test_model_manifest_detaches_from_mutable_sequences_and_nested_metadata(self) -> None:
+        shards = [
+            WeightShard("weights/a.safetensors", sha("immutable-a"), 10),
+        ]
+        metadata = {"nested": {"labels": ["a", "b"]}}
+        manifest = ModelArtifactManifest(
+            model_id="immutable-model",
+            architecture_id="decoder-v1",
+            architecture_config_digest=sha("immutable-arch"),
+            representation=self.representation(),
+            weight_shards=shards,  # type: ignore[arg-type]
+            weight_format="safetensors",
+            dtype="bf16",
+            quantization="none",
+            model_code_digest=sha("immutable-code"),
+            runtime_abi="skeleton.inference.v1",
+            data_manifest_root=sha("immutable-data"),
+            eval_evidence_root=sha("immutable-eval"),
+            provenance_root=sha("immutable-prov"),
+            metadata=metadata,
+        )
+        identity = manifest.artifact_id
+        shards.append(WeightShard("weights/b.safetensors", sha("immutable-b"), 10))
+        metadata["nested"]["labels"].append("c")
+
+        self.assertEqual(manifest.artifact_id, identity)
+        self.assertEqual(len(manifest.weight_shards), 1)
+        self.assertEqual(manifest.as_dict()["metadata"], {"nested": {"labels": ["a", "b"]}})
+        with self.assertRaises(TypeError):
+            manifest.metadata["new"] = "value"  # type: ignore[index]
+
+    def test_artifact_request_detaches_from_mutable_shard_and_tensor_lists(self) -> None:
+        tensors = [TensorDescriptor("a", "bf16", (2, 2))]
+        shard = ArtifactShard(
+            name="weights/a.safetensors",
+            digest=sha("request-a"),
+            encoded_bytes=16,
+            decoded_bytes=16,
+            tensors=tensors,  # type: ignore[arg-type]
+        )
+        shards = [shard]
+        request = ArtifactLoadRequest(
+            artifact_id="model:" + sha("request-immutable"),
+            weight_format="safetensors",
+            shards=shards,  # type: ignore[arg-type]
+            metadata_bytes=0,
+            safe_parser=True,
+            embedded_executable_code=False,
+        )
+        identity = request.digest
+        tensors.append(TensorDescriptor("b", "bf16", (2, 2)))
+        shards.append(
+            ArtifactShard(
+                name="weights/b.safetensors",
+                digest=sha("request-b"),
+                encoded_bytes=16,
+                decoded_bytes=16,
+            )
+        )
+
+        self.assertEqual(request.digest, identity)
+        self.assertEqual(len(request.shards), 1)
+        self.assertEqual(len(request.shards[0].tensors), 1)
+
+    def test_training_lineage_detaches_from_mutable_collections(self) -> None:
+        components = [
+            MixtureComponent("ds-a", 3),
+            MixtureComponent("ds-b", 1),
+        ]
+        mixture = MixtureManifest(
+            mixture_id="immutable-mixture",
+            components=components,  # type: ignore[arg-type]
+            seed=1,
+        )
+        mixture_identity = mixture.digest
+        components.append(MixtureComponent("ds-c", 1))
+        self.assertEqual(mixture.digest, mixture_identity)
+        self.assertEqual(len(mixture.components), 2)
+
+        sources = [
+            SourceRecord(
+                source_id="source:a",
+                content_digest=sha("immutable-source-a"),
+                rights_refs=("rights:a",),
+            ),
+            SourceRecord(
+                source_id="source:b",
+                content_digest=sha("immutable-source-b"),
+                rights_refs=("rights:b",),
+            ),
+        ]
+        shards = [
+            DatasetShardManifest(
+                dataset_id="ds-a",
+                shard_id="000",
+                content_digest=sha("immutable-ds-a"),
+                sample_count=10,
+                source_ids=("source:a",),
+            ),
+            DatasetShardManifest(
+                dataset_id="ds-b",
+                shard_id="000",
+                content_digest=sha("immutable-ds-b"),
+                sample_count=10,
+                source_ids=("source:b",),
+            ),
+        ]
+        metadata = {"nested": {"labels": ["x"]}}
+        manifest = TrainingDataManifest(
+            manifest_id="immutable-training",
+            sources=sources,  # type: ignore[arg-type]
+            shards=shards,  # type: ignore[arg-type]
+            mixture=mixture,
+            metadata=metadata,
+        )
+        root = manifest.root_digest
+        sources.append(
+            SourceRecord(
+                source_id="source:c",
+                content_digest=sha("immutable-source-c"),
+                rights_refs=("rights:c",),
+            )
+        )
+        metadata["nested"]["labels"].append("y")
+
+        self.assertEqual(manifest.root_digest, root)
+        self.assertEqual(len(manifest.sources), 2)
+        self.assertEqual(manifest.as_dict()["metadata"], {"nested": {"labels": ["x"]}})
+
+    def test_training_cursor_detaches_from_mutable_offsets(self) -> None:
+        manifest = self.training_manifest()
+        offsets = manifest.expected_dataset_offsets(draw_index=25)
+        cursor = TrainingCursor(
+            manifest_root=manifest.root_digest,
+            mixture_digest=manifest.mixture.digest,
+            draw_index=25,
+            dataset_offsets=offsets,
+        )
+        identity = cursor.digest
+        offsets["ds-a"] += 100
+
+        self.assertEqual(cursor.digest, identity)
+        cursor.assert_compatible(manifest)
+        with self.assertRaises(TypeError):
+            cursor.dataset_offsets["ds-a"] = 999  # type: ignore[index]
+
     def test_lineage_component_digests_are_deterministic(self) -> None:
         manifest = self.training_manifest()
         self.assertEqual(manifest.sources[0].digest, manifest.sources[0].digest)
