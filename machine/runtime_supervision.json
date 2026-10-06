@@ -1,6 +1,6 @@
 {
   "schema_version": "skeleton.architecture.runtime_supervision.v2",
-  "contract_version": "1.1.0",
+  "contract_version": "1.2.0",
   "status": "active",
   "purpose": "One executable backend/engine lifecycle and connector-cancellation contract covering readiness, draining, recovery, deadlines, cancellation propagation, retry interruption, late-result fencing and operation identity.",
   "masterplan_binding": {
@@ -40,7 +40,10 @@
     "every admitted HTTP request and engine execution is generation-bound by a work lease",
     "DRAINING atomically revokes new-work authority while preserving accountability for already admitted work",
     "STOPPED cannot be asserted while in-flight work leases remain",
-    "shutdown cancels/drains background execution before closing durable dependencies"
+    "shutdown cancels/drains background execution before closing durable dependencies",
+    "public drain responses never expose active work identities or cancellation detail",
+    "engine shutdown reconciles exact task-bound work leases before returning",
+    "backend repeated lifespan startup creates a fresh generation after terminal shutdown"
   ],
   "services": [
     {
@@ -66,7 +69,11 @@
             "exempt_prefixes=(\"/api/health\",)",
             "t.cancel()",
             "client.close()",
-            "@api_router.get(\"/health/ready\")"
+            "@api_router.get(\"/health/ready\")",
+            "ServicePhase.STOPPED",
+            "ServicePhase.FAILED",
+            "_runtime_lifecycle.restart(reason=\"backend-lifespan-restart\")",
+            "backend lifespan cannot overlap an active lifecycle generation"
           ]
         }
       ],
@@ -118,7 +125,11 @@
             "self.lifecycle.acquire_work(",
             "self.lifecycle.release_work(lease)",
             "allow_starting=True",
-            "self._lifecycle_leases"
+            "self._lifecycle_leases",
+            "task_items = tuple(self._tasks.items())",
+            "await asyncio.gather(",
+            "self._task_done(execution_id, task)",
+            "engine-work-lease-release-failed"
           ]
         },
         {
@@ -184,6 +195,23 @@
         "inflight_work",
         "active_work_ids",
         "last_lease_sequence"
+      ],
+      "shutdown_reconciliation": "synchronous_before_shutdown_returns",
+      "task_identity_binding": true
+    },
+    "public_drain_response": {
+      "status_code": 503,
+      "retry_after_seconds": 1,
+      "allowed_lifecycle_fields": [
+        "service_id",
+        "phase",
+        "generation",
+        "admits_work",
+        "inflight_work"
+      ],
+      "forbidden_lifecycle_fields": [
+        "active_work_ids",
+        "cancellation"
       ]
     }
   },
