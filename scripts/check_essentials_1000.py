@@ -9,6 +9,8 @@ PATH = ROOT / "machine" / "essentials_1000.json"
 SCHEDULER = ROOT / "machine" / "project_self_improvement_idle_scheduler.json"
 CLOSURE = ROOT / "machine" / "essentials_1000_closure_protocol.json"
 LEDGER = ROOT / "machine" / "essentials_1000_gap_ledger.json"
+PRIORITY = ROOT / "machine" / "essentials_1000_priority_policy.json"
+FRONTIER = ROOT / "machine" / "essentials_1000_execution_frontier.json"
 
 MATURITY = ["planned","specified","implemented","integrated","independently_verified","signed_complete"]
 
@@ -91,7 +93,84 @@ def validate_ledger(ledger: dict, data: dict) -> list[str]:
         errors.append("ledger: signed-current count diverges from ESS level completion count")
     return errors
 
-def validate(data: dict, scheduler: dict | None = None, closure: dict | None = None, ledger: dict | None = None) -> list[str]:
+def validate_priority_policy(policy: dict) -> list[str]:
+    errors: list[str] = []
+    if policy.get("schema_version") != "skeleton.essentials_1000_priority_policy.v1":
+        errors.append("priority: unexpected schema_version")
+    classes=policy.get("severity_classes",[])
+    if [x.get("id") for x in classes] != ["E0","E1","E2","E3"]:
+        errors.append("priority: severity class order changed")
+    hard=policy.get("hard_order",[])
+    if not hard or hard[-1] != "optional PSI optimization":
+        errors.append("priority: optional PSI must remain below all essential gap classes")
+    scoring=policy.get("scoring_within_same_severity",{})
+    if "inside the same non-compensable severity class" not in scoring.get("rule",""):
+        errors.append("priority: scores may only order within one severity class")
+    starvation=policy.get("starvation",{})
+    if starvation.get("cannot_cross_severity_boundary") is not True:
+        errors.append("priority: starvation cannot cross severity boundary")
+    batching=policy.get("batching",{})
+    if batching.get("max_parallel_lanes") != 99:
+        errors.append("priority: max parallel lanes must be 99")
+    if batching.get("same_stratum_one_mutating_candidate_at_a_time") is not True:
+        errors.append("priority: same-stratum mutation concurrency weakened")
+    if batching.get("cross_stratum_parallelism") is not True:
+        errors.append("priority: cross-stratum parallelism must remain enabled")
+    anti="\n".join(policy.get("anti_gaming",[]))
+    for phrase in ["severity cannot be lowered by benchmark gains","priority score is not completion evidence","self-improvement agents cannot rewrite severity policy"]:
+        if phrase not in anti:
+            errors.append(f"priority: anti-gaming invariant missing: {phrase}")
+    return errors
+
+def validate_frontier(frontier: dict, data: dict, ledger: dict) -> list[str]:
+    errors: list[str] = []
+    if frontier.get("schema_version") != "skeleton.essentials_1000_execution_frontier.v1":
+        errors.append("frontier: unexpected schema_version")
+    lanes=frontier.get("lanes",[])
+    if len(lanes) != 99:
+        errors.append(f"frontier: expected 99 domain lanes, got {len(lanes)}")
+    expected_gates=[f"ESS1000-{i*10:04d}" for i in range(1,100)]
+    actual_gates=[]
+    for i,lane in enumerate(lanes,1):
+        if lane.get("lane_id") != f"ESS-LANE-{i:03d}":
+            errors.append(f"frontier: lane {i} identity mismatch")
+        if lane.get("stratum_id") != f"ESS-S{i:03d}":
+            errors.append(f"frontier: lane {i} stratum mismatch")
+        if lane.get("current_frontier") != f"ESS1000-{i*10-9:04d}":
+            errors.append(f"frontier: lane {i} initial frontier mismatch")
+        gate=f"ESS1000-{i*10:04d}"
+        if lane.get("closure_gate") != gate:
+            errors.append(f"frontier: lane {i} closure gate mismatch")
+        actual_gates.append(lane.get("closure_gate"))
+        if lane.get("state") != "open" or lane.get("signed_current") != 0 or lane.get("open") != 10:
+            errors.append(f"frontier: lane {i} initial state mismatch")
+        if lane.get("planning_default_severity") == "E0":
+            errors.append(f"frontier: lane {i} may not receive planning-default E0")
+        if lane.get("active_severity") is not None:
+            errors.append(f"frontier: lane {i} may not claim an active incident severity initially")
+    if actual_gates != expected_gates:
+        errors.append("frontier: closure gate set mismatch")
+    model=frontier.get("execution_model",{})
+    if model.get("parallel_domain_lanes") != 99:
+        errors.append("frontier: execution model must expose 99 domain lanes")
+    if model.get("finality_gate_inputs") != expected_gates:
+        errors.append("frontier: finality gate inputs mismatch")
+    final=frontier.get("finality_lane",{})
+    if final.get("stratum_id") != "ESS-S100" or final.get("state") != "blocked":
+        errors.append("frontier: finality lane must start blocked")
+    if final.get("blocked_by") != expected_gates:
+        errors.append("frontier: finality blocked_by mismatch")
+    if final.get("current_frontier") is not None:
+        errors.append("frontier: finality frontier must be null before all 99 gates close")
+    summary=ledger.get("summary",{})
+    snap=frontier.get("snapshot",{})
+    if snap.get("total_essentials") != summary.get("total") or snap.get("signed_current") != summary.get("signed_current") or snap.get("open") != summary.get("open"):
+        errors.append("frontier: snapshot diverges from gap ledger")
+    if sum(frontier.get("planning_default_lane_counts",{}).values()) != 99:
+        errors.append("frontier: planning severity counts must cover 99 lanes")
+    return errors
+
+def validate(data: dict, scheduler: dict | None = None, closure: dict | None = None, ledger: dict | None = None, priority: dict | None = None, frontier: dict | None = None) -> list[str]:
     errors: list[str] = []
     levels=data.get("levels",[]); strata=data.get("strata",[]); waves=data.get("construction_waves",[])
     rel=data.get("relationship",{}); completion=data.get("completion",{})
@@ -167,6 +246,10 @@ def validate(data: dict, scheduler: dict | None = None, closure: dict | None = N
         errors.extend(validate_closure_protocol(closure))
     if ledger is not None:
         errors.extend(validate_ledger(ledger,data))
+    if priority is not None:
+        errors.extend(validate_priority_policy(priority))
+    if frontier is not None and ledger is not None:
+        errors.extend(validate_frontier(frontier,data,ledger))
     return errors
 
 def main() -> int:
@@ -175,16 +258,20 @@ def main() -> int:
     p.add_argument("--scheduler-path",type=Path,default=SCHEDULER)
     p.add_argument("--closure-path",type=Path,default=CLOSURE)
     p.add_argument("--ledger-path",type=Path,default=LEDGER)
+    p.add_argument("--priority-path",type=Path,default=PRIORITY)
+    p.add_argument("--frontier-path",type=Path,default=FRONTIER)
     a=p.parse_args()
     d=json.loads(a.path.read_text(encoding="utf-8"))
     s=json.loads(a.scheduler_path.read_text(encoding="utf-8"))
     c=json.loads(a.closure_path.read_text(encoding="utf-8"))
     l=json.loads(a.ledger_path.read_text(encoding="utf-8"))
-    errors=validate(d,s,c,l)
+    ppol=json.loads(a.priority_path.read_text(encoding="utf-8"))
+    f=json.loads(a.frontier_path.read_text(encoding="utf-8"))
+    errors=validate(d,s,c,l,ppol,f)
     if errors:
         for e in errors: print("ERROR:",e)
         return 1
-    print("ESS-1000 valid: 1000 essentials / closure freshness + gap ledger + PSI priority enforced")
+    print("ESS-1000 valid: 1000 essentials / revocable closure / gap ledger / severity policy / 99-lane frontier enforced")
     return 0
 
 if __name__=="__main__":
