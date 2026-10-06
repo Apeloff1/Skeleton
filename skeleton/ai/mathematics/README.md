@@ -36,6 +36,11 @@ model authority boundaries.
 - `spectral.py` — symmetric dominant eigenpair and deterministic periodogram diagnostics.
 - `integration.py` — adaptive Simpson quadrature and bounded fixed-step RK4 dynamics.
 - `statistics.py` — Welford moments, covariance/correlation, robust quantiles and MAD.
+- `graph.py` — validated Laplacians, random-walk matrices and stationary-distribution evidence.
+- `solvers.py` — bracketed roots and SPD conjugate gradient with explicit residual reports.
+- `sampling.py` — deterministic SplitMix64, systematic resampling, Halton points and Monte Carlo error.
+- `geometry.py` — Euclidean/angular metrics, simplex projection, barycentric and subspace projection.
+- `losses.py` — stable regression/classification losses and logit-domain cross entropy.
 - `validation.py` — parity evidence against existing optimized runtime kernels.
 
 ## Guarantees
@@ -49,7 +54,11 @@ model authority boundaries.
 - Automatic differentiation rejects silent derivative-dimension changes.
 - Spectral eigen analysis reports residuals and convergence instead of merely returning a vector.
 - Quadrature reports an error estimate/evaluation count; RK4 validates every derivative state.
-- Optimization is deterministic, bounded by iteration/line-search limits, and records a trace.
+- Optimization and root/linear solvers are deterministic, bounded, and expose residual/convergence evidence.
+- Graph mathematics validates stochasticity/symmetry rather than assuming graph-runtime invariants.
+- Sampling is explicitly seeded and reproducible; quasi-random sequences have fixed index semantics.
+- Geometry projection rejects degenerate or rank-deficient constructions instead of hiding them.
+- Training losses operate in stable logit/log domains and reject impossible support.
 - `audit_runtime_kernels()` compares optimized runtime softmax, matmul and attention against
   this reference substrate without replacing those kernels.
 
