@@ -6,10 +6,12 @@
   "masterplan_binding": {
     "volume_ref": "VOL-004",
     "title": "Kernel & Execution Foundation",
-    "required_gap_texts": [
+    "closed_implementation_gap_texts": [
       "unify service supervision semantics across backend and engine",
       "expand cancellation propagation coverage into all connectors"
-    ]
+    ],
+    "remaining_verification_gap_text": "independent exact-head VOL-004 Runtime Supervision Closure qualification remains pending",
+    "completion_requires_independent_exact_head": true
   },
   "sources": {
     "runtime_manifest": "skeleton/app/manifest.json",
