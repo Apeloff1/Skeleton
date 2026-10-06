@@ -1556,7 +1556,7 @@
       "source": "skeleton/data",
       "destination": "skeleton/ai/runtime/data",
       "kind": "tree",
-      "source_git_object_sha": "c661b24196b4b8b56b6e04947a513cc5b7984bb5",
+      "source_git_object_sha": "5c39deb49b2195a62896759b1185123f5365754e",
       "role": "Cache, event bus, schema evolution, migrations, and lineage helpers are governed runtime data/state infrastructure.",
       "work_package_refs": [
         "WP-W03",
@@ -6957,8 +6957,8 @@
       "policy": "Refresh exact Git object identities and aggregate mapping counts after P3T2 storage and subsequent current-main merges; this metadata repair grants no cutover, completion, promotion, implementation signoff, or independent verification authority."
     },
     "p3t2_data_candidate": {
-      "implementation_head_sha": "b394f1d9199a3c8809f788ded670b454af166654",
-      "source_tree_sha": "c661b24196b4b8b56b6e04947a513cc5b7984bb5",
+      "implementation_head_sha": "fa380fc955e2282c6cc17859258e1f54df387628",
+      "source_tree_sha": "5c39deb49b2195a62896759b1185123f5365754e",
       "task_id": "P3T2-DATA-01",
       "volume_refs": [
         "VOL-137",
