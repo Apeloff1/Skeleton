@@ -101,13 +101,19 @@ class NoveltyReservoir:
             if existing != record:
                 raise ResilienceError("candidate novelty identity reused with different payload")
             return False
-        if self._records and self.nearest_distance(record) < self.minimum_distance:
-            weakest = min(
+        if self._records:
+            nearest = min(
                 self._records.values(),
-                key=lambda item: (item.quality_score, item.candidate_digest),
+                key=lambda item: (
+                    self.distance(record, item),
+                    item.candidate_digest,
+                ),
             )
-            if record.quality_score <= weakest.quality_score:
-                return False
+            nearest_distance = self.distance(record, nearest)
+            if nearest_distance < self.minimum_distance:
+                if record.quality_score <= nearest.quality_score:
+                    return False
+                del self._records[nearest.candidate_digest]
         self._records[record.candidate_digest] = record
         while len(self._records) > self.capacity:
             victim = min(
