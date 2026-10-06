@@ -1211,14 +1211,14 @@ def test_context_allocation_policy_rejects_invalid_fraction_budget() -> None:
             derived_untrusted_fraction=0.3,
         )
 
-    with pytest.raises(ValueError, match="in \[0,1\]"):
+    with pytest.raises(ValueError, match=r"in \[0,1\]"):
         ContextAllocationPolicy(
             authorized_user_fraction=1.1,
             untrusted_evidence_fraction=0.0,
             derived_untrusted_fraction=-0.1,
         )
 
-    with pytest.raises(ValueError, match=r"in \\[0,1\\]"):
+    with pytest.raises(ValueError, match=r"in \[0,1\]"):
         ContextAllocationPolicy(
             authorized_user_fraction=float("nan"),
             untrusted_evidence_fraction=0.5,
