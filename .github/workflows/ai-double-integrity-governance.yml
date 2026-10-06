@@ -74,11 +74,14 @@ jobs:
           "pydantic-settings==2.15.0"
           "fastapi==0.136.1"
 
-      - name: Verify exact-head identity and clean diff syntax
+      - name: Verify exact-head identity and clean full PR diff syntax
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
-          git diff --check HEAD^ HEAD
+          git fetch --no-tags origin main
+          BASE="$(git merge-base HEAD origin/main)"
+          test -n "$BASE"
+          git diff --check "$BASE" HEAD
 
       - name: Compile doubled governance surfaces
         run: >-
