@@ -124,6 +124,28 @@ class ForgeControlPlane:
                     non_compensable=True,
                 )
             )
+            declared = submitted.quality_map
+            adjudicated = panel_decision.quality_map
+            max_drift = max(
+                abs(declared[axis] - adjudicated[axis])
+                for axis in declared
+            )
+            gates.append(
+                GateResult(
+                    "quality_calibration",
+                    max_drift <= 0.15,
+                    canonical_digest(
+                        {
+                            "candidate": submitted.digest,
+                            "declared": declared,
+                            "adjudicated": adjudicated,
+                            "max_drift": max_drift,
+                            "threshold": 0.15,
+                        }
+                    ),
+                    non_compensable=True,
+                )
+            )
             evaluator_id = (
                 "panel:"
                 + canonical_digest(
@@ -139,6 +161,11 @@ class ForgeControlPlane:
             submitted=submitted,
             evaluator_id=evaluator_id,
             gate_results=tuple(gates),
+            evaluated_quality=(
+                panel_decision.quality_map
+                if submitted is not None and panel_decision is not None
+                else None
+            ),
         )
 
     def checkpoint_bundle(self) -> dict[str, object]:
