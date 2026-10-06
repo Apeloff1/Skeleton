@@ -137,6 +137,40 @@ def _validate_lifecycle_semantics(
     ]:
         raise RuntimeSupervisionError("work lease snapshot contract drifted")
 
+    public_response = lifecycle.get("public_drain_response")
+    if not isinstance(public_response, dict):
+        raise RuntimeSupervisionError(
+            "lifecycle public_drain_response must be an object"
+        )
+    if public_response.get("status_code") != 503:
+        raise RuntimeSupervisionError("drain response status must be 503")
+    if public_response.get("retry_after_seconds") != 1:
+        raise RuntimeSupervisionError("drain Retry-After must remain one second")
+    if public_response.get("allowed_lifecycle_fields") != [
+        "service_id",
+        "phase",
+        "generation",
+        "admits_work",
+        "inflight_work",
+    ]:
+        raise RuntimeSupervisionError("public drain lifecycle fields drifted")
+    if public_response.get("forbidden_lifecycle_fields") != [
+        "active_work_ids",
+        "cancellation",
+    ]:
+        raise RuntimeSupervisionError("public drain forbidden fields drifted")
+
+    work_leases = lifecycle["work_leases"]
+    if (
+        work_leases.get("shutdown_reconciliation")
+        != "synchronous_before_shutdown_returns"
+    ):
+        raise RuntimeSupervisionError(
+            "shutdown lease reconciliation must be synchronous"
+        )
+    if work_leases.get("task_identity_binding") is not True:
+        raise RuntimeSupervisionError("engine leases must bind exact task identity")
+
     shared = _repo_path(contract["sources"].get("shared_lifecycle"))
     mirror = _repo_path(contract["sources"].get("governed_lifecycle_mirror"))
     shared_path = root / shared
@@ -160,6 +194,8 @@ def _validate_lifecycle_semantics(
         "self.lifecycle.release_work(lease)",
         "runtime_not_accepting_work",
         "retry-after",
+        'snapshot["service_id"]',
+        'snapshot["inflight_work"]',
         "in-flight work leases",
         "def restart(",
         "LifecycleReceipt(",
