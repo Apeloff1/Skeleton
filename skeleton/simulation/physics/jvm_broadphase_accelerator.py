@@ -786,9 +786,17 @@ class JvmBroadPhaseAccelerator:
 
 def get_default_broadphase_accelerator() -> JvmBroadPhaseAccelerator:
     """Return the physics helper owned by the canonical JVM registry."""
-    from skeleton.native.jvm_registry import get_default_jvm_registry
+    from skeleton.native.jvm_registry import (
+        JvmAcceleratorRegistryError,
+        get_default_jvm_registry,
+    )
 
-    accelerator = get_default_jvm_registry().get("physics")
+    try:
+        accelerator = get_default_jvm_registry().get_selected("physics")
+    except JvmAcceleratorRegistryError as exc:
+        raise JvmBroadPhaseUnavailable(
+            "physics JVM accelerator is not profile-selected"
+        ) from exc
     if not isinstance(accelerator, JvmBroadPhaseAccelerator):
         raise JvmBroadPhaseUnavailable(
             "canonical JVM registry returned wrong physics type"
