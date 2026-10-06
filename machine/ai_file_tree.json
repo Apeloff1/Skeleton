@@ -7731,6 +7731,17 @@
         "VOL-413",
         "VOL-414"
       ]
+    },
+    {
+      "id": "AIFT-NATIVE-MATHEMATICS-ROOT",
+      "path": "skeleton/ai/mathematics",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI-native deterministic mathematical reference substrate for stable numerics, linear algebra, probability, optimization, and runtime parity evidence; no independent knowledge, model, promotion, or execution authority.",
+      "volume_refs": [
+        "VOL-012"
+      ]
     }
   ]
 }

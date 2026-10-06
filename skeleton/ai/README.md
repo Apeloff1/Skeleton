@@ -24,6 +24,7 @@ objects already in the repository. Existing imports remain compatibility paths. 
 - `agents/jeeves/` — Jeeves reasoning and agent system.
 - `agents/core/` — core agent/swarm execution runtime.
 - `shell/` — AI control-plane/shell implementation: governance, planning, policy, verification, durable recovery, trust and release evidence.
+- `mathematics/` — deterministic AI-native reference math: stable numerics, dense linear algebra, probability/information measures, bounded optimization, and parity oracles; no model or knowledge authority.
 - `cognition/`, `learning/`, `evaluation/` — cognition, controlled learning, and evaluation support.
 - `modeling/` — governed model registry, model-development training/evaluation, and publication support.
 - `training/` — governed training control, distributed/checkpoint/recovery, evaluation-gate, post-training, curriculum, RL-environment, and verifier-model support.
