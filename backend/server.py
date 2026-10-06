@@ -2236,8 +2236,14 @@ from services.ai_assistant_svc import AIAssistantService, ai_service  # noqa: E4
 executor_factory = ExecutorFactory()
 app_start_time = time.time()
 
+from skeleton.kernel.runtime_supervision import RuntimeServiceLifecycle
+_runtime_lifecycle = RuntimeServiceLifecycle("backend")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if _runtime_lifecycle.phase.value in {"stopped", "failed"}:
+        _runtime_lifecycle.restart(reason="backend-lifespan-restart")
+    app.state.runtime_lifecycle = _runtime_lifecycle
     # ═══════════════════════════════════════════════════════════════════════
     # ★ GUARANTEED LAUNCH ENVELOPE  (2026-02 deploy fix)
     # The entire lifespan body is wrapped so ANY unexpected exception during
@@ -2271,9 +2277,42 @@ async def lifespan(app: FastAPI):
     #   • Per-task duration is tracked.
     _BOOT_REGISTRY: dict = {}
     _BOOT_TASKS: list = []
+    _BOOT_THREADS: list = []
     _BOOT_START_TS = time.time()
     app.state._boot_registry = _BOOT_REGISTRY  # exposed via /api/health/boot
     app.state._boot_start_ts = _BOOT_START_TS
+
+    def _start_lifecycle_thread(label, target):
+        """Start one boot thread under generation-bound lifecycle accounting."""
+
+        import threading
+
+        work_id = f"thread:{len(_BOOT_THREADS):04d}:{label}"
+        lease = _runtime_lifecycle.acquire_work(
+            work_id,
+            allow_starting=True,
+        )
+
+        def _thread_runner():
+            try:
+                if _runtime_lifecycle.cancellation.cancelled:
+                    return
+                target()
+            finally:
+                _runtime_lifecycle.release_work(lease)
+
+        thread = threading.Thread(
+            target=_thread_runner,
+            name=f"boot-thread:{label}",
+            daemon=True,
+        )
+        try:
+            thread.start()
+        except BaseException:
+            _runtime_lifecycle.release_work(lease)
+            raise
+        _BOOT_THREADS.append(thread)
+        return thread
 
     def _kick(delay, label, coro_factory):
         """Schedule a background task that sleeps `delay` s then runs.
@@ -2370,9 +2409,19 @@ async def lifespan(app: FastAPI):
             # Registry not ready or duplicate name — never fatal.
             pass
 
+        work_id = f"background:{len(_BOOT_TASKS):04d}:{label}"
+        lease = _runtime_lifecycle.acquire_work(
+            work_id,
+            allow_starting=True,
+        )
+
         async def _runner():
             try:
                 await asyncio.sleep(delay)
+                if _runtime_lifecycle.cancellation.cancelled:
+                    entry["status"] = "cancelled"
+                    entry["completed_at"] = time.time()
+                    return
                 entry["status"] = "running"
                 entry["started_at"] = time.time()
                 print(f"[BOOT] {time.strftime('%H:%M:%S')} background: {label} starting (+{delay:.0f}s)", flush=True)
@@ -2392,7 +2441,14 @@ async def lifespan(app: FastAPI):
                 entry["completed_at"] = time.time()
                 entry["error"] = "boot_task_failed"
                 logger.warning(f"[stagger] {label} failed: {e}")
-        task = asyncio.create_task(_runner(), name=f"kick:{label}")
+            finally:
+                _runtime_lifecycle.release_work(lease)
+
+        try:
+            task = asyncio.create_task(_runner(), name=f"kick:{label}")
+        except BaseException:
+            _runtime_lifecycle.release_work(lease)
+            raise
         _BOOT_TASKS.append(task)
         return task
 
@@ -2989,8 +3045,7 @@ async def lifespan(app: FastAPI):
 
             stats = _vs()
             if stats.get("shard_count", 0) < len(_SD):
-                import threading
-                threading.Thread(target=_kick_swarm_seed, daemon=True).start()
+                _start_lifecycle_thread("hyperscale-swarm-seed", _kick_swarm_seed)
                 logger.info(f"[swarm] hyperscale seed kicked off (have {stats.get('shard_count',0)}/{len(_SD)} shards)")
             else:
                 logger.info(f"[swarm] hyperscale vault ready: {stats['shard_count']} shards, {stats['total_rows']} rows, {round(stats['total_compressed_bytes']/1024/1024,2)} MB compressed")
@@ -3101,8 +3156,8 @@ async def lifespan(app: FastAPI):
     def _kick_auto_reseal():
         return  # no-op — kept as placeholder for future optional auto-reseal
         try:
-            import time as _t
-            _t.sleep(90)
+            if _runtime_lifecycle.cancellation.wait(90.0):
+                return
             from core import cold_storage as _cs
             regs = _cs.registry_list()
             if not regs:
@@ -3119,6 +3174,8 @@ async def lifespan(app: FastAPI):
             resealed = 0
             skipped_protected = 0
             for nm in list(_xdb.list_collection_names()):
+                if _runtime_lifecycle.cancellation.cancelled:
+                    return
                 if nm in protected:
                     skipped_protected += 1
                     continue
@@ -3131,16 +3188,15 @@ async def lifespan(app: FastAPI):
             logger.info(f"[cold] auto-reseal: re-froze {resealed} collections that startup seeders rehydrated; skipped {skipped_protected} PROTECTED")
         except Exception as _ex:
             logger.warning(f"[cold] auto-reseal failed: {_ex}")
-    import threading as _tr
-    _tr.Thread(target=_kick_auto_reseal, daemon=True).start()
+    _start_lifecycle_thread("cold-auto-reseal", _kick_auto_reseal)
 
     # ═══ Academy / Quiz / Test thawer: if any user-facing collection is still
     # frozen (from a previous auto-reseal run before it was PROTECTED), thaw
     # it back into Mongo so the UI has data immediately.  ═══
     def _kick_academy_thaw():
         try:
-            import time as _t
-            _t.sleep(5)  # short delay so startup seeders finish first
+            if _runtime_lifecycle.cancellation.wait(5.0):
+                return
             from core import cold_storage as _cs
             from core.databases import get_sync_db
             _xdb = get_sync_db()
@@ -3151,6 +3207,8 @@ async def lifespan(app: FastAPI):
             thawed = 0
             total_rows = 0
             for nm in targets:
+                if _runtime_lifecycle.cancellation.cancelled:
+                    return
                 try:
                     # Skip if already populated live
                     if nm in _xdb.list_collection_names() and _xdb[nm].estimated_document_count() > 0:
@@ -3165,7 +3223,7 @@ async def lifespan(app: FastAPI):
                 logger.info(f"[academy-thaw] restored {thawed} frozen user-facing collections ({total_rows} total rows)")
         except Exception as _ex:
             logger.warning(f"[academy-thaw] failed: {_ex}")
-    _tr.Thread(target=_kick_academy_thaw, daemon=True).start()
+    _start_lifecycle_thread("academy-thaw", _kick_academy_thaw)
 
     logger.info(f"CodeDock Quantum Nexus v{SYSTEM_VERSION} ready to serve requests")
     # Stage E — start the autonomic background scheduler (self-learning sweeps,
@@ -3181,9 +3239,11 @@ async def lifespan(app: FastAPI):
     app.state._boot_ready_at = time.time()
     app.state._boot_ready_ms = int((app.state._boot_ready_at - _BOOT_START_TS) * 1000)
     logger.info(f"[BOOT] readiness reached in {app.state._boot_ready_ms} ms — {len(_BOOT_TASKS)} background tasks scheduled")
+    _runtime_lifecycle.mark_ready(reason="backend-readiness-reached")
 
     yield
 
+    _runtime_lifecycle.begin_drain(reason="backend-fastapi-lifespan-shutdown")
     # ═══════════════════════════════════════════════════════════════════════
     # ★ CLEAN SHUTDOWN (2026-02-18 upgrade)
     #   FastAPI 0.130+ enforces graceful task drain at shutdown.  Without
@@ -3210,6 +3270,7 @@ async def lifespan(app: FastAPI):
     for t in list(_BOOT_TASKS):
         if not t.done():
             t.cancel()
+    task_timeout = False
     if _BOOT_TASKS:
         try:
             await asyncio.wait_for(
@@ -3218,12 +3279,42 @@ async def lifespan(app: FastAPI):
             )
             logger.info("All background tasks cancelled cleanly")
         except asyncio.TimeoutError:
-            still_running = [t.get_name() for t in _BOOT_TASKS if not t.done()]
-            logger.warning(f"Timed out cancelling tasks; still running: {still_running[:5]}")
+            task_timeout = True
+            still_running = [
+                t.get_name() for t in _BOOT_TASKS if not t.done()
+            ]
+            logger.error(
+                "Timed out cancelling tasks; still running: %s",
+                still_running[:10],
+            )
+
+    thread_deadline = time.monotonic() + 5.0
+    for thread in _BOOT_THREADS:
+        if not thread.is_alive():
+            continue
+        remaining = max(0.0, thread_deadline - time.monotonic())
+        if remaining <= 0:
+            break
+        await asyncio.to_thread(thread.join, remaining)
+    live_threads = [
+        thread.name for thread in _BOOT_THREADS if thread.is_alive()
+    ]
+
+    if task_timeout or live_threads or _runtime_lifecycle.inflight_work:
+        raise RuntimeError(
+            "backend shutdown failed to quiesce runtime work "
+            f"(async_timeout={task_timeout}, "
+            f"live_threads={live_threads[:10]}, "
+            f"inflight={_runtime_lifecycle.inflight_work})"
+        )
+
     try:
         client.close()
-    except Exception:
-        pass
+    except Exception as exc:
+        raise RuntimeError("backend Mongo client close failed") from exc
+    _runtime_lifecycle.mark_stopped(
+        reason="backend-background-and-db-drained"
+    )
     logger.info("Shutdown complete.")
 
 app = FastAPI(
@@ -3232,6 +3323,14 @@ app = FastAPI(
     version=SYSTEM_VERSION,
     lifespan=lifespan
 )
+
+from skeleton.kernel.runtime_supervision import RuntimeAdmissionMiddleware
+app.add_middleware(
+    RuntimeAdmissionMiddleware,
+    lifecycle=_runtime_lifecycle,
+    exempt_prefixes=("/api/health",),
+)
+
 from core.http_errors import install_public_error_handlers as _install_public_error_handlers
 _install_public_error_handlers(app)
 
