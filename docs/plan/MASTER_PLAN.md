@@ -793,7 +793,7 @@ Required validation:
 
 ```bash
 python scripts/check_ai_game_builder_500_levels.py --json
-python -m pytest -q --noconftest tests/test_ai_game_builder_500_levels.py skeleton/testing/test_ai_game_builder_contracts.py
+python -m pytest -q --noconftest tests/test_ai_game_builder_500_levels.py tests/test_ai_game_builder_runtime.py
 ```
 
 ## 25. Scope freeze and future plan evolution
