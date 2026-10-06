@@ -64,6 +64,7 @@ from .resilience import (
 from .release import (
     CriticalGateQualification,
     FamilyQualification,
+    ForgeReleaseBinding,
     GoldMasterBundle,
     GoldMasterTribunal,
     GoldMasterVerdict,
@@ -171,6 +172,7 @@ __all__ = [
     "Objection",
     "ResilienceError",
     "FamilyQualification",
+    "ForgeReleaseBinding",
     "GoldMasterBundle",
     "GoldMasterTribunal",
     "GoldMasterVerdict",
