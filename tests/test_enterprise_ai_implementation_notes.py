@@ -239,6 +239,31 @@ def test_rejects_dossier_generated_for_old_masterplan_version(
         MODULE.validate(root)
 
 
+def test_rejects_semantically_hollow_level(tmp_path: Path) -> None:
+    root = _fixture(tmp_path)
+    path, payload = _first_dossier_file(root)
+    level = payload["dossiers"][0]["implementation_levels"][7]
+    level["implementation_notes"] = [
+        "This implementation has extensive controls and detailed procedures "
+        "for operational quality, consistency, safety and correctness.",
+        "The subsystem documents behavior, dependencies, ownership and "
+        "acceptance expectations with sufficient narrative depth.",
+    ]
+    level["acceptance"] = [
+        "The implementation is reviewed in CI and produces deterministic "
+        "results for its declared operating envelope.",
+        "Operators can inspect its state and verify completion using the "
+        "normal release workflow and evidence package.",
+    ]
+    _write(path, payload)
+
+    with pytest.raises(
+        MODULE.ImplementationNotesError,
+        match="missing required concept family",
+    ):
+        MODULE.validate(root)
+
+
 def test_rejects_missing_october_2026_non_negotiable(tmp_path: Path) -> None:
     root = _fixture(tmp_path)
     path = root / "machine/enterprise_ai_implementation_notes_index.json"
