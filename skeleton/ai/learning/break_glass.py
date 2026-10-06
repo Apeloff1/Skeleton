@@ -382,7 +382,9 @@ class BreakGlassAuthority:
                     "break-glass grant nonce has already been consumed"
                 )
             if len(self._receipts) >= self._max_receipts:
-                blockers.append("break-glass audit receipt capacity exhausted")
+                raise BreakGlassError(
+                    "break-glass audit receipt capacity exhausted"
+                )
 
             admitted = not blockers
             if admitted:
