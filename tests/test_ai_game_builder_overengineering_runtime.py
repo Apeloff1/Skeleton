@@ -99,8 +99,16 @@ def _producer_provenance(
     *,
     project_id: str = "project:test-game",
     run_id: str = "run:test-forge",
+    artifact_ref: str | None = None,
+    evidence_refs: tuple[str, ...] | None = None,
 ) -> ProducerProvenance:
     suffix = (token * 40)[:40]
+    default_evidence_refs = (
+        f"evidence-{suffix}",
+        f"assumption-{suffix}",
+        f"attack-{suffix}",
+        f"counter-{suffix}",
+    )
     return ProducerProvenance(
         project_id=project_id,
         run_id=run_id,
@@ -112,13 +120,8 @@ def _producer_provenance(
         producer_behavior_digest=canonical_digest({"behavior": token}),
         source_revision=canonical_digest({"source": token})[:40],
         provider_receipt_refs=(f"provider-receipt:{token}",),
-        output_artifact_refs=(f"artifact-{suffix}",),
-        output_evidence_refs=(
-            f"evidence-{suffix}",
-            f"assumption-{suffix}",
-            f"attack-{suffix}",
-            f"counter-{suffix}",
-        ),
+        output_artifact_refs=(artifact_ref or f"artifact-{suffix}",),
+        output_evidence_refs=evidence_refs or default_evidence_refs,
     )
 
 
@@ -487,9 +490,15 @@ def _forge_release_binding(
     canon_digest: str,
     provenance_digest: str,
 ) -> ForgeReleaseBinding:
+    release_evidence = "release-champion-evidence-" + "e" * 24
+    release_assumption = "release-champion-assumption-" + "a" * 24
     champion = Candidate.create(
         producer_id="release-champion",
-        producer_provenance=_producer_provenance("release-champion"),
+        producer_provenance=_producer_provenance(
+            "release-champion",
+            artifact_ref=artifact_digest,
+            evidence_refs=(release_evidence, release_assumption),
+        ),
         artifact=ArtifactIdentity(
             artifact_digest=artifact_digest,
             canon_digest=canon_digest,
@@ -498,8 +507,8 @@ def _forge_release_binding(
             level_id="GBL-021",
         ),
         quality=_quality(0.9),
-        evidence_digests=("release-champion-evidence-" + "e" * 24,),
-        assumption_digest="release-champion-assumption-" + "a" * 24,
+        evidence_digests=(release_evidence,),
+        assumption_digest=release_assumption,
     )
     forge = DualRivalForge(effort_mode=100, champion=champion)
     for round_number in range(1, 101):
