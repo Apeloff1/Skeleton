@@ -115,8 +115,19 @@ def validate(data: dict, scheduler: dict | None = None, closure: dict | None = N
         if l.get("documentation_alone_sufficient") is not False: errors.append(f"{lid}: docs alone cannot qualify")
         if l.get("maturity") not in MATURITY: errors.append(f"{lid}: invalid maturity")
         if not l.get("essential_contract") or not l.get("acceptance_proof"): errors.append(f"{lid}: missing contract/proof")
-        for dep in l.get("depends_on",[]):
+        deps=l.get("depends_on",[])
+        for dep in deps:
             if dep not in expected[:i-1]: errors.append(f"{lid}: invalid/forward dependency {dep}")
+        stratum=((i-1)//10)+1
+        stage=((i-1)%10)+1
+        if stratum<100:
+            expected_deps=[] if stage==1 else [f"ESS1000-{i-1:04d}"]
+        elif stage==1:
+            expected_deps=[f"ESS1000-{k*10:04d}" for k in range(1,100)]
+        else:
+            expected_deps=[f"ESS1000-{i-1:04d}"]
+        if deps!=expected_deps:
+            errors.append(f"{lid}: dependency topology mismatch")
         if l.get("complete"):
             if l.get("maturity")!="signed_complete": errors.append(f"{lid}: complete without signed_complete")
             if not l.get("implementation_signed"): errors.append(f"{lid}: missing implementation signature")
@@ -128,6 +139,9 @@ def validate(data: dict, scheduler: dict | None = None, closure: dict | None = N
     if completion.get("essentials_1000_qualified") is not (signed==1000): errors.append("qualification mismatch")
     if completion.get("implementation_claim") is not False: errors.append("false implementation claim")
     if levels and levels[-1].get("id")!="ESS1000-1000": errors.append("finality identity mismatch")
+    topology=data.get("dependency_topology",{})
+    if topology.get("maximum_parallel_domain_lanes")!=99: errors.append("dependency topology: expected 99 parallel lanes")
+    if topology.get("finality_fan_in")!=99: errors.append("dependency topology: expected 99-way finality fan-in")
     laws="\n".join(data.get("laws",[]))
     for phrase in ["no advanced feature","Documentation","Stale evidence","PSI-affected domain"]:
         if phrase not in laws: errors.append(f"missing essential law fragment: {phrase}")
