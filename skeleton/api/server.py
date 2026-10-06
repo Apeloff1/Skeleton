@@ -657,10 +657,6 @@ class ServerState:
         """Bind durable engine API authority and local execution coordinator."""
 
         if self.engine_execution_service is not None:
-    ) -> Any:
-        """Bind durable engine API authority and local execution coordinator."""
-
-        if self.engine_execution_service is not None:
             return self.engine_execution_service
 
         from pathlib import Path
