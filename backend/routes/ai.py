@@ -1101,6 +1101,7 @@ async def ai_chat(
                 operation_id,
                 tenant_id=tenant_id,
                 owner_id=owner_id,
+                provider_receipt_refs=existing_assistant.provider_receipt_refs,
             )
         except Exception:
             logger.exception(
@@ -1498,11 +1499,7 @@ async def ai_chat(
             tenant_id=tenant_id,
             owner_id=owner_id,
             reason_code="model-result-verified",
-            provider_receipt_ref=(
-                provider_receipts[0]
-                if len(provider_receipts) == 1
-                else None
-            ),
+            provider_receipt_refs=provider_receipts,
         )
     except Exception as exc:
         raise _chat_error(exc) from exc
@@ -1563,6 +1560,11 @@ async def ai_chat(
             tenant_id=tenant_id,
             owner_id=owner_id,
             reason_code="conversation-assistant-committed",
+            provider_receipt_refs=assistant_message.provider_receipt_refs,
+        )
+        chat_turn_lifecycle.assert_provider_receipts(
+            chat_turn,
+            assistant_message.provider_receipt_refs,
         )
     except Exception as exc:
         raise _chat_error(exc) from exc
@@ -1650,6 +1652,7 @@ async def get_ai_chat_turn(
                     operation_id,
                     tenant_id=tenant_id,
                     owner_id=owner_id,
+                    provider_receipt_refs=assistant_message.provider_receipt_refs,
                 )
             except Exception as exc:
                 raise _chat_error(exc) from exc
@@ -1896,11 +1899,7 @@ async def get_ai_chat_turn(
                 tenant_id=tenant_id,
                 owner_id=owner_id,
                 reason_code="deferred-engine-result-verified",
-                provider_receipt_ref=(
-                    engine_result.provider_receipts[0]
-                    if len(engine_result.provider_receipts) == 1
-                    else None
-                ),
+                provider_receipt_refs=engine_result.provider_receipts,
             )
         except Exception as exc:
             raise _chat_error(exc) from exc
@@ -1965,6 +1964,11 @@ async def get_ai_chat_turn(
                 tenant_id=tenant_id,
                 owner_id=owner_id,
                 reason_code="deferred-assistant-committed",
+                provider_receipt_refs=assistant_message.provider_receipt_refs,
+            )
+            chat_turn_lifecycle.assert_provider_receipts(
+                chat_turn,
+                assistant_message.provider_receipt_refs,
             )
         except Exception as exc:
             raise _chat_error(exc) from exc
