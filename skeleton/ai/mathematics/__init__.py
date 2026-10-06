@@ -67,6 +67,14 @@ from .differentiation import (
     finite_difference_jacobian,
     richardson_derivative,
 )
+from .density import (
+    EmpiricalCDF,
+    HistogramReport,
+    empirical_cdf,
+    gaussian_kde_density,
+    histogram,
+    silverman_bandwidth,
+)
 from .distances import (
     bray_curtis_distance,
     canberra_distance,
@@ -145,6 +153,7 @@ from .information_geometry import (
     mahalanobis_distance,
     total_variation_distance,
 )
+from .interpolation_nd import bilinear_gradient, bilinear_interpolate, trilinear_interpolate
 from .integration2 import AdaptiveODEPoint, AdaptiveODEReport, adaptive_rk45
 from .integration import (
     ODEPoint,
@@ -226,6 +235,16 @@ from .proximal import (
     soft_threshold,
     soft_threshold_vector,
 )
+from .polynomials import (
+    PolynomialRootsReport,
+    polynomial_add,
+    polynomial_derivative,
+    polynomial_divmod,
+    polynomial_evaluate,
+    polynomial_integral,
+    polynomial_multiply,
+    polynomial_roots,
+)
 from .probability import (
     cross_entropy,
     effective_sample_size,
@@ -242,6 +261,13 @@ from .quadrature2 import (
     gauss_legendre_rule,
 )
 from .resampling import BootstrapReport, JackknifeReport, bootstrap, jackknife
+from .rank_statistics import (
+    KendallTauReport,
+    kendall_tau_b,
+    rank_biserial_correlation,
+    rankdata,
+    spearman_correlation,
+)
 from .robust import (
     HuberLocationReport,
     huber_location,
@@ -434,6 +460,12 @@ __all__ = [
     "check_gradient",
     "finite_difference_jacobian",
     "richardson_derivative",
+    "EmpiricalCDF",
+    "HistogramReport",
+    "empirical_cdf",
+    "gaussian_kde_density",
+    "histogram",
+    "silverman_bandwidth",
     "bray_curtis_distance",
     "canberra_distance",
     "chebyshev_distance",
@@ -494,6 +526,9 @@ __all__ = [
     "hellinger_distance",
     "mahalanobis_distance",
     "total_variation_distance",
+    "bilinear_gradient",
+    "bilinear_interpolate",
+    "trilinear_interpolate",
     "AdaptiveODEPoint",
     "AdaptiveODEReport",
     "adaptive_rk45",
@@ -571,6 +606,14 @@ __all__ = [
     "proximal_elastic_net",
     "soft_threshold",
     "soft_threshold_vector",
+    "PolynomialRootsReport",
+    "polynomial_add",
+    "polynomial_derivative",
+    "polynomial_divmod",
+    "polynomial_evaluate",
+    "polynomial_integral",
+    "polynomial_multiply",
+    "polynomial_roots",
     "cross_entropy",
     "effective_sample_size",
     "entropy",
@@ -586,6 +629,11 @@ __all__ = [
     "JackknifeReport",
     "bootstrap",
     "jackknife",
+    "KendallTauReport",
+    "kendall_tau_b",
+    "rank_biserial_correlation",
+    "rankdata",
+    "spearman_correlation",
     "HuberLocationReport",
     "huber_location",
     "modified_z_scores",

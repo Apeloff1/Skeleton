@@ -83,6 +83,10 @@ model authority boundaries.
 - `proximal.py` — soft/group shrinkage plus L1/L2/L-infinity projections and elastic-net proximal maps.
 - `hypothesis.py` — two-sample KS and chi-square goodness-of-fit statistics with bounded p-values.
 - `smoothing.py` — local polynomial and Savitzky-Golay-style smoothing/derivative references.
+- `rank_statistics.py` — average-tie ranks, Spearman, Kendall tau-b and rank-biserial references.
+- `density.py` — empirical CDFs, histograms, Silverman bandwidth and weighted Gaussian KDE.
+- `polynomials.py` — polynomial algebra/division/calculus and deterministic complex-root iteration.
+- `interpolation_nd.py` — bilinear/trilinear regular-grid interpolation and bilinear gradients.
 - `validation.py` — parity evidence against existing optimized runtime kernels.
 
 ## Guarantees
@@ -143,6 +147,10 @@ model authority boundaries.
 - Proximal operators make norm-ball constraints and regularization weights explicit rather than hiding optimizer policy.
 - Hypothesis diagnostics expose the statistic, degrees/sample counts and bounded asymptotic probability evidence.
 - Local polynomial smoothing fits edge windows explicitly rather than silently truncating kernels.
+- Rank statistics carry tie semantics explicitly and fail closed when concordance is undefined.
+- Density estimators expose support, binning and bandwidth choices instead of hiding estimator policy.
+- Polynomial roots report convergence/update/residual evidence rather than returning unqualified roots.
+- Multi-dimensional interpolation rejects extrapolation and shape mismatch at the public boundary.
 - `audit_runtime_kernels()` compares optimized runtime softmax, matmul and attention against
   this reference substrate without replacing those kernels.
 
