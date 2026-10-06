@@ -23,6 +23,11 @@ GAME_BUILDER_RUNTIME_FORGE = ROOT / "skeleton" / "ai" / "game_builder" / "dual_r
 GAME_BUILDER_CANON = ROOT / "skeleton" / "ai" / "game_builder" / "canon.py"
 GAME_BUILDER_RIGHTS = ROOT / "skeleton" / "ai" / "game_builder" / "rights.py"
 GAME_BUILDER_ATOMS = ROOT / "skeleton" / "ai" / "game_builder" / "atomizer.py"
+GAME_BUILDER_EVALUATION = ROOT / "skeleton" / "ai" / "game_builder" / "evaluation.py"
+GAME_BUILDER_RESOURCES = ROOT / "skeleton" / "ai" / "game_builder" / "resource_governor.py"
+GAME_BUILDER_QUALITY_DEBT = ROOT / "skeleton" / "ai" / "game_builder" / "quality_debt.py"
+GAME_BUILDER_CONTROL_PLANE = ROOT / "skeleton" / "ai" / "game_builder" / "control_plane.py"
+GAME_BUILDER_OVERENGINEERING_TESTS = ROOT / "tests" / "test_ai_game_builder_overengineering_runtime.py"
 DEPTH_000_040 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_000_040.md"
 DEPTH_041_080 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_041_080.md"
 DEPTH_081_120 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_081_120.md"
@@ -145,7 +150,7 @@ def validate(data: dict) -> list[str]:
             ("levels_per_family", 10),
             ("total_levels", 500),
             ("stages_per_round", 3),
-            ("overengineering_planes", 24),
+            ("overengineering_planes", 48),
         ):
             if game_builder.get(field) != expected_value:
                 errors.append(f"AI game builder {field} must equal {expected_value}")
@@ -161,13 +166,29 @@ def validate(data: dict) -> list[str]:
             "package": "skeleton/ai/game_builder",
             "contracts": "skeleton/ai/game_builder/contracts.py",
             "dual_rival_state_machine": "skeleton/ai/game_builder/dual_rival_forge.py",
-            "tests": "tests/test_ai_game_builder_runtime.py",
+            "evaluation_panel": "skeleton/ai/game_builder/evaluation.py",
+            "resource_governor": "skeleton/ai/game_builder/resource_governor.py",
+            "quality_debt": "skeleton/ai/game_builder/quality_debt.py",
+            "integrated_control_plane": "skeleton/ai/game_builder/control_plane.py",
+            "tests": [
+                "tests/test_ai_game_builder_runtime.py",
+                "tests/test_ai_game_builder_overengineering_runtime.py",
+            ],
         }:
             errors.append("AI game builder runtime contract binding drifted")
         if not GAME_BUILDER_RUNTIME_CONTRACTS.is_file():
             errors.append("AI game builder runtime contracts implementation is missing")
         if not GAME_BUILDER_RUNTIME_FORGE.is_file():
             errors.append("AI game builder dual-rival runtime implementation is missing")
+        for label, path in (
+            ("evaluation panel", GAME_BUILDER_EVALUATION),
+            ("resource governor", GAME_BUILDER_RESOURCES),
+            ("quality debt", GAME_BUILDER_QUALITY_DEBT),
+            ("integrated control plane", GAME_BUILDER_CONTROL_PLANE),
+            ("overengineering runtime tests", GAME_BUILDER_OVERENGINEERING_TESTS),
+        ):
+            if not path.is_file():
+                errors.append(f"AI game builder {label} implementation is missing")
         if game_builder.get("governance_runtime") != {
             "canon": "skeleton/ai/game_builder/canon.py",
             "rights": "skeleton/ai/game_builder/rights.py",
@@ -196,8 +217,8 @@ def validate(data: dict) -> list[str]:
                 if not isinstance(over_topology, dict):
                     errors.append("AI game builder overengineering topology must be an object")
                 else:
-                    if over_topology.get("plane_count") != 24:
-                        errors.append("AI game builder overengineering authority must contain 24 planes")
+                    if over_topology.get("plane_count") != 48:
+                        errors.append("AI game builder overengineering authority must contain 48 planes")
                     if over_topology.get("family_count") != 50:
                         errors.append("AI game builder overengineering authority must cover 50 families")
                 bindings = overengineering.get("family_bindings")
