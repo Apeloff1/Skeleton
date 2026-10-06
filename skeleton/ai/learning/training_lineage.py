@@ -89,6 +89,10 @@ class SourceRecord:
             "synthetic_parent_refs": list(self.synthetic_parent_refs),
         }
 
+    @property
+    def digest(self) -> str:
+        return _digest(self.as_dict())
+
 
 @dataclass(frozen=True, slots=True)
 class DatasetShardManifest:
@@ -122,6 +126,10 @@ class DatasetShardManifest:
             "sample_count": self.sample_count,
             "source_ids": list(self.source_ids),
         }
+
+    @property
+    def digest(self) -> str:
+        return _digest(self.as_dict())
 
 
 @dataclass(frozen=True, slots=True)
@@ -182,19 +190,7 @@ class MixtureManifest:
     def digest(self) -> str:
         return _digest(self.as_dict())
 
-    def dataset_schedule(self, *, draws: int) -> tuple[str, ...]:
-        """Return an exact deterministic weighted round-robin schedule.
-
-        The algorithm converts rational weights to integer tickets and advances
-        a deficit counter.  It uses no floating-point arithmetic, so schedule
-        identity is stable across runtimes.
-        """
-
-        if isinstance(draws, bool) or not isinstance(draws, int) or draws < 0:
-            raise TrainingLineageError("draws must be a non-negative integer")
-        if draws == 0:
-            return ()
-
+    def _ticket_state(self) -> tuple[tuple[int, ...], int, tuple[int, ...]]:
         denominators = [item.weight.denominator for item in self.components]
         common = 1
         for denominator in denominators:
@@ -203,17 +199,32 @@ class MixtureManifest:
                 a, b = b, a % b
             common = common * denominator // a
 
-        tickets = [
+        tickets = tuple(
             item.weight.numerator * (common // item.weight.denominator)
             for item in self.components
-        ]
+        )
         total = sum(tickets)
         if total <= 0:
             raise TrainingLineageError("mixture ticket total must be positive")
 
-        # Seed only rotates tie-breaking order; identical manifests remain exact.
         offset = self.seed % len(self.components)
         order = tuple(range(offset, len(self.components))) + tuple(range(0, offset))
+        return tickets, total, order
+
+    @staticmethod
+    def _validate_draws(draws: object) -> int:
+        if isinstance(draws, bool) or not isinstance(draws, int) or draws < 0:
+            raise TrainingLineageError("draws must be a non-negative integer")
+        return draws
+
+    def dataset_schedule(self, *, draws: int) -> tuple[str, ...]:
+        """Return an exact deterministic weighted round-robin schedule."""
+
+        draws = self._validate_draws(draws)
+        if draws == 0:
+            return ()
+
+        tickets, total, order = self._ticket_state()
         deficits = [0] * len(self.components)
         schedule: list[str] = []
         for _ in range(draws):
@@ -223,6 +234,26 @@ class MixtureManifest:
             deficits[winner] -= total
             schedule.append(self.components[winner].dataset_id)
         return tuple(schedule)
+
+    def dataset_draw_counts(self, *, draws: int) -> dict[str, int]:
+        """Return exact per-dataset draw counts without replaying full epochs."""
+
+        draws = self._validate_draws(draws)
+        tickets, total, order = self._ticket_state()
+        cycles, remainder = divmod(draws, total)
+        counts = [cycles * ticket for ticket in tickets]
+        if remainder:
+            deficits = [0] * len(self.components)
+            for _ in range(remainder):
+                for index, ticket in enumerate(tickets):
+                    deficits[index] += ticket
+                winner = max(order, key=lambda index: deficits[index])
+                deficits[winner] -= total
+                counts[winner] += 1
+        return {
+            component.dataset_id: counts[index]
+            for index, component in enumerate(self.components)
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -307,17 +338,30 @@ class TrainingDataManifest:
     def root_digest(self) -> str:
         return _digest(self.as_dict())
 
+    def expected_dataset_offsets(self, *, draw_index: int) -> dict[str, int]:
+        return dict(self.mixture.dataset_draw_counts(draws=draw_index))
+
     def checkpoint_cursor(
         self,
         *,
         draw_index: int,
         dataset_offsets: Mapping[str, int],
     ) -> "TrainingCursor":
-        return TrainingCursor(
+        cursor = TrainingCursor(
             manifest_root=self.root_digest,
             mixture_digest=self.mixture.digest,
             draw_index=draw_index,
             dataset_offsets=dict(dataset_offsets),
+        )
+        cursor.assert_compatible(self)
+        return cursor
+
+    def derived_checkpoint_cursor(self, *, draw_index: int) -> "TrainingCursor":
+        return TrainingCursor(
+            manifest_root=self.root_digest,
+            mixture_digest=self.mixture.digest,
+            draw_index=draw_index,
+            dataset_offsets=self.expected_dataset_offsets(draw_index=draw_index),
         )
 
 
@@ -342,28 +386,40 @@ class TrainingCursor:
         offsets: dict[str, int] = {}
         for dataset_id, raw in self.dataset_offsets.items():
             key = _text("dataset_id", dataset_id)
+            if key in offsets:
+                raise TrainingLineageError(
+                    "dataset offset identities collide after normalization"
+                )
             if isinstance(raw, bool) or not isinstance(raw, int) or raw < 0:
                 raise TrainingLineageError("dataset offsets must be non-negative integers")
             offsets[key] = raw
         object.__setattr__(self, "dataset_offsets", dict(sorted(offsets.items())))
 
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "schema_version": "skeleton.training_cursor.v1",
+            "manifest_root": self.manifest_root,
+            "mixture_digest": self.mixture_digest,
+            "draw_index": self.draw_index,
+            "dataset_offsets": dict(self.dataset_offsets),
+        }
+
     @property
     def digest(self) -> str:
-        return _digest(
-            {
-                "schema_version": "skeleton.training_cursor.v1",
-                "manifest_root": self.manifest_root,
-                "mixture_digest": self.mixture_digest,
-                "draw_index": self.draw_index,
-                "dataset_offsets": dict(self.dataset_offsets),
-            }
-        )
+        return _digest(self.as_dict())
 
     def assert_compatible(self, manifest: TrainingDataManifest) -> None:
+        if not isinstance(manifest, TrainingDataManifest):
+            raise TypeError("manifest must be TrainingDataManifest")
         if self.manifest_root != manifest.root_digest:
             raise TrainingLineageError("checkpoint data manifest root mismatch")
         if self.mixture_digest != manifest.mixture.digest:
             raise TrainingLineageError("checkpoint mixture identity mismatch")
+        expected = manifest.expected_dataset_offsets(draw_index=self.draw_index)
+        if dict(self.dataset_offsets) != expected:
+            raise TrainingLineageError(
+                "checkpoint dataset offsets do not match deterministic mixture schedule"
+            )
 
 
 __all__ = [
