@@ -2,6 +2,8 @@
 
 Machine authority: `machine/competitive_ai_engineering_ladder.json`
 
+Benchmark/promotion authority: `machine/competitive_ai_benchmark_governance.json` / `docs/architecture/COMPETITIVE_AI_BENCHMARK_GOVERNANCE.md`
+
 This overlay exists to answer frontier-AI claims with engineering proof rather than marketing parity. It adds **200 explicit engineering levels** as **20 competitive claim families × 10 escalation stages**. It does not add top-level masterplan volumes beyond `VOL-420`; every level binds back to existing canonical volumes and owners.
 
 A level is not complete because this document exists. The machine authority starts every level at `planned`; promotion requires landed exact-head implementation, focused tests, adversarial/fault evidence and the level's exit criteria. Family level 10 additionally requires reproducible Pareto-safe comparator evidence and independent promotion authority.
