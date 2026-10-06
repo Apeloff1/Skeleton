@@ -87,6 +87,10 @@ model authority boundaries.
 - `density.py` — empirical CDFs, histograms, Silverman bandwidth and weighted Gaussian KDE.
 - `polynomials.py` — polynomial algebra/division/calculus and deterministic complex-root iteration.
 - `interpolation_nd.py` — bilinear/trilinear regular-grid interpolation and bilinear gradients.
+- `iterative_linear.py` — Jacobi, Gauss-Seidel and SOR with residual-based convergence evidence.
+- `conditioning.py` — matrix norms, 1/inf condition numbers and linear backward-error reports.
+- `matrix_structures.py` — Toeplitz/circulant constructors, Gershgorin discs and dominance diagnostics.
+- `cosine_transforms.py` — orthonormal DCT-II/DCT-IV plus separable 2-D DCT round trips.
 - `validation.py` — parity evidence against existing optimized runtime kernels.
 
 ## Guarantees
@@ -151,6 +155,10 @@ model authority boundaries.
 - Density estimators expose support, binning and bandwidth choices instead of hiding estimator policy.
 - Polynomial roots report convergence/update/residual evidence rather than returning unqualified roots.
 - Multi-dimensional interpolation rejects extrapolation and shape mismatch at the public boundary.
+- Stationary linear solvers expose residual convergence and reject zero diagonals or invalid relaxation factors.
+- Conditioning diagnostics distinguish matrix norm growth from actual backward error and verify inverse residuals.
+- Structured-matrix helpers keep Toeplitz/circulant indexing and Gershgorin radii deterministic.
+- Cosine transforms use orthonormal conventions so inverse and energy semantics are explicit.
 - `audit_runtime_kernels()` compares optimized runtime softmax, matmul and attention against
   this reference substrate without replacing those kernels.
 

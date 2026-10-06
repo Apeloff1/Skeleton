@@ -49,7 +49,17 @@ from .combinatorics import (
     log_factorial,
     multinomial_log_pmf,
 )
+from .conditioning import (
+    BackwardErrorReport,
+    ConditionReport,
+    condition_number,
+    linear_backward_error,
+    matrix_infinity_norm,
+    matrix_max_norm,
+    matrix_one_norm,
+)
 from .contracts import MathInvariantError, Matrix, Vector
+from .cosine_transforms import dct2, dct_ii, dct_iv, inverse_dct2, inverse_dct_ii
 from .decompositions import (
     CholeskyReport,
     LeastSquaresReport,
@@ -144,6 +154,12 @@ from .graph import (
     random_walk_matrix,
     stationary_distribution,
     validate_transition_matrix,
+)
+from .iterative_linear import (
+    StationaryIterationReport,
+    gauss_seidel_solve,
+    jacobi_solve,
+    sor_solve,
 )
 from .information_geometry import (
     bhattacharyya_coefficient,
@@ -325,6 +341,15 @@ from .matrix_algebra2 import (
     slogdet,
 )
 from .matrix_functions import MatrixExponentialReport, matrix_exponential
+from .matrix_structures import (
+    GershgorinDisc,
+    circulant,
+    diagonal_dominance_margins,
+    gershgorin_discs,
+    is_strictly_diagonally_dominant,
+    symmetrize,
+    toeplitz,
+)
 from .matching import AssignmentReport, minimum_cost_assignment
 from .solvers import (
     ConjugateGradientReport,
@@ -431,6 +456,13 @@ __all__ = [
     "log_binomial_coefficient",
     "log_factorial",
     "multinomial_log_pmf",
+    "BackwardErrorReport",
+    "ConditionReport",
+    "condition_number",
+    "linear_backward_error",
+    "matrix_infinity_norm",
+    "matrix_max_norm",
+    "matrix_one_norm",
     "MathInvariantError",
     "Matrix",
     "Vector",
@@ -447,6 +479,11 @@ __all__ = [
     "dual_sqrt",
     "dual_tanh",
     "value_and_gradient",
+    "dct2",
+    "dct_ii",
+    "dct_iv",
+    "inverse_dct2",
+    "inverse_dct_ii",
     "CholeskyReport",
     "LeastSquaresReport",
     "QRReport",
@@ -520,6 +557,10 @@ __all__ = [
     "random_walk_matrix",
     "stationary_distribution",
     "validate_transition_matrix",
+    "StationaryIterationReport",
+    "gauss_seidel_solve",
+    "jacobi_solve",
+    "sor_solve",
     "bhattacharyya_coefficient",
     "bhattacharyya_distance",
     "fisher_rao_distance",
@@ -679,6 +720,13 @@ __all__ = [
     "slogdet",
     "MatrixExponentialReport",
     "matrix_exponential",
+    "GershgorinDisc",
+    "circulant",
+    "diagonal_dominance_margins",
+    "gershgorin_discs",
+    "is_strictly_diagonally_dominant",
+    "symmetrize",
+    "toeplitz",
     "AssignmentReport",
     "minimum_cost_assignment",
     "ConjugateGradientReport",
