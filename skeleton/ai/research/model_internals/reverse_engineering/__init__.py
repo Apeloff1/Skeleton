@@ -126,6 +126,25 @@ from .provenance_graph import ProvenanceGraphReport, ProvenanceNode, verify_prov
 from .randomized_assignment import AssignedUnit, AssignmentPlan, AssignmentUnit, build_balanced_assignment
 from .signature_distance import SignatureDistanceReport, analyze_signature_distance
 
+from .adaptive_design import AdaptiveDesignDecision, AdaptiveExperimentCandidate, select_adaptive_experiments
+from .bundle_verifier import BundleItem, BundleVerificationReport, verify_bundle
+from .calibration_curve import CalibrationBin, CalibrationCurveReport, CalibrationPrediction, analyze_calibration_curve
+from .campaign_audit import AuditCheck, CampaignAuditReport, audit_campaign
+from .claim_closure import ClaimClosureDecision, ClaimClosureEvidence, ClaimClosurePolicy, evaluate_claim_closure
+from .evidence_staleness import EvidenceAge, EvidenceStalenessReport, analyze_evidence_staleness
+from .falsification_registry import FalsificationReport, Falsifier, evaluate_falsifiers
+from .hierarchical_calibration import GroupCalibrationMetric, GroupCalibrationPrediction, HierarchicalCalibrationReport, analyze_hierarchical_calibration
+from .hierarchical_uncertainty import HierarchicalObservation, HierarchicalUncertaintyReport, analyze_hierarchical_uncertainty
+from .lineage_closure import LineageClosureReport, LineageNode, analyze_lineage_closure
+from .missingness import MissingnessRecord, MissingnessReport, analyze_missingness
+from .nonlinear_mediation import NonlinearMediationObservation, NonlinearMediationPoint, NonlinearMediationReport, analyze_nonlinear_mediation
+from .replication_decay import AgedReplication, ReplicationDecayReport, analyze_replication_decay
+from .replication_meta import ReplicationMetaReport, ReplicationStudy, analyze_replication_meta
+from .stopping_rule import StoppingDecision, StoppingEvidence, StoppingRule, evaluate_stopping_rule
+from .transport_stress import TransportStressPoint, TransportStressReport, analyze_transport_stress
+from .transportability import TransportObservation, TransportabilityReport, analyze_transportability
+from .version_drift import VersionDriftReport, VersionDriftStep, VersionSignature, analyze_version_drift
+
 __all__ = [
     "ActivationLayerReport",
     "ActivationSample",
@@ -403,4 +422,64 @@ __all__ = [
     "plan_two_group_power",
     "schedule_probes",
     "verify_provenance_graph",
+    "AdaptiveDesignDecision",
+    "AdaptiveExperimentCandidate",
+    "AgedReplication",
+    "AuditCheck",
+    "BundleItem",
+    "BundleVerificationReport",
+    "CalibrationBin",
+    "CalibrationCurveReport",
+    "CalibrationPrediction",
+    "CampaignAuditReport",
+    "ClaimClosureDecision",
+    "ClaimClosureEvidence",
+    "ClaimClosurePolicy",
+    "EvidenceAge",
+    "EvidenceStalenessReport",
+    "FalsificationReport",
+    "Falsifier",
+    "GroupCalibrationMetric",
+    "GroupCalibrationPrediction",
+    "HierarchicalCalibrationReport",
+    "HierarchicalObservation",
+    "HierarchicalUncertaintyReport",
+    "LineageClosureReport",
+    "LineageNode",
+    "MissingnessRecord",
+    "MissingnessReport",
+    "NonlinearMediationObservation",
+    "NonlinearMediationPoint",
+    "NonlinearMediationReport",
+    "ReplicationDecayReport",
+    "ReplicationMetaReport",
+    "ReplicationStudy",
+    "StoppingDecision",
+    "StoppingEvidence",
+    "StoppingRule",
+    "TransportObservation",
+    "TransportStressPoint",
+    "TransportStressReport",
+    "TransportabilityReport",
+    "VersionDriftReport",
+    "VersionDriftStep",
+    "VersionSignature",
+    "analyze_calibration_curve",
+    "analyze_evidence_staleness",
+    "analyze_hierarchical_calibration",
+    "analyze_hierarchical_uncertainty",
+    "analyze_lineage_closure",
+    "analyze_missingness",
+    "analyze_nonlinear_mediation",
+    "analyze_replication_decay",
+    "analyze_replication_meta",
+    "analyze_transport_stress",
+    "analyze_transportability",
+    "analyze_version_drift",
+    "audit_campaign",
+    "evaluate_claim_closure",
+    "evaluate_falsifiers",
+    "evaluate_stopping_rule",
+    "select_adaptive_experiments",
+    "verify_bundle",
 ]

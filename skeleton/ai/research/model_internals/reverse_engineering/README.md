@@ -107,12 +107,30 @@ The lab contains bounded analyzers for:
 - **assignment balance** — arm imbalance diagnostics within experimental strata;
 - **probe Pareto frontiers** — non-dominated cost/information/risk probe selection;
 - **multiple-testing correction** — Benjamini–Hochberg false-discovery-rate control.
+- **adaptive experiment design** — uncertainty/information/cost/risk-aware next-experiment selection with prerequisite enforcement;
+- **hierarchical uncertainty** — within-group, between-group, total-variance, ICC, and grand-mean uncertainty summaries;
+- **nonlinear mediation** — dose-stratified total/direct/mediated effects and peak mediated-dose localization;
+- **transportability** — source/target effect-gap and sign-preservation checks;
+- **precision stopping rules** — stop-supported, stop-futile, stop-conflicted, or continue decisions from precision, effect, replication, and contradiction;
+- **replication meta-analysis** — inverse-variance pooled effects, uncertainty, heterogeneity, actor count, and sign agreement;
+- **lineage closure** — evidence→analysis→claim→replication completeness checks for supported claims;
+- **falsification registry** — explicit claim falsifiers with incomplete/survived/falsified states;
+- **calibration curves** — binned calibration gaps, ECE, MCE, and Brier score;
+- **version drift** — ordered signature drift across model/research versions;
+- **missingness diagnostics** — per-field missingness and complete-record ratios;
+- **evidence staleness** — epoch-based freshness enforcement for long-running campaigns;
+- **hierarchical calibration** — group-level calibration and worst-group diagnostics;
+- **transport stress** — effect-gap growth and sign flips under increasing environment shift;
+- **replication decay** — age-decayed replication quality with configurable evidence half-life;
+- **bundle verification** — dependency completeness and cycle checks across exported research artifacts;
+- **claim closure** — final fail-closed closure gate combining quality, quorum, lineage, falsification, replication, freshness, and contradiction;
+- **campaign audit** — ready/hold/blocked end-state audit over critical and noncritical research controls.
 
 These surfaces characterize what can be observed or what is available in artifacts
 the operator is authorized to inspect. They do not assert proprietary architecture
 identity, recover hidden weights from inaccessible systems, bypass access controls,
 or create a right to inspect artifacts without ownership or permission.
 
-Future work can deepen adaptive experimental design, nonlinear mediation, circuit search,
-intervention transportability, hierarchical uncertainty, and adversarial replication while
-preserving the same evidence/inference boundary.
+Future work can deepen nonlinear structural models, cross-modal causal transport, richer
+hierarchical Bayes-style uncertainty approximations, automated experiment generation, and
+independent adversarial replication while preserving the same evidence/inference boundary.

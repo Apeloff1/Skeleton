@@ -78,7 +78,7 @@ def test_version_drift_accumulates_signature_change():
         )
     )
     assert report.version_count == 3
-    assert report.cumulative_euclidean_distance == 0.30000000000000004
+    assert abs(report.cumulative_euclidean_distance - 0.3) < 1e-12
     assert report.maximum_step_distance == 0.2
 
 
