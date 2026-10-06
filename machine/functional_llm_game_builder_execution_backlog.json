@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "kind": "functional-llm-game-builder-execution-backlog",
-  "plan_version": "2.5.0",
+  "plan_version": "2.6.0",
   "status": "active",
   "task_count": 216,
   "plane_count": 18,
@@ -14697,9 +14697,14 @@
         "provenance and exact artifact identity",
         "cross-plane integration",
         "exact-head regression evidence",
-        "independent verification"
+        "independent verification",
+        "fresh >=3-comparator frontier registry with exact identities and disclosed budgets",
+        "12-domain frontier competition scorecard with critical-domain non-compensation",
+        "frontier parity-or-better evidence for coding, long-horizon consistency and game-building core targets",
+        "blind human evaluation plus statistical uncertainty where applicable",
+        "exact-head independently verified frontier challenge bundle"
       ],
-      "closure_rule": "Code, contract, tests, evidence and rollback/recovery behavior must exist on exact head; plan text alone never signs this task."
+      "closure_rule": "Code, contract, tests, evidence and rollback/recovery behavior must exist on exact head; plan text alone never signs this task. Whole-product closure additionally requires the frontier-competition gate: fresh comparators, all 12 domains, non-compensable critical gates, core-target parity-or-better, exact-head evidence, and independent verification."
     },
     {
       "id": "FLGB-18-T12",
@@ -14763,9 +14768,48 @@
         "provenance and exact artifact identity",
         "cross-plane integration",
         "exact-head regression evidence",
-        "independent verification"
+        "independent verification",
+        "fresh >=3-comparator frontier registry with exact identities and disclosed budgets",
+        "12-domain frontier competition scorecard with critical-domain non-compensation",
+        "frontier parity-or-better evidence for coding, long-horizon consistency and game-building core targets",
+        "blind human evaluation plus statistical uncertainty where applicable",
+        "exact-head independently verified frontier challenge bundle"
       ],
-      "closure_rule": "Code, contract, tests, evidence and rollback/recovery behavior must exist on exact head; plan text alone never signs this task."
+      "closure_rule": "Code, contract, tests, evidence and rollback/recovery behavior must exist on exact head; plan text alone never signs this task. Whole-product closure additionally requires the frontier-competition gate: fresh comparators, all 12 domains, non-compensable critical gates, core-target parity-or-better, exact-head evidence, and independent verification."
     }
-  ]
+  ],
+  "frontier_competition_gate": {
+    "authority": "machine/functional_llm_game_builder_10mb_manifest.json#frontier_competition",
+    "status": "planned-evidence-pending",
+    "completion_claim": false,
+    "required_task_ids": [
+      "FLGB-18-T11",
+      "FLGB-18-T12"
+    ],
+    "required_outputs": [
+      "fresh comparator registry with at least three exact-identity frontier systems",
+      "12-domain frontier competition scorecard",
+      "public plus private-heldout evaluation manifest with contamination controls",
+      "blind human pairwise evaluation receipts for subjective quality",
+      "statistical uncertainty and per-domain raw result bundle",
+      "cost latency token tool-call hardware and resource accounting",
+      "fault recovery replay rollback and deterministic evidence bundle",
+      "security privacy rights authority and similarity-screen evidence",
+      "exact-head reproducibility bundle",
+      "independent verification signoff"
+    ],
+    "non_compensable": [
+      "critical-domain failure",
+      "security/safety/privacy failure",
+      "rights or suspicious-similarity failure",
+      "authority-boundary failure",
+      "recovery/replay/rollback failure"
+    ],
+    "core_targets": [
+      "coding and repository engineering",
+      "long-context and long-horizon consistency",
+      "game project construction and gameplay quality"
+    ],
+    "completion_rule": "The whole-product backlog cannot close until all 216 build units are evidence-complete and FLGB-18-T11/T12 prove the manifest frontier-competition contract on exact head with independent verification."
+  }
 }
