@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "authority": "candidate_classification_only",
-  "record_count": 169,
-  "independent_evidence_candidate_count": 25,
+  "record_count": 170,
+  "independent_evidence_candidate_count": 26,
   "implementation_only_blocked_count": 144,
   "records": [
     {
@@ -1470,6 +1470,17 @@
       "completion_authorized": false,
       "sources": [
         "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-253",
+      "state": "independent_evidence_review_candidate",
+      "implementation_evidence_recovered": false,
+      "independent_evidence_anchor_recovered": true,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "8d74b7d3979421780d50b23fb5c10a06204a1219"
       ]
     },
     {
