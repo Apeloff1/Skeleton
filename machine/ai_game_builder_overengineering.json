@@ -2162,7 +2162,14 @@
     "regression_tests": [
       "tests/test_ai_game_builder_runtime.py",
       "tests/test_ai_game_builder_governance.py"
-    ]
+    ],
+    "second_generation": {
+      "evaluator_ensemble": "skeleton/ai/game_builder/evaluation.py",
+      "bounded_resource_governor": "skeleton/ai/game_builder/resource_governor.py",
+      "quality_debt_ratchet": "skeleton/ai/game_builder/quality_debt.py",
+      "integrated_control_plane": "skeleton/ai/game_builder/control_plane.py",
+      "regression_tests": "tests/test_ai_game_builder_overengineering_runtime.py"
+    }
   },
   "second_generation_runtime": {
     "evaluation_panel": "skeleton/ai/game_builder/evaluation.py",
