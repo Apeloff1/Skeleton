@@ -608,10 +608,17 @@ class PromotionLedger:
         self,
         candidate: ImprovementCandidate,
         decision: PromotionDecision,
+        *,
+        evaluation: EvaluationBundle,
+        canary: CanaryEvidence | None = None,
     ) -> PromotionDecision:
         if not isinstance(decision, PromotionDecision):
             raise ImprovementError(
                 "decision must be PromotionDecision"
+            )
+        if not isinstance(evaluation, EvaluationBundle):
+            raise ImprovementError(
+                "evaluation must be EvaluationBundle"
             )
         self.register_candidate(candidate)
         if decision.candidate_digest != candidate.digest:
@@ -621,6 +628,34 @@ class PromotionLedger:
             raise ImprovementError(
                 "decision id does not match candidate identity"
             )
+
+        if decision.status is PromotionStatus.PROMOTE:
+            if not isinstance(canary, CanaryEvidence):
+                raise ImprovementError(
+                    "promoted decision requires typed canary evidence"
+                )
+            expected = promote_with_canary(
+                candidate,
+                evaluation,
+                decision.verifier_id,
+                canary,
+            )
+        else:
+            if canary is not None:
+                raise ImprovementError(
+                    "rejected decision cannot register canary authority"
+                )
+            expected = decide(
+                candidate,
+                evaluation,
+                decision.verifier_id,
+                canary_digest=None,
+            )
+        if expected != decision:
+            raise ImprovementError(
+                "decision does not match supplied evaluation/canary evidence"
+            )
+
         with self._lock:
             prior = self._decisions.get(decision.decision_id)
             if prior is not None:
@@ -633,6 +668,43 @@ class PromotionLedger:
             self._audit_digests.append(decision.digest)
             return decision
 
+    def decide_and_record(
+        self,
+        candidate: ImprovementCandidate,
+        evaluation: EvaluationBundle,
+        verifier_id: str,
+        *,
+        canary: CanaryEvidence | None = None,
+    ) -> PromotionDecision:
+        if evaluation.gates_passed:
+            if canary is None:
+                raise ImprovementError(
+                    "passing evaluation requires typed canary evidence"
+                )
+            decision = promote_with_canary(
+                candidate,
+                evaluation,
+                verifier_id,
+                canary,
+            )
+        else:
+            if canary is not None:
+                raise ImprovementError(
+                    "rejected evaluation cannot register canary authority"
+                )
+            decision = decide(
+                candidate,
+                evaluation,
+                verifier_id,
+                canary_digest=None,
+            )
+        return self.record_decision(
+            candidate,
+            decision,
+            evaluation=evaluation,
+            canary=canary,
+        )
+
     def record_rollback(
         self,
         candidate: ImprovementCandidate,
@@ -641,7 +713,17 @@ class PromotionLedger:
         rollback_evidence_digest: str,
         verifier_id: str,
     ) -> RollbackReceipt:
-        self.record_decision(candidate, decision)
+        self.register_candidate(candidate)
+        with self._lock:
+            recorded = self._decisions.get(decision.decision_id)
+        if recorded is None:
+            raise ImprovementError(
+                "promotion decision must be evidence-verified before rollback"
+            )
+        if recorded != decision:
+            raise ImprovementError(
+                "rollback decision does not match verified ledger decision"
+            )
         if decision.status is not PromotionStatus.PROMOTE:
             raise ImprovementError(
                 "rollback applies only to promoted candidate"
