@@ -51,6 +51,14 @@ from .decompositions import (
     qr_decompose,
     solve_cholesky,
 )
+from .differentiation import (
+    DerivativeReport,
+    GradientCheckReport,
+    JacobianReport,
+    check_gradient,
+    finite_difference_jacobian,
+    richardson_derivative,
+)
 from .distributions import (
     bernoulli_log_pmf,
     gaussian_mixture_log_density,
@@ -60,6 +68,12 @@ from .distributions import (
     normal_quantile,
     poisson_log_pmf,
     student_t_log_pdf,
+)
+from .eigensystems import (
+    PCAReport,
+    SymmetricEigensystemReport,
+    principal_components,
+    symmetric_eigensystem,
 )
 from .geometry import (
     ProjectionReport,
@@ -88,6 +102,7 @@ from .information_geometry import (
     mahalanobis_distance,
     total_variation_distance,
 )
+from .integration2 import AdaptiveODEPoint, AdaptiveODEReport, adaptive_rk45
 from .integration import (
     ODEPoint,
     ODEReport,
@@ -133,6 +148,12 @@ from .numerics import (
     relative_error,
     stable_mean,
     stable_softmax,
+)
+from .optimization2 import (
+    AdvancedOptimizationResult,
+    AdvancedOptimizationStep,
+    bfgs,
+    damped_newton,
 )
 from .optimization import (
     OptimizationConfig,
@@ -254,6 +275,12 @@ __all__ = [
     "least_squares",
     "qr_decompose",
     "solve_cholesky",
+    "DerivativeReport",
+    "GradientCheckReport",
+    "JacobianReport",
+    "check_gradient",
+    "finite_difference_jacobian",
+    "richardson_derivative",
     "bernoulli_log_pmf",
     "gaussian_mixture_log_density",
     "normal_cdf",
@@ -262,6 +289,10 @@ __all__ = [
     "normal_quantile",
     "poisson_log_pmf",
     "student_t_log_pdf",
+    "PCAReport",
+    "SymmetricEigensystemReport",
+    "principal_components",
+    "symmetric_eigensystem",
     "ProjectionReport",
     "angular_distance",
     "barycentric_triangle",
@@ -283,6 +314,9 @@ __all__ = [
     "hellinger_distance",
     "mahalanobis_distance",
     "total_variation_distance",
+    "AdaptiveODEPoint",
+    "AdaptiveODEReport",
+    "adaptive_rk45",
     "ODEPoint",
     "ODEReport",
     "QuadratureReport",
@@ -319,6 +353,10 @@ __all__ = [
     "relative_error",
     "stable_mean",
     "stable_softmax",
+    "AdvancedOptimizationResult",
+    "AdvancedOptimizationStep",
+    "bfgs",
+    "damped_newton",
     "OptimizationConfig",
     "OptimizationResult",
     "OptimizationStep",

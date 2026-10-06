@@ -51,6 +51,10 @@ model authority boundaries.
 - `kernels.py` — linear/polynomial/RBF/Laplacian kernels, Gram centering and MMD reference tests.
 - `information_geometry.py` — TV, Hellinger, Bhattacharyya, Fisher-Rao and Mahalanobis distances.
 - `sequence.py` — Levenshtein, DTW with explicit alignment path, and discrete Fréchet distance.
+- `eigensystems.py` — full symmetric Jacobi eigensystems and covariance PCA with reconstruction evidence.
+- `differentiation.py` — Richardson scalar derivatives, finite-difference Jacobians and gradient checks.
+- `optimization2.py` — damped Newton and BFGS references with deterministic Armijo line search.
+- `integration2.py` — adaptive Dormand-Prince RK45 with accepted/rejected-step evidence.
 - `validation.py` — parity evidence against existing optimized runtime kernels.
 
 ## Guarantees
@@ -79,6 +83,10 @@ model authority boundaries.
 - Kernels and MMD measure similarity/distribution shift but do not fit or promote models.
 - Information geometry normalizes distributions explicitly and uses SPD covariance solves for Mahalanobis distance.
 - Sequence metrics return deterministic edit/alignment/trajectory distances without taking retrieval or ranking authority.
+- Full eigensystems and PCA expose orthogonality/reconstruction evidence rather than silently trusting decomposition output.
+- Numerical differentiation explicitly detects output-shape drift and can cross-check analytic/autodiff gradients.
+- Second-order/quasi-Newton optimizers are reference solvers only and do not own model parameter updates.
+- Adaptive RK45 records accepted/rejected steps and fails closed on dimension or tolerance violations.
 - `audit_runtime_kernels()` compares optimized runtime softmax, matmul and attention against
   this reference substrate without replacing those kernels.
 
