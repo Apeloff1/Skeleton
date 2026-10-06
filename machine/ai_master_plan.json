@@ -24480,10 +24480,15 @@
       "reconciliation may not delete a live registered overlay",
       "reconciliation may not replace a non-empty live authority with an empty blob",
       "reconciliation may not remove the sole validator, test or workflow for a live overlay",
-      "incoming overlays are unioned with current-main authority rather than reconstructed from a stale ancestor"
+      "incoming overlays are unioned with current-main authority rather than reconstructed from a stale ancestor",
+      "registered overlays must preserve declared semantic cardinality and topology, not merely file presence or JSON validity"
     ],
     "validator": "scripts/check_masterplan_overlay_reconciliation.py",
     "test": "tests/test_masterplan_overlay_reconciliation.py",
-    "workflow": ".github/workflows/masterplan-overlay-reconciliation.yml"
+    "workflow": ".github/workflows/masterplan-overlay-reconciliation.yml",
+    "semantic_registry": "machine/masterplan_overlay_semantic_registry.json",
+    "semantic_validator": "scripts/check_masterplan_overlay_semantics.py",
+    "semantic_test": "tests/test_masterplan_overlay_semantics.py",
+    "semantic_workflow": ".github/workflows/masterplan-overlay-semantics.yml"
   }
 }
