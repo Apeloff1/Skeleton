@@ -149,6 +149,21 @@ class ResourceBudget:
             and usage.parallelism <= self.parallelism
         )
 
+    def is_within(self, parent: "ResourceBudget") -> bool:
+        """Return whether every child limit is no broader than the parent."""
+
+        if not isinstance(parent, ResourceBudget):
+            raise ExecutionAuthorityError("parent must be ResourceBudget")
+        return (
+            self.provider_calls <= parent.provider_calls
+            and self.tool_calls <= parent.tool_calls
+            and self.input_tokens <= parent.input_tokens
+            and self.output_tokens <= parent.output_tokens
+            and self.artifact_bytes <= parent.artifact_bytes
+            and self.wall_time_ms <= parent.wall_time_ms
+            and self.parallelism <= parent.parallelism
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class ResourceUsage:
@@ -364,6 +379,31 @@ class AdmissionReceipt:
         return hashlib.sha256(canonical_json_bytes(self.canonical_payload())).hexdigest()
 
 
+def validate_authority_attenuation(
+    parent: ExecutionAuthority,
+    child: ExecutionAuthority,
+) -> None:
+    """Reject delegated authority that can exceed its parent in any dimension."""
+
+    if not isinstance(parent, ExecutionAuthority) or not isinstance(
+        child, ExecutionAuthority
+    ):
+        raise ExecutionAuthorityError("parent and child must be ExecutionAuthority")
+    if child.parent_authority_digest != parent.digest:
+        raise ExecutionAuthorityError("child is not bound to parent authority digest")
+    for name in ("operation_id", "execution_id", "actor_id"):
+        if getattr(child, name) != getattr(parent, name):
+            raise ExecutionAuthorityError(f"delegated {name} mismatch")
+    if child.issued_at < parent.issued_at:
+        raise ExecutionAuthorityError("child authority predates parent")
+    if child.expires_at > parent.expires_at:
+        raise ExecutionAuthorityError("child authority outlives parent")
+    if not set(child.capabilities).issubset(parent.capabilities):
+        raise ExecutionAuthorityError("child authority escalates capabilities")
+    if not child.budget.is_within(parent.budget):
+        raise ExecutionAuthorityError("child authority escalates resource budget")
+
+
 def authority_policy_digest(policy: Mapping[str, Any]) -> str:
     """Return the stable policy digest used to bind an authority to policy input."""
 
@@ -383,4 +423,5 @@ __all__ = [
     "ResourceBudget",
     "ResourceUsage",
     "authority_policy_digest",
+    "validate_authority_attenuation",
 ]
