@@ -19,8 +19,7 @@
       "plane": "frontier",
       "handler": "skeleton.ai.runtime.deferred.contracts.CapabilityRegistry",
       "source_gaps": [
-        "generate cross-reference inventory",
-        "bind normative terms to owners"
+        "independent reference-integrity evaluation remains pending"
       ],
       "source_risks": [
         "stale appendix overrides canonical source",
@@ -45,8 +44,7 @@
       "plane": "tool_security",
       "handler": "skeleton.ai.runtime.deferred.tooling_security.ToolSDK",
       "source_gaps": [
-        "materialize SDK package",
-        "bind tools to policy/receipt contracts"
+        "independent Tool SDK schema, authority-scope, idempotency, and invocation verification remains pending"
       ],
       "source_risks": [
         "tool self-authorizes",
@@ -71,8 +69,7 @@
       "plane": "tool_security",
       "handler": "skeleton.ai.runtime.deferred.tooling_security.ConnectorContract",
       "source_gaps": [
-        "materialize connector SDK",
-        "bind connectors to tool policy"
+        "independent connector scope/permission and lifecycle verification remains pending"
       ],
       "source_risks": [
         "scope escalation",
@@ -97,8 +94,7 @@
       "plane": "tool_security",
       "handler": "skeleton.ai.runtime.deferred.tooling_security.PluginRegistry",
       "source_gaps": [
-        "define plugin manifest schema",
-        "bind plugin state to capability registry"
+        "independent plugin-lifecycle and capability-integration verification remains pending"
       ],
       "source_risks": [
         "plugin privilege creep",
@@ -123,8 +119,7 @@
       "plane": "tool_security",
       "handler": "skeleton.ai.runtime.deferred.tooling_security.PluginRegistry",
       "source_gaps": [
-        "define trust tiers",
-        "materialize quarantine/revocation path"
+        "independent marketplace attestation, quarantine, and revocation verification remains pending"
       ],
       "source_risks": [
         "supply-chain compromise",
@@ -149,8 +144,7 @@
       "plane": "tool_security",
       "handler": "skeleton.ai.runtime.deferred.tooling_security.PolicySimulator",
       "source_gaps": [
-        "share evaluator with runtime",
-        "establish trace corpus governance"
+        "independent exact-head policy-simulation reconciliation remains pending"
       ],
       "source_risks": [
         "simulation differs from runtime",
@@ -175,8 +169,7 @@
       "plane": "tool_security",
       "handler": "skeleton.ai.runtime.deferred.tooling_security.NetworkPolicy",
       "source_gaps": [
-        "materialize network topology",
-        "bind egress/identity controls"
+        "independent network-topology, identity, and egress-policy verification remains pending"
       ],
       "source_risks": [
         "flat network trust",
@@ -201,8 +194,7 @@
       "plane": "tool_security",
       "handler": "skeleton.ai.runtime.deferred.tooling_security.SecretLease",
       "source_gaps": [
-        "unify secret access path",
-        "bind detectors to CI/runtime"
+        "independent exact-head secret-handle/lifecycle verification remains pending"
       ],
       "source_risks": [
         "secret in prompt/log",
@@ -227,8 +219,7 @@
       "plane": "tool_security",
       "handler": "skeleton.ai.runtime.deferred.tooling_security.KeyRing",
       "source_gaps": [
-        "define KMS abstraction",
-        "bind signatures/encryption to versions"
+        "independent exact-head key-version/rotation/restore verification remains pending"
       ],
       "source_risks": [
         "lost key",
@@ -253,8 +244,7 @@
       "plane": "tool_security",
       "handler": "skeleton.ai.runtime.deferred.tooling_security.PrivacyLabel",
       "source_gaps": [
-        "define privacy label lattice",
-        "bind to ingestion/retrieval/tools"
+        "independent exact-head privacy-label propagation and purpose-boundary verification remains pending"
       ],
       "source_risks": [
         "classification loss",
@@ -279,8 +269,7 @@
       "plane": "tool_security",
       "handler": "skeleton.ai.runtime.deferred.tooling_security.DeletionGraph",
       "source_gaps": [
-        "materialize deletion graph",
-        "bind backup/restore reconciliation"
+        "independent exact-head deletion/restore-resurrection verification remains pending"
       ],
       "source_risks": [
         "tombstone resurrection",
@@ -305,8 +294,7 @@
       "plane": "tool_security",
       "handler": "skeleton.ai.runtime.deferred.tooling_security.SBOM",
       "source_gaps": [
-        "select SBOM format",
-        "bind generation to release pipeline"
+        "independent exact-head SBOM artifact-binding and coverage verification remains pending"
       ],
       "source_risks": [
         "missing transitive dependency",
@@ -331,8 +319,7 @@
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.SLOSpec",
       "source_gaps": [
-        "define core service SLOs",
-        "bind alerts/error budgets"
+        "independent exact-head SLO/SLI and operations-review verification remains pending"
       ],
       "source_risks": [
         "misleading SLI",
@@ -357,8 +344,7 @@
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.ErrorBudget",
       "source_gaps": [
-        "define burn policy",
-        "bind to canary/release gates"
+        "independent exact-head error-budget burn/release-boundary verification remains pending"
       ],
       "source_risks": [
         "bad denominator",
@@ -383,8 +369,7 @@
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.CardinalityGuard",
       "source_gaps": [
-        "inventory metric labels",
-        "add cardinality linting"
+        "independent exact-head telemetry-cardinality and sensitive-label verification remains pending"
       ],
       "source_risks": [
         "metrics backend overload",
@@ -409,8 +394,7 @@
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.TraceModel",
       "source_gaps": [
-        "define span taxonomy",
-        "bind receipts/events to traces"
+        "independent exact-head trace-causality and non-authoritative telemetry verification remains pending"
       ],
       "source_risks": [
         "broken correlation",
@@ -435,8 +419,7 @@
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.ProfileRecord",
       "source_gaps": [
-        "standardize profile bundles",
-        "bind findings to backlog"
+        "independent exact-head profile-identity and regression verification remains pending"
       ],
       "source_risks": [
         "benchmark distortion",
@@ -461,8 +444,7 @@
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.LatencyBudget",
       "source_gaps": [
-        "define canonical operation budgets",
-        "bind routing/admission"
+        "independent exact-head percentile/stage latency-budget verification remains pending"
       ],
       "source_risks": [
         "retry hides tail latency",
@@ -487,8 +469,7 @@
       "plane": "frontier",
       "handler": "skeleton.ai.runtime.deferred.contracts.BudgetLedger",
       "source_gaps": [
-        "unify cost ledger",
-        "bind model/tool routing"
+        "independent exact-head durable cost reservation/fallback verification remains pending"
       ],
       "source_risks": [
         "double charge",
@@ -513,8 +494,7 @@
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.EfficiencySample",
       "source_gaps": [
-        "define measurement methodology",
-        "bind to capacity/cost reviews"
+        "independent exact-head quality-normalized efficiency verification remains pending"
       ],
       "source_risks": [
         "greenwashing metric",
@@ -721,8 +701,7 @@
       "plane": "operations_experience",
       "handler": "skeleton.ai.runtime.deferred.operations_experience.LocalEnvironment",
       "source_gaps": [
-        "define one-command bootstrap",
-        "bind versions to environment spec"
+        "check in canonical uv.lock and bind its digest as the authoritative local dependency graph"
       ],
       "source_risks": [
         "works-only-on-maintainer machine",
@@ -746,10 +725,7 @@
       "title": "Test Fixture Platform",
       "plane": "operations_experience",
       "handler": "skeleton.ai.runtime.deferred.operations_experience.Fixture",
-      "source_gaps": [
-        "catalog fixtures",
-        "add hermeticity checks"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "brittle shared fixtures",
         "real external side effects"
@@ -771,7 +747,7 @@
       "volume_id": "VOL-197",
       "title": "Simulation Mode",
       "plane": "operations_experience",
-      "handler": "skeleton.ai.runtime.deferred.operations_experience.SimulationReceipt",
+      "handler": "skeleton.ai.runtime.deferred.simulation_mode.SimulationRuntime",
       "source_gaps": [
         "define adapter switch contract",
         "bind evidence labels"
@@ -797,7 +773,7 @@
       "volume_id": "VOL-198",
       "title": "Contract Fuzzing",
       "plane": "operations_experience",
-      "handler": "skeleton.ai.runtime.deferred.operations_experience.FuzzReproducer",
+      "handler": "skeleton.ai.runtime.deferred.contract_fuzzing.ContractFuzzer",
       "source_gaps": [
         "select P0 contract targets",
         "integrate reproducers into regression suite"
@@ -851,8 +827,8 @@
       "plane": "operations_experience",
       "handler": "skeleton.ai.runtime.deferred.operations_experience.FormalCandidateRanker",
       "source_gaps": [
-        "rank first candidate set",
-        "establish conformance workflow"
+        "materialize the first ranked candidate set from concrete high-consequence runtime targets",
+        "wire proof-to-test handoff validation into exact-head conformance CI"
       ],
       "source_risks": [
         "formal effort on low-value target",
@@ -1189,8 +1165,7 @@
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.ComponentCard",
       "source_gaps": [
-        "define card schema",
-        "generate from MBOM/evals"
+        "independent exact-head model-card MBOM/evaluation generation validation remains pending"
       ],
       "source_risks": [
         "stale marketing claim",
@@ -1215,8 +1190,7 @@
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.ComponentCard",
       "source_gaps": [
-        "define card schema",
-        "generate from dataset registry"
+        "independent exact-head dataset-card registry/lineage validation remains pending"
       ],
       "source_risks": [
         "unknown rights hidden",
@@ -1241,8 +1215,7 @@
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.ComponentCard",
       "source_gaps": [
-        "generate from ToolDefinition",
-        "bind security review"
+        "independent exact-head tool-card definition/security-review validation remains pending"
       ],
       "source_risks": [
         "tool description prompt injection",
@@ -1267,8 +1240,7 @@
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.ComponentCard",
       "source_gaps": [
-        "generate from agent registry",
-        "bind performance evidence"
+        "independent exact-head agent-card registry/performance/control validation remains pending"
       ],
       "source_risks": [
         "card overstates autonomy",
@@ -1293,8 +1265,7 @@
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.HealthScore",
       "source_gaps": [
-        "define dimensions",
-        "bind dashboard to evidence sources"
+        "independent exact-head component-health evidence-source validation remains pending"
       ],
       "source_risks": [
         "green average hides critical failure",
@@ -1319,8 +1290,7 @@
       "plane": "operations_experience",
       "handler": "skeleton.ai.runtime.deferred.operations_experience.DependencyHealth",
       "source_gaps": [
-        "connect SBOM to health",
-        "bind findings to backlog"
+        "independent exact-head SBOM/dependency-backlog validation remains pending"
       ],
       "source_risks": [
         "abandoned dependency",
@@ -1345,8 +1315,7 @@
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.ProviderRisk",
       "source_gaps": [
-        "map provider dependencies",
-        "bind to failover"
+        "independent exact-head provider dependency/risk validation remains pending"
       ],
       "source_risks": [
         "vendor lock-in",
@@ -1371,8 +1340,7 @@
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.ProviderFailover",
       "source_gaps": [
-        "define compatibility classes",
-        "bind health to router"
+        "independent exact-head compatibility-safe provider failover validation remains pending"
       ],
       "source_risks": [
         "double execution",
@@ -1397,8 +1365,7 @@
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.DeploymentProfile",
       "source_gaps": [
-        "define offline capability map",
-        "bind local model/storage"
+        "independent exact-head offline capability/model/storage validation remains pending"
       ],
       "source_risks": [
         "stale data presented current",
@@ -1423,8 +1390,7 @@
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.DeploymentProfile",
       "source_gaps": [
-        "define package trust workflow",
-        "materialize air-gap install test"
+        "independent exact-head air-gap package trust/install validation remains pending"
       ],
       "source_risks": [
         "hidden egress dependency",
@@ -1449,8 +1415,7 @@
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.DeploymentProfile",
       "source_gaps": [
-        "define edge resource tiers",
-        "bind model/router constraints"
+        "independent exact-head edge resource-tier/router validation remains pending"
       ],
       "source_risks": [
         "resource thrash",
@@ -1475,8 +1440,7 @@
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.DeploymentProfile",
       "source_gaps": [
-        "define reference topologies",
-        "bind enterprise acceptance"
+        "independent exact-head enterprise topology/security acceptance validation remains pending"
       ],
       "source_risks": [
         "admin overprivilege",
@@ -1501,8 +1465,7 @@
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.FederatedIdentity",
       "source_gaps": [
-        "define principal mapping",
-        "bind revocation/sessions"
+        "independent exact-head federated principal/session/revocation validation remains pending"
       ],
       "source_risks": [
         "account takeover via claim mapping",
@@ -1527,8 +1490,7 @@
       "plane": "operations_experience",
       "handler": "skeleton.ai.runtime.deferred.operations_experience.AdminOperation",
       "source_gaps": [
-        "define admin capability scopes",
-        "bind break-glass/approval"
+        "independent exact-head admin scope/approval/break-glass validation remains pending"
       ],
       "source_risks": [
         "admin CSRF/confused deputy",
@@ -4231,7 +4193,6 @@
       "plane": "compute",
       "handler": "skeleton.ai.runtime.deferred.compute.SandboxManifest",
       "source_gaps": [
-        "define sandbox lifecycle",
         "bind feature flags/technology radar"
       ],
       "source_risks": [
