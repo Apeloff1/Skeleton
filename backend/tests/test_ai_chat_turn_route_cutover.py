@@ -1,0 +1,230 @@
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from types import SimpleNamespace
+from uuid import uuid4
+
+import pytest
+
+from core.engine_client import EngineNotFoundError, EngineUnavailableError
+from skeleton.ai.assistant.turn_runtime import TurnState
+from skeleton.contracts.conversation import (
+    ConversationAuthorType,
+    ConversationMessage,
+    ConversationThread,
+    ConversationThreadState,
+)
+
+
+NOW = datetime(2026, 10, 6, 4, 0, tzinfo=timezone.utc)
+
+
+def _thread_and_user():
+    thread_id = str(uuid4())
+    branch_id = str(uuid4())
+    thread = ConversationThread(
+        thread_id=thread_id,
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+        created_at=NOW,
+        updated_at=NOW,
+        version=2,
+        message_sequence=1,
+        active_branch_id=branch_id,
+        state=ConversationThreadState.ACTIVE,
+        title="Durable chat",
+        data_class="internal",
+    )
+    user = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=thread_id,
+        branch_id=branch_id,
+        sequence=1,
+        author_type=ConversationAuthorType.USER,
+        created_at=NOW,
+        idempotency_key="turn-1",
+        content="Build it.",
+        data_class="internal",
+    )
+    return thread, user
+
+
+def _request(route, thread_id):
+    return route.AIChatRequest(
+        message="Build it.",
+        thread_id=thread_id,
+        idempotency_key="turn-1",
+        expected_thread_version=1,
+    )
+
+
+def _conversation_authority(thread, user, *, allow_commit=True):
+    async def active_transcript(*_args, **_kwargs):
+        return (user,)
+
+    async def append_user_message(*_args, **_kwargs):
+        return thread, user
+
+    async def commit_assistant_message(_thread_id, **kwargs):
+        if not allow_commit:
+            raise AssertionError("assistant commit must not run")
+        committed_thread = ConversationThread(
+            thread_id=thread.thread_id,
+            tenant_id=thread.tenant_id,
+            owner_id=thread.owner_id,
+            created_at=thread.created_at,
+            updated_at=thread.updated_at,
+            version=3,
+            message_sequence=2,
+            active_branch_id=thread.active_branch_id,
+            state=thread.state,
+            title=thread.title,
+            data_class=thread.data_class,
+        )
+        message = ConversationMessage(
+            message_id=str(uuid4()),
+            thread_id=thread.thread_id,
+            branch_id=thread.active_branch_id,
+            sequence=2,
+            author_type=ConversationAuthorType.ASSISTANT,
+            created_at=NOW,
+            idempotency_key=kwargs["idempotency_key"],
+            content=kwargs["content"],
+            parent_message_id=user.message_id,
+            causal_user_message_id=user.message_id,
+            operation_id=kwargs["operation_id"],
+            ai_result_id=kwargs["ai_result_id"],
+            context_id=kwargs["context_id"],
+            context_digest=kwargs["context_digest"],
+            context_source_snapshot=kwargs["context_source_snapshot"],
+            context_compiler_version=kwargs["context_compiler_version"],
+            provider_receipt_refs=kwargs.get("provider_receipt_refs", ()),
+            tool_receipt_refs=kwargs.get("tool_receipt_refs", ()),
+            memory_refs=kwargs.get("memory_refs", ()),
+            citation_refs=kwargs.get("citation_refs", ()),
+            artifact_refs=kwargs.get("artifact_refs", ()),
+            data_class=thread.data_class,
+        )
+        return committed_thread, message
+
+    return SimpleNamespace(
+        active_transcript=active_transcript,
+        append_user_message=append_user_message,
+        commit_assistant_message=commit_assistant_message,
+    )
+
+
+@pytest.mark.asyncio
+async def test_live_chat_success_reaches_durable_complete(
+    monkeypatch,
+    ai_chat_turn_test_authority,
+):
+    import routes.ai as route
+
+    thread, user = _thread_and_user()
+    monkeypatch.setattr(
+        route,
+        "conversation_authority",
+        _conversation_authority(thread, user),
+    )
+    fake_client = SimpleNamespace(
+        config=SimpleNamespace(
+            service_principal="codedock-backend",
+            execution_timeout_s=30.0,
+        )
+    )
+
+    async def wait_for_terminal(**_kwargs):
+        raise EngineNotFoundError("not started")
+
+    async def execute(command):
+        return SimpleNamespace(
+            final_output="Done.",
+            execution_id=command.execution_request.execution_id,
+            verification="verified",
+            evidence_refs=("evidence:1",),
+            provider_receipts=("provider:test:receipt-1",),
+            tool_receipts=(),
+            memory_refs=(),
+            artifact_refs=(),
+        )
+
+    fake_client.wait_for_terminal = wait_for_terminal
+    fake_client.execute = execute
+    monkeypatch.setattr(route.EngineClient, "from_env", lambda: fake_client)
+
+    response = await route.ai_chat(
+        _request(route, thread.thread_id),
+        user={"tenant_id": "tenant-a", "email": "owner-a"},
+    )
+
+    assert response["success"] is True
+    assert response["turn_state"] == "complete"
+    persisted = ai_chat_turn_test_authority.repo.reconstruct(
+        response["operation_id"],
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+    )
+    assert persisted.snapshot.state is TurnState.COMPLETE
+    events = ai_chat_turn_test_authority.repo.list_events(
+        response["operation_id"],
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+    )
+    assert [event.to_state for event in events] == [
+        TurnState.ADMITTED,
+        TurnState.USER_MESSAGE_COMMITTED,
+        TurnState.CONTEXT_COMPILING,
+        TurnState.ROUTING,
+        TurnState.MODEL_RUNNING,
+        TurnState.VERIFYING,
+        TurnState.FINALIZING,
+        TurnState.ASSISTANT_MESSAGE_COMMITTED,
+        TurnState.COMPLETE,
+    ]
+
+
+@pytest.mark.asyncio
+async def test_live_chat_engine_outage_is_durable_retryable_failure(
+    monkeypatch,
+    ai_chat_turn_test_authority,
+):
+    import routes.ai as route
+
+    thread, user = _thread_and_user()
+    monkeypatch.setattr(
+        route,
+        "conversation_authority",
+        _conversation_authority(thread, user, allow_commit=False),
+    )
+    fake_client = SimpleNamespace(
+        config=SimpleNamespace(
+            service_principal="codedock-backend",
+            execution_timeout_s=30.0,
+        )
+    )
+
+    async def wait_for_terminal(**_kwargs):
+        raise EngineNotFoundError("not started")
+
+    async def execute(_command):
+        raise EngineUnavailableError("down")
+
+    fake_client.wait_for_terminal = wait_for_terminal
+    fake_client.execute = execute
+    monkeypatch.setattr(route.EngineClient, "from_env", lambda: fake_client)
+
+    response = await route.ai_chat(
+        _request(route, thread.thread_id),
+        user={"tenant_id": "tenant-a", "email": "owner-a"},
+    )
+
+    assert response["success"] is False
+    assert response["error_code"] == "engine_unavailable"
+    operation_id, _ = route._chat_turn_ids(thread.thread_id, user.message_id)
+    persisted = ai_chat_turn_test_authority.repo.reconstruct(
+        operation_id,
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+    )
+    assert persisted.snapshot.state is TurnState.FAILED_RETRYABLE
