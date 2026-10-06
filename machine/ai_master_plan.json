@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plan_version": "1.8.0",
+  "plan_version": "1.9.0",
   "status": "active",
   "architecture_lane": "PR-1904",
   "architecture_branch": "integration/architecture-map-v1",
@@ -48,7 +48,11 @@
     "enterprise_ai_implementation_notes": "machine/enterprise_ai_implementation_notes_index.json",
     "frontier_96_ladder": "machine/frontier_96_ai_ladder.json",
     "frontier_96_ladder_human": "docs/plan/FRONTIER_96_AI_LADDER.md",
-    "frontier_96_validator": "scripts/check_frontier_96_ladder.py"
+    "frontier_96_validator": "scripts/check_frontier_96_ladder.py",
+    "cs_300_ladder": "machine/cs_300_computer_science_ladder.json",
+    "cs_300_ladder_human": "docs/plan/CS_300_COMPUTER_SCIENCE_LADDER.md",
+    "cs_300_validator": "scripts/check_cs_300_ladder.py",
+    "cs_300_workflow": ".github/workflows/cs-300-authority.yml"
   },
   "laws": [
     "durable governed state is authoritative",
@@ -60,7 +64,8 @@
     "self-improvement produces candidates; promotion is gated",
     "SOTA status requires reproducible comparative evidence",
     "enterprise AI qualification requires exact-head comparator-backed superiority evidence with non-compensable security, privacy, authority, tenant-isolation, recovery and rollback gates",
-    "Frontier-96 qualification sits above enterprise superiority, preserves the VOL-420 breadth freeze, and requires all 96 F96 layers to carry current independent evidence before finality"
+    "Frontier-96 qualification sits above enterprise superiority, preserves the VOL-420 breadth freeze, and requires all 96 F96 layers to carry current independent evidence before finality",
+    "CS-300 qualification sits strictly above Frontier-96, preserves the VOL-420 breadth freeze, and requires all 300 computer-science layers to carry current independent evidence before CS300-300 finality"
   ],
   "thematic_parts": [
     {
@@ -518,6 +523,17 @@
         "Prevent orphan work and unbounded background execution after terminal operation state."
       ],
       "capabilities": [
+        "runtime bootstrap",
+        "lifecycle supervision",
+        "operation admission/cancellation"
+      ],
+      "contracts": [
+        "OperationEnvelope",
+        "ExecutionContext",
+        "LifecycleState",
+        "ServiceHealth"
+      ],
+      "implementation_paths": [
         "skeleton/app",
         "skeleton/persistence/operation_runtime.py",
         "skeleton/api/server.py",
@@ -526,51 +542,15 @@
         "scripts/check_architecture_runtime_supervision.py",
         "skeleton/kernel/runtime_supervision.py",
         "skeleton/ai/runtime/kernel/runtime_supervision.py",
-        "skeleton/api/engine_runtime.py",
-        "backend/server.py",
         "skeleton/automation/free_model.py",
-        "skeleton/automation/chatgpt_adapter.py",
         "skeleton/automation/shift_supervisor/model_gateway.py",
-        ".github/workflows/vol004-runtime-supervision.yml"
-      ],
-      "tests": [
-        "skeleton/testing/test_app_assembly.py",
-        "skeleton/testing/test_operation_runtime.py",
-        "skeleton/testing/test_operation_server_binding.py",
-        "tests/test_architecture_runtime_supervision.py",
-        "skeleton/testing/test_vol004_runtime_supervision_v2.py",
-        "skeleton/testing/test_kernel_supervisor_cancellation.py",
-        "backend/tests/test_engine_cross_service_closure.py"
-      ],
-      "evaluations": [
-        "python scripts/check_architecture_runtime_supervision.py --json",
-        "VOL-004 Runtime Supervision Closure exact-head workflow",
-        "adversarial lifecycle state/lease/restart race suite",
-        "cross-service durable cancellation and late-result fencing journey",
-        "network-transport connector cancellation inventory convergence"
-      ],
-      "evidence": [
-        "https://github.com/Apeloff1/Skeleton/commit/be408977891328b78522074c1fe693267b01ce5b",
-        "docs/architecture/RUNTIME_SUPERVISION.md",
-        "machine/runtime_supervision.json",
-        "scripts/check_architecture_runtime_supervision.py",
-        "skeleton/kernel/runtime_supervision.py",
-        "skeleton/ai/runtime/kernel/runtime_supervision.py",
-        "skeleton/testing/test_vol004_runtime_supervision_v2.py",
-        "tests/test_architecture_runtime_supervision.py",
-        "backend/tests/test_engine_cross_service_closure.py",
-        ".github/workflows/vol004-runtime-supervision.yml"
-      ],
-      "risks": [
-        "orphan tasks",
-        "readiness before dependencies are usable",
-        "shutdown ordering data loss"
-      ],
-      "gaps": [
-        "independent exact-head VOL-004 Runtime Supervision Closure qualification remains pending"
-      ],
-      "accountability_id": "ACC-VOL-004",
-      "completion_checkbox": false,
+        "skeleton/automation/chatgpt_adapter.py",
+        ".github/workflows/vol004-runtime-supervision.yml",
+        "backend/server.py",
+        "backend/core/engine_client.py",
+        "skeleton/api/engine_runtime.py",
+        "skeleton/api/engine_service.py",
+        "skeleton/provider_runtime.py",
         "machine/ai_app_construction.json",
         "docs/architecture/RUNTIME_SUPERVISION.md"
       ],

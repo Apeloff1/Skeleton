@@ -119,7 +119,21 @@ Machine adversarial closure contract: [`machine/ai_adversarial_closure.json`](..
 
 Exotic systems depth: [`EXOTIC_SYSTEMS_DEPTH.md`](EXOTIC_SYSTEMS_DEPTH.md)
 
-Machine exotic catalogue: [`machine/ai_exotic_systems_catalog.json`](../../machine/ai_exotic_systems_catalog.json)\n\nFrontier-96 post-enterprise ladder: [`FRONTIER_96_AI_LADDER.md`](FRONTIER_96_AI_LADDER.md)\n\nMachine Frontier-96 contract: [`machine/frontier_96_ai_ladder.json`](../../machine/frontier_96_ai_ladder.json)\n\nFrontier-96 validator: [`scripts/check_frontier_96_ladder.py`](../../scripts/check_frontier_96_ladder.py)
+Machine exotic catalogue: [`machine/ai_exotic_systems_catalog.json`](../../machine/ai_exotic_systems_catalog.json)
+
+Frontier-96 post-enterprise ladder: [`FRONTIER_96_AI_LADDER.md`](FRONTIER_96_AI_LADDER.md)
+
+Machine Frontier-96 contract: [`machine/frontier_96_ai_ladder.json`](../../machine/frontier_96_ai_ladder.json)
+
+Frontier-96 validator: [`scripts/check_frontier_96_ladder.py`](../../scripts/check_frontier_96_ladder.py)
+
+CS-300 computer-science ladder: [`CS_300_COMPUTER_SCIENCE_LADDER.md`](CS_300_COMPUTER_SCIENCE_LADDER.md)
+
+Machine CS-300 contract: [`machine/cs_300_computer_science_ladder.json`](../../machine/cs_300_computer_science_ladder.json)
+
+CS-300 validator: [`scripts/check_cs_300_ladder.py`](../../scripts/check_cs_300_ladder.py)
+
+CS-300 exact-head workflow: [`.github/workflows/cs-300-authority.yml`](../../.github/workflows/cs-300-authority.yml)
 
 ## Purpose
 
@@ -182,9 +196,16 @@ Repository work on this plan must respect the existing PR #1904 bootstrap stack:
 49. `docs/plan/OPENAI_OSS_ASSIMILATION_2026-09-25.md`
 50. `machine/openai_oss_assimilation.json`
 51. `docs/plan/XAI_GROK_OSS_ASSIMILATION_2026-09-25.md`
-52. `machine/xai_grok_oss_assimilation.json`\n53. `docs/plan/FRONTIER_96_AI_LADDER.md`\n54. `machine/frontier_96_ai_ladder.json`\n55. `scripts/check_frontier_96_ladder.py`
+52. `machine/xai_grok_oss_assimilation.json`
+53. `docs/plan/FRONTIER_96_AI_LADDER.md`
+54. `machine/frontier_96_ai_ladder.json`
+55. `scripts/check_frontier_96_ladder.py`
+56. `docs/plan/CS_300_COMPUTER_SCIENCE_LADDER.md`
+57. `machine/cs_300_computer_science_ladder.json`
+58. `scripts/check_cs_300_ladder.py`
+59. `.github/workflows/cs-300-authority.yml`
 
-The first ten remain the present implementation/construction authority. Items 11–40 form the frozen long-range planning, risk, sequencing, depth, adversarial-closure, exotic-research and engineering-validation stack. Items 41–42 define the historical implementation-depth frontier and its machine-checkable reconciliation contract. Items 43–45 define the bounded P1 trustworthy-production maturity frontier and its dependency-ordered 44-task execution DAG. Items 46–48 define the P2 capability-expansion boundary sourced exactly from P1's 314 deferred volumes, with explicit scheduled/queued ownership and fail-closed dependency validation. Items 49–52 deepen the frozen research/provider/runtime volumes with pinned OpenAI and xAI/Grok OSS provenance and bounded interoperability. Items 53–55 define and validate the post-enterprise Frontier-96 qualification overlay. Frontier-96 does not add a new architecture volume; it raises the evidence bar above enterprise superiority while preserving the VOL-420 breadth freeze.
+The first ten remain the present implementation/construction authority. Items 11–40 form the frozen long-range planning, risk, sequencing, depth, adversarial-closure, exotic-research and engineering-validation stack. Items 41–42 define the historical implementation-depth frontier and its machine-checkable reconciliation contract. Items 43–45 define the bounded P1 trustworthy-production maturity frontier and its dependency-ordered 44-task execution DAG. Items 46–48 define the P2 capability-expansion boundary sourced exactly from P1's 314 deferred volumes, with explicit scheduled/queued ownership and fail-closed dependency validation. Items 49–52 deepen the frozen research/provider/runtime volumes with pinned OpenAI and xAI/Grok OSS provenance and bounded interoperability. Items 53–55 define and validate the post-enterprise Frontier-96 qualification overlay. Items 56–59 define and validate the CS-300 cutting-edge computer-science overlay above Frontier-96, including its exact-head CI authority. Neither overlay adds a new architecture volume; both raise depth and evidence requirements while preserving the VOL-420 breadth freeze.
 
 ## Index laws
 
