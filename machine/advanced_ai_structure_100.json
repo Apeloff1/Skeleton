@@ -6541,5 +6541,4366 @@
       "default_disable": "disable-frontier-experiment-plane-and-retain-lower-verified-baseline",
       "operator_priority": "tier-0"
     }
+  },
+  "level_blueprints": [
+    {
+      "id": "ADV-L001",
+      "level_id": "L001",
+      "ordinal": 1,
+      "stratum": "S01",
+      "title": "Typed Cognitive Contracts",
+      "primary_owner_plane": "foundation",
+      "collaborating_planes": [
+        "identity",
+        "data-persistence",
+        "governance",
+        "security-safety",
+        "observability",
+        "configuration-secrets",
+        "engine-api",
+        "application-api"
+      ],
+      "implementation_mode": "contract-and-runtime-foundation",
+      "entry_gate": "enterprise Level-0 baseline structurally valid and implementation target explicitly authorized",
+      "build_contract": [
+        "implement Define canonical typed envelopes for goals, observations, beliefs, plans, actions, evidence, results, and errors.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "identity confusion",
+        "budget amplification",
+        "provenance break",
+        "replay inconsistency",
+        "fail-open policy"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "shadow-validate then mandatory substrate cutover",
+      "rollback_mode": "restore last verified substrate contract and replay-safe runtime baseline",
+      "promotion_result": "L001 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L002",
+      "level_id": "L002",
+      "ordinal": 2,
+      "stratum": "S01",
+      "title": "Identity and Causality Fabric",
+      "primary_owner_plane": "foundation",
+      "collaborating_planes": [
+        "identity",
+        "data-persistence",
+        "governance",
+        "security-safety",
+        "observability",
+        "configuration-secrets",
+        "engine-api",
+        "application-api"
+      ],
+      "implementation_mode": "contract-and-runtime-foundation",
+      "entry_gate": "L001 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Bind tenant, principal, operation, execution, turn, artifact, tool call, and causal parent identities across every cognitive event.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "identity confusion",
+        "budget amplification",
+        "provenance break",
+        "replay inconsistency",
+        "fail-open policy"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "shadow-validate then mandatory substrate cutover",
+      "rollback_mode": "restore last verified substrate contract and replay-safe runtime baseline",
+      "promotion_result": "L002 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L003",
+      "level_id": "L003",
+      "ordinal": 3,
+      "stratum": "S01",
+      "title": "Temporal and Sequence Semantics",
+      "primary_owner_plane": "foundation",
+      "collaborating_planes": [
+        "identity",
+        "data-persistence",
+        "governance",
+        "security-safety",
+        "observability",
+        "configuration-secrets",
+        "engine-api",
+        "application-api"
+      ],
+      "implementation_mode": "contract-and-runtime-foundation",
+      "entry_gate": "L002 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Give cognition monotonic ordering, deadlines, freshness, replay positions, causal clocks, and explicit wall-clock versus monotonic-time rules.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "identity confusion",
+        "budget amplification",
+        "provenance break",
+        "replay inconsistency",
+        "fail-open policy"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "shadow-validate then mandatory substrate cutover",
+      "rollback_mode": "restore last verified substrate contract and replay-safe runtime baseline",
+      "promotion_result": "L003 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L004",
+      "level_id": "L004",
+      "ordinal": 4,
+      "stratum": "S01",
+      "title": "Budget and Constraint Calculus",
+      "primary_owner_plane": "foundation",
+      "collaborating_planes": [
+        "identity",
+        "data-persistence",
+        "governance",
+        "security-safety",
+        "observability",
+        "configuration-secrets",
+        "engine-api",
+        "application-api"
+      ],
+      "implementation_mode": "contract-and-runtime-foundation",
+      "entry_gate": "L003 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Represent tokens, cost, latency, workers, tools, writes, storage, risk, and depth as enforceable composable budgets.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "identity confusion",
+        "budget amplification",
+        "provenance break",
+        "replay inconsistency",
+        "fail-open policy"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "shadow-validate then mandatory substrate cutover",
+      "rollback_mode": "restore last verified substrate contract and replay-safe runtime baseline",
+      "promotion_result": "L004 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L005",
+      "level_id": "L005",
+      "ordinal": 5,
+      "stratum": "S01",
+      "title": "State Authority Partitioning",
+      "primary_owner_plane": "foundation",
+      "collaborating_planes": [
+        "identity",
+        "data-persistence",
+        "governance",
+        "security-safety",
+        "observability",
+        "configuration-secrets",
+        "engine-api",
+        "application-api"
+      ],
+      "implementation_mode": "contract-and-runtime-foundation",
+      "entry_gate": "L004 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Separate canonical, derived, scratch, recovery, telemetry, and experimental state with singular owners and promotion rules.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "identity confusion",
+        "budget amplification",
+        "provenance break",
+        "replay inconsistency",
+        "fail-open policy"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "shadow-validate then mandatory substrate cutover",
+      "rollback_mode": "restore last verified substrate contract and replay-safe runtime baseline",
+      "promotion_result": "L005 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L006",
+      "level_id": "L006",
+      "ordinal": 6,
+      "stratum": "S01",
+      "title": "Provenance and Evidence Graph",
+      "primary_owner_plane": "foundation",
+      "collaborating_planes": [
+        "identity",
+        "data-persistence",
+        "governance",
+        "security-safety",
+        "observability",
+        "configuration-secrets",
+        "engine-api",
+        "application-api"
+      ],
+      "implementation_mode": "contract-and-runtime-foundation",
+      "entry_gate": "L005 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Bind every material inference, transformation, source, tool result, model result, and artifact to tamper-evident provenance.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "identity confusion",
+        "budget amplification",
+        "provenance break",
+        "replay inconsistency",
+        "fail-open policy"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "shadow-validate then mandatory substrate cutover",
+      "rollback_mode": "restore last verified substrate contract and replay-safe runtime baseline",
+      "promotion_result": "L006 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L007",
+      "level_id": "L007",
+      "ordinal": 7,
+      "stratum": "S01",
+      "title": "Capability and Permission Lattice",
+      "primary_owner_plane": "foundation",
+      "collaborating_planes": [
+        "identity",
+        "data-persistence",
+        "governance",
+        "security-safety",
+        "observability",
+        "configuration-secrets",
+        "engine-api",
+        "application-api"
+      ],
+      "implementation_mode": "contract-and-runtime-foundation",
+      "entry_gate": "L006 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Model capabilities, scopes, risk classes, approvals, delegation, and revocation as deterministic authority independent of model text.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "identity confusion",
+        "budget amplification",
+        "provenance break",
+        "replay inconsistency",
+        "fail-open policy"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "shadow-validate then mandatory substrate cutover",
+      "rollback_mode": "restore last verified substrate contract and replay-safe runtime baseline",
+      "promotion_result": "L007 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L008",
+      "level_id": "L008",
+      "ordinal": 8,
+      "stratum": "S01",
+      "title": "Deterministic Replay and Checkpointing",
+      "primary_owner_plane": "foundation",
+      "collaborating_planes": [
+        "identity",
+        "data-persistence",
+        "governance",
+        "security-safety",
+        "observability",
+        "configuration-secrets",
+        "engine-api",
+        "application-api"
+      ],
+      "implementation_mode": "contract-and-runtime-foundation",
+      "entry_gate": "L007 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Make admitted cognitive operations reconstructable after crash without fabricating completion or repeating ambiguous effects.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "identity confusion",
+        "budget amplification",
+        "provenance break",
+        "replay inconsistency",
+        "fail-open policy"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "shadow-validate then mandatory substrate cutover",
+      "rollback_mode": "restore last verified substrate contract and replay-safe runtime baseline",
+      "promotion_result": "L008 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L009",
+      "level_id": "L009",
+      "ordinal": 9,
+      "stratum": "S01",
+      "title": "Safety and Interlock Substrate",
+      "primary_owner_plane": "foundation",
+      "collaborating_planes": [
+        "identity",
+        "data-persistence",
+        "governance",
+        "security-safety",
+        "observability",
+        "configuration-secrets",
+        "engine-api",
+        "application-api"
+      ],
+      "implementation_mode": "contract-and-runtime-foundation",
+      "entry_gate": "L008 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Install non-bypassable policy, content, side-effect, data-governance, and emergency-stop interlocks beneath learned behavior.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "identity confusion",
+        "budget amplification",
+        "provenance break",
+        "replay inconsistency",
+        "fail-open policy"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "shadow-validate then mandatory substrate cutover",
+      "rollback_mode": "restore last verified substrate contract and replay-safe runtime baseline",
+      "promotion_result": "L009 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L010",
+      "level_id": "L010",
+      "ordinal": 10,
+      "stratum": "S01",
+      "title": "Cognitive Substrate Closure",
+      "primary_owner_plane": "foundation",
+      "collaborating_planes": [
+        "identity",
+        "data-persistence",
+        "governance",
+        "security-safety",
+        "observability",
+        "configuration-secrets",
+        "engine-api",
+        "application-api"
+      ],
+      "implementation_mode": "contract-and-runtime-foundation",
+      "entry_gate": "L009 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Prove the complete substrate composes without shadow authority, replay gaps, budget amplification, provenance loss, or fail-open safety.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "identity confusion",
+        "budget amplification",
+        "provenance break",
+        "replay inconsistency",
+        "fail-open policy"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "shadow-validate then mandatory substrate cutover",
+      "rollback_mode": "restore last verified substrate contract and replay-safe runtime baseline",
+      "promotion_result": "L010 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L011",
+      "level_id": "L011",
+      "ordinal": 11,
+      "stratum": "S02",
+      "title": "Multimodal Ingestion Fabric",
+      "primary_owner_plane": "prompt-context",
+      "collaborating_planes": [
+        "retrieval",
+        "artifact-files",
+        "model-provider",
+        "security-safety",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "implementation_mode": "context-pipeline",
+      "entry_gate": "L010 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Normalize text, image, audio, video, document, sensor, and structured inputs through typed bounded ingestion paths.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "prompt/context injection",
+        "trust inversion",
+        "oversized input",
+        "cross-modal mismatch",
+        "context starvation"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "shadow context comparison then bounded canary",
+      "rollback_mode": "disable advanced context layer and fall back to lower qualified context compiler",
+      "promotion_result": "L011 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L012",
+      "level_id": "L012",
+      "ordinal": 12,
+      "stratum": "S02",
+      "title": "Content-Type and Integrity Verification",
+      "primary_owner_plane": "prompt-context",
+      "collaborating_planes": [
+        "retrieval",
+        "artifact-files",
+        "model-provider",
+        "security-safety",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "implementation_mode": "context-pipeline",
+      "entry_gate": "L011 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Verify media/container type, size, hashes, malware status, parser safety, and source integrity before semantic interpretation.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "prompt/context injection",
+        "trust inversion",
+        "oversized input",
+        "cross-modal mismatch",
+        "context starvation"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "shadow context comparison then bounded canary",
+      "rollback_mode": "disable advanced context layer and fall back to lower qualified context compiler",
+      "promotion_result": "L012 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L013",
+      "level_id": "L013",
+      "ordinal": 13,
+      "stratum": "S02",
+      "title": "Semantic Segmentation",
+      "primary_owner_plane": "prompt-context",
+      "collaborating_planes": [
+        "retrieval",
+        "artifact-files",
+        "model-provider",
+        "security-safety",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "implementation_mode": "context-pipeline",
+      "entry_gate": "L012 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Split complex inputs into addressable semantic units while preserving source offsets, modality, chronology, and provenance.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "prompt/context injection",
+        "trust inversion",
+        "oversized input",
+        "cross-modal mismatch",
+        "context starvation"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "shadow context comparison then bounded canary",
+      "rollback_mode": "disable advanced context layer and fall back to lower qualified context compiler",
+      "promotion_result": "L013 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L014",
+      "level_id": "L014",
+      "ordinal": 14,
+      "stratum": "S02",
+      "title": "Trust Classification",
+      "primary_owner_plane": "prompt-context",
+      "collaborating_planes": [
+        "retrieval",
+        "artifact-files",
+        "model-provider",
+        "security-safety",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "implementation_mode": "context-pipeline",
+      "entry_gate": "L013 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Assign immutable trust/data classes to control, user, memory, retrieval, tool, artifact, provider, and model-derived segments.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "prompt/context injection",
+        "trust inversion",
+        "oversized input",
+        "cross-modal mismatch",
+        "context starvation"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "shadow context comparison then bounded canary",
+      "rollback_mode": "disable advanced context layer and fall back to lower qualified context compiler",
+      "promotion_result": "L014 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L015",
+      "level_id": "L015",
+      "ordinal": 15,
+      "stratum": "S02",
+      "title": "Context Normalization",
+      "primary_owner_plane": "prompt-context",
+      "collaborating_planes": [
+        "retrieval",
+        "artifact-files",
+        "model-provider",
+        "security-safety",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "implementation_mode": "context-pipeline",
+      "entry_gate": "L014 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Canonicalize heterogeneous observations into a common context schema without erasing uncertainty, source identity, or modality.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "prompt/context injection",
+        "trust inversion",
+        "oversized input",
+        "cross-modal mismatch",
+        "context starvation"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "shadow context comparison then bounded canary",
+      "rollback_mode": "disable advanced context layer and fall back to lower qualified context compiler",
+      "promotion_result": "L015 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L016",
+      "level_id": "L016",
+      "ordinal": 16,
+      "stratum": "S02",
+      "title": "Salience and Relevance Modeling",
+      "primary_owner_plane": "prompt-context",
+      "collaborating_planes": [
+        "retrieval",
+        "artifact-files",
+        "model-provider",
+        "security-safety",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "implementation_mode": "context-pipeline",
+      "entry_gate": "L015 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Rank candidate context by task relevance, trust, recency, novelty, causal importance, and user intent under deterministic bounds.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "prompt/context injection",
+        "trust inversion",
+        "oversized input",
+        "cross-modal mismatch",
+        "context starvation"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "shadow context comparison then bounded canary",
+      "rollback_mode": "disable advanced context layer and fall back to lower qualified context compiler",
+      "promotion_result": "L016 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L017",
+      "level_id": "L017",
+      "ordinal": 17,
+      "stratum": "S02",
+      "title": "Context Compression and Distillation",
+      "primary_owner_plane": "prompt-context",
+      "collaborating_planes": [
+        "retrieval",
+        "artifact-files",
+        "model-provider",
+        "security-safety",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "implementation_mode": "context-pipeline",
+      "entry_gate": "L016 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Compress long histories and evidence while retaining source links, uncertainty, obligations, unresolved conflicts, and control invariants.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "prompt/context injection",
+        "trust inversion",
+        "oversized input",
+        "cross-modal mismatch",
+        "context starvation"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "shadow context comparison then bounded canary",
+      "rollback_mode": "disable advanced context layer and fall back to lower qualified context compiler",
+      "promotion_result": "L017 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L018",
+      "level_id": "L018",
+      "ordinal": 18,
+      "stratum": "S02",
+      "title": "Long-Context Paging and Recall",
+      "primary_owner_plane": "prompt-context",
+      "collaborating_planes": [
+        "retrieval",
+        "artifact-files",
+        "model-provider",
+        "security-safety",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "implementation_mode": "context-pipeline",
+      "entry_gate": "L017 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Page context across large projects using stable references, resumable windows, eviction policy, and high-trust non-evictable controls.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "prompt/context injection",
+        "trust inversion",
+        "oversized input",
+        "cross-modal mismatch",
+        "context starvation"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "shadow context comparison then bounded canary",
+      "rollback_mode": "disable advanced context layer and fall back to lower qualified context compiler",
+      "promotion_result": "L018 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L019",
+      "level_id": "L019",
+      "ordinal": 19,
+      "stratum": "S02",
+      "title": "Cross-Modal Alignment",
+      "primary_owner_plane": "prompt-context",
+      "collaborating_planes": [
+        "retrieval",
+        "artifact-files",
+        "model-provider",
+        "security-safety",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "implementation_mode": "context-pipeline",
+      "entry_gate": "L018 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Align entities, events, quantities, timestamps, speakers, regions, and claims across text, image, audio, video, and structured evidence.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "prompt/context injection",
+        "trust inversion",
+        "oversized input",
+        "cross-modal mismatch",
+        "context starvation"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "shadow context comparison then bounded canary",
+      "rollback_mode": "disable advanced context layer and fall back to lower qualified context compiler",
+      "promotion_result": "L019 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L020",
+      "level_id": "L020",
+      "ordinal": 20,
+      "stratum": "S02",
+      "title": "Context Intelligence Closure",
+      "primary_owner_plane": "prompt-context",
+      "collaborating_planes": [
+        "retrieval",
+        "artifact-files",
+        "model-provider",
+        "security-safety",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "implementation_mode": "context-pipeline",
+      "entry_gate": "L019 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Prove context construction resists injection, starvation, provenance loss, modality confusion, overflow, and trust inversion.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "prompt/context injection",
+        "trust inversion",
+        "oversized input",
+        "cross-modal mismatch",
+        "context starvation"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "shadow context comparison then bounded canary",
+      "rollback_mode": "disable advanced context layer and fall back to lower qualified context compiler",
+      "promotion_result": "L020 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L021",
+      "level_id": "L021",
+      "ordinal": 21,
+      "stratum": "S03",
+      "title": "Working Memory",
+      "primary_owner_plane": "memory",
+      "collaborating_planes": [
+        "retrieval",
+        "data-persistence",
+        "governance",
+        "observability"
+      ],
+      "implementation_mode": "governed-state-and-retrieval",
+      "entry_gate": "L020 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Maintain bounded task-local active state, unresolved obligations, intermediate facts, and execution scratch without confusing it with durable memory.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "memory poisoning",
+        "cross-tenant recall",
+        "stale fact promotion",
+        "deletion resurrection",
+        "retrieval ACL bypass"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "dual-read/compare then controlled authority adoption where applicable",
+      "rollback_mode": "disable new memory/knowledge path and rebuild derived state from canonical sources",
+      "promotion_result": "L021 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L022",
+      "level_id": "L022",
+      "ordinal": 22,
+      "stratum": "S03",
+      "title": "Episodic Memory",
+      "primary_owner_plane": "memory",
+      "collaborating_planes": [
+        "retrieval",
+        "data-persistence",
+        "governance",
+        "observability"
+      ],
+      "implementation_mode": "governed-state-and-retrieval",
+      "entry_gate": "L021 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Store governed event episodes with time, actors, outcomes, provenance, confidence, sensitivity, and supersession.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "memory poisoning",
+        "cross-tenant recall",
+        "stale fact promotion",
+        "deletion resurrection",
+        "retrieval ACL bypass"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "dual-read/compare then controlled authority adoption where applicable",
+      "rollback_mode": "disable new memory/knowledge path and rebuild derived state from canonical sources",
+      "promotion_result": "L022 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L023",
+      "level_id": "L023",
+      "ordinal": 23,
+      "stratum": "S03",
+      "title": "Semantic Memory",
+      "primary_owner_plane": "memory",
+      "collaborating_planes": [
+        "retrieval",
+        "data-persistence",
+        "governance",
+        "observability"
+      ],
+      "implementation_mode": "governed-state-and-retrieval",
+      "entry_gate": "L022 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Maintain durable facts/concepts with source lineage, confidence, freshness, contradiction, tenant scope, and lifecycle policy.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "memory poisoning",
+        "cross-tenant recall",
+        "stale fact promotion",
+        "deletion resurrection",
+        "retrieval ACL bypass"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "dual-read/compare then controlled authority adoption where applicable",
+      "rollback_mode": "disable new memory/knowledge path and rebuild derived state from canonical sources",
+      "promotion_result": "L023 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L024",
+      "level_id": "L024",
+      "ordinal": 24,
+      "stratum": "S03",
+      "title": "Procedural Memory",
+      "primary_owner_plane": "memory",
+      "collaborating_planes": [
+        "retrieval",
+        "data-persistence",
+        "governance",
+        "observability"
+      ],
+      "implementation_mode": "governed-state-and-retrieval",
+      "entry_gate": "L023 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Represent reusable procedures, workflows, heuristics, and skill knowledge separately from privileged executable authority.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "memory poisoning",
+        "cross-tenant recall",
+        "stale fact promotion",
+        "deletion resurrection",
+        "retrieval ACL bypass"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "dual-read/compare then controlled authority adoption where applicable",
+      "rollback_mode": "disable new memory/knowledge path and rebuild derived state from canonical sources",
+      "promotion_result": "L024 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L025",
+      "level_id": "L025",
+      "ordinal": 25,
+      "stratum": "S03",
+      "title": "Temporal Memory",
+      "primary_owner_plane": "memory",
+      "collaborating_planes": [
+        "retrieval",
+        "data-persistence",
+        "governance",
+        "observability"
+      ],
+      "implementation_mode": "governed-state-and-retrieval",
+      "entry_gate": "L024 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Reason over changing facts, validity intervals, event sequences, recency, decay, and historical snapshots.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "memory poisoning",
+        "cross-tenant recall",
+        "stale fact promotion",
+        "deletion resurrection",
+        "retrieval ACL bypass"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "dual-read/compare then controlled authority adoption where applicable",
+      "rollback_mode": "disable new memory/knowledge path and rebuild derived state from canonical sources",
+      "promotion_result": "L025 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L026",
+      "level_id": "L026",
+      "ordinal": 26,
+      "stratum": "S03",
+      "title": "Knowledge Graph Intelligence",
+      "primary_owner_plane": "memory",
+      "collaborating_planes": [
+        "retrieval",
+        "data-persistence",
+        "governance",
+        "observability"
+      ],
+      "implementation_mode": "governed-state-and-retrieval",
+      "entry_gate": "L025 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Build typed entity/relation graphs with provenance, temporal edges, contradiction handling, and graph-query authorization.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "memory poisoning",
+        "cross-tenant recall",
+        "stale fact promotion",
+        "deletion resurrection",
+        "retrieval ACL bypass"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "dual-read/compare then controlled authority adoption where applicable",
+      "rollback_mode": "disable new memory/knowledge path and rebuild derived state from canonical sources",
+      "promotion_result": "L026 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L027",
+      "level_id": "L027",
+      "ordinal": 27,
+      "stratum": "S03",
+      "title": "Retrieval Fusion",
+      "primary_owner_plane": "memory",
+      "collaborating_planes": [
+        "retrieval",
+        "data-persistence",
+        "governance",
+        "observability"
+      ],
+      "implementation_mode": "governed-state-and-retrieval",
+      "entry_gate": "L026 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Fuse lexical, vector, graph, structured, temporal, and private/public retrieval with ACL-first filtering and calibrated reranking.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "memory poisoning",
+        "cross-tenant recall",
+        "stale fact promotion",
+        "deletion resurrection",
+        "retrieval ACL bypass"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "dual-read/compare then controlled authority adoption where applicable",
+      "rollback_mode": "disable new memory/knowledge path and rebuild derived state from canonical sources",
+      "promotion_result": "L027 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L028",
+      "level_id": "L028",
+      "ordinal": 28,
+      "stratum": "S03",
+      "title": "Memory Consolidation and Supersession",
+      "primary_owner_plane": "memory",
+      "collaborating_planes": [
+        "retrieval",
+        "data-persistence",
+        "governance",
+        "observability"
+      ],
+      "implementation_mode": "governed-state-and-retrieval",
+      "entry_gate": "L027 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Merge redundant memories, preserve contradictions, supersede stale records, and maintain reversible provenance-aware consolidation.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "memory poisoning",
+        "cross-tenant recall",
+        "stale fact promotion",
+        "deletion resurrection",
+        "retrieval ACL bypass"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "dual-read/compare then controlled authority adoption where applicable",
+      "rollback_mode": "disable new memory/knowledge path and rebuild derived state from canonical sources",
+      "promotion_result": "L028 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L029",
+      "level_id": "L029",
+      "ordinal": 29,
+      "stratum": "S03",
+      "title": "Forgetting, Privacy, and Lifecycle",
+      "primary_owner_plane": "memory",
+      "collaborating_planes": [
+        "retrieval",
+        "data-persistence",
+        "governance",
+        "observability"
+      ],
+      "implementation_mode": "governed-state-and-retrieval",
+      "entry_gate": "L028 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Apply deletion, retention, legal hold, sensitivity, minimization, and derived-projection purge semantics across memory systems.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "memory poisoning",
+        "cross-tenant recall",
+        "stale fact promotion",
+        "deletion resurrection",
+        "retrieval ACL bypass"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "dual-read/compare then controlled authority adoption where applicable",
+      "rollback_mode": "disable new memory/knowledge path and rebuild derived state from canonical sources",
+      "promotion_result": "L029 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L030",
+      "level_id": "L030",
+      "ordinal": 30,
+      "stratum": "S03",
+      "title": "Memory and Knowledge Closure",
+      "primary_owner_plane": "memory",
+      "collaborating_planes": [
+        "retrieval",
+        "data-persistence",
+        "governance",
+        "observability"
+      ],
+      "implementation_mode": "governed-state-and-retrieval",
+      "entry_gate": "L029 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Prove continuity, retrieval quality, isolation, deletion, provenance, freshness, contradiction, rebuild, and degraded stateless operation.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "memory poisoning",
+        "cross-tenant recall",
+        "stale fact promotion",
+        "deletion resurrection",
+        "retrieval ACL bypass"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "dual-read/compare then controlled authority adoption where applicable",
+      "rollback_mode": "disable new memory/knowledge path and rebuild derived state from canonical sources",
+      "promotion_result": "L030 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L031",
+      "level_id": "L031",
+      "ordinal": 31,
+      "stratum": "S04",
+      "title": "Problem Framing",
+      "primary_owner_plane": "reasoning-verification",
+      "collaborating_planes": [
+        "orchestration",
+        "model-routing",
+        "evaluation",
+        "prompt-context"
+      ],
+      "implementation_mode": "reasoning-and-verification",
+      "entry_gate": "L030 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Convert ambiguous user goals into explicit objective, scope, constraints, success criteria, assumptions, unknowns, and risk.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "constraint violation",
+        "hallucinated proof",
+        "overconfidence",
+        "causal confusion",
+        "verification collusion"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "offline evaluation then shadow/canary reasoning selection",
+      "rollback_mode": "route to last qualified reasoning strategy or abstain",
+      "promotion_result": "L031 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L032",
+      "level_id": "L032",
+      "ordinal": 32,
+      "stratum": "S04",
+      "title": "Task Decomposition",
+      "primary_owner_plane": "reasoning-verification",
+      "collaborating_planes": [
+        "orchestration",
+        "model-routing",
+        "evaluation",
+        "prompt-context"
+      ],
+      "implementation_mode": "reasoning-and-verification",
+      "entry_gate": "L031 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Build dependency-aware task DAGs with bounded subtasks, owners, budgets, checkpoints, and recomposition criteria.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "constraint violation",
+        "hallucinated proof",
+        "overconfidence",
+        "causal confusion",
+        "verification collusion"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "offline evaluation then shadow/canary reasoning selection",
+      "rollback_mode": "route to last qualified reasoning strategy or abstain",
+      "promotion_result": "L032 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L033",
+      "level_id": "L033",
+      "ordinal": 33,
+      "stratum": "S04",
+      "title": "Hypothesis Generation",
+      "primary_owner_plane": "reasoning-verification",
+      "collaborating_planes": [
+        "orchestration",
+        "model-routing",
+        "evaluation",
+        "prompt-context"
+      ],
+      "implementation_mode": "reasoning-and-verification",
+      "entry_gate": "L032 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Generate competing explanations or solution candidates while labeling assumptions, priors, expected evidence, and falsifiers.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "constraint violation",
+        "hallucinated proof",
+        "overconfidence",
+        "causal confusion",
+        "verification collusion"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "offline evaluation then shadow/canary reasoning selection",
+      "rollback_mode": "route to last qualified reasoning strategy or abstain",
+      "promotion_result": "L033 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L034",
+      "level_id": "L034",
+      "ordinal": 34,
+      "stratum": "S04",
+      "title": "Search and Branching",
+      "primary_owner_plane": "reasoning-verification",
+      "collaborating_planes": [
+        "orchestration",
+        "model-routing",
+        "evaluation",
+        "prompt-context"
+      ],
+      "implementation_mode": "reasoning-and-verification",
+      "entry_gate": "L033 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Explore alternative reasoning branches with bounded beam/tree search, pruning, diversity control, and branch provenance.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "constraint violation",
+        "hallucinated proof",
+        "overconfidence",
+        "causal confusion",
+        "verification collusion"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "offline evaluation then shadow/canary reasoning selection",
+      "rollback_mode": "route to last qualified reasoning strategy or abstain",
+      "promotion_result": "L034 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L035",
+      "level_id": "L035",
+      "ordinal": 35,
+      "stratum": "S04",
+      "title": "Constraint Solving",
+      "primary_owner_plane": "reasoning-verification",
+      "collaborating_planes": [
+        "orchestration",
+        "model-routing",
+        "evaluation",
+        "prompt-context"
+      ],
+      "implementation_mode": "reasoning-and-verification",
+      "entry_gate": "L034 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Apply hard/soft constraints, optimization objectives, feasibility checks, and conflict explanations before accepting plans.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "constraint violation",
+        "hallucinated proof",
+        "overconfidence",
+        "causal confusion",
+        "verification collusion"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "offline evaluation then shadow/canary reasoning selection",
+      "rollback_mode": "route to last qualified reasoning strategy or abstain",
+      "promotion_result": "L035 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L036",
+      "level_id": "L036",
+      "ordinal": 36,
+      "stratum": "S04",
+      "title": "Quantitative and Symbolic Reasoning",
+      "primary_owner_plane": "reasoning-verification",
+      "collaborating_planes": [
+        "orchestration",
+        "model-routing",
+        "evaluation",
+        "prompt-context"
+      ],
+      "implementation_mode": "reasoning-and-verification",
+      "entry_gate": "L035 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Route mathematics, logic, code, formal rules, and structured computation through verifiable representations and tools.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "constraint violation",
+        "hallucinated proof",
+        "overconfidence",
+        "causal confusion",
+        "verification collusion"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "offline evaluation then shadow/canary reasoning selection",
+      "rollback_mode": "route to last qualified reasoning strategy or abstain",
+      "promotion_result": "L036 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L037",
+      "level_id": "L037",
+      "ordinal": 37,
+      "stratum": "S04",
+      "title": "Causal Reasoning",
+      "primary_owner_plane": "reasoning-verification",
+      "collaborating_planes": [
+        "orchestration",
+        "model-routing",
+        "evaluation",
+        "prompt-context"
+      ],
+      "implementation_mode": "reasoning-and-verification",
+      "entry_gate": "L036 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Distinguish correlation, intervention, mechanism, confounders, counterfactuals, and causal uncertainty in planning and explanation.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "constraint violation",
+        "hallucinated proof",
+        "overconfidence",
+        "causal confusion",
+        "verification collusion"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "offline evaluation then shadow/canary reasoning selection",
+      "rollback_mode": "route to last qualified reasoning strategy or abstain",
+      "promotion_result": "L037 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L038",
+      "level_id": "L038",
+      "ordinal": 38,
+      "stratum": "S04",
+      "title": "Uncertainty Calibration",
+      "primary_owner_plane": "reasoning-verification",
+      "collaborating_planes": [
+        "orchestration",
+        "model-routing",
+        "evaluation",
+        "prompt-context"
+      ],
+      "implementation_mode": "reasoning-and-verification",
+      "entry_gate": "L037 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Track epistemic/aleatoric uncertainty, confidence intervals, evidence coverage, disagreement, and abstention thresholds.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "constraint violation",
+        "hallucinated proof",
+        "overconfidence",
+        "causal confusion",
+        "verification collusion"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "offline evaluation then shadow/canary reasoning selection",
+      "rollback_mode": "route to last qualified reasoning strategy or abstain",
+      "promotion_result": "L038 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L039",
+      "level_id": "L039",
+      "ordinal": 39,
+      "stratum": "S04",
+      "title": "Independent Critique and Verification",
+      "primary_owner_plane": "reasoning-verification",
+      "collaborating_planes": [
+        "orchestration",
+        "model-routing",
+        "evaluation",
+        "prompt-context"
+      ],
+      "implementation_mode": "reasoning-and-verification",
+      "entry_gate": "L038 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Separate generation from deterministic checks and optional independent critics, adversarial review, simulation, and evidence validation.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "constraint violation",
+        "hallucinated proof",
+        "overconfidence",
+        "causal confusion",
+        "verification collusion"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "offline evaluation then shadow/canary reasoning selection",
+      "rollback_mode": "route to last qualified reasoning strategy or abstain",
+      "promotion_result": "L039 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L040",
+      "level_id": "L040",
+      "ordinal": 40,
+      "stratum": "S04",
+      "title": "Deliberative Intelligence Closure",
+      "primary_owner_plane": "reasoning-verification",
+      "collaborating_planes": [
+        "orchestration",
+        "model-routing",
+        "evaluation",
+        "prompt-context"
+      ],
+      "implementation_mode": "reasoning-and-verification",
+      "entry_gate": "L039 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Prove framing, decomposition, search, constraint, causal, quantitative, uncertainty, and verification layers compose under bounded resources.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "constraint violation",
+        "hallucinated proof",
+        "overconfidence",
+        "causal confusion",
+        "verification collusion"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "offline evaluation then shadow/canary reasoning selection",
+      "rollback_mode": "route to last qualified reasoning strategy or abstain",
+      "promotion_result": "L040 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L041",
+      "level_id": "L041",
+      "ordinal": 41,
+      "stratum": "S05",
+      "title": "Intent-to-Action Proposal",
+      "primary_owner_plane": "tool-runtime",
+      "collaborating_planes": [
+        "identity",
+        "security-safety",
+        "governance",
+        "jobs-durability",
+        "artifact-files"
+      ],
+      "implementation_mode": "privileged-action-runtime",
+      "entry_gate": "L040 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Translate plans into explicit action proposals with target, arguments, expected effect, risk, reversibility, and evidence needs.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "capability escalation",
+        "approval drift",
+        "duplicate side effect",
+        "ambiguous write replay",
+        "tool result forgery"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "read-only/sandbox first, then approval-bound canary side effects",
+      "rollback_mode": "disable consequential actions and retain verified read-only/tool-safe path",
+      "promotion_result": "L041 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L042",
+      "level_id": "L042",
+      "ordinal": 42,
+      "stratum": "S05",
+      "title": "Capability Admission",
+      "primary_owner_plane": "tool-runtime",
+      "collaborating_planes": [
+        "identity",
+        "security-safety",
+        "governance",
+        "jobs-durability",
+        "artifact-files"
+      ],
+      "implementation_mode": "privileged-action-runtime",
+      "entry_gate": "L041 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Resolve whether the principal and operation may attempt an action under tenant, policy, budget, risk, and data-class constraints.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "capability escalation",
+        "approval drift",
+        "duplicate side effect",
+        "ambiguous write replay",
+        "tool result forgery"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "read-only/sandbox first, then approval-bound canary side effects",
+      "rollback_mode": "disable consequential actions and retain verified read-only/tool-safe path",
+      "promotion_result": "L042 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L043",
+      "level_id": "L043",
+      "ordinal": 43,
+      "stratum": "S05",
+      "title": "Tool Schema Grounding",
+      "primary_owner_plane": "tool-runtime",
+      "collaborating_planes": [
+        "identity",
+        "security-safety",
+        "governance",
+        "jobs-durability",
+        "artifact-files"
+      ],
+      "implementation_mode": "privileged-action-runtime",
+      "entry_gate": "L042 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Ground model proposals into exact typed tool contracts, enumerated resources, validated arguments, and provider-neutral call identities.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "capability escalation",
+        "approval drift",
+        "duplicate side effect",
+        "ambiguous write replay",
+        "tool result forgery"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "read-only/sandbox first, then approval-bound canary side effects",
+      "rollback_mode": "disable consequential actions and retain verified read-only/tool-safe path",
+      "promotion_result": "L043 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L044",
+      "level_id": "L044",
+      "ordinal": 44,
+      "stratum": "S05",
+      "title": "Side-Effect Classification",
+      "primary_owner_plane": "tool-runtime",
+      "collaborating_planes": [
+        "identity",
+        "security-safety",
+        "governance",
+        "jobs-durability",
+        "artifact-files"
+      ],
+      "implementation_mode": "privileged-action-runtime",
+      "entry_gate": "L043 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Classify actions as read-only, reversible, consequential, destructive, security-sensitive, financial, external-write, or other governed classes.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "capability escalation",
+        "approval drift",
+        "duplicate side effect",
+        "ambiguous write replay",
+        "tool result forgery"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "read-only/sandbox first, then approval-bound canary side effects",
+      "rollback_mode": "disable consequential actions and retain verified read-only/tool-safe path",
+      "promotion_result": "L044 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L045",
+      "level_id": "L045",
+      "ordinal": 45,
+      "stratum": "S05",
+      "title": "Approval and Consent Orchestration",
+      "primary_owner_plane": "tool-runtime",
+      "collaborating_planes": [
+        "identity",
+        "security-safety",
+        "governance",
+        "jobs-durability",
+        "artifact-files"
+      ],
+      "implementation_mode": "privileged-action-runtime",
+      "entry_gate": "L044 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Acquire, bind, expire, revoke, and revalidate approvals against exact operation, arguments, risk, and acting principal.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "capability escalation",
+        "approval drift",
+        "duplicate side effect",
+        "ambiguous write replay",
+        "tool result forgery"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "read-only/sandbox first, then approval-bound canary side effects",
+      "rollback_mode": "disable consequential actions and retain verified read-only/tool-safe path",
+      "promotion_result": "L045 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L046",
+      "level_id": "L046",
+      "ordinal": 46,
+      "stratum": "S05",
+      "title": "Sandboxed Execution",
+      "primary_owner_plane": "tool-runtime",
+      "collaborating_planes": [
+        "identity",
+        "security-safety",
+        "governance",
+        "jobs-durability",
+        "artifact-files"
+      ],
+      "implementation_mode": "privileged-action-runtime",
+      "entry_gate": "L045 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Run executable/untrusted workloads in isolated resource-, filesystem-, process-, and network-bounded environments.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "capability escalation",
+        "approval drift",
+        "duplicate side effect",
+        "ambiguous write replay",
+        "tool result forgery"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "read-only/sandbox first, then approval-bound canary side effects",
+      "rollback_mode": "disable consequential actions and retain verified read-only/tool-safe path",
+      "promotion_result": "L046 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L047",
+      "level_id": "L047",
+      "ordinal": 47,
+      "stratum": "S05",
+      "title": "Transactional External Integration",
+      "primary_owner_plane": "tool-runtime",
+      "collaborating_planes": [
+        "identity",
+        "security-safety",
+        "governance",
+        "jobs-durability",
+        "artifact-files"
+      ],
+      "implementation_mode": "privileged-action-runtime",
+      "entry_gate": "L046 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Use idempotency, outbox/saga, receipts, retries, compensation, and reconciliation for actions across external systems.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "capability escalation",
+        "approval drift",
+        "duplicate side effect",
+        "ambiguous write replay",
+        "tool result forgery"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "read-only/sandbox first, then approval-bound canary side effects",
+      "rollback_mode": "disable consequential actions and retain verified read-only/tool-safe path",
+      "promotion_result": "L047 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L048",
+      "level_id": "L048",
+      "ordinal": 48,
+      "stratum": "S05",
+      "title": "Ambiguous Effect Reconciliation",
+      "primary_owner_plane": "tool-runtime",
+      "collaborating_planes": [
+        "identity",
+        "security-safety",
+        "governance",
+        "jobs-durability",
+        "artifact-files"
+      ],
+      "implementation_mode": "privileged-action-runtime",
+      "entry_gate": "L047 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Detect uncertain side effects after timeout/crash and reconcile external status before any retry or model continuation.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "capability escalation",
+        "approval drift",
+        "duplicate side effect",
+        "ambiguous write replay",
+        "tool result forgery"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "read-only/sandbox first, then approval-bound canary side effects",
+      "rollback_mode": "disable consequential actions and retain verified read-only/tool-safe path",
+      "promotion_result": "L048 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L049",
+      "level_id": "L049",
+      "ordinal": 49,
+      "stratum": "S05",
+      "title": "Action Outcome Verification",
+      "primary_owner_plane": "tool-runtime",
+      "collaborating_planes": [
+        "identity",
+        "security-safety",
+        "governance",
+        "jobs-durability",
+        "artifact-files"
+      ],
+      "implementation_mode": "privileged-action-runtime",
+      "entry_gate": "L048 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Verify observed outcome against intended effect, tool receipt, external state, policy, and user-visible claim before completion.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "capability escalation",
+        "approval drift",
+        "duplicate side effect",
+        "ambiguous write replay",
+        "tool result forgery"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "read-only/sandbox first, then approval-bound canary side effects",
+      "rollback_mode": "disable consequential actions and retain verified read-only/tool-safe path",
+      "promotion_result": "L049 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L050",
+      "level_id": "L050",
+      "ordinal": 50,
+      "stratum": "S05",
+      "title": "Governed Agency Closure",
+      "primary_owner_plane": "tool-runtime",
+      "collaborating_planes": [
+        "identity",
+        "security-safety",
+        "governance",
+        "jobs-durability",
+        "artifact-files"
+      ],
+      "implementation_mode": "privileged-action-runtime",
+      "entry_gate": "L049 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Prove proposals cannot bypass authority, approvals cannot drift, external effects are replay-safe, and claimed outcomes are receipt-backed.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "capability escalation",
+        "approval drift",
+        "duplicate side effect",
+        "ambiguous write replay",
+        "tool result forgery"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "read-only/sandbox first, then approval-bound canary side effects",
+      "rollback_mode": "disable consequential actions and retain verified read-only/tool-safe path",
+      "promotion_result": "L050 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L051",
+      "level_id": "L051",
+      "ordinal": 51,
+      "stratum": "S06",
+      "title": "Agent Role and Responsibility Models",
+      "primary_owner_plane": "orchestration",
+      "collaborating_planes": [
+        "jobs-durability",
+        "operator-control",
+        "observability",
+        "cost-capacity"
+      ],
+      "implementation_mode": "distributed-orchestration",
+      "entry_gate": "L050 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Define specialist roles, responsibilities, allowed context, budgets, capabilities, and escalation boundaries.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "authority amplification",
+        "recursive worker explosion",
+        "deadlock",
+        "duplicate work/effects",
+        "consensus capture"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "single-worker baseline then bounded parallel canary",
+      "rollback_mode": "collapse multi-agent work to serial or smaller verified worker topology",
+      "promotion_result": "L051 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L052",
+      "level_id": "L052",
+      "ordinal": 52,
+      "stratum": "S06",
+      "title": "Delegation Graph",
+      "primary_owner_plane": "orchestration",
+      "collaborating_planes": [
+        "jobs-durability",
+        "operator-control",
+        "observability",
+        "cost-capacity"
+      ],
+      "implementation_mode": "distributed-orchestration",
+      "entry_gate": "L051 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Create explicit parent-child delegation edges carrying reduced authority, sub-budgets, task contracts, deadlines, and expected evidence.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "authority amplification",
+        "recursive worker explosion",
+        "deadlock",
+        "duplicate work/effects",
+        "consensus capture"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "single-worker baseline then bounded parallel canary",
+      "rollback_mode": "collapse multi-agent work to serial or smaller verified worker topology",
+      "promotion_result": "L052 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L053",
+      "level_id": "L053",
+      "ordinal": 53,
+      "stratum": "S06",
+      "title": "Bounded Worker Spawning",
+      "primary_owner_plane": "orchestration",
+      "collaborating_planes": [
+        "jobs-durability",
+        "operator-control",
+        "observability",
+        "cost-capacity"
+      ],
+      "implementation_mode": "distributed-orchestration",
+      "entry_gate": "L052 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Control worker count, recursion depth, fan-out, lifetime, token/cost budgets, and cancellation propagation.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "authority amplification",
+        "recursive worker explosion",
+        "deadlock",
+        "duplicate work/effects",
+        "consensus capture"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "single-worker baseline then bounded parallel canary",
+      "rollback_mode": "collapse multi-agent work to serial or smaller verified worker topology",
+      "promotion_result": "L053 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L054",
+      "level_id": "L054",
+      "ordinal": 54,
+      "stratum": "S06",
+      "title": "Shared Workspace Coordination",
+      "primary_owner_plane": "orchestration",
+      "collaborating_planes": [
+        "jobs-durability",
+        "operator-control",
+        "observability",
+        "cost-capacity"
+      ],
+      "implementation_mode": "distributed-orchestration",
+      "entry_gate": "L053 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Coordinate artifacts, hypotheses, task state, locks, versions, and provenance in a canonical collaboration workspace.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "authority amplification",
+        "recursive worker explosion",
+        "deadlock",
+        "duplicate work/effects",
+        "consensus capture"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "single-worker baseline then bounded parallel canary",
+      "rollback_mode": "collapse multi-agent work to serial or smaller verified worker topology",
+      "promotion_result": "L054 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L055",
+      "level_id": "L055",
+      "ordinal": 55,
+      "stratum": "S06",
+      "title": "Negotiation and Consensus",
+      "primary_owner_plane": "orchestration",
+      "collaborating_planes": [
+        "jobs-durability",
+        "operator-control",
+        "observability",
+        "cost-capacity"
+      ],
+      "implementation_mode": "distributed-orchestration",
+      "entry_gate": "L054 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Aggregate competing agent proposals through evidence-weighted voting, debate, ranking, confidence, and consensus rules.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "authority amplification",
+        "recursive worker explosion",
+        "deadlock",
+        "duplicate work/effects",
+        "consensus capture"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "single-worker baseline then bounded parallel canary",
+      "rollback_mode": "collapse multi-agent work to serial or smaller verified worker topology",
+      "promotion_result": "L055 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L056",
+      "level_id": "L056",
+      "ordinal": 56,
+      "stratum": "S06",
+      "title": "Conflict Detection and Resolution",
+      "primary_owner_plane": "orchestration",
+      "collaborating_planes": [
+        "jobs-durability",
+        "operator-control",
+        "observability",
+        "cost-capacity"
+      ],
+      "implementation_mode": "distributed-orchestration",
+      "entry_gate": "L055 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Detect incompatible plans, writes, claims, locks, goals, or resource needs and resolve through policy, arbitration, or escalation.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "authority amplification",
+        "recursive worker explosion",
+        "deadlock",
+        "duplicate work/effects",
+        "consensus capture"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "single-worker baseline then bounded parallel canary",
+      "rollback_mode": "collapse multi-agent work to serial or smaller verified worker topology",
+      "promotion_result": "L056 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L057",
+      "level_id": "L057",
+      "ordinal": 57,
+      "stratum": "S06",
+      "title": "Supervisor-Secretary-Worker Hierarchy",
+      "primary_owner_plane": "orchestration",
+      "collaborating_planes": [
+        "jobs-durability",
+        "operator-control",
+        "observability",
+        "cost-capacity"
+      ],
+      "implementation_mode": "distributed-orchestration",
+      "entry_gate": "L056 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Formalize scheduling/delegation, decomposition/coordination, and bounded execution roles without collapsing authority separation.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "authority amplification",
+        "recursive worker explosion",
+        "deadlock",
+        "duplicate work/effects",
+        "consensus capture"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "single-worker baseline then bounded parallel canary",
+      "rollback_mode": "collapse multi-agent work to serial or smaller verified worker topology",
+      "promotion_result": "L057 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L058",
+      "level_id": "L058",
+      "ordinal": 58,
+      "stratum": "S06",
+      "title": "Swarm and Parallel Coordination",
+      "primary_owner_plane": "orchestration",
+      "collaborating_planes": [
+        "jobs-durability",
+        "operator-control",
+        "observability",
+        "cost-capacity"
+      ],
+      "implementation_mode": "distributed-orchestration",
+      "entry_gate": "L057 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Execute large parallel workloads with shard identity, deterministic joins, straggler policy, fairness, duplicate suppression, and bounded concurrency.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "authority amplification",
+        "recursive worker explosion",
+        "deadlock",
+        "duplicate work/effects",
+        "consensus capture"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "single-worker baseline then bounded parallel canary",
+      "rollback_mode": "collapse multi-agent work to serial or smaller verified worker topology",
+      "promotion_result": "L058 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L059",
+      "level_id": "L059",
+      "ordinal": 59,
+      "stratum": "S06",
+      "title": "Cross-Agent Provenance",
+      "primary_owner_plane": "orchestration",
+      "collaborating_planes": [
+        "jobs-durability",
+        "operator-control",
+        "observability",
+        "cost-capacity"
+      ],
+      "implementation_mode": "distributed-orchestration",
+      "entry_gate": "L058 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Preserve which agent produced, consumed, transformed, challenged, or approved every material claim, action, and artifact.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "authority amplification",
+        "recursive worker explosion",
+        "deadlock",
+        "duplicate work/effects",
+        "consensus capture"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "single-worker baseline then bounded parallel canary",
+      "rollback_mode": "collapse multi-agent work to serial or smaller verified worker topology",
+      "promotion_result": "L059 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L060",
+      "level_id": "L060",
+      "ordinal": 60,
+      "stratum": "S06",
+      "title": "Organizational Intelligence Closure",
+      "primary_owner_plane": "orchestration",
+      "collaborating_planes": [
+        "jobs-durability",
+        "operator-control",
+        "observability",
+        "cost-capacity"
+      ],
+      "implementation_mode": "distributed-orchestration",
+      "entry_gate": "L059 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Prove multi-agent work cannot amplify authority/budget, lose provenance, deadlock indefinitely, duplicate effects, or silently override conflicts.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "authority amplification",
+        "recursive worker explosion",
+        "deadlock",
+        "duplicate work/effects",
+        "consensus capture"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "single-worker baseline then bounded parallel canary",
+      "rollback_mode": "collapse multi-agent work to serial or smaller verified worker topology",
+      "promotion_result": "L060 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L061",
+      "level_id": "L061",
+      "ordinal": 61,
+      "stratum": "S07",
+      "title": "Feedback Capture",
+      "primary_owner_plane": "evaluation",
+      "collaborating_planes": [
+        "feedback-learning",
+        "observability",
+        "model-routing",
+        "memory",
+        "governance"
+      ],
+      "implementation_mode": "evaluation-learning-release",
+      "entry_gate": "L060 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Collect explicit user feedback, implicit outcome signals, tool results, evaluator labels, incidents, and corrections with provenance and consent.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "evaluation leakage",
+        "reward hacking",
+        "data poisoning",
+        "silent drift",
+        "unsafe self-promotion"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "offline/shadow experiment then independently approved canary",
+      "rollback_mode": "freeze adaptation and restore last verified routing/model/strategy baseline",
+      "promotion_result": "L061 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L062",
+      "level_id": "L062",
+      "ordinal": 62,
+      "stratum": "S07",
+      "title": "Offline Evaluation",
+      "primary_owner_plane": "evaluation",
+      "collaborating_planes": [
+        "feedback-learning",
+        "observability",
+        "model-routing",
+        "memory",
+        "governance"
+      ],
+      "implementation_mode": "evaluation-learning-release",
+      "entry_gate": "L061 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Run reproducible datasets, golden tasks, safety suites, regressions, stress cases, and counterexamples outside production serving.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "evaluation leakage",
+        "reward hacking",
+        "data poisoning",
+        "silent drift",
+        "unsafe self-promotion"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "offline/shadow experiment then independently approved canary",
+      "rollback_mode": "freeze adaptation and restore last verified routing/model/strategy baseline",
+      "promotion_result": "L062 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L063",
+      "level_id": "L063",
+      "ordinal": 63,
+      "stratum": "S07",
+      "title": "Online Evaluation",
+      "primary_owner_plane": "evaluation",
+      "collaborating_planes": [
+        "feedback-learning",
+        "observability",
+        "model-routing",
+        "memory",
+        "governance"
+      ],
+      "implementation_mode": "evaluation-learning-release",
+      "entry_gate": "L062 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Measure quality, latency, cost, safety, user success, calibration, and failure modes on governed production-like or shadow traffic.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "evaluation leakage",
+        "reward hacking",
+        "data poisoning",
+        "silent drift",
+        "unsafe self-promotion"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "offline/shadow experiment then independently approved canary",
+      "rollback_mode": "freeze adaptation and restore last verified routing/model/strategy baseline",
+      "promotion_result": "L063 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L064",
+      "level_id": "L064",
+      "ordinal": 64,
+      "stratum": "S07",
+      "title": "Counterfactual Analysis",
+      "primary_owner_plane": "evaluation",
+      "collaborating_planes": [
+        "feedback-learning",
+        "observability",
+        "model-routing",
+        "memory",
+        "governance"
+      ],
+      "implementation_mode": "evaluation-learning-release",
+      "entry_gate": "L063 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Estimate alternative routing, prompting, tool, memory, and policy outcomes without mutating production authority.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "evaluation leakage",
+        "reward hacking",
+        "data poisoning",
+        "silent drift",
+        "unsafe self-promotion"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "offline/shadow experiment then independently approved canary",
+      "rollback_mode": "freeze adaptation and restore last verified routing/model/strategy baseline",
+      "promotion_result": "L064 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L065",
+      "level_id": "L065",
+      "ordinal": 65,
+      "stratum": "S07",
+      "title": "Preference and Reward Learning",
+      "primary_owner_plane": "evaluation",
+      "collaborating_planes": [
+        "feedback-learning",
+        "observability",
+        "model-routing",
+        "memory",
+        "governance"
+      ],
+      "implementation_mode": "evaluation-learning-release",
+      "entry_gate": "L064 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Learn bounded preferences or reward models from governed signals while controlling bias, drift, poisoning, and tenant leakage.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "evaluation leakage",
+        "reward hacking",
+        "data poisoning",
+        "silent drift",
+        "unsafe self-promotion"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "offline/shadow experiment then independently approved canary",
+      "rollback_mode": "freeze adaptation and restore last verified routing/model/strategy baseline",
+      "promotion_result": "L065 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L066",
+      "level_id": "L066",
+      "ordinal": 66,
+      "stratum": "S07",
+      "title": "Curriculum and Self-Training",
+      "primary_owner_plane": "evaluation",
+      "collaborating_planes": [
+        "feedback-learning",
+        "observability",
+        "model-routing",
+        "memory",
+        "governance"
+      ],
+      "implementation_mode": "evaluation-learning-release",
+      "entry_gate": "L065 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Sequence learning tasks and synthetic practice under provenance, holdouts, contamination controls, and independent evaluation.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "evaluation leakage",
+        "reward hacking",
+        "data poisoning",
+        "silent drift",
+        "unsafe self-promotion"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "offline/shadow experiment then independently approved canary",
+      "rollback_mode": "freeze adaptation and restore last verified routing/model/strategy baseline",
+      "promotion_result": "L066 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L067",
+      "level_id": "L067",
+      "ordinal": 67,
+      "stratum": "S07",
+      "title": "Adaptive Routing",
+      "primary_owner_plane": "evaluation",
+      "collaborating_planes": [
+        "feedback-learning",
+        "observability",
+        "model-routing",
+        "memory",
+        "governance"
+      ],
+      "implementation_mode": "evaluation-learning-release",
+      "entry_gate": "L066 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Continuously optimize model/provider/tool/strategy selection using current telemetry while preserving hard privacy, quality, and capability constraints.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "evaluation leakage",
+        "reward hacking",
+        "data poisoning",
+        "silent drift",
+        "unsafe self-promotion"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "offline/shadow experiment then independently approved canary",
+      "rollback_mode": "freeze adaptation and restore last verified routing/model/strategy baseline",
+      "promotion_result": "L067 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L068",
+      "level_id": "L068",
+      "ordinal": 68,
+      "stratum": "S07",
+      "title": "Memory and Strategy Adaptation",
+      "primary_owner_plane": "evaluation",
+      "collaborating_planes": [
+        "feedback-learning",
+        "observability",
+        "model-routing",
+        "memory",
+        "governance"
+      ],
+      "implementation_mode": "evaluation-learning-release",
+      "entry_gate": "L067 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Adapt retrieval, memory use, planning heuristics, and cognitive strategies using measured outcomes without silently rewriting policy.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "evaluation leakage",
+        "reward hacking",
+        "data poisoning",
+        "silent drift",
+        "unsafe self-promotion"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "offline/shadow experiment then independently approved canary",
+      "rollback_mode": "freeze adaptation and restore last verified routing/model/strategy baseline",
+      "promotion_result": "L068 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L069",
+      "level_id": "L069",
+      "ordinal": 69,
+      "stratum": "S07",
+      "title": "Safe Promotion and Rollback",
+      "primary_owner_plane": "evaluation",
+      "collaborating_planes": [
+        "feedback-learning",
+        "observability",
+        "model-routing",
+        "memory",
+        "governance"
+      ],
+      "implementation_mode": "evaluation-learning-release",
+      "entry_gate": "L068 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Promote learned changes through experiment, evaluation, canary, approval, provenance, rollback, and baseline comparison.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "evaluation leakage",
+        "reward hacking",
+        "data poisoning",
+        "silent drift",
+        "unsafe self-promotion"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "offline/shadow experiment then independently approved canary",
+      "rollback_mode": "freeze adaptation and restore last verified routing/model/strategy baseline",
+      "promotion_result": "L069 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L070",
+      "level_id": "L070",
+      "ordinal": 70,
+      "stratum": "S07",
+      "title": "Adaptive Intelligence Closure",
+      "primary_owner_plane": "evaluation",
+      "collaborating_planes": [
+        "feedback-learning",
+        "observability",
+        "model-routing",
+        "memory",
+        "governance"
+      ],
+      "implementation_mode": "evaluation-learning-release",
+      "entry_gate": "L069 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Prove learning cannot poison authority, bypass holdouts, leak tenants, overfit hidden tests, or promote regressions without rollback.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "evaluation leakage",
+        "reward hacking",
+        "data poisoning",
+        "silent drift",
+        "unsafe self-promotion"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "offline/shadow experiment then independently approved canary",
+      "rollback_mode": "freeze adaptation and restore last verified routing/model/strategy baseline",
+      "promotion_result": "L070 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L071",
+      "level_id": "L071",
+      "ordinal": 71,
+      "stratum": "S08",
+      "title": "Goal Lifecycle Management",
+      "primary_owner_plane": "resilience",
+      "collaborating_planes": [
+        "cost-capacity",
+        "governance",
+        "security-safety",
+        "deployment-release",
+        "jobs-durability",
+        "operator-control"
+      ],
+      "implementation_mode": "durable-autonomy-and-resilience",
+      "entry_gate": "L070 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Represent goals with origin, authority, priority, deadlines, stop conditions, dependencies, satisfaction evidence, and revocation.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "goal persistence after revoke",
+        "unbounded background work",
+        "failed cancellation",
+        "self-healing overreach",
+        "risk escalation miss"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "operator-supervised autonomy then bounded unattended canary",
+      "rollback_mode": "stop new autonomous goals and suspend/drain active operations",
+      "promotion_result": "L071 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L072",
+      "level_id": "L072",
+      "ordinal": 72,
+      "stratum": "S08",
+      "title": "Autonomy Policy Engine",
+      "primary_owner_plane": "resilience",
+      "collaborating_planes": [
+        "cost-capacity",
+        "governance",
+        "security-safety",
+        "deployment-release",
+        "jobs-durability",
+        "operator-control"
+      ],
+      "implementation_mode": "durable-autonomy-and-resilience",
+      "entry_gate": "L071 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Determine what may run unattended, what requires confirmation, what must escalate, and what is prohibited by capability/risk/data policy.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "goal persistence after revoke",
+        "unbounded background work",
+        "failed cancellation",
+        "self-healing overreach",
+        "risk escalation miss"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "operator-supervised autonomy then bounded unattended canary",
+      "rollback_mode": "stop new autonomous goals and suspend/drain active operations",
+      "promotion_result": "L072 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L073",
+      "level_id": "L073",
+      "ordinal": 73,
+      "stratum": "S08",
+      "title": "Scheduled and Background Cognition",
+      "primary_owner_plane": "resilience",
+      "collaborating_planes": [
+        "cost-capacity",
+        "governance",
+        "security-safety",
+        "deployment-release",
+        "jobs-durability",
+        "operator-control"
+      ],
+      "implementation_mode": "durable-autonomy-and-resilience",
+      "entry_gate": "L072 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Run recurring or deferred cognitive work with durable schedules, deduplication, missed-run policy, budgets, and owner-visible state.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "goal persistence after revoke",
+        "unbounded background work",
+        "failed cancellation",
+        "self-healing overreach",
+        "risk escalation miss"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "operator-supervised autonomy then bounded unattended canary",
+      "rollback_mode": "stop new autonomous goals and suspend/drain active operations",
+      "promotion_result": "L073 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L074",
+      "level_id": "L074",
+      "ordinal": 74,
+      "stratum": "S08",
+      "title": "Interruption, Resume, and Handoff",
+      "primary_owner_plane": "resilience",
+      "collaborating_planes": [
+        "cost-capacity",
+        "governance",
+        "security-safety",
+        "deployment-release",
+        "jobs-durability",
+        "operator-control"
+      ],
+      "implementation_mode": "durable-autonomy-and-resilience",
+      "entry_gate": "L073 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Checkpoint and transfer long-running work across process/device/agent boundaries without duplicate side effects or context corruption.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "goal persistence after revoke",
+        "unbounded background work",
+        "failed cancellation",
+        "self-healing overreach",
+        "risk escalation miss"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "operator-supervised autonomy then bounded unattended canary",
+      "rollback_mode": "stop new autonomous goals and suspend/drain active operations",
+      "promotion_result": "L074 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L075",
+      "level_id": "L075",
+      "ordinal": 75,
+      "stratum": "S08",
+      "title": "Fault Diagnosis",
+      "primary_owner_plane": "resilience",
+      "collaborating_planes": [
+        "cost-capacity",
+        "governance",
+        "security-safety",
+        "deployment-release",
+        "jobs-durability",
+        "operator-control"
+      ],
+      "implementation_mode": "durable-autonomy-and-resilience",
+      "entry_gate": "L074 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Diagnose provider, tool, state, network, configuration, data, model, capacity, and policy failures using evidence rather than guesswork.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "goal persistence after revoke",
+        "unbounded background work",
+        "failed cancellation",
+        "self-healing overreach",
+        "risk escalation miss"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "operator-supervised autonomy then bounded unattended canary",
+      "rollback_mode": "stop new autonomous goals and suspend/drain active operations",
+      "promotion_result": "L075 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L076",
+      "level_id": "L076",
+      "ordinal": 76,
+      "stratum": "S08",
+      "title": "Self-Healing Proposal Engine",
+      "primary_owner_plane": "resilience",
+      "collaborating_planes": [
+        "cost-capacity",
+        "governance",
+        "security-safety",
+        "deployment-release",
+        "jobs-durability",
+        "operator-control"
+      ],
+      "implementation_mode": "durable-autonomy-and-resilience",
+      "entry_gate": "L075 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Generate bounded remediation proposals, rollback options, reconfiguration, reroutes, or repairs subject to independent authority.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "goal persistence after revoke",
+        "unbounded background work",
+        "failed cancellation",
+        "self-healing overreach",
+        "risk escalation miss"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "operator-supervised autonomy then bounded unattended canary",
+      "rollback_mode": "stop new autonomous goals and suspend/drain active operations",
+      "promotion_result": "L076 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L077",
+      "level_id": "L077",
+      "ordinal": 77,
+      "stratum": "S08",
+      "title": "Chaos and Resilience Intelligence",
+      "primary_owner_plane": "resilience",
+      "collaborating_planes": [
+        "cost-capacity",
+        "governance",
+        "security-safety",
+        "deployment-release",
+        "jobs-durability",
+        "operator-control"
+      ],
+      "implementation_mode": "durable-autonomy-and-resilience",
+      "entry_gate": "L076 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Exercise controlled failure injection, dependency loss, corruption detection, overload, restart, and recovery to harden runtime behavior.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "goal persistence after revoke",
+        "unbounded background work",
+        "failed cancellation",
+        "self-healing overreach",
+        "risk escalation miss"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "operator-supervised autonomy then bounded unattended canary",
+      "rollback_mode": "stop new autonomous goals and suspend/drain active operations",
+      "promotion_result": "L077 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L078",
+      "level_id": "L078",
+      "ordinal": 78,
+      "stratum": "S08",
+      "title": "Policy and Governance Reasoning",
+      "primary_owner_plane": "resilience",
+      "collaborating_planes": [
+        "cost-capacity",
+        "governance",
+        "security-safety",
+        "deployment-release",
+        "jobs-durability",
+        "operator-control"
+      ],
+      "implementation_mode": "durable-autonomy-and-resilience",
+      "entry_gate": "L077 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Interpret applicable policy, data classification, residency, retention, approval, and control obligations without becoming the policy authority.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "goal persistence after revoke",
+        "unbounded background work",
+        "failed cancellation",
+        "self-healing overreach",
+        "risk escalation miss"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "operator-supervised autonomy then bounded unattended canary",
+      "rollback_mode": "stop new autonomous goals and suspend/drain active operations",
+      "promotion_result": "L078 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L079",
+      "level_id": "L079",
+      "ordinal": 79,
+      "stratum": "S08",
+      "title": "Risk-Aware Escalation",
+      "primary_owner_plane": "resilience",
+      "collaborating_planes": [
+        "cost-capacity",
+        "governance",
+        "security-safety",
+        "deployment-release",
+        "jobs-durability",
+        "operator-control"
+      ],
+      "implementation_mode": "durable-autonomy-and-resilience",
+      "entry_gate": "L078 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Escalate based on impact, uncertainty, irreversibility, novelty, security, legal/governance triggers, and evidence insufficiency.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "goal persistence after revoke",
+        "unbounded background work",
+        "failed cancellation",
+        "self-healing overreach",
+        "risk escalation miss"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "operator-supervised autonomy then bounded unattended canary",
+      "rollback_mode": "stop new autonomous goals and suspend/drain active operations",
+      "promotion_result": "L079 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L080",
+      "level_id": "L080",
+      "ordinal": 80,
+      "stratum": "S08",
+      "title": "Bounded Autonomy Closure",
+      "primary_owner_plane": "resilience",
+      "collaborating_planes": [
+        "cost-capacity",
+        "governance",
+        "security-safety",
+        "deployment-release",
+        "jobs-durability",
+        "operator-control"
+      ],
+      "implementation_mode": "durable-autonomy-and-resilience",
+      "entry_gate": "L079 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Prove unattended work remains revocable, observable, budgeted, policy-bound, recoverable, and incapable of self-escalating privilege.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "goal persistence after revoke",
+        "unbounded background work",
+        "failed cancellation",
+        "self-healing overreach",
+        "risk escalation miss"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "operator-supervised autonomy then bounded unattended canary",
+      "rollback_mode": "stop new autonomous goals and suspend/drain active operations",
+      "promotion_result": "L080 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L081",
+      "level_id": "L081",
+      "ordinal": 81,
+      "stratum": "S09",
+      "title": "World Model Construction",
+      "primary_owner_plane": "reasoning-verification",
+      "collaborating_planes": [
+        "orchestration",
+        "retrieval",
+        "memory",
+        "evaluation",
+        "model-routing",
+        "observability"
+      ],
+      "implementation_mode": "advanced-modeling-and-science",
+      "entry_gate": "L080 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Maintain explicit models of entities, environments, systems, constraints, dynamics, and uncertainty tied to observed evidence.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "simulation-reality confusion",
+        "false stakeholder certainty",
+        "long-horizon compounding error",
+        "scientific p-hacking",
+        "metacognitive overconfidence"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "offline/simulation/shadow before production advisory use",
+      "rollback_mode": "disable advanced world/simulation/science layer and return to evidence-backed reasoning",
+      "promotion_result": "L081 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L082",
+      "level_id": "L082",
+      "ordinal": 82,
+      "stratum": "S09",
+      "title": "Simulation and Digital Twin Reasoning",
+      "primary_owner_plane": "reasoning-verification",
+      "collaborating_planes": [
+        "orchestration",
+        "retrieval",
+        "memory",
+        "evaluation",
+        "model-routing",
+        "observability"
+      ],
+      "implementation_mode": "advanced-modeling-and-science",
+      "entry_gate": "L081 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Run counterfactual simulations or digital twins with stated assumptions, calibration, uncertainty, and separation from observed reality.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "simulation-reality confusion",
+        "false stakeholder certainty",
+        "long-horizon compounding error",
+        "scientific p-hacking",
+        "metacognitive overconfidence"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "offline/simulation/shadow before production advisory use",
+      "rollback_mode": "disable advanced world/simulation/science layer and return to evidence-backed reasoning",
+      "promotion_result": "L082 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L083",
+      "level_id": "L083",
+      "ordinal": 83,
+      "stratum": "S09",
+      "title": "Long-Horizon Planning",
+      "primary_owner_plane": "reasoning-verification",
+      "collaborating_planes": [
+        "orchestration",
+        "retrieval",
+        "memory",
+        "evaluation",
+        "model-routing",
+        "observability"
+      ],
+      "implementation_mode": "advanced-modeling-and-science",
+      "entry_gate": "L082 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Plan across extended time horizons with milestones, contingencies, dependency uncertainty, resource curves, and re-planning triggers.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "simulation-reality confusion",
+        "false stakeholder certainty",
+        "long-horizon compounding error",
+        "scientific p-hacking",
+        "metacognitive overconfidence"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "offline/simulation/shadow before production advisory use",
+      "rollback_mode": "disable advanced world/simulation/science layer and return to evidence-backed reasoning",
+      "promotion_result": "L083 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L084",
+      "level_id": "L084",
+      "ordinal": 84,
+      "stratum": "S09",
+      "title": "Hierarchical Planning",
+      "primary_owner_plane": "reasoning-verification",
+      "collaborating_planes": [
+        "orchestration",
+        "retrieval",
+        "memory",
+        "evaluation",
+        "model-routing",
+        "observability"
+      ],
+      "implementation_mode": "advanced-modeling-and-science",
+      "entry_gate": "L083 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Compose strategy, programs, projects, tasks, and actions across abstraction levels while preserving traceable goal decomposition.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "simulation-reality confusion",
+        "false stakeholder certainty",
+        "long-horizon compounding error",
+        "scientific p-hacking",
+        "metacognitive overconfidence"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "offline/simulation/shadow before production advisory use",
+      "rollback_mode": "disable advanced world/simulation/science layer and return to evidence-backed reasoning",
+      "promotion_result": "L084 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L085",
+      "level_id": "L085",
+      "ordinal": 85,
+      "stratum": "S09",
+      "title": "Metacognitive Control",
+      "primary_owner_plane": "reasoning-verification",
+      "collaborating_planes": [
+        "orchestration",
+        "retrieval",
+        "memory",
+        "evaluation",
+        "model-routing",
+        "observability"
+      ],
+      "implementation_mode": "advanced-modeling-and-science",
+      "entry_gate": "L084 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Estimate when reasoning is stuck, shallow, overconfident, underspecified, or using the wrong strategy and trigger bounded strategy changes.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "simulation-reality confusion",
+        "false stakeholder certainty",
+        "long-horizon compounding error",
+        "scientific p-hacking",
+        "metacognitive overconfidence"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "offline/simulation/shadow before production advisory use",
+      "rollback_mode": "disable advanced world/simulation/science layer and return to evidence-backed reasoning",
+      "promotion_result": "L085 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L086",
+      "level_id": "L086",
+      "ordinal": 86,
+      "stratum": "S09",
+      "title": "Epistemic State Tracking",
+      "primary_owner_plane": "reasoning-verification",
+      "collaborating_planes": [
+        "orchestration",
+        "retrieval",
+        "memory",
+        "evaluation",
+        "model-routing",
+        "observability"
+      ],
+      "implementation_mode": "advanced-modeling-and-science",
+      "entry_gate": "L085 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Track known, inferred, disputed, unknown, stale, impossible-to-know, and evidence-needed states explicitly across a project.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "simulation-reality confusion",
+        "false stakeholder certainty",
+        "long-horizon compounding error",
+        "scientific p-hacking",
+        "metacognitive overconfidence"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "offline/simulation/shadow before production advisory use",
+      "rollback_mode": "disable advanced world/simulation/science layer and return to evidence-backed reasoning",
+      "promotion_result": "L086 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L087",
+      "level_id": "L087",
+      "ordinal": 87,
+      "stratum": "S09",
+      "title": "Stakeholder and Theory-of-Mind Modeling",
+      "primary_owner_plane": "reasoning-verification",
+      "collaborating_planes": [
+        "orchestration",
+        "retrieval",
+        "memory",
+        "evaluation",
+        "model-routing",
+        "observability"
+      ],
+      "implementation_mode": "advanced-modeling-and-science",
+      "entry_gate": "L086 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Model likely stakeholder goals, knowledge, constraints, and interpretations with uncertainty, consent boundaries, and no claim of mind-reading.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "simulation-reality confusion",
+        "false stakeholder certainty",
+        "long-horizon compounding error",
+        "scientific p-hacking",
+        "metacognitive overconfidence"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "offline/simulation/shadow before production advisory use",
+      "rollback_mode": "disable advanced world/simulation/science layer and return to evidence-backed reasoning",
+      "promotion_result": "L087 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L088",
+      "level_id": "L088",
+      "ordinal": 88,
+      "stratum": "S09",
+      "title": "Creative Synthesis",
+      "primary_owner_plane": "reasoning-verification",
+      "collaborating_planes": [
+        "orchestration",
+        "retrieval",
+        "memory",
+        "evaluation",
+        "model-routing",
+        "observability"
+      ],
+      "implementation_mode": "advanced-modeling-and-science",
+      "entry_gate": "L087 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Generate novel combinations, abstractions, analogies, designs, and hypotheses while preserving provenance and downstream verification.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "simulation-reality confusion",
+        "false stakeholder certainty",
+        "long-horizon compounding error",
+        "scientific p-hacking",
+        "metacognitive overconfidence"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "offline/simulation/shadow before production advisory use",
+      "rollback_mode": "disable advanced world/simulation/science layer and return to evidence-backed reasoning",
+      "promotion_result": "L088 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L089",
+      "level_id": "L089",
+      "ordinal": 89,
+      "stratum": "S09",
+      "title": "Scientific Discovery Loop",
+      "primary_owner_plane": "reasoning-verification",
+      "collaborating_planes": [
+        "orchestration",
+        "retrieval",
+        "memory",
+        "evaluation",
+        "model-routing",
+        "observability"
+      ],
+      "implementation_mode": "advanced-modeling-and-science",
+      "entry_gate": "L088 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Automate hypothesis, experiment design, evidence acquisition, analysis, falsification, replication, and knowledge-update proposals under governance.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "simulation-reality confusion",
+        "false stakeholder certainty",
+        "long-horizon compounding error",
+        "scientific p-hacking",
+        "metacognitive overconfidence"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "offline/simulation/shadow before production advisory use",
+      "rollback_mode": "disable advanced world/simulation/science layer and return to evidence-backed reasoning",
+      "promotion_result": "L089 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L090",
+      "level_id": "L090",
+      "ordinal": 90,
+      "stratum": "S09",
+      "title": "Advanced Cognition Closure",
+      "primary_owner_plane": "reasoning-verification",
+      "collaborating_planes": [
+        "orchestration",
+        "retrieval",
+        "memory",
+        "evaluation",
+        "model-routing",
+        "observability"
+      ],
+      "implementation_mode": "advanced-modeling-and-science",
+      "entry_gate": "L089 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Prove world models, simulation, long-horizon planning, metacognition, stakeholder models, creativity, and science remain evidence-calibrated.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "simulation-reality confusion",
+        "false stakeholder certainty",
+        "long-horizon compounding error",
+        "scientific p-hacking",
+        "metacognitive overconfidence"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent verification green"
+      ],
+      "rollout_mode": "offline/simulation/shadow before production advisory use",
+      "rollback_mode": "disable advanced world/simulation/science layer and return to evidence-backed reasoning",
+      "promotion_result": "L090 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L091",
+      "level_id": "L091",
+      "ordinal": 91,
+      "stratum": "S10",
+      "title": "Architecture Introspection",
+      "primary_owner_plane": "feedback-learning",
+      "collaborating_planes": [
+        "evaluation",
+        "deployment-release",
+        "governance",
+        "security-safety",
+        "observability",
+        "orchestration",
+        "foundation"
+      ],
+      "implementation_mode": "isolated-frontier-experimentation",
+      "entry_gate": "L090 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Build machine-readable self-models of capabilities, dependencies, contracts, state authorities, performance, limits, and unresolved gaps.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "self-approval",
+        "safeguard deletion",
+        "promotion-criteria tampering",
+        "recursive authority growth",
+        "benchmark gaming"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "isolated experiment only until independent release promotion",
+      "rollback_mode": "disable frontier experiment plane and preserve lower verified production baseline",
+      "promotion_result": "L091 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L092",
+      "level_id": "L092",
+      "ordinal": 92,
+      "stratum": "S10",
+      "title": "Capability Gap Discovery",
+      "primary_owner_plane": "feedback-learning",
+      "collaborating_planes": [
+        "evaluation",
+        "deployment-release",
+        "governance",
+        "security-safety",
+        "observability",
+        "orchestration",
+        "foundation"
+      ],
+      "implementation_mode": "isolated-frontier-experimentation",
+      "entry_gate": "L091 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Compare objectives and observed failures against the self-model to identify missing, weak, redundant, unsafe, or misowned capabilities.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "self-approval",
+        "safeguard deletion",
+        "promotion-criteria tampering",
+        "recursive authority growth",
+        "benchmark gaming"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "isolated experiment only until independent release promotion",
+      "rollback_mode": "disable frontier experiment plane and preserve lower verified production baseline",
+      "promotion_result": "L092 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L093",
+      "level_id": "L093",
+      "ordinal": 93,
+      "stratum": "S10",
+      "title": "Continuous Self-Benchmarking",
+      "primary_owner_plane": "feedback-learning",
+      "collaborating_planes": [
+        "evaluation",
+        "deployment-release",
+        "governance",
+        "security-safety",
+        "observability",
+        "orchestration",
+        "foundation"
+      ],
+      "implementation_mode": "isolated-frontier-experimentation",
+      "entry_gate": "L092 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Run current capability, safety, reliability, efficiency, calibration, and regression benchmarks against baselines and declared targets.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "self-approval",
+        "safeguard deletion",
+        "promotion-criteria tampering",
+        "recursive authority growth",
+        "benchmark gaming"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "isolated experiment only until independent release promotion",
+      "rollback_mode": "disable frontier experiment plane and preserve lower verified production baseline",
+      "promotion_result": "L093 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L094",
+      "level_id": "L094",
+      "ordinal": 94,
+      "stratum": "S10",
+      "title": "Design-Space Exploration",
+      "primary_owner_plane": "feedback-learning",
+      "collaborating_planes": [
+        "evaluation",
+        "deployment-release",
+        "governance",
+        "security-safety",
+        "observability",
+        "orchestration",
+        "foundation"
+      ],
+      "implementation_mode": "isolated-frontier-experimentation",
+      "entry_gate": "L093 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Generate and rank alternative architectures, algorithms, prompts, tools, memory strategies, and execution plans under explicit constraints.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "self-approval",
+        "safeguard deletion",
+        "promotion-criteria tampering",
+        "recursive authority growth",
+        "benchmark gaming"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "isolated experiment only until independent release promotion",
+      "rollback_mode": "disable frontier experiment plane and preserve lower verified production baseline",
+      "promotion_result": "L094 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L095",
+      "level_id": "L095",
+      "ordinal": 95,
+      "stratum": "S10",
+      "title": "Automated Experiment Generation",
+      "primary_owner_plane": "feedback-learning",
+      "collaborating_planes": [
+        "evaluation",
+        "deployment-release",
+        "governance",
+        "security-safety",
+        "observability",
+        "orchestration",
+        "foundation"
+      ],
+      "implementation_mode": "isolated-frontier-experimentation",
+      "entry_gate": "L094 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Design controlled experiments with hypotheses, variables, baselines, metrics, stopping rules, reproducibility, and contamination defenses.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "self-approval",
+        "safeguard deletion",
+        "promotion-criteria tampering",
+        "recursive authority growth",
+        "benchmark gaming"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "isolated experiment only until independent release promotion",
+      "rollback_mode": "disable frontier experiment plane and preserve lower verified production baseline",
+      "promotion_result": "L095 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L096",
+      "level_id": "L096",
+      "ordinal": 96,
+      "stratum": "S10",
+      "title": "Verified Improvement Proposals",
+      "primary_owner_plane": "feedback-learning",
+      "collaborating_planes": [
+        "evaluation",
+        "deployment-release",
+        "governance",
+        "security-safety",
+        "observability",
+        "orchestration",
+        "foundation"
+      ],
+      "implementation_mode": "isolated-frontier-experimentation",
+      "entry_gate": "L095 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Produce code, configuration, policy-neutral strategy, or model-change proposals with tests, proofs/evidence, rollback, and blast-radius analysis.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "self-approval",
+        "safeguard deletion",
+        "promotion-criteria tampering",
+        "recursive authority growth",
+        "benchmark gaming"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "isolated experiment only until independent release promotion",
+      "rollback_mode": "disable frontier experiment plane and preserve lower verified production baseline",
+      "promotion_result": "L096 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L097",
+      "level_id": "L097",
+      "ordinal": 97,
+      "stratum": "S10",
+      "title": "Cross-Domain Transfer",
+      "primary_owner_plane": "feedback-learning",
+      "collaborating_planes": [
+        "evaluation",
+        "deployment-release",
+        "governance",
+        "security-safety",
+        "observability",
+        "orchestration",
+        "foundation"
+      ],
+      "implementation_mode": "isolated-frontier-experimentation",
+      "entry_gate": "L096 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Transfer validated patterns and representations across domains while detecting distribution shift, invalid analogy, and domain-specific constraints.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "self-approval",
+        "safeguard deletion",
+        "promotion-criteria tampering",
+        "recursive authority growth",
+        "benchmark gaming"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "isolated experiment only until independent release promotion",
+      "rollback_mode": "disable frontier experiment plane and preserve lower verified production baseline",
+      "promotion_result": "L097 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L098",
+      "level_id": "L098",
+      "ordinal": 98,
+      "stratum": "S10",
+      "title": "Strategic Meta-Orchestration",
+      "primary_owner_plane": "feedback-learning",
+      "collaborating_planes": [
+        "evaluation",
+        "deployment-release",
+        "governance",
+        "security-safety",
+        "observability",
+        "orchestration",
+        "foundation"
+      ],
+      "implementation_mode": "isolated-frontier-experimentation",
+      "entry_gate": "L097 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Allocate cognitive methods, models, agents, tools, experiments, budgets, and time across portfolios of goals using measured value and risk.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "self-approval",
+        "safeguard deletion",
+        "promotion-criteria tampering",
+        "recursive authority growth",
+        "benchmark gaming"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "isolated experiment only until independent release promotion",
+      "rollback_mode": "disable frontier experiment plane and preserve lower verified production baseline",
+      "promotion_result": "L098 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L099",
+      "level_id": "L099",
+      "ordinal": 99,
+      "stratum": "S10",
+      "title": "Bounded Self-Evolution Governance",
+      "primary_owner_plane": "feedback-learning",
+      "collaborating_planes": [
+        "evaluation",
+        "deployment-release",
+        "governance",
+        "security-safety",
+        "observability",
+        "orchestration",
+        "foundation"
+      ],
+      "implementation_mode": "isolated-frontier-experimentation",
+      "entry_gate": "L098 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Govern iterative self-improvement with independent approval, immutable baselines, capability ceilings, rollback, audit, and anti-self-approval rules.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "self-approval",
+        "safeguard deletion",
+        "promotion-criteria tampering",
+        "recursive authority growth",
+        "benchmark gaming"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "isolated experiment only until independent release promotion",
+      "rollback_mode": "disable frontier experiment plane and preserve lower verified production baseline",
+      "promotion_result": "L099 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    },
+    {
+      "id": "ADV-L100",
+      "level_id": "L100",
+      "ordinal": 100,
+      "stratum": "S10",
+      "title": "Frontier System Acceptance",
+      "primary_owner_plane": "feedback-learning",
+      "collaborating_planes": [
+        "evaluation",
+        "deployment-release",
+        "governance",
+        "security-safety",
+        "observability",
+        "orchestration",
+        "foundation"
+      ],
+      "implementation_mode": "isolated-frontier-experimentation",
+      "entry_gate": "L099 is PROMOTED and current evidence is valid",
+      "build_contract": [
+        "implement Integrate all 100 levels under exact-head evidence, adversarial evaluation, safety/security/governance, performance, recovery, and independent promotion authority.",
+        "preserve canonical ownership and authority separation",
+        "bind resource, data-class, tenant and risk semantics",
+        "emit observability and evidence without default sensitive-content capture",
+        "provide deterministic safe-disable/rollback behavior"
+      ],
+      "adversarial_focus": [
+        "self-approval",
+        "safeguard deletion",
+        "promotion-criteria tampering",
+        "recursive authority growth",
+        "benchmark gaming"
+      ],
+      "exit_gate": [
+        "implementation contract complete",
+        "focused tests green",
+        "adversarial/failure-mode tests green",
+        "operational readiness complete",
+        "risk-class evidence current",
+        "exact-head structural receipt valid",
+        "independent critical-risk review green"
+      ],
+      "rollout_mode": "isolated experiment only until independent release promotion",
+      "rollback_mode": "disable frontier experiment plane and preserve lower verified production baseline",
+      "promotion_result": "L100 becomes eligible for QUALIFIED then PROMOTED; no higher level is implied automatically"
+    }
+  ],
+  "blueprint_rules": {
+    "count_rule": "Exactly one ADV-Lxxx blueprint must exist for every Lxxx level.",
+    "owner_rule": "primary_owner_plane must be a canonical construction plane included by the level's stratum.",
+    "collaboration_rule": "collaborating planes do not acquire ownership merely by participating.",
+    "build_rule": "blueprints are engineering instructions; they do not count as implementation evidence.",
+    "rollout_rule": "every blueprint has a bounded rollout mode and deterministic rollback/safe-disable mode.",
+    "adversarial_rule": "every blueprint includes stratum-specific adversarial focuses in addition to level-specific tests.",
+    "closure_rule": "a blueprint closes only through the level promotion state machine and current evidence; completion text cannot override it."
   }
 }
