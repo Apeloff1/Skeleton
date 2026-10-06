@@ -19,7 +19,11 @@ from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import Any, Iterable, Mapping
 
-from skeleton.ai.assistant.turn_runtime import ExecutionBudget
+from skeleton.ai.assistant.turn_runtime import (
+    BudgetGovernor,
+    ExecutionBudget,
+    TurnSnapshot,
+)
 from skeleton.intelligence.admission import ResourceBudget
 from skeleton.vault.governance_registry import GovernanceContext
 
@@ -282,6 +286,74 @@ class RouteRequest:
             expected_output_tokens=output_tokens,
             latency_budget_ms=budget.max_wall_seconds * 1000.0,
             cost_budget=budget.max_cost_usd,
+            **kwargs,
+        )
+
+    @classmethod
+    def from_turn_snapshot(
+        cls,
+        task_type: str,
+        snapshot: TurnSnapshot,
+        *,
+        context_tokens: int = 0,
+        expected_output_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> "RouteRequest":
+        """Project only the durable turn's remaining authority into routing.
+
+        Retry and failover callers must not reuse the original ExecutionBudget:
+        doing so would silently restore wall-time, output-token, call, or cost
+        authority that the turn has already consumed.
+        """
+
+        if not isinstance(snapshot, TurnSnapshot):
+            raise TypeError("snapshot must be a TurnSnapshot")
+        if snapshot.terminal:
+            raise ValueError("terminal turn cannot acquire model routing authority")
+        remaining = BudgetGovernor.assess(snapshot.budget, snapshot.usage)
+        if not remaining.allowed:
+            raise ValueError("turn usage exceeds durable execution budget")
+        values = remaining.remaining
+        if int(values["model_calls"]) < 1:
+            raise ValueError("model-call budget exhausted")
+        if (
+            isinstance(context_tokens, bool)
+            or not isinstance(context_tokens, int)
+            or context_tokens < 0
+        ):
+            raise ValueError("context_tokens must be a non-negative integer")
+        if context_tokens > int(values["input_tokens"]):
+            raise ValueError("context exceeds remaining input-token budget")
+        if expected_output_tokens is not None:
+            if (
+                isinstance(expected_output_tokens, bool)
+                or not isinstance(expected_output_tokens, int)
+                or expected_output_tokens < 0
+            ):
+                raise ValueError(
+                    "expected_output_tokens must be a non-negative integer"
+                )
+            if expected_output_tokens > int(values["output_tokens"]):
+                raise ValueError(
+                    "expected output exceeds remaining output-token budget"
+                )
+        remaining_budget = ExecutionBudget(
+            max_wall_seconds=float(values["wall_seconds"]),
+            max_input_tokens=int(values["input_tokens"]),
+            max_output_tokens=int(values["output_tokens"]),
+            max_model_calls=int(values["model_calls"]),
+            max_tool_calls=int(values["tool_calls"]),
+            max_agent_depth=int(values["agent_depth"]),
+            max_parallel_workers=int(values["parallel_workers"]),
+            max_retrieval_queries=int(values["retrieval_queries"]),
+            max_external_writes=int(values["external_writes"]),
+            max_cost_usd=float(values["cost_usd"]),
+        )
+        return cls.from_turn_budget(
+            task_type,
+            remaining_budget,
+            context_tokens=context_tokens,
+            expected_output_tokens=expected_output_tokens,
             **kwargs,
         )
 
