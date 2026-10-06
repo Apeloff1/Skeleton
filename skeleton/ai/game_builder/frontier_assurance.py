@@ -60,6 +60,8 @@ class CausalObligation:
             raise FrontierAssuranceError(
                 "causal evidence must be referenced by obligation authority"
             )
+        if not isinstance(self.severity, ObligationSeverity):
+            raise TypeError("causal obligation severity must be ObligationSeverity")
         if not self.premise_ids or not self.consequence_ids:
             raise FrontierAssuranceError("causal obligation requires premises and consequences")
         if len(set(self.premise_ids)) != len(self.premise_ids):
