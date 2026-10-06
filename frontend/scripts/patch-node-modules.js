@@ -195,7 +195,7 @@ function patchHttpCacheSemanticsMaxStale() {
   if (!fs.existsSync(pkgPath)) return;
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
-  if (version !== '4.2.0') {
+  if (!new Set(['4.2.0', '4.3.0']).has(version)) {
     throw new Error(`[patch-node-modules] http-cache-semantics ${version} requires security patch review`);
   }
 

@@ -2,7 +2,7 @@
   "schema_version": "skeleton.enterprise_ai.implementation_notes.v1",
   "standard_version": "2026.10",
   "depth_pass": "DP-401-420",
-  "generated_from_master_plan": "1.7.0",
+  "generated_from_master_plan": "2.5.0",
   "volume_count": 20,
   "dossiers": [
     {
