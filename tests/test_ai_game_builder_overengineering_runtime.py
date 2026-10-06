@@ -684,6 +684,10 @@ def test_completed_forge_release_binding_matches_terminal_champion() -> None:
         binding.champion_producer_provenance_digest
         == forge.champion.producer_provenance.digest
     )
+    assert (
+        binding.champion_output_binding_digest
+        == forge.champion.producer_provenance.output_binding_digest
+    )
     assert binding.champion_artifact_digest == forge.champion.artifact.artifact_digest
     assert binding.champion_canon_digest == forge.champion.artifact.canon_digest
     assert binding.champion_provenance_digest == forge.champion.artifact.provenance_digest
@@ -741,7 +745,11 @@ def test_forge_release_binding_rejects_self_consistent_incomplete_checkpoint() -
     }
     checkpoint = {**core, "checkpoint_digest": canonical_digest(core)}
     with pytest.raises(ValueError, match="not at exact terminal round"):
-        ForgeReleaseBinding.from_checkpoint(checkpoint, receipts=())
+        ForgeReleaseBinding.from_checkpoint(
+            checkpoint,
+            expected_checkpoint_digest=checkpoint["checkpoint_digest"],
+            receipts=(),
+        )
 
 
 def test_gold_master_failed_critical_gate_blocks_release() -> None:
