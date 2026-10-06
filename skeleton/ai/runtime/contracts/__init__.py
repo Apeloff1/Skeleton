@@ -424,7 +424,9 @@ __all__ += [
 
 from .execution_authority import (
     AdmissionReceipt,
+    AuthorityConsumptionReceipt,
     AuthorityEffect,
+    AuthorityEvidenceBundle,
     EXECUTION_AUTHORITY_SCHEMA_VERSION,
     ExecutionAuthority,
     ExecutionAuthorityError,
@@ -434,11 +436,14 @@ from .execution_authority import (
     ResourceUsage,
     authority_policy_digest,
     validate_authority_attenuation,
+    verify_authority_receipt_chain,
 )
 
 __all__ += [
     "AdmissionReceipt",
+    "AuthorityConsumptionReceipt",
     "AuthorityEffect",
+    "AuthorityEvidenceBundle",
     "EXECUTION_AUTHORITY_SCHEMA_VERSION",
     "ExecutionAuthority",
     "ExecutionAuthorityError",
@@ -448,4 +453,5 @@ __all__ += [
     "ResourceUsage",
     "authority_policy_digest",
     "validate_authority_attenuation",
+    "verify_authority_receipt_chain",
 ]
