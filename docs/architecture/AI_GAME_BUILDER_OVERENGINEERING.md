@@ -80,8 +80,8 @@ The branch now contains a deterministic control-plane kernel and three governed 
 - `skeleton/ai/game_builder/canon.py`
 - `skeleton/ai/game_builder/rights.py`
 - `skeleton/ai/game_builder/atomizer.py`
-- `skeleton/testing/test_ai_game_builder_contracts.py`
-- `skeleton/testing/test_ai_game_builder_governance.py`
+- `tests/test_ai_game_builder_runtime.py`
+- `tests/test_ai_game_builder_governance.py`
 
 The forge kernel enforces exact effort budgets, exact three-stage order, alternating roles, independent evaluator identity, non-compensable gate vetoes, Pareto-safe quality promotion, explicit synthesis ancestry, tamper-evident checkpoint digests, and exact completion only when the selected round count is reached.
 
