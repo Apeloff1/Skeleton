@@ -103,6 +103,10 @@ model authority boundaries.
 - `symmetric_functions.py` — spectral square-root/inverse-root/log/exp functions for symmetric matrices.
 - `hyperdual.py` — exact small-problem gradients/Hessians through hyper-dual second-order differentiation.
 - `orthogonal_polynomials.py` — Chebyshev/Legendre/Hermite recurrences, Clenshaw evaluation and fitted Chebyshev series.
+- `tensor_contract.py` — explicit-axis dense tensor contraction, outer/dot and mode products.
+- `finite_element1d.py` — linear-element mass/stiffness assembly and Dirichlet Poisson solves.
+- `covariance_shrinkage.py` — identity/diagonal covariance shrinkage and OAS regularization evidence.
+- `low_rank.py` — truncated-SVD approximation and retained-energy rank selection.
 - `validation.py` — parity evidence against existing optimized runtime kernels.
 
 ## Guarantees
@@ -183,6 +187,10 @@ model authority boundaries.
 - Symmetric matrix functions validate spectral domains before applying roots, inverse roots or logarithms.
 - Hyper-dual calculus provides exact second-order oracle derivatives without becoming a training graph executor.
 - Orthogonal-polynomial series expose coefficient/sample semantics and forbid silent fit-domain extrapolation.
+- Tensor contraction validates every contracted axis and keeps scalar outputs in the package's canonical singleton representation.
+- Finite-element assembly exposes mass/stiffness symmetry, exact Dirichlet boundaries and algebraic residual evidence.
+- Covariance shrinkage keeps target/intensity/eigenspectrum explicit rather than hiding regularization policy.
+- Low-rank approximations report discarded Frobenius energy and never reinterpret rank as model capacity authority.
 - `audit_runtime_kernels()` compares optimized runtime softmax, matmul and attention against
   this reference substrate without replacing those kernels.
 

@@ -65,6 +65,11 @@ from .combinatorics import (
     log_factorial,
     multinomial_log_pmf,
 )
+from .covariance_shrinkage import (
+    CovarianceShrinkageReport,
+    oracle_approximating_shrinkage,
+    shrink_covariance,
+)
 from .conditioning import (
     BackwardErrorReport,
     ConditionReport,
@@ -136,6 +141,12 @@ from .eigensystems import (
     SymmetricEigensystemReport,
     principal_components,
     symmetric_eigensystem,
+)
+from .finite_element1d import (
+    FEMPoissonReport,
+    LinearFEMAssembly,
+    assemble_linear_fem_1d,
+    solve_poisson_fem_1d,
 )
 from .finite_difference2d import curl_z_2d, divergence_2d, gradient_2d, laplacian_2d
 from .finite_difference import (
@@ -219,6 +230,11 @@ from .kernels import (
     maximum_mean_discrepancy_squared,
     polynomial_kernel,
     rbf_kernel,
+)
+from .low_rank import (
+    LowRankApproximationReport,
+    rank_for_retained_energy,
+    truncated_svd_approximation,
 )
 from .losses import (
     binary_cross_entropy,
@@ -472,6 +488,7 @@ from .statistics import (
     quantile,
     standardize,
 )
+from .tensor_contract import mode_product, tensor_contract, tensor_dot, tensor_outer
 from .tensor import (
     DenseTensor,
     add as tensor_add,
@@ -537,6 +554,9 @@ __all__ = [
     "log_binomial_coefficient",
     "log_factorial",
     "multinomial_log_pmf",
+    "CovarianceShrinkageReport",
+    "oracle_approximating_shrinkage",
+    "shrink_covariance",
     "BackwardErrorReport",
     "ConditionReport",
     "condition_number",
@@ -612,6 +632,10 @@ __all__ = [
     "SymmetricEigensystemReport",
     "principal_components",
     "symmetric_eigensystem",
+    "FEMPoissonReport",
+    "LinearFEMAssembly",
+    "assemble_linear_fem_1d",
+    "solve_poisson_fem_1d",
     "curl_z_2d",
     "divergence_2d",
     "gradient_2d",
@@ -698,6 +722,9 @@ __all__ = [
     "maximum_mean_discrepancy_squared",
     "polynomial_kernel",
     "rbf_kernel",
+    "LowRankApproximationReport",
+    "rank_for_retained_energy",
+    "truncated_svd_approximation",
     "binary_cross_entropy",
     "brier_score",
     "cross_entropy_from_logits",
@@ -899,6 +926,10 @@ __all__ = [
     "moments",
     "quantile",
     "standardize",
+    "mode_product",
+    "tensor_contract",
+    "tensor_dot",
+    "tensor_outer",
     "DenseTensor",
     "tensor_add",
     "broadcast_shape",
