@@ -7,8 +7,7 @@
     "volume_ref": "VOL-093",
     "title": "Backlog Control",
     "required_gap_texts": [
-      "establish canonical backlog IDs",
-      "bind backlog to gap/risk closure"
+      "independent backlog coverage, deduplication, and stale-state verification remains pending"
     ]
   },
   "sources": [
