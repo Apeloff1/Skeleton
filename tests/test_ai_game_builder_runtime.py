@@ -438,7 +438,7 @@ def test_pareto_safe_candidate_promotes_with_independent_judge() -> None:
             target_candidate_digest=built.digest,
             attack_digest="attack-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             improved_candidate=improved,
-            counterexample_digests=("counter-bbbbbbbbbbbbbbbbbbbbbbbbbbbbb",),
+            counterexample_digests=("counterexample-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",),
         )
     )
     receipt = forge.reconcile(
