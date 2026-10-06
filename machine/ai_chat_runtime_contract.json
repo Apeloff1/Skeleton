@@ -73,7 +73,8 @@
     "live engine output cannot enter canonical transcript state without a response-acceptance receipt bound to exact operation execution context and output",
     "live response-acceptance receipts hash output and evidence references instead of storing response prose or provider receipt contents",
     "engine-backed live chat requires an accepted verification identity and at least one canonical provider receipt before transcript commit",
-    "synchronous and deferred engine results must pass the same canonical response-acceptance policy before transcript commit"
+    "synchronous and deferred engine results must pass the same canonical response-acceptance policy before transcript commit",
+    "live response acceptance binds both engine operation identity and execution identity before transcript promotion"
   ],
   "budget_dimensions": [
     "wall_seconds",
@@ -186,7 +187,7 @@
   "response_acceptance": {
     "contract": "skeleton/ai/assistant/response_acceptance.py",
     "live_policy": "backend.ai.chat.live-response/v1",
-    "execution_rule": "observed engine execution identity must exactly match the canonical chat execution identity",
+    "execution_rule": "observed engine operation and execution identities must exactly match the canonical chat operation and execution identities",
     "verification_rule": "verification must be canonical and explicitly accepted by the live policy",
     "provider_rule": "engine-backed live chat requires at least one canonical provider receipt and rejects malformed or duplicate receipt identity",
     "output_rule": "non-empty UTF-8 output is digest-bound and hard-bounded before canonical commit",
