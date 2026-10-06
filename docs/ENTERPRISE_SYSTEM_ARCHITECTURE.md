@@ -746,6 +746,32 @@ The system is not enterprise-complete until the following are automated:
 11. backup restore -> isolated verification -> system reconstruction;
 12. privileged operator action -> JIT authority -> immutable audit -> expiry.
 
+## 16.1 Enterprise customer control surfaces
+
+Infrastructure alone does not make the product enterprise-ready. The assembled
+product must expose governed enterprise administration capabilities.
+
+Required target surfaces:
+
+| Capability | Requirement |
+| --- | --- |
+| Enterprise SSO | OIDC baseline; SAML through a broker where required |
+| Directory lifecycle | SCIM or equivalent governed user/group provisioning |
+| Tenant administration | Tenant-scoped admins, membership, policy, service accounts |
+| Fine-grained access | RBAC plus resource/capability/data-class policy |
+| Audit export | Tenant-scoped, integrity-bearing, redacted export |
+| Quotas/budgets | Usage, cost, concurrency and storage controls |
+| Data residency | Region/jurisdiction policy for state, backup, provider and tool egress |
+| Retention/legal hold | Retention policy with governed hold/release |
+| Export/delete | Cross-plane governed data lifecycle |
+| Service accounts | Minimum scopes, rotation, revocation and audit |
+| Private connectivity | Restricted ingress/egress without bypassing identity |
+| Support diagnostics | Minimized, authorized, expiring and audited support access |
+
+Each surface has a required production-evidence test in the machine contract.
+None of these capabilities may create a second authorization or state authority
+outside the canonical planes.
+
 ## 17. Operating model
 
 ### Service owner
