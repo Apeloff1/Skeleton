@@ -15,6 +15,7 @@ import urllib.error
 import urllib.request
 from urllib.parse import urlsplit
 
+from skeleton.shells.cancellation import CancellationToken
 from skeleton.provider_contract import (
     ProviderArchitectureError,
     ProviderArchitectureReceipt,
@@ -132,7 +133,18 @@ class FreeModelClient:
             "architecture": self.architecture_receipt.as_dict(),
         }
 
-    def chat(self, system: str, user: str, max_tokens: int = 2500) -> str:
+    def chat(
+        self,
+        system: str,
+        user: str,
+        max_tokens: int = 2500,
+        *,
+        cancellation: CancellationToken | None = None,
+    ) -> str:
+        if cancellation is not None:
+            if not isinstance(cancellation, CancellationToken):
+                raise TypeError("cancellation must be CancellationToken")
+            cancellation.require_active()
         payload = {
             "model": self.model,
             "messages": [
@@ -153,9 +165,15 @@ class FreeModelClient:
             method="POST",
         )
         try:
+            if cancellation is not None:
+                cancellation.require_active()
             with urllib.request.urlopen(req, timeout=self.timeout) as response:
                 raw_bytes = response.read(_MAX_RESPONSE_BYTES + 1)
+            if cancellation is not None:
+                cancellation.require_active()
         except (urllib.error.URLError, TimeoutError) as exc:
+            if cancellation is not None and cancellation.cancelled:
+                cancellation.require_active()
             raise ModelError(
                 f"model request failed: {_secret(str(exc))}"
             ) from exc
