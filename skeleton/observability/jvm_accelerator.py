@@ -8,7 +8,6 @@ server, or Java dependency is introduced into the normal Skeleton startup path.
 from __future__ import annotations
 
 import array
-import atexit
 import math
 import os
 import queue
