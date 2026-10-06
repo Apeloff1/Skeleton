@@ -7,6 +7,8 @@ DATA=ROOT/"machine"/"essentials_1000.json"
 SCHED=ROOT/"machine"/"project_self_improvement_idle_scheduler.json"
 CLOSURE=ROOT/"machine"/"essentials_1000_closure_protocol.json"
 LEDGER=ROOT/"machine"/"essentials_1000_gap_ledger.json"
+PRIORITY=ROOT/"machine"/"essentials_1000_priority_policy.json"
+FRONTIER=ROOT/"machine"/"essentials_1000_execution_frontier.json"
 MODULE=ROOT/"scripts"/"check_essentials_1000.py"
 
 def _m():
@@ -17,8 +19,10 @@ def _d(): return json.loads(DATA.read_text(encoding="utf-8"))
 def _s(): return json.loads(SCHED.read_text(encoding="utf-8"))
 def _c(): return json.loads(CLOSURE.read_text(encoding="utf-8"))
 def _l(): return json.loads(LEDGER.read_text(encoding="utf-8"))
+def _p(): return json.loads(PRIORITY.read_text(encoding="utf-8"))
+def _f(): return json.loads(FRONTIER.read_text(encoding="utf-8"))
 
-def test_contract_is_valid(): assert _m().validate(_d(),_s(),_c(),_l())==[]
+def test_contract_is_valid(): assert _m().validate(_d(),_s(),_c(),_l(),_p(),_f())==[]
 def test_exact_1000_and_100_strata():
     d=_d()
     assert [x["id"] for x in d["levels"]]==[f"ESS1000-{i:04d}" for i in range(1,1001)]
@@ -119,3 +123,31 @@ def test_construction_waves_match_parallel_dependency_topology():
             assert w["prerequisite_waves"]==[]
         else:
             assert w["prerequisite_waves"]==[f"ESS-W{k:03d}" for k in range(1,100)]
+
+
+def test_priority_policy_never_uses_scores_to_cross_severity():
+    p=_p()
+    assert [x["id"] for x in p["severity_classes"]]==["E0","E1","E2","E3"]
+    assert p["hard_order"][-1]=="optional PSI optimization"
+    assert "inside the same non-compensable severity class" in p["scoring_within_same_severity"]["rule"]
+    assert p["starvation"]["cannot_cross_severity_boundary"] is True
+    assert p["batching"]["max_parallel_lanes"]==99
+
+def test_execution_frontier_starts_with_99_parallel_open_lanes():
+    f=_f()
+    assert len(f["lanes"])==99
+    assert f["execution_model"]["parallel_domain_lanes"]==99
+    assert f["snapshot"]["open"]==1000
+    assert f["snapshot"]["signed_current"]==0
+    assert all(l["state"]=="open" for l in f["lanes"])
+    assert all(l["active_severity"] is None for l in f["lanes"])
+    assert all(l["planning_default_severity"]!="E0" for l in f["lanes"])
+
+def test_execution_finality_lane_requires_all_99_domain_closure_gates():
+    f=_f()
+    gates=[f"ESS1000-{i*10:04d}" for i in range(1,100)]
+    assert f["execution_model"]["finality_gate_inputs"]==gates
+    final=f["finality_lane"]
+    assert final["state"]=="blocked"
+    assert final["blocked_by"]==gates
+    assert final["current_frontier"] is None
