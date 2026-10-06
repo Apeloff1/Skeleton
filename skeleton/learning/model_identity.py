@@ -8,10 +8,12 @@ and evaluation/provenance roots.
 
 from __future__ import annotations
 
+from collections.abc import Mapping as MappingABC
 from dataclasses import dataclass, field
 import hashlib
 import json
 from pathlib import PurePosixPath
+from types import MappingProxyType
 from typing import Mapping, Sequence
 
 
@@ -69,6 +71,30 @@ def _artifact_path(name: str, value: object) -> str:
     if len(first) == 2 and first[0].isalpha() and first[1] == ":":
         raise ModelIdentityError(f"{name} must be a canonical artifact-relative path")
     return path
+
+
+def _freeze_json(value: object) -> object:
+    if value is None or isinstance(value, (str, bool, int, float)):
+        _stable_json(value)
+        return value
+    if isinstance(value, MappingABC):
+        frozen: dict[str, object] = {}
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise ModelIdentityError("metadata object keys must be strings")
+            frozen[key] = _freeze_json(item)
+        return MappingProxyType(dict(sorted(frozen.items())))
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze_json(item) for item in value)
+    raise ModelIdentityError("metadata contains non-JSON value")
+
+
+def _thaw_json(value: object) -> object:
+    if isinstance(value, MappingABC):
+        return {key: _thaw_json(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_thaw_json(item) for item in value]
+    return value
 
 
 def _unique_text(name: str, values: Sequence[str]) -> tuple[str, ...]:
@@ -130,7 +156,11 @@ class RepresentationSpec:
                 raise ModelIdentityError("special token ids must be unique")
             tokens[name] = raw_id
             ids.add(raw_id)
-        object.__setattr__(self, "special_token_map", dict(sorted(tokens.items())))
+        object.__setattr__(
+            self,
+            "special_token_map",
+            MappingProxyType(dict(sorted(tokens.items()))),
+        )
 
         for field_name in ("bos_token", "eos_token", "padding_token"):
             value = getattr(self, field_name)
@@ -235,11 +265,13 @@ class ModelArtifactManifest:
             )
         if not isinstance(self.representation, RepresentationSpec):
             raise TypeError("representation must be RepresentationSpec")
-        if not self.weight_shards:
+        shards = tuple(self.weight_shards)
+        if not shards:
             raise ModelIdentityError("at least one weight shard is required")
-        if any(not isinstance(shard, WeightShard) for shard in self.weight_shards):
+        if any(not isinstance(shard, WeightShard) for shard in shards):
             raise TypeError("weight_shards must contain WeightShard values")
-        paths = [shard.path for shard in self.weight_shards]
+        object.__setattr__(self, "weight_shards", shards)
+        paths = [shard.path for shard in shards]
         if len(paths) != len(set(paths)):
             raise ModelIdentityError("weight shard paths must be unique")
         object.__setattr__(
@@ -258,9 +290,9 @@ class ModelArtifactManifest:
                 object.__setattr__(
                     self, field_name, _sha(field_name, value)
                 )
-        frozen = dict(self.metadata)
-        _stable_json(frozen)
-        object.__setattr__(self, "metadata", frozen)
+        raw_metadata = dict(self.metadata)
+        _stable_json(raw_metadata)
+        object.__setattr__(self, "metadata", _freeze_json(raw_metadata))
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -285,7 +317,7 @@ class ModelArtifactManifest:
             "data_manifest_root": self.data_manifest_root,
             "eval_evidence_root": self.eval_evidence_root,
             "provenance_root": self.provenance_root,
-            "metadata": dict(self.metadata),
+            "metadata": _thaw_json(self.metadata),
         }
 
     @property
