@@ -96,3 +96,10 @@ This overlay is complete only as a **specification addition** when its validator
 ## Dimensional closure
 
 Every FLGB plane now declares 12 required subsystems, 12 lifecycle stages, 10 evidence classes, and 12 stress scenarios. The validator requires all subsystem × lifecycle pairs, all coverage IDs, every evidence label, and every stress dimension to remain present. This converts “no gaps” from a prose promise into a fail-closed specification invariant.
+
+
+## Execution backlog
+
+The machine construction bridge is `machine/functional_llm_game_builder_execution_backlog.json`. It contains **216 planned build units**: exactly 12 subsystem tasks for each of the 18 FLGB planes. Every unit names a target implementation module, schema contract, focused test target, lifecycle/evidence/stress obligations, dependency context, acceptance gates, and exact-head closure rule. No unit is pre-completed or pre-signed.
+
+The backlog validator is `scripts/check_functional_llm_game_builder_execution_backlog.py`; it rejects missing plane/subsystem pairs, duplicate targets, dependency cycles, drift from the atlas coverage dimensions, premature completion/signoff, and an incomplete FLGB-18 whole-product fan-in.
