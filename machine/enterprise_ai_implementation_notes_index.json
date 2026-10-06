@@ -1,0 +1,156 @@
+{
+  "schema_version": "skeleton.enterprise_ai.implementation_notes_index.v1",
+  "standard_name": "Skeleton October 2026 Enterprise AI Implementation Standard",
+  "standard_version": "2026.10",
+  "status": "active_design_authority",
+  "effective_date": "2026-10-06",
+  "scope": {
+    "first_volume": "VOL-000",
+    "last_volume": "VOL-420",
+    "expected_volume_count": 421,
+    "rule": "Every masterplan volume requires one current deep implementation dossier before enterprise qualification."
+  },
+  "authority": {
+    "master_plan": "machine/ai_master_plan.json",
+    "enterprise_superiority": "machine/enterprise_ai_superiority.json",
+    "construction_manual": "docs/AI_APP_CONSTRUCTION_MANUAL.md",
+    "validator": "scripts/check_enterprise_ai_implementation_notes.py",
+    "tests": "tests/test_enterprise_ai_implementation_notes.py",
+    "human_index": "docs/architecture/enterprise-volume-notes/README.md"
+  },
+  "required_levels": [
+    {
+      "id": "L00",
+      "name": "Intent & ownership"
+    },
+    {
+      "id": "L01",
+      "name": "Architecture & dependencies"
+    },
+    {
+      "id": "L02",
+      "name": "Contracts & compatibility"
+    },
+    {
+      "id": "L03",
+      "name": "Admission & authority"
+    },
+    {
+      "id": "L04",
+      "name": "Runtime control flow"
+    },
+    {
+      "id": "L05",
+      "name": "State & data semantics"
+    },
+    {
+      "id": "L06",
+      "name": "Security, privacy & tenancy"
+    },
+    {
+      "id": "L07",
+      "name": "Failure, resilience & recovery"
+    },
+    {
+      "id": "L08",
+      "name": "Observability & operability"
+    },
+    {
+      "id": "L09",
+      "name": "Performance, capacity & economics"
+    },
+    {
+      "id": "L10",
+      "name": "Verification & adversarial evaluation"
+    },
+    {
+      "id": "L11",
+      "name": "Deployment, migration & rollback"
+    },
+    {
+      "id": "L12",
+      "name": "Operator controls & runbooks"
+    },
+    {
+      "id": "L13",
+      "name": "Enterprise superiority & exit"
+    }
+  ],
+  "october_2026_non_negotiables": [
+    "one canonical owner per production responsibility; shadow owners are defects",
+    "typed/versioned contracts and canonical parsing at trust boundaries",
+    "models propose; deterministic control planes authorize durable or privileged effects",
+    "principal, tenant, policy, budget, deadline and idempotency identity precede protected execution",
+    "authoritative, derived, cache and ephemeral state are explicitly separated",
+    "acknowledged durable writes require transactional/outbox or equivalent recovery semantics",
+    "untrusted model, retrieval, tool, file and external content never becomes policy or authority",
+    "all loops, retries, searches, delegation, concurrency, tokens, wall time and resource use are bounded",
+    "p95/p99, saturation, resource pressure and failure behavior accompany median performance claims",
+    "security/privacy/authority/tenant/state-loss regressions are non-compensable",
+    "operation identity joins logs, metrics, traces, cost, model/tool/retrieval decisions and durable receipts",
+    "negative, adversarial, concurrency, crash, replay, saturation and recovery testing is mandatory",
+    "immutable release identity, provenance, migration preflight, canary and tested rollback are mandatory",
+    "operator controls use preflight, explicit admission, execution and immutable receipt",
+    "enterprise evidence is exact-head and expires on governed source, policy, contract, evaluator or operating-envelope change",
+    "complete enterprise AI requires all 421 volumes enterprise-qualified plus critical superiority and golden-journey evidence"
+  ],
+  "dossier_files": [
+    {
+      "depth_pass": "DP-000-040",
+      "path": "machine/enterprise_volume_notes/DP-000-040.json",
+      "human_path": "docs/architecture/enterprise-volume-notes/DP-000-040.md"
+    },
+    {
+      "depth_pass": "DP-041-080",
+      "path": "machine/enterprise_volume_notes/DP-041-080.json",
+      "human_path": "docs/architecture/enterprise-volume-notes/DP-041-080.md"
+    },
+    {
+      "depth_pass": "DP-081-120",
+      "path": "machine/enterprise_volume_notes/DP-081-120.json",
+      "human_path": "docs/architecture/enterprise-volume-notes/DP-081-120.md"
+    },
+    {
+      "depth_pass": "DP-121-160",
+      "path": "machine/enterprise_volume_notes/DP-121-160.json",
+      "human_path": "docs/architecture/enterprise-volume-notes/DP-121-160.md"
+    },
+    {
+      "depth_pass": "DP-161-200",
+      "path": "machine/enterprise_volume_notes/DP-161-200.json",
+      "human_path": "docs/architecture/enterprise-volume-notes/DP-161-200.md"
+    },
+    {
+      "depth_pass": "DP-201-240",
+      "path": "machine/enterprise_volume_notes/DP-201-240.json",
+      "human_path": "docs/architecture/enterprise-volume-notes/DP-201-240.md"
+    },
+    {
+      "depth_pass": "DP-241-280",
+      "path": "machine/enterprise_volume_notes/DP-241-280.json",
+      "human_path": "docs/architecture/enterprise-volume-notes/DP-241-280.md"
+    },
+    {
+      "depth_pass": "DP-281-320",
+      "path": "machine/enterprise_volume_notes/DP-281-320.json",
+      "human_path": "docs/architecture/enterprise-volume-notes/DP-281-320.md"
+    },
+    {
+      "depth_pass": "DP-321-360",
+      "path": "machine/enterprise_volume_notes/DP-321-360.json",
+      "human_path": "docs/architecture/enterprise-volume-notes/DP-321-360.md"
+    },
+    {
+      "depth_pass": "DP-361-400",
+      "path": "machine/enterprise_volume_notes/DP-361-400.json",
+      "human_path": "docs/architecture/enterprise-volume-notes/DP-361-400.md"
+    },
+    {
+      "depth_pass": "DP-401-420",
+      "path": "machine/enterprise_volume_notes/DP-401-420.json",
+      "human_path": "docs/architecture/enterprise-volume-notes/DP-401-420.md"
+    }
+  ],
+  "qualification_rule": "A volume cannot advance to enterprise_qualified or superior unless its dossier exists, all 14 levels are complete, masterplan fields match, evidence is exact-head/current, and the applicable enterprise superiority/golden-journey gates pass.",
+  "anti_shortcut": "Implementation notes are obligations, not evidence. Prose, LOC, file existence, legacy implementation status, or self-scored benchmarks cannot promote enterprise grade."
+}
