@@ -18,6 +18,7 @@ from skeleton.context.compaction import (
 )
 from skeleton.context.compiler import (
     COMPILER_VERSION,
+    ContextAllocationPolicy,
     ContextCompilationError,
     ContextCompiler,
     ProviderContextProjection,
@@ -108,6 +109,7 @@ __all__ = [
     "compact_context_segment",
     "COMPILER_VERSION",
     "ContextAdmissionDecision",
+    "ContextAllocationPolicy",
     "ContextCompilationError",
     "ContextCompilePolicy",
     "ContextCompiler",
