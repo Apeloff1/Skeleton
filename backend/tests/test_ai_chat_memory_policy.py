@@ -253,6 +253,7 @@ async def test_chat_memory_policy_reaches_delegated_engine_command(
     async def execute(command):
         captured.append(command)
         return SimpleNamespace(
+            operation_id=command.operation.operation_id,
             final_output="Verified memory-worthy answer.",
             execution_id=command.execution_request.execution_id,
             verification="verification:memory",
