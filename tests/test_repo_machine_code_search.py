@@ -10,6 +10,7 @@ from skeleton.repo_machine.code_search import (
     CodeSearchError,
     CodeSearchIndex,
     MAX_REFERENCE_TERMS_PER_DOCUMENT,
+    MAX_RENDERED_LINE_BYTES,
     load_code_search_index,
     save_code_search_index,
 )
@@ -125,6 +126,15 @@ class CodeSearchIndexTests(unittest.TestCase):
             index = CodeSearchIndex.build(root, model)
             target = root / ".machine" / "code-search-index.json"
             save_code_search_index(index, target)
+            rendered = target.read_bytes()
+            self.assertGreater(rendered.count(b"\n"), 1)
+            self.assertLessEqual(
+                max(len(line) for line in rendered.splitlines()),
+                MAX_RENDERED_LINE_BYTES,
+            )
+            first_render = rendered
+            save_code_search_index(index, target)
+            self.assertEqual(target.read_bytes(), first_render)
             loaded = load_code_search_index(
                 target,
                 expected_fingerprint=model.fingerprint,
