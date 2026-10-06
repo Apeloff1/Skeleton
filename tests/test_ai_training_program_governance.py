@@ -1147,6 +1147,7 @@ def test_governed_model_promotion_rejects_wrong_challenger_model() -> None:
             evaluation_refs=("eval:a", "eval:b"),
             governance_candidate=candidate_value,
             governance_decision=decision,
+            governance_ledger=ledger,
         )
 
 
@@ -1214,6 +1215,7 @@ def test_governed_model_promotion_verifier_must_match_decision() -> None:
             evaluation_refs=("eval:a", "eval:b"),
             governance_candidate=candidate_value,
             governance_decision=decision,
+            governance_ledger=ledger,
         )
 
 
