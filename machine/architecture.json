@@ -29,7 +29,12 @@
     "enterprise_system_contract": "machine/enterprise_system_architecture.json",
     "enterprise_system_manual": "docs/ENTERPRISE_SYSTEM_ARCHITECTURE.md",
     "enterprise_system_validator": "scripts/check_enterprise_system_architecture.py",
-    "enterprise_system_independent_verifier": "scripts/verify_enterprise_system_architecture.py"
+    "enterprise_system_independent_verifier": "scripts/verify_enterprise_system_architecture.py",
+    "advanced_ai_structure": "machine/advanced_ai_structure_100.json",
+    "advanced_ai_structure_manual": "docs/plan/ADVANCED_AI_100_LEVELS.md",
+    "advanced_ai_structure_validator": "scripts/check_advanced_ai_structure.py",
+    "advanced_ai_structure_independent_verifier": "scripts/verify_advanced_ai_structure.py",
+    "advanced_ai_maturity_ledger": "machine/advanced_ai_maturity_ledger.json"
   },
   "objectives": [
     "one product shell",
@@ -55,7 +60,8 @@
     "restore canonical state before rebuilding vector indexes, caches, snapshots, and other projections",
     "one typed machine-readable schema catalog for cross-plane AI runtime envelopes",
     "one governed canonical AI assembly file tree under skeleton/ai",
-    "one enterprise system-of-systems contract for HA topology, tenancy, security, SLO, DR, capacity, operations and production acceptance"
+    "one enterprise system-of-systems contract for HA topology, tenancy, security, SLO, DR, capacity, operations and production acceptance",
+    "100-level advanced AI promotion structure above the enterprise operational baseline without creating shadow runtime ownership"
   ],
   "principles": [
     "runtime topology and repository topology are separate contracts linked by this map",
@@ -570,7 +576,8 @@
     "Functional-AI P0 closure is evidence-based and tracked separately from implementation progress.",
     "Every user-visible AI capability must be declared in the concrete capability registry and resolve readiness from canonical plane/provider dependencies.",
     "AI file-tree migration mirrors remain byte-identical to compatibility sources until explicit import/ownership cutover",
-    "enterprise production readiness is an evidence state composed over canonical plane owners and never a documentation-only claim"
+    "enterprise production readiness is an evidence state composed over canonical plane owners and never a documentation-only claim",
+    "advanced AI maturity levels are promotion/evidence structure, not authorization and not a substitute for canonical capability-plane ownership"
   ],
   "construction": {
     "contract": "machine/ai_app_construction.json",

@@ -3555,7 +3555,8 @@
     "rollback target and trigger criteria",
     "enterprise AI superiority exact-head validator output",
     "all-421-volume October 2026 implementation dossier validator output",
-    "enterprise system architecture exact-head validator and independent receipt"
+    "enterprise system architecture exact-head validator and independent receipt",
+    "100-level advanced AI structure exact-head validator and independent receipt"
   ],
   "construction_work_packages": [
     {
@@ -9757,5 +9758,35 @@
       "canonical AI runtime mirror parity",
       "independent redundancy verifier"
     ]
+  },
+  "advanced_ai_structure": {
+    "schema_version": "advanced-ai-structure/v1",
+    "contract": "machine/advanced_ai_structure_100.json",
+    "human_plan": "docs/plan/ADVANCED_AI_100_LEVELS.md",
+    "validator": "scripts/check_advanced_ai_structure.py",
+    "independent_verifier": "scripts/verify_advanced_ai_structure.py",
+    "workflow": ".github/workflows/advanced-ai-structure.yml",
+    "levels": 100,
+    "strata": 10,
+    "enterprise_baseline": "machine/enterprise_system_architecture.json",
+    "promotion_semantics": "ordinal maturity ladder; not a 100-hop runtime dependency chain",
+    "closure_gates": [
+      "L010",
+      "L020",
+      "L030",
+      "L040",
+      "L050",
+      "L060",
+      "L070",
+      "L080",
+      "L090",
+      "L100"
+    ],
+    "frontier_guardrails": [
+      "self-improvement may propose and evaluate but may not self-approve production promotion",
+      "higher levels inherit lower authority, tenant, safety, provenance, budget and recovery invariants",
+      "regression of a lower promoted level invalidates dependent higher-level promotion evidence"
+    ],
+    "maturity_ledger": "machine/advanced_ai_maturity_ledger.json"
   }
 }
