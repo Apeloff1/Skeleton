@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 import hashlib
+import re
 from typing import Any
 
 from skeleton.ai.runtime.contracts.ai_execution import AIExecutionRequest
@@ -21,8 +22,11 @@ from skeleton.ai.runtime.contracts.execution_authority import (
     ExecutionAuthority,
     ExecutionAuthorityError,
     ResourceUsage,
+    validate_authority_attenuation,
 )
 
+
+_REPLAY_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,191}$")
 
 MAX_GUARD_AUTHORITIES = 4096
 MAX_GUARD_REPLAY_KEYS = 16384
@@ -74,7 +78,8 @@ class ExecutionAuthorityGuard:
         self._authorities: dict[str, _AuthorityState] = {}
         self._authority_order: list[str] = []
         self._replay_digests: dict[str, str] = {}
-        self._replay_order: list[str] = []
+        self._replay_order: list[str] = {}
+        self._admission_receipts: dict[str, AdmissionReceipt] = []
 
     @staticmethod
     def _aware(now: datetime | None) -> datetime:
@@ -82,6 +87,12 @@ class ExecutionAuthorityGuard:
         if value.tzinfo is None or value.utcoffset() is None:
             raise ExecutionAuthorityError("now must be timezone-aware")
         return value.astimezone(timezone.utc)
+
+    @staticmethod
+    def _validate_replay_key(replay_key: str) -> str:
+        if not isinstance(replay_key, str) or _REPLAY_KEY.fullmatch(replay_key) is None:
+            raise ExecutionAuthorityError("invalid replay_key")
+        return replay_key
 
     @staticmethod
     def _replay_payload_digest(
@@ -106,6 +117,7 @@ class ExecutionAuthorityGuard:
         while len(self._replay_order) >= self.max_replay_keys:
             oldest = self._replay_order.pop(0)
             self._replay_digests.pop(oldest, None)
+            self._admission_receipts.pop(oldest, None)
         self._replay_digests[replay_key] = digest
         self._replay_order.append(replay_key)
 
@@ -138,6 +150,7 @@ class ExecutionAuthorityGuard:
         """Bind one execution request to an authority and return durable evidence."""
 
         instant = self._aware(now)
+        replay_key = self._validate_replay_key(replay_key)
         if not isinstance(authority, ExecutionAuthority):
             raise ExecutionAuthorityError("authority must be ExecutionAuthority")
         if not isinstance(request, AIExecutionRequest):
@@ -148,6 +161,16 @@ class ExecutionAuthorityGuard:
             raise ExecutionAuthorityError("operation identity mismatch")
         if request.execution_id != authority.execution_id:
             raise ExecutionAuthorityError("execution identity mismatch")
+
+        if authority.parent_authority_digest is not None:
+            parent_state = self._authorities.get(authority.parent_authority_digest)
+            if parent_state is None:
+                raise ExecutionAuthorityError("parent authority has not been admitted")
+            if parent_state.revoked:
+                raise ExecutionAuthorityError("parent authority is revoked")
+            if parent_state.authority.expired(now=instant):
+                raise ExecutionAuthorityError("parent authority is expired")
+            validate_authority_attenuation(parent_state.authority, authority)
 
         state = self._remember_authority(authority)
         if state.revoked:
@@ -165,11 +188,15 @@ class ExecutionAuthorityGuard:
         ).hexdigest()
 
         prior = self._replay_digests.get(replay_key)
-        if prior is not None and prior != admission_replay_digest:
-            raise ExecutionAuthorityError("replay_key reused for different admission")
-        self._remember_replay(replay_key, admission_replay_digest)
+        if prior is not None:
+            if prior != admission_replay_digest:
+                raise ExecutionAuthorityError("replay_key reused for different admission")
+            existing_receipt = self._admission_receipts.get(replay_key)
+            if existing_receipt is None:
+                raise ExecutionAuthorityError("admission replay state is inconsistent")
+            return existing_receipt
 
-        return AdmissionReceipt(
+        receipt = AdmissionReceipt(
             receipt_id=receipt_id,
             authority_digest=authority.digest,
             request_identity_digest=request.identity_digest,
@@ -179,6 +206,9 @@ class ExecutionAuthorityGuard:
             expires_at=authority.expires_at,
             replay_key=replay_key,
         )
+        self._remember_replay(replay_key, admission_replay_digest)
+        self._admission_receipts[replay_key] = receipt
+        return receipt
 
     def authorize(
         self,
@@ -196,6 +226,7 @@ class ExecutionAuthorityGuard:
         """
 
         instant = self._aware(now)
+        replay_key = self._validate_replay_key(replay_key)
         if not isinstance(authority, ExecutionAuthority):
             raise ExecutionAuthorityError("authority must be ExecutionAuthority")
         usage_delta = delta or ResourceUsage()
@@ -303,6 +334,7 @@ class ExecutionAuthorityGuard:
             "authorities": authorities,
             "authority_count": len(authorities),
             "replay_key_count": len(self._replay_digests),
+            "admission_receipt_count": len(self._admission_receipts),
         }
 
 
