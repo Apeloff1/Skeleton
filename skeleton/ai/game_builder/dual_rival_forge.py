@@ -14,6 +14,7 @@ from .contracts import (
     Candidate,
     Challenge,
     EffortMode,
+    EvaluatorProvenance,
     GateResult,
     PromotionReceipt,
     ProducerProvenance,
@@ -364,9 +365,12 @@ class DualRivalForge:
         *,
         submitted: Candidate | None,
         evaluator_id: str,
+        evaluator_provenance: EvaluatorProvenance,
+        authority_evidence_digest: str,
         gate_results: Sequence[GateResult],
         protected_axes: Iterable[str] | None = None,
         evaluated_quality: Mapping[str, float] | None = None,
+        evaluation_decision_digest: str | None = None,
     ) -> PromotionReceipt:
         if self.completed:
             raise ForgeStateError("effort-mode round budget is complete")
@@ -386,8 +390,11 @@ class DualRivalForge:
             incumbent=self.champion,
             submitted=submitted,
             evaluator_id=evaluator_id,
+            evaluator_provenance=evaluator_provenance,
+            authority_evidence_digest=authority_evidence_digest,
             gate_results=gate_results,
             submitted_quality_override=evaluated_quality,
+            evaluation_decision_digest=evaluation_decision_digest,
             **kwargs,
         )
         if receipt.decision == "promote":
