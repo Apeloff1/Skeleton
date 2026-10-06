@@ -39,6 +39,8 @@ def _fixture(tmp_path: Path) -> Path:
         "skeleton/ai/game_builder/quality_debt.py",
         "skeleton/ai/game_builder/resource_governor.py",
         "skeleton/ai/game_builder/evaluation.py",
+        "skeleton/ai/game_builder/release.py",
+        "skeleton/ai/game_builder/resilience.py",
         *manifest["shards"],
     ]
     for relative in paths:
