@@ -391,9 +391,11 @@ def validate_authority_attenuation(
         raise ExecutionAuthorityError("parent and child must be ExecutionAuthority")
     if child.parent_authority_digest != parent.digest:
         raise ExecutionAuthorityError("child is not bound to parent authority digest")
-    for name in ("operation_id", "execution_id", "actor_id"):
+    for name in ("operation_id", "execution_id"):
         if getattr(child, name) != getattr(parent, name):
             raise ExecutionAuthorityError(f"delegated {name} mismatch")
+    if child.issuer_id != parent.actor_id:
+        raise ExecutionAuthorityError("child issuer is not the parent actor")
     if child.issued_at < parent.issued_at:
         raise ExecutionAuthorityError("child authority predates parent")
     if child.expires_at > parent.expires_at:
