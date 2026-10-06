@@ -313,3 +313,45 @@ def test_evidence_status_model_cannot_drop_invalidated_state() -> None:
     ]
     errors = _validate(checker, payloads)
     assert "evidence status model drifted" in errors
+
+
+
+def test_level_cannot_drop_operational_readiness_requirement() -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_operability")
+    payloads = _payloads()
+    payloads["contract"] = copy.deepcopy(payloads["contract"])
+    payloads["contract"]["levels"][70]["operational_readiness_required"] = False
+    errors = _validate(checker, payloads)
+    assert "L071 must require operational readiness" in errors
+
+
+def test_control_profile_must_match_stratum() -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_control_profile")
+    payloads = _payloads()
+    payloads["contract"] = copy.deepcopy(payloads["contract"])
+    payloads["contract"]["levels"][40]["control_profile"] = copy.deepcopy(
+        payloads["contract"]["level_control_profiles"]["S02"]
+    )
+    errors = _validate(checker, payloads)
+    assert "L041.control_profile must match S05" in errors
+
+
+def test_deprecation_state_model_cannot_be_bypassed() -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_deprecation")
+    payloads = _payloads()
+    payloads["contract"] = copy.deepcopy(payloads["contract"])
+    payloads["contract"]["deprecation_and_migration"]["states"] = [
+        "ACTIVE",
+        "RETIRED",
+    ]
+    errors = _validate(checker, payloads)
+    assert "deprecation/migration state model drifted" in errors
+
+
+def test_shadow_authority_detector_is_mandatory() -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_shadow_authority")
+    payloads = _payloads()
+    payloads["contract"] = copy.deepcopy(payloads["contract"])
+    payloads["contract"]["dependency_integrity"]["shadow_authority_detector"] = ""
+    errors = _validate(checker, payloads)
+    assert "dependency_integrity.shadow_authority_detector must be non-empty" in errors
