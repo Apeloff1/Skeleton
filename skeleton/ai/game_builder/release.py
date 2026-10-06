@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, Mapping
 
-from .contracts import EffortMode, canonical_digest
+from .contracts import EffortMode, PromotionReceipt, canonical_digest
 
 
 class ReleaseArbitrationError(RuntimeError):
@@ -78,6 +78,8 @@ class ForgeReleaseBinding:
     def from_checkpoint(
         cls,
         checkpoint: Mapping[str, object],
+        *,
+        receipts: Iterable[PromotionReceipt],
     ) -> "ForgeReleaseBinding":
         if not isinstance(checkpoint, Mapping):
             raise TypeError("forge checkpoint must be a mapping")
@@ -109,15 +111,32 @@ class ForgeReleaseBinding:
         receipt_digests = checkpoint.get("receipt_digests")
         if not isinstance(receipt_digests, list):
             raise TypeError("forge release receipt digest chain must be a list")
-        if len(receipt_digests) != completed_rounds:
+        materialized_receipts = tuple(receipts)
+        if any(not isinstance(item, PromotionReceipt) for item in materialized_receipts):
+            raise TypeError("forge release receipts must contain PromotionReceipt values")
+        actual_receipt_digests = [
+            receipt.decision_digest
+            for receipt in materialized_receipts
+        ]
+        if actual_receipt_digests != receipt_digests:
+            raise ValueError("forge release receipts do not match checkpoint chain")
+        if len(materialized_receipts) != completed_rounds:
             raise ValueError("forge release receipt chain must cover every completed round")
-        if any(
-            not isinstance(item, str) or len(item) < 16
-            for item in receipt_digests
-        ):
-            raise ValueError("forge release receipt chain contains an unstable digest")
-        if len(receipt_digests) != len(set(receipt_digests)):
+        if len(actual_receipt_digests) != len(set(actual_receipt_digests)):
             raise ValueError("forge release receipt digests must be unique")
+
+        previous_promoted_digest: str | None = None
+        for expected_round, receipt in enumerate(materialized_receipts, start=1):
+            if receipt.round_index != expected_round:
+                raise ValueError("forge release receipt rounds must form exact 1..N sequence")
+            if receipt.effort_mode is not effort_mode:
+                raise ValueError("forge release receipt effort mode mismatch")
+            if (
+                previous_promoted_digest is not None
+                and receipt.incumbent_digest != previous_promoted_digest
+            ):
+                raise ValueError("forge release receipt winner chain is discontinuous")
+            previous_promoted_digest = receipt.promoted_digest
 
         champion = checkpoint.get("champion")
         if not isinstance(champion, Mapping):
@@ -132,16 +151,20 @@ class ForgeReleaseBinding:
                 raise ValueError(f"forge release champion {key} is invalid")
             identities[key] = value
 
+        champion_candidate_digest = canonical_digest(champion)
+        if previous_promoted_digest != champion_candidate_digest:
+            raise ValueError("forge release terminal receipt does not match champion")
+
         return cls(
             checkpoint_digest=supplied_digest,
-            champion_candidate_digest=canonical_digest(champion),
+            champion_candidate_digest=champion_candidate_digest,
             champion_artifact_digest=identities["artifact_digest"],
             champion_canon_digest=identities["canon_digest"],
             champion_provenance_digest=identities["provenance_digest"],
-            promotion_chain_digest=canonical_digest(receipt_digests),
+            promotion_chain_digest=canonical_digest(actual_receipt_digests),
             effort_mode=effort_mode,
             completed_rounds=completed_rounds,
-            receipt_count=len(receipt_digests),
+            receipt_count=len(materialized_receipts),
         )
 
     def to_payload(self) -> dict[str, object]:
