@@ -135,6 +135,8 @@ class HorizonProbe:
         _stable(self.probe_id, "probe_id")
         _stable(self.anchor_id, "anchor_id")
         _stable(self.evidence_digest, "evidence_digest")
+        if not isinstance(self.passed, bool):
+            raise TypeError("horizon probe passed state must be boolean")
         if self.minimum_distance < 1:
             raise FrontierAssuranceError("minimum_distance must be positive")
         if not self.distant_ids:
@@ -452,6 +454,8 @@ class WisdomRecord:
     def __post_init__(self) -> None:
         _stable(self.lesson_id, "lesson_id")
         _stable(self.statement_digest, "statement_digest")
+        if not isinstance(self.independently_verified, bool):
+            raise TypeError("wisdom independent verification state must be boolean")
         if not self.scope_ids or not self.evidence_digests:
             raise FrontierAssuranceError("wisdom record requires scope and evidence")
 
