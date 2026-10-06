@@ -1,11 +1,11 @@
-# Functional LLM + Game Builder — 10 MB Execution Atlas
+# Functional LLM + Game Builder — 20 MB+ Deep-Closure Execution Atlas
 
 This depth overlay expands the canonical Skeleton AI masterplan without adding top-level volumes. The VOL-000..420 breadth freeze remains intact.
 
 ## Size and authority
 
-- Requested addition: at least 10,000,000 bytes of implementation-grade masterplan depth.
-- Shard bytes committed by this overlay: **11,476,903 bytes** across 18 shards.
+- Requested minimum: at least 20,000,000 bytes of implementation-grade masterplan depth (Pass 2 doubles the original floor).
+- Shard bytes committed by this overlay: **52,648,747 bytes** across 18 shards.
 - Runtime completion is **not** claimed.
 - Implementation signoff is **false**.
 - Independent verification signoff is **false**.
@@ -36,24 +36,30 @@ Provider-native objects, engine-native objects, model confidence, chat history, 
 
 ## Primary planes
 
-- **FLGB-01 — LLM Session and Inference Runtime**: [SHARD_01_FLGB-01_LLM_SESSION_AND_INFERENCE_RUNTIME.md](SHARD_01_FLGB-01_LLM_SESSION_AND_INFERENCE_RUNTIME.md) — 637,410 bytes
-- **FLGB-02 — Tokenizer Model Runtime and Serving**: [SHARD_02_FLGB-02_TOKENIZER_MODEL_RUNTIME_AND_SERVING.md](SHARD_02_FLGB-02_TOKENIZER_MODEL_RUNTIME_AND_SERVING.md) — 636,567 bytes
-- **FLGB-03 — Context Memory Retrieval and Knowledge**: [SHARD_03_FLGB-03_CONTEXT_MEMORY_RETRIEVAL_AND_KNOWLEDGE.md](SHARD_03_FLGB-03_CONTEXT_MEMORY_RETRIEVAL_AND_KNOWLEDGE.md) — 638,076 bytes
-- **FLGB-04 — Tools Agents and Long-Horizon Execution**: [SHARD_04_FLGB-04_TOOLS_AGENTS_AND_LONG_HORIZON_EXECUTION.md](SHARD_04_FLGB-04_TOOLS_AGENTS_AND_LONG_HORIZON_EXECUTION.md) — 638,197 bytes
-- **FLGB-05 — Security Safety Policy and Privacy**: [SHARD_05_FLGB-05_SECURITY_SAFETY_POLICY_AND_PRIVACY.md](SHARD_05_FLGB-05_SECURITY_SAFETY_POLICY_AND_PRIVACY.md) — 637,854 bytes
-- **FLGB-06 — Evaluation Observability Reliability and Recovery**: [SHARD_06_FLGB-06_EVALUATION_OBSERVABILITY_RELIABILITY_AND_RECOVERY.md](SHARD_06_FLGB-06_EVALUATION_OBSERVABILITY_RELIABILITY_AND_RECOVERY.md) — 637,311 bytes
-- **FLGB-07 — Training Weights Adaptation and Self-Improvement**: [SHARD_07_FLGB-07_TRAINING_WEIGHTS_ADAPTATION_AND_SELF_IMPROVEMENT.md](SHARD_07_FLGB-07_TRAINING_WEIGHTS_ADAPTATION_AND_SELF_IMPROVEMENT.md) — 638,251 bytes
-- **FLGB-08 — Multimodal Vision Audio Video and Documents**: [SHARD_08_FLGB-08_MULTIMODAL_VISION_AUDIO_VIDEO_AND_DOCUMENTS.md](SHARD_08_FLGB-08_MULTIMODAL_VISION_AUDIO_VIDEO_AND_DOCUMENTS.md) — 636,960 bytes
-- **FLGB-09 — Game Project Editor and World Model**: [SHARD_09_FLGB-09_GAME_PROJECT_EDITOR_AND_WORLD_MODEL.md](SHARD_09_FLGB-09_GAME_PROJECT_EDITOR_AND_WORLD_MODEL.md) — 637,620 bytes
-- **FLGB-10 — Scene ECS Physics and Simulation**: [SHARD_10_FLGB-10_SCENE_ECS_PHYSICS_AND_SIMULATION.md](SHARD_10_FLGB-10_SCENE_ECS_PHYSICS_AND_SIMULATION.md) — 637,002 bytes
-- **FLGB-11 — Rendering Materials Lighting Cameras and VFX**: [SHARD_11_FLGB-11_RENDERING_MATERIALS_LIGHTING_CAMERAS_AND_VFX.md](SHARD_11_FLGB-11_RENDERING_MATERIALS_LIGHTING_CAMERAS_AND_VFX.md) — 637,800 bytes
-- **FLGB-12 — Animation Audio UI Input and Accessibility**: [SHARD_12_FLGB-12_ANIMATION_AUDIO_UI_INPUT_AND_ACCESSIBILITY.md](SHARD_12_FLGB-12_ANIMATION_AUDIO_UI_INPUT_AND_ACCESSIBILITY.md) — 638,467 bytes
-- **FLGB-13 — Gameplay Scripting Narrative Quests and NPC AI**: [SHARD_13_FLGB-13_GAMEPLAY_SCRIPTING_NARRATIVE_QUESTS_AND_NPC_AI.md](SHARD_13_FLGB-13_GAMEPLAY_SCRIPTING_NARRATIVE_QUESTS_AND_NPC_AI.md) — 638,440 bytes
-- **FLGB-14 — Procedural Generation Worldbuilding and Longform Consistency**: [SHARD_14_FLGB-14_PROCEDURAL_GENERATION_WORLDBUILDING_AND_LONGFORM_CONSISTENCY.md](SHARD_14_FLGB-14_PROCEDURAL_GENERATION_WORLDBUILDING_AND_LONGFORM_CONSISTENCY.md) — 637,128 bytes
-- **FLGB-15 — Networking Saves Mods Localization and Platform Services**: [SHARD_15_FLGB-15_NETWORKING_SAVES_MODS_LOCALIZATION_AND_PLATFORM_SERVICES.md](SHARD_15_FLGB-15_NETWORKING_SAVES_MODS_LOCALIZATION_AND_PLATFORM_SERVICES.md) — 638,208 bytes
-- **FLGB-16 — Assets Build Export Performance and Automated Testing**: [SHARD_16_FLGB-16_ASSETS_BUILD_EXPORT_PERFORMANCE_AND_AUTOMATED_TESTING.md](SHARD_16_FLGB-16_ASSETS_BUILD_EXPORT_PERFORMANCE_AND_AUTOMATED_TESTING.md) — 636,720 bytes
-- **FLGB-17 — Dual-Rival Forge Adversarial Quality and Rights Clean Room**: [SHARD_17_FLGB-17_DUAL_RIVAL_FORGE_ADVERSARIAL_QUALITY_AND_RIGHTS_CLEAN_ROOM.md](SHARD_17_FLGB-17_DUAL_RIVAL_FORGE_ADVERSARIAL_QUALITY_AND_RIGHTS_CLEAN_ROOM.md) — 638,279 bytes
-- **FLGB-18 — Integrated Product Orchestration Deployment and Gapless Closure**: [SHARD_18_FLGB-18_INTEGRATED_PRODUCT_ORCHESTRATION_DEPLOYMENT_AND_GAPLESS_CLOSURE.md](SHARD_18_FLGB-18_INTEGRATED_PRODUCT_ORCHESTRATION_DEPLOYMENT_AND_GAPLESS_CLOSURE.md) — 636,613 bytes
+- **FLGB-01 — LLM Session and Inference Runtime**: [SHARD_01_FLGB-01_LLM_SESSION_AND_INFERENCE_RUNTIME.md](SHARD_01_FLGB-01_LLM_SESSION_AND_INFERENCE_RUNTIME.md) — 2,520,378 bytes
+- **FLGB-02 — Tokenizer Model Runtime and Serving**: [SHARD_02_FLGB-02_TOKENIZER_MODEL_RUNTIME_AND_SERVING.md](SHARD_02_FLGB-02_TOKENIZER_MODEL_RUNTIME_AND_SERVING.md) — 3,158,567 bytes
+- **FLGB-03 — Context Memory Retrieval and Knowledge**: [SHARD_03_FLGB-03_CONTEXT_MEMORY_RETRIEVAL_AND_KNOWLEDGE.md](SHARD_03_FLGB-03_CONTEXT_MEMORY_RETRIEVAL_AND_KNOWLEDGE.md) — 3,167,207 bytes
+- **FLGB-04 — Tools Agents and Long-Horizon Execution**: [SHARD_04_FLGB-04_TOOLS_AGENTS_AND_LONG_HORIZON_EXECUTION.md](SHARD_04_FLGB-04_TOOLS_AGENTS_AND_LONG_HORIZON_EXECUTION.md) — 3,158,581 bytes
+- **FLGB-05 — Security Safety Policy and Privacy**: [SHARD_05_FLGB-05_SECURITY_SAFETY_POLICY_AND_PRIVACY.md](SHARD_05_FLGB-05_SECURITY_SAFETY_POLICY_AND_PRIVACY.md) — 3,163,093 bytes
+- **FLGB-06 — Evaluation Observability Reliability and Recovery**: [SHARD_06_FLGB-06_EVALUATION_OBSERVABILITY_RELIABILITY_AND_RECOVERY.md](SHARD_06_FLGB-06_EVALUATION_OBSERVABILITY_RELIABILITY_AND_RECOVERY.md) — 3,181,681 bytes
+- **FLGB-07 — Training Weights Adaptation and Self-Improvement**: [SHARD_07_FLGB-07_TRAINING_WEIGHTS_ADAPTATION_AND_SELF_IMPROVEMENT.md](SHARD_07_FLGB-07_TRAINING_WEIGHTS_ADAPTATION_AND_SELF_IMPROVEMENT.md) — 3,177,436 bytes
+- **FLGB-08 — Multimodal Vision Audio Video and Documents**: [SHARD_08_FLGB-08_MULTIMODAL_VISION_AUDIO_VIDEO_AND_DOCUMENTS.md](SHARD_08_FLGB-08_MULTIMODAL_VISION_AUDIO_VIDEO_AND_DOCUMENTS.md) — 3,170,956 bytes
+- **FLGB-09 — Game Project Editor and World Model**: [SHARD_09_FLGB-09_GAME_PROJECT_EDITOR_AND_WORLD_MODEL.md](SHARD_09_FLGB-09_GAME_PROJECT_EDITOR_AND_WORLD_MODEL.md) — 3,157,028 bytes
+- **FLGB-10 — Scene ECS Physics and Simulation**: [SHARD_10_FLGB-10_SCENE_ECS_PHYSICS_AND_SIMULATION.md](SHARD_10_FLGB-10_SCENE_ECS_PHYSICS_AND_SIMULATION.md) — 3,163,535 bytes
+- **FLGB-11 — Rendering Materials Lighting Cameras and VFX**: [SHARD_11_FLGB-11_RENDERING_MATERIALS_LIGHTING_CAMERAS_AND_VFX.md](SHARD_11_FLGB-11_RENDERING_MATERIALS_LIGHTING_CAMERAS_AND_VFX.md) — 3,163,373 bytes
+- **FLGB-12 — Animation Audio UI Input and Accessibility**: [SHARD_12_FLGB-12_ANIMATION_AUDIO_UI_INPUT_AND_ACCESSIBILITY.md](SHARD_12_FLGB-12_ANIMATION_AUDIO_UI_INPUT_AND_ACCESSIBILITY.md) — 3,165,982 bytes
+- **FLGB-13 — Gameplay Scripting Narrative Quests and NPC AI**: [SHARD_13_FLGB-13_GAMEPLAY_SCRIPTING_NARRATIVE_QUESTS_AND_NPC_AI.md](SHARD_13_FLGB-13_GAMEPLAY_SCRIPTING_NARRATIVE_QUESTS_AND_NPC_AI.md) — 2,528,491 bytes
+- **FLGB-14 — Procedural Generation Worldbuilding and Longform Consistency**: [SHARD_14_FLGB-14_PROCEDURAL_GENERATION_WORLDBUILDING_AND_LONGFORM_CONSISTENCY.md](SHARD_14_FLGB-14_PROCEDURAL_GENERATION_WORLDBUILDING_AND_LONGFORM_CONSISTENCY.md) — 2,556,693 bytes
+- **FLGB-15 — Networking Saves Mods Localization and Platform Services**: [SHARD_15_FLGB-15_NETWORKING_SAVES_MODS_LOCALIZATION_AND_PLATFORM_SERVICES.md](SHARD_15_FLGB-15_NETWORKING_SAVES_MODS_LOCALIZATION_AND_PLATFORM_SERVICES.md) — 2,540,489 bytes
+- **FLGB-16 — Assets Build Export Performance and Automated Testing**: [SHARD_16_FLGB-16_ASSETS_BUILD_EXPORT_PERFORMANCE_AND_AUTOMATED_TESTING.md](SHARD_16_FLGB-16_ASSETS_BUILD_EXPORT_PERFORMANCE_AND_AUTOMATED_TESTING.md) — 2,548,910 bytes
+- **FLGB-17 — Dual-Rival Forge Adversarial Quality and Rights Clean Room**: [SHARD_17_FLGB-17_DUAL_RIVAL_FORGE_ADVERSARIAL_QUALITY_AND_RIGHTS_CLEAN_ROOM.md](SHARD_17_FLGB-17_DUAL_RIVAL_FORGE_ADVERSARIAL_QUALITY_AND_RIGHTS_CLEAN_ROOM.md) — 2,554,747 bytes
+- **FLGB-18 — Integrated Product Orchestration Deployment and Gapless Closure**: [SHARD_18_FLGB-18_INTEGRATED_PRODUCT_ORCHESTRATION_DEPLOYMENT_AND_GAPLESS_CLOSURE.md](SHARD_18_FLGB-18_INTEGRATED_PRODUCT_ORCHESTRATION_DEPLOYMENT_AND_GAPLESS_CLOSURE.md) — 2,571,600 bytes
+
+## Pass-2 doubled deep closure
+
+The original 10 MB path/name is retained for compatibility, but the enforced specification floor is now **20,000,000 bytes** and the current 18-shard payload is **52,648,747 bytes**. Each FLGB plane contains exactly **1,296** Pass-2 deep-closure atoms: 12 registered subsystems × 12 lifecycle stages × 9 adversarial stress profiles. Across 18 planes this is **23,328** additional machine-validated atoms.
+
+Every Pass-2 atom binds canonical identity, bounded authority, typed failure, cross-plane evidence, recovery/replay, rollback and independent-verification obligations. This increases specification depth only; implementation_signed, independent_verification_signed, and runtime_completion_claim remain false until exact-head executable evidence exists.
 
 ## Gap policy
 
