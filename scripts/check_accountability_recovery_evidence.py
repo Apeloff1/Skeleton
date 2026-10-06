@@ -22,6 +22,8 @@ def validate(data):
     errors.append(f"anchor[{i}] implementation evidence may not promote verification")
    if a.get("completion_state") not in (None,"explicitly_open"):
     errors.append(f"anchor[{i}] implementation evidence may not promote completion")
+  overlap=seen.intersection(ids)
+  if overlap: errors.append(f"anchor[{i}] overlaps earlier anchors: {sorted(overlap)}")
   seen.update(ids)
  cohorts={x.get("name"):x for x in data.get("cohorts",[])}
  c=cohorts.get("terminal_p1_retro_sign")
