@@ -111,6 +111,30 @@ def _canon_assertion(
     )
 
 
+def _knowledge(
+    character_id: str,
+    assertion_id: str,
+    branch_id: str,
+    learned_tick: int,
+    source_id: str,
+    *,
+    certainty: float = 1.0,
+) -> CharacterKnowledge:
+    evidence = _digest(
+        f"knowledge-{character_id}-{assertion_id}-{branch_id}-{learned_tick}"
+    )
+    return CharacterKnowledge(
+        character_id,
+        assertion_id,
+        branch_id,
+        learned_tick,
+        source_id,
+        _authority(f"knowledge-{character_id}-authority", evidence),
+        evidence,
+        certainty,
+    )
+
+
 def _source_binding(source_id: str) -> AtomSourceBinding:
     evidence = _digest(f"lineage-{source_id}")
     return AtomSourceBinding(
@@ -166,7 +190,7 @@ def test_character_cannot_know_fact_before_it_exists_or_across_unrelated_branch(
     )
     with pytest.raises(CanonError, match="before it exists"):
         ledger.add_knowledge(
-            CharacterKnowledge("npc", "secret", "root", 10, "overheard")
+            _knowledge("npc", "secret", "root", 10, "overheard")
         )
 
     ledger.add_branch("a", fork_tick=20)
@@ -176,7 +200,7 @@ def test_character_cannot_know_fact_before_it_exists_or_across_unrelated_branch(
     )
     with pytest.raises(CanonError, match="unrelated branch"):
         ledger.add_knowledge(
-            CharacterKnowledge("npc", "branch-secret", "b", 30, "impossible")
+            _knowledge("npc", "branch-secret", "b", 30, "impossible")
         )
 
 
@@ -186,7 +210,7 @@ def test_character_knowledge_is_explicit_and_time_bounded() -> None:
         _canon_assertion("map", "gate", "location", "north", "root", 0)
     )
     ledger.add_knowledge(
-        CharacterKnowledge("guide", "map", "root", 12, "saw-map")
+        _knowledge("guide", "map", "root", 12, "saw-map")
     )
     assert not ledger.character_knows(
         character_id="guide", assertion_id="map", branch_id="root", tick=11
@@ -194,6 +218,20 @@ def test_character_knowledge_is_explicit_and_time_bounded() -> None:
     assert ledger.character_knows(
         character_id="guide", assertion_id="map", branch_id="root", tick=12
     )
+
+
+def test_character_knowledge_rejects_unattributed_observation_evidence() -> None:
+    evidence = _digest("knowledge-unbound")
+    with pytest.raises(CanonError, match="referenced by observation authority"):
+        CharacterKnowledge(
+            "guide",
+            "map",
+            "root",
+            12,
+            "saw-map",
+            _authority("wrong-knowledge-authority", _digest("other-knowledge")),
+            evidence,
+        )
 
 
 def test_unknown_rights_fail_closed_and_reference_only_cannot_supply_expression() -> None:
@@ -507,7 +545,7 @@ def test_child_branch_does_not_inherit_parent_events_after_fork() -> None:
         _canon_assertion("post", "weather", "storm", True, "root", 15)
     )
     ledger.add_knowledge(
-        CharacterKnowledge("parent-npc", "post", "root", 15, "radio")
+        _knowledge("parent-npc", "post", "root", 15, "radio")
     )
 
     assert ledger.effective(
