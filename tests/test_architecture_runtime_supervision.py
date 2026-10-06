@@ -214,7 +214,45 @@ class RuntimeSupervisionTests(unittest.TestCase):
         path.write_text(json.dumps(data), encoding="utf-8")
         with self.assertRaisesRegex(
             MODULE.RuntimeSupervisionError,
-            "retain only the independent qualification gap",
+            "gap state must be pending exact-head qualification or signed",
+        ):
+            MODULE.validate(root)
+
+    def test_signed_closure_state_is_valid(self) -> None:
+        root = self._fixture()
+        contract_path = root / "machine/runtime_supervision.json"
+        contract = json.loads(contract_path.read_text(encoding="utf-8"))
+        contract["masterplan_binding"]["implementation_state"] = "verified"
+        contract_path.write_text(json.dumps(contract), encoding="utf-8")
+
+        master_path = root / "machine/ai_master_plan.json"
+        master = json.loads(master_path.read_text(encoding="utf-8"))
+        volume = next(v for v in master["volumes"] if v["key"] == "VOL-004")
+        volume["gaps"] = []
+        volume["completion_checkbox"] = True
+        volume["completion_checkbox_mark"] = "[x]"
+        volume["implementation_status"] = "verified"
+        master_path.write_text(json.dumps(master), encoding="utf-8")
+
+        result = MODULE.validate(root)
+
+        self.assertEqual(result["status"], "valid")
+        self.assertEqual(result["masterplan_binding"], "VOL-004")
+
+    def test_rejects_signed_masterplan_with_pending_machine_state(self) -> None:
+        root = self._fixture()
+        master_path = root / "machine/ai_master_plan.json"
+        master = json.loads(master_path.read_text(encoding="utf-8"))
+        volume = next(v for v in master["volumes"] if v["key"] == "VOL-004")
+        volume["gaps"] = []
+        volume["completion_checkbox"] = True
+        volume["completion_checkbox_mark"] = "[x]"
+        volume["implementation_status"] = "verified"
+        master_path.write_text(json.dumps(master), encoding="utf-8")
+
+        with self.assertRaisesRegex(
+            MODULE.RuntimeSupervisionError,
+            "machine implementation_state must match masterplan closure state",
         ):
             MODULE.validate(root)
 
