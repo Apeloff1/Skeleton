@@ -25,6 +25,8 @@ EVALUATION_RUNTIME = Path("skeleton/ai/game_builder/evaluation.py")
 RESOURCE_RUNTIME = Path("skeleton/ai/game_builder/resource_governor.py")
 QUALITY_DEBT_RUNTIME = Path("skeleton/ai/game_builder/quality_debt.py")
 CONTROL_PLANE_RUNTIME = Path("skeleton/ai/game_builder/control_plane.py")
+RESILIENCE_RUNTIME = Path("skeleton/ai/game_builder/resilience.py")
+GOLD_MASTER_RUNTIME = Path("skeleton/ai/game_builder/release.py")
 OVERENGINEERING_RUNTIME_TESTS = Path("tests/test_ai_game_builder_overengineering_runtime.py")
 
 
@@ -131,6 +133,8 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         "resource_governor": str(RESOURCE_RUNTIME),
         "quality_debt": str(QUALITY_DEBT_RUNTIME),
         "integrated_control_plane": str(CONTROL_PLANE_RUNTIME),
+        "resilience": str(RESILIENCE_RUNTIME),
+        "gold_master": str(GOLD_MASTER_RUNTIME),
         "tests": [str(RUNTIME_TESTS), str(OVERENGINEERING_RUNTIME_TESTS)],
     }
     if runtime != expected_runtime:
@@ -143,6 +147,8 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         RESOURCE_RUNTIME,
         QUALITY_DEBT_RUNTIME,
         CONTROL_PLANE_RUNTIME,
+        RESILIENCE_RUNTIME,
+        GOLD_MASTER_RUNTIME,
         OVERENGINEERING_RUNTIME_TESTS,
     ):
         if not (root / path).is_file():
@@ -199,6 +205,8 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         str(RESOURCE_RUNTIME),
         str(QUALITY_DEBT_RUNTIME),
         str(CONTROL_PLANE_RUNTIME),
+        str(RESILIENCE_RUNTIME),
+        str(GOLD_MASTER_RUNTIME),
         str(OVERENGINEERING_RUNTIME_TESTS),
     ):
         if required_path not in json.dumps(foundations, sort_keys=True):
