@@ -1218,6 +1218,13 @@ def test_context_allocation_policy_rejects_invalid_fraction_budget() -> None:
             derived_untrusted_fraction=-0.1,
         )
 
+    with pytest.raises(ValueError, match=r"in \\[0,1\\]"):
+        ContextAllocationPolicy(
+            authorized_user_fraction=float("nan"),
+            untrusted_evidence_fraction=0.5,
+            derived_untrusted_fraction=0.5,
+        )
+
 
 def test_context_compiler_v2_digest_binds_compiler_version() -> None:
     operation_id, execution_id, turn_id = _ids()
