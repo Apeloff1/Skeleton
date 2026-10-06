@@ -355,3 +355,66 @@ def test_shadow_authority_detector_is_mandatory() -> None:
     payloads["contract"]["dependency_integrity"]["shadow_authority_detector"] = ""
     errors = _validate(checker, payloads)
     assert "dependency_integrity.shadow_authority_detector must be non-empty" in errors
+
+
+
+def test_every_level_has_exactly_one_executable_blueprint() -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_blueprints")
+    payloads = _payloads()
+    contract = payloads["contract"]
+    assert len(contract["level_blueprints"]) == 100
+    assert {item["id"] for item in contract["level_blueprints"]} == {
+        f"ADV-L{i:03d}" for i in range(1, 101)
+    }
+    assert _validate(checker, payloads) == []
+
+
+def test_blueprint_owner_must_be_canonical_for_level() -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_blueprint_owner")
+    payloads = _payloads()
+    payloads["contract"] = copy.deepcopy(payloads["contract"])
+    payloads["contract"]["level_blueprints"][40][
+        "primary_owner_plane"
+    ] = "memory"
+    errors = _validate(checker, payloads)
+    assert (
+        "ADV-L041.primary_owner_plane must be in level required planes"
+        in errors
+    )
+
+
+def test_blueprint_cannot_drop_rollback_mode() -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_blueprint_rollback")
+    payloads = _payloads()
+    payloads["contract"] = copy.deepcopy(payloads["contract"])
+    payloads["contract"]["level_blueprints"][79]["rollback_mode"] = ""
+    errors = _validate(checker, payloads)
+    assert "ADV-L080.rollback_mode must be non-empty" in errors
+
+
+def test_blueprint_cannot_drop_adversarial_focus() -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_blueprint_adversarial")
+    payloads = _payloads()
+    payloads["contract"] = copy.deepcopy(payloads["contract"])
+    payloads["contract"]["level_blueprints"][98]["adversarial_focus"] = []
+    errors = _validate(checker, payloads)
+    assert any(
+        error.startswith(
+            "ADV-L099.adversarial_focus must contain at least"
+        )
+        for error in errors
+    )
+
+
+def test_blueprint_owner_and_collaborators_cover_level_planes() -> None:
+    checker = _load_module(CHECKER, "advanced_ai_checker_blueprint_coverage")
+    payloads = _payloads()
+    payloads["contract"] = copy.deepcopy(payloads["contract"])
+    payloads["contract"]["level_blueprints"][20][
+        "collaborating_planes"
+    ] = []
+    errors = _validate(checker, payloads)
+    assert (
+        "ADV-L021 owner/collaborator planes must cover the level plane set"
+        in errors
+    )
