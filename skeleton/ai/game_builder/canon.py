@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from .contracts import canonical_digest, canonical_json
+from .contracts import EvaluatorProvenance, canonical_digest, canonical_json
 
 
 class CanonError(RuntimeError):
@@ -38,6 +38,7 @@ class CanonAssertion:
     branch_id: str
     valid_from_tick: int
     valid_to_tick: int | None = None
+    evaluator_provenance: EvaluatorProvenance
     intentional_contradiction: bool = False
     evidence_digests: tuple[str, ...] = ()
 
@@ -50,14 +51,39 @@ class CanonAssertion:
         if self.valid_to_tick is not None and self.valid_to_tick < self.valid_from_tick:
             raise ValueError("valid_to_tick cannot precede valid_from_tick")
         canonical_json(self.value)
-        if any(len(item) < 16 for item in self.evidence_digests):
+        if not isinstance(self.intentional_contradiction, bool):
+            raise TypeError("intentional_contradiction must be boolean")
+        if not isinstance(self.evaluator_provenance, EvaluatorProvenance):
+            raise TypeError("canon assertion evaluator_provenance must be EvaluatorProvenance")
+        if not self.evidence_digests:
+            raise CanonError("canon assertion requires evidence")
+        if any(not isinstance(item, str) or len(item) < 16 for item in self.evidence_digests):
             raise ValueError("evidence digests must be stable")
         if len(self.evidence_digests) != len(set(self.evidence_digests)):
             raise ValueError("evidence digests must be unique")
+        if set(self.evidence_digests) - set(self.evaluator_provenance.output_evidence_refs):
+            raise CanonError("canon evidence must be referenced by assertion authority")
 
     @property
     def value_digest(self) -> str:
         return canonical_digest(self.value)
+
+    @property
+    def evidence_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "assertion_id": self.assertion_id,
+                "branch_id": self.branch_id,
+                "evaluator_provenance_digest": self.evaluator_provenance.digest,
+                "evidence_digests": list(self.evidence_digests),
+                "intentional_contradiction": self.intentional_contradiction,
+                "predicate": self.predicate,
+                "subject": self.subject,
+                "valid_from_tick": self.valid_from_tick,
+                "valid_to_tick": self.valid_to_tick,
+                "value_digest": self.value_digest,
+            }
+        )
 
     def active_at(self, tick: int) -> bool:
         return self.valid_from_tick <= tick and (
@@ -74,6 +100,8 @@ class CanonAssertion:
             "assertion_id": self.assertion_id,
             "branch_id": self.branch_id,
             "evidence_digests": list(self.evidence_digests),
+            "evidence_binding_digest": self.evidence_binding_digest,
+            "evaluator_provenance_digest": self.evaluator_provenance.digest,
             "intentional_contradiction": self.intentional_contradiction,
             "predicate": self.predicate,
             "subject": self.subject,
