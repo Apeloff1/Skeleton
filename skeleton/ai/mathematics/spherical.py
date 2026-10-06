@@ -5,7 +5,7 @@ import math
 from numbers import Real
 from typing import Sequence
 
-from .contracts import MathInvariantError, Vector, finite_vector, positive_scalar
+from .contracts import MathInvariantError, Vector, finite_scalar, finite_vector, positive_scalar
 from .linear import dot, l2_norm
 
 
@@ -107,8 +107,8 @@ def spherical_interpolate(
             reason="dimension_mismatch",
             field="vectors",
         )
-    t = float(fraction)
-    if not math.isfinite(t) or not 0.0 <= t <= 1.0:
+    t = finite_scalar("fraction", fraction)
+    if not 0.0 <= t <= 1.0:
         raise MathInvariantError(
             "spherical interpolation fraction must lie in [0, 1]",
             reason="invalid_probability",

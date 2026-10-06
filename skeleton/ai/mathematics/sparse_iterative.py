@@ -194,7 +194,8 @@ def bicgstab(
         )
 
     x = start
-    residual = tuple(target[i] - matrix.matvec(x)[i] for i in range(n))
+    initial_image = matrix.matvec(x)
+    residual = tuple(target[i] - initial_image[i] for i in range(n))
     shadow = residual
     rhs_norm = l2_norm(target)
     threshold = max(abs_tol, tol * rhs_norm)

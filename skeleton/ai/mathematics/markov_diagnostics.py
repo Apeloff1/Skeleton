@@ -88,6 +88,12 @@ def detailed_balance_report(
                 field="stationary",
             )
         total = compensated_sum(raw)
+        if total <= 0.0:
+            raise MathInvariantError(
+                "stationary candidate must have positive mass",
+                reason="zero_probability_mass",
+                field="stationary",
+            )
         probabilities = tuple(value / total for value in raw)
     residuals = []
     for i in range(len(matrix)):

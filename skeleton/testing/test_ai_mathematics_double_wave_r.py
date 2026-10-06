@@ -5,6 +5,7 @@ import math
 import pytest
 
 from skeleton.ai.mathematics import (
+    MathInvariantError,
     advection_upwind_periodic,
     centered_l2_discrepancy,
     detailed_balance_report,
@@ -73,6 +74,8 @@ def test_markov_detailed_balance_and_mixing_profile() -> None:
     assert balance.maximum_flux_residual <= 1e-10
     assert balance.reversible
     assert dobrushin_coefficient(transition) == pytest.approx(0.7)
+    with pytest.raises(MathInvariantError, match="positive mass"):
+        detailed_balance_report(transition, stationary=(0.0, 0.0))
 
     mixing = mixing_profile(transition, (1.0, 0.0), steps=20, tolerance=1e-3)
     assert mixing.distances[-1] < mixing.distances[0]
