@@ -399,3 +399,41 @@ def test_master_plan_rejects_competitive_engineering_topology_drift() -> None:
     errors = checker.validate(mutated)
 
     assert "competitive engineering total_levels must equal 200" in errors
+
+
+def test_master_plan_binds_500_level_ai_game_builder_overlay() -> None:
+    data = checker.load_plan()
+    overlay = data["ai_game_builder_500_levels"]
+    authority = json.loads(checker.GAME_BUILDER.read_text(encoding="utf-8"))
+    duel = json.loads(checker.GAME_BUILDER_DUEL.read_text(encoding="utf-8"))
+
+    assert overlay["authority"] == "machine/ai_game_builder_500_levels.json"
+    assert overlay["dual_rival_authority"] == "machine/ai_game_builder_dual_rival_forge.json"
+    assert overlay["human_spec"] == "docs/architecture/AI_GAME_BUILDER_500_LEVELS.md"
+    assert overlay["family_count"] == 50
+    assert overlay["levels_per_family"] == 10
+    assert overlay["total_levels"] == 500
+    assert overlay["effort_modes"] == {
+        "forge_100": 100,
+        "forge_1000": 1000,
+        "forge_10000": 10000,
+    }
+    assert overlay["stages_per_round"] == 3
+    assert overlay["wall_clock_deadline"] is None
+    assert len(authority["families"]) == 50
+    assert authority["topology"]["total_levels"] == 500
+    assert duel["effort_modes"]["forge_100"]["rounds"] == 100
+    assert duel["effort_modes"]["forge_1000"]["rounds"] == 1000
+    assert duel["effort_modes"]["forge_10000"]["rounds"] == 10000
+
+
+def test_master_plan_rejects_ai_game_builder_topology_drift() -> None:
+    data = checker.load_plan()
+    mutated = json.loads(json.dumps(data))
+    mutated["ai_game_builder_500_levels"]["total_levels"] = 499
+    mutated["ai_game_builder_500_levels"]["effort_modes"]["forge_10000"] = 9999
+
+    errors = checker.validate(mutated)
+
+    assert "AI game builder total_levels must equal 500" in errors
+    assert "AI game builder effort modes must equal 100/1000/10000" in errors

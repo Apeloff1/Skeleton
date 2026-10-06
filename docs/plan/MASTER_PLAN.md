@@ -1,6 +1,6 @@
 # Skeleton AI Master Plan
 
-Plan version: **2.4.0**
+Plan version: **1.9.0**
 
 Architecture lane: `PR #1904 / integration/architecture-map-v1`
 
@@ -10,15 +10,9 @@ Machine mirror: [`machine/ai_master_plan.json`](../../machine/ai_master_plan.jso
 
 Exotic systems depth: [`EXOTIC_SYSTEMS_DEPTH.md`](EXOTIC_SYSTEMS_DEPTH.md) / [`machine/ai_exotic_systems_catalog.json`](../../machine/ai_exotic_systems_catalog.json)
 
-Post-enterprise Frontier-96 ladder: [`FRONTIER_96_AI_LADDER.md`](FRONTIER_96_AI_LADDER.md) / [`machine/frontier_96_ai_ladder.json`](../../machine/frontier_96_ai_ladder.json)
+Competitive engineering ladder: [`COMPETITIVE_AI_ENGINEERING_LADDER.md`](../architecture/COMPETITIVE_AI_ENGINEERING_LADDER.md) / [`machine/competitive_ai_engineering_ladder.json`](../../machine/competitive_ai_engineering_ladder.json)
 
-Cutting-edge CS-300 ladder: [`CS_300_COMPUTER_SCIENCE_LADDER.md`](CS_300_COMPUTER_SCIENCE_LADDER.md) / [`machine/cs_300_computer_science_ladder.json`](../../machine/cs_300_computer_science_ladder.json)
-
-Paired Learning-400 + Adversarial-400: [`LEARNING_400_ADVERSARIAL_400.md`](LEARNING_400_ADVERSARIAL_400.md) / [`machine/learning_400_adversarial_400.json`](../../machine/learning_400_adversarial_400.json)
-
-Project Self-Improvement-1000: [`PROJECT_SELF_IMPROVEMENT_1000.md`](PROJECT_SELF_IMPROVEMENT_1000.md) / [`machine/project_self_improvement_1000.json`](../../machine/project_self_improvement_1000.json) / [`machine/project_self_improvement_epoch_contract.json`](../../machine/project_self_improvement_epoch_contract.json) / [`machine/project_self_improvement_idle_scheduler.json`](../../machine/project_self_improvement_idle_scheduler.json)
-
-Essential Completeness-1000: [`ESSENTIALS_1000.md`](ESSENTIALS_1000.md) / [`machine/essentials_1000.json`](../../machine/essentials_1000.json) / [`machine/essentials_1000_closure_protocol.json`](../../machine/essentials_1000_closure_protocol.json) / [`machine/essentials_1000_gap_ledger.json`](../../machine/essentials_1000_gap_ledger.json) / [`machine/essentials_1000_priority_policy.json`](../../machine/essentials_1000_priority_policy.json) / [`machine/essentials_1000_execution_frontier.json`](../../machine/essentials_1000_execution_frontier.json)
+AI Game Builder 500-level authority: [`AI_GAME_BUILDER_500_LEVELS.md`](../architecture/AI_GAME_BUILDER_500_LEVELS.md) / [`machine/ai_game_builder_500_levels.json`](../../machine/ai_game_builder_500_levels.json) / [`machine/ai_game_builder_dual_rival_forge.json`](../../machine/ai_game_builder_dual_rival_forge.json)
 
 Existing construction manual: [`docs/AI_APP_CONSTRUCTION_MANUAL.md`](../AI_APP_CONSTRUCTION_MANUAL.md)
 
@@ -753,93 +747,50 @@ After reconciliation of the landed Stage-0 through Stage-3 candidates, the next 
 
 The frontier validator `scripts/check_ai_execution_frontier.py` cross-checks the snapshot and candidate lifecycle states against `machine/ai_build_accountability.json`. Any subsequent ledger promotion therefore requires this frontier snapshot to be deliberately advanced rather than silently becoming stale.
 
-## 24.6 Frontier-96 post-enterprise qualification overlay
+## 24.6 Competitive AI engineering ladder — 200 proof-bearing levels
 
-The post-enterprise ladder is defined by [`docs/plan/FRONTIER_96_AI_LADDER.md`](FRONTIER_96_AI_LADDER.md) and [`machine/frontier_96_ai_ladder.json`](../../machine/frontier_96_ai_ladder.json).
+The masterplan carries a second depth axis for areas where frontier AI systems are commonly marketed as exceptional. This axis is authoritative in `machine/competitive_ai_engineering_ladder.json` and documented in `docs/architecture/COMPETITIVE_AI_ENGINEERING_LADDER.md`.
 
-It adds **96 independently specifiable and signable capability layers** `F96-001..F96-096` above the existing enterprise-superiority grade. It is deliberately an **acceptance/depth overlay**, not a new architecture-volume family, so the `VOL-000..420` breadth freeze remains intact.
+Competitive promotion evidence is separately governed by `machine/competitive_ai_benchmark_governance.json` / `docs/architecture/COMPETITIVE_AI_BENCHMARK_GOVERNANCE.md`. Benchmark targets, effect thresholds, exclusions, uncertainty methods, multiplicity handling and stopping rules are frozen before challenger results are visible; material protocol changes restart qualification.
 
-The 96 layers are grouped into twelve eight-layer strata: authority/context, memory/knowledge, retrieval/evidence, reasoning/metacognition, planning/search, tools/actions, agents/delegation, multimodal/world intelligence, learning/adaptation, model/training/compute systems, verification/safety/security, and scientific-autonomy/frontier operations.
+It contains **200 explicit engineering levels** constructed as **20 competitive claim families × 10 escalation stages**. The families cover reasoning, long context, memory, autonomous agents, tools/computer use, coding, retrieval/research, multimodality, realtime interaction, math/science verification, long-horizon planning, routing/ensembles, learning/self-improvement, safety, security/privacy/tenancy, reliability/recovery, advanced serving, hardware/resource scale, enterprise governance, and benchmark/evaluation integrity.
 
-Eligibility is fail-closed: a Frontier-96 layer may qualify only when its mapped prerequisite capabilities already satisfy the current enterprise `superior` grade with exact-head evidence. Each layer then requires its own implementation evidence, adversarial/boundary/recovery coverage where applicable, an implementation signature, and a distinct independent-verification signature.
+This is an **overlay**, not a breadth expansion. Every `ENG-001` through `ENG-200` binds to existing `VOL-000..VOL-420` ownership and therefore does not violate the Volume-420 scope freeze.
 
-The `96` label is an organizational discipline inspired by the published GPT-3 175B depth; it is **not** a claim that the current ChatGPT product exposes a fixed 96-transformer-layer architecture. Skeleton uses the count to force a complete system-level ladder rather than to imitate undocumented model internals.
+Each ten-level family escalates through claim/comparator contract, architecture ownership, typed contracts, deterministic admission/control, durable state/provenance, adversarial hardening, performance/economics, recovery/migration/rollback, independent comparator evaluation, and continuous superiority qualification.
 
-The final `frontier_96_qualified` claim is valid only when all 96 layers are simultaneously signed complete on current evidence and `F96-096` has independent finality evidence. A stale lower-layer prerequisite automatically invalidates downstream frontier qualification.
+No competitive level is complete because prose, a demo, a class, or a passing happy-path test exists. Completion requires exact-head implementation evidence, negative/adversarial coverage, the declared hard gates, and the level-specific exit criteria. Family level 10 additionally requires reproducible Pareto-safe evidence against the declared baseline and independent promotion authority. Material drift in source, model/provider, policy, workload, scorer, environment, or budget expires the superiority claim.
 
-## 24.7 CS-300 cutting-edge computer-science qualification overlay
+Required validation:
 
-The computer-science superstructure is defined by [`docs/plan/CS_300_COMPUTER_SCIENCE_LADDER.md`](CS_300_COMPUTER_SCIENCE_LADDER.md) and [`machine/cs_300_computer_science_ladder.json`](../../machine/cs_300_computer_science_ladder.json).
+```bash
+python scripts/check_competitive_ai_engineering_ladder.py --json
+python scripts/check_competitive_ai_benchmark_governance.py --json
+python -m pytest -q --noconftest tests/test_competitive_ai_engineering_ladder.py tests/test_competitive_ai_benchmark_governance.py
+```
 
-It adds **300 independently specifiable and signable layers** `CS300-001..CS300-300` grouped into **30 ten-layer strata**. The strata span computability and complexity; data structures; programming languages and types; compilers; runtimes; kernels; concurrency; distributed systems; networking; storage; databases; streaming/dataflow; information theory; cryptography; formal methods; software evolution; reliability; observability/performance; security/supply chain; privacy; numerical/scientific computing; accelerators; heterogeneous hardware; cloud/edge; cyber-physical systems; graphics/simulation; quantum; neuromorphic/unconventional computing; autonomic systems; and whole-system frontier synthesis.
+## 24.7 AI Game Builder — 500 task-specific adversarial levels
 
-CS-300 is a **depth and qualification overlay**, not a new top-level architecture-volume family. The `VOL-000..420` breadth freeze therefore remains intact.
+The masterplan adds a game-building depth overlay governed by `machine/ai_game_builder_500_levels.json`, documented in `docs/architecture/AI_GAME_BUILDER_500_LEVELS.md`, and executed conceptually under the dual-rival contract in `machine/ai_game_builder_dual_rival_forge.json`.
 
-Its entry gate is deliberately stricter than Frontier-96: a CS-300 layer cannot qualify until Frontier-96 is currently qualified on exact-head evidence and all declared earlier CS-300 dependencies are signed complete. Every CS-300 layer then requires its own implementation contract, acceptance proof, current evidence, implementation signature and independent-verification signature. Research-only layers remain non-production until promotion evidence exists.
+It contains **500 explicit task/capability levels** constructed as **50 game-building families × 10 maturation/proof stages**, spanning intent compilation, creative DNA, dual-rival orchestration, atomization, canon, narrative, character/dialogue/quest systems, worldbuilding, scenes/levels/procedural generation, gameplay/mechanics/combat/traversal/input, progression/economy/items/NPCs/encounters/world simulation, physics/animation/2D/pixel/3D/rendering, camera/UI/audio/music/voice/accessibility, multiplayer/save/performance/export, playtesting/balance/repair/research/rights, per-pixel QA, long-form narrative QA, player-value evaluation, asset versioning, and whole-game release readiness.
 
-`CS300-300` is the signed finality layer. It cannot self-attest and may qualify only when all 300 layers are simultaneously current and independently verified, with cross-layer invariants, independent reproduction, evidence freshness/revocation and rollback readiness where applicable.
+Every work item runs under the same exact rival cycle: **construct → attack/improve → reconcile/promote**, with Rival A and Rival B exchanging builder/challenger roles every round. Effort modes are exact: **Forge-100 = 100 rounds**, **Forge-1000 = 1,000 rounds**, and **Forge-10000 = 10,000 rounds**. Each round has three stages. These modes have **no wall-clock deadline**; time is used through checkpointed iteration, while compute, memory, storage, retries, delegation and concurrency remain bounded.
 
-## 24.8 Learning-400 + Adversarial-400 paired intelligence overlay
+**Long-form consistency is a prime directive.** A locally stronger pixel, line, scene, level, mechanic, quest, character beat, asset, audio cue, optimization, or code change cannot promote if it silently breaks project DNA, canon, chronology, character knowledge/motivation, world geography/state, quest causality, mechanics, progression, visual/audio language, save/replay identity, player-choice consequences, setup/payoff, or late-game callbacks.
 
-The learning authority is defined by [`docs/plan/LEARNING_400_ADVERSARIAL_400.md`](LEARNING_400_ADVERSARIAL_400.md) and [`machine/learning_400_adversarial_400.json`](../../machine/learning_400_adversarial_400.json).
+The system may inspect artifacts at the smallest useful unit—including pixels/regions, sprite frames, mesh/material elements, dialogue lines, story beats, scene nodes, mechanics, state transitions, audio events, code units and world entities—but every atomic finding retains provenance to its parent scene/story/system/project state.
 
-It adds **400 learning levels** `L400-001..L400-400` and an equal **400-level adversarial learning plane** `A400-001..A400-400`, grouped into forty ten-level strata on each side. Every learning level is paired one-for-one with an adversarial challenger. This is a depth overlay, not a new top-level volume family, so `VOL-000..420` remains frozen.
+Gaming sources are broad but governed. Official engine/platform documentation, standards, academic work, public factual metadata, postmortems, tutorials, community discussion, project-owned material, public-domain work and compatible licensed/open-source material may inform development according to their rights classification. Availability never grants permission to copy protected expression. Unknown rights are quarantined; incorporated third-party material needs provenance; suspiciously similar text/code/image/audio/names/layouts/characters/world elements block promotion pending review; similarity scores are risk indicators rather than legal determinations.
 
-The learning plane is deliberately broader than model fine-tuning. It covers epistemic foundations; lawful open-web discovery and crawling; public/authorized web acquisition including feeds/APIs and rendered dynamic pages; long-form reading; temporal video/audio understanding; multimodal grounding; provenance; source trust; knowledge extraction and graphs; memory formation/consolidation; temporal knowledge; calibration; evidence-grounded and causal reasoning; scientific experimentation; self-directed curricula; skills; project-derived learning; human teaching; benchmarks; dataset governance; synthetic data; representation/self-supervised/supervised/preference learning; continual learning; meta-learning; architecture search; native weight genesis/pretraining; training optimization/distribution; distillation; project adapters; weight merging/editing; model registry/promotion; wisdom/judgment; and autonomous learning research.
+This remains an **overlay inside the frozen `VOL-000..VOL-420` architecture**. It creates no `VOL-421+`. All `GBL-001..GBL-500` records begin `planned` and unsigned. Prose, elapsed time, iteration count, AI confidence or a demo cannot complete them. Exact-head implementation, adversarial/recovery evidence, rights/provenance evidence, whole-project consistency, declared quality metrics and independent Stage-10 promotion evidence are required.
 
-Web acquisition is powerful but bounded. Search, sitemaps, feeds, public links, authorized APIs and rendered public pages are eligible. Authentication bypass, paywall bypass and anti-bot evasion are explicitly outside the learning authority. External content remains untrusted evidence rather than instruction authority, and every durable learning object carries source, rights/privacy, transformation, freshness and project/tenant lineage.
+Required validation:
 
-Video learning is temporal and multimodal rather than transcript-only: speech, keyframes, scene changes, on-screen text, diagrams, actions and demonstrations are bound to timestamped evidence while preserving modality-specific provenance and disagreement.
-
-Native learning may initialize and train Skeleton-owned candidate weights, perform pretraining, continual learning, distillation, parameter-efficient project adaptation, weight editing/merging and architecture search. Project outcomes may improve future candidates, but project/tenant boundaries are preserved. Production weights **never silently self-modify in place**: improvement creates a versioned candidate with immutable dataset/recipe/checkpoint lineage, held-out evaluation, paired adversarial qualification, independent promotion authority, canary and rollback.
-
-The adversarial plane is a peer system, not a final audit. It covers search/crawl poisoning; hostile documents and multimodal injection; provenance spoofing; semantic/knowledge/memory poisoning; staleness; overconfidence; reasoning and causal traps; scientific fraud; curriculum/skill/project/feedback attacks; benchmark leakage; dataset poisoning; synthetic collapse; representation/objective/label attacks; reward hacking; catastrophic forgetting; meta-learning and architecture-search gaming; weight/training/distributed-training integrity; compression/adapter/weight-edit attacks; registry/promotion attacks; wisdom failure; and autonomous-learning governance escape.
-
-A learning level may be signed complete only when its corresponding adversarial level is also signed complete on current exact-head evidence. `L400-400` and `A400-400` are paired finality gates; the learning program cannot claim completion until **400/400 learning + 400/400 adversarial** levels are independently verified and current.
-
-## 24.9 Project Self-Improvement-1000 idle mirror-room overlay
-
-The project self-improvement authority is defined by [`docs/plan/PROJECT_SELF_IMPROVEMENT_1000.md`](PROJECT_SELF_IMPROVEMENT_1000.md), [`machine/project_self_improvement_1000.json`](../../machine/project_self_improvement_1000.json), and the deterministic epoch state machine [`machine/project_self_improvement_epoch_contract.json`](../../machine/project_self_improvement_epoch_contract.json).
-
-It adds **1000 independently specifiable project-improvement levels** `PSI1000-0001..PSI1000-1000`, grouped into **100 ten-level strata**. The ladder is instantiated separately for every project. A maturity state, benchmark, lesson, weight candidate, code candidate or signed receipt from one project cannot silently qualify another project.
-
-The activation rule is **foreground-idle**, not machine-idle. When no foreground instruction is runnable, no exclusive foreground mutation lock is held, no mandatory recovery/safety intervention is active, and protected resource reservations can be honored, a project becomes immediately eligible for a bounded mirror-room epoch. Waiting on CI, remote builds, downloads, external APIs, human review or another nonexclusive dependency may therefore be used as learning time. Any new foreground instruction or protected-resource conflict immediately preempts or checkpoints mirror work.
-
-Each epoch freezes an exact baseline, mines gaps, generates diverse candidates, runs a proposer/challenger competition, reverses those roles for a second independent pass, performs bounded sandbox experiments, measures causal gain against the baseline, stress-tests rollback and failure behavior, consolidates positive and negative project learning, and then promotes, rejects or quarantines the candidate. The next epoch may begin only after an auditable epoch receipt is written and the idle predicate is reevaluated.
-
-The plane covers project mission and requirements; architecture; APIs; data/state; concurrency; algorithms; code quality; static analysis; unit/property/fuzz/integration/E2E testing; build/CI; dependencies and supply chain; secrets/auth/authz/isolation/privacy/network/content safety; reliability/chaos/recovery/DR; observability; performance/cost/hardware/distributed execution; databases/caches/search/RAG/knowledge/memory/context; reasoning/planning/tools/agents/model routing/inference; prompts and multimodal systems; web/research/evidence/science; datasets and all major learning modes; native weights, adapters, weight editing, compression and evaluation; red-team/drift; project skill acquisition; UX/accessibility/product/DX/docs/migrations/governance; wisdom; and whole-project finality.
-
-Mirror rooms are deliberately non-authoritative. Proposer, challenger and verifier roles cannot self-promote. Production state and production model weights never silently mutate in place. Every accepted change is a versioned candidate tied to an immutable baseline and requires measurable project-relevant gain or risk reduction, held-out/counterfactual evidence where applicable, current adversarial challenge, independent verification, non-compensable gate preservation and rollback.
-
-Idle opportunity selection is governed by `machine/project_self_improvement_idle_scheduler.json`: it ranks measurable project capability gain, risk reduction, knowledge value, project relevance, uncertainty reduction and evidence staleness against cost and interference risk; critical correctness/security/data-loss/recovery regressions override ordinary optimization. It reserves long-run idle capacity for exploration, prevents eligible PSI strata from starving indefinitely, and requires a durable scheduler-decision receipt.
-
-Repeated no-gain hypotheses are not allowed to consume idle resources forever: they receive evidence-backed backoff while materially new project evidence can reopen them. Every epoch carries explicit limits for wall time, model compute, CPU, memory, accelerator use, storage, network, external API calls and experiment count.
-
-The template itself remains **0/1000 implementation-signed**. A specific project may claim PSI-1000 qualification only when all 1000 levels for that exact project identity are simultaneously current and independently signed. Stale baseline compatibility, broken rollback, violated isolation or weakened non-compensable gates revoke downstream qualification.
-
-## 24.10 ESS-1000 non-compensable essential completeness overlay
-
-The essential completeness lattice is defined by [`docs/plan/ESSENTIALS_1000.md`](ESSENTIALS_1000.md) and [`machine/essentials_1000.json`](../../machine/essentials_1000.json).
-
-It adds **1000 exact essential levels** `ESS1000-0001..ESS1000-1000`, organized as **100 strata × 10 closure stages** and ten macro-groups: purpose/architecture; state/persistence; interfaces/security; isolation/change control; delivery/testing; reliability/recovery; operability/efficiency; infrastructure/data; AI runtime/assurance; and human/product/governance finality.
-
-ESS-1000 is deliberately a **floor**, not another frontier ladder. An advanced capability cannot compensate for a missing essential. Better benchmarks do not compensate for broken authorization. More agents do not compensate for ambiguous ownership. Better model weights do not compensate for missing rollback. A sophisticated mirror room does not compensate for missing idempotency, restore evidence, privacy deletion, supply-chain provenance, exact-head CI or human override.
-
-Every essential passes ten stages: invariant/minimum definition; canonical contract; baseline implementation; explicit failure semantics; verification/test floor; observability; security/privacy/isolation gate; recovery/compatibility/rollback; independent exact-head evidence; and non-compensable closure.
-
-All 1000 levels are mandatory for the complete Skeleton platform. Optional capabilities may be disabled, but their safe-disabled control path remains an essential obligation; a not-applicable label cannot erase the platform-level control requirement.
-
-Every `ESS1000-nnnn` is paired with `PSI1000-nnnn`. The PSI idle scheduler now treats an unresolved or regressed paired essential as higher priority than optional optimization in that affected domain, except where a more severe non-compensable incident elsewhere must take precedence. PSI experiment evidence may be reused when it is exact, current and independently reproducible, but it cannot automatically sign the ESS level.
-
-`ESS1000-1000` is whole-system essential finality and cannot self-attest. ESS-1000 remains incomplete until all **1000/1000** essentials are simultaneously signed complete on current independent evidence. PSI-1000 finality, Frontier-96, CS-300, Learning-400 or any benchmark claim cannot substitute for that essential closure.
-
-ESS closure is governed by `machine/essentials_1000_closure_protocol.json`. A signed essential can reopen when mapped implementation, contracts, schemas, dependencies, configuration, policy, runtime environment, regressions, incidents, recovery evidence or evidence artifacts change. Reopening propagates to dependent ESS levels rather than preserving stale downstream green state.
-
-The explicit accountability surface is `machine/essentials_1000_gap_ledger.json`. It contains one record for every ESS identity and initially records all **1000/1000 as open**, with no implementation identity or closure receipt. Waivers and exceptions can authorize bounded operation only when policy permits; they cannot set an ESS level to complete. Likewise, a capability being optional or disabled never removes its safe-disabled essential control path.
-
-ESS closure ordering is governed by `machine/essentials_1000_priority_policy.json`. Non-compensable severity wins before optimization scoring: active existential E0 conditions outrank everything, followed by E1/E2/E3 work, while E0 remains a runtime incident/regression class rather than a label automatically attached to ordinary open gaps. Within the same severity class, downstream unblock value, risk reduction, recovery value and evidence staleness are balanced against time-to-verified-closure, resource cost, blast radius and rollback complexity.
-
-The implementation frontier is `machine/essentials_1000_execution_frontier.json`. ESS-S001..ESS-S099 execute as 99 parallel domain lanes with ordered stages inside each lane. ESS-S100 is blocked until the stage-10 closure gate from every one of those 99 lanes is current, after which whole-system finality proceeds. The initial frontier remains 1000 open / 0 signed; planning severity is explicitly distinct from an active incident declaration.
+```bash
+python scripts/check_ai_game_builder_500_levels.py --json
+python -m pytest -q --noconftest tests/test_ai_game_builder_500_levels.py
+```
 
 ## 25. Scope freeze and future plan evolution
 

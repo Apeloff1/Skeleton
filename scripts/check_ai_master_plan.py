@@ -15,6 +15,8 @@ EXECUTION_FRONTIER = ROOT / "machine" / "ai_execution_frontier_20260924.json"
 INDEX = ROOT / "docs" / "plan" / "MASTER_INDEX.md"
 PLAN = ROOT / "docs" / "plan" / "MASTER_PLAN.md"
 COMPETITIVE_LADDER = ROOT / "machine" / "competitive_ai_engineering_ladder.json"
+GAME_BUILDER = ROOT / "machine" / "ai_game_builder_500_levels.json"
+GAME_BUILDER_DUEL = ROOT / "machine" / "ai_game_builder_dual_rival_forge.json"
 DEPTH_000_040 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_000_040.md"
 DEPTH_041_080 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_041_080.md"
 DEPTH_081_120 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_081_120.md"
@@ -116,6 +118,72 @@ def validate(data: dict) -> list[str]:
                         or levels[-1].get("id") != "ENG-200"
                     ):
                         errors.append("competitive engineering authority range must be ENG-001..ENG-200")
+
+    game_builder = data.get("ai_game_builder_500_levels")
+    if not isinstance(game_builder, dict):
+        errors.append("ai_game_builder_500_levels must be an object")
+    else:
+        expected_bindings = {
+            "authority": "machine/ai_game_builder_500_levels.json",
+            "dual_rival_authority": "machine/ai_game_builder_dual_rival_forge.json",
+            "human_spec": "docs/architecture/AI_GAME_BUILDER_500_LEVELS.md",
+            "schema_version": "skeleton.ai_game_builder_500_levels.v1",
+        }
+        for field, expected_value in expected_bindings.items():
+            if game_builder.get(field) != expected_value:
+                errors.append(f"AI game builder {field} binding drifted")
+        for field, expected_value in (
+            ("family_count", 50),
+            ("levels_per_family", 10),
+            ("total_levels", 500),
+            ("stages_per_round", 3),
+        ):
+            if game_builder.get(field) != expected_value:
+                errors.append(f"AI game builder {field} must equal {expected_value}")
+        if game_builder.get("effort_modes") != {
+            "forge_100": 100,
+            "forge_1000": 1000,
+            "forge_10000": 10000,
+        }:
+            errors.append("AI game builder effort modes must equal 100/1000/10000")
+        if game_builder.get("wall_clock_deadline") is not None:
+            errors.append("AI game builder wall_clock_deadline must be null")
+        if not GAME_BUILDER.is_file():
+            errors.append("AI game builder machine authority is missing")
+        else:
+            try:
+                builder_authority = json.loads(GAME_BUILDER.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                errors.append(f"cannot parse AI game builder authority: {exc}")
+            else:
+                topology = builder_authority.get("topology", {})
+                if not isinstance(topology, dict):
+                    errors.append("AI game builder topology must be an object")
+                else:
+                    if topology.get("family_count") != 50:
+                        errors.append("AI game builder authority must contain 50 families")
+                    if topology.get("total_levels") != 500:
+                        errors.append("AI game builder authority must contain 500 levels")
+                families = builder_authority.get("families")
+                if not isinstance(families, list) or len(families) != 50:
+                    errors.append("AI game builder authority family registry must contain 50 entries")
+        if not GAME_BUILDER_DUEL.is_file():
+            errors.append("AI game builder dual-rival authority is missing")
+        else:
+            try:
+                duel_authority = json.loads(GAME_BUILDER_DUEL.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                errors.append(f"cannot parse AI game builder dual-rival authority: {exc}")
+            else:
+                modes = duel_authority.get("effort_modes", {})
+                for key, rounds in (("forge_100", 100), ("forge_1000", 1000), ("forge_10000", 10000)):
+                    mode = modes.get(key) if isinstance(modes, dict) else None
+                    if not isinstance(mode, dict) or mode.get("rounds") != rounds:
+                        errors.append(f"AI game builder {key} round count drifted")
+                    elif mode.get("stages_per_round") != 3:
+                        errors.append(f"AI game builder {key} stages_per_round must equal 3")
+                    elif mode.get("wall_clock_deadline") is not None:
+                        errors.append(f"AI game builder {key} wall-clock deadline must be null")
 
     execution_frontier = data.get("execution_frontier")
     if not isinstance(execution_frontier, dict):
