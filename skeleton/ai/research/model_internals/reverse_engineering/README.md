@@ -52,12 +52,22 @@ The lab contains bounded analyzers for:
 - **replication** — independent-actor reproduction ledgers before a supported observation is treated as replicated;
 - **experiment design** — deterministic factorial matrices with stable protocol identities;
 - **evidence chains** — tamper-evident append-only linkage for reports and measurements.
+- **subspace/circuit overlap** — symmetric basis overlap for authorized representation subspaces;
+- **multimodal alignment** — paired semantic representation alignment by modality and layer;
+- **routing stability** — long-horizon total-variation drift and dominant-route switches;
+- **probe calibration** — sensitivity, specificity, precision, and balanced accuracy from explicit positive/negative controls;
+- **attribution stability** — repeated top-k overlap, universal features, and majority features;
+- **intervention localization** — effect concentration, peak layer, centroid, and sign consistency;
+- **counterfactual consistency** — expected-change sensitivity and expected-invariance specificity;
+- **effect size** — pooled-standard-deviation normalized treatment/control effects;
+- **causal circuit graph** — reproduced source→target intervention edges with effect and sign consistency;
+- **claim-quality gate** — fail-closed promotion requiring calibration, stability, material effect, independent domains, replication, and low contradiction;
 
 These surfaces characterize what can be observed or what is available in artifacts
 the operator is authorized to inspect. They do not assert proprietary architecture
 identity, recover hidden weights from inaccessible systems, bypass access controls,
 or create a right to inspect artifacts without ownership or permission.
 
-Future work can deepen causal tracing, circuit/subspace analysis, multimodal alignment
-interventions, long-horizon routing experiments, and adversarial replication while
-preserving the same evidence/inference boundary.
+Future work can deepen automated circuit discovery, rank-sensitive attribution, causal
+mediation, multimodal alignment interventions, long-horizon drift alarms, and adversarial
+replication while preserving the same evidence/inference boundary.
