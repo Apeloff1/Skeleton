@@ -326,5 +326,34 @@
       "verification_state": "explicitly_unsigned",
       "completion_state": "explicitly_open"
     }
+  ],
+  "cohorts": [
+    {
+      "name": "terminal_p1_retro_sign",
+      "source_commit": "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2",
+      "scope": {
+        "canonical_p1_primary_volumes": 107,
+        "newly_implementation_signed": 103,
+        "already_completed": [
+          "ACC-VOL-013",
+          "ACC-VOL-014",
+          "ACC-VOL-253"
+        ],
+        "already_implementation_signed": [
+          "ACC-VOL-248"
+        ],
+        "p2_deferred_untouched": 314
+      },
+      "claim": "103 previously unsigned P1 primary volumes received identity-bound implementation signoffs",
+      "verification_signatures_added": 0,
+      "completion_checkboxes_added": 0,
+      "evidence_basis": {
+        "terminal_closure": "107/107",
+        "governed_risk_obligations": "513/513",
+        "blocking_unresolved": 0,
+        "unclassified": 0
+      },
+      "recovery_limitation": "cohort proves implementation-signoff population and authority boundary but does not enumerate the 103 IDs in this manifest; materialization must derive membership from the historical masterplan/ledger state or terminal P1 frontier, never by guessing"
+    }
   ]
 }
