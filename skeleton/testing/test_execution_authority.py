@@ -570,18 +570,21 @@ def test_receipt_chain_verifier_rejects_missing_middle_receipt() -> None:
     first = guard.authorize(
         authority=authority,
         capability="repo.read",
+        delta=ResourceUsage(provider_calls=1),
         replay_key="read-001",
         now=NOW + timedelta(seconds=1),
     )
     second = guard.authorize(
         authority=authority,
         capability="repo.read",
+        delta=ResourceUsage(provider_calls=1),
         replay_key="read-002",
         now=NOW + timedelta(seconds=2),
     )
     third = guard.authorize(
         authority=authority,
         capability="repo.read",
+        delta=ResourceUsage(provider_calls=1),
         replay_key="read-003",
         now=NOW + timedelta(seconds=3),
     )
@@ -781,6 +784,7 @@ def test_authorization_clock_regression_is_denied_without_advancing_chain() -> N
     first = guard.authorize(
         authority=authority,
         capability="repo.read",
+        delta=ResourceUsage(provider_calls=1),
         replay_key="read-later",
         now=NOW + timedelta(seconds=10),
     )
@@ -804,6 +808,7 @@ def test_sealed_evidence_has_stable_execution_lineage_reference() -> None:
     guard.authorize(
         authority=authority,
         capability="repo.read",
+        delta=ResourceUsage(provider_calls=1),
         replay_key="read-001",
         now=NOW + timedelta(seconds=1),
     )
@@ -828,6 +833,7 @@ def test_authority_evidence_binds_to_immutable_execution_result() -> None:
     guard.authorize(
         authority=authority,
         capability="repo.read",
+        delta=ResourceUsage(provider_calls=1),
         replay_key="read-001",
         now=NOW + timedelta(seconds=1),
     )
@@ -1119,6 +1125,7 @@ def test_checkpoint_digest_is_stable_for_identical_state() -> None:
     guard.authorize(
         authority=authority,
         capability="repo.read",
+        delta=ResourceUsage(provider_calls=1),
         replay_key="read-checkpoint",
         now=NOW + timedelta(seconds=1),
     )
@@ -1530,3 +1537,32 @@ def test_intermediate_authority_direct_use_honors_grandchild_consumption() -> No
     assert middle_overflow.disposition is AuthorizationDisposition.DENY
     assert guard.effective_usage_for(child).tool_calls == 2
     assert guard.effective_usage_for(root).tool_calls == 2
+
+
+
+def test_zero_cost_authorization_is_denied_without_poisoning_replay_key() -> None:
+    guard = ExecutionAuthorityGuard()
+    authority = _authority()
+    _admit(guard, authority)
+
+    denied = guard.authorize(
+        authority=authority,
+        capability="repo.write",
+        delta=ResourceUsage(),
+        replay_key="metered-write",
+        now=NOW + timedelta(seconds=1),
+    )
+    allowed = guard.authorize(
+        authority=authority,
+        capability="repo.write",
+        delta=ResourceUsage(tool_calls=1),
+        replay_key="metered-write",
+        now=NOW + timedelta(seconds=2),
+    )
+
+    assert denied.disposition is AuthorizationDisposition.DENY
+    assert denied.reason == "authorization requires a non-zero metered resource charge"
+    assert denied.receipt is None
+    assert allowed.allowed
+    assert allowed.receipt is not None
+    assert guard.usage_for(authority).tool_calls == 1
