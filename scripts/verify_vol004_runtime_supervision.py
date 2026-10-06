@@ -380,6 +380,13 @@ def _verify_masterplan(master: dict[str, Any], errors: list[str]) -> dict[str, A
     gaps = list(volume.get("gaps") or [])
     if gaps not in ([QUALIFICATION_GAP], []):
         errors.append("VOL-004 gap state contains unexpected obligations")
+    completion = volume.get("completion_checkbox")
+    if gaps and completion is not False:
+        errors.append("VOL-004 cannot remain signed with pending qualification")
+    if not gaps and completion is not True:
+        errors.append("VOL-004 cannot clear qualification gap before signoff")
+    if not gaps and volume.get("implementation_status") != "verified":
+        errors.append("signed VOL-004 must have verified implementation status")
 
     binding = {
         "key": volume.get("key"),
@@ -428,6 +435,14 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
     connector_digests = _verify_connectors(contract, construction, root, errors)
     mirror = _verify_mirror(contract, root, errors)
     volume = _verify_masterplan(master, errors)
+    if isinstance(binding, dict) and volume:
+        pending = list(volume.get("gaps") or []) == [QUALIFICATION_GAP]
+        expected_state = "implemented_verification_pending" if pending else "verified"
+        if binding.get("implementation_state") != expected_state:
+            errors.append(
+                "runtime supervision implementation_state/masterplan drift: "
+                f"expected {expected_state}"
+            )
 
     receipt: dict[str, Any] = {
         "schema_version": 1,
