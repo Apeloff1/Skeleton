@@ -210,3 +210,8 @@ def test_promotion_blocks_metric_regression_and_unresolved_critical_defect() -> 
     assert decision.regressed_metrics == ("friction_detection",)
     assert "experience metric regression" in decision.blockers
     assert "candidate has unresolved critical experience defects" in decision.blockers
+
+
+def test_creative_rivals_cannot_self_supply_independent_experience_evidence() -> None:
+    with pytest.raises(ValueError, match="independent from both rivals"):
+        _observation("OBS-RIVAL", "rival_a")
