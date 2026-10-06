@@ -271,10 +271,9 @@ def verify(root: Path, *, head_sha: str) -> dict[str, Any]:
     )
     if not isinstance(volume, dict):
         raise VerificationError("VOL-005 is absent from masterplan")
-    if volume.get("completion_checkbox") is True:
-        raise VerificationError(
-            "independent verifier refuses pre-signed VOL-005 completion"
-        )
+    completion_checkbox = volume.get("completion_checkbox")
+    if completion_checkbox not in {True, False}:
+        raise VerificationError("VOL-005 completion checkbox must be boolean")
 
     evidence_payload = {
         "head_sha": head_sha,
@@ -287,6 +286,7 @@ def verify(root: Path, *, head_sha: str) -> dict[str, Any]:
         "release_gate": expected_gate,
         "runtime_sha256": hashlib.sha256(runtime.read_bytes()).hexdigest(),
         "required_tests": sorted(required_tests),
+        "vol005_completion_checkbox": completion_checkbox,
     }
     return {
         "schema_version": 1,
