@@ -24,6 +24,7 @@ from skeleton.ai.runtime.contracts.execution_authority import (
     AuthorityConsumptionReceipt,
     AuthorityEvidenceBundle,
     AuthorityRevocationReceipt,
+    AuthorityStateCheckpoint,
     ExecutionAuthority,
     ExecutionAuthorityError,
     ResourceUsage,
@@ -128,6 +129,25 @@ class ExecutionAuthorityGuard:
         if not isinstance(replay_key, str) or _REPLAY_KEY.fullmatch(replay_key) is None:
             raise ExecutionAuthorityError("invalid replay_key")
         return replay_key
+
+    @staticmethod
+    def _admission_replay_payload_digest(
+        *,
+        authority_digest: str,
+        request_identity_digest: str,
+        operation_id: str,
+        execution_id: str,
+    ) -> str:
+        return hashlib.sha256(
+            canonical_json_bytes(
+                {
+                    "authority_digest": authority_digest,
+                    "request_identity_digest": request_identity_digest,
+                    "operation_id": operation_id,
+                    "execution_id": execution_id,
+                }
+            )
+        ).hexdigest()
 
     @staticmethod
     def _replay_payload_digest(
@@ -249,16 +269,12 @@ class ExecutionAuthorityGuard:
         if state.revoked:
             raise ExecutionAuthorityError("authority is revoked")
 
-        admission_replay_digest = hashlib.sha256(
-            canonical_json_bytes(
-                {
-                    "authority_digest": authority.digest,
-                    "request_identity_digest": request.identity_digest,
-                    "operation_id": request.operation_id,
-                    "execution_id": request.execution_id,
-                }
-            )
-        ).hexdigest()
+        admission_replay_digest = self._admission_replay_payload_digest(
+            authority_digest=authority.digest,
+            request_identity_digest=request.identity_digest,
+            operation_id=request.operation_id,
+            execution_id=request.execution_id,
+        )
 
         prior = self._replay_digests.get(replay_key)
         if prior is not None:
@@ -471,6 +487,135 @@ class ExecutionAuthorityGuard:
         state.revocation_receipt = receipt
         state.revoked = True
         return receipt
+
+    @_synchronized
+    def checkpoint(
+        self,
+        authority: ExecutionAuthority,
+        *,
+        now: datetime | None = None,
+    ) -> AuthorityStateCheckpoint:
+        """Create a restart-safe checkpoint without exposing mutable guard state."""
+
+        instant = self._aware(now)
+        if not isinstance(authority, ExecutionAuthority):
+            raise ExecutionAuthorityError("authority must be ExecutionAuthority")
+        state = self._authorities.get(authority.digest)
+        if state is None:
+            raise ExecutionAuthorityError("authority has not been admitted")
+        if state.authority != authority:
+            raise ExecutionAuthorityError("admitted authority content mismatch")
+        if state.admission_receipt_digest is None:
+            raise ExecutionAuthorityError("authority admission evidence is missing")
+
+        admission = next(
+            (
+                receipt
+                for receipt in self._admission_receipts.values()
+                if receipt.digest == state.admission_receipt_digest
+            ),
+            None,
+        )
+        if admission is None:
+            raise ExecutionAuthorityError("admission receipt state is inconsistent")
+        receipts = tuple(
+            sorted(
+                (
+                    receipt
+                    for receipt in self._authorization_receipts.values()
+                    if receipt.authority_digest == authority.digest
+                ),
+                key=lambda receipt: receipt.sequence,
+            )
+        )
+        checkpoint = AuthorityStateCheckpoint(
+            authority=authority,
+            admission_receipt=admission,
+            consumption_receipts=receipts,
+            revocation_receipt=state.revocation_receipt,
+            created_at=instant,
+        )
+        if checkpoint.final_usage != state.usage:
+            raise ExecutionAuthorityError("checkpoint usage does not match guard state")
+        if len(receipts) != state.consumption_count:
+            raise ExecutionAuthorityError("checkpoint receipt count does not match guard state")
+        expected_latest = None if not receipts else receipts[-1].digest
+        if expected_latest != state.latest_receipt_digest:
+            raise ExecutionAuthorityError(
+                "checkpoint latest receipt does not match guard state"
+            )
+        return checkpoint
+
+    @_synchronized
+    def restore_checkpoint(self, checkpoint: AuthorityStateCheckpoint) -> None:
+        """Restore authority state without permitting budget or replay reset."""
+
+        if not isinstance(checkpoint, AuthorityStateCheckpoint):
+            raise ExecutionAuthorityError(
+                "checkpoint must be AuthorityStateCheckpoint"
+            )
+        authority = checkpoint.authority
+        if authority.digest in self._authorities:
+            raise ExecutionAuthorityError("checkpoint authority is already admitted")
+        if len(self._authority_order) >= self.max_authorities:
+            raise ExecutionAuthorityError(
+                "authority guard capacity exhausted; refusing checkpoint restore"
+            )
+
+        if authority.parent_authority_digest is not None:
+            parent_state = self._authorities.get(authority.parent_authority_digest)
+            if parent_state is None:
+                raise ExecutionAuthorityError(
+                    "checkpoint parent authority must be restored first"
+                )
+            validate_authority_attenuation(parent_state.authority, authority)
+
+        receipts = checkpoint.consumption_receipts
+        replay_keys = [checkpoint.admission_receipt.replay_key]
+        replay_keys.extend(receipt.replay_key for receipt in receipts)
+        if len(set(replay_keys)) != len(replay_keys):
+            raise ExecutionAuthorityError("checkpoint contains duplicate replay keys")
+        for replay_key in replay_keys:
+            self._validate_replay_key(replay_key)
+            if replay_key in self._replay_digests:
+                raise ExecutionAuthorityError(
+                    "checkpoint replay key conflicts with existing guard state"
+                )
+        if len(self._replay_order) + len(replay_keys) > self.max_replay_keys:
+            raise ExecutionAuthorityError(
+                "replay guard capacity exhausted; refusing checkpoint restore"
+            )
+
+        state = self._remember_authority(authority)
+        admission = checkpoint.admission_receipt
+        admission_digest = self._admission_replay_payload_digest(
+            authority_digest=authority.digest,
+            request_identity_digest=admission.request_identity_digest,
+            operation_id=admission.operation_id,
+            execution_id=admission.execution_id,
+        )
+        self._remember_replay(admission.replay_key, admission_digest)
+        self._admission_receipts[admission.replay_key] = admission
+        state.admission_receipt_digest = admission.digest
+        state.admitted_at = admission.admitted_at
+
+        for receipt in receipts:
+            replay_digest = self._replay_payload_digest(
+                authority_digest=authority.digest,
+                capability=receipt.capability,
+                delta=receipt.delta_usage,
+            )
+            self._remember_replay(receipt.replay_key, replay_digest)
+            self._authorization_receipts[receipt.replay_key] = receipt
+
+        state.usage = checkpoint.final_usage
+        state.consumption_count = len(receipts)
+        state.latest_receipt_digest = None if not receipts else receipts[-1].digest
+        state.last_authorized_at = (
+            None if not receipts else receipts[-1].authorized_at
+        )
+        state.revocation_receipt = checkpoint.revocation_receipt
+        state.revoked = checkpoint.revocation_receipt is not None
 
     @_synchronized
     def seal_evidence(
