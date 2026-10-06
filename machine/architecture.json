@@ -25,7 +25,11 @@
     "ai_implementation_handoff": "machine/ai_implementation_handoff.json",
     "ai_closure_evidence": "machine/ai_closure_evidence.json",
     "ai_capability_registry": "machine/ai_capabilities.json",
-    "ai_file_tree": "machine/ai_file_tree.json"
+    "ai_file_tree": "machine/ai_file_tree.json",
+    "enterprise_system_contract": "machine/enterprise_system_architecture.json",
+    "enterprise_system_manual": "docs/ENTERPRISE_SYSTEM_ARCHITECTURE.md",
+    "enterprise_system_validator": "scripts/check_enterprise_system_architecture.py",
+    "enterprise_system_independent_verifier": "scripts/verify_enterprise_system_architecture.py"
   },
   "objectives": [
     "one product shell",
@@ -50,7 +54,8 @@
     "one machine-readable state authority topology separating authoritative, derived, scratch, recovery, and transitional stores",
     "restore canonical state before rebuilding vector indexes, caches, snapshots, and other projections",
     "one typed machine-readable schema catalog for cross-plane AI runtime envelopes",
-    "one governed canonical AI assembly file tree under skeleton/ai"
+    "one governed canonical AI assembly file tree under skeleton/ai",
+    "one enterprise system-of-systems contract for HA topology, tenancy, security, SLO, DR, capacity, operations and production acceptance"
   ],
   "principles": [
     "runtime topology and repository topology are separate contracts linked by this map",
@@ -564,7 +569,8 @@
     "Every functional-AI P0 gap must have one file-level implementation handoff entry consistent with the closure DAG.",
     "Functional-AI P0 closure is evidence-based and tracked separately from implementation progress.",
     "Every user-visible AI capability must be declared in the concrete capability registry and resolve readiness from canonical plane/provider dependencies.",
-    "AI file-tree migration mirrors remain byte-identical to compatibility sources until explicit import/ownership cutover"
+    "AI file-tree migration mirrors remain byte-identical to compatibility sources until explicit import/ownership cutover",
+    "enterprise production readiness is an evidence state composed over canonical plane owners and never a documentation-only claim"
   ],
   "construction": {
     "contract": "machine/ai_app_construction.json",
