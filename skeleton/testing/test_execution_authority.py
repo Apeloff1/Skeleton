@@ -3,13 +3,14 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from skeleton.ai.runtime.contracts.ai_execution import AIExecutionRequest
+from skeleton.ai.runtime.contracts.ai_execution import AIExecutionRequest, AIExecutionResult
 from skeleton.ai.runtime.contracts.execution_authority import (
     ExecutionAuthority,
     ExecutionAuthorityError,
     ResourceBudget,
     ResourceUsage,
     authority_policy_digest,
+    bind_authority_evidence,
     verify_authority_receipt_chain,
 )
 from skeleton.ai.runtime.core.execution_authority import (
@@ -814,3 +815,59 @@ def test_sealed_evidence_has_stable_execution_lineage_reference() -> None:
     assert payload["ref"] == evidence.evidence_ref
     assert payload["digest"] == evidence.digest
     assert payload["payload"] == evidence.canonical_payload()
+
+
+
+def test_authority_evidence_binds_to_immutable_execution_result() -> None:
+    guard = ExecutionAuthorityGuard()
+    authority = _authority()
+    _admit(guard, authority)
+    guard.authorize(
+        authority=authority,
+        capability="repo.read",
+        replay_key="read-001",
+        now=NOW + timedelta(seconds=1),
+    )
+    evidence = guard.seal_evidence(
+        authority,
+        now=NOW + timedelta(seconds=2),
+    )
+    original = AIExecutionResult(
+        operation_id=authority.operation_id,
+        execution_id=authority.execution_id,
+        status="completed",
+        usage=guard.usage_for(authority).as_dict(),
+        completed_at=NOW + timedelta(seconds=3),
+        final_output="done",
+    )
+
+    bound = bind_authority_evidence(original, evidence)
+
+    assert original.evidence_refs == ()
+    assert bound.evidence_refs == (evidence.evidence_ref,)
+    assert bound.operation_id == original.operation_id
+    assert bound.execution_id == original.execution_id
+
+
+def test_authority_evidence_binding_rejects_cross_execution_mixup() -> None:
+    guard = ExecutionAuthorityGuard()
+    authority = _authority()
+    _admit(guard, authority)
+    evidence = guard.seal_evidence(
+        authority,
+        now=NOW + timedelta(seconds=1),
+    )
+    foreign = AIExecutionResult(
+        operation_id=authority.operation_id,
+        execution_id="execution-foreign",
+        status="completed",
+        usage={},
+        completed_at=NOW + timedelta(seconds=2),
+        final_output="done",
+    )
+
+    with pytest.raises(
+        ExecutionAuthorityError,
+        match="execution_id does not match",
+    ):
+        bind_authority_evidence(foreign, evidence)
