@@ -64,6 +64,10 @@ MIRROR_PAIRS: tuple[tuple[str, str], ...] = (
         "skeleton/research/source_lineage.py",
         "skeleton/ai/research/source_lineage.py",
     ),
+    (
+        "skeleton/eval/research_acceptance.py",
+        "skeleton/ai/evaluation/research_acceptance.py",
+    ),
 )
 
 REQUIRED_VOL001_PATHS = {
@@ -77,7 +81,7 @@ REQUIRED_VOL001_TESTS = {
     "tests/test_research_lineage_independent_verifier.py",
 }
 REQUIRED_VOL001_EVALUATIONS = {
-    ".github/workflows/vol001-research-lineage-closure.yml",
+    ".github/workflows/ai-research-lineage.yml",
     "scripts/verify_research_lineage_closure.py",
 }
 
