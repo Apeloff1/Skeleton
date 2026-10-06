@@ -116,7 +116,7 @@
             "async def close_engine_execution_service",
             "await coordinator.shutdown()",
             "errors: list[BaseException]",
-            "engine runtime shutdown completed with supervision/cleanup errors",
+            "engine runtime shutdown completed with supervision/cleanup ",
             "def close_operation_runtime"
           ]
         },
