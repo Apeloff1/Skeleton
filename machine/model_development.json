@@ -1,0 +1,167 @@
+{
+  "schema_version": "skeleton.model_development.closure.v1",
+  "contract_version": "1.0.0",
+  "status": "active",
+  "purpose": "Exact model-development closure contract for content-addressed registry lineage, deterministic bounded training replay, atomic publication, and non-authoritative evaluation eligibility.",
+  "masterplan_binding": {
+    "volume_ref": "VOL-006",
+    "title": "Model Development Program",
+    "qualification_gap": "independent exact-head VOL-006 Model Development Closure qualification remains pending"
+  },
+  "sources": {
+    "registry": "skeleton/modeling/registry.py",
+    "training": "skeleton/modeling/training.py",
+    "evaluation": "skeleton/modeling/evaluation.py",
+    "publication": "skeleton/modeling/publication.py"
+  },
+  "purity_policy": {
+    "rule": "Model-development closure is a pure research/evidence plane. It may hash, validate, account and replay but may not perform network, process, filesystem or deployment effects.",
+    "forbidden_import_roots": [
+      "httpx",
+      "os",
+      "pathlib",
+      "requests",
+      "socket",
+      "sqlite3",
+      "subprocess",
+      "urllib"
+    ],
+    "forbidden_call_names": [
+      "open",
+      "exec",
+      "eval",
+      "system",
+      "popen"
+    ],
+    "production_authority_forbidden": true
+  },
+  "boundaries": {
+    "registry": {
+      "required_symbols": [
+        "class DatasetManifest:",
+        "contamination_digest",
+        "dedup_digest",
+        "class TrainingRun:",
+        "hardware_digest",
+        "config_digest",
+        "seed:int",
+        "class ModelArtifact:",
+        "authority_scope:str=\"research-only\"",
+        "class ModelDevelopmentRegistry:",
+        "def lineage(",
+        "def verify(",
+        "def snapshot_digest("
+      ],
+      "authority_scope": "research-only"
+    },
+    "training": {
+      "required_symbols": [
+        "class TrainingBudget:",
+        "class StepReceipt:",
+        "class TrainingCheckpoint:",
+        "class TrainingExecution:",
+        "def record_step(",
+        "def checkpoint(",
+        "def recover(",
+        "hmac.compare_digest",
+        "\"authority_scope\":\"research-only\""
+      ],
+      "authority_scope": "research-only"
+    },
+    "publication": {
+      "required_symbols": [
+        "class TrainingCompletion:",
+        "authority_scope:str=\"research-only\"",
+        "def complete_execution(",
+        "class ArtifactPublisher:",
+        "def publish(",
+        "completion run mismatch",
+        "completion seed mismatch",
+        "artifact run mismatch",
+        "self.registry.add_artifact"
+      ],
+      "authority_scope": "research-only"
+    },
+    "evaluation": {
+      "required_symbols": [
+        "class EvaluationEvidence:",
+        "authority_scope:str=\"evidence-only\"",
+        "class PromotionEligibility:",
+        "authority_scope:str=\"eligibility-only\"",
+        "def assess_eligibility(",
+        "evaluation artifact mismatch",
+        "evaluation completion mismatch",
+        "artifact completion lineage mismatch",
+        "evaluation suite mismatch"
+      ],
+      "authority_scope": "evidence-only"
+    }
+  },
+  "reproducibility": {
+    "dataset_identity": [
+      "content_digest",
+      "integrity_digest",
+      "dedup_digest",
+      "contamination_digest",
+      "rights",
+      "pii_policy",
+      "sources"
+    ],
+    "run_identity": [
+      "dataset_digests",
+      "code_digest",
+      "config_digest",
+      "hardware_digest",
+      "seed",
+      "parent_artifact_digests",
+      "status"
+    ],
+    "execution_evidence": [
+      "ordinal",
+      "input_digest",
+      "output_digest",
+      "tokens",
+      "compute_units",
+      "metrics"
+    ],
+    "checkpoint_evidence": [
+      "prior_checkpoint_digest",
+      "state_digest",
+      "cumulative_tokens",
+      "cumulative_compute_units",
+      "receipt_digests"
+    ],
+    "publication_binding": [
+      "run_digest",
+      "completion_digest",
+      "artifact_digest"
+    ],
+    "evaluation_binding": [
+      "artifact_digest",
+      "completion_digest",
+      "suite_digest",
+      "evaluation_digest"
+    ]
+  },
+  "required_tests": [
+    "skeleton/testing/test_vol006_model_registry.py",
+    "skeleton/testing/test_vol006_training_execution.py",
+    "skeleton/testing/test_vol006_artifact_publication.py",
+    "skeleton/testing/test_vol006_evaluation_eligibility.py",
+    "skeleton/testing/test_vol006_model_development_system.py",
+    "tests/test_vol006_model_development_independent.py"
+  ],
+  "required_evaluations": [
+    ".github/workflows/vol006-model-development-closure.yml",
+    "scripts/verify_vol006_model_development.py"
+  ],
+  "invariants": [
+    "dataset manifests bind content, integrity, rights, PII policy, deduplication and contamination identities before training lineage is accepted",
+    "training runs bind dataset, code, configuration, hardware and seed identities",
+    "training execution is bounded, receipt-ordered, checkpointed and replay-verifiable",
+    "publication mutates the registry only after completed-run, completion and artifact lineage checks pass",
+    "evaluation evidence binds artifact, completion and suite identity before eligibility is calculated",
+    "registry, completion, evaluation and eligibility artifacts never grant production execution authority",
+    "independent verification must not import the canonical skeleton.modeling implementation"
+  ]
+}
