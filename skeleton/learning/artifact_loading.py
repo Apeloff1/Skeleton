@@ -195,9 +195,11 @@ class ArtifactShard:
             value = getattr(self, field_name)
             if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
                 raise ArtifactLoadError(f"{field_name} must be a positive integer")
-        if any(not isinstance(item, TensorDescriptor) for item in self.tensors):
+        tensors = tuple(self.tensors)
+        if any(not isinstance(item, TensorDescriptor) for item in tensors):
             raise TypeError("tensors must contain TensorDescriptor values")
-        tensor_names = [item.name for item in self.tensors]
+        object.__setattr__(self, "tensors", tensors)
+        tensor_names = [item.name for item in tensors]
         if len(tensor_names) != len(set(tensor_names)):
             raise ArtifactLoadError("tensor names within a shard must be unique")
 
@@ -225,11 +227,13 @@ class ArtifactLoadRequest:
     def __post_init__(self) -> None:
         object.__setattr__(self, "artifact_id", _text("artifact_id", self.artifact_id))
         object.__setattr__(self, "weight_format", _text("weight_format", self.weight_format))
-        if not self.shards:
+        shards = tuple(self.shards)
+        if not shards:
             raise ArtifactLoadError("artifact requires at least one shard")
-        if any(not isinstance(item, ArtifactShard) for item in self.shards):
+        if any(not isinstance(item, ArtifactShard) for item in shards):
             raise TypeError("shards must contain ArtifactShard values")
-        names = [item.name for item in self.shards]
+        object.__setattr__(self, "shards", shards)
+        names = [item.name for item in shards]
         if len(names) != len(set(names)):
             raise ArtifactLoadError("shard names must be unique")
         if isinstance(self.metadata_bytes, bool) or not isinstance(self.metadata_bytes, int):
