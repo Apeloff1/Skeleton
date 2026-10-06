@@ -152,5 +152,413 @@
     }
   ],
   "qualification_rule": "A volume cannot advance to enterprise_qualified or superior unless its dossier exists, all 14 levels are complete, masterplan fields match, evidence is exact-head/current, and the applicable enterprise superiority/golden-journey gates pass.",
-  "anti_shortcut": "Implementation notes are obligations, not evidence. Prose, LOC, file existence, legacy implementation status, or self-scored benchmarks cannot promote enterprise grade."
+  "anti_shortcut": "Implementation notes are obligations, not evidence. Prose, LOC, file existence, legacy implementation status, or self-scored benchmarks cannot promote enterprise grade.",
+  "required_level_sections": [
+    "implementation_notes",
+    "acceptance",
+    "design_invariants",
+    "failure_modes",
+    "telemetry_and_slos",
+    "required_evidence"
+  ],
+  "level_semantic_requirements": {
+    "L00": [
+      {
+        "concept": "canonical ownership",
+        "aliases": [
+          "canonical production owner",
+          "canonical owner"
+        ]
+      },
+      {
+        "concept": "shadow ownership",
+        "aliases": [
+          "shadow owner",
+          "shadow-owner"
+        ]
+      },
+      {
+        "concept": "capability scope",
+        "aliases": [
+          "capability scope",
+          "declared capability"
+        ]
+      }
+    ],
+    "L01": [
+      {
+        "concept": "dependencies",
+        "aliases": [
+          "dependencies",
+          "dependency"
+        ]
+      },
+      {
+        "concept": "readiness",
+        "aliases": [
+          "readiness",
+          "ready"
+        ]
+      },
+      {
+        "concept": "degraded mode",
+        "aliases": [
+          "degrade",
+          "degraded"
+        ]
+      }
+    ],
+    "L02": [
+      {
+        "concept": "versioned contracts",
+        "aliases": [
+          "schema version",
+          "contract identity",
+          "version"
+        ]
+      },
+      {
+        "concept": "canonical parsing",
+        "aliases": [
+          "canonical encoding",
+          "canonical parsing"
+        ]
+      },
+      {
+        "concept": "migration",
+        "aliases": [
+          "migration",
+          "compatibility"
+        ]
+      }
+    ],
+    "L03": [
+      {
+        "concept": "identity",
+        "aliases": [
+          "principal",
+          "identity"
+        ]
+      },
+      {
+        "concept": "tenant",
+        "aliases": [
+          "tenant"
+        ]
+      },
+      {
+        "concept": "policy",
+        "aliases": [
+          "policy"
+        ]
+      },
+      {
+        "concept": "budget",
+        "aliases": [
+          "budget"
+        ]
+      },
+      {
+        "concept": "idempotency",
+        "aliases": [
+          "idempotency"
+        ]
+      }
+    ],
+    "L04": [
+      {
+        "concept": "bounded execution",
+        "aliases": [
+          "bounded",
+          "budget"
+        ]
+      },
+      {
+        "concept": "cancellation",
+        "aliases": [
+          "cancellation",
+          "cancel"
+        ]
+      },
+      {
+        "concept": "retry",
+        "aliases": [
+          "retry",
+          "retries"
+        ]
+      },
+      {
+        "concept": "checkpoint",
+        "aliases": [
+          "checkpoint",
+          "resume"
+        ]
+      }
+    ],
+    "L05": [
+      {
+        "concept": "authoritative state",
+        "aliases": [
+          "authoritative"
+        ]
+      },
+      {
+        "concept": "transactional durability",
+        "aliases": [
+          "transaction",
+          "outbox",
+          "idempotency"
+        ]
+      },
+      {
+        "concept": "restore",
+        "aliases": [
+          "restore",
+          "rebuild"
+        ]
+      },
+      {
+        "concept": "lifecycle deletion",
+        "aliases": [
+          "deletion",
+          "tombstone",
+          "retention"
+        ]
+      }
+    ],
+    "L06": [
+      {
+        "concept": "zero trust",
+        "aliases": [
+          "zero trust",
+          "untrusted"
+        ]
+      },
+      {
+        "concept": "tenant isolation",
+        "aliases": [
+          "tenant"
+        ]
+      },
+      {
+        "concept": "secret handling",
+        "aliases": [
+          "secret"
+        ]
+      },
+      {
+        "concept": "egress or sandbox",
+        "aliases": [
+          "egress",
+          "sandbox"
+        ]
+      }
+    ],
+    "L07": [
+      {
+        "concept": "bounded retries",
+        "aliases": [
+          "retry",
+          "retries"
+        ]
+      },
+      {
+        "concept": "backpressure",
+        "aliases": [
+          "backpressure",
+          "queue"
+        ]
+      },
+      {
+        "concept": "crash",
+        "aliases": [
+          "crash"
+        ]
+      },
+      {
+        "concept": "replay or recovery",
+        "aliases": [
+          "replay",
+          "recovery"
+        ]
+      }
+    ],
+    "L08": [
+      {
+        "concept": "operation correlation",
+        "aliases": [
+          "operation identity",
+          "correlate"
+        ]
+      },
+      {
+        "concept": "logs metrics traces",
+        "aliases": [
+          "logs",
+          "metrics",
+          "traces"
+        ]
+      },
+      {
+        "concept": "redaction",
+        "aliases": [
+          "redacted",
+          "redaction"
+        ]
+      },
+      {
+        "concept": "semantic health",
+        "aliases": [
+          "semantic health",
+          "readiness"
+        ]
+      }
+    ],
+    "L09": [
+      {
+        "concept": "tail latency",
+        "aliases": [
+          "p95",
+          "p99",
+          "tail"
+        ]
+      },
+      {
+        "concept": "saturation",
+        "aliases": [
+          "saturation"
+        ]
+      },
+      {
+        "concept": "resource admission",
+        "aliases": [
+          "admission",
+          "reserve"
+        ]
+      },
+      {
+        "concept": "cost",
+        "aliases": [
+          "cost",
+          "economics"
+        ]
+      }
+    ],
+    "L10": [
+      {
+        "concept": "requirements traceability",
+        "aliases": [
+          "requirement",
+          "risk"
+        ]
+      },
+      {
+        "concept": "adversarial testing",
+        "aliases": [
+          "adversarial"
+        ]
+      },
+      {
+        "concept": "independent verification",
+        "aliases": [
+          "independent",
+          "verifier"
+        ]
+      },
+      {
+        "concept": "reproducibility",
+        "aliases": [
+          "reproducibility",
+          "immutable evaluation"
+        ]
+      }
+    ],
+    "L11": [
+      {
+        "concept": "provenance",
+        "aliases": [
+          "provenance",
+          "sbom"
+        ]
+      },
+      {
+        "concept": "migration",
+        "aliases": [
+          "migration"
+        ]
+      },
+      {
+        "concept": "canary",
+        "aliases": [
+          "canary"
+        ]
+      },
+      {
+        "concept": "rollback",
+        "aliases": [
+          "rollback",
+          "failback"
+        ]
+      }
+    ],
+    "L12": [
+      {
+        "concept": "operator readiness",
+        "aliases": [
+          "operator",
+          "readiness"
+        ]
+      },
+      {
+        "concept": "runbook or game-day",
+        "aliases": [
+          "runbook",
+          "game-day"
+        ]
+      },
+      {
+        "concept": "break glass",
+        "aliases": [
+          "break-glass",
+          "break_glass"
+        ]
+      },
+      {
+        "concept": "audit receipt",
+        "aliases": [
+          "receipt",
+          "audit replay"
+        ]
+      }
+    ],
+    "L13": [
+      {
+        "concept": "enterprise grade",
+        "aliases": [
+          "enterprise grade",
+          "enterprise_qualified"
+        ]
+      },
+      {
+        "concept": "superiority",
+        "aliases": [
+          "superior",
+          "pareto"
+        ]
+      },
+      {
+        "concept": "exact head",
+        "aliases": [
+          "exact-head"
+        ]
+      },
+      {
+        "concept": "golden journey",
+        "aliases": [
+          "golden-journey",
+          "golden journey"
+        ]
+      }
+    ]
+  }
 }
