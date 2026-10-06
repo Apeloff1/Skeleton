@@ -1,9 +1,9 @@
 {
   "schema_version": "ai-chat-runtime/v1",
   "status": "implemented_candidate",
-  "prepared_at_utc": "2026-10-06T04:20:00Z",
+  "prepared_at_utc": "2026-10-06T04:25:00Z",
   "prepared_by": "chatgpt:gpt-5.6-sol",
-  "base_main_sha": "92a6dcc85976e41c3d86fcd87866e1c5d384f125",
+  "base_main_sha": "692175ca8cd6531f8deeb6a262f7d6f426700b62",
   "canonical_module": "skeleton/ai/assistant/turn_runtime.py",
   "scope": "durable provider-neutral AI chat turn state, live product-route persistence, replay, reconnectable streaming, resource admission, and crash recovery",
   "authority": {
