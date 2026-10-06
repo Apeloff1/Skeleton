@@ -7650,6 +7650,19 @@
       ]
     },
     {
+      "id": "AIFT-NATIVE-GAME-BUILDER-ROOT",
+      "path": "skeleton/ai/game_builder",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI-native dual-rival game-builder control, canon, rights, evaluation, resilience, assurance, resource, debt, and release runtime surfaces.",
+      "volume_refs": [
+        "VOL-073",
+        "VOL-101",
+        "VOL-197"
+      ]
+    },
+    {
       "id": "AIFT-NATIVE-AI-ROOT-RESIDUAL",
       "path": "skeleton/ai",
       "kind": "tree",
