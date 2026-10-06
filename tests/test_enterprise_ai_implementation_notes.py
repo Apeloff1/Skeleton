@@ -101,6 +101,14 @@ def test_every_dossier_has_all_14_deep_levels() -> None:
                 assert len(level["acceptance"]) >= 2
                 assert sum(map(len, level["implementation_notes"])) >= 120
                 assert sum(map(len, level["acceptance"])) >= 80
+                for section in (
+                    "design_invariants",
+                    "failure_modes",
+                    "telemetry_and_slos",
+                    "required_evidence",
+                ):
+                    assert len(level[section]) >= 2
+                    assert sum(map(len, level[section])) >= 80
 
     assert seen == {f"VOL-{index:03d}" for index in range(421)}
 
@@ -165,6 +173,62 @@ def test_rejects_shallow_implementation_level(tmp_path: Path) -> None:
     with pytest.raises(
         MODULE.ImplementationNotesError,
         match="implementation notes are too shallow",
+    ):
+        MODULE.validate(root)
+
+
+def test_rejects_missing_deep_level_section(tmp_path: Path) -> None:
+    root = _fixture(tmp_path)
+    path, payload = _first_dossier_file(root)
+    payload["dossiers"][0]["implementation_levels"][7].pop(
+        "telemetry_and_slos"
+    )
+    _write(path, payload)
+
+    with pytest.raises(
+        MODULE.ImplementationNotesError,
+        match="telemetry_and_slos",
+    ):
+        MODULE.validate(root)
+
+
+def test_rejects_missing_level_semantics(tmp_path: Path) -> None:
+    root = _fixture(tmp_path)
+    path, payload = _first_dossier_file(root)
+    level = payload["dossiers"][0]["implementation_levels"][3]
+    level["implementation_notes"] = [
+        "A deliberately generic admission note with enough length to pass the "
+        "surface depth check but without the required protected-work concepts.",
+        "Another deliberately generic sentence about starting work safely and "
+        "consistently while avoiding every required identity-related keyword.",
+    ]
+    level["acceptance"] = [
+        "Generic acceptance text confirms deterministic behavior without "
+        "describing the protected admission envelope or its required fields.",
+        "Generic negative behavior remains safe and bounded in this fixture.",
+    ]
+    level["design_invariants"] = [
+        "Generic invariant one is intentionally verbose but semantically empty "
+        "for the admission layer under test.",
+        "Generic invariant two likewise avoids the mandatory admission concepts.",
+    ]
+    level["failure_modes"] = [
+        "Generic failure behavior is deterministic and bounded for this fixture.",
+        "Generic failure behavior produces no side effect in this fixture.",
+    ]
+    level["telemetry_and_slos"] = [
+        "generic_admission_metric_one remains observable at qualification",
+        "generic_admission_metric_two remains observable at qualification",
+    ]
+    level["required_evidence"] = [
+        "generic deterministic admission evidence bundle",
+        "generic exact-head admission verifier receipt",
+    ]
+    _write(path, payload)
+
+    with pytest.raises(
+        MODULE.ImplementationNotesError,
+        match="missing semantic concept",
     ):
         MODULE.validate(root)
 
