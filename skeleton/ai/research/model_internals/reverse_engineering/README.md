@@ -62,12 +62,34 @@ The lab contains bounded analyzers for:
 - **effect size** — pooled-standard-deviation normalized treatment/control effects;
 - **causal circuit graph** — reproduced source→target intervention edges with effect and sign consistency;
 - **claim-quality gate** — fail-closed promotion requiring calibration, stability, material effect, independent domains, replication, and low contradiction;
+- **bootstrap uncertainty** — deterministic mean confidence intervals with reproducible seeds;
+- **permutation nulls** — two-sided empirical null testing for controlled group effects;
+- **sequential evidence** — bounded likelihood-ratio accumulation with explicit support/reject thresholds;
+- **calibration drift** — sensitivity/specificity/precision stability across ordered evaluation windows;
+- **causal mediation** — total, direct, mediated, and mediated-fraction effect decomposition;
+- **rank sensitivity** — top-k attribution stability as the retained rank changes;
+- **adversarial probe robustness** — paired baseline/adversarial degradation and output-change rates;
+- **long-context interference** — distractor-load fidelity curves and threshold crossings;
+- **memory decay** — controlled recall-loss horizons and half-recall delay estimates;
+- **tool-policy boundaries** — allow/deny accuracy plus unauthorized execution detection;
+- **feature interactions** — pairwise non-additive synergy and sign consistency;
+- **circuit motifs** — chains, fan-in/fan-out, reciprocal pairs, sources, and sinks;
+- **path patching** — source→mediator→target recovery fractions for authorized causal interventions;
+- **negative controls** — expected-null deviation checks and leakage/false-positive alarms;
+- **cross-seed stability** — metric range and tolerance consistency across stochastic seeds;
+- **contradiction matrices** — explicit pairwise proposition conflict structure;
+- **circuit centrality** — deterministic weighted in/out centrality summaries for reconstructed circuits;
+- **evidence quorum** — minimum independent-domain support with bounded contradiction;
+- **claim registry** — governed hypothesis/supported/conflicted/rejected transitions with fail-closed promotion;
+- **campaign manifests** — deterministic dependency-linked inventories of reports, claims, and protocols;
+- **report envelopes** — canonical versioned exports with tamper-verifiable payload identity;
+- **drift alarms** — multi-domain threshold aggregation with observe/warning/critical severity.
 
 These surfaces characterize what can be observed or what is available in artifacts
 the operator is authorized to inspect. They do not assert proprietary architecture
 identity, recover hidden weights from inaccessible systems, bypass access controls,
 or create a right to inspect artifacts without ownership or permission.
 
-Future work can deepen automated circuit discovery, rank-sensitive attribution, causal
-mediation, multimodal alignment interventions, long-horizon drift alarms, and adversarial
-replication while preserving the same evidence/inference boundary.
+Future work can deepen automated circuit discovery, causal mediation and path patching,
+multimodal interventions, sequential drift response, experimental power analysis, and
+adversarial replication while preserving the same evidence/inference boundary.

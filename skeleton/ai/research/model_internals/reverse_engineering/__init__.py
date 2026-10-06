@@ -79,6 +79,29 @@ from .subspace_overlap import SubspaceBasis, SubspaceOverlapReport, analyze_subs
 from .tool_topology import ToolCallObservation, ToolTopologyReport, analyze_tool_topology
 from .topology import TopologyReport, infer_tensor_topology
 
+from .adversarial_probe import AdversarialProbePair, AdversarialProbeReport, analyze_adversarial_probe_robustness
+from .bootstrap_ci import BootstrapConfig, BootstrapInterval, bootstrap_mean_interval
+from .calibration_drift import CalibrationDriftReport, CalibrationWindow, analyze_calibration_drift
+from .campaign import CampaignArtifact, CampaignManifest, build_campaign_manifest
+from .circuit_centrality import CircuitCentralityReport, NodeCentrality, WeightedCircuitEdge, analyze_circuit_centrality
+from .circuit_motifs import CircuitMotifReport, DirectedCircuitEdge, analyze_circuit_motifs
+from .claim_registry import ClaimRecord, ClaimRegistry, ClaimTransition
+from .contradiction_matrix import ContradictionMatrixReport, ContradictionPair, PropositionEvidence, build_contradiction_matrix
+from .cross_seed_stability import CrossSeedStabilityReport, SeedMeasurement, analyze_cross_seed_stability
+from .drift_alarm import DriftAlarmReport, DriftSignal, evaluate_drift_alarm
+from .evidence_quorum import DomainEvidence, EvidenceQuorumReport, evaluate_evidence_quorum
+from .feature_interaction import FeatureInteractionObservation, FeatureInteractionReport, analyze_feature_interactions
+from .long_context_interference import InterferenceReport, InterferenceTrial, analyze_long_context_interference
+from .mediation import MediationObservation, MediationReport, analyze_mediation
+from .memory_decay import MemoryDecayReport, MemoryDecayTrial, analyze_memory_decay
+from .negative_control import NegativeControlObservation, NegativeControlReport, analyze_negative_controls
+from .path_patching import PathPatchObservation, PathPatchReport, analyze_path_patching
+from .permutation_null import PermutationTestResult, permutation_mean_difference
+from .rank_sensitivity import RankedFeatureList, RankSensitivityPoint, RankSensitivityReport, analyze_rank_sensitivity
+from .report_export import ReportEnvelope, build_report_envelope, verify_report_envelope
+from .sequential_evidence import SequentialEvidenceReport, SequentialObservation, analyze_sequential_evidence
+from .tool_policy_boundary import ToolPolicyBoundaryReport, ToolPolicyTrial, analyze_tool_policy_boundary
+
 __all__ = [
     "ActivationLayerReport",
     "ActivationSample",
@@ -218,4 +241,72 @@ __all__ = [
     "replication_status",
     "routing_fingerprint",
     "synthesize_evidence",
+    "AdversarialProbePair",
+    "AdversarialProbeReport",
+    "BootstrapConfig",
+    "BootstrapInterval",
+    "CalibrationDriftReport",
+    "CalibrationWindow",
+    "CampaignArtifact",
+    "CampaignManifest",
+    "CircuitCentralityReport",
+    "CircuitMotifReport",
+    "ClaimRecord",
+    "ClaimRegistry",
+    "ClaimTransition",
+    "ContradictionMatrixReport",
+    "ContradictionPair",
+    "CrossSeedStabilityReport",
+    "DirectedCircuitEdge",
+    "DomainEvidence",
+    "DriftAlarmReport",
+    "DriftSignal",
+    "EvidenceQuorumReport",
+    "FeatureInteractionObservation",
+    "FeatureInteractionReport",
+    "InterferenceReport",
+    "InterferenceTrial",
+    "MediationObservation",
+    "MediationReport",
+    "MemoryDecayReport",
+    "MemoryDecayTrial",
+    "NegativeControlObservation",
+    "NegativeControlReport",
+    "NodeCentrality",
+    "PathPatchObservation",
+    "PathPatchReport",
+    "PermutationTestResult",
+    "PropositionEvidence",
+    "RankSensitivityPoint",
+    "RankSensitivityReport",
+    "RankedFeatureList",
+    "ReportEnvelope",
+    "SeedMeasurement",
+    "SequentialEvidenceReport",
+    "SequentialObservation",
+    "ToolPolicyBoundaryReport",
+    "ToolPolicyTrial",
+    "WeightedCircuitEdge",
+    "analyze_adversarial_probe_robustness",
+    "analyze_calibration_drift",
+    "analyze_circuit_centrality",
+    "analyze_circuit_motifs",
+    "analyze_cross_seed_stability",
+    "analyze_feature_interactions",
+    "analyze_long_context_interference",
+    "analyze_mediation",
+    "analyze_memory_decay",
+    "analyze_negative_controls",
+    "analyze_path_patching",
+    "analyze_rank_sensitivity",
+    "analyze_sequential_evidence",
+    "analyze_tool_policy_boundary",
+    "bootstrap_mean_interval",
+    "build_campaign_manifest",
+    "build_contradiction_matrix",
+    "build_report_envelope",
+    "evaluate_drift_alarm",
+    "evaluate_evidence_quorum",
+    "permutation_mean_difference",
+    "verify_report_envelope",
 ]
