@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "topology_version": "1.8.0",
+  "topology_version": "1.9.0",
   "architecture_tag": "arch-map/v3.7",
   "status": "active",
   "title": "Skeleton State Authority and Persistence Topology",
@@ -17,7 +17,8 @@
     "authoritative durable state has an explicit migration, backup, restore, retention, and consistency contract",
     "recovery snapshots are evidence or recovery aids unless explicitly promoted by contract",
     "one logical state domain has one canonical authority at a time",
-    "mixed-authority stores are transitional and require an explicit open construction gap"
+    "mixed-authority stores are transitional and require an explicit open construction gap",
+    "closed construction gaps are historical evidence and must not remain attached to production-bound state domains"
   ],
   "physical_stores": [
     {
@@ -353,7 +354,7 @@
       "logical_location": "SKL_MONGO_DATABASE / skeleton",
       "authority": "authoritative",
       "source_of_truth": true,
-      "status": "declared-partial",
+      "status": "production-bound",
       "data_classes": [
         "internal",
         "confidential"
@@ -361,13 +362,17 @@
       "transaction_scope": "engine repository/document boundary",
       "consistency": "engine durable writes require Mongo acknowledgement",
       "retention": "governance controlled",
-      "backup_restore": "required before relying on engine Mongo state in production",
-      "migration": "explicit engine schema/repository migrations",
+      "backup_restore": "required as part of governed Mongo backup/restore; production activation must preserve engine state identity before dependent traffic",
+      "migration": "production-bound engine Mongo migrations must preserve namespace/resource/event identity, tenant isolation and compatibility with the active spine runtime",
       "derived_from": [],
       "rebuildable": false,
       "evidence": [
         "docker-compose.yml",
-        "skeleton/config/settings.py"
+        "skeleton/config/settings.py",
+        "skeleton/persistence/spine_runtime_production_activation.py",
+        "skeleton/persistence/spine_runtime_production_activation_verify.py",
+        "scripts/state_migration_compatibility.py",
+        ".github/workflows/state-recovery-drill.yml"
       ]
     },
     {
@@ -469,8 +474,7 @@
         "scripts/state_recovery_drill.py",
         "skeleton/testing/test_state_recovery_drill.py",
         ".github/workflows/state-recovery-drill.yml"
-      ],
-      "gap": "gap-state-authority-convergence"
+      ]
     },
     {
       "id": "operation-event-stream",
@@ -867,8 +871,7 @@
         "skeleton/testing/test_governance_runtime_binding.py",
         "pyproject.toml",
         "skeleton/vault/lifecycle_adapters.py"
-      ],
-      "gap": "gap-memory-durable-authority"
+      ]
     },
     {
       "id": "local-reference-provenance",
@@ -1122,5 +1125,12 @@
     "tool": "scripts/state_backup_bundle.py",
     "recovery_drill": "scripts/state_recovery_drill.py",
     "workflow": ".github/workflows/state-recovery-drill.yml"
+  },
+  "migration_compatibility": {
+    "tool": "scripts/state_migration_compatibility.py",
+    "test": "skeleton/testing/test_state_migration_compatibility.py",
+    "release_workflow": ".github/workflows/p1-migration-rollback-compatibility.yml",
+    "recovery_workflow": ".github/workflows/state-recovery-drill.yml",
+    "policy": "legacy durable schemas must upgrade in place without identity loss; additive fields require deterministic defaults/backfill; exact-head release and recovery gates must execute the rehearsal"
   }
 }
