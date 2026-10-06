@@ -303,6 +303,8 @@ Competitive AI claims are governed by the **200-level engineering ladder** in
 `machine/competitive_ai_engineering_ladder.json`, with the human specification
 in `docs/architecture/COMPETITIVE_AI_ENGINEERING_LADDER.md`.
 
+Their comparator studies are governed by `machine/competitive_ai_benchmark_governance.json`. That authority requires benchmark preregistration before challenger results are visible, retains negative evidence, prohibits post-hoc metric/baseline selection, and requires applicable cross-family qualification journeys before competitive promotion.
+
 The ladder is intentionally stricter than a feature checklist. It converts 20
 common frontier-AI claim families into ten escalating proof stages each. A
 family cannot be called competitively superior until its stage-10 level has
