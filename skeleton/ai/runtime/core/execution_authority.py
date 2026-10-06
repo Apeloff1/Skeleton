@@ -19,6 +19,8 @@ from skeleton.ai.runtime.contracts.ai_execution import AIExecutionRequest
 from skeleton.ai.runtime.contracts.canonical import canonical_json_bytes
 from skeleton.ai.runtime.contracts.execution_authority import (
     AdmissionReceipt,
+    AuthorityConsumptionReceipt,
+    AuthorityEvidenceBundle,
     ExecutionAuthority,
     ExecutionAuthorityError,
     ResourceUsage,
@@ -46,6 +48,7 @@ class AuthorizationDecision:
     authority_digest: str
     usage: ResourceUsage
     replay_key: str = ""
+    receipt: AuthorityConsumptionReceipt | None = None
 
     @property
     def allowed(self) -> bool:
@@ -57,6 +60,9 @@ class _AuthorityState:
     authority: ExecutionAuthority
     usage: ResourceUsage
     revoked: bool = False
+    admission_receipt_digest: str | None = None
+    consumption_count: int = 0
+    latest_receipt_digest: str | None = None
 
 
 class ExecutionAuthorityGuard:
@@ -81,6 +87,7 @@ class ExecutionAuthorityGuard:
         self._replay_digests: dict[str, str] = {}
         self._replay_order: list[str] = []
         self._admission_receipts: dict[str, AdmissionReceipt] = {}
+        self._authorization_receipts: dict[str, AuthorityConsumptionReceipt] = {}
 
     @staticmethod
     def _aware(now: datetime | None) -> datetime:
@@ -119,6 +126,7 @@ class ExecutionAuthorityGuard:
             oldest = self._replay_order.pop(0)
             self._replay_digests.pop(oldest, None)
             self._admission_receipts.pop(oldest, None)
+            self._authorization_receipts.pop(oldest, None)
         self._replay_digests[replay_key] = digest
         self._replay_order.append(replay_key)
 
@@ -243,6 +251,8 @@ class ExecutionAuthorityGuard:
         )
         self._remember_replay(replay_key, admission_replay_digest)
         self._admission_receipts[replay_key] = receipt
+        if state.admission_receipt_digest is None:
+            state.admission_receipt_digest = receipt.digest
         return receipt
 
     def authorize(
@@ -316,12 +326,18 @@ class ExecutionAuthorityGuard:
                 raise ExecutionAuthorityError(
                     "replay_key reused with different authorization payload"
                 )
+            existing_receipt = self._authorization_receipts.get(replay_key)
+            if existing_receipt is None:
+                raise ExecutionAuthorityError(
+                    "authorization replay state is inconsistent"
+                )
             return AuthorizationDecision(
                 AuthorizationDisposition.REPLAY,
                 "authorization replay already accounted",
                 authority.digest,
                 state.usage,
                 replay_key,
+                existing_receipt,
             )
 
         projected = state.usage.add(usage_delta)
@@ -334,14 +350,31 @@ class ExecutionAuthorityGuard:
                 replay_key,
             )
 
+        receipt = AuthorityConsumptionReceipt(
+            authority_digest=authority.digest,
+            operation_id=authority.operation_id,
+            execution_id=authority.execution_id,
+            actor_id=authority.actor_id,
+            capability=capability,
+            sequence=state.consumption_count + 1,
+            replay_key=replay_key,
+            authorized_at=instant,
+            delta_usage=usage_delta,
+            total_usage=projected,
+            previous_receipt_digest=state.latest_receipt_digest,
+        )
         state.usage = projected
+        state.consumption_count = receipt.sequence
+        state.latest_receipt_digest = receipt.digest
         self._remember_replay(replay_key, replay_digest)
+        self._authorization_receipts[replay_key] = receipt
         return AuthorizationDecision(
             AuthorizationDisposition.ALLOW,
             "authorized",
             authority.digest,
             state.usage,
             replay_key,
+            receipt,
         )
 
     def revoke(self, authority: ExecutionAuthority) -> None:
@@ -350,6 +383,36 @@ class ExecutionAuthorityGuard:
         state = self._authorities.get(authority.digest)
         if state is not None:
             state.revoked = True
+
+    def seal_evidence(
+        self,
+        authority: ExecutionAuthority,
+        *,
+        now: datetime | None = None,
+    ) -> AuthorityEvidenceBundle:
+        """Seal compact evidence for admission and all accounted consumption."""
+
+        instant = self._aware(now)
+        if not isinstance(authority, ExecutionAuthority):
+            raise ExecutionAuthorityError("authority must be ExecutionAuthority")
+        state = self._authorities.get(authority.digest)
+        if state is None:
+            raise ExecutionAuthorityError("authority has not been admitted")
+        if state.authority != authority:
+            raise ExecutionAuthorityError("admitted authority content mismatch")
+        if state.admission_receipt_digest is None:
+            raise ExecutionAuthorityError("authority admission evidence is missing")
+        return AuthorityEvidenceBundle(
+            authority_digest=authority.digest,
+            operation_id=authority.operation_id,
+            execution_id=authority.execution_id,
+            admission_receipt_digest=state.admission_receipt_digest,
+            consumption_count=state.consumption_count,
+            latest_consumption_digest=state.latest_receipt_digest,
+            final_usage=state.usage,
+            revoked=state.revoked,
+            sealed_at=instant,
+        )
 
     def usage_for(self, authority: ExecutionAuthority) -> ResourceUsage:
         if not isinstance(authority, ExecutionAuthority):
@@ -371,6 +434,9 @@ class ExecutionAuthorityGuard:
                     "execution_id": state.authority.execution_id,
                     "revoked": state.revoked,
                     "usage": state.usage.as_dict(),
+                    "consumption_count": state.consumption_count,
+                    "latest_receipt_digest": state.latest_receipt_digest,
+                    "admission_receipt_digest": state.admission_receipt_digest,
                     "expires_at": state.authority.expires_at.isoformat(),
                 }
             )
@@ -379,6 +445,7 @@ class ExecutionAuthorityGuard:
             "authority_count": len(authorities),
             "replay_key_count": len(self._replay_digests),
             "admission_receipt_count": len(self._admission_receipts),
+            "authorization_receipt_count": len(self._authorization_receipts),
         }
 
 
