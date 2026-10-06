@@ -60,6 +60,7 @@
     "project_self_improvement_1000": "machine/project_self_improvement_1000.json",
     "project_self_improvement_1000_human": "docs/plan/PROJECT_SELF_IMPROVEMENT_1000.md",
     "project_self_improvement_epoch_contract": "machine/project_self_improvement_epoch_contract.json",
+    "project_self_improvement_idle_scheduler": "machine/project_self_improvement_idle_scheduler.json",
     "project_self_improvement_1000_validator": "scripts/check_project_self_improvement_1000.py",
     "project_self_improvement_1000_workflow": ".github/workflows/project-self-improvement-1000.yml"
   },
