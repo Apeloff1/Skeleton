@@ -133,6 +133,14 @@ def validate(data: dict, scheduler: dict | None = None, closure: dict | None = N
             if not l.get("implementation_signed"): errors.append(f"{lid}: missing implementation signature")
             if not l.get("independent_verification_signed"): errors.append(f"{lid}: missing independent signature")
             if not l.get("evidence"): errors.append(f"{lid}: missing evidence")
+    for i,w in enumerate(waves,1):
+        wid=f"ESS-W{i:03d}"
+        if w.get("id")!=wid: errors.append(f"{wid}: wave identity mismatch")
+        expected_many=[] if i<100 else [f"ESS-W{k:03d}" for k in range(1,100)]
+        if w.get("prerequisite_wave") is not None:
+            errors.append(f"{wid}: legacy singular prerequisite must be null")
+        if w.get("prerequisite_waves")!=expected_many:
+            errors.append(f"{wid}: wave prerequisite topology mismatch")
     if completion.get("total_levels")!=1000: errors.append("completion total mismatch")
     signed=sum(bool(x.get("complete")) for x in levels)
     if completion.get("signed_complete")!=signed: errors.append("completion signed count mismatch")
