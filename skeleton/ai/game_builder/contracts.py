@@ -470,7 +470,8 @@ class EvaluatorProvenance:
     execution_id: str
     execution_identity_digest: str
     finalization_intent_digest: str
-    model_identity_digest: str
+    authority_kind: str
+    authority_identity_digest: str
     method_id: str
     source_revision: str
     provider_receipt_refs: tuple[str, ...] = ()
@@ -485,10 +486,18 @@ class EvaluatorProvenance:
             )
         if self.evaluator_id in {Rival.A.value, Rival.B.value}:
             raise ValueError("evaluator provenance must be independent from both rivals")
+        authority_kind = _normalized_identity_text(
+            "authority_kind",
+            self.authority_kind,
+            maximum=64,
+        )
+        if authority_kind not in {"ai_execution", "deterministic_control"}:
+            raise ValueError("unsupported evaluator authority_kind")
+        object.__setattr__(self, "authority_kind", authority_kind)
         for name in (
             "execution_identity_digest",
             "finalization_intent_digest",
-            "model_identity_digest",
+            "authority_identity_digest",
         ):
             object.__setattr__(
                 self,
@@ -524,8 +533,9 @@ class EvaluatorProvenance:
             "execution_id": self.execution_id,
             "execution_identity_digest": self.execution_identity_digest,
             "finalization_intent_digest": self.finalization_intent_digest,
+            "authority_kind": self.authority_kind,
+            "authority_identity_digest": self.authority_identity_digest,
             "method_id": self.method_id,
-            "model_identity_digest": self.model_identity_digest,
             "operation_id": self.operation_id,
             "output_evidence_refs": list(self.output_evidence_refs),
             "provider_receipt_refs": list(self.provider_receipt_refs),
