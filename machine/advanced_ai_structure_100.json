@@ -4036,5 +4036,178 @@
     "promoted_levels": [],
     "signed_levels": [],
     "rule": "No level is signed or promoted by this planning change."
-  }
+  },
+  "promotion_state_machine": {
+    "states": [
+      "PLANNED",
+      "CONTRACT_READY",
+      "IMPLEMENTED_CANDIDATE",
+      "QUALIFIED",
+      "PROMOTED",
+      "SUSPENDED",
+      "ROLLED_BACK"
+    ],
+    "initial": "PLANNED",
+    "transitions": [
+      {
+        "from": "PLANNED",
+        "to": "CONTRACT_READY",
+        "requires": [
+          "canonical owner",
+          "typed contract",
+          "authority/failure/budget semantics"
+        ]
+      },
+      {
+        "from": "CONTRACT_READY",
+        "to": "IMPLEMENTED_CANDIDATE",
+        "requires": [
+          "runtime implementation",
+          "observability",
+          "focused tests",
+          "recovery/degraded behavior"
+        ]
+      },
+      {
+        "from": "IMPLEMENTED_CANDIDATE",
+        "to": "QUALIFIED",
+        "requires": [
+          "adversarial tests",
+          "integration tests",
+          "exact-head receipt",
+          "independent verification"
+        ]
+      },
+      {
+        "from": "QUALIFIED",
+        "to": "PROMOTED",
+        "requires": [
+          "all promotion prerequisites promoted",
+          "release/policy authority",
+          "production or production-like evidence appropriate to impact"
+        ]
+      },
+      {
+        "from": "PROMOTED",
+        "to": "SUSPENDED",
+        "requires": [
+          "regression, incident, stale evidence, dependency loss, or operator safety action"
+        ]
+      },
+      {
+        "from": "SUSPENDED",
+        "to": "QUALIFIED",
+        "requires": [
+          "repair",
+          "fresh exact-head requalification"
+        ]
+      },
+      {
+        "from": "SUSPENDED",
+        "to": "ROLLED_BACK",
+        "requires": [
+          "rollback decision",
+          "verified prior baseline"
+        ]
+      },
+      {
+        "from": "ROLLED_BACK",
+        "to": "IMPLEMENTED_CANDIDATE",
+        "requires": [
+          "new remediation candidate"
+        ]
+      }
+    ],
+    "contiguous_rule": "The declared maximum maturity level is the highest contiguous PROMOTED level starting at L001; skipped levels cannot be hidden as non-applicable to claim a higher level.",
+    "invalidation_rule": "If a promoted prerequisite is suspended or rolled back, every dependent higher-level promotion becomes non-current until requalified.",
+    "production_rule": "PROMOTED is an evidence-bearing release state, not a model assertion, benchmark label, or documentation checkbox."
+  },
+  "cross_stratum_bridges": [
+    {
+      "id": "B01",
+      "from": "S01",
+      "to": "S02",
+      "contract": "typed identity/trust/budget/provenance envelopes enter perception and context; untyped evidence is rejected or quarantined"
+    },
+    {
+      "id": "B02",
+      "from": "S02",
+      "to": "S03",
+      "contract": "context may propose memory/knowledge updates but persistence requires memory/governance admission and provenance"
+    },
+    {
+      "id": "B03",
+      "from": "S03",
+      "to": "S04",
+      "contract": "memory and retrieval provide evidence to reasoning; they cannot become instructions or authorization"
+    },
+    {
+      "id": "B04",
+      "from": "S04",
+      "to": "S05",
+      "contract": "reasoning emits explicit action proposals; only agency/tool authorities may admit side effects"
+    },
+    {
+      "id": "B05",
+      "from": "S05",
+      "to": "S06",
+      "contract": "multi-agent coordination may distribute proposals/work but privileged effects remain in canonical tool/action authority"
+    },
+    {
+      "id": "B06",
+      "from": "S06",
+      "to": "S07",
+      "contract": "agent traces and outcomes may become governed evaluation/learning data but never direct production policy updates"
+    },
+    {
+      "id": "B07",
+      "from": "S07",
+      "to": "S08",
+      "contract": "learned strategies may influence bounded autonomy only after qualification; learning cannot expand autonomous authority"
+    },
+    {
+      "id": "B08",
+      "from": "S08",
+      "to": "S09",
+      "contract": "autonomous observations may update world/scientific models through evidence admission; simulation remains non-authoritative"
+    },
+    {
+      "id": "B09",
+      "from": "S09",
+      "to": "S10",
+      "contract": "scientific/metacognitive evidence may drive improvement hypotheses and experiments but not self-promotion"
+    },
+    {
+      "id": "B10",
+      "from": "S10",
+      "to": "S01",
+      "contract": "accepted improvements re-enter through ordinary architecture/contracts/tests/release controls; frontier layers cannot patch the substrate out-of-band"
+    }
+  ],
+  "activation_profiles": [
+    {
+      "id": "advanced-assistant",
+      "target_ceiling": "L050",
+      "description": "High-assurance conversational/reasoning system with context, memory, verification and governed tool agency.",
+      "rule": "The profile may stop at L050 but cannot claim any higher maturity level without promoting intervening levels."
+    },
+    {
+      "id": "enterprise-agent-system",
+      "target_ceiling": "L080",
+      "description": "Adds bounded multi-agent organization, governed learning, scheduled/background work, resilience and revocable autonomy.",
+      "rule": "Unattended operation requires promoted S01-S08 closure gates and current enterprise Level-0 evidence."
+    },
+    {
+      "id": "scientific-intelligence",
+      "target_ceiling": "L090",
+      "description": "Adds world models, simulation, long-horizon/metacognitive reasoning, creative synthesis and governed scientific discovery loops.",
+      "rule": "Scientific/model outputs remain hypotheses until evidence authorities accept them."
+    },
+    {
+      "id": "frontier-governed-system",
+      "target_ceiling": "L100",
+      "description": "Adds self-modeling, gap discovery, benchmarking, experiment generation, verified improvement proposals and bounded self-evolution governance.",
+      "rule": "Level 100 cannot self-approve; independent promotion authority and rollback evidence remain mandatory."
+    }
+  ]
 }
