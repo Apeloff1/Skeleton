@@ -64,7 +64,7 @@ def decoding_signatures(samples: Sequence[DecodeSample]) -> tuple[DecodingSignat
     for condition, items in sorted(grouped.items()):
         outputs = {item.output_digest for item in items}
         total = len(items)
-        diversity = round(len(outputs) / total, 12)
+        diversity = len(outputs) / total
         stops: dict[str, int] = {}
         for item in items:
             stops[item.stop_reason] = stops.get(item.stop_reason, 0) + 1
@@ -87,10 +87,10 @@ def decoding_signatures(samples: Sequence[DecodeSample]) -> tuple[DecodingSignat
                 sample_count=total,
                 unique_output_count=len(outputs),
                 diversity_ratio=diversity,
-                collision_ratio=round(1.0 - diversity, 12),
+                collision_ratio=1.0 - diversity,
                 min_output_units=min(units),
                 max_output_units=max(units),
-                mean_output_units=round(sum(units) / total, 12),
+                mean_output_units=sum(units) / total,
                 stop_reason_counts=tuple(sorted(stops.items())),
                 digest=stable_digest(payload),
             )

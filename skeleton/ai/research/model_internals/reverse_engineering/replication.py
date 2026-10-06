@@ -53,10 +53,14 @@ def replication_status(
     minimum_independent_actors: int = 2,
     minimum_ratio: float = 0.75,
 ) -> ReplicationStatus:
+    if minimum_independent_actors < 1:
+        raise ReverseEngineeringError("minimum_independent_actors must be positive")
+    if not 0.0 <= minimum_ratio <= 1.0:
+        raise ReverseEngineeringError("minimum_ratio must be within [0, 1]")
     relevant = [attempt for attempt in attempts if attempt.claim_id == claim.claim_id]
     actors = {attempt.independent_actor for attempt in relevant}
     reproductions = sum(1 for attempt in relevant if attempt.reproduced)
-    ratio = round(reproductions / len(relevant), 12) if relevant else 0.0
+    ratio = reproductions / len(relevant) if relevant else 0.0
     replicated = (
         claim.status == "supported"
         and len(actors) >= minimum_independent_actors

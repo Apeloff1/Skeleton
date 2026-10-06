@@ -56,9 +56,9 @@ def routing_fingerprint(observations: Sequence[RoutingObservation]) -> RoutingFi
 
     total = len(observations)
     concentration = sum((count / total) ** 2 for count in route_counts.values())
-    entropy_proxy = round(1.0 - concentration, 12)
+    entropy_proxy = 1.0 - concentration
     deterministic = sum(1 for routes in class_routes.values() if len(routes) == 1)
-    deterministic_ratio = round(deterministic / len(class_routes), 12)
+    deterministic_ratio = deterministic / len(class_routes)
     class_routes_tuple = tuple(
         (name, tuple(sorted(routes))) for name, routes in sorted(class_routes.items())
     )
