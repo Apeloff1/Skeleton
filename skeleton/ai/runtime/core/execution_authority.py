@@ -640,6 +640,11 @@ class ExecutionAuthorityGuard:
             raise ExecutionAuthorityError("evidence seal time predates admission")
         if state.last_authorized_at is not None and instant < state.last_authorized_at:
             raise ExecutionAuthorityError("evidence seal time predates latest consumption")
+        if (
+            state.revocation_receipt is not None
+            and instant < state.revocation_receipt.revoked_at
+        ):
+            raise ExecutionAuthorityError("evidence seal time predates revocation")
         return AuthorityEvidenceBundle(
             authority_digest=authority.digest,
             operation_id=authority.operation_id,
