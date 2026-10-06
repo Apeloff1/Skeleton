@@ -7,7 +7,7 @@
   "relationship_to_masterplan": "depth-only overlay; VOL-000..420 breadth freeze preserved",
   "bytes": {
     "requested_minimum": 10000000,
-    "shard_total": 11188293,
+    "shard_total": 11189563,
     "threshold_met": true
   },
   "completion": {
@@ -214,7 +214,7 @@
       "id": "FLGB-11",
       "title": "Rendering Materials Lighting Cameras and VFX",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_11_FLGB-11_RENDERING_MATERIALS_LIGHTING_CAMERAS_AND_VFX.md",
-      "bytes": 621609,
+      "bytes": 621863,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
@@ -223,7 +223,7 @@
       "id": "FLGB-12",
       "title": "Animation Audio UI Input and Accessibility",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_12_FLGB-12_ANIMATION_AUDIO_UI_INPUT_AND_ACCESSIBILITY.md",
-      "bytes": 622262,
+      "bytes": 622516,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
@@ -232,7 +232,7 @@
       "id": "FLGB-13",
       "title": "Gameplay Scripting Narrative Quests and NPC AI",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_13_FLGB-13_GAMEPLAY_SCRIPTING_NARRATIVE_QUESTS_AND_NPC_AI.md",
-      "bytes": 622248,
+      "bytes": 622502,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
@@ -241,7 +241,7 @@
       "id": "FLGB-14",
       "title": "Procedural Generation Worldbuilding and Longform Consistency",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_14_FLGB-14_PROCEDURAL_GENERATION_WORLDBUILDING_AND_LONGFORM_CONSISTENCY.md",
-      "bytes": 620905,
+      "bytes": 621159,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
@@ -250,7 +250,7 @@
       "id": "FLGB-15",
       "title": "Networking Saves Mods Localization and Platform Services",
       "path": "docs/plan/FUNCTIONAL_LLM_GAME_BUILDER_10MB/SHARD_15_FLGB-15_NETWORKING_SAVES_MODS_LOCALIZATION_AND_PLATFORM_SERVICES.md",
-      "bytes": 622019,
+      "bytes": 622273,
       "min_bytes": 620000,
       "implementation_signed": false,
       "verification_signed": false
