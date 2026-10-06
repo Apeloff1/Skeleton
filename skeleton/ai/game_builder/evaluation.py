@@ -34,6 +34,37 @@ class JudgeVerdict:
     evidence_digest: str
     method_id: str
 
+    def __post_init__(self) -> None:
+        evaluator_id = self.evaluator_id.strip() if isinstance(self.evaluator_id, str) else ""
+        method_id = self.method_id.strip() if isinstance(self.method_id, str) else ""
+        if not evaluator_id or evaluator_id in {Rival.A.value, Rival.B.value}:
+            raise ValueError("evaluator must be independent from both rivals")
+        if not isinstance(self.evaluator_provenance, EvaluatorProvenance):
+            raise TypeError("evaluator_provenance must be EvaluatorProvenance")
+        if self.evaluator_provenance.evaluator_id != evaluator_id:
+            raise ValueError("verdict evaluator identity does not match provenance")
+        if not method_id:
+            raise ValueError("method_id must be non-empty")
+        if self.evaluator_provenance.method_id != method_id:
+            raise ValueError("verdict method does not match evaluator provenance")
+        if not isinstance(self.candidate_digest, str) or len(self.candidate_digest) < 16:
+            raise ValueError("candidate/evidence identities must be stable digests")
+        if not isinstance(self.evidence_digest, str) or len(self.evidence_digest) < 16:
+            raise ValueError("candidate/evidence identities must be stable digests")
+        if self.evidence_digest not in self.evaluator_provenance.output_evidence_refs:
+            raise ValueError(
+                "verdict evidence must be referenced by evaluator execution output"
+            )
+        if isinstance(self.confidence, bool) or not isinstance(self.confidence, (int, float)):
+            raise ValueError("confidence must be numeric")
+        confidence = float(self.confidence)
+        if not 0.0 <= confidence <= 1.0:
+            raise ValueError("confidence must be within [0,1]")
+        object.__setattr__(self, "evaluator_id", evaluator_id)
+        object.__setattr__(self, "method_id", method_id)
+        object.__setattr__(self, "confidence", confidence)
+        object.__setattr__(self, "quality", normalize_quality(dict(self.quality)))
+
     @classmethod
     def create(
         cls,
@@ -46,29 +77,6 @@ class JudgeVerdict:
         evidence_digest: str,
         method_id: str,
     ) -> "JudgeVerdict":
-        evaluator_id = evaluator_id.strip()
-        method_id = method_id.strip()
-        if not evaluator_id or evaluator_id in {Rival.A.value, Rival.B.value}:
-            raise ValueError("evaluator must be independent from both rivals")
-        if not isinstance(evaluator_provenance, EvaluatorProvenance):
-            raise TypeError("evaluator_provenance must be EvaluatorProvenance")
-        if evaluator_provenance.evaluator_id != evaluator_id:
-            raise ValueError("verdict evaluator identity does not match provenance")
-        if not method_id:
-            raise ValueError("method_id must be non-empty")
-        if evaluator_provenance.method_id != method_id:
-            raise ValueError("verdict method does not match evaluator provenance")
-        if len(candidate_digest) < 16 or len(evidence_digest) < 16:
-            raise ValueError("candidate/evidence identities must be stable digests")
-        if evidence_digest not in evaluator_provenance.output_evidence_refs:
-            raise ValueError(
-                "verdict evidence must be referenced by evaluator execution output"
-            )
-        if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
-            raise ValueError("confidence must be numeric")
-        confidence = float(confidence)
-        if not 0.0 <= confidence <= 1.0:
-            raise ValueError("confidence must be within [0,1]")
         return cls(
             evaluator_id=evaluator_id,
             evaluator_provenance=evaluator_provenance,
@@ -144,6 +152,41 @@ class PanelDecision:
             raise ValueError("panel decision does not satisfy recorded quorum")
         if len(set(self.evaluator_ids)) != len(self.evaluator_ids):
             raise ValueError("panel evaluator ids must be unique")
+        if any(
+            isinstance(value, bool) or not isinstance(value, (int, float))
+            for value in (
+                self.median_confidence,
+                self.minimum_confidence,
+                self.max_disagreement,
+                self.required_minimum_confidence,
+                self.max_axis_disagreement_limit,
+            )
+        ):
+            raise TypeError("panel numeric authority fields must be numeric")
+        if not 0.0 <= self.minimum_confidence <= 1.0:
+            raise ValueError("panel minimum confidence must be within [0,1]")
+        if not 0.0 <= self.required_minimum_confidence <= 1.0:
+            raise ValueError("panel required confidence must be within [0,1]")
+        expected_disagreement_axes = tuple(
+            axis
+            for axis, spread in self.per_axis_spread
+            if spread > self.max_axis_disagreement_limit
+        )
+        if expected_disagreement_axes != self.disagreement_axes:
+            raise ValueError("panel disagreement axes do not match recorded spreads")
+        expected_max_disagreement = max(
+            (spread for _, spread in self.per_axis_spread),
+            default=0.0,
+        )
+        if abs(expected_max_disagreement - self.max_disagreement) > 1e-12:
+            raise ValueError("panel max disagreement does not match recorded spreads")
+        expected_eligible = (
+            self.minimum_confidence >= self.required_minimum_confidence
+            and len(self.method_ids) >= self.minimum_method_diversity
+            and not self.disagreement_axes
+        )
+        if self.eligible != expected_eligible:
+            raise ValueError("panel eligibility does not match recorded policy evidence")
         expected = canonical_digest(self.decision_payload())
         if self.decision_digest != expected:
             raise ValueError("panel decision digest mismatch")
@@ -176,6 +219,8 @@ class PanelDecision:
             "evidence_binding_digests": list(self.evidence_binding_digests),
             "eligible": self.eligible,
             "max_axis_disagreement": self.max_axis_disagreement_limit,
+            "max_disagreement": self.max_disagreement,
+            "per_axis_spread": dict(self.per_axis_spread),
             "median_confidence": self.median_confidence,
             "methods": list(self.method_ids),
             "minimum_confidence": self.minimum_confidence,
@@ -289,6 +334,8 @@ class EvaluationPanel:
             ),
             "eligible": eligible,
             "max_axis_disagreement": self.max_axis_disagreement,
+            "max_disagreement": decision_kwargs["max_disagreement"],
+            "per_axis_spread": dict(decision_kwargs["per_axis_spread"]),
             "median_confidence": decision_kwargs["median_confidence"],
             "methods": list(methods),
             "minimum_confidence": confidence_floor,
