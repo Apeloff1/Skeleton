@@ -466,8 +466,24 @@ exact-head qualification.
 
 ### Volume 3 — durable streaming projection
 
-Publish operation events to clients with sequence replay, duplicate tolerance,
-reconnect, cancellation, and terminal reconstruction.
+Status: **projection implemented candidate; transport/API cutover pending**.
+
+Implemented:
+
+- deterministic public projection of durable turn transitions;
+- content-minimized event envelopes that omit arbitrary model/tool payloads;
+- stable event identities bound to operation, sequence, event digest, and kind;
+- reconnect cursors bound to operation identity, sequence, and digest;
+- overlap tolerance without duplicate delivery;
+- fail-closed sequence-gap and digest-chain detection;
+- transport-neutral pages suitable for SSE, WebSocket, polling, or native
+  client transports;
+- terminal-state projection for completion, degradation, failures,
+  cancellation, and quarantine.
+
+The remaining cutover is to expose this projection through the product chat
+transport after the persistence and stream surfaces pass exact-head
+qualification.
 
 ### Volume 4 — context compiler v2
 
