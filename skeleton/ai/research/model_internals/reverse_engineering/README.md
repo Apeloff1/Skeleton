@@ -15,7 +15,8 @@ The core contract is deliberately black-box-first:
 - architecture statements remain hypotheses unless evidence thresholds are met;
 - differential runs compare observable behavior without claiming hidden implementation identity;
 - artifact inspection is separately gated by rights provenance and rejects credential/personal-data-bearing inputs;
-- report identities are canonical and deterministic so later verification can bind to exact evidence.
+- report identities are canonical and deterministic so later verification can bind to exact evidence;
+- evidence synthesis requires independent domains and surfaces contradictory evidence instead of averaging it away.
 
 ## Characterization planes
 
@@ -29,11 +30,22 @@ The lab contains bounded analyzers for:
 - **embedding geometry** — norms, pairwise cosine structure, centroid magnitude, and zero-norm accounting;
 - **KV-cache behavior** — measured bytes/token, approximate linearity, and theoretical-geometry error;
 - **cache eviction** — first over-capacity point, first retention loss, hit-rate and retention curves;
-- **attention geometry** — MHA/GQA/MQA classification, head ratios, and width-consistency checks;\n- **attention patterns** — concentration, effective support, first/last-position mass, and sink-candidate ratios from authorized local attention observations;
-- **activation geometry** — per-layer norms, sparsity, and pairwise cosine structure while reports retain only vector digests;\n- **representation drift** — adjacent-layer cosine drift and norm-ratio trajectories on matched digested inputs;\n- **logit-lens trajectories** — top-token changes, stabilization layer, and confidence progression from authorized local-model snapshots;
-- **architecture-family scoring** — transparent evidence-weighted candidate ranking rather than opaque identity claims;\n- **position sensitivity** — controlled offset-vs-similarity curves without asserting a positional-encoding implementation;\n- **prefill/decode scaling** — log-log latency exponents and fit quality from controlled measurements;\n- **model correspondence** — matched-input representation cosine/norm correspondence across authorized models;\n- **multimodal adapters** — projection dimensions, low-rank structure, modalities, and target spaces from authorized projection metadata;\n- **tool topology** — caller→tool and tool→tool transition graphs reconstructed from digested execution traces;\n- **evidence synthesis** — multi-domain support/conflict aggregation that requires independent evidence before promotion from hypothesis to supported;
+- **attention geometry** — MHA/GQA/MQA classification, head ratios, and width-consistency checks;
+- **attention patterns** — concentration, effective support, first/last-position mass, and sink-candidate ratios;
+- **activation geometry** — per-layer norms, sparsity, and pairwise cosine structure while reports retain only vector digests;
+- **representation drift** — adjacent-layer cosine drift and norm-ratio trajectories on matched digested inputs;
+- **logit-lens trajectories** — top-token changes, stabilization layer, and confidence progression from authorized local snapshots;
+- **position sensitivity** — controlled offset-vs-similarity curves without asserting a positional-encoding implementation;
+- **prefill/decode scaling** — log-log latency exponents and fit quality from controlled measurements;
+- **model correspondence** — matched-input representation cosine/norm correspondence across authorized models;
+- **architecture-family scoring** — transparent evidence-weighted candidate ranking rather than opaque identity claims;
+- **evidence synthesis** — multi-domain support/conflict aggregation before promotion from hypothesis to supported;
 - **expert routing** — observed top-k, expert load concentration, and routing-weight summaries for authorized MoE models;
-- **residual interventions** — output-change and metric-delta summaries for controlled causal interventions on authorized local models;
+- **residual interventions** — output-change and metric-delta summaries for controlled causal interventions;
+- **causal tracing** — corruption/restoration effect and recovery-fraction summaries by layer;
+- **feature specialization** — feature-to-unit score concentration and dominant layer/unit summaries;
+- **multimodal adapters** — projection dimensions, low-rank structure, modalities, and target spaces from authorized metadata;
+- **tool topology** — caller→tool and tool→tool transition graphs reconstructed from digested execution traces;
 - **authorized artifact manifests** — tensor shapes/dtypes/counts with provenance receipts but no raw tensor persistence;
 - **tensor topology** — indexed-layer and recurrent-shape inference from authorized tensor metadata;
 - **quantization** — numerical error and cosine-similarity characterization for authorized reference/quantized samples;
@@ -46,7 +58,6 @@ the operator is authorized to inspect. They do not assert proprietary architectu
 identity, recover hidden weights from inaccessible systems, bypass access controls,
 or create a right to inspect artifacts without ownership or permission.
 
-Future work can layer tool topology, residual-stream/activation interventions on
-authorized local models, cache eviction experiments, multimodal adapter geometry,
-and adversarial replication over these contracts while preserving the same
-evidence/inference boundary.
+Future work can deepen causal tracing, circuit/subspace analysis, multimodal alignment
+interventions, long-horizon routing experiments, and adversarial replication while
+preserving the same evidence/inference boundary.

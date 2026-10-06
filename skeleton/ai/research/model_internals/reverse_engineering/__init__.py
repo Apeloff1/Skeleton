@@ -13,14 +13,15 @@ from .architecture_family import (
     classify_architecture_family,
 )
 from .artifact_manifest import ArtifactManifest, TensorRecord, build_artifact_manifest
-from .attention_patterns import AttentionPatternReport, AttentionPatternSample, analyze_attention_patterns
 from .attention_geometry import (
     AttentionGeometryReport,
     AttentionLayerShape,
     AttentionMode,
     analyze_attention_geometry,
 )
+from .attention_patterns import AttentionPatternReport, AttentionPatternSample, analyze_attention_patterns
 from .cache_eviction import CacheEvictionReport, CacheTrial, analyze_cache_eviction
+from .causal_trace import CausalTraceLayerReport, CausalTraceObservation, analyze_causal_trace
 from .context_window import ContextBoundaryReport, ContextTrial, characterize_context
 from .contracts import (
     AuthorizationScope,
@@ -38,14 +39,19 @@ from .evidence_chain import EvidenceChain, EvidenceChainEntry
 from .evidence_synthesis import EvidenceSignal, EvidenceSynthesisReport, synthesize_evidence
 from .experiment import ExperimentCell, build_experiment_matrix
 from .expert_routing import ExpertRoutingObservation, ExpertRoutingReport, analyze_expert_routing
+from .feature_specialization import (
+    FeatureSpecializationReport,
+    FeatureUnitObservation,
+    analyze_feature_specialization,
+)
 from .fingerprint import BehavioralFingerprint, fingerprint_bundle
 from .inference import infer_architecture
+from .kv_cache import KVCacheObservation, KVCacheReport, analyze_kv_cache
 from .latency_scaling import LatencyObservation, LatencyScalingReport, analyze_latency_scaling
 from .logit_trajectory import LogitLensSnapshot, LogitTrajectoryReport, analyze_logit_trajectory
 from .model_correspondence import CorrespondencePair, ModelCorrespondenceReport, analyze_model_correspondence
 from .multimodal_adapter import AdapterProjection, MultimodalAdapterReport, analyze_multimodal_adapters
 from .position_sensitivity import PositionSensitivityReport, PositionTrial, analyze_position_sensitivity
-from .kv_cache import KVCacheObservation, KVCacheReport, analyze_kv_cache
 from .probes import ProbeRunner
 from .provenance import ArtifactProvenance, ProvenanceGate
 from .quantization import QuantizationPair, QuantizationReport, analyze_quantization
@@ -59,31 +65,33 @@ from .residual_intervention import (
 from .routing import RoutingFingerprint, RoutingObservation, routing_fingerprint
 from .session import ReverseEngineeringSession, SessionReport
 from .state_memory import StateMemoryReport, StateTrial, analyze_state_memory
-from .tool_topology import ToolCallObservation, ToolTopologyReport, analyze_tool_topology
 from .tokenizer_fingerprint import TokenizationSample, TokenizerFingerprint, fingerprint_tokenizer
+from .tool_topology import ToolCallObservation, ToolTopologyReport, analyze_tool_topology
 from .topology import TopologyReport, infer_tensor_topology
 
 __all__ = [
     "ActivationLayerReport",
     "ActivationSample",
+    "AdapterProjection",
     "ArchitectureCandidate",
     "ArchitectureFamilyReport",
     "ArchitectureSignals",
-    "AdapterProjection",
     "ArtifactManifest",
     "ArtifactProvenance",
     "AttentionGeometryReport",
-    "AttentionPatternReport",
-    "AttentionPatternSample",
     "AttentionLayerShape",
     "AttentionMode",
+    "AttentionPatternReport",
+    "AttentionPatternSample",
     "AuthorizationScope",
     "BehavioralFingerprint",
     "CacheEvictionReport",
     "CacheTrial",
+    "CausalTraceLayerReport",
+    "CausalTraceObservation",
     "ContextBoundaryReport",
-    "CorrespondencePair",
     "ContextTrial",
+    "CorrespondencePair",
     "DecodeSample",
     "DecodingSignature",
     "DifferentialFinding",
@@ -97,21 +105,23 @@ __all__ = [
     "ExperimentCell",
     "ExpertRoutingObservation",
     "ExpertRoutingReport",
+    "FeatureSpecializationReport",
+    "FeatureUnitObservation",
     "InferenceClaim",
+    "KVCacheObservation",
+    "KVCacheReport",
     "LatencyObservation",
     "LatencyScalingReport",
     "LayerRepresentation",
     "LogitLensSnapshot",
     "LogitTrajectoryReport",
-    "KVCacheObservation",
-    "KVCacheReport",
     "ModelCorrespondenceReport",
     "MultimodalAdapterReport",
     "Observation",
-    "ProbeCase",
-    "ProbeKind",
     "PositionSensitivityReport",
     "PositionTrial",
+    "ProbeCase",
+    "ProbeKind",
     "ProbeRunner",
     "ProvenanceGate",
     "QuantizationPair",
@@ -135,11 +145,13 @@ __all__ = [
     "ToolTopologyReport",
     "TopologyReport",
     "analyze_activation_geometry",
+    "analyze_attention_geometry",
     "analyze_attention_patterns",
     "analyze_cache_eviction",
-    "analyze_attention_geometry",
+    "analyze_causal_trace",
     "analyze_embedding_geometry",
     "analyze_expert_routing",
+    "analyze_feature_specialization",
     "analyze_kv_cache",
     "analyze_latency_scaling",
     "analyze_logit_trajectory",

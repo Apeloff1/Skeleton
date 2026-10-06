@@ -42,6 +42,6 @@ def test_feature_specialization_finds_consistent_unit():
     )[0]
     assert report.top_layer_id == "l1"
     assert report.top_unit_id == "u1"
-    assert report.top_mean_score == 0.85
+    assert abs(report.top_mean_score - 0.85) < 1e-12
     assert report.score_concentration > 0.7
     assert report.unit_count == 3
