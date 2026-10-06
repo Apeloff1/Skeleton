@@ -43,8 +43,7 @@ description = "Inherited generic API key rule with Skeleton documentation false-
   condition = "AND"
   regexTarget = "line"
   regexes = ['''p1:adversarial-wave3-evidence:AC-17:cache_key_collision:[0-9a-f]{40}''']
-  paths = ['''^machine/p1_risk_evidence_bindings\.json
-'']
+  paths = ['''^machine/p1_risk_evidence_bindings\.json$'']
 
   [[rules.allowlists]]
   description = "Credential lifecycle adversarial evidence URIs carry git SHAs, not credentials"
@@ -54,5 +53,4 @@ description = "Inherited generic API key rule with Skeleton documentation false-
     '''p1:adversarial-wave4-evidence:AC-08:credential_revalidation:[0-9a-f]{40}''',
     '''p1:adversarial-ac10-ac21-evidence:AC-10:credential_rotation:[0-9a-f]{40}'''
   ]
-  paths = ['''^machine/p1_risk_evidence_bindings\.json
-'']
+  paths = ['''^machine/p1_risk_evidence_bindings\.json$'']
