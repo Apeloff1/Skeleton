@@ -2,7 +2,7 @@
   "schema_version": 1,
   "kind": "functional-llm-game-builder-execution-atlas",
   "overlay_id": "Functional-LLM-Game-Builder-20MB-Plus",
-  "plan_version": "2.5.0",
+  "plan_version": "2.6.0",
   "status": "active-specification",
   "relationship_to_masterplan": "depth-only overlay; VOL-000..420 breadth freeze preserved",
   "bytes": {
@@ -54,7 +54,8 @@
     "runtime completion cannot be inferred from documentation volume",
     "FLGB deep-closure pass 2 requires exactly 1,296 additional normative atoms per plane (12 subsystems × 12 lifecycle stages × 9 adversarial stress profiles) and may not auto-sign implementation.",
     "The literal doubled atlas minimum is 22,953,806 UTF-8 shard bytes (2 × the original 11,476,903-byte atlas); exact byte accounting is fail-closed and specification size never substitutes for executable evidence.",
-    "Legacy FLGB requirement-atom preservation is bound to the pre-Pass-2 baseline commit 4f2d5f736bebc30e7156d0431da18ada41664afa; every plane must preserve or exceed its exact recorded baseline while Pass-2 FLGBX coverage remains independently mandatory."
+    "Legacy FLGB requirement-atom preservation is bound to the pre-Pass-2 baseline commit 4f2d5f736bebc30e7156d0431da18ada41664afa; every plane must preserve or exceed its exact recorded baseline while Pass-2 FLGBX coverage remains independently mandatory.",
+    "frontier-competition claims require fresh multi-comparator evidence; no aggregate benchmark score may compensate for a critical-domain, safety, rights, authority, or recovery failure"
   ],
   "coverage": {
     "required_planes": [
@@ -899,5 +900,123 @@
       "FLGB-17": 278,
       "FLGB-18": 276
     }
+  },
+  "frontier_competition": {
+    "objective": "The integrated functional LLM + game-builder must be evaluated as a direct competitor to current frontier systems, not merely as a feature-complete local stack.",
+    "status": "specification-registered-evidence-pending",
+    "completion_claim": false,
+    "comparison_unit": "exact model/provider/version + inference configuration + tool policy + hardware/environment + budget + source revision",
+    "comparator_policy": {
+      "minimum_frontier_comparators": 3,
+      "strongest_available_comparator_required": true,
+      "exact_identity_required": true,
+      "maximum_comparator_age_days": 90,
+      "same_or_disclosed_budget_required": true,
+      "contamination_controls_required": true,
+      "public_and_heldout_mix_required": true,
+      "benchmark_cherry_picking_forbidden": true
+    },
+    "required_domains": [
+      {
+        "id": "FC-01",
+        "name": "reasoning and planning",
+        "critical": true
+      },
+      {
+        "id": "FC-02",
+        "name": "coding and repository engineering",
+        "critical": true
+      },
+      {
+        "id": "FC-03",
+        "name": "long-context and long-horizon consistency",
+        "critical": true
+      },
+      {
+        "id": "FC-04",
+        "name": "tool use and governed agentic execution",
+        "critical": true
+      },
+      {
+        "id": "FC-05",
+        "name": "multimodal vision audio video and documents",
+        "critical": false
+      },
+      {
+        "id": "FC-06",
+        "name": "game project construction and editor/world manipulation",
+        "critical": true
+      },
+      {
+        "id": "FC-07",
+        "name": "gameplay simulation playtesting and debugging",
+        "critical": true
+      },
+      {
+        "id": "FC-08",
+        "name": "narrative canon continuity and creative quality",
+        "critical": true
+      },
+      {
+        "id": "FC-09",
+        "name": "adversarial self-improvement and rival refinement",
+        "critical": true
+      },
+      {
+        "id": "FC-10",
+        "name": "reliability recovery replay and deterministic evidence",
+        "critical": true
+      },
+      {
+        "id": "FC-11",
+        "name": "security safety privacy rights and authority integrity",
+        "critical": true
+      },
+      {
+        "id": "FC-12",
+        "name": "latency throughput cost and resource efficiency",
+        "critical": false
+      }
+    ],
+    "evaluation_modes": [
+      "versioned public benchmarks with contamination controls",
+      "private heldout tasks unseen by builders and candidate systems",
+      "multi-hour and multi-session real project tasks",
+      "repository-level coding and debugging tasks",
+      "end-to-end game creation tasks from brief to reopenable export",
+      "adversarial and fault-injection campaigns",
+      "blind human pairwise quality evaluation for subjective outputs",
+      "deterministic replay and recovery evaluation",
+      "cross-platform performance and resource evaluation"
+    ],
+    "promotion_rules": {
+      "per_domain_results_required": true,
+      "statistical_uncertainty_required": true,
+      "blind_human_evaluation_required_for_subjective_quality": true,
+      "no_critical_domain_may_be_hidden_by_aggregate_score": true,
+      "safety_privacy_authority_rights_and_recovery_are_non_compensable": true,
+      "game_builder_target_requires_frontier_parity_or_better": true,
+      "long_horizon_consistency_target_requires_frontier_parity_or_better": true,
+      "coding_repository_engineering_target_requires_frontier_parity_or_better": true,
+      "dual_rival_gain_must_be_measured_against_single_pass_baseline": true,
+      "regressions_against_current_champion_block_promotion": true,
+      "exact_head_evidence_required": true,
+      "independent_verification_required": true
+    },
+    "required_evidence": [
+      "comparator registry with exact identities and freshness",
+      "task and dataset manifests with leakage/contamination controls",
+      "per-domain raw results and normalized scorecards",
+      "confidence intervals or equivalent uncertainty estimates",
+      "blind human-evaluation receipts where subjective",
+      "cost latency token tool-call and hardware accounting",
+      "failure recovery replay and rollback receipts",
+      "security privacy authority rights and similarity-screen evidence",
+      "exact-head reproducibility bundle",
+      "independent verification signoff"
+    ],
+    "target_interpretation": "Frontier-competitive means no hidden critical-domain collapse, demonstrated parity-or-better on the product's core reasoning/coding/long-horizon/game-building targets, and evidence-backed differentiation from dual-rival quality, durable project state, deterministic recovery, and rights-governed production.",
+    "implementation_signed": false,
+    "independent_verification_signed": false
   }
 }
