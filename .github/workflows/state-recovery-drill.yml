@@ -6,7 +6,11 @@ on:
       - "machine/ai_build_accountability.json"
       - "machine/ai_accountability_closure_map.json"
       - "scripts/state_recovery_drill.py"
+      - "scripts/state_migration_compatibility.py"
       - "scripts/state_backup_bundle.py"
+      - "scripts/check_state_topology.py"
+      - "machine/ai_master_plan.json"
+      - "skeleton/testing/test_state_migration_compatibility.py"
       - "scripts/verify_state_authority_closure.py"
       - "tests/test_state_authority_independent_verifier.py"
       - "skeleton/testing/test_state_recovery_drill.py"
@@ -209,6 +213,45 @@ jobs:
           python -m pytest -q --noconftest
           skeleton/testing/test_state_recovery_drill.py
           skeleton/testing/test_state_backup_bundle.py
+          skeleton/testing/test_state_migration_compatibility.py
+
+      - name: Rehearse legacy durable-state migration compatibility
+        env:
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/state_migration_compatibility.py
+          --workdir "${RUNNER_TEMP}/skeleton_state_migration_compatibility"
+          --output "${RUNNER_TEMP}/state-migration-compatibility.json"
+          --print-evidence
+
+      - name: Assert exact-head state migration receipt
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              (Path(os.environ["RUNNER_TEMP"]) / "state-migration-compatibility.json")
+              .read_text(encoding="utf-8")
+          )
+          assert receipt["schema_version"] == 1
+          assert receipt["kind"] == "vol005-state-migration-compatibility"
+          assert receipt["head_sha"] == os.environ["EXPECTED_SHA"]
+          assert receipt["volume"] == "VOL-005"
+          assert receipt["passed"] is True
+          assert set(receipt["stores"]) == {"execution", "tool_receipts", "quota"}
+          assert receipt["topology"]["closed_gap_references"] == 0
+          assert receipt["topology"]["partial_authorities"] == 0
+          assert len(receipt["workflow_binding"]["recovery"]["digest"]) == 64
+          assert len(receipt["workflow_binding"]["release"]["digest"]) == 64
+          assert len(receipt["volume_binding"]["binding_digest"]) == 64
+          assert len(receipt["receipt_digest"]) == 64
+          print("VOL-005 state migration exact-head receipt OK")
+          print(receipt["receipt_digest"])
+          PY
 
       - name: Verify durable AI admission recovery contracts
         env:
