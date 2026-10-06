@@ -295,3 +295,32 @@ Skeleton may be described as a complete enterprise AI only when:
 6. exact-head release evidence is current.
 
 Until then the honest status is **enterprise construction in progress**.
+
+
+### October 2026 per-volume implementation dossiers
+
+Every `VOL-000` through `VOL-420` has a mandatory deep implementation dossier
+indexed by `machine/enterprise_ai_implementation_notes_index.json`. Human
+notebooks are under `docs/architecture/enterprise-volume-notes/`.
+
+Each volume must be implemented and reviewed through all fourteen levels:
+
+`L00` ownership, `L01` architecture/dependencies, `L02` contracts,
+`L03` admission/authority, `L04` runtime control flow, `L05` state/data,
+`L06` security/privacy/tenancy, `L07` resilience/recovery, `L08`
+observability/operability, `L09` performance/capacity/economics, `L10`
+verification/adversarial evaluation, `L11` deployment/migration/rollback,
+`L12` operator controls/runbooks, and `L13` enterprise superiority/exit.
+
+The dossiers are governed implementation obligations. They do not create
+completion evidence by themselves. A volume cannot be enterprise-qualified
+when its dossier is missing, shallow, stale versus the masterplan, inconsistent
+with its enterprise grade/target/profile, or missing current exact-head
+implementation and acceptance evidence.
+
+Required validation:
+
+```bash
+python scripts/check_enterprise_ai_implementation_notes.py --json
+python -m pytest -q tests/test_enterprise_ai_implementation_notes.py
+```
