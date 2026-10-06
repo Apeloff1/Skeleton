@@ -382,8 +382,10 @@ class DualRivalForge:
             raise ForgeStateError("forge release binding requires completed effort budget")
         from .release import ForgeReleaseBinding
 
+        checkpoint = self.checkpoint()
         return ForgeReleaseBinding.from_checkpoint(
-            self.checkpoint(),
+            checkpoint,
+            expected_checkpoint_digest=checkpoint["checkpoint_digest"],
             receipts=self.receipts,
         )
 
