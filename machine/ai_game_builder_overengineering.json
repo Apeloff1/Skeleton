@@ -2168,7 +2168,9 @@
       "bounded_resource_governor": "skeleton/ai/game_builder/resource_governor.py",
       "quality_debt_ratchet": "skeleton/ai/game_builder/quality_debt.py",
       "integrated_control_plane": "skeleton/ai/game_builder/control_plane.py",
-      "regression_tests": "tests/test_ai_game_builder_overengineering_runtime.py"
+      "regression_tests": "tests/test_ai_game_builder_overengineering_runtime.py",
+      "resilience_controls": "skeleton/ai/game_builder/resilience.py",
+      "gold_master_tribunal": "skeleton/ai/game_builder/release.py"
     }
   },
   "second_generation_runtime": {
@@ -2176,6 +2178,8 @@
     "resource_governor": "skeleton/ai/game_builder/resource_governor.py",
     "quality_debt": "skeleton/ai/game_builder/quality_debt.py",
     "control_plane": "skeleton/ai/game_builder/control_plane.py",
-    "tests": "tests/test_ai_game_builder_overengineering_runtime.py"
+    "tests": "tests/test_ai_game_builder_overengineering_runtime.py",
+    "resilience": "skeleton/ai/game_builder/resilience.py",
+    "gold_master": "skeleton/ai/game_builder/release.py"
   }
 }
