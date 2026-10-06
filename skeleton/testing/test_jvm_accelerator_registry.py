@@ -14,6 +14,7 @@ from skeleton.jvm_accelerators import (
     JvmAcceleratorRegistry,
     JvmAcceleratorRegistryError,
 )
+from skeleton.native import jvm_registry as jvm_registry_module
 
 
 @dataclass
@@ -405,3 +406,81 @@ def test_bad_registry_configuration_rejects_unknown_factory_name() -> None:
         JvmAcceleratorRegistry(
             factories={"unknown": lambda: object()},
         )
+
+
+def test_default_domain_getters_share_one_canonical_registry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from skeleton.memory.jvm_vector_accelerator import (
+        get_default_vector_accelerator,
+    )
+    from skeleton.observability.jvm_accelerator import get_default_accelerator
+    from skeleton.simulation.physics.jvm_broadphase_accelerator import (
+        get_default_broadphase_accelerator,
+    )
+
+    monkeypatch.setattr(jvm_registry_module, "_default_registry", None)
+    registry = jvm_registry_module.get_default_jvm_registry()
+
+    vector = get_default_vector_accelerator()
+    observability = get_default_accelerator()
+    physics = get_default_broadphase_accelerator()
+
+    assert registry.get("vector") is vector
+    assert registry.get("observability") is observability
+    assert registry.get("physics") is physics
+    assert registry.initialized("vector") is True
+    assert registry.initialized("observability") is True
+    assert registry.initialized("physics") is True
+
+    # Construction remains lazy: obtaining domain helpers does not start Java.
+    assert vector.status().running is False
+    assert observability.status().running is False
+    assert physics.status().running is False
+
+    jvm_registry_module.close_default_jvm_registry()
+    assert jvm_registry_module._default_registry is None
+
+
+def test_domain_close_retires_only_its_registry_entry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from skeleton.memory.jvm_vector_accelerator import (
+        close_default_vector_accelerator,
+        get_default_vector_accelerator,
+    )
+    from skeleton.observability.jvm_accelerator import get_default_accelerator
+
+    monkeypatch.setattr(jvm_registry_module, "_default_registry", None)
+    registry = jvm_registry_module.get_default_jvm_registry()
+    first_vector = get_default_vector_accelerator()
+    observability = get_default_accelerator()
+
+    close_default_vector_accelerator()
+
+    assert registry.initialized("vector") is False
+    assert registry.initialized("observability") is True
+    assert registry.get("observability") is observability
+
+    replacement = get_default_vector_accelerator()
+    assert replacement is not first_vector
+    assert registry.get("vector") is replacement
+
+    jvm_registry_module.close_default_jvm_registry()
+
+
+def test_default_registry_is_process_singleton_and_resettable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(jvm_registry_module, "_default_registry", None)
+
+    first = jvm_registry_module.get_default_jvm_registry()
+    second = jvm_registry_module.get_default_jvm_registry()
+
+    assert first is second
+
+    jvm_registry_module.close_default_jvm_registry()
+    third = jvm_registry_module.get_default_jvm_registry()
+    assert third is not first
+
+    jvm_registry_module.close_default_jvm_registry()
