@@ -23,6 +23,7 @@ from skeleton.ai.runtime.contracts.execution_authority import (
     AdmissionReceipt,
     AuthorityConsumptionReceipt,
     AuthorityEvidenceBundle,
+    AuthorityRevocationReceipt,
     ExecutionAuthority,
     ExecutionAuthorityError,
     ResourceUsage,
@@ -87,6 +88,7 @@ class _AuthorityState:
     latest_receipt_digest: str | None = None
     admitted_at: datetime | None = None
     last_authorized_at: datetime | None = None
+    revocation_receipt: AuthorityRevocationReceipt | None = None
 
 
 class ExecutionAuthorityGuard:
@@ -425,12 +427,50 @@ class ExecutionAuthorityGuard:
         )
 
     @_synchronized
-    def revoke(self, authority: ExecutionAuthority) -> None:
+    def revoke(
+        self,
+        authority: ExecutionAuthority,
+        *,
+        revoked_by: str = "runtime",
+        reason_code: str = "explicit.revocation",
+        now: datetime | None = None,
+    ) -> AuthorityRevocationReceipt:
+        """Revoke admitted authority and return stable tamper-evident evidence."""
+
+        instant = self._aware(now)
         if not isinstance(authority, ExecutionAuthority):
             raise ExecutionAuthorityError("authority must be ExecutionAuthority")
         state = self._authorities.get(authority.digest)
-        if state is not None:
-            state.revoked = True
+        if state is None:
+            raise ExecutionAuthorityError("authority has not been admitted")
+        if state.authority != authority:
+            raise ExecutionAuthorityError("admitted authority content mismatch")
+        if state.admitted_at is not None and instant < state.admitted_at:
+            raise ExecutionAuthorityError("revocation time predates admission")
+        if state.last_authorized_at is not None and instant < state.last_authorized_at:
+            raise ExecutionAuthorityError("revocation time predates latest consumption")
+        if state.revoked:
+            receipt = state.revocation_receipt
+            if receipt is None:
+                raise ExecutionAuthorityError("revocation evidence is inconsistent")
+            if receipt.revoked_by != revoked_by or receipt.reason_code != reason_code:
+                raise ExecutionAuthorityError(
+                    "authority already revoked with different evidence"
+                )
+            return receipt
+
+        receipt = AuthorityRevocationReceipt(
+            authority_digest=authority.digest,
+            operation_id=authority.operation_id,
+            execution_id=authority.execution_id,
+            revoked_by=revoked_by,
+            reason_code=reason_code,
+            revoked_at=instant,
+            latest_consumption_digest=state.latest_receipt_digest,
+        )
+        state.revocation_receipt = receipt
+        state.revoked = True
+        return receipt
 
     @_synchronized
     def seal_evidence(
@@ -465,6 +505,11 @@ class ExecutionAuthorityGuard:
             final_usage=state.usage,
             revoked=state.revoked,
             sealed_at=instant,
+            revocation_receipt_digest=(
+                None
+                if state.revocation_receipt is None
+                else state.revocation_receipt.digest
+            ),
         )
 
     @_synchronized
@@ -492,6 +537,11 @@ class ExecutionAuthorityGuard:
                     "consumption_count": state.consumption_count,
                     "latest_receipt_digest": state.latest_receipt_digest,
                     "admission_receipt_digest": state.admission_receipt_digest,
+                    "revocation_receipt_digest": (
+                        None
+                        if state.revocation_receipt is None
+                        else state.revocation_receipt.digest
+                    ),
                     "admitted_at": (
                         None if state.admitted_at is None else state.admitted_at.isoformat()
                     ),
