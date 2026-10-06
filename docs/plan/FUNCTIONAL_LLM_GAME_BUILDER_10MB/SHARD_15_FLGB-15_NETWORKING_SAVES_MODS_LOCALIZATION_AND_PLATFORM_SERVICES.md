@@ -9,6 +9,8 @@ Independent verification signed: false
 ## Plane objective
 Convert Networking Saves Mods Localization and Platform Services from an architectural intention into a buildable, testable, replayable contract surface for the integrated LLM/game-builder product.
 
+**Plane provenance.** Every accepted artifact and state transition binds exact source revision, schema, engine/model identity, runtime configuration, dependency identity and evidence lineage so the result can be reconstructed and independently audited.
+
 ## FLGB-15-00001 — network protocol / contract / unit proof
 **Capability target.** network protocol must survive the contract lifecycle during cold start while maintaining explicit identities, schemas, deterministic transaction boundaries, cancellation semantics, version compatibility and reproducible evidence.
 
