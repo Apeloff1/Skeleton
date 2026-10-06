@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import math
 from typing import Any, Iterable
 from uuid import NAMESPACE_URL, uuid5
 
@@ -76,6 +77,7 @@ class ContextAllocationPolicy:
         if any(
             isinstance(value, bool)
             or not isinstance(value, (int, float))
+            or not math.isfinite(float(value))
             or value < 0
             or value > 1
             for value in values
