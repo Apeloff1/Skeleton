@@ -1027,7 +1027,8 @@
       "enterprise identity federation boundary",
       "external dependency registration policy",
       "expiring architecture exception policy",
-      "API and contract governance"
+      "API and contract governance",
+      "enterprise customer capability baseline"
     ],
     "not_signable_without_runtime_evidence": [
       "production availability",
@@ -1130,5 +1131,67 @@
     "compatibility": "breaking changes use versioned or expand/migrate/contract rollout; silent wire-shape breakage is prohibited",
     "idempotency": "required for externally retried mutations where duplicate effects are possible",
     "error_contract": "stable machine-readable error classes with sanitized public detail and internal correlation identity"
-  }
+  },
+  "enterprise_customer_capabilities": [
+    {
+      "id": "enterprise-sso",
+      "requirement": "OIDC baseline; SAML via broker when required; tenant policy controls allowed identity providers",
+      "production_evidence": "federation login, logout, revocation and tenant-bound role mapping tests"
+    },
+    {
+      "id": "directory-provisioning",
+      "requirement": "SCIM or equivalent governed user/group lifecycle sync",
+      "production_evidence": "create/update/disable/group-sync and replay/idempotency tests"
+    },
+    {
+      "id": "tenant-administration",
+      "requirement": "tenant-scoped admin roles, membership, policy and service-account management",
+      "production_evidence": "cross-tenant denial and JIT privileged-admin tests"
+    },
+    {
+      "id": "fine-grained-access",
+      "requirement": "RBAC plus resource/capability/data-class policy checks",
+      "production_evidence": "authorization matrix and confused-deputy adversarial tests"
+    },
+    {
+      "id": "audit-export",
+      "requirement": "tenant-authorized export of privileged, governance, tool, release and security audit records with integrity metadata",
+      "production_evidence": "scoped export, redaction and tamper-detection tests"
+    },
+    {
+      "id": "quota-budget-controls",
+      "requirement": "tenant-visible and operator-controlled usage/cost/concurrency/storage budgets",
+      "production_evidence": "quota enforcement, saturation and accounting reconciliation tests"
+    },
+    {
+      "id": "data-residency",
+      "requirement": "tenant/jurisdiction placement policy constrains stores, backups, providers and tool egress",
+      "production_evidence": "placement denial and residency-routing tests"
+    },
+    {
+      "id": "retention-legal-hold",
+      "requirement": "tenant policy for retention plus legal-hold override without destroying required evidence",
+      "production_evidence": "expiry, hold, release and deletion propagation tests"
+    },
+    {
+      "id": "data-export-delete",
+      "requirement": "governed tenant/user export and physical deletion propagation across canonical authorities and projections",
+      "production_evidence": "complete export/delete lifecycle journey"
+    },
+    {
+      "id": "service-accounts",
+      "requirement": "non-human identities with minimum scopes, rotation, expiry/revocation and audit",
+      "production_evidence": "scope, rotation and revocation tests"
+    },
+    {
+      "id": "private-connectivity",
+      "requirement": "production profile can restrict ingress/egress and integrate private networking without bypassing application identity",
+      "production_evidence": "network policy and authenticated private-path tests"
+    },
+    {
+      "id": "support-diagnostics",
+      "requirement": "governed support bundle and diagnostic mode with tenant authorization, minimization, expiry and audit",
+      "production_evidence": "support access, redaction, expiry and no-secret-leak tests"
+    }
+  ]
 }
