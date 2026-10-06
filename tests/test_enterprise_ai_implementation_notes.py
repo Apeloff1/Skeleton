@@ -223,9 +223,13 @@ def test_rejects_missing_october_2026_non_negotiable(tmp_path: Path) -> None:
     path = root / "machine/enterprise_ai_implementation_notes_index.json"
     payload = _load(path)
     payload["october_2026_non_negotiables"] = [
-        row
+        (
+            "Performance claims require representative workloads and "
+            "resource-pressure evidence."
+            if "p95/p99" in row
+            else row
+        )
         for row in payload["october_2026_non_negotiables"]
-        if "p95/p99" not in row
     ]
     _write(path, payload)
 
