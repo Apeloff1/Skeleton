@@ -2218,11 +2218,15 @@ async def cancel_ai_chat_turn(
     except EngineClientError as exc:
         raise HTTPException(status_code=502, detail="AI engine protocol failure") from exc
 
-    state = str(status_payload.get("execution_state") or "unknown")
+    engine_state = str(status_payload.get("execution_state") or "unknown")
     cancellation_requested = bool(status_payload.get("cancellation_requested"))
-    if cancellation_requested and state not in {"completed", "failed", "cancelled"}:
-        state = "cancelled"
-    if state in {"failed", "cancelled"}:
+    terminal_engine_state = engine_state in {"completed", "failed", "cancelled"}
+    state = (
+        "cancellation_requested"
+        if cancellation_requested and not terminal_engine_state
+        else engine_state
+    )
+    if engine_state in {"failed", "cancelled"}:
         if chat_turn is not None and not chat_turn.snapshot.terminal:
             try:
                 chat_turn = await chat_turn_lifecycle.fail(
@@ -2231,10 +2235,10 @@ async def cancel_ai_chat_turn(
                     owner_id=owner_id,
                     reason_code=(
                         str(status_payload.get("failure_code") or "cancelled")
-                        if state == "cancelled"
+                        if engine_state == "cancelled"
                         else str(status_payload.get("failure_code") or "failed")
                     ),
-                    cancelled=state == "cancelled",
+                    cancelled=engine_state == "cancelled",
                 )
             except Exception as exc:
                 raise _chat_error(exc) from exc
@@ -2262,7 +2266,7 @@ async def cancel_ai_chat_turn(
                     execution_id=execution_id,
                     terminal_state=(
                         "cancelled"
-                        if state == "cancelled"
+                        if engine_state == "cancelled"
                         else "failed"
                     ),
                     failure_code=(
@@ -2277,7 +2281,7 @@ async def cancel_ai_chat_turn(
     return {
         "success": True,
         "changed": cancellation_requested,
-        "terminal": state in {"completed", "failed", "cancelled"},
+        "terminal": terminal_engine_state,
         "state": state,
         "cancellation_requested": cancellation_requested,
         "operation_id": operation_id,
