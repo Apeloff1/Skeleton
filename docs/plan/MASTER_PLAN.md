@@ -890,8 +890,10 @@ A reconciliation may not lower `plan_version`, remove a live registered overlay,
 
 ## Functional LLM + Game Builder 10MB execution atlas
 
-The depth-only execution atlas at [FUNCTIONAL_LLM_GAME_BUILDER_10MB/README.md](FUNCTIONAL_LLM_GAME_BUILDER_10MB/README.md) adds 11,189,563 bytes of implementation-grade requirements across 18 primary planes while preserving the VOL-000..420 breadth freeze.
+The depth-only execution atlas at [FUNCTIONAL_LLM_GAME_BUILDER_10MB/README.md](FUNCTIONAL_LLM_GAME_BUILDER_10MB/README.md) adds 11,476,903 bytes of implementation-grade requirements across 18 primary planes while preserving the VOL-000..420 breadth freeze.
 
 Its machine authority is `machine/functional_llm_game_builder_10mb_manifest.json`. The atlas requires one durable end-to-end transaction from natural-language objective through governed context and provider-neutral inference, bounded dual-rival Forge competition, authorized project/world/scene mutations, simulation/presentation, automated playtest and continuity verification, rights/security/performance gates, reproducible build/export, and close/reopen/replay/recovery.
 
 This is specification depth, not a runtime-completion claim. All atoms remain implementation-unsigned and independently verification-unsigned until exact-head executable evidence exists.
+
+The FLGB validator additionally enforces 18 planes × 12 registered subsystems, complete subsystem × lifecycle coverage, all 10 evidence classes, all 12 stress scenarios, explicit coverage IDs, and fail-closed unsigned runtime status.
