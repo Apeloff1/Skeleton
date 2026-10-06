@@ -28,8 +28,13 @@ def _load(name: str, relative: str) -> None:
 _package("skeleton", ROOT / "skeleton")
 _package("skeleton.ai", ROOT / "skeleton" / "ai")
 _package("skeleton.ai.game_builder", ROOT / "skeleton" / "ai" / "game_builder")
+_load("skeleton.ai.game_builder.contracts", "skeleton/ai/game_builder/contracts.py")
 _load("skeleton.ai.game_builder.deep_assurance", "skeleton/ai/game_builder/deep_assurance.py")
 
+from skeleton.ai.game_builder.contracts import (  # noqa: E402
+    EvaluatorProvenance,
+    canonical_digest,
+)
 from skeleton.ai.game_builder.deep_assurance import (  # noqa: E402
     ClosureCertificate,
     ComplexityGovernor,
@@ -63,6 +68,25 @@ def _d(prefix: str) -> str:
     return prefix + "-" + "a" * 40
 
 
+def _authority(
+    evaluator_id: str,
+    *evidence_refs: str,
+) -> EvaluatorProvenance:
+    refs = tuple(evidence_refs)
+    return EvaluatorProvenance(
+        evaluator_id=evaluator_id,
+        operation_id=f"operation:{evaluator_id}",
+        execution_id=f"execution:{evaluator_id}",
+        execution_identity_digest=canonical_digest({"execution": evaluator_id}),
+        finalization_intent_digest=canonical_digest({"finalization": evaluator_id}),
+        authority_kind="deterministic_control",
+        authority_identity_digest=canonical_digest({"authority": evaluator_id}),
+        method_id="assurance-proof",
+        source_revision=canonical_digest({"source": evaluator_id})[:40],
+        output_evidence_refs=refs,
+    )
+
+
 def test_complexity_governor_requires_quality_density() -> None:
     gov = ComplexityGovernor(max_weighted_complexity=1000, minimum_quality_per_complexity=0.01)
     before = ComplexitySnapshot(10, 10, 10, 1024)
@@ -78,16 +102,34 @@ def test_complexity_governor_requires_quality_density() -> None:
 def test_requirement_closure_is_fail_closed() -> None:
     ledger = RequirementClosureLedger(("REQ-1", "REQ-2"))
     ledger.record(
-        RequirementProof("REQ-1", _d("artifact"), (_d("evidence"),), critical=True)
+        RequirementProof(
+            "REQ-1",
+            _d("artifact"),
+            (_d("evidence"),),
+            _authority("req-1-judge", _d("evidence")),
+            critical=True,
+        )
     )
     assert ledger.closed is False
     assert ledger.missing == ("REQ-2",)
     ledger.record(
-        RequirementProof("REQ-2", _d("artifact2"), (_d("evidence2"),), passed=False)
+        RequirementProof(
+            "REQ-2",
+            _d("artifact2"),
+            (_d("evidence2"),),
+            _authority("req-2-fail-judge", _d("evidence2")),
+            passed=False,
+        )
     )
     assert ledger.failed == ("REQ-2",)
     ledger.record(
-        RequirementProof("REQ-2", _d("artifact2"), (_d("evidence3"),), passed=True)
+        RequirementProof(
+            "REQ-2",
+            _d("artifact2"),
+            (_d("evidence3"),),
+            _authority("req-2-pass-judge", _d("evidence3")),
+            passed=True,
+        )
     )
     assert ledger.closed is True
     assert len(ledger.digest) == 64
@@ -101,6 +143,7 @@ def test_requirement_closure_is_fail_closed() -> None:
                 "REQ-X",
                 _d("artifact-x"),
                 (_d("evidence-x"),),
+                _authority("req-x-judge", _d("evidence-x")),
                 passed="false",
             ),
             "requirement proof passed state must be boolean",
@@ -110,6 +153,7 @@ def test_requirement_closure_is_fail_closed() -> None:
                 "REQ-X",
                 _d("artifact-x"),
                 (_d("evidence-x"),),
+                _authority("req-x-critical-judge", _d("evidence-x")),
                 critical="false",
             ),
             "requirement proof critical state must be boolean",
@@ -119,6 +163,7 @@ def test_requirement_closure_is_fail_closed() -> None:
                 "C-X",
                 "false",
                 _d("constraint-x"),
+                _authority("constraint-x-judge", _d("constraint-x")),
             ),
             "constraint passed state must be boolean",
         ),
@@ -127,6 +172,7 @@ def test_requirement_closure_is_fail_closed() -> None:
                 "C-X",
                 True,
                 _d("constraint-x"),
+                _authority("constraint-x-critical-judge", _d("constraint-x")),
                 critical="false",
             ),
             "constraint critical state must be boolean",
@@ -141,10 +187,45 @@ def test_deep_assurance_rejects_truthy_non_boolean_authority_states(
         factory()
 
 
+def test_requirement_proof_rejects_unattributed_evidence() -> None:
+    with pytest.raises(DeepAssuranceError, match="referenced by evaluator authority"):
+        RequirementProof(
+            "REQ-UNBOUND",
+            _d("artifact-unbound"),
+            (_d("evidence-unbound"),),
+            _authority("req-unbound-judge", _d("other-evidence")),
+        )
+
+
+def test_constraint_rejects_unattributed_evidence() -> None:
+    with pytest.raises(DeepAssuranceError, match="referenced by evaluator authority"):
+        ConstraintResult(
+            "C-UNBOUND",
+            True,
+            _d("constraint-unbound"),
+            _authority("constraint-unbound-judge", _d("other-constraint")),
+        )
+
+
 def test_constraint_proof_extracts_blocking_conflict_core() -> None:
     proof = ConstraintProofSet()
-    proof.add(ConstraintResult("C1", True, _d("e1")))
-    proof.add(ConstraintResult("C2", False, _d("e2"), conflict_ids=("C3",)))
+    proof.add(
+        ConstraintResult(
+            "C1",
+            True,
+            _d("e1"),
+            _authority("constraint-c1", _d("e1")),
+        )
+    )
+    proof.add(
+        ConstraintResult(
+            "C2",
+            False,
+            _d("e2"),
+            _authority("constraint-c2", _d("e2")),
+            conflict_ids=("C3",),
+        )
+    )
     assert proof.promotable is False
     assert proof.conflict_core == ("C2", "C3")
 
@@ -267,8 +348,14 @@ def test_project_resurrection_is_exact_and_content_addressed() -> None:
 def test_evidence_merkle_root_changes_on_append() -> None:
     ledger = EvidenceMerkleLedger()
     root0 = ledger.root
-    root1 = ledger.append(_d("one"))
-    root2 = ledger.append(_d("two"))
+    root1 = ledger.append(
+        _d("one"),
+        evaluator_provenance=_authority("evidence-one", _d("one")),
+    )
+    root2 = ledger.append(
+        _d("two"),
+        evaluator_provenance=_authority("evidence-two", _d("two")),
+    )
     assert root0 != root1 != root2
     assert len(root2) == 64
 
@@ -282,7 +369,24 @@ def test_closure_certificate_rejects_truthy_non_boolean_independent_verification
             evidence_root=_d("evidence"),
             family_ids=tuple(f"GB{i:02d}" for i in range(1, 51)),
             critical_plane_ids=("OP01",),
+            verifier_provenance=_authority("closure-verifier", _d("closure-verify")),
+            verification_evidence_digest=_d("closure-verify"),
             independently_verified="false",
+        )
+
+
+def test_closure_certificate_rejects_unattributed_verification_evidence() -> None:
+    with pytest.raises(DeepAssuranceError, match="referenced by verifier authority"):
+        ClosureCertificate(
+            artifact_digest=_d("artifact"),
+            canon_digest=_d("canon"),
+            provenance_digest=_d("provenance"),
+            evidence_root=_d("evidence"),
+            family_ids=tuple(f"GB{i:02d}" for i in range(1, 51)),
+            critical_plane_ids=("OP01",),
+            verifier_provenance=_authority("closure-wrong-verifier", _d("other-evidence")),
+            verification_evidence_digest=_d("closure-evidence"),
+            independently_verified=True,
         )
 
 
@@ -295,6 +399,8 @@ def test_closure_certificate_requires_all_families_zero_critical_gaps_and_indepe
         evidence_root=_d("evidence"),
         family_ids=tuple(f"GB{i:02d}" for i in range(1, 51)),
         critical_plane_ids=critical,
+        verifier_provenance=_authority("closure-verifier", _d("closure-verify")),
+        verification_evidence_digest=_d("closure-verify"),
         independently_verified=True,
     )
     cert.validate(required_critical_planes=critical)
@@ -308,6 +414,8 @@ def test_closure_certificate_requires_all_families_zero_critical_gaps_and_indepe
         family_ids=tuple(f"GB{i:02d}" for i in range(1, 51)),
         critical_plane_ids=critical,
         unresolved_critical_gaps=("save-corruption",),
+        verifier_provenance=_authority("closure-gap-verifier", _d("closure-gap-verify")),
+        verification_evidence_digest=_d("closure-gap-verify"),
         independently_verified=True,
     )
     with pytest.raises(DeepAssuranceError, match="unresolved critical gaps"):
