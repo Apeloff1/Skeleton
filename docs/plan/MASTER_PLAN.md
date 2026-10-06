@@ -1,6 +1,6 @@
 # Skeleton AI Master Plan
 
-Plan version: **2.0.0**
+Plan version: **2.1.0**
 
 Architecture lane: `PR #1904 / integration/architecture-map-v1`
 
@@ -15,6 +15,8 @@ Post-enterprise Frontier-96 ladder: [`FRONTIER_96_AI_LADDER.md`](FRONTIER_96_AI_
 Cutting-edge CS-300 ladder: [`CS_300_COMPUTER_SCIENCE_LADDER.md`](CS_300_COMPUTER_SCIENCE_LADDER.md) / [`machine/cs_300_computer_science_ladder.json`](../../machine/cs_300_computer_science_ladder.json)
 
 Paired Learning-400 + Adversarial-400: [`LEARNING_400_ADVERSARIAL_400.md`](LEARNING_400_ADVERSARIAL_400.md) / [`machine/learning_400_adversarial_400.json`](../../machine/learning_400_adversarial_400.json)
+
+Project Self-Improvement-1000: [`PROJECT_SELF_IMPROVEMENT_1000.md`](PROJECT_SELF_IMPROVEMENT_1000.md) / [`machine/project_self_improvement_1000.json`](../../machine/project_self_improvement_1000.json) / [`machine/project_self_improvement_epoch_contract.json`](../../machine/project_self_improvement_epoch_contract.json)
 
 Existing construction manual: [`docs/AI_APP_CONSTRUCTION_MANUAL.md`](../AI_APP_CONSTRUCTION_MANUAL.md)
 
@@ -792,6 +794,24 @@ Native learning may initialize and train Skeleton-owned candidate weights, perfo
 The adversarial plane is a peer system, not a final audit. It covers search/crawl poisoning; hostile documents and multimodal injection; provenance spoofing; semantic/knowledge/memory poisoning; staleness; overconfidence; reasoning and causal traps; scientific fraud; curriculum/skill/project/feedback attacks; benchmark leakage; dataset poisoning; synthetic collapse; representation/objective/label attacks; reward hacking; catastrophic forgetting; meta-learning and architecture-search gaming; weight/training/distributed-training integrity; compression/adapter/weight-edit attacks; registry/promotion attacks; wisdom failure; and autonomous-learning governance escape.
 
 A learning level may be signed complete only when its corresponding adversarial level is also signed complete on current exact-head evidence. `L400-400` and `A400-400` are paired finality gates; the learning program cannot claim completion until **400/400 learning + 400/400 adversarial** levels are independently verified and current.
+
+## 24.9 Project Self-Improvement-1000 idle mirror-room overlay
+
+The project self-improvement authority is defined by [`docs/plan/PROJECT_SELF_IMPROVEMENT_1000.md`](PROJECT_SELF_IMPROVEMENT_1000.md), [`machine/project_self_improvement_1000.json`](../../machine/project_self_improvement_1000.json), and the deterministic epoch state machine [`machine/project_self_improvement_epoch_contract.json`](../../machine/project_self_improvement_epoch_contract.json).
+
+It adds **1000 independently specifiable project-improvement levels** `PSI1000-0001..PSI1000-1000`, grouped into **100 ten-level strata**. The ladder is instantiated separately for every project. A maturity state, benchmark, lesson, weight candidate, code candidate or signed receipt from one project cannot silently qualify another project.
+
+The activation rule is **foreground-idle**, not machine-idle. When no foreground instruction is runnable, no exclusive foreground mutation lock is held, no mandatory recovery/safety intervention is active, and protected resource reservations can be honored, a project becomes immediately eligible for a bounded mirror-room epoch. Waiting on CI, remote builds, downloads, external APIs, human review or another nonexclusive dependency may therefore be used as learning time. Any new foreground instruction or protected-resource conflict immediately preempts or checkpoints mirror work.
+
+Each epoch freezes an exact baseline, mines gaps, generates diverse candidates, runs a proposer/challenger competition, reverses those roles for a second independent pass, performs bounded sandbox experiments, measures causal gain against the baseline, stress-tests rollback and failure behavior, consolidates positive and negative project learning, and then promotes, rejects or quarantines the candidate. The next epoch may begin only after an auditable epoch receipt is written and the idle predicate is reevaluated.
+
+The plane covers project mission and requirements; architecture; APIs; data/state; concurrency; algorithms; code quality; static analysis; unit/property/fuzz/integration/E2E testing; build/CI; dependencies and supply chain; secrets/auth/authz/isolation/privacy/network/content safety; reliability/chaos/recovery/DR; observability; performance/cost/hardware/distributed execution; databases/caches/search/RAG/knowledge/memory/context; reasoning/planning/tools/agents/model routing/inference; prompts and multimodal systems; web/research/evidence/science; datasets and all major learning modes; native weights, adapters, weight editing, compression and evaluation; red-team/drift; project skill acquisition; UX/accessibility/product/DX/docs/migrations/governance; wisdom; and whole-project finality.
+
+Mirror rooms are deliberately non-authoritative. Proposer, challenger and verifier roles cannot self-promote. Production state and production model weights never silently mutate in place. Every accepted change is a versioned candidate tied to an immutable baseline and requires measurable project-relevant gain or risk reduction, held-out/counterfactual evidence where applicable, current adversarial challenge, independent verification, non-compensable gate preservation and rollback.
+
+Repeated no-gain hypotheses are not allowed to consume idle resources forever: they receive evidence-backed backoff while materially new project evidence can reopen them. Every epoch carries explicit limits for wall time, model compute, CPU, memory, accelerator use, storage, network, external API calls and experiment count.
+
+The template itself remains **0/1000 implementation-signed**. A specific project may claim PSI-1000 qualification only when all 1000 levels for that exact project identity are simultaneously current and independently signed. Stale baseline compatibility, broken rollback, violated isolation or weakened non-compensable gates revoke downstream qualification.
 
 ## 25. Scope freeze and future plan evolution
 
