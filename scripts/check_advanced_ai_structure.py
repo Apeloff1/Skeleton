@@ -350,6 +350,21 @@ def validate_payloads(
         if required_planes - plane_ids:
             errors.append(f"{expected_id} references unknown canonical plane")
 
+        if level.get("implementation_contract_required") is not True:
+            errors.append(f"{expected_id} must require implementation contract")
+        if level.get("operational_readiness_required") is not True:
+            errors.append(f"{expected_id} must require operational readiness")
+        if level.get("deprecation_state") != "ACTIVE_PLAN":
+            errors.append(f"{expected_id}.deprecation_state must be ACTIVE_PLAN")
+        control_profile = level.get("control_profile")
+        expected_profile = profiles.get(expected_stratum)
+        if not isinstance(control_profile, dict):
+            errors.append(f"{expected_id}.control_profile must be an object")
+        elif control_profile != expected_profile:
+            errors.append(
+                f"{expected_id}.control_profile must match {expected_stratum}"
+            )
+
         risk_class = level.get("risk_class")
         if risk_class not in {"standard", "high", "critical"}:
             errors.append(f"{expected_id}.risk_class invalid")
@@ -398,6 +413,102 @@ def validate_payloads(
     for index, band in enumerate(maturity, start=1):
         if band.get("band") != f"A{index}":
             errors.append(f"maturity band {index} identity drifted")
+
+    implementation_contract = contract.get("level_implementation_contract")
+    if not isinstance(implementation_contract, dict):
+        errors.append("level_implementation_contract must be an object")
+        implementation_contract = {}
+    _strings(
+        implementation_contract.get("required_fields"),
+        label="level_implementation_contract.required_fields",
+        errors=errors,
+        minimum=15,
+    )
+    for field in (
+        "owner_rule",
+        "runtime_rule",
+        "state_rule",
+        "authority_rule",
+        "disable_rule",
+        "deprecation_rule",
+    ):
+        value = implementation_contract.get(field)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(
+                f"level_implementation_contract.{field} must be non-empty"
+            )
+
+    operational = contract.get("operational_readiness")
+    if not isinstance(operational, dict):
+        errors.append("operational_readiness must be an object")
+        operational = {}
+    _strings(
+        operational.get("per_level_required"),
+        label="operational_readiness.per_level_required",
+        errors=errors,
+        minimum=10,
+    )
+    _strings(
+        operational.get("stratum_gate_required"),
+        label="operational_readiness.stratum_gate_required",
+        errors=errors,
+        minimum=7,
+    )
+    value = operational.get("production_rule")
+    if not isinstance(value, str) or not value.strip():
+        errors.append("operational_readiness.production_rule must be non-empty")
+
+    deprecation = contract.get("deprecation_and_migration")
+    if not isinstance(deprecation, dict):
+        errors.append("deprecation_and_migration must be an object")
+        deprecation = {}
+    if deprecation.get("states") != [
+        "ACTIVE",
+        "DEPRECATED",
+        "MIGRATING",
+        "RETIRED",
+    ]:
+        errors.append("deprecation/migration state model drifted")
+    _strings(
+        deprecation.get("rules"),
+        label="deprecation_and_migration.rules",
+        errors=errors,
+        minimum=6,
+    )
+    value = deprecation.get("evidence_rule")
+    if not isinstance(value, str) or not value.strip():
+        errors.append("deprecation_and_migration.evidence_rule must be non-empty")
+
+    dependency_integrity = contract.get("dependency_integrity")
+    if not isinstance(dependency_integrity, dict):
+        errors.append("dependency_integrity must be an object")
+        dependency_integrity = {}
+    _strings(
+        dependency_integrity.get("rules"),
+        label="dependency_integrity.rules",
+        errors=errors,
+        minimum=6,
+    )
+    for field in ("shadow_authority_detector", "circularity_rule"):
+        value = dependency_integrity.get(field)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(f"dependency_integrity.{field} must be non-empty")
+
+    profiles = contract.get("level_control_profiles")
+    if not isinstance(profiles, dict):
+        errors.append("level_control_profiles must be an object")
+        profiles = {}
+    if set(profiles) != EXPECTED_STRATA:
+        errors.append("level control profile set must be S01 through S10")
+    for sid in EXPECTED_STRATA:
+        profile = profiles.get(sid, {})
+        if not isinstance(profile, dict):
+            errors.append(f"{sid} control profile must be an object")
+            continue
+        for field in ("runtime_posture", "default_disable", "operator_priority"):
+            value = profile.get(field)
+            if not isinstance(value, str) or not value.strip():
+                errors.append(f"{sid} control profile {field} must be non-empty")
 
     risk_policy = contract.get("risk_and_freshness_policy")
     if not isinstance(risk_policy, dict):
