@@ -737,3 +737,80 @@ def test_concurrent_authorizations_are_serialized_into_one_valid_receipt_chain()
     assert reconstructed.tool_calls == 32
     assert reconstructed.artifact_bytes == 320
     assert reconstructed == guard.usage_for(authority)
+
+
+
+def test_future_dated_authority_is_not_active_before_issuance() -> None:
+    authority = ExecutionAuthority(
+        authority_id="authority-future",
+        operation_id="operation-001",
+        execution_id="execution-001",
+        actor_id="agent.builder",
+        issuer_id="supervisor",
+        issued_at=NOW + timedelta(seconds=10),
+        expires_at=NOW + timedelta(minutes=10),
+        capabilities=("repo.read",),
+        budget=_budget(),
+        policy_digest=authority_policy_digest({"mode": "fail_closed"}),
+        nonce="nonce-future",
+    )
+
+    assert not authority.active(now=NOW)
+    assert not authority.permits("repo.read", now=NOW)
+
+    guard = ExecutionAuthorityGuard()
+    with pytest.raises(ExecutionAuthorityError, match="not active yet"):
+        guard.admit(
+            authority=authority,
+            request=_request(),
+            receipt_id="receipt-future",
+            replay_key="admission-future",
+            now=NOW,
+        )
+
+
+def test_authorization_clock_regression_is_denied_without_advancing_chain() -> None:
+    guard = ExecutionAuthorityGuard()
+    authority = _authority()
+    _admit(guard, authority)
+
+    first = guard.authorize(
+        authority=authority,
+        capability="repo.read",
+        replay_key="read-later",
+        now=NOW + timedelta(seconds=10),
+    )
+    regressed = guard.authorize(
+        authority=authority,
+        capability="repo.read",
+        replay_key="read-earlier",
+        now=NOW + timedelta(seconds=9),
+    )
+
+    assert first.allowed
+    assert regressed.disposition is AuthorizationDisposition.DENY
+    assert regressed.reason == "authorization time regressed"
+    assert guard.snapshot()["authorities"][0]["consumption_count"] == 1
+
+
+def test_sealed_evidence_has_stable_execution_lineage_reference() -> None:
+    guard = ExecutionAuthorityGuard()
+    authority = _authority()
+    _admit(guard, authority)
+    guard.authorize(
+        authority=authority,
+        capability="repo.read",
+        replay_key="read-001",
+        now=NOW + timedelta(seconds=1),
+    )
+
+    evidence = guard.seal_evidence(
+        authority,
+        now=NOW + timedelta(seconds=2),
+    )
+    payload = evidence.as_execution_evidence()
+
+    assert evidence.evidence_ref == f"execution-authority-evidence:{evidence.digest}"
+    assert payload["ref"] == evidence.evidence_ref
+    assert payload["digest"] == evidence.digest
+    assert payload["payload"] == evidence.canonical_payload()
