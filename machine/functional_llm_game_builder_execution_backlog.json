@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "kind": "functional-llm-game-builder-execution-backlog",
-  "plan_version": "2.6.0",
+  "plan_version": "2.7.0",
   "status": "active",
   "task_count": 216,
   "plane_count": 18,
@@ -14702,9 +14702,17 @@
         "12-domain frontier competition scorecard with critical-domain non-compensation",
         "frontier parity-or-better evidence for coding, long-horizon consistency and game-building core targets",
         "blind human evaluation plus statistical uncertainty where applicable",
-        "exact-head independently verified frontier challenge bundle"
+        "exact-head independently verified frontier challenge bundle",
+        "frontier protocol v2 preregistered immutable task manifest with hidden challenge rotation",
+        "minimum six independent runs per scored task with failed/aborted trajectories retained",
+        "50% and 80% long-horizon success curves plus state/canon drift measurement",
+        "equal-budget head-to-head plus compute-normalized Pareto and unconstrained-quality ceiling",
+        "anti-gaming reward-hacking leakage harness-tampering and evaluator-manipulation review",
+        "independent evaluator disagreement/collusion review with adjudication receipt",
+        ">=10 of 12 domains parity-or-better and >=2 superior core targets under preregistered margins",
+        "dual-rival equal-budget ablation plus extra-compute single-agent control"
       ],
-      "closure_rule": "Code, contract, tests, evidence and rollback/recovery behavior must exist on exact head; plan text alone never signs this task. Whole-product closure additionally requires the frontier-competition gate: fresh comparators, all 12 domains, non-compensable critical gates, core-target parity-or-better, exact-head evidence, and independent verification."
+      "closure_rule": "Code, contract, tests, evidence and rollback/recovery behavior must exist on exact head; plan text alone never signs this task. Whole-product closure additionally requires frontier protocol v2: fresh exact-identity comparators, immutable hidden/public challenge manifests, >=6 independent trials, long-horizon 50%/80% curves, compute-normalized head-to-head evidence, anti-gaming review, evaluator independence, non-compensable critical gates, statistical dominance thresholds, exact-head reproducibility, and independent verification."
     },
     {
       "id": "FLGB-18-T12",
@@ -14773,9 +14781,17 @@
         "12-domain frontier competition scorecard with critical-domain non-compensation",
         "frontier parity-or-better evidence for coding, long-horizon consistency and game-building core targets",
         "blind human evaluation plus statistical uncertainty where applicable",
-        "exact-head independently verified frontier challenge bundle"
+        "exact-head independently verified frontier challenge bundle",
+        "frontier protocol v2 preregistered immutable task manifest with hidden challenge rotation",
+        "minimum six independent runs per scored task with failed/aborted trajectories retained",
+        "50% and 80% long-horizon success curves plus state/canon drift measurement",
+        "equal-budget head-to-head plus compute-normalized Pareto and unconstrained-quality ceiling",
+        "anti-gaming reward-hacking leakage harness-tampering and evaluator-manipulation review",
+        "independent evaluator disagreement/collusion review with adjudication receipt",
+        ">=10 of 12 domains parity-or-better and >=2 superior core targets under preregistered margins",
+        "dual-rival equal-budget ablation plus extra-compute single-agent control"
       ],
-      "closure_rule": "Code, contract, tests, evidence and rollback/recovery behavior must exist on exact head; plan text alone never signs this task. Whole-product closure additionally requires the frontier-competition gate: fresh comparators, all 12 domains, non-compensable critical gates, core-target parity-or-better, exact-head evidence, and independent verification."
+      "closure_rule": "Code, contract, tests, evidence and rollback/recovery behavior must exist on exact head; plan text alone never signs this task. Whole-product closure additionally requires frontier protocol v2: fresh exact-identity comparators, immutable hidden/public challenge manifests, >=6 independent trials, long-horizon 50%/80% curves, compute-normalized head-to-head evidence, anti-gaming review, evaluator independence, non-compensable critical gates, statistical dominance thresholds, exact-head reproducibility, and independent verification."
     }
   ],
   "frontier_competition_gate": {
@@ -14796,20 +14812,46 @@
       "fault recovery replay rollback and deterministic evidence bundle",
       "security privacy rights authority and similarity-screen evidence",
       "exact-head reproducibility bundle",
-      "independent verification signoff"
+      "independent verification signoff",
+      "preregistered immutable challenge manifest with hidden-task rotation",
+      "minimum six independent runs per scored task with retained failed/aborted trajectories",
+      "50% and 80% long-horizon success curves with state/canon drift measurements",
+      "equal-budget head-to-head plus unconstrained quality ceiling and compute-normalized Pareto analysis",
+      "anti-gaming reward-hacking leakage harness-tampering and evaluator-manipulation review",
+      "independent evaluator disagreement/collusion review and adjudication receipts",
+      "dual-rival equal-budget ablation plus extra-compute single-agent control"
     ],
     "non_compensable": [
       "critical-domain failure",
       "security/safety/privacy failure",
       "rights or suspicious-similarity failure",
       "authority-boundary failure",
-      "recovery/replay/rollback failure"
+      "recovery/replay/rollback failure",
+      "reward hacking or evaluation harness manipulation",
+      "unreviewed hidden-task leakage or benchmark contamination",
+      "long-horizon state/canon integrity collapse",
+      "evaluator-independence failure"
     ],
     "core_targets": [
       "coding and repository engineering",
       "long-context and long-horizon consistency",
       "game project construction and gameplay quality"
     ],
-    "completion_rule": "The whole-product backlog cannot close until all 216 build units are evidence-complete and FLGB-18-T11/T12 prove the manifest frontier-competition contract on exact head with independent verification."
+    "completion_rule": "The whole-product backlog cannot close until all 216 build units are evidence-complete and FLGB-18-T11/T12 prove frontier protocol v2 on exact head: fresh >=3 comparators, immutable hidden/public task manifests, >=6 independent runs per scored task, 12-domain scorecards, 50%/80% long-horizon curves, equal-budget and compute-normalized comparisons, anti-gaming review, evaluator independence, non-compensable critical gates, >=10 parity-or-better domains, >=2 superior core targets, exact-head reproducibility, and independent verification.",
+    "protocol_version": "2.0",
+    "measurement_requirements": {
+      "comparator_maximum_age_days": 45,
+      "minimum_independent_runs_per_scored_task": 6,
+      "confidence_interval_level": 0.95,
+      "non_inferiority_margin_pp_max": 2,
+      "minimum_parity_or_better_domains": 10,
+      "minimum_superior_core_targets": 2,
+      "equal_budget_head_to_head": true,
+      "compute_normalized_pareto": true,
+      "hidden_challenge_rotation": true,
+      "anti_gaming_review": true,
+      "long_horizon_50_and_80_percent_curves": true,
+      "evaluator_independence": true
+    }
   }
 }
