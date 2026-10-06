@@ -8,6 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PATH = ROOT / "machine" / "project_self_improvement_1000.json"
 EPOCH_PATH = ROOT / "machine" / "project_self_improvement_epoch_contract.json"
+SCHEDULER_PATH = ROOT / "machine" / "project_self_improvement_idle_scheduler.json"
 
 MATURITY = [
     "planned","specified","implemented","integrated",
@@ -130,7 +131,68 @@ def validate_epoch(epoch: dict) -> list[str]:
             errors.append(f"epoch: missing invariant: {item}")
     return errors
 
-def validate(data: dict, epoch: dict | None = None) -> list[str]:
+def validate_scheduler(scheduler: dict) -> list[str]:
+    errors: list[str] = []
+    if scheduler.get("schema_version") != "skeleton.project_self_improvement_idle_scheduler.v1":
+        errors.append("scheduler: unexpected schema_version")
+    eligibility = scheduler.get("eligibility", {})
+    if eligibility.get("unknown_state") != "ineligible":
+        errors.append("scheduler: unknown eligibility must fail closed")
+    if eligibility.get("production_mutation") != "forbidden":
+        errors.append("scheduler: production mutation must remain forbidden")
+
+    ranking = scheduler.get("ranking", {})
+    hard_reject = set(ranking.get("hard_reject", []))
+    for item in {
+        "outside_project_scope","violates_non_compensable_invariant","cannot_be_sandboxed",
+        "no_reproducible_baseline","no_rollback_or_compensation_path",
+        "requires_production_in_place_mutation","budget_exceeds_available_idle_envelope",
+    }:
+        if item not in hard_reject:
+            errors.append(f"scheduler: missing hard reject {item}")
+    if "expected_capability_gain" not in ranking.get("maximize", []):
+        errors.append("scheduler: capability gain must be maximized")
+    if "expected_risk_reduction" not in ranking.get("maximize", []):
+        errors.append("scheduler: risk reduction must be maximized")
+
+    portfolio = scheduler.get("portfolio_policy", {})
+    if not 0 < portfolio.get("exploration_share_floor", 0) <= 1:
+        errors.append("scheduler: exploration share floor invalid")
+    if not 0 < portfolio.get("exploit_share_ceiling", 0) <= 1:
+        errors.append("scheduler: exploit share ceiling invalid")
+    if portfolio.get("domain_starvation_limit_epochs", 0) <= 0:
+        errors.append("scheduler: domain starvation limit required")
+    if not portfolio.get("critical_regression_override"):
+        errors.append("scheduler: critical regression override missing")
+
+    plateau = scheduler.get("plateau_policy", {})
+    if plateau.get("no_gain_threshold", 0) <= 0:
+        errors.append("scheduler: no-gain threshold required")
+    if plateau.get("repeated_failure_threshold", 0) <= plateau.get("no_gain_threshold", 0):
+        errors.append("scheduler: repeated-failure threshold must exceed no-gain threshold")
+    if "exponential backoff" not in plateau.get("action_after_no_gain", ""):
+        errors.append("scheduler: no-gain action must back off")
+    if "quarantine" not in plateau.get("action_after_repeated_failure", ""):
+        errors.append("scheduler: repeated failures must quarantine")
+
+    fairness = scheduler.get("project_fairness", {})
+    if fairness.get("starvation_forbidden") is not True:
+        errors.append("scheduler: eligible project starvation forbidden")
+    if "deny-by-default" not in fairness.get("cross_project_evidence_use", ""):
+        errors.append("scheduler: cross-project evidence use must deny by default")
+
+    dispatch = scheduler.get("dispatch", {})
+    for key in ("one_active_epoch_per_project","recheck_idle_before_dispatch","recheck_idle_before_experiment","recheck_idle_before_promotion","epoch_receipt_required_before_redispatch"):
+        if dispatch.get(key) is not True:
+            errors.append(f"scheduler: dispatch invariant {key} must be true")
+    if dispatch.get("foreground_preemption") != "absolute":
+        errors.append("scheduler: foreground preemption must be absolute")
+
+    if not scheduler.get("audit_receipt", {}).get("required"):
+        errors.append("scheduler: audit receipt schema missing")
+    return errors
+
+def validate(data: dict, epoch: dict | None = None, scheduler: dict | None = None) -> list[str]:
     errors: list[str] = []
     levels = data.get("levels", [])
     strata = data.get("strata", [])
@@ -276,21 +338,25 @@ def validate(data: dict, epoch: dict | None = None) -> list[str]:
 
     if epoch is not None:
         errors.extend(validate_epoch(epoch))
+    if scheduler is not None:
+        errors.extend(validate_scheduler(scheduler))
     return errors
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--path", type=Path, default=PATH)
     parser.add_argument("--epoch-path", type=Path, default=EPOCH_PATH)
+    parser.add_argument("--scheduler-path", type=Path, default=SCHEDULER_PATH)
     args = parser.parse_args()
     data = json.loads(args.path.read_text(encoding="utf-8"))
     epoch = json.loads(args.epoch_path.read_text(encoding="utf-8"))
-    errors = validate(data, epoch)
+    scheduler = json.loads(args.scheduler_path.read_text(encoding="utf-8"))
+    errors = validate(data, epoch, scheduler)
     if errors:
         for error in errors:
             print(f"ERROR: {error}")
         return 1
-    print("PSI-1000 valid: 1000 levels / 100 strata / deterministic preemptible mirror-room epochs enforced")
+    print("PSI-1000 valid: 1000 levels / 100 strata / deterministic preemptible mirror-room epochs + idle scheduler enforced")
     return 0
 
 if __name__ == "__main__":
