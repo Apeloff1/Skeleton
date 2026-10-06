@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "authority": "recovery_strength_classification_only",
-  "record_count": 25,
-  "signature_fields_recoverable_count": 15,
+  "record_count": 26,
+  "signature_fields_recoverable_count": 16,
   "evidence_only_manual_review_count": 10,
   "records": [
     {
@@ -239,6 +239,16 @@
       "record_id": "ACC-VOL-248",
       "classification": "signature_fields_recoverable",
       "source_commit": "d06925c181862f46cd6c87bdfa5401efe8f2e472",
+      "verifier_identity_recovered": true,
+      "exact_head_recovered": true,
+      "run_or_job_evidence_recovered": true,
+      "completion_semantics_recovered": true,
+      "automatic_signature_write_authorized": false
+    },
+    {
+      "record_id": "ACC-VOL-253",
+      "classification": "signature_fields_recoverable",
+      "source_commit": "8d74b7d3979421780d50b23fb5c10a06204a1219",
       "verifier_identity_recovered": true,
       "exact_head_recovered": true,
       "run_or_job_evidence_recovered": true,
