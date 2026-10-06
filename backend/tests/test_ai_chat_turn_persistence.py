@@ -8,6 +8,10 @@ import pytest
 
 from core.chat_turns import MongoChatTurnAuthority
 from skeleton.ai.assistant.contracts import SideEffectClass
+from skeleton.ai.assistant.turn_ownership import (
+    TurnLeaseBusy,
+    TurnLeaseStale,
+)
 from skeleton.ai.assistant.turn_runtime import (
     RecoveryAction,
     TurnState,
@@ -56,6 +60,10 @@ def _matches(doc, query):
         if isinstance(expected, dict):
             if "$gt" in expected and not actual > expected["$gt"]:
                 return False
+            if "$exists" in expected:
+                exists = key in doc
+                if exists is not bool(expected["$exists"]):
+                    return False
             continue
         if actual != expected:
             return False
@@ -320,3 +328,265 @@ async def test_mongo_duplicate_sequence_with_changed_payload_fails():
             tenant_id=TENANT,
             owner_id=OWNER,
         )
+
+
+@pytest.mark.asyncio
+async def test_mongo_live_owner_blocks_competing_worker():
+    authority = MongoChatTurnAuthority(FakeDatabase())
+    operation_id = str(uuid4())
+    await authority.create_operation(
+        operation_id=operation_id,
+        request_digest="e" * 64,
+        binding=_binding(),
+        created_at=NOW,
+    )
+    first = await authority.acquire_lease(
+        operation_id,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+        holder_id="worker-a",
+        ttl_seconds=30,
+        now=NOW,
+    )
+    assert first.epoch == 1
+
+    with pytest.raises(TurnLeaseBusy):
+        await authority.acquire_lease(
+            operation_id,
+            tenant_id=TENANT,
+            owner_id=OWNER,
+            holder_id="worker-b",
+            ttl_seconds=30,
+            now=NOW + timedelta(seconds=1),
+        )
+
+
+@pytest.mark.asyncio
+async def test_mongo_renewal_invalidates_previous_lease_token():
+    authority = MongoChatTurnAuthority(FakeDatabase())
+    operation_id = str(uuid4())
+    await authority.create_operation(
+        operation_id=operation_id,
+        request_digest="f" * 64,
+        binding=_binding(),
+        created_at=NOW,
+    )
+    first = await authority.acquire_lease(
+        operation_id,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+        holder_id="worker-a",
+        ttl_seconds=30,
+        now=NOW,
+    )
+    renewed = await authority.renew_lease(
+        first,
+        ttl_seconds=60,
+        now=NOW + timedelta(seconds=10),
+    )
+    assert renewed.epoch == first.epoch
+    assert renewed.heartbeat_sequence == first.heartbeat_sequence + 1
+
+    with pytest.raises(TurnLeaseStale):
+        await authority.assert_lease(
+            first,
+            now=NOW + timedelta(seconds=11),
+        )
+    assert (
+        await authority.assert_lease(
+            renewed,
+            now=NOW + timedelta(seconds=11),
+        )
+        == renewed
+    )
+
+
+@pytest.mark.asyncio
+async def test_mongo_expiry_takeover_fences_stale_event_append():
+    authority = MongoChatTurnAuthority(FakeDatabase())
+    operation_id = str(uuid4())
+    turn = await authority.create_operation(
+        operation_id=operation_id,
+        request_digest="1" * 64,
+        binding=_binding(),
+        created_at=NOW,
+    )
+    stale = await authority.acquire_lease(
+        operation_id,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+        holder_id="worker-a",
+        ttl_seconds=10,
+        now=NOW,
+    )
+    current = await authority.acquire_lease(
+        operation_id,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+        holder_id="worker-b",
+        ttl_seconds=30,
+        now=NOW + timedelta(seconds=11),
+    )
+    assert current.epoch == stale.epoch + 1
+
+    event = make_event(
+        turn.snapshot,
+        TurnState.ADMITTED,
+        observed_at=NOW + timedelta(seconds=12),
+    )
+    with pytest.raises(TurnLeaseStale):
+        await authority.append_event(
+            event,
+            tenant_id=TENANT,
+            owner_id=OWNER,
+            lease=stale,
+        )
+
+    advanced = await authority.append_event(
+        event,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+        lease=current,
+    )
+    assert advanced.snapshot.state is TurnState.ADMITTED
+
+
+@pytest.mark.asyncio
+async def test_mongo_crash_recovery_discards_prepared_event_after_takeover():
+    from core.chat_turns import _event_doc
+
+    database = FakeDatabase()
+    authority = MongoChatTurnAuthority(database)
+    operation_id = str(uuid4())
+    turn = await authority.create_operation(
+        operation_id=operation_id,
+        request_digest="2" * 64,
+        binding=_binding(),
+        created_at=NOW,
+    )
+    stale = await authority.acquire_lease(
+        operation_id,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+        holder_id="worker-a",
+        ttl_seconds=10,
+        now=NOW,
+    )
+    event = make_event(
+        turn.snapshot,
+        TurnState.ADMITTED,
+        observed_at=NOW + timedelta(seconds=5),
+    )
+    await authority.events.insert_one(_event_doc(event, stale))
+
+    current = await authority.acquire_lease(
+        operation_id,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+        holder_id="worker-b",
+        ttl_seconds=30,
+        now=NOW + timedelta(seconds=11),
+    )
+    assert current.epoch == stale.epoch + 1
+
+    recovered = await authority.get_operation(
+        operation_id,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+    )
+    assert recovered.snapshot.state is TurnState.RECEIVED
+    assert (
+        await authority.events.find_one(
+            {"_id": f"{operation_id}:1"}
+        )
+        is None
+    )
+
+
+@pytest.mark.asyncio
+async def test_mongo_crash_recovery_commits_prepared_event_with_live_lease(
+    monkeypatch,
+):
+    from core import chat_turns as chat_turn_module
+
+    database = FakeDatabase()
+    authority = MongoChatTurnAuthority(database)
+    operation_id = str(uuid4())
+    turn = await authority.create_operation(
+        operation_id=operation_id,
+        request_digest="3" * 64,
+        binding=_binding(),
+        created_at=NOW,
+    )
+    lease = await authority.acquire_lease(
+        operation_id,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+        holder_id="worker-a",
+        ttl_seconds=30,
+        now=NOW,
+    )
+    event = make_event(
+        turn.snapshot,
+        TurnState.ADMITTED,
+        observed_at=NOW + timedelta(seconds=5),
+    )
+    await authority.events.insert_one(
+        chat_turn_module._event_doc(event, lease)
+    )
+    monkeypatch.setattr(
+        chat_turn_module,
+        "_utcnow",
+        lambda: NOW + timedelta(seconds=6),
+    )
+
+    recovered = await authority.get_operation(
+        operation_id,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+    )
+    assert recovered.snapshot.state is TurnState.ADMITTED
+    persisted_event = await authority.events.find_one(
+        {"_id": f"{operation_id}:1"}
+    )
+    assert persisted_event["_commit_state"] == "committed"
+
+
+@pytest.mark.asyncio
+async def test_mongo_legacy_operation_gets_atomic_ownership_schema():
+    database = FakeDatabase()
+    authority = MongoChatTurnAuthority(database)
+    operation_id = str(uuid4())
+    await authority.create_operation(
+        operation_id=operation_id,
+        request_digest="4" * 64,
+        binding=_binding(),
+        created_at=NOW,
+    )
+
+    raw = authority.operations.docs[operation_id]
+    for field in (
+        "lease_epoch",
+        "lease_holder_id",
+        "lease_granted_at",
+        "lease_expires_at",
+        "lease_heartbeat_sequence",
+        "lease_previous_digest",
+        "lease_digest",
+        "ownership_receipt_digest",
+        "ownership_audit_sequence",
+    ):
+        raw.pop(field, None)
+
+    lease = await authority.acquire_lease(
+        operation_id,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+        holder_id="worker-a",
+        ttl_seconds=30,
+        now=NOW,
+    )
+    assert lease.epoch == 1
+    initialized = authority.operations.docs[operation_id]
+    assert initialized["lease_epoch"] == 1
+    assert initialized["lease_holder_id"] == "worker-a"

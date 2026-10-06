@@ -11,6 +11,11 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
+from skeleton.ai.assistant.turn_ownership import (
+    TurnLeasePolicy,
+    TurnLeaseToken,
+    TurnOwnershipReceipt,
+)
 from skeleton.ai.assistant.turn_runtime import (
     FailureClass,
     TERMINAL_STATES,
@@ -92,6 +97,44 @@ class ChatTurnLifecycle:
             reason_code="conversation-user-committed",
         )
 
+    async def acquire_execution(
+        self,
+        turn: PersistedChatTurn,
+        *,
+        tenant_id: str,
+        owner_id: str,
+        holder_id: str,
+        ttl_seconds: float | None = None,
+        policy: TurnLeasePolicy | None = None,
+    ) -> TurnLeaseToken:
+        return await self.authority.acquire_lease(
+            turn.snapshot.operation_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            holder_id=holder_id,
+            ttl_seconds=ttl_seconds,
+            policy=policy,
+        )
+
+    async def renew_execution(
+        self,
+        lease: TurnLeaseToken,
+        *,
+        ttl_seconds: float | None = None,
+        policy: TurnLeasePolicy | None = None,
+    ) -> TurnLeaseToken:
+        return await self.authority.renew_lease(
+            lease,
+            ttl_seconds=ttl_seconds,
+            policy=policy,
+        )
+
+    async def release_execution(
+        self,
+        lease: TurnLeaseToken,
+    ) -> TurnOwnershipReceipt:
+        return await self.authority.release_lease(lease)
+
     async def get_if_present(
         self,
         operation_id: str,
@@ -117,6 +160,7 @@ class ChatTurnLifecycle:
         owner_id: str,
         reason_code: str,
         provider_receipt_ref: str | None = None,
+        lease: TurnLeaseToken | None = None,
     ) -> PersistedChatTurn:
         current = turn.snapshot.state
         if current in TERMINAL_STATES:
@@ -145,10 +189,15 @@ class ChatTurnLifecycle:
                     else None
                 ),
             )
+            append_kwargs = {
+                "tenant_id": tenant_id,
+                "owner_id": owner_id,
+            }
+            if lease is not None:
+                append_kwargs["lease"] = lease
             result = await self.authority.append_event(
                 event,
-                tenant_id=tenant_id,
-                owner_id=owner_id,
+                **append_kwargs,
             )
         return result
 
@@ -161,6 +210,7 @@ class ChatTurnLifecycle:
         reason_code: str,
         retryable: bool = False,
         cancelled: bool = False,
+        lease: TurnLeaseToken | None = None,
     ) -> PersistedChatTurn:
         if turn.snapshot.state in TERMINAL_STATES:
             return turn
@@ -180,10 +230,15 @@ class ChatTurnLifecycle:
             reason_code=reason_code,
             failure_class=failure,
         )
+        append_kwargs = {
+            "tenant_id": tenant_id,
+            "owner_id": owner_id,
+        }
+        if lease is not None:
+            append_kwargs["lease"] = lease
         return await self.authority.append_event(
             event,
-            tenant_id=tenant_id,
-            owner_id=owner_id,
+            **append_kwargs,
         )
 
     async def finalize_existing_assistant(

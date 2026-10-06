@@ -46,6 +46,17 @@ REQUIRED_INVARIANTS = (
     "same-operation retries preserve the original durable conversation binding while revalidating request digest and causal user identity",
     "transient engine or provider unavailability leaves the durable turn resumable instead of fabricating terminal completion",
     "cancellation request acknowledgement is non-terminal until the engine confirms a terminal cancelled state",
+    "at most one live execution holder owns mutable model or terminal progression for a turn",
+    "every execution ownership takeover increments a monotonic fencing epoch",
+    "heartbeat renewal invalidates the previous lease token even when the fencing epoch is unchanged",
+    "lease-bound durable event append validates holder epoch digest and expiry at the atomic write boundary",
+    "Mongo crash recovery discards a prepared event when its authorizing lease is stale expired or superseded",
+    "ownership acquire renew release and takeover mutations produce a digest-chained audit receipt",
+    "live engine output cannot enter canonical transcript state without a response-acceptance receipt bound to exact operation execution context and output",
+    "live response-acceptance receipts hash output and evidence references instead of storing response prose or provider receipt contents",
+    "engine-backed live chat requires an accepted verification identity and at least one canonical provider receipt before transcript commit",
+    "synchronous and deferred engine results must pass the same canonical response-acceptance policy before transcript commit",
+    "live response acceptance binds both engine operation identity and execution identity before transcript promotion",
 )
 
 
@@ -111,6 +122,11 @@ def validate() -> list[str]:
         "live_lifecycle",
         "live_route",
         "live_route_tests",
+        "ownership",
+        "ownership_tests",
+        "ownership_repository_tests",
+        "response_acceptance",
+        "response_acceptance_tests",
     }
     if set(files) != expected_roles:
         errors.append("AI chat runtime contract file roles drifted")
@@ -158,6 +174,9 @@ def validate() -> list[str]:
             "TurnJournal.verify",
             "snapshot_digest",
             "assert_assistant_message_binding",
+            "acquire_lease",
+            "_assert_matching_lease",
+            "ownership_receipt_digest",
         ),
         "mongo_authority": (
             "_commit_state",
@@ -165,6 +184,9 @@ def validate() -> list[str]:
             "find_one_and_update",
             "_recover_prepared",
             "TurnJournal.verify",
+            "acquire_lease",
+            "_lease_from_payload",
+            "ownership_audit_sequence",
         ),
     }
     for role, markers in persistence_checks.items():
@@ -200,6 +222,71 @@ def validate() -> list[str]:
                 + ", ".join(missing_persistence)
             )
 
+    ownership_path = files.get("ownership")
+    if isinstance(ownership_path, str) and (ROOT / ownership_path).is_file():
+        try:
+            ownership_source = (ROOT / ownership_path).read_text(encoding="utf-8")
+            ast.parse(ownership_source)
+        except (OSError, UnicodeDecodeError, SyntaxError) as exc:
+            errors.append(f"AI chat ownership module is invalid: {exc}")
+        else:
+            required_ownership = (
+                "TurnLeaseToken",
+                "TurnLeasePolicy",
+                "TurnOwnershipReceipt",
+                "heartbeat_sequence",
+                "previous_lease_digest",
+                "TurnLeaseStale",
+                "TurnLeaseExpired",
+            )
+            missing_ownership = [
+                marker for marker in required_ownership
+                if marker not in ownership_source
+            ]
+            if missing_ownership:
+                errors.append(
+                    "AI chat ownership lost fencing markers: "
+                    + ", ".join(missing_ownership)
+                )
+
+    response_acceptance_path = files.get("response_acceptance")
+    if (
+        isinstance(response_acceptance_path, str)
+        and (ROOT / response_acceptance_path).is_file()
+    ):
+        try:
+            response_acceptance_source = (
+                ROOT / response_acceptance_path
+            ).read_text(encoding="utf-8")
+            ast.parse(response_acceptance_source)
+        except (OSError, UnicodeDecodeError, SyntaxError) as exc:
+            errors.append(
+                f"AI chat response acceptance module is invalid: {exc}"
+            )
+        else:
+            required_response_acceptance = (
+                "LiveResponseAcceptancePolicy",
+                "LiveResponseAcceptanceReceipt",
+                "evaluate_live_response_acceptance",
+                "operation_identity_mismatch",
+                "execution_identity_mismatch",
+                "provider_receipt_missing",
+                "verification_not_accepted",
+                "output_size_exceeded",
+                "response-acceptance-sha256:",
+                "production_authority: bool = False",
+            )
+            missing_response_acceptance = [
+                marker
+                for marker in required_response_acceptance
+                if marker not in response_acceptance_source
+            ]
+            if missing_response_acceptance:
+                errors.append(
+                    "AI chat response acceptance lost fail-closed markers: "
+                    + ", ".join(missing_response_acceptance)
+                )
+
     streaming_path = files.get("streaming")
     if isinstance(streaming_path, str) and (ROOT / streaming_path).is_file():
         try:
@@ -231,6 +318,9 @@ def validate() -> list[str]:
             "finalize_existing_assistant",
             "existing durable turn does not match canonical retry identity",
             "conversation-assistant-already-committed",
+            "acquire_execution",
+            "renew_execution",
+            "release_execution",
         ),
         "live_route": (
             "chat_turn_lifecycle.begin",
@@ -242,6 +332,9 @@ def validate() -> list[str]:
             "require_resume_cursor",
             "terminal_engine_state",
             "\"cancellation_requested\"",
+            "evaluate_live_response_acceptance",
+            "response_acceptance_rejected",
+            "response_acceptance.artifact_ref",
         ),
     }
     for role, markers in live_checks.items():
@@ -271,6 +364,14 @@ def validate() -> list[str]:
         if "retryable=True" in live_route_source:
             errors.append(
                 "live AI chat route must not terminalize transient failures as FAILED_RETRYABLE"
+            )
+        if live_route_source.count("evaluate_live_response_acceptance(") < 2:
+            errors.append(
+                "live AI chat route must gate both synchronous and deferred finalization"
+            )
+        if "deferred_response_acceptance" not in live_route_source:
+            errors.append(
+                "live AI chat deferred response acceptance binding is missing"
             )
 
     required_states = contract.get("required_states")

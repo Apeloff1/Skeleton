@@ -18,7 +18,7 @@ preserve the same invariants:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 import sqlite3
@@ -27,6 +27,14 @@ from typing import Iterable
 from uuid import UUID
 
 from skeleton.ai.assistant.contracts import SideEffectClass
+from skeleton.ai.assistant.turn_ownership import (
+    TurnLeaseBusy,
+    TurnLeaseExpired,
+    TurnLeasePolicy,
+    TurnLeaseStale,
+    TurnLeaseToken,
+    TurnOwnershipReceipt,
+)
 from skeleton.ai.assistant.turn_runtime import (
     CHAT_TURN_SCHEMA_VERSION,
     BudgetUsage,
@@ -307,6 +315,14 @@ class SQLiteChatTurnRepository:
                     external_effect_started INTEGER NOT NULL,
                     provider_receipt_ref TEXT,
                     failure_class TEXT,
+                    lease_epoch INTEGER NOT NULL DEFAULT 0,
+                    lease_holder_id TEXT,
+                    lease_granted_at TEXT,
+                    lease_expires_at TEXT,
+                    lease_heartbeat_sequence INTEGER NOT NULL DEFAULT 0,
+                    lease_previous_digest TEXT,
+                    lease_digest TEXT,
+                    ownership_receipt_digest TEXT,
                     snapshot_digest TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
@@ -344,8 +360,133 @@ class SQLiteChatTurnRepository:
                 ON ai_chat_turn_event(
                     namespace, operation_id, sequence
                 );
+
+                CREATE TABLE IF NOT EXISTS ai_chat_turn_ownership_audit (
+                    namespace TEXT NOT NULL,
+                    operation_id TEXT NOT NULL,
+                    sequence INTEGER NOT NULL,
+                    receipt_digest TEXT NOT NULL,
+                    receipt_json TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    epoch INTEGER NOT NULL,
+                    observed_at TEXT NOT NULL,
+                    PRIMARY KEY(namespace, operation_id, sequence),
+                    UNIQUE(namespace, operation_id, receipt_digest),
+                    FOREIGN KEY(namespace, operation_id)
+                        REFERENCES ai_chat_turn_operation(
+                            namespace, operation_id
+                        )
+                        ON DELETE CASCADE
+                );
                 """
             )
+            self._ensure_ownership_columns()
+
+    def _ensure_ownership_columns(self) -> None:
+        """Migrate existing local conformance databases in place."""
+
+        rows = self._connection.execute(
+            "PRAGMA table_info(ai_chat_turn_operation)"
+        ).fetchall()
+        known = {str(row["name"]) for row in rows}
+        additions = {
+            "lease_epoch": "INTEGER NOT NULL DEFAULT 0",
+            "lease_holder_id": "TEXT",
+            "lease_granted_at": "TEXT",
+            "lease_expires_at": "TEXT",
+            "lease_heartbeat_sequence": "INTEGER NOT NULL DEFAULT 0",
+            "lease_previous_digest": "TEXT",
+            "lease_digest": "TEXT",
+            "ownership_receipt_digest": "TEXT",
+        }
+        for name, ddl in additions.items():
+            if name not in known:
+                self._connection.execute(
+                    f"ALTER TABLE ai_chat_turn_operation ADD COLUMN {name} {ddl}"
+                )
+
+    @staticmethod
+    def _lease_from_row(row: sqlite3.Row) -> TurnLeaseToken | None:
+        holder = row["lease_holder_id"]
+        if holder is None:
+            return None
+        try:
+            return TurnLeaseToken(
+                operation_id=row["operation_id"],
+                tenant_id=row["tenant_id"],
+                owner_id=row["owner_id"],
+                holder_id=holder,
+                epoch=int(row["lease_epoch"]),
+                heartbeat_sequence=int(row["lease_heartbeat_sequence"]),
+                granted_at=_parse_time(row["lease_granted_at"], "lease_granted_at"),
+                expires_at=_parse_time(row["lease_expires_at"], "lease_expires_at"),
+                previous_lease_digest=row["lease_previous_digest"],
+            )
+        except (
+            KeyError,
+            TypeError,
+            ValueError,
+            ChatTurnRepositoryError,
+        ) as exc:
+            raise ChatTurnCorruption("persisted turn lease is invalid") from exc
+
+    @staticmethod
+    def _assert_matching_lease(
+        row: sqlite3.Row,
+        lease: TurnLeaseToken,
+        *,
+        now: datetime,
+    ) -> TurnLeaseToken:
+        current = SQLiteChatTurnRepository._lease_from_row(row)
+        if current is None:
+            raise TurnLeaseStale("turn has no active execution lease")
+        if (
+            current.operation_id != lease.operation_id
+            or current.tenant_id != lease.tenant_id
+            or current.owner_id != lease.owner_id
+            or current.holder_id != lease.holder_id
+            or current.epoch != lease.epoch
+            or current.digest != lease.digest
+        ):
+            raise TurnLeaseStale(
+                "turn execution lease no longer matches current fencing token"
+            )
+        current.require_live(now)
+        return current
+
+    def _next_ownership_sequence(self, operation_id: str) -> int:
+        row = self._connection.execute(
+            """
+            SELECT COALESCE(MAX(sequence), 0) AS sequence
+            FROM ai_chat_turn_ownership_audit
+            WHERE namespace = ? AND operation_id = ?
+            """,
+            (self.namespace, operation_id),
+        ).fetchone()
+        return int(row["sequence"]) + 1
+
+    def _append_ownership_receipt(
+        self,
+        receipt: TurnOwnershipReceipt,
+    ) -> None:
+        self._connection.execute(
+            """
+            INSERT INTO ai_chat_turn_ownership_audit(
+                namespace, operation_id, sequence, receipt_digest,
+                receipt_json, action, epoch, observed_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                self.namespace,
+                receipt.operation_id,
+                self._next_ownership_sequence(receipt.operation_id),
+                receipt.digest,
+                _json(receipt.as_dict()),
+                receipt.action,
+                receipt.epoch,
+                receipt.observed_at.isoformat(),
+            ),
+        )
 
     @staticmethod
     def _binding_from_row(row: sqlite3.Row) -> ChatTurnBinding:
@@ -580,6 +721,278 @@ class SQLiteChatTurnRepository:
                 self._connection.execute("ROLLBACK")
                 raise
 
+    def acquire_lease(
+        self,
+        operation_id: str,
+        *,
+        tenant_id: str,
+        owner_id: str,
+        holder_id: str,
+        policy: TurnLeasePolicy | None = None,
+        ttl_seconds: float | None = None,
+        now: datetime | None = None,
+    ) -> TurnLeaseToken:
+        operation = _uuid(operation_id, "operation_id")
+        holder = _text(holder_id, "holder_id")
+        lease_policy = policy or TurnLeasePolicy()
+        ttl = lease_policy.clamp_ttl(ttl_seconds)
+        instant = _utc(now)
+        expires = instant + timedelta(seconds=ttl)
+
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = self._operation_row(operation)
+                if row is None:
+                    raise ChatTurnNotFound(operation)
+                turn = self._turn_from_row(row)
+                self._authorize(turn, tenant_id, owner_id)
+                current = self._lease_from_row(row)
+                if current is not None and current.is_live(instant):
+                    if current.holder_id == holder:
+                        self._connection.execute("COMMIT")
+                        return current
+                    raise TurnLeaseBusy(
+                        "turn already has a live execution owner"
+                    )
+
+                epoch = int(row["lease_epoch"] or 0) + 1
+                previous_lease_digest = row["lease_digest"]
+                token = TurnLeaseToken(
+                    operation_id=operation,
+                    tenant_id=tenant_id,
+                    owner_id=owner_id,
+                    holder_id=holder,
+                    epoch=epoch,
+                    heartbeat_sequence=0,
+                    granted_at=instant,
+                    expires_at=expires,
+                    previous_lease_digest=previous_lease_digest,
+                )
+                receipt = TurnOwnershipReceipt(
+                    operation_id=operation,
+                    action="acquire" if epoch == 1 else "takeover",
+                    epoch=epoch,
+                    holder_id=holder,
+                    observed_at=instant,
+                    lease_digest=token.digest,
+                    previous_receipt_digest=row["ownership_receipt_digest"],
+                )
+                self._connection.execute(
+                    """
+                    UPDATE ai_chat_turn_operation
+                    SET lease_epoch = ?, lease_holder_id = ?,
+                        lease_granted_at = ?, lease_expires_at = ?,
+                        lease_heartbeat_sequence = ?,
+                        lease_previous_digest = ?, lease_digest = ?,
+                        ownership_receipt_digest = ?
+                    WHERE namespace = ? AND operation_id = ?
+                    """,
+                    (
+                        token.epoch,
+                        token.holder_id,
+                        token.granted_at.isoformat(),
+                        token.expires_at.isoformat(),
+                        token.heartbeat_sequence,
+                        token.previous_lease_digest,
+                        token.digest,
+                        receipt.digest,
+                        self.namespace,
+                        operation,
+                    ),
+                )
+                self._append_ownership_receipt(receipt)
+                self._connection.execute("COMMIT")
+                return token
+            except BaseException:
+                self._connection.execute("ROLLBACK")
+                raise
+
+    def renew_lease(
+        self,
+        lease: TurnLeaseToken,
+        *,
+        policy: TurnLeasePolicy | None = None,
+        ttl_seconds: float | None = None,
+        now: datetime | None = None,
+    ) -> TurnLeaseToken:
+        if not isinstance(lease, TurnLeaseToken):
+            raise TypeError("lease must be TurnLeaseToken")
+        lease_policy = policy or TurnLeasePolicy()
+        ttl = lease_policy.clamp_ttl(ttl_seconds)
+        instant = _utc(now)
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = self._operation_row(lease.operation_id)
+                if row is None:
+                    raise ChatTurnNotFound(lease.operation_id)
+                turn = self._turn_from_row(row)
+                self._authorize(turn, lease.tenant_id, lease.owner_id)
+                current = self._assert_matching_lease(
+                    row,
+                    lease,
+                    now=instant,
+                )
+                renewed = TurnLeaseToken(
+                    operation_id=current.operation_id,
+                    tenant_id=current.tenant_id,
+                    owner_id=current.owner_id,
+                    holder_id=current.holder_id,
+                    epoch=current.epoch,
+                    heartbeat_sequence=current.heartbeat_sequence + 1,
+                    granted_at=current.granted_at,
+                    expires_at=instant + timedelta(seconds=ttl),
+                    previous_lease_digest=current.digest,
+                )
+                receipt = TurnOwnershipReceipt(
+                    operation_id=current.operation_id,
+                    action="renew",
+                    epoch=current.epoch,
+                    holder_id=current.holder_id,
+                    observed_at=instant,
+                    lease_digest=renewed.digest,
+                    previous_receipt_digest=row["ownership_receipt_digest"],
+                )
+                self._connection.execute(
+                    """
+                    UPDATE ai_chat_turn_operation
+                    SET lease_expires_at = ?, lease_heartbeat_sequence = ?,
+                        lease_previous_digest = ?, lease_digest = ?,
+                        ownership_receipt_digest = ?
+                    WHERE namespace = ? AND operation_id = ?
+                      AND lease_epoch = ? AND lease_holder_id = ?
+                      AND lease_digest = ?
+                    """,
+                    (
+                        renewed.expires_at.isoformat(),
+                        renewed.heartbeat_sequence,
+                        renewed.previous_lease_digest,
+                        renewed.digest,
+                        receipt.digest,
+                        self.namespace,
+                        current.operation_id,
+                        current.epoch,
+                        current.holder_id,
+                        current.digest,
+                    ),
+                )
+                self._append_ownership_receipt(receipt)
+                self._connection.execute("COMMIT")
+                return renewed
+            except BaseException:
+                self._connection.execute("ROLLBACK")
+                raise
+
+    def release_lease(
+        self,
+        lease: TurnLeaseToken,
+        *,
+        now: datetime | None = None,
+    ) -> TurnOwnershipReceipt:
+        if not isinstance(lease, TurnLeaseToken):
+            raise TypeError("lease must be TurnLeaseToken")
+        instant = _utc(now)
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = self._operation_row(lease.operation_id)
+                if row is None:
+                    raise ChatTurnNotFound(lease.operation_id)
+                turn = self._turn_from_row(row)
+                self._authorize(turn, lease.tenant_id, lease.owner_id)
+                current = self._assert_matching_lease(
+                    row,
+                    lease,
+                    now=instant,
+                )
+                receipt = TurnOwnershipReceipt(
+                    operation_id=current.operation_id,
+                    action="release",
+                    epoch=current.epoch,
+                    holder_id=current.holder_id,
+                    observed_at=instant,
+                    lease_digest=current.digest,
+                    previous_receipt_digest=row["ownership_receipt_digest"],
+                )
+                self._connection.execute(
+                    """
+                    UPDATE ai_chat_turn_operation
+                    SET lease_holder_id = NULL,
+                        lease_granted_at = NULL,
+                        lease_expires_at = NULL,
+                        lease_heartbeat_sequence = 0,
+                        lease_previous_digest = ?,
+                        lease_digest = ?,
+                        ownership_receipt_digest = ?
+                    WHERE namespace = ? AND operation_id = ?
+                      AND lease_epoch = ? AND lease_holder_id = ?
+                      AND lease_digest = ?
+                    """,
+                    (
+                        current.previous_lease_digest,
+                        current.digest,
+                        receipt.digest,
+                        self.namespace,
+                        current.operation_id,
+                        current.epoch,
+                        current.holder_id,
+                        current.digest,
+                    ),
+                )
+                self._append_ownership_receipt(receipt)
+                self._connection.execute("COMMIT")
+                return receipt
+            except BaseException:
+                self._connection.execute("ROLLBACK")
+                raise
+
+    def assert_lease(
+        self,
+        lease: TurnLeaseToken,
+        *,
+        now: datetime | None = None,
+    ) -> TurnLeaseToken:
+        if not isinstance(lease, TurnLeaseToken):
+            raise TypeError("lease must be TurnLeaseToken")
+        instant = _utc(now)
+        with self._lock:
+            row = self._operation_row(lease.operation_id)
+            if row is None:
+                raise ChatTurnNotFound(lease.operation_id)
+            turn = self._turn_from_row(row)
+            self._authorize(turn, lease.tenant_id, lease.owner_id)
+            return self._assert_matching_lease(row, lease, now=instant)
+
+    def list_ownership_receipts(
+        self,
+        operation_id: str,
+        *,
+        tenant_id: str,
+        owner_id: str,
+    ) -> tuple[dict[str, object], ...]:
+        operation = _uuid(operation_id, "operation_id")
+        turn = self.get_operation(
+            operation,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        del turn
+        with self._lock:
+            rows = self._connection.execute(
+                """
+                SELECT receipt_json
+                FROM ai_chat_turn_ownership_audit
+                WHERE namespace = ? AND operation_id = ?
+                ORDER BY sequence ASC
+                """,
+                (self.namespace, operation),
+            ).fetchall()
+        return tuple(
+            _parse_json(row["receipt_json"], "receipt_json")
+            for row in rows
+        )
+
     def get_operation(
         self,
         operation_id: str,
@@ -662,6 +1075,7 @@ class SQLiteChatTurnRepository:
         tenant_id: str,
         owner_id: str,
         updated_at: datetime | None = None,
+        lease: TurnLeaseToken | None = None,
     ) -> PersistedChatTurn:
         if not isinstance(event, TurnEvent):
             raise TypeError("event must be TurnEvent")
@@ -676,6 +1090,12 @@ class SQLiteChatTurnRepository:
                     raise ChatTurnNotFound(operation)
                 current = self._turn_from_row(row)
                 self._authorize(current, tenant_id, owner_id)
+                if lease is not None:
+                    self._assert_matching_lease(
+                        row,
+                        lease,
+                        now=now,
+                    )
 
                 duplicate = self._connection.execute(
                     """

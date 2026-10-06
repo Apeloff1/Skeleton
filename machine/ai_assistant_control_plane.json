@@ -1,9 +1,9 @@
 {
   "schema_version": "ai-assistant-control-plane/v1",
   "status": "implemented_candidate",
-  "prepared_at_utc": "2026-10-06T00:48:00Z",
+  "prepared_at_utc": "2026-10-06T12:45:00Z",
   "prepared_by": "chatgpt:gpt-5.6-sol",
-  "base_main_sha": "92a6dcc85976e41c3d86fcd87866e1c5d384f125",
+  "base_main_sha": "a04fffb388317a9744d9025f4e523ac0cdc19d7f",
   "canonical_root": "skeleton/ai/assistant",
   "scope": "clean-room product assistant control plane composed over existing Skeleton AI contracts",
   "principles": [
@@ -35,7 +35,10 @@
     "skeleton/ai/assistant/turn_runtime.py",
     "skeleton/persistence/chat_turn_repository.py",
     "backend/core/chat_turns.py",
-    "skeleton/ai/assistant/streaming.py"
+    "skeleton/ai/assistant/streaming.py",
+    "skeleton/ai/assistant/turn_ownership.py",
+    "backend/core/chat_turn_lifecycle.py",
+    "backend/routes/ai.py"
   ],
   "tests": [
     "skeleton/testing/test_ai_assistant_routing.py",
@@ -46,7 +49,10 @@
     "skeleton/testing/test_ai_chat_turn_runtime.py",
     "skeleton/testing/test_ai_chat_turn_repository.py",
     "backend/tests/test_ai_chat_turn_persistence.py",
-    "skeleton/testing/test_ai_chat_streaming.py"
+    "skeleton/testing/test_ai_chat_streaming.py",
+    "skeleton/testing/test_ai_chat_turn_ownership.py",
+    "skeleton/testing/test_ai_chat_turn_ownership_repository.py",
+    "backend/tests/test_ai_chat_turn_route_cutover.py"
   ],
   "integration": {
     "existing_cognitive_runtime": "skeleton/ai/runtime/intelligence/execution_runtime.py",
@@ -64,7 +70,9 @@
     "chat_turn_rule": "digest-chained durable state coordinates assistant execution without owning provider or privileged tool authority",
     "chat_turn_portable_repository": "skeleton/persistence/chat_turn_repository.py",
     "chat_turn_production_authority": "backend/core/chat_turns.py",
-    "chat_stream_projection": "skeleton/ai/assistant/streaming.py"
+    "chat_stream_projection": "skeleton/ai/assistant/streaming.py",
+    "chat_turn_ownership": "skeleton/ai/assistant/turn_ownership.py",
+    "chat_turn_fencing_rule": "mutable execution progression is single-owner and every fenced append validates the current holder, epoch, lease digest, and expiry"
   },
   "explicit_exclusions": [
     "vendor model weights",

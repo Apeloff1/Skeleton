@@ -7,7 +7,9 @@ from skeleton.ai.assistant.evidence import (
     PublicationDisposition,
 )
 from skeleton.ai.assistant.response_acceptance import (
+    LiveResponseAcceptancePolicy,
     ResponseAcceptancePolicy,
+    evaluate_live_response_acceptance,
     evaluate_response_acceptance,
 )
 from skeleton.contracts.verification import (
@@ -285,3 +287,121 @@ def test_acceptance_decision_is_deterministic_and_non_executing() -> None:
     assert first.digest == second.digest
     assert first.authority_scope == "response-acceptance-decision-only"
     assert first.production_authority is False
+
+
+
+def live_acceptance(**overrides):
+    values = {
+        "operation_id": "operation-1",
+        "observed_operation_id": "operation-1",
+        "expected_execution_id": "execution-1",
+        "observed_execution_id": "execution-1",
+        "context_digest": "d" * 64,
+        "final_output": "Verified answer.",
+        "verification": "verification:engine-v1",
+        "provider_receipts": ("provider:local:receipt-1",),
+        "tool_receipts": (),
+        "evidence_refs": ("evidence:answer-1",),
+    }
+    values.update(overrides)
+    return evaluate_live_response_acceptance(**values)
+
+
+def test_live_engine_response_is_bound_before_commit() -> None:
+    receipt_value = live_acceptance()
+    assert receipt_value.accepted is True
+    assert receipt_value.reasons == ()
+    assert receipt_value.expected_execution_id == "execution-1"
+    assert receipt_value.observed_execution_id == "execution-1"
+    assert receipt_value.context_digest == "d" * 64
+    assert len(receipt_value.output_sha256 or "") == 64
+    assert receipt_value.artifact_ref == (
+        "response-acceptance-sha256:" + receipt_value.digest
+    )
+
+
+def test_live_response_acceptance_rejects_operation_identity_drift() -> None:
+    receipt_value = live_acceptance(observed_operation_id="operation-2")
+    assert receipt_value.accepted is False
+    assert "operation_identity_mismatch" in receipt_value.reasons
+
+
+def test_live_response_acceptance_rejects_execution_identity_drift() -> None:
+    receipt_value = live_acceptance(observed_execution_id="execution-2")
+    assert receipt_value.accepted is False
+    assert "execution_identity_mismatch" in receipt_value.reasons
+
+
+def test_live_response_acceptance_requires_provider_receipt() -> None:
+    receipt_value = live_acceptance(provider_receipts=())
+    assert receipt_value.accepted is False
+    assert "provider_receipt_missing" in receipt_value.reasons
+
+
+def test_live_response_acceptance_rejects_unverified_output() -> None:
+    receipt_value = live_acceptance(verification="unverified")
+    assert receipt_value.accepted is False
+    assert "verification_not_accepted" in receipt_value.reasons
+
+
+def test_live_response_acceptance_rejects_malformed_provider_receipt() -> None:
+    receipt_value = live_acceptance(
+        provider_receipts=("receipt-without-provider-prefix",)
+    )
+    assert receipt_value.accepted is False
+    assert "provider_receipt_prefix_invalid" in receipt_value.reasons
+    assert "provider_receipt_missing" in receipt_value.reasons
+
+
+def test_live_response_acceptance_rejects_duplicate_receipt_identity() -> None:
+    receipt_value = live_acceptance(
+        provider_receipts=(
+            "provider:local:receipt-1",
+            "provider:local:receipt-1",
+        )
+    )
+    assert receipt_value.accepted is False
+    assert "provider_receipt_duplicate" in receipt_value.reasons
+
+
+def test_live_response_acceptance_enforces_output_hard_bound() -> None:
+    receipt_value = live_acceptance(
+        final_output="abcdefghij",
+        policy=LiveResponseAcceptancePolicy(max_output_utf8_bytes=8),
+    )
+    assert receipt_value.accepted is False
+    assert "output_size_exceeded" in receipt_value.reasons
+    assert receipt_value.output_sha256 is None
+
+
+def test_live_response_receipt_is_content_minimized_and_deterministic() -> None:
+    first = live_acceptance()
+    second = live_acceptance()
+    assert first.digest == second.digest
+    encoded = str(first.as_dict())
+    assert "Verified answer." not in encoded
+    assert "provider:local:receipt-1" not in encoded
+    assert "evidence:answer-1" not in encoded
+    assert first.production_authority is False
+    assert first.authority_scope == "live-response-acceptance-decision-only"
+
+
+
+def test_live_response_receipt_is_order_invariant_for_receipt_sets() -> None:
+    first = live_acceptance(
+        provider_receipts=(
+            "provider:local:receipt-a",
+            "provider:local:receipt-b",
+        ),
+        evidence_refs=("evidence:a", "evidence:b"),
+    )
+    second = live_acceptance(
+        provider_receipts=(
+            "provider:local:receipt-b",
+            "provider:local:receipt-a",
+        ),
+        evidence_refs=("evidence:b", "evidence:a"),
+    )
+    assert first.accepted is True
+    assert second.accepted is True
+    assert first.digest == second.digest

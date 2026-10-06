@@ -453,6 +453,7 @@ def test_explicit_chat_memory_policy_delegates_verified_memory_and_commits_refs(
                 final_output="You prefer concise answers.",
                 verification="verification:memory-policy",
                 evidence_refs=(),
+                provider_receipts=("provider:local:memory-policy",),
                 tool_receipts=(),
                 memory_refs=("memory:preference-1",),
                 artifact_refs=(),
