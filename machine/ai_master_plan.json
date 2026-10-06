@@ -24376,6 +24376,16 @@
     "scope": "overlay-only; binds inside VOL-000..VOL-420",
     "prime_directive": "Long-form consistency may veto any local improvement.",
     "completion_rule": "Exact-head implementation plus deterministic/adversarial/recovery/rights evidence is required; prose, round count, elapsed time or model confidence never completes a level.",
-    "originality_rule": "Unknown incorporated rights are quarantined; reference-only sources may inform facts, techniques and abstract ideas but may not supply protected expression; ambiguous legal/similarity cases require human/legal review."
+    "originality_rule": "Unknown incorporated rights are quarantined; reference-only sources may inform facts, techniques and abstract ideas but may not supply protected expression; ambiguous legal/similarity cases require human/legal review.",
+    "overengineering_authority": "machine/ai_game_builder_overengineering.json",
+    "overengineering_human_spec": "docs/architecture/AI_GAME_BUILDER_OVERENGINEERING.md",
+    "overengineering_planes": 24,
+    "runtime_contracts": {
+      "package": "skeleton/ai/game_builder",
+      "contracts": "skeleton/ai/game_builder/contracts.py",
+      "dual_rival_state_machine": "skeleton/ai/game_builder/dual_rival_forge.py",
+      "tests": "skeleton/testing/test_ai_game_builder_contracts.py"
+    },
+    "overengineering_rule": "Every GB family inherits all critical cross-cutting planes and no plane may weaken family/level hard gates."
   }
 }
