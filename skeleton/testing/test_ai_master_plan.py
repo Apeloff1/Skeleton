@@ -416,6 +416,12 @@ def test_master_plan_binds_500_level_ai_game_builder_overlay() -> None:
     assert overlay["overengineering_planes"] == 24
     assert overlay["runtime_contracts"]["contracts"] == "skeleton/ai/game_builder/contracts.py"
     assert overlay["runtime_contracts"]["dual_rival_state_machine"] == "skeleton/ai/game_builder/dual_rival_forge.py"
+    assert overlay["governance_runtime"] == {
+        "canon": "skeleton/ai/game_builder/canon.py",
+        "rights": "skeleton/ai/game_builder/rights.py",
+        "atom_lineage": "skeleton/ai/game_builder/atomizer.py",
+        "tests": "skeleton/testing/test_ai_game_builder_governance.py",
+    }
     assert overlay["family_count"] == 50
     assert overlay["levels_per_family"] == 10
     assert overlay["total_levels"] == 500
@@ -443,6 +449,7 @@ def test_master_plan_rejects_ai_game_builder_topology_drift() -> None:
     mutated["ai_game_builder_500_levels"]["effort_modes"]["forge_10000"] = 9999
     mutated["ai_game_builder_500_levels"]["overengineering_planes"] = 23
     mutated["ai_game_builder_500_levels"]["runtime_contracts"]["contracts"] = "wrong.py"
+    mutated["ai_game_builder_500_levels"]["governance_runtime"]["rights"] = "wrong.py"
 
     errors = checker.validate(mutated)
 
@@ -450,3 +457,4 @@ def test_master_plan_rejects_ai_game_builder_topology_drift() -> None:
     assert "AI game builder effort modes must equal 100/1000/10000" in errors
     assert "AI game builder overengineering_planes must equal 24" in errors
     assert "AI game builder runtime contract binding drifted" in errors
+    assert "AI game builder governance runtime binding drifted" in errors
