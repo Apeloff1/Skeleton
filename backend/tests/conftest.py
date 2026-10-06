@@ -149,3 +149,51 @@ def sample_user_state() -> dict:
 def api_base_url() -> str:
     """Base URL for API endpoints."""
     return "/api"
+
+
+_AI_CHAT_ROUTE_TEST_FILES = {
+    "test_ai_chat_context_idempotency.py",
+    "test_ai_chat_conversation_authority.py",
+    "test_ai_chat_conversation_finalization.py",
+    "test_ai_chat_engine_cutover.py",
+    "test_ai_chat_local_engine_e2e.py",
+    "test_ai_chat_memory_policy.py",
+    "test_ai_chat_turn_route_cutover.py",
+}
+
+
+@pytest.fixture(autouse=True)
+def ai_chat_turn_test_authority(request: pytest.FixtureRequest, monkeypatch):
+    """Keep route tests hermetic while exercising the real turn lifecycle."""
+
+    if Path(str(request.path)).name not in _AI_CHAT_ROUTE_TEST_FILES:
+        yield None
+        return
+
+    import routes.ai as ai
+    from core.chat_turn_lifecycle import ChatTurnLifecycle
+    from skeleton.persistence.chat_turn_repository import SQLiteChatTurnRepository
+
+    class AsyncSQLiteTurnAuthority:
+        def __init__(self) -> None:
+            self.repo = SQLiteChatTurnRepository()
+
+        async def create_operation(self, **kwargs):
+            return self.repo.create_operation(**kwargs)
+
+        async def get_operation(self, operation_id, **kwargs):
+            return self.repo.get_operation(operation_id, **kwargs)
+
+        async def append_event(self, event, **kwargs):
+            return self.repo.append_event(event, **kwargs)
+
+    authority = AsyncSQLiteTurnAuthority()
+    monkeypatch.setattr(
+        ai,
+        "chat_turn_lifecycle",
+        ChatTurnLifecycle(authority),
+    )
+    try:
+        yield authority
+    finally:
+        authority.repo.close()
