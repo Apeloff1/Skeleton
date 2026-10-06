@@ -377,3 +377,24 @@ def test_live_response_receipt_is_content_minimized_and_deterministic() -> None:
     assert "evidence:answer-1" not in encoded
     assert first.production_authority is False
     assert first.authority_scope == "live-response-acceptance-decision-only"
+
+
+
+def test_live_response_receipt_is_order_invariant_for_receipt_sets() -> None:
+    first = live_acceptance(
+        provider_receipts=(
+            "provider:local:receipt-a",
+            "provider:local:receipt-b",
+        ),
+        evidence_refs=("evidence:a", "evidence:b"),
+    )
+    second = live_acceptance(
+        provider_receipts=(
+            "provider:local:receipt-b",
+            "provider:local:receipt-a",
+        ),
+        evidence_refs=("evidence:b", "evidence:a"),
+    )
+    assert first.accepted is True
+    assert second.accepted is True
+    assert first.digest == second.digest
