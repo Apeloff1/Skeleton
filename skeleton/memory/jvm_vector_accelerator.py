@@ -796,9 +796,17 @@ class JvmVectorAccelerator:
 
 def get_default_vector_accelerator() -> JvmVectorAccelerator:
     """Return the vector helper owned by the canonical JVM registry."""
-    from skeleton.native.jvm_registry import get_default_jvm_registry
+    from skeleton.native.jvm_registry import (
+        JvmAcceleratorRegistryError,
+        get_default_jvm_registry,
+    )
 
-    accelerator = get_default_jvm_registry().get("vector")
+    try:
+        accelerator = get_default_jvm_registry().get_selected("vector")
+    except JvmAcceleratorRegistryError as exc:
+        raise JvmVectorUnavailable(
+            "vector JVM accelerator is not profile-selected"
+        ) from exc
     if not isinstance(accelerator, JvmVectorAccelerator):
         raise JvmVectorUnavailable("canonical JVM registry returned wrong vector type")
     return accelerator
