@@ -69,7 +69,7 @@ def test_independent_research_verifier_accepts_complete_binding(
     monkeypatch,
 ) -> None:
     root = _valid_repo(tmp_path)
-    monkeypatch.setenv("GITHUB_SHA", "research-head")
+    monkeypatch.setenv("EVIDENCE_HEAD_SHA", "research-head")
 
     receipt = verify_repository(root)
 
@@ -147,7 +147,7 @@ def test_independent_research_verifier_rejects_missing_closure_evaluation(
     path = root / "machine" / "ai_master_plan.json"
     payload = json.loads(path.read_text(encoding="utf-8"))
     payload["volumes"][0]["evaluations"].remove(
-        ".github/workflows/vol001-research-lineage-closure.yml"
+        ".github/workflows/ai-research-lineage.yml"
     )
     path.write_text(json.dumps(payload), encoding="utf-8")
 
