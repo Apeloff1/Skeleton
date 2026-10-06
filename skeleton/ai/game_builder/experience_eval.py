@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from statistics import median
 from typing import Iterable, Mapping
 
-from .contracts import Rival, canonical_digest
+from .contracts import EvaluatorProvenance, Rival, canonical_digest
 
 
 class ExperienceEvaluationError(RuntimeError):
@@ -73,7 +73,55 @@ class ExperienceObservation:
     observed_facts: tuple[str, ...]
     interpretations: tuple[str, ...]
     metrics: tuple[tuple[str, float], ...]
+    evaluator_provenance: EvaluatorProvenance
     evidence_digest: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "observation_id", _text(self.observation_id, "observation_id"))
+        object.__setattr__(self, "artifact_digest", _digest(self.artifact_digest, "artifact_digest"))
+        object.__setattr__(self, "project_revision", _text(self.project_revision, "project_revision"))
+        evaluator_id = _text(self.evaluator_id, "evaluator_id")
+        method_id = _text(self.method_id, "method_id")
+        if evaluator_id in {Rival.A.value, Rival.B.value}:
+            raise ValueError("experience evaluator must be independent from both rivals")
+        if not isinstance(self.evaluator_provenance, EvaluatorProvenance):
+            raise TypeError("experience evaluator_provenance must be EvaluatorProvenance")
+        if evaluator_id != self.evaluator_provenance.evaluator_id:
+            raise ExperienceEvaluationError("experience evaluator identity does not match provenance")
+        if method_id != self.evaluator_provenance.method_id:
+            raise ExperienceEvaluationError("experience method identity does not match provenance")
+        object.__setattr__(self, "evaluator_id", evaluator_id)
+        object.__setattr__(self, "method_id", method_id)
+        object.__setattr__(self, "atomic_target_id", _text(self.atomic_target_id, "atomic_target_id"))
+
+        parents = tuple(_text(value, "parent_context") for value in self.parent_context)
+        facts = tuple(_text(value, "observed_fact", max_length=2048) for value in self.observed_facts)
+        interpretations = tuple(
+            _text(value, "interpretation", max_length=2048)
+            for value in self.interpretations
+        )
+        if not parents:
+            raise ValueError("atomic observation requires parent context")
+        if not facts:
+            raise ValueError("observed_facts must be non-empty")
+        if len(parents) != len(set(parents)):
+            raise ValueError("parent_context identities must be unique")
+        object.__setattr__(self, "parent_context", parents)
+        object.__setattr__(self, "observed_facts", facts)
+        object.__setattr__(self, "interpretations", interpretations)
+
+        raw_metrics = tuple(self.metrics)
+        if len(raw_metrics) != len({name for name, _ in raw_metrics}):
+            raise ValueError("experience metric names must be unique")
+        normalized_metrics = normalize_experience_metrics(dict(raw_metrics))
+        object.__setattr__(self, "metrics", normalized_metrics)
+
+        evidence_digest = _digest(self.evidence_digest, "evidence_digest")
+        if evidence_digest not in self.evaluator_provenance.output_evidence_refs:
+            raise ExperienceEvaluationError(
+                "experience evidence must be referenced by evaluator authority"
+            )
+        object.__setattr__(self, "evidence_digest", evidence_digest)
 
     @classmethod
     def create(
@@ -89,34 +137,22 @@ class ExperienceObservation:
         observed_facts: Iterable[str],
         interpretations: Iterable[str],
         metrics: Mapping[str, float],
+        evaluator_provenance: EvaluatorProvenance,
         evidence_digest: str,
     ) -> "ExperienceObservation":
-        parents = tuple(_text(value, "parent_context") for value in parent_context)
-        facts = tuple(_text(value, "observed_fact", max_length=2048) for value in observed_facts)
-        interpretations_tuple = tuple(
-            _text(value, "interpretation", max_length=2048) for value in interpretations
-        )
-        if not parents:
-            raise ValueError("atomic observation requires parent context")
-        if not facts:
-            raise ValueError("observed_facts must be non-empty")
-        if len(parents) != len(set(parents)):
-            raise ValueError("parent_context identities must be unique")
-        normalized_evaluator = _text(evaluator_id, "evaluator_id")
-        if normalized_evaluator in {Rival.A.value, Rival.B.value}:
-            raise ValueError("experience evaluator must be independent from both rivals")
         return cls(
-            observation_id=_text(observation_id, "observation_id"),
-            artifact_digest=_digest(artifact_digest, "artifact_digest"),
-            project_revision=_text(project_revision, "project_revision"),
-            evaluator_id=normalized_evaluator,
-            method_id=_text(method_id, "method_id"),
-            atomic_target_id=_text(atomic_target_id, "atomic_target_id"),
-            parent_context=parents,
-            observed_facts=facts,
-            interpretations=interpretations_tuple,
-            metrics=normalize_experience_metrics(metrics),
-            evidence_digest=_digest(evidence_digest, "evidence_digest"),
+            observation_id=observation_id,
+            artifact_digest=artifact_digest,
+            project_revision=project_revision,
+            evaluator_id=evaluator_id,
+            method_id=method_id,
+            atomic_target_id=atomic_target_id,
+            parent_context=tuple(parent_context),
+            observed_facts=tuple(observed_facts),
+            interpretations=tuple(interpretations),
+            metrics=tuple(metrics.items()),
+            evaluator_provenance=evaluator_provenance,
+            evidence_digest=evidence_digest,
         )
 
     @property
@@ -130,6 +166,7 @@ class ExperienceObservation:
                 "artifact_digest": self.artifact_digest,
                 "atomic_target_id": self.atomic_target_id,
                 "evaluator_id": self.evaluator_id,
+                "evaluator_provenance_digest": self.evaluator_provenance.digest,
                 "evidence_digest": self.evidence_digest,
                 "interpretations": list(self.interpretations),
                 "method_id": self.method_id,
@@ -150,25 +187,77 @@ class ExperienceDefect:
     summary: str
     evidence_digest: str
     affected_context: tuple[str, ...]
+    evaluator_provenance: EvaluatorProvenance
     resolved_by_digest: str | None = None
+    resolution_authority: EvaluatorProvenance | None = None
 
     def __post_init__(self) -> None:
-        _text(self.defect_id, "defect_id")
-        _digest(self.artifact_digest, "artifact_digest")
-        _text(self.summary, "summary", max_length=2048)
-        _digest(self.evidence_digest, "evidence_digest")
+        object.__setattr__(self, "defect_id", _text(self.defect_id, "defect_id"))
+        object.__setattr__(self, "artifact_digest", _digest(self.artifact_digest, "artifact_digest"))
+        object.__setattr__(self, "summary", _text(self.summary, "summary", max_length=2048))
+        object.__setattr__(self, "evidence_digest", _digest(self.evidence_digest, "evidence_digest"))
         if self.severity not in (1, 2, 4, 8):
             raise ValueError("severity must be one of 1,2,4,8")
         if not self.affected_context:
             raise ValueError("affected_context must be non-empty")
-        for value in self.affected_context:
-            _text(value, "affected_context")
-        if self.resolved_by_digest is not None:
-            _digest(self.resolved_by_digest, "resolved_by_digest")
+        context = tuple(_text(value, "affected_context") for value in self.affected_context)
+        if len(context) != len(set(context)):
+            raise ValueError("affected_context identities must be unique")
+        object.__setattr__(self, "affected_context", context)
+        if not isinstance(self.evaluator_provenance, EvaluatorProvenance):
+            raise TypeError("defect evaluator_provenance must be EvaluatorProvenance")
+        if self.evidence_digest not in self.evaluator_provenance.output_evidence_refs:
+            raise ExperienceEvaluationError(
+                "defect evidence must be referenced by evaluator authority"
+            )
+
+        if self.resolved_by_digest is None:
+            if self.resolution_authority is not None:
+                raise ValueError("unresolved defect cannot carry resolution authority")
+        else:
+            object.__setattr__(
+                self,
+                "resolved_by_digest",
+                _digest(self.resolved_by_digest, "resolved_by_digest"),
+            )
+            if not isinstance(self.resolution_authority, EvaluatorProvenance):
+                raise TypeError("resolved defect requires resolution authority")
+            if self.resolved_by_digest not in self.resolution_authority.output_evidence_refs:
+                raise ExperienceEvaluationError(
+                    "defect resolution evidence must be referenced by resolution authority"
+                )
+            if (
+                self.severity >= 8
+                and self.resolution_authority.evaluator_id
+                == self.evaluator_provenance.evaluator_id
+            ):
+                raise ExperienceEvaluationError(
+                    "critical defect resolution requires independent authority"
+                )
 
     @property
     def unresolved(self) -> bool:
         return self.resolved_by_digest is None
+
+    @property
+    def digest(self) -> str:
+        return canonical_digest(
+            {
+                "affected_context": list(self.affected_context),
+                "artifact_digest": self.artifact_digest,
+                "defect_id": self.defect_id,
+                "evaluator_provenance_digest": self.evaluator_provenance.digest,
+                "evidence_digest": self.evidence_digest,
+                "resolution_authority_digest": (
+                    None
+                    if self.resolution_authority is None
+                    else self.resolution_authority.digest
+                ),
+                "resolved_by_digest": self.resolved_by_digest,
+                "severity": self.severity,
+                "summary": self.summary,
+            }
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -177,6 +266,7 @@ class ExperienceReport:
     project_revision: str
     evaluator_ids: tuple[str, ...]
     observation_digests: tuple[str, ...]
+    defect_digests: tuple[str, ...]
     aggregate_metrics: tuple[tuple[str, float], ...]
     unresolved_critical_defects: tuple[str, ...]
     report_digest: str
@@ -238,6 +328,7 @@ def build_experience_report(
     core = {
         "aggregate_metrics": dict(aggregate),
         "artifact_digest": artifact_digest,
+        "defect_digests": sorted(defect.digest for defect in defect_rows),
         "evaluator_ids": list(evaluator_ids),
         "observation_digests": sorted(row.digest for row in rows),
         "project_revision": next(iter(revisions)),
@@ -248,6 +339,7 @@ def build_experience_report(
         project_revision=core["project_revision"],
         evaluator_ids=evaluator_ids,
         observation_digests=tuple(core["observation_digests"]),
+        defect_digests=tuple(core["defect_digests"]),
         aggregate_metrics=aggregate,
         unresolved_critical_defects=critical,
         report_digest=canonical_digest(core),
