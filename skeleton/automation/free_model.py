@@ -19,6 +19,7 @@ from skeleton.shells.cancellation import CancellationToken
 from skeleton.provider_contract import (
     ProviderArchitectureError,
     ProviderArchitectureReceipt,
+    ProviderArchitectureReceipt,
     load_provider_architecture,
 )
 
@@ -129,7 +130,6 @@ class FreeModelClient:
             "provider_id": self.provider_id,
             "provider_family": self.provider_family,
             "model": self.model,
-            "endpoint_host": urlsplit(self.url).hostname,
             "architecture": self.architecture_receipt.as_dict(),
         }
 
@@ -148,17 +148,35 @@ class FreeModelClient:
         payload = {
             "model": self.model,
             "messages": [
+        user: str,
+        max_tokens: int = 2500,
+        *,
+        cancellation: CancellationToken | None = None,
+    ) -> str:
+        if cancellation is not None:
+            if not isinstance(cancellation, CancellationToken):
+                raise TypeError("cancellation must be CancellationToken")
+            cancellation.require_active()
+        payload = {
+            "model": self.model,
+            "messages": [
                 {"role": "system", "content": redact_secrets(system)},
                 {"role": "user", "content": redact_secrets(user)},
-            ],
-            "temperature": 0.1,
-            "max_tokens": max(256, min(max_tokens, 8000)),
-        }
-        req = urllib.request.Request(
-            self.url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {self.key}",
+            method="POST",
+        )
+        try:
+            if cancellation is not None:
+                cancellation.require_active()
+            with urllib.request.urlopen(req, timeout=self.timeout) as response:
+                raw_bytes = response.read(_MAX_RESPONSE_BYTES + 1)
+            if cancellation is not None:
+                cancellation.require_active()
+        except (urllib.error.URLError, TimeoutError) as exc:
+            if cancellation is not None and cancellation.cancelled:
+                cancellation.require_active()
+            raise ModelError(
+                f"model request failed: {_secret(str(exc))}"
+            ) from exc
                 "Content-Type": "application/json",
                 "User-Agent": "Skeleton-Repo-Bots/2.0",
             },
