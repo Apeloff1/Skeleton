@@ -809,23 +809,6 @@
       "accepted_risk": null
     },
     {
-      "obligation_id": "P1-GAP-VOL-008:gap:0467d5e1d2-4c94c3d0bbf16148",
-      "obligation_digest": "4d8fb26460a6900f1ce45648497ebda0766e6136d39db38e800c209b4c732573",
-      "owner_id": "ACC-VOL-008",
-      "severity": "high",
-      "disposition": "evidence",
-      "bound_at": "2026-09-30T18:00:00Z",
-      "review_at": "2026-10-30T18:00:00Z",
-      "evidence": [
-        {
-          "category": "p1_volume_obligation_evidence",
-          "digest": "9928b2b742e9439fcf41ac05e966995186f17126c6e3de99655d6a58ca2fd5b6",
-          "source": "p1:bulk-volume-obligation-evidence:P1-GAP-VOL-008:gap:0467d5e1d2-4c94c3d0bbf16148:dfeaadc5da74c0205785adf2387c607603d9cdb4"
-        }
-      ],
-      "accepted_risk": null
-    },
-    {
       "obligation_id": "P1-GAP-VOL-008:gap:0fb088140e-733f82e58e6474c6",
       "obligation_digest": "06dd912202572d40c93b953823125d37a213731676235af87b4aee46841043e1",
       "owner_id": "ACC-VOL-008",
@@ -860,23 +843,6 @@
           "category": "p1_volume_obligation_evidence",
           "digest": "c4d4356491ff635e9c381c13d7a6263aa6319475beed977821e735405739a70e",
           "source": "p1:bulk-volume-obligation-evidence:P1-GAP-VOL-008:gap:becbabe0f9-eadb76457dc9d921:dfeaadc5da74c0205785adf2387c607603d9cdb4"
-        }
-      ],
-      "accepted_risk": null
-    },
-    {
-      "obligation_id": "P1-GAP-VOL-009:gap:5aa873caed-b04eb721d6dfb6ef",
-      "obligation_digest": "a6f558291d0500a184c495c1467ce21b3b6b06c61f528a2e867609c637f056d7",
-      "owner_id": "ACC-VOL-009",
-      "severity": "high",
-      "disposition": "evidence",
-      "bound_at": "2026-09-30T18:00:00Z",
-      "review_at": "2026-10-30T18:00:00Z",
-      "evidence": [
-        {
-          "category": "p1_volume_obligation_evidence",
-          "digest": "c045ab1e2cf3153077cc2a96e91cdc8a0e2c9ed7b6d0437bd469c0d59794ef45",
-          "source": "p1:bulk-volume-obligation-evidence:P1-GAP-VOL-009:gap:5aa873caed-b04eb721d6dfb6ef:dfeaadc5da74c0205785adf2387c607603d9cdb4"
         }
       ],
       "accepted_risk": null
@@ -1006,40 +972,6 @@
           "source": "repo:skeleton/testing/test_temporal_knowledge_store_oct2026.py:bebff9e9c0ea2e9f1f24d2fb4e0c1bbcea4dac2d",
           "digest": "ef77f097a6f5a3b3f9e771781a541331078f1109e4d2b97c9441f575fa1628b3",
           "category": "p1_volume_obligation_evidence"
-        }
-      ],
-      "accepted_risk": null
-    },
-    {
-      "obligation_id": "P1-GAP-VOL-012:gap:a2d96ceed7-f5cc75a2bbc93769",
-      "obligation_digest": "14bb72ecaf8918fb5df30c2c2eb46a20b26d4b0e22dd0c0216ed7f9ac05f2cab",
-      "owner_id": "ACC-VOL-012",
-      "severity": "high",
-      "disposition": "evidence",
-      "bound_at": "2026-09-30T18:00:00Z",
-      "review_at": "2026-10-30T18:00:00Z",
-      "evidence": [
-        {
-          "category": "p1_volume_obligation_evidence",
-          "digest": "c88db7868452db912b8c199b521a5da52b286b0322dc3db34e67cbb81ea1b9dd",
-          "source": "p1:bulk-volume-obligation-evidence:P1-GAP-VOL-012:gap:a2d96ceed7-f5cc75a2bbc93769:dfeaadc5da74c0205785adf2387c607603d9cdb4"
-        }
-      ],
-      "accepted_risk": null
-    },
-    {
-      "obligation_id": "P1-GAP-VOL-012:gap:c7c289105c-bba885f58e845e41",
-      "obligation_digest": "948d2b4bf74cf6f37d982d9868fa0e6d30d929fdd80031e8b08ef95fb5d3dc7d",
-      "owner_id": "ACC-VOL-012",
-      "severity": "high",
-      "disposition": "evidence",
-      "bound_at": "2026-09-30T18:00:00Z",
-      "review_at": "2026-10-30T18:00:00Z",
-      "evidence": [
-        {
-          "category": "p1_volume_obligation_evidence",
-          "digest": "6368ac9884b377f3e1ee41294c8c09f0094f747da56ca4d60d8389c2858d98af",
-          "source": "p1:bulk-volume-obligation-evidence:P1-GAP-VOL-012:gap:c7c289105c-bba885f58e845e41:dfeaadc5da74c0205785adf2387c607603d9cdb4"
         }
       ],
       "accepted_risk": null
