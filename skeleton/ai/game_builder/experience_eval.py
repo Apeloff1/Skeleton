@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from statistics import median
 from typing import Iterable, Mapping
 
-from .contracts import canonical_digest
+from .contracts import Rival, canonical_digest
 
 
 class ExperienceEvaluationError(RuntimeError):
@@ -102,11 +102,14 @@ class ExperienceObservation:
             raise ValueError("observed_facts must be non-empty")
         if len(parents) != len(set(parents)):
             raise ValueError("parent_context identities must be unique")
+        normalized_evaluator = _text(evaluator_id, "evaluator_id")
+        if normalized_evaluator in {Rival.A.value, Rival.B.value}:
+            raise ValueError("experience evaluator must be independent from both rivals")
         return cls(
             observation_id=_text(observation_id, "observation_id"),
             artifact_digest=_digest(artifact_digest, "artifact_digest"),
             project_revision=_text(project_revision, "project_revision"),
-            evaluator_id=_text(evaluator_id, "evaluator_id"),
+            evaluator_id=normalized_evaluator,
             method_id=_text(method_id, "method_id"),
             atomic_target_id=_text(atomic_target_id, "atomic_target_id"),
             parent_context=parents,
