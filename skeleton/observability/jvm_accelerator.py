@@ -632,6 +632,6 @@ def get_default_accelerator() -> JvmObservabilityAccelerator:
 
 def close_default_accelerator() -> None:
     """Retire only the observability helper from the canonical JVM registry."""
-    from skeleton.native.jvm_registry import get_default_jvm_registry
+    from skeleton.native.jvm_registry import close_default_jvm_accelerator
 
-    get_default_jvm_registry().close("observability")
+    close_default_jvm_accelerator("observability")
