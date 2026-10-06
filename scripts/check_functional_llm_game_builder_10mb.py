@@ -46,6 +46,18 @@ def main() -> int:
         if policy.get(key) is not True:
             fail(f"coverage policy disabled: {key}")
 
+    legacy = data.get("legacy_requirement_baseline", {})
+    expected_legacy_source = "4f2d5f736bebc30e7156d0431da18ada41664afa"
+    if legacy.get("source_commit") != expected_legacy_source:
+        fail("legacy requirement baseline source drift")
+    legacy_per_plane = legacy.get("per_plane")
+    if not isinstance(legacy_per_plane, dict):
+        fail("legacy requirement baseline map missing")
+    if set(legacy_per_plane) != set(expected_ids):
+        fail("legacy requirement baseline plane set mismatch")
+    if int(legacy.get("total_atoms", 0)) != sum(int(v) for v in legacy_per_plane.values()):
+        fail("legacy requirement baseline total drift")
+
     total = 0
     for shard in shards:
         shard_id = shard["id"]
@@ -77,9 +89,20 @@ def main() -> int:
         atom_ids = set(
             re.findall(rf"^## ({re.escape(shard_id)}-\d{{5}})\b", text, re.MULTILINE)
         )
-        minimum_atoms = int(shard.get("minimum_requirement_atoms", 450))
-        if len(atom_ids) < minimum_atoms:
-            fail(f"insufficient requirement atoms in {shard_id}: {len(atom_ids)}")
+        legacy_floor = int(legacy_per_plane.get(shard_id, 0))
+        declared_legacy_floor = int(shard.get("legacy_baseline_requirement_atoms", 0))
+        minimum_atoms = int(shard.get("minimum_requirement_atoms", 0))
+        if legacy_floor <= 0:
+            fail(f"missing legacy requirement baseline for {shard_id}")
+        if declared_legacy_floor != legacy_floor:
+            fail(f"{shard_id} legacy baseline metadata drift")
+        if minimum_atoms != legacy_floor:
+            fail(f"{shard_id} minimum requirement atom floor drift")
+        if len(atom_ids) < legacy_floor:
+            fail(
+                f"legacy requirement atoms regressed in {shard_id}: "
+                f"{len(atom_ids)} < {legacy_floor}"
+            )
 
         heading_matches = re.findall(
             rf"^## {re.escape(shard_id)}-\d{{5}} — (.*?) / (.*?) / (.*?)$",
