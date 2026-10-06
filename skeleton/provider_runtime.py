@@ -56,6 +56,7 @@ from skeleton.intelligence.admission_runtime import (
     AdmissionRuntime,
     AdmissionRuntimeError,
 )
+from skeleton.shells.cancellation import CancellationToken
 from skeleton.vault.data_governance import (
     DataGovernanceDenied,
     ProviderTransferRequest,
@@ -2228,12 +2229,16 @@ class OpenAIProviderAdapter(ProviderAdapter):
             if request.max_output_tokens is not None
             else min(4_096, request.resource_budget.max_output_tokens)
         )
+        request_timeout = _remaining_provider_timeout(
+            request,
+            self.timeout_seconds,
+        )
         lease, estimate = _admit_provider_request(
             self.admission_runtime,
             request,
             tenant_id=effective_tenant_id,
             requested_output_tokens=requested_output,
-            timeout_seconds=self.timeout_seconds,
+            timeout_seconds=request_timeout,
             provider_attempts=self.max_retries + 1,
         )
 
@@ -2267,10 +2272,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
             if structured_payload is not None:
                 kwargs["text"] = structured_payload
 
-            timeout_seconds = _remaining_provider_timeout(
-                request,
-                self.timeout_seconds,
-            )
+            timeout_seconds = request_timeout
             try:
                 dispatched = True
                 response = await _await_bounded_provider_call(
@@ -3002,7 +3004,16 @@ class OpenAISyncProviderAdapter:
     def _decode_response(response: Any) -> Mapping[str, Any]:
         return _read_provider_json(response)
 
-    def generate_sync(self, request: ProviderRequest) -> ProviderResponse:
+    def generate_sync(
+        self,
+        request: ProviderRequest,
+        *,
+        cancellation: CancellationToken | None = None,
+    ) -> ProviderResponse:
+        if cancellation is not None:
+            if not isinstance(cancellation, CancellationToken):
+                raise TypeError("cancellation must be CancellationToken")
+            cancellation.require_active()
         model = _validate_request(request, default_model=self.model)
         self._ensure_architecture()
 
@@ -3034,12 +3045,16 @@ class OpenAISyncProviderAdapter:
             if request.max_output_tokens is not None
             else min(4_096, request.resource_budget.max_output_tokens)
         )
+        request_timeout = _remaining_provider_timeout(
+            request,
+            self.timeout_seconds,
+        )
         lease, estimate = _admit_provider_request(
             self.admission_runtime,
             request,
             tenant_id=effective_tenant_id,
             requested_output_tokens=requested_output,
-            timeout_seconds=self.timeout_seconds,
+            timeout_seconds=request_timeout,
             provider_attempts=self.max_retries + 1,
         )
 
@@ -3089,18 +3104,24 @@ class OpenAISyncProviderAdapter:
         dispatched = False
         try:
             for _attempt in range(self.max_retries + 1):
+                if cancellation is not None:
+                    cancellation.require_active()
                 attempts_used += 1
                 try:
                     timeout_seconds = _remaining_provider_timeout(
                         request,
-                        self.timeout_seconds,
+                        request_timeout,
                     )
+                    if cancellation is not None:
+                        cancellation.require_active()
                     dispatched = True
                     with urllib.request.urlopen(
                         outbound,
                         timeout=timeout_seconds,
                     ) as response:
                         payload = self._decode_response(response)
+                    if cancellation is not None:
+                        cancellation.require_active()
                     raw_text = self._extract_response_text(payload)
                     (
                         text,
@@ -3127,6 +3148,8 @@ class OpenAISyncProviderAdapter:
                         attempts_used=attempts_used,
                         normalized_usage=usage,
                     )
+                    if cancellation is not None:
+                        cancellation.require_active()
                     try:
                         _finalize_provider_usage(
                             self.admission_runtime,
@@ -3169,6 +3192,8 @@ class OpenAISyncProviderAdapter:
                 except ProviderError:
                     raise
                 except TimeoutError as exc:
+                    if cancellation is not None and cancellation.cancelled:
+                        cancellation.require_active()
                     last_error = exc
                     if request.deadline is not None:
                         deadline = request.deadline.astimezone(timezone.utc)
@@ -3182,6 +3207,8 @@ class OpenAISyncProviderAdapter:
                     OSError,
                     ValueError,
                 ) as exc:
+                    if cancellation is not None and cancellation.cancelled:
+                        cancellation.require_active()
                     last_error = exc
                     continue
         except _ProviderUsageIncompleteError:
