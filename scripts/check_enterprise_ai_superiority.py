@@ -17,6 +17,8 @@ from typing import Any, Mapping
 ROOT = Path(__file__).resolve().parents[1]
 POLICY = Path("machine/enterprise_ai_superiority.json")
 MASTER_PLAN = Path("machine/ai_master_plan.json")
+COMPETITIVE_LADDER = Path("machine/competitive_ai_engineering_ladder.json")
+COMPETITIVE_BENCHMARK = Path("machine/competitive_ai_benchmark_governance.json")
 
 REQUIRED_GRADE_STATES = (
     "designed",
@@ -152,6 +154,60 @@ def _volume_map(master: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
     return output
 
 
+def _validate_competitive_benchmark(policy: Mapping[str, Any], root: Path) -> int:
+    authority = _mapping(policy.get("authority"), "authority")
+    if authority.get("competitive_benchmark_governance") != str(COMPETITIVE_BENCHMARK):
+        raise EnterpriseSuperiorityError(
+            "enterprise authority must bind machine/competitive_ai_benchmark_governance.json"
+        )
+    benchmark = _load(root / COMPETITIVE_BENCHMARK)
+    if benchmark.get("schema_version") != "skeleton.competitive_ai_benchmark_governance.v1":
+        raise EnterpriseSuperiorityError("competitive benchmark schema binding drift")
+    journeys = benchmark.get("cross_family_journeys")
+    if not isinstance(journeys, list) or len(journeys) != 8:
+        raise EnterpriseSuperiorityError(
+            "competitive benchmark must contain 8 cross-family journeys"
+        )
+    prereg = _mapping(benchmark.get("preregistration"), "benchmark.preregistration")
+    if prereg.get("required") is not True:
+        raise EnterpriseSuperiorityError(
+            "competitive benchmark preregistration must be mandatory"
+        )
+    return len(journeys)
+
+
+def _validate_competitive_ladder(policy: Mapping[str, Any], root: Path) -> tuple[int, int]:
+    authority = _mapping(policy.get("authority"), "authority")
+    if authority.get("competitive_engineering_ladder") != str(COMPETITIVE_LADDER):
+        raise EnterpriseSuperiorityError(
+            "enterprise authority must bind machine/competitive_ai_engineering_ladder.json"
+        )
+
+    binding = _mapping(
+        policy.get("competitive_engineering_ladder"),
+        "competitive_engineering_ladder",
+    )
+    if binding.get("schema_version") != "skeleton.competitive_ai_engineering_ladder.v1":
+        raise EnterpriseSuperiorityError("competitive ladder schema binding drift")
+    if binding.get("family_count") != 20 or binding.get("total_levels") != 200:
+        raise EnterpriseSuperiorityError("competitive ladder topology binding drift")
+
+    ladder = _load(root / COMPETITIVE_LADDER)
+    families = ladder.get("families")
+    levels = ladder.get("levels")
+    if not isinstance(families, list) or len(families) != 20:
+        raise EnterpriseSuperiorityError("competitive ladder must contain 20 families")
+    if not isinstance(levels, list) or len(levels) != 200:
+        raise EnterpriseSuperiorityError("competitive ladder must contain 200 levels")
+    if levels[0].get("id") != "ENG-001" or levels[-1].get("id") != "ENG-200":
+        raise EnterpriseSuperiorityError("competitive ladder level range drift")
+    if any(row.get("signed") is not False or row.get("status") != "planned" for row in levels):
+        raise EnterpriseSuperiorityError(
+            "design-authority competitive levels may not self-claim completion"
+        )
+    return len(families), len(levels)
+
+
 def _validate_common(policy: Mapping[str, Any]) -> None:
     if policy.get("schema_version") != "skeleton.enterprise_ai_superiority.v1":
         raise EnterpriseSuperiorityError("unsupported superiority schema")
@@ -166,6 +222,7 @@ def _validate_common(policy: Mapping[str, Any]) -> None:
         "tail behavior",
         "exact-head",
         "expires",
+        "200-level engineering ladder",
     ):
         if token not in law_blob:
             raise EnterpriseSuperiorityError(f"missing enterprise law fragment: {token}")
@@ -449,6 +506,8 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     policy = _load(root / POLICY)
     master = _load(root / MASTER_PLAN)
     _validate_common(policy)
+    ladder_families, ladder_levels = _validate_competitive_ladder(policy, root)
+    benchmark_journeys = _validate_competitive_benchmark(policy, root)
     volumes = _volume_map(master)
     profiles = _validate_profiles(policy, volumes)
     golden_journeys = _validate_end_to_end(policy, volumes)
@@ -474,6 +533,9 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         "enterprise_qualified_profiles": qualified,
         "superior_profiles": superior,
         "all_volumes_inherit_common_contract": True,
+        "competitive_engineering_family_count": ladder_families,
+        "competitive_engineering_level_count": ladder_levels,
+        "competitive_benchmark_journey_count": benchmark_journeys,
     }
 
 
