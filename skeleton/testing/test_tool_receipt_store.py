@@ -6,11 +6,16 @@ from uuid import uuid4
 import pytest
 
 from skeleton.skills.tool_contract import (
+    ToolExecutionReceipt,
     ToolExecutionRequest,
     ToolExecutionStatus,
     ToolManifest,
 )
-from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
+from skeleton.skills.tool_receipt_store import (
+    SQLiteToolReceiptStore,
+    ToolReceiptConflict,
+    ToolReconciliationOutcome,
+)
 from skeleton.skills.tool_runtime import AsyncToolRuntime, ToolRuntime
 
 
@@ -363,3 +368,127 @@ def test_durable_store_rejects_privacy_context_change_for_same_identity(
 
     with pytest.raises(Exception, match="privacy context"):
         store.reserve(conflicting, now=_now())
+
+
+def _receipt_for(request):
+    return ToolExecutionReceipt(
+        receipt_id=str(uuid4()),
+        request_id=request.request_id,
+        operation_id=request.operation_id,
+        execution_id=request.execution_id,
+        turn_id=request.turn_id,
+        call_id=request.call_id,
+        tenant_id=request.tenant_id,
+        tool_id=request.tool_id,
+        idempotency_key=request.idempotency_key,
+        arguments_digest=request.arguments_digest,
+        status=ToolExecutionStatus.SUCCEEDED,
+        started_at=_now(),
+        finished_at=_now(),
+        result_ref="artifact:reconciled",
+        data_class=request.data_class,
+        transfer_purpose=request.transfer_purpose,
+    )
+
+
+def test_no_effect_reconciliation_releases_only_current_fence(tmp_path) -> None:
+    path = tmp_path / "tool-reconciliation.sqlite3"
+    request = _request()
+    store = SQLiteToolReceiptStore(path)
+    assert store.reserve(request, now=_now()).status == "owner"
+
+    resolved = store.resolve_no_effect(
+        request,
+        evidence_ref="audit:no-effect-1",
+        now=_now(),
+    )
+    assert resolved.outcome is ToolReconciliationOutcome.NO_EFFECT
+    assert resolved.reference.startswith("tool-reconciliation:")
+    assert store.pending() == ()
+    assert store.reconciliation(
+        tenant_id=request.tenant_id,
+        operation_id=request.operation_id,
+        idempotency_key=request.idempotency_key,
+    ) == resolved
+
+    # A retry may acquire a fresh fence only after no-effect reconciliation.
+    assert store.reserve(request, now=_now()).status == "owner"
+
+    # The old evidence cannot be reused to release this new incident.
+    with pytest.raises(ToolReceiptConflict, match="already consumed"):
+        store.resolve_no_effect(
+            request,
+            evidence_ref="audit:no-effect-1",
+            now=_now(),
+        )
+    assert store.pending() == (
+        (request.tenant_id, request.operation_id, request.idempotency_key),
+    )
+
+    second = store.resolve_no_effect(
+        request,
+        evidence_ref="audit:no-effect-2",
+        now=_now(),
+    )
+    assert second.reconciliation_id != resolved.reconciliation_id
+    assert store.pending() == ()
+
+
+def test_no_effect_reconciliation_is_idempotent_after_release(tmp_path) -> None:
+    path = tmp_path / "tool-reconciliation-idempotent.sqlite3"
+    request = _request()
+    store = SQLiteToolReceiptStore(path)
+    store.reserve(request, now=_now())
+
+    first = store.resolve_no_effect(
+        request,
+        evidence_ref="audit:no-effect",
+        now=_now(),
+    )
+    second = store.resolve_no_effect(
+        request,
+        evidence_ref="audit:no-effect",
+        now=_now(),
+    )
+    assert second == first
+
+
+def test_committed_reconciliation_preserves_canonical_receipt(tmp_path) -> None:
+    path = tmp_path / "tool-reconciliation-commit.sqlite3"
+    request = _request()
+    store = SQLiteToolReceiptStore(path)
+    store.reserve(request, now=_now())
+    receipt = _receipt_for(request)
+
+    reconciliation = store.resolve_committed(
+        request,
+        receipt,
+        evidence_ref="audit:effect-confirmed",
+        now=_now(),
+    )
+    assert reconciliation.outcome is ToolReconciliationOutcome.COMMITTED
+    assert reconciliation.receipt_id == receipt.receipt_id
+    durable = store.get(
+        tenant_id=request.tenant_id,
+        operation_id=request.operation_id,
+        idempotency_key=request.idempotency_key,
+    )
+    assert durable is not None
+    assert durable.status == "committed"
+    assert durable.receipt == receipt
+
+
+def test_committed_execution_cannot_be_reconciled_as_no_effect(tmp_path) -> None:
+    path = tmp_path / "tool-reconciliation-conflict.sqlite3"
+    request = _request()
+    store = SQLiteToolReceiptStore(path)
+    store.reserve(request, now=_now())
+    receipt = _receipt_for(request)
+    store.commit(request, receipt, now=_now())
+
+    with pytest.raises(ToolReceiptConflict, match="cannot reconcile as no-effect"):
+        store.resolve_no_effect(
+            request,
+            evidence_ref="audit:false-no-effect",
+            now=_now(),
+        )

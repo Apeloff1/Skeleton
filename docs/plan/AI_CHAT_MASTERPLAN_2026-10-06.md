@@ -491,23 +491,117 @@ transport-neutral journal projection without creating a second event source.
 
 ### Volume 4 — context compiler v2
 
-Add budget allocation, protected control reserve, provenance-aware compaction,
-and adversarial trust tests.
+Status: **implemented candidate; exact-head qualification pending**.
+
+Implemented:
+
+- compiler identity advanced to `context-compiler-v2`;
+- required trusted controls remain non-evictable;
+- canonical current user turn is protected before optional controls/evidence;
+- current user text is never silently compacted into a derived summary;
+- configured policy reserve remains protected during current-turn admission;
+- remaining evidence receives deterministic trust-tier first-pass quotas;
+- unused quota is borrowed in trust order to retain high utilization;
+- lower-trust retrieval cannot starve authorized conversation data;
+- context digests bind the compiler version and selected evidence;
+- canonical and `skeleton/ai/runtime/context` mirror implementations remain
+  byte-identical;
+- adversarial tests cover retrieval flooding, oversized current turns, trust
+  starvation, allocation-policy validation, and compiler-version identity.
+
+Next integration: surface allocation diagnostics/pressure telemetry without
+exposing prompt or evidence contents.
 
 ### Volume 5 — routing v2
 
-Bind turn budgets, privacy, endpoint health, provider receipts, and fail-closed
-fallback into model placement.
+Status: **implemented candidate on stacked routing branch; exact-head
+qualification pending**.
+
+Implemented:
+
+- durable AI-chat `ExecutionBudget` projects directly into routing latency,
+  cost, and output ceilings;
+- immutable route-request digests bind every hard placement constraint;
+- route-decision digests bind the selected endpoint, compliant fallbacks,
+  rejection evidence, and routing timestamp;
+- jurisdiction allowlists fail closed for unknown or disallowed placement;
+- provider receipt capability can be required as a hard constraint;
+- minimum telemetry observations can be required before an endpoint is
+  eligible;
+- telemetry freshness can be bounded and missing/stale/future evidence fails
+  closed;
+- explicit endpoint quarantine removes unhealthy endpoints from primary and
+  fallback selection until cleared or expired;
+- endpoint replacement and unregister operations clear stale quarantine state;
+- all fallback candidates are produced only after the same privacy,
+  capability, modality, context, quality, reliability, jurisdiction, receipt,
+  latency, and cost constraints;
+- canonical backend routing and clean-room AI compatibility mirror remain
+  byte-identical;
+- dedicated structural and independent exact-head routing closure evidence is
+  included.
+
+Next integration: bind durable provider execution receipts and runtime
+health/circuit-breaker observations back into quarantine/telemetry updates.
 
 ### Volume 6 — tool recovery integration
 
-Bind the turn runtime directly to canonical tool receipt reconciliation and
-approval state.
+Status: **implemented candidate on stacked tool-recovery branch; exact-head
+qualification pending**.
+
+Implemented:
+
+- canonical tool effects/risk/authority map conservatively into chat side-effect
+  classes;
+- approval-required tools become durable `AWAITING_USER` turn state before
+  privileged execution;
+- consequential tools enter `TOOL_EXECUTING` with conservative
+  effect-started semantics before the handler can escape the journal;
+- committed durable reservations bypass handler re-execution;
+- in-doubt reservations force reconciliation and are never blindly replayed;
+- durable tool events carry an explicit `tool_reconciliation_ref`;
+- a confirmed no-effect reconciliation is the only legal
+  `TOOL_EXECUTING -> TOOL_REQUIRED` retry escape;
+- confirmed committed effects bind both reconciliation and canonical tool
+  receipt references before model continuation;
+- canonical receipt storage now persists auditable reconciliation evidence;
+- no-effect reconciliation releases exactly one reservation fence;
+- reconciliation evidence cannot be reused to release a later crash/retry
+  incident;
+- committed executions cannot be relabeled as no-effect;
+- canonical and AI-runtime tool receipt stores remain byte-identical.
+
+Next integration: expose reconciliation as an operator/automated verifier
+workflow for external systems that can prove whether an in-doubt effect
+actually committed.
 
 ### Volume 7 — governed attachment plane
 
-Move PDFs/images/files from inline payload handling to governed
-content-addressed references.
+Status: **implemented candidate on stacked attachment branch; product-route
+cutover pending**.
+
+Implemented:
+
+- raw upload bytes terminate at a dedicated attachment-admission boundary;
+- byte signatures, not filenames or claimed MIME, determine supported format;
+- claimed MIME and filename-extension mismatches fail closed;
+- per-file, text, batch-byte, and attachment-count budgets are enforced before
+  parsing or model exposure;
+- admitted files receive deterministic SHA-256 content references;
+- exact duplicate attachments are deduplicated by content digest;
+- PDF structure requires a bounded EOF marker before admission;
+- PDF active-action/embed indicators are quarantined before extraction;
+- quarantined references cannot enter the context compiler;
+- sandbox-extracted text projects only through canonical artifact context and
+  is asserted to remain `UNTRUSTED_EVIDENCE`;
+- image references bind into the existing canonical
+  `MultimodalIngestionCore` only when digest, byte count, media type, format,
+  classification, and pipeline admission all agree;
+- multimodal digest or probe drift fails closed.
+
+Next integration: replace remaining chat-inline base64/file payloads with
+durable attachment references backed by the repository's governed storage
+authority and sandbox extraction receipts.
 
 ### Volume 8 — evidence and citation plane
 

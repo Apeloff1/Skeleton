@@ -186,3 +186,53 @@ __all__ += [
     "project_turn_page",
     "require_resume_cursor",
 ]
+
+
+from .tool_recovery import (
+    ToolRecoveryAction,
+    ToolRecoveryDecision,
+    ToolRecoveryError,
+    committed_receipt_event,
+    decide_tool_preflight,
+    map_tool_side_effect,
+    preflight_event,
+    reconciliation_event,
+    tool_receipt_ref,
+)
+
+__all__ += [
+    "ToolRecoveryAction",
+    "ToolRecoveryDecision",
+    "ToolRecoveryError",
+    "committed_receipt_event",
+    "decide_tool_preflight",
+    "map_tool_side_effect",
+    "preflight_event",
+    "reconciliation_event",
+    "tool_receipt_ref",
+]
+
+
+from .attachments import (
+    AttachmentAdmissionError,
+    AttachmentAdmissionPlane,
+    AttachmentBatchReceipt,
+    AttachmentFormat,
+    AttachmentPolicy,
+    AttachmentReference,
+    AttachmentUpload,
+    admit_multimodal_reference,
+    attachment_context_evidence,
+)
+
+__all__ += [
+    "AttachmentAdmissionError",
+    "AttachmentAdmissionPlane",
+    "AttachmentBatchReceipt",
+    "AttachmentFormat",
+    "AttachmentPolicy",
+    "AttachmentReference",
+    "AttachmentUpload",
+    "admit_multimodal_reference",
+    "attachment_context_evidence",
+]

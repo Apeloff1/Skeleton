@@ -171,6 +171,7 @@ _ALLOWED_TRANSITIONS: Mapping[TurnState, frozenset[TurnState]] = {
     ),
     TurnState.TOOL_EXECUTING: frozenset(
         {
+            TurnState.TOOL_REQUIRED,
             TurnState.MODEL_RUNNING,
             TurnState.VERIFYING,
             TurnState.FAILED_RETRYABLE,
@@ -499,6 +500,7 @@ class TurnEvent:
     tool_call_id: str | None = None
     tool_side_effect: SideEffectClass | None = None
     tool_receipt_ref: str | None = None
+    tool_reconciliation_ref: str | None = None
     external_effect_started: bool = False
     provider_receipt_ref: str | None = None
     usage: BudgetUsage | None = None
@@ -559,6 +561,15 @@ class TurnEvent:
             _optional_text(
                 self.tool_receipt_ref,
                 "tool_receipt_ref",
+                maximum=2048,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "tool_reconciliation_ref",
+            _optional_text(
+                self.tool_reconciliation_ref,
+                "tool_reconciliation_ref",
                 maximum=2048,
             ),
         )
@@ -625,6 +636,7 @@ class TurnEvent:
                 None if self.tool_side_effect is None else self.tool_side_effect.value
             ),
             "tool_receipt_ref": self.tool_receipt_ref,
+            "tool_reconciliation_ref": self.tool_reconciliation_ref,
             "external_effect_started": self.external_effect_started,
             "provider_receipt_ref": self.provider_receipt_ref,
             "usage": None if self.usage is None else self.usage.as_dict(),
@@ -761,8 +773,10 @@ class TurnSnapshot:
                 tool_side_effect in _CONSEQUENTIAL_EFFECTS
                 and external_effect_started
                 and tool_receipt_ref is None
+                and event.tool_reconciliation_ref is None
                 and event.to_state
                 in {
+                    TurnState.TOOL_REQUIRED,
                     TurnState.MODEL_RUNNING,
                     TurnState.VERIFYING,
                     TurnState.FAILED_RETRYABLE,
@@ -834,6 +848,7 @@ def make_event(
     tool_call_id: str | None = None,
     tool_side_effect: SideEffectClass | None = None,
     tool_receipt_ref: str | None = None,
+    tool_reconciliation_ref: str | None = None,
     external_effect_started: bool = False,
     provider_receipt_ref: str | None = None,
     usage: BudgetUsage | None = None,
@@ -852,6 +867,7 @@ def make_event(
         tool_call_id=tool_call_id,
         tool_side_effect=tool_side_effect,
         tool_receipt_ref=tool_receipt_ref,
+        tool_reconciliation_ref=tool_reconciliation_ref,
         external_effect_started=external_effect_started,
         provider_receipt_ref=provider_receipt_ref,
         usage=usage,
@@ -1054,6 +1070,7 @@ def turn_event_from_dict(raw: Mapping[str, object]) -> TurnEvent:
         tool_call_id=raw.get("tool_call_id"),
         tool_side_effect=raw.get("tool_side_effect"),
         tool_receipt_ref=raw.get("tool_receipt_ref"),
+        tool_reconciliation_ref=raw.get("tool_reconciliation_ref"),
         external_effect_started=bool(raw.get("external_effect_started")),
         provider_receipt_ref=raw.get("provider_receipt_ref"),
         usage=(
