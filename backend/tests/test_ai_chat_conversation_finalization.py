@@ -131,6 +131,7 @@ async def test_chat_commits_assistant_only_from_successful_engine_result(
     async def execute(command):
         captured_commands.append(command)
         return SimpleNamespace(
+            operation_id=command.operation.operation_id,
             final_output="Verified terminal answer.",
             execution_id=command.execution_request.execution_id,
             verification="verification:terminal",
