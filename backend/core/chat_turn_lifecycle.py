@@ -59,13 +59,31 @@ class ChatTurnLifecycle:
         tenant_id: str,
         owner_id: str,
     ) -> PersistedChatTurn:
-        binding = ChatTurnBinding.from_conversation(thread, user_message)
-        turn = await self.authority.create_operation(
-            operation_id=operation_id,
-            request_digest=request_digest,
-            binding=binding,
-            created_at=user_message.created_at,
+        existing = await self.get_if_present(
+            operation_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
         )
+        if existing is not None:
+            if (
+                existing.snapshot.request_digest != request_digest
+                or existing.binding.thread_id != thread.thread_id
+                or existing.binding.causal_user_message_id != user_message.message_id
+                or existing.binding.tenant_id != tenant_id
+                or existing.binding.owner_id != owner_id
+            ):
+                raise ValueError(
+                    "existing durable turn does not match canonical retry identity"
+                )
+            turn = existing
+        else:
+            binding = ChatTurnBinding.from_conversation(thread, user_message)
+            turn = await self.authority.create_operation(
+                operation_id=operation_id,
+                request_digest=request_digest,
+                binding=binding,
+                created_at=user_message.created_at,
+            )
         return await self.advance(
             turn,
             TurnState.USER_MESSAGE_COMMITTED,
