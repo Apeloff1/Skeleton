@@ -208,11 +208,16 @@ class ChatTurnLifecycle:
             return turn
 
         result = turn
+        verifying_index = _STAGE_INDEX[TurnState.VERIFYING]
         for state in _ROUTE_STAGES[current_index + 1 : target_index + 1]:
             bind_receipt = (
                 effective_receipt_ref
                 if effective_receipt_ref is not None
                 and result.snapshot.provider_receipt_ref is None
+                and (
+                    state is TurnState.VERIFYING
+                    or current_index >= verifying_index
+                )
                 else None
             )
             event = make_event(
