@@ -5,6 +5,8 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 DATA=ROOT/"machine"/"essentials_1000.json"
 SCHED=ROOT/"machine"/"project_self_improvement_idle_scheduler.json"
+CLOSURE=ROOT/"machine"/"essentials_1000_closure_protocol.json"
+LEDGER=ROOT/"machine"/"essentials_1000_gap_ledger.json"
 MODULE=ROOT/"scripts"/"check_essentials_1000.py"
 
 def _m():
@@ -13,8 +15,10 @@ def _m():
     mod=importlib.util.module_from_spec(spec); spec.loader.exec_module(mod); return mod
 def _d(): return json.loads(DATA.read_text(encoding="utf-8"))
 def _s(): return json.loads(SCHED.read_text(encoding="utf-8"))
+def _c(): return json.loads(CLOSURE.read_text(encoding="utf-8"))
+def _l(): return json.loads(LEDGER.read_text(encoding="utf-8"))
 
-def test_contract_is_valid(): assert _m().validate(_d(),_s())==[]
+def test_contract_is_valid(): assert _m().validate(_d(),_s(),_c(),_l())==[]
 def test_exact_1000_and_100_strata():
     d=_d()
     assert [x["id"] for x in d["levels"]]==[f"ESS1000-{i:04d}" for i in range(1,1001)]
@@ -42,3 +46,46 @@ def test_disabled_capability_cannot_escape_baseline():
     laws="\n".join(_d()["laws"])
     assert "safe disabled-state contract" in laws
     assert "not-applicable labels" in laws
+
+
+def test_gap_ledger_is_explicitly_open_not_fake_complete():
+    l=_l()
+    assert len(l["records"])==1000
+    assert l["summary"]["open"]==1000
+    assert l["summary"]["signed_current"]==0
+    assert l["summary"]["essentials_1000_qualified"] is False
+    assert all(r["state"]=="open" for r in l["records"])
+    assert all(r["implementation_identity"] is None for r in l["records"])
+    assert all(r["closure_receipt_digest"] is None for r in l["records"])
+
+def test_waivers_and_not_applicable_cannot_close_essentials():
+    c=_c()
+    assert c["exception_policy"]["waivers_can_mark_complete"] is False
+    assert c["exception_policy"]["exception_can_bypass_non_compensable_invariant"] is False
+    assert c["applicability"]["not_applicable_completion"] is False
+
+def test_stale_evidence_must_reopen_and_propagate():
+    c=_c()
+    assert "moves the affected essential out of signed closure" in c["freshness"]["revalidation_rule"]
+    assert "invalidates downstream ESS levels" in c["freshness"]["dependency_propagation"]
+    assert "mapped implementation changes" in c["freshness"]["invalidation_triggers"]
+    assert "new failing regression evidence" in c["freshness"]["invalidation_triggers"]
+
+def test_signatures_are_separated_and_finality_cannot_self_attest():
+    c=_c()
+    assert "distinct identities" in c["signatures"]["separation_rule"]
+    assert "whole-system finality verifier" in c["signatures"]["finality_rule"]
+    assert c["finality"]["no_majority_vote"] is True
+    assert c["finality"]["no_score_substitution"] is True
+    assert c["finality"]["no_benchmark_substitution"] is True
+
+def test_ledger_divergence_is_detected():
+    m=_m(); d=_d(); l=_l()
+    l["records"][0]["state"]="signed_current"
+    l["records"][0]["implementation_identity"]="fake"
+    l["records"][0]["closure_receipt_digest"]="fake"
+    l["records"][0]["current_evidence_ids"]=["fake"]
+    l["summary"]["signed_current"]=1
+    l["summary"]["open"]=999
+    errors=m.validate(d,_s(),_c(),l)
+    assert any("signed-current count diverges" in e for e in errors)
