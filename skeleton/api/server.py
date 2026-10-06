@@ -846,16 +846,50 @@ class ServerState:
         return await coordinator.recover()
 
     async def close_engine_execution_service(self) -> None:
+        """Drain execution authority and close durable handles without masking faults."""
+
+        errors: list[BaseException] = []
         coordinator = self.engine_execution_coordinator
         if coordinator is not None:
-            await coordinator.shutdown()
+            try:
+                await coordinator.shutdown()
+            except BaseException as exc:
+                errors.append(exc)
+
         service = self.engine_execution_service
         if service is not None:
-            service.repository.close()
-            service.submissions.close()
+            for closer in (
+                service.repository.close,
+                service.submissions.close,
+            ):
+                try:
+                    closer()
+                except BaseException as exc:
+                    errors.append(exc)
+
         receipt_store = self.engine_tool_receipt_store
         if receipt_store is not None:
-            receipt_store.close()
+            try:
+                receipt_store.close()
+            except BaseException as exc:
+                errors.append(exc)
+
+        quota_ledger = self.engine_quota_ledger
+        close_quota = getattr(quota_ledger, "close", None)
+        if callable(close_quota):
+            try:
+                close_quota()
+            except BaseException as exc:
+                errors.append(exc)
+
+        pressure_ledger = self.engine_pressure_ledger
+        close_pressure = getattr(pressure_ledger, "close", None)
+        if callable(close_pressure):
+            try:
+                close_pressure()
+            except BaseException as exc:
+                errors.append(exc)
+
         self.engine_execution_coordinator = None
         self.engine_execution_service = None
         self.engine_tool_receipt_store = None
@@ -863,6 +897,13 @@ class ServerState:
         self.engine_execution_admission_runtime = None
         self.engine_quota_ledger = None
         self.engine_pressure_ledger = None
+
+        if errors:
+            kinds = ",".join(type(exc).__name__ for exc in errors[:8])
+            raise RuntimeError(
+                "engine runtime shutdown completed with supervision/cleanup "
+                f"errors ({kinds})"
+            ) from errors[0]
 
     def wire_from_genesis(self, genesis: Any) -> None:
         self.genesis = genesis
