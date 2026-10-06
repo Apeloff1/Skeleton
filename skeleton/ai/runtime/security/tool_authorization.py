@@ -21,7 +21,7 @@ class ToolRequest:
  operation:str
  request_digest:str
  def __post_init__(self):
-  if not all(isinstance(x,str) and x for x in (self.tool_id,self.capability,self.resource,self.operation)):raise SecurityContractError("request fields required")
+  if not all(isinstance(x,str) and x and x==x.strip() for x in (self.tool_id,self.capability,self.resource,self.operation)):raise SecurityContractError("request fields required")
   if not isinstance(self.request_digest,str) or not _SHA.fullmatch(self.request_digest):raise SecurityContractError("invalid request digest")
 @dataclass(frozen=True,slots=True)
 class AuthorizationReceipt:
