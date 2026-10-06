@@ -3492,3 +3492,58 @@ An enabled capability is not automatically ready. Readiness is resolved from its
 `machine/ai_closure_evidence.json` separately tracks closure proof. Implementation progress and closure decision are intentionally different concepts. A P0 closes only after dependency closure, executable evidence, blueprint promotion, focused tests, and canonical gap-state update. A regression in a lower-stage contract can reopen dependent evidence.
 
 These three files are mandatory provider-bootstrap material and are linked from the architecture and runtime manifests.
+
+
+## Enterprise AI superiority authority
+
+The canonical competitive/enterprise acceptance authority is
+`machine/enterprise_ai_superiority.json`; its human explanation is
+`docs/architecture/ENTERPRISE_AI_SUPERIORITY.md`.
+
+This authority changes the definition of completion:
+
+- `implemented` means runtime behavior exists; it is not an enterprise claim;
+- `hardened` means negative/recovery/concurrency behavior is covered; it is
+  still not an enterprise claim;
+- `enterprise_qualified` requires current exact-head SLO, security, privacy,
+  tenant-isolation, recovery, rollback and operability evidence;
+- `superior` additionally requires a reproducible comparator-backed Pareto
+  improvement against the baseline declared by that volume's superiority
+  profile.
+
+All masterplan volumes inherit the common enterprise contract. Critical
+production and advanced serving volumes additionally bind
+`enterprise_superiority_profile` to a dedicated `ENT-VOL-xxx` profile.
+
+Builders MUST NOT:
+
+- promote an enterprise grade from implementation status, LOC, documentation,
+  or happy-path tests;
+- trade a security/privacy/authority/tenant/state-loss regression for quality,
+  speed, throughput or cost;
+- compare against an unbound or materially different workload/environment and
+  call the result superiority;
+- use median-only performance wins while ignoring tail latency, saturation,
+  failure recovery or resource pressure;
+- allow the implementation under test to self-promote from its own benchmark;
+- leave optimized paths without a tested reference/rollback path unless a
+  signed architecture exception proves that rollback is impossible.
+
+For a dedicated profile, construction starts from the declared conventional
+baseline and primary outcome. The implementation must then satisfy at least the
+declared dominance targets and all non-compensable gates. The evidence bundle
+binds source/head, baseline, policy/contracts, workload, model/provider,
+environment, scorer, budget, raw result digest and verifier verdict.
+
+Before signing a critical volume, run:
+
+```bash
+python scripts/check_enterprise_ai_superiority.py --json
+python -m pytest -q tests/test_enterprise_ai_superiority.py
+```
+
+The repository-wide workflow
+`.github/workflows/enterprise-ai-superiority.yml` validates the authority at
+the exact PR head. A complete enterprise-AI claim is prohibited until every
+production-path volume satisfies the common contract and every dedicated
+critical profile reaches its required evidence-backed grade.
