@@ -99,7 +99,10 @@
         "data-persistence",
         "governance",
         "security-safety",
-        "observability"
+        "observability",
+        "configuration-secrets",
+        "engine-api",
+        "application-api"
       ],
       "authority": "Deterministic contracts and canonical state outrank model inference; no learned component may redefine identity, authority, provenance, or durability.",
       "failure": "Reject, quarantine, or degrade before allowing ambiguous identity, state, permission, provenance, or budget semantics.",
@@ -116,7 +119,9 @@
         "retrieval",
         "artifact-files",
         "model-provider",
-        "security-safety"
+        "security-safety",
+        "product-experience",
+        "streaming-realtime"
       ],
       "authority": "Input interpretation may classify and transform evidence but cannot promote evidence into policy or canonical authority.",
       "failure": "Drop, quarantine, externalize, or mark insufficient context rather than silently trusting malformed, oversized, or low-integrity input.",
@@ -286,7 +291,10 @@
         "data-persistence",
         "governance",
         "security-safety",
-        "observability"
+        "observability",
+        "configuration-secrets",
+        "engine-api",
+        "application-api"
       ],
       "authority_rule": "Deterministic contracts and canonical state outrank model inference; no learned component may redefine identity, authority, provenance, or durability.",
       "failure_mode": "Reject, quarantine, or degrade before allowing ambiguous identity, state, permission, provenance, or budget semantics.",
@@ -322,7 +330,10 @@
         "data-persistence",
         "governance",
         "security-safety",
-        "observability"
+        "observability",
+        "configuration-secrets",
+        "engine-api",
+        "application-api"
       ],
       "authority_rule": "Deterministic contracts and canonical state outrank model inference; no learned component may redefine identity, authority, provenance, or durability.",
       "failure_mode": "Reject, quarantine, or degrade before allowing ambiguous identity, state, permission, provenance, or budget semantics.",
@@ -358,7 +369,10 @@
         "data-persistence",
         "governance",
         "security-safety",
-        "observability"
+        "observability",
+        "configuration-secrets",
+        "engine-api",
+        "application-api"
       ],
       "authority_rule": "Deterministic contracts and canonical state outrank model inference; no learned component may redefine identity, authority, provenance, or durability.",
       "failure_mode": "Reject, quarantine, or degrade before allowing ambiguous identity, state, permission, provenance, or budget semantics.",
@@ -394,7 +408,10 @@
         "data-persistence",
         "governance",
         "security-safety",
-        "observability"
+        "observability",
+        "configuration-secrets",
+        "engine-api",
+        "application-api"
       ],
       "authority_rule": "Deterministic contracts and canonical state outrank model inference; no learned component may redefine identity, authority, provenance, or durability.",
       "failure_mode": "Reject, quarantine, or degrade before allowing ambiguous identity, state, permission, provenance, or budget semantics.",
@@ -430,7 +447,10 @@
         "data-persistence",
         "governance",
         "security-safety",
-        "observability"
+        "observability",
+        "configuration-secrets",
+        "engine-api",
+        "application-api"
       ],
       "authority_rule": "Deterministic contracts and canonical state outrank model inference; no learned component may redefine identity, authority, provenance, or durability.",
       "failure_mode": "Reject, quarantine, or degrade before allowing ambiguous identity, state, permission, provenance, or budget semantics.",
@@ -466,7 +486,10 @@
         "data-persistence",
         "governance",
         "security-safety",
-        "observability"
+        "observability",
+        "configuration-secrets",
+        "engine-api",
+        "application-api"
       ],
       "authority_rule": "Deterministic contracts and canonical state outrank model inference; no learned component may redefine identity, authority, provenance, or durability.",
       "failure_mode": "Reject, quarantine, or degrade before allowing ambiguous identity, state, permission, provenance, or budget semantics.",
@@ -502,7 +525,10 @@
         "data-persistence",
         "governance",
         "security-safety",
-        "observability"
+        "observability",
+        "configuration-secrets",
+        "engine-api",
+        "application-api"
       ],
       "authority_rule": "Deterministic contracts and canonical state outrank model inference; no learned component may redefine identity, authority, provenance, or durability.",
       "failure_mode": "Reject, quarantine, or degrade before allowing ambiguous identity, state, permission, provenance, or budget semantics.",
@@ -538,7 +564,10 @@
         "data-persistence",
         "governance",
         "security-safety",
-        "observability"
+        "observability",
+        "configuration-secrets",
+        "engine-api",
+        "application-api"
       ],
       "authority_rule": "Deterministic contracts and canonical state outrank model inference; no learned component may redefine identity, authority, provenance, or durability.",
       "failure_mode": "Reject, quarantine, or degrade before allowing ambiguous identity, state, permission, provenance, or budget semantics.",
@@ -574,7 +603,10 @@
         "data-persistence",
         "governance",
         "security-safety",
-        "observability"
+        "observability",
+        "configuration-secrets",
+        "engine-api",
+        "application-api"
       ],
       "authority_rule": "Deterministic contracts and canonical state outrank model inference; no learned component may redefine identity, authority, provenance, or durability.",
       "failure_mode": "Reject, quarantine, or degrade before allowing ambiguous identity, state, permission, provenance, or budget semantics.",
@@ -610,7 +642,10 @@
         "data-persistence",
         "governance",
         "security-safety",
-        "observability"
+        "observability",
+        "configuration-secrets",
+        "engine-api",
+        "application-api"
       ],
       "authority_rule": "Deterministic contracts and canonical state outrank model inference; no learned component may redefine identity, authority, provenance, or durability.",
       "failure_mode": "Reject, quarantine, or degrade before allowing ambiguous identity, state, permission, provenance, or budget semantics.",
@@ -645,7 +680,9 @@
         "retrieval",
         "artifact-files",
         "model-provider",
-        "security-safety"
+        "security-safety",
+        "product-experience",
+        "streaming-realtime"
       ],
       "authority_rule": "Input interpretation may classify and transform evidence but cannot promote evidence into policy or canonical authority.",
       "failure_mode": "Drop, quarantine, externalize, or mark insufficient context rather than silently trusting malformed, oversized, or low-integrity input.",
@@ -680,7 +717,9 @@
         "retrieval",
         "artifact-files",
         "model-provider",
-        "security-safety"
+        "security-safety",
+        "product-experience",
+        "streaming-realtime"
       ],
       "authority_rule": "Input interpretation may classify and transform evidence but cannot promote evidence into policy or canonical authority.",
       "failure_mode": "Drop, quarantine, externalize, or mark insufficient context rather than silently trusting malformed, oversized, or low-integrity input.",
@@ -715,7 +754,9 @@
         "retrieval",
         "artifact-files",
         "model-provider",
-        "security-safety"
+        "security-safety",
+        "product-experience",
+        "streaming-realtime"
       ],
       "authority_rule": "Input interpretation may classify and transform evidence but cannot promote evidence into policy or canonical authority.",
       "failure_mode": "Drop, quarantine, externalize, or mark insufficient context rather than silently trusting malformed, oversized, or low-integrity input.",
@@ -750,7 +791,9 @@
         "retrieval",
         "artifact-files",
         "model-provider",
-        "security-safety"
+        "security-safety",
+        "product-experience",
+        "streaming-realtime"
       ],
       "authority_rule": "Input interpretation may classify and transform evidence but cannot promote evidence into policy or canonical authority.",
       "failure_mode": "Drop, quarantine, externalize, or mark insufficient context rather than silently trusting malformed, oversized, or low-integrity input.",
@@ -785,7 +828,9 @@
         "retrieval",
         "artifact-files",
         "model-provider",
-        "security-safety"
+        "security-safety",
+        "product-experience",
+        "streaming-realtime"
       ],
       "authority_rule": "Input interpretation may classify and transform evidence but cannot promote evidence into policy or canonical authority.",
       "failure_mode": "Drop, quarantine, externalize, or mark insufficient context rather than silently trusting malformed, oversized, or low-integrity input.",
@@ -820,7 +865,9 @@
         "retrieval",
         "artifact-files",
         "model-provider",
-        "security-safety"
+        "security-safety",
+        "product-experience",
+        "streaming-realtime"
       ],
       "authority_rule": "Input interpretation may classify and transform evidence but cannot promote evidence into policy or canonical authority.",
       "failure_mode": "Drop, quarantine, externalize, or mark insufficient context rather than silently trusting malformed, oversized, or low-integrity input.",
@@ -855,7 +902,9 @@
         "retrieval",
         "artifact-files",
         "model-provider",
-        "security-safety"
+        "security-safety",
+        "product-experience",
+        "streaming-realtime"
       ],
       "authority_rule": "Input interpretation may classify and transform evidence but cannot promote evidence into policy or canonical authority.",
       "failure_mode": "Drop, quarantine, externalize, or mark insufficient context rather than silently trusting malformed, oversized, or low-integrity input.",
@@ -890,7 +939,9 @@
         "retrieval",
         "artifact-files",
         "model-provider",
-        "security-safety"
+        "security-safety",
+        "product-experience",
+        "streaming-realtime"
       ],
       "authority_rule": "Input interpretation may classify and transform evidence but cannot promote evidence into policy or canonical authority.",
       "failure_mode": "Drop, quarantine, externalize, or mark insufficient context rather than silently trusting malformed, oversized, or low-integrity input.",
@@ -925,7 +976,9 @@
         "retrieval",
         "artifact-files",
         "model-provider",
-        "security-safety"
+        "security-safety",
+        "product-experience",
+        "streaming-realtime"
       ],
       "authority_rule": "Input interpretation may classify and transform evidence but cannot promote evidence into policy or canonical authority.",
       "failure_mode": "Drop, quarantine, externalize, or mark insufficient context rather than silently trusting malformed, oversized, or low-integrity input.",
@@ -960,7 +1013,9 @@
         "retrieval",
         "artifact-files",
         "model-provider",
-        "security-safety"
+        "security-safety",
+        "product-experience",
+        "streaming-realtime"
       ],
       "authority_rule": "Input interpretation may classify and transform evidence but cannot promote evidence into policy or canonical authority.",
       "failure_mode": "Drop, quarantine, externalize, or mark insufficient context rather than silently trusting malformed, oversized, or low-integrity input.",
