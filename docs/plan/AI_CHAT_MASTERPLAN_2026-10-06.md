@@ -805,3 +805,35 @@ Remaining integration:
   backends before signing this volume complete.
 
 No completion signature is asserted by this implementation commit.
+
+
+## Advanced AI 100-level overlay
+
+The chat masterplan is now a vertical product slice through the repository-wide
+100-level advanced AI architecture in
+`docs/plan/ADVANCED_AI_100_LEVELS.md` and
+`machine/advanced_ai_structure_100.json`.
+
+Chat work does not define a competing maturity model. It consumes the canonical
+ladder:
+
+- Levels 001-010 govern durable identity, budgets, provenance, replay and safety;
+- Levels 011-020 govern multimodal/context compilation;
+- Levels 021-030 govern conversational and durable memory/knowledge;
+- Levels 031-040 govern reasoning, planning, uncertainty and verification;
+- Levels 041-050 govern tools, approval and action outcomes;
+- Levels 051-060 govern bounded agent delegation;
+- Levels 061-070 govern evaluation and safe adaptation;
+- Levels 071-080 govern scheduled/resumable autonomy;
+- Levels 081-090 govern long-horizon, world-model, metacognitive and scientific
+  chat capabilities;
+- Levels 091-100 govern architecture introspection and verified improvement
+  proposals without self-approval.
+
+Existing chat volumes remain implementation slices. Completion of a chat volume
+does not automatically promote a 100-level maturity level, and a planned
+100-level entry does not fabricate implementation of the chat volume.
+
+Every tenth advanced level is a closure gate. Level 100 can only be promoted
+when every required lower level and the enterprise Level-0 baseline have current
+exact-head evidence.
