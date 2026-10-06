@@ -4972,4 +4972,3 @@ Specify a complete implementation/evidence surface for Scene ECS Physics and Sim
 **Quality gate.** Track correctness, verified-success, latency, resource use, reproducibility, rollback success and unresolved dependencies. No optimization can compensate for a regression in rights, security, integrity, isolation, determinism boundaries or recovery.
 
 **Status.** Specification atom only: implementation_signed=false; verification_signed=false. Closure requires exact-head executable evidence and an independent verifier.
-
