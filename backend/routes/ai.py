@@ -20,6 +20,8 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 
+from core.chat_turn_lifecycle import ChatTurnLifecycle
+from core.chat_turns import chat_turn_authority
 from core.conversations import ConversationStorageUnavailable, conversation_authority
 from core.engine_client import (
     EngineClient,
@@ -41,6 +43,14 @@ from skeleton.contracts.conversation import ConversationAuthorType, Conversation
 from skeleton.context.compiler import ContextCompiler
 from skeleton.context.instruction_policy import InstructionPolicy
 from skeleton.context.sources import artifact_segment, conversation_message_segment
+from skeleton.ai.assistant.turn_runtime import TurnState
+from skeleton.persistence.chat_turn_repository import (
+    ChatTurnAuthorizationError,
+    ChatTurnConflict,
+    ChatTurnCorruption,
+    ChatTurnNotFound,
+    ChatTurnRepositoryError,
+)
 from skeleton.persistence.conversation_repository import (
     ConversationConflict,
     ConversationNotFound,
@@ -49,6 +59,7 @@ from skeleton.persistence.conversation_repository import (
 
 logger = logging.getLogger("CodeDock.AI")
 router = APIRouter(prefix="/ai", tags=["AI Assistant v16"])
+chat_turn_lifecycle = ChatTurnLifecycle(chat_turn_authority)
 AI_MODES = {
     "explain": {
         "id": "explain",
@@ -322,8 +333,8 @@ def _chat_memory_write_intent(
     }
 
 
-def _chat_request_identity_ref(request: AIChatRequest) -> str:
-    """Bind retry identity to all user-controlled execution semantics."""
+def _chat_request_digest(request: AIChatRequest) -> str:
+    """Digest all user-controlled semantics that define one chat turn."""
 
     context_digest = (
         None
@@ -349,7 +360,13 @@ def _chat_request_identity_ref(request: AIChatRequest) -> str:
         ensure_ascii=False,
         allow_nan=False,
     ).encode("utf-8")
-    return "chat-request-sha256:" + hashlib.sha256(encoded).hexdigest()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _chat_request_identity_ref(request: AIChatRequest) -> str:
+    """Bind retry identity to all user-controlled execution semantics."""
+
+    return "chat-request-sha256:" + _chat_request_digest(request)
 
 
 def _chat_identity(user: dict) -> tuple[str, str]:
@@ -369,6 +386,14 @@ def _chat_error(exc: Exception) -> HTTPException:
         return HTTPException(status_code=409, detail=str(exc))
     if isinstance(exc, ConversationStorageUnavailable):
         return HTTPException(status_code=503, detail="Conversation storage is unavailable")
+    if isinstance(exc, ChatTurnNotFound):
+        return HTTPException(status_code=404, detail="Chat turn not found")
+    if isinstance(exc, (ChatTurnConflict, ChatTurnCorruption)):
+        return HTTPException(status_code=409, detail=str(exc))
+    if isinstance(exc, ChatTurnAuthorizationError):
+        return HTTPException(status_code=403, detail="Chat turn access denied")
+    if isinstance(exc, ChatTurnRepositoryError):
+        return HTTPException(status_code=503, detail="Chat turn storage is unavailable")
     if isinstance(exc, (ValueError, TypeError)):
         return HTTPException(status_code=422, detail="Conversation request is invalid")
     return HTTPException(status_code=500, detail="Conversation operation failed")
