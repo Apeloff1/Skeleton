@@ -110,8 +110,28 @@ class ToolInvocation:
         args = dict(self.arguments)
         _canonical(args)
         object.__setattr__(self, "arguments", args)
-        if not self.requested_scope:
+        scope = frozenset(_require_nonempty(item, field_name="requested_scope item") for item in self.requested_scope)
+        if not scope:
             raise ValueError("requested_scope must be explicit")
+        object.__setattr__(self, "requested_scope", scope)
+        if self.idempotency_key is not None:
+            object.__setattr__(
+                self,
+                "idempotency_key",
+                _require_nonempty(self.idempotency_key, field_name="idempotency_key"),
+            )
+
+    @property
+    def semantic_digest(self) -> str:
+        """Identity of the intended effect, excluding transport invocation identity."""
+
+        return _digest(
+            {
+                "tool_digest": self.tool_digest,
+                "arguments": dict(self.arguments),
+                "requested_scope": sorted(self.requested_scope),
+            }
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,11 +174,26 @@ class ToolExecutor(Protocol):
 
 
 class ToolRegistry:
-    """Registry that cannot authorize itself."""
+    """Registry that cannot authorize itself and fail-closes duplicate side effects.
 
-    def __init__(self) -> None:
+    Idempotency keys are bound to the semantic invocation (tool, arguments and
+    requested authority scope). Replays are re-authorized but never execute the
+    underlying tool twice. The in-memory reference ledger is deliberately
+    bounded; capacity exhaustion rejects new keyed effects instead of evicting
+    old receipts and reopening a duplicate-side-effect window.
+    """
+
+    def __init__(self, *, max_idempotency_records: int = 4096) -> None:
+        if (
+            isinstance(max_idempotency_records, bool)
+            or not isinstance(max_idempotency_records, int)
+            or max_idempotency_records <= 0
+        ):
+            raise ValueError("max_idempotency_records must be a positive integer")
         self._definitions: dict[str, ToolDefinition] = {}
         self._executors: dict[str, ToolExecutor] = {}
+        self._max_idempotency_records = max_idempotency_records
+        self._idempotency: dict[tuple[str, str], tuple[str, ToolResult]] = {}
 
     def register(self, definition: ToolDefinition, executor: ToolExecutor) -> str:
         if definition.digest in self._definitions:
@@ -182,14 +217,30 @@ class ToolRegistry:
             raise PermissionError("invocation requests scope outside tool declaration")
         if definition.idempotency == "non_idempotent" and not invocation.idempotency_key:
             raise ValueError("non-idempotent tool invocation requires idempotency_key")
+
+        replay_key: tuple[str, str] | None = None
+        prior: tuple[str, ToolResult] | None = None
+        if invocation.idempotency_key is not None:
+            replay_key = (invocation.tool_digest, invocation.idempotency_key)
+            prior = self._idempotency.get(replay_key)
+            if prior is not None and prior[0] != invocation.semantic_digest:
+                raise ValueError("idempotency_key is already bound to a different semantic invocation")
+            if prior is None and len(self._idempotency) >= self._max_idempotency_records:
+                raise BufferError("idempotency ledger capacity exhausted")
+
+        # Authorization is intentionally checked on every replay so an old
+        # receipt cannot bypass newly revoked or narrowed authority.
         if not authorize(definition, invocation):
             raise PermissionError("tool invocation denied by external authority")
+        if prior is not None:
+            return prior[1]
+
         started = now()
         output = dict(self._executors[invocation.tool_digest](invocation.arguments))
         finished = now()
         if finished - started > definition.timeout_seconds:
             raise TimeoutError("tool execution exceeded declared timeout")
-        return ToolResult(
+        result = ToolResult(
             invocation_id=invocation.invocation_id,
             tool_digest=invocation.tool_digest,
             status="succeeded",
@@ -197,6 +248,13 @@ class ToolRegistry:
             started_at=started,
             finished_at=finished,
         )
+        if replay_key is not None:
+            self._idempotency[replay_key] = (invocation.semantic_digest, result)
+        return result
+
+    @property
+    def idempotency_record_count(self) -> int:
+        return len(self._idempotency)
 
 
 @dataclass(frozen=True, slots=True)
@@ -367,10 +425,20 @@ class PluginRegistry:
         self.api_version = _require_nonempty(api_version, field_name="api_version")
         self._manifests: dict[str, PluginManifest] = {}
         self._states: dict[str, PluginLifecycle] = {}
+        self._versions: dict[tuple[str, str], str] = {}
 
     def install(self, manifest: PluginManifest) -> PluginLifecycle:
         if self.api_version not in manifest.compatible_api_versions:
             raise ValueError("plugin is incompatible with runtime API")
+        version_key = (manifest.plugin_id, manifest.version)
+        bound_digest = self._versions.get(version_key)
+        if bound_digest is not None and bound_digest != manifest.digest:
+            raise ValueError("plugin id/version is already bound to different immutable content")
+        if manifest.digest in self._states:
+            # Re-installing the identical immutable manifest is idempotent and
+            # must never reset enabled/disabled/removed lifecycle state.
+            return self._states[manifest.digest]
+        self._versions[version_key] = manifest.digest
         self._manifests[manifest.digest] = manifest
         state = PluginLifecycle(manifest.digest, "installed", 0)
         self._states[manifest.digest] = state
