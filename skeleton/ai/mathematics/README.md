@@ -99,6 +99,10 @@ model authority boundaries.
 - `whitening.py` — PCA/ZCA covariance whitening with eigenvalue and covariance-residual evidence.
 - `finite_difference2d.py` — 2-D gradient, divergence, Laplacian and scalar curl finite differences.
 - `matrix_updates.py` — symmetric rank-one updates plus Cholesky update/downdate reconstruction evidence.
+- `matrix_equations.py` — dense Sylvester and continuous Lyapunov solves with equation residual evidence.
+- `symmetric_functions.py` — spectral square-root/inverse-root/log/exp functions for symmetric matrices.
+- `hyperdual.py` — exact small-problem gradients/Hessians through hyper-dual second-order differentiation.
+- `orthogonal_polynomials.py` — Chebyshev/Legendre/Hermite recurrences, Clenshaw evaluation and fitted Chebyshev series.
 - `validation.py` — parity evidence against existing optimized runtime kernels.
 
 ## Guarantees
@@ -175,6 +179,10 @@ model authority boundaries.
 - Whitening distinguishes PCA/ZCA semantics and verifies the transformed covariance against the regularized target.
 - 2-D finite differences make grid orientation, spacing and boundary stencils explicit.
 - Rank-one Cholesky updates verify reconstructed targets and fail closed when a downdate would lose positive definiteness.
+- Matrix-equation solvers expose equation residuals and keep state-estimation/control authority outside this layer.
+- Symmetric matrix functions validate spectral domains before applying roots, inverse roots or logarithms.
+- Hyper-dual calculus provides exact second-order oracle derivatives without becoming a training graph executor.
+- Orthogonal-polynomial series expose coefficient/sample semantics and forbid silent fit-domain extrapolation.
 - `audit_runtime_kernels()` compares optimized runtime softmax, matmul and attention against
   this reference substrate without replacing those kernels.
 

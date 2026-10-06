@@ -241,6 +241,18 @@ from .numerics import (
     stable_softmax,
 )
 from .online_stats import RunningCovariance, RunningMoments
+from .hyperdual import (
+    HyperDual,
+    HyperDualHessianReport,
+    cos as hyperdual_cos,
+    exp as hyperdual_exp,
+    log as hyperdual_log,
+    second_derivative as hyperdual_second_derivative,
+    sin as hyperdual_sin,
+    sqrt as hyperdual_sqrt,
+    tanh as hyperdual_tanh,
+    value_gradient_hessian,
+)
 from .hypothesis import (
     ChiSquareReport,
     TwoSampleKSReport,
@@ -289,6 +301,14 @@ from .orthogonal import (
     givens_rotation,
     householder_reflection,
     orthogonal_reflection_matrix,
+)
+from .orthogonal_polynomials import (
+    ChebyshevSeries,
+    chebyshev_t,
+    clenshaw_chebyshev,
+    fit_chebyshev_series,
+    legendre_p,
+    probabilists_hermite,
 )
 from .probability import (
     cross_entropy,
@@ -346,6 +366,13 @@ from .sequence import (
     levenshtein_distance,
     normalized_levenshtein_distance,
 )
+from .symmetric_functions import (
+    SymmetricMatrixFunctionReport,
+    symmetric_matrix_exp,
+    symmetric_matrix_inverse_sqrt,
+    symmetric_matrix_log,
+    symmetric_matrix_sqrt,
+)
 from .svd import (
     PseudoinverseReport,
     SVDReport,
@@ -368,6 +395,12 @@ from .matrix_algebra2 import (
     matrix_power,
     matrix_trace,
     slogdet,
+)
+from .matrix_equations import (
+    LyapunovReport,
+    SylvesterReport,
+    solve_continuous_lyapunov,
+    solve_sylvester,
 )
 from .matrix_functions import MatrixExponentialReport, matrix_exponential
 from .matrix_structures import (
@@ -684,6 +717,16 @@ __all__ = [
     "stable_softmax",
     "RunningCovariance",
     "RunningMoments",
+    "HyperDual",
+    "HyperDualHessianReport",
+    "hyperdual_cos",
+    "hyperdual_exp",
+    "hyperdual_log",
+    "hyperdual_second_derivative",
+    "hyperdual_sin",
+    "hyperdual_sqrt",
+    "hyperdual_tanh",
+    "value_gradient_hessian",
     "ChiSquareReport",
     "TwoSampleKSReport",
     "chi_square_goodness_of_fit",
@@ -721,6 +764,12 @@ __all__ = [
     "givens_rotation",
     "householder_reflection",
     "orthogonal_reflection_matrix",
+    "ChebyshevSeries",
+    "chebyshev_t",
+    "clenshaw_chebyshev",
+    "fit_chebyshev_series",
+    "legendre_p",
+    "probabilists_hermite",
     "cross_entropy",
     "effective_sample_size",
     "entropy",
@@ -767,6 +816,11 @@ __all__ = [
     "normalized_levenshtein_distance",
     "CSRMatrix",
     "sparse_dense_matmul",
+    "SymmetricMatrixFunctionReport",
+    "symmetric_matrix_exp",
+    "symmetric_matrix_inverse_sqrt",
+    "symmetric_matrix_log",
+    "symmetric_matrix_sqrt",
     "PseudoinverseReport",
     "SVDReport",
     "least_norm_solve",
@@ -784,6 +838,10 @@ __all__ = [
     "matrix_power",
     "matrix_trace",
     "slogdet",
+    "LyapunovReport",
+    "SylvesterReport",
+    "solve_continuous_lyapunov",
+    "solve_sylvester",
     "MatrixExponentialReport",
     "matrix_exponential",
     "GershgorinDisc",
