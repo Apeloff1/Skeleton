@@ -226,7 +226,8 @@
       "deep_closure_pass": 2,
       "deep_closure_signed": false,
       "legacy_baseline_requirement_atoms": 259,
-      "legacy_baseline_atoms": 259
+      "legacy_baseline_atoms": 259,
+      "legacy_requirement_atom_baseline": 259
     },
     {
       "id": "FLGB-02",
@@ -260,7 +261,8 @@
       "deep_closure_pass": 2,
       "deep_closure_signed": false,
       "legacy_baseline_requirement_atoms": 258,
-      "legacy_baseline_atoms": 258
+      "legacy_baseline_atoms": 258,
+      "legacy_requirement_atom_baseline": 258
     },
     {
       "id": "FLGB-03",
@@ -294,7 +296,8 @@
       "deep_closure_pass": 2,
       "deep_closure_signed": false,
       "legacy_baseline_requirement_atoms": 259,
-      "legacy_baseline_atoms": 259
+      "legacy_baseline_atoms": 259,
+      "legacy_requirement_atom_baseline": 259
     },
     {
       "id": "FLGB-04",
@@ -328,7 +331,8 @@
       "deep_closure_pass": 2,
       "deep_closure_signed": false,
       "legacy_baseline_requirement_atoms": 260,
-      "legacy_baseline_atoms": 260
+      "legacy_baseline_atoms": 260,
+      "legacy_requirement_atom_baseline": 260
     },
     {
       "id": "FLGB-05",
@@ -362,7 +366,8 @@
       "deep_closure_pass": 2,
       "deep_closure_signed": false,
       "legacy_baseline_requirement_atoms": 259,
-      "legacy_baseline_atoms": 259
+      "legacy_baseline_atoms": 259,
+      "legacy_requirement_atom_baseline": 259
     },
     {
       "id": "FLGB-06",
@@ -396,7 +401,8 @@
       "deep_closure_pass": 2,
       "deep_closure_signed": false,
       "legacy_baseline_requirement_atoms": 293,
-      "legacy_baseline_atoms": 293
+      "legacy_baseline_atoms": 293,
+      "legacy_requirement_atom_baseline": 293
     },
     {
       "id": "FLGB-07",
@@ -430,7 +436,8 @@
       "deep_closure_pass": 2,
       "deep_closure_signed": false,
       "legacy_baseline_requirement_atoms": 294,
-      "legacy_baseline_atoms": 294
+      "legacy_baseline_atoms": 294,
+      "legacy_requirement_atom_baseline": 294
     },
     {
       "id": "FLGB-08",
@@ -464,7 +471,8 @@
       "deep_closure_pass": 2,
       "deep_closure_signed": false,
       "legacy_baseline_requirement_atoms": 293,
-      "legacy_baseline_atoms": 293
+      "legacy_baseline_atoms": 293,
+      "legacy_requirement_atom_baseline": 293
     },
     {
       "id": "FLGB-09",
@@ -498,7 +506,8 @@
       "deep_closure_pass": 2,
       "deep_closure_signed": false,
       "legacy_baseline_requirement_atoms": 295,
-      "legacy_baseline_atoms": 295
+      "legacy_baseline_atoms": 295,
+      "legacy_requirement_atom_baseline": 295
     },
     {
       "id": "FLGB-10",
@@ -532,7 +541,8 @@
       "deep_closure_pass": 2,
       "deep_closure_signed": false,
       "legacy_baseline_requirement_atoms": 292,
-      "legacy_baseline_atoms": 292
+      "legacy_baseline_atoms": 292,
+      "legacy_requirement_atom_baseline": 292
     },
     {
       "id": "FLGB-11",
@@ -566,7 +576,8 @@
       "deep_closure_pass": 2,
       "deep_closure_signed": false,
       "legacy_baseline_requirement_atoms": 295,
-      "legacy_baseline_atoms": 295
+      "legacy_baseline_atoms": 295,
+      "legacy_requirement_atom_baseline": 295
     },
     {
       "id": "FLGB-12",
@@ -600,7 +611,8 @@
       "deep_closure_pass": 2,
       "deep_closure_signed": false,
       "legacy_baseline_requirement_atoms": 294,
-      "legacy_baseline_atoms": 294
+      "legacy_baseline_atoms": 294,
+      "legacy_requirement_atom_baseline": 294
     },
     {
       "id": "FLGB-13",
@@ -634,7 +646,8 @@
       "deep_closure_pass": 2,
       "deep_closure_signed": false,
       "legacy_baseline_requirement_atoms": 295,
-      "legacy_baseline_atoms": 295
+      "legacy_baseline_atoms": 295,
+      "legacy_requirement_atom_baseline": 295
     },
     {
       "id": "FLGB-14",
@@ -668,7 +681,8 @@
       "deep_closure_pass": 2,
       "deep_closure_signed": false,
       "legacy_baseline_requirement_atoms": 293,
-      "legacy_baseline_atoms": 293
+      "legacy_baseline_atoms": 293,
+      "legacy_requirement_atom_baseline": 293
     },
     {
       "id": "FLGB-15",
@@ -702,7 +716,8 @@
       "deep_closure_pass": 2,
       "deep_closure_signed": false,
       "legacy_baseline_requirement_atoms": 295,
-      "legacy_baseline_atoms": 295
+      "legacy_baseline_atoms": 295,
+      "legacy_requirement_atom_baseline": 295
     },
     {
       "id": "FLGB-16",
@@ -736,7 +751,8 @@
       "deep_closure_pass": 2,
       "deep_closure_signed": false,
       "legacy_baseline_requirement_atoms": 277,
-      "legacy_baseline_atoms": 277
+      "legacy_baseline_atoms": 277,
+      "legacy_requirement_atom_baseline": 277
     },
     {
       "id": "FLGB-17",
@@ -770,7 +786,8 @@
       "deep_closure_pass": 2,
       "deep_closure_signed": false,
       "legacy_baseline_requirement_atoms": 278,
-      "legacy_baseline_atoms": 278
+      "legacy_baseline_atoms": 278,
+      "legacy_requirement_atom_baseline": 278
     },
     {
       "id": "FLGB-18",
@@ -804,7 +821,8 @@
       "deep_closure_pass": 2,
       "deep_closure_signed": false,
       "legacy_baseline_requirement_atoms": 276,
-      "legacy_baseline_atoms": 276
+      "legacy_baseline_atoms": 276,
+      "legacy_requirement_atom_baseline": 276
     }
   ],
   "deep_closure": {
@@ -899,5 +917,10 @@
       "FLGB-17": 278,
       "FLGB-18": 276
     }
+  },
+  "legacy_atom_baseline": {
+    "source_commit": "4f2d5f736bebc30e7156d0431da18ada41664afa",
+    "total_atoms": 5065,
+    "rule": "Current legacy FLGB atoms may grow but may never fall below the exact per-plane atom count measured from the pre-Pass-2 atlas baseline."
   }
 }
