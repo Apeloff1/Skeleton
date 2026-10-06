@@ -24379,7 +24379,7 @@
     "originality_rule": "Unknown incorporated rights are quarantined; reference-only sources may inform facts, techniques and abstract ideas but may not supply protected expression; ambiguous legal/similarity cases require human/legal review.",
     "overengineering_authority": "machine/ai_game_builder_overengineering.json",
     "overengineering_human_spec": "docs/architecture/AI_GAME_BUILDER_OVERENGINEERING.md",
-    "overengineering_planes": 48,
+    "overengineering_planes": 64,
     "runtime_contracts": {
       "package": "skeleton/ai/game_builder",
       "contracts": "skeleton/ai/game_builder/contracts.py",
@@ -24390,17 +24390,34 @@
       "integrated_control_plane": "skeleton/ai/game_builder/control_plane.py",
       "tests": [
         "tests/test_ai_game_builder_runtime.py",
-        "tests/test_ai_game_builder_overengineering_runtime.py"
+        "tests/test_ai_game_builder_overengineering_runtime.py",
+        "tests/test_ai_game_builder_frontier_runtime.py"
       ],
       "resilience": "skeleton/ai/game_builder/resilience.py",
-      "gold_master": "skeleton/ai/game_builder/release.py"
+      "gold_master": "skeleton/ai/game_builder/release.py",
+      "frontier_assurance": "skeleton/ai/game_builder/frontier_assurance.py"
     },
-    "overengineering_rule": "Every GB family inherits all 20 critical cross-cutting planes and at least 20 total planes. Cross-cutting evidence is additive and can only tighten family/GBL gates.",
+    "overengineering_rule": "Every GB family inherits all 28 critical cross-cutting planes and at least 28 total planes; current bindings provide 30–37. Cross-cutting evidence is additive and can only tighten family/GBL gates.",
     "governance_runtime": {
       "canon": "skeleton/ai/game_builder/canon.py",
       "rights": "skeleton/ai/game_builder/rights.py",
       "atom_lineage": "skeleton/ai/game_builder/atomizer.py",
       "tests": "tests/test_ai_game_builder_governance.py"
+    },
+    "frontier_assurance": {
+      "authority_planes": [
+        "OP49",
+        "OP50",
+        "OP51",
+        "OP54",
+        "OP55",
+        "OP60",
+        "OP63",
+        "OP64"
+      ],
+      "runtime": "skeleton/ai/game_builder/frontier_assurance.py",
+      "tests": "tests/test_ai_game_builder_frontier_runtime.py",
+      "purpose": "Bind causal obligations, multi-horizon consistency, exact-tier effort allocation, evaluator independence, counterfactual regret, transitive evidence invalidation, verified project wisdom, and stagnation/cycle escape into the game-builder proof stack."
     }
   }
 }
