@@ -193,6 +193,33 @@ class RuntimeSupervisionTests(unittest.TestCase):
         ):
             MODULE.validate(root)
 
+    def test_rejects_generated_identity_policy_weakening(self) -> None:
+        root = self._fixture()
+        path = root / "machine/runtime_supervision.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        generated = data["lifecycle_semantics"]["work_leases"]["generated_identity"]
+        generated["object_identity_forbidden"] = False
+        path.write_text(json.dumps(data), encoding="utf-8")
+
+        with self.assertRaisesRegex(
+            MODULE.RuntimeSupervisionError,
+            "object identity must be forbidden",
+        ):
+            MODULE.validate(root)
+
+    def test_rejects_unleased_background_threads(self) -> None:
+        root = self._fixture()
+        path = root / "machine/runtime_supervision.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["lifecycle_semantics"]["background_work"]["threads_leased"] = False
+        path.write_text(json.dumps(data), encoding="utf-8")
+
+        with self.assertRaisesRegex(
+            MODULE.RuntimeSupervisionError,
+            "background_work.threads_leased must be true",
+        ):
+            MODULE.validate(root)
+
     def test_rejects_backend_shared_middleware_drift(self) -> None:
         root = self._fixture()
         path = root / "backend/server.py"
