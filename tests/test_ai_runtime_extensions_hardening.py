@@ -167,6 +167,59 @@ def test_idempotency_ledger_capacity_fails_closed_without_eviction() -> None:
     assert executions == [1]
 
 
+def test_executor_failure_leaves_key_fenced_as_indeterminate() -> None:
+    tool = _tool()
+    executions = 0
+
+    def execute(_args):
+        nonlocal executions
+        executions += 1
+        raise RuntimeError("backend failed after starting")
+
+    registry = ToolRegistry()
+    registry.register(tool, execute)
+    with pytest.raises(RuntimeError, match="backend failed"):
+        registry.invoke(
+            _call(tool, invocation_id="call-1", key="effect-1"),
+            authorize=lambda *_: True,
+            now=lambda: 1.0,
+        )
+
+    with pytest.raises(RuntimeError, match="indeterminate prior effect"):
+        registry.invoke(
+            _call(tool, invocation_id="call-2", key="effect-1"),
+            authorize=lambda *_: True,
+        )
+    assert executions == 1
+    assert registry.idempotency_record_count == 1
+
+
+def test_post_execution_timeout_does_not_reopen_duplicate_side_effect_window() -> None:
+    tool = _tool()
+    executions = 0
+
+    def execute(_args):
+        nonlocal executions
+        executions += 1
+        return {"mutated": True}
+
+    registry = ToolRegistry()
+    registry.register(tool, execute)
+    with pytest.raises(TimeoutError, match="declared timeout"):
+        registry.invoke(
+            _call(tool, invocation_id="call-1", key="effect-1"),
+            authorize=lambda *_: True,
+            now=iter((1.0, 3.0)).__next__,
+        )
+
+    with pytest.raises(RuntimeError, match="indeterminate prior effect"):
+        registry.invoke(
+            _call(tool, invocation_id="call-2", key="effect-1"),
+            authorize=lambda *_: True,
+        )
+    assert executions == 1
+
+
 @pytest.mark.parametrize("capacity", [True, 0, -1, 1.5])
 def test_tool_registry_rejects_invalid_idempotency_capacity(capacity) -> None:
     with pytest.raises(ValueError, match="positive integer"):
