@@ -47,7 +47,10 @@ from skeleton.ai.game_builder.contracts import (  # noqa: E402
     canonical_digest,
 )
 from skeleton.ai.game_builder.control_plane import ForgeControlPlane  # noqa: E402
-from skeleton.ai.game_builder.dual_rival_forge import DualRivalForge  # noqa: E402
+from skeleton.ai.game_builder.dual_rival_forge import (  # noqa: E402
+    DualRivalForge,
+    ForgeStateError,
+)
 from skeleton.ai.game_builder.evaluation import (  # noqa: E402
     EvaluationError,
     EvaluationPanel,
@@ -467,23 +470,28 @@ def _forge_release_binding(
         evidence_digests=("release-champion-evidence-" + "e" * 24,),
         assumption_digest="release-champion-assumption-" + "a" * 24,
     )
-    core = {
-        "builder": Rival.A.value,
-        "champion": champion.to_payload(),
-        "completed_rounds": 100,
-        "effort_mode": 100,
-        "pending_challenge": None,
-        "pending_construct": None,
-        "receipt_digests": [
-            f"receipt-{index:03d}-" + "r" * 48
-            for index in range(1, 101)
-        ],
-        "round_index": 100,
-        "schema": DualRivalForge.SCHEMA,
-        "stage": "construct",
-    }
-    checkpoint = {**core, "checkpoint_digest": canonical_digest(core)}
-    return ForgeReleaseBinding.from_checkpoint(checkpoint)
+    forge = DualRivalForge(effort_mode=100, champion=champion)
+    for round_number in range(1, 101):
+        built = _candidate(
+            forge.builder.value,
+            f"release-build-{round_number}",
+            0.5,
+        )
+        forge.submit_construct(built)
+        forge.submit_attack(
+            _challenge(
+                forge.challenger,
+                built,
+                f"release-attack-{round_number}",
+                0.5,
+            )
+        )
+        forge.reconcile(
+            submitted=None,
+            evaluator_id="release-binding-judge",
+            gate_results=_gates(),
+        )
+    return forge.release_binding()
 
 
 def _gold_bundle(*, failed_family: str | None = None) -> GoldMasterBundle:
@@ -583,7 +591,7 @@ def test_forge_release_binding_rejects_incomplete_forge() -> None:
         effort_mode=100,
         champion=_candidate("seed", "release-incomplete", 0.5),
     )
-    with pytest.raises(Exception, match="completed effort budget"):
+    with pytest.raises(ForgeStateError, match="completed effort budget"):
         forge.release_binding()
 
 
@@ -668,7 +676,7 @@ def test_forge_release_binding_rejects_self_consistent_incomplete_checkpoint() -
     }
     checkpoint = {**core, "checkpoint_digest": canonical_digest(core)}
     with pytest.raises(ValueError, match="not at exact terminal round"):
-        ForgeReleaseBinding.from_checkpoint(checkpoint)
+        ForgeReleaseBinding.from_checkpoint(checkpoint, receipts=())
 
 
 def test_gold_master_failed_critical_gate_blocks_release() -> None:
