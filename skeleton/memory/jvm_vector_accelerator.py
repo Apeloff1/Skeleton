@@ -795,25 +795,18 @@ class JvmVectorAccelerator:
         return f"{message}; java stderr: {' | '.join(self._stderr_tail)}"
 
 
-_default_lock = threading.Lock()
-_default_accelerator: JvmVectorAccelerator | None = None
-
-
 def get_default_vector_accelerator() -> JvmVectorAccelerator:
-    global _default_accelerator
-    with _default_lock:
-        if _default_accelerator is None:
-            _default_accelerator = JvmVectorAccelerator()
-        return _default_accelerator
+    """Return the vector helper owned by the canonical JVM registry."""
+    from skeleton.native.jvm_registry import get_default_jvm_registry
+
+    accelerator = get_default_jvm_registry().get("vector")
+    if not isinstance(accelerator, JvmVectorAccelerator):
+        raise JvmVectorUnavailable("canonical JVM registry returned wrong vector type")
+    return accelerator
 
 
 def close_default_vector_accelerator() -> None:
-    global _default_accelerator
-    with _default_lock:
-        accelerator = _default_accelerator
-        _default_accelerator = None
-    if accelerator is not None:
-        accelerator.close()
+    """Retire only the vector helper from the canonical JVM registry."""
+    from skeleton.native.jvm_registry import get_default_jvm_registry
 
-
-atexit.register(close_default_vector_accelerator)
+    get_default_jvm_registry().close("vector")
