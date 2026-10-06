@@ -204,7 +204,13 @@ def test_stage_order_and_role_rotation_are_fail_closed() -> None:
 
     attack = _challenge(Rival.B, built, "b")
     assert forge.submit_attack(attack).stage is Stage.RECONCILE_AND_PROMOTE
-    forge.reconcile(submitted=None, evaluator_id="independent-judge", gate_results=_gates())
+    forge.reconcile(
+        submitted=None,
+        evaluator_id="independent-judge",
+        evaluator_provenance=_adjudicator("independent-judge")[0],
+        authority_evidence_digest=_adjudicator("independent-judge")[1],
+        gate_results=_gates(),
+    )
 
     assert forge.completed_rounds == 1
     assert forge.builder is Rival.B
@@ -293,8 +299,6 @@ def test_duplicate_gate_ids_are_rejected_before_promotion() -> None:
         forge.reconcile(
             submitted=challenge.improved_candidate,
             evaluator_id="independent-judge",
-        evaluator_provenance=_adjudicator("independent-judge")[0],
-        authority_evidence_digest=_adjudicator("independent-judge")[1],
             evaluator_provenance=_adjudicator("independent-judge")[0],
             authority_evidence_digest=_adjudicator("independent-judge")[1],
             gate_results=(_gates()[0], duplicate),
@@ -313,8 +317,6 @@ def test_malformed_gate_object_is_rejected_before_promotion() -> None:
         forge.reconcile(
             submitted=challenge.improved_candidate,
             evaluator_id="independent-judge",
-        evaluator_provenance=_adjudicator("independent-judge")[0],
-        authority_evidence_digest=_adjudicator("independent-judge")[1],
             evaluator_provenance=_adjudicator("independent-judge")[0],
             authority_evidence_digest=_adjudicator("independent-judge")[1],
             gate_results=(object(),),
@@ -557,8 +559,6 @@ def test_synthesis_requires_both_parent_candidates_and_non_rival_identity() -> N
         forge.reconcile(
             submitted=bad,
             evaluator_id="independent-judge",
-        evaluator_provenance=_adjudicator("independent-judge")[0],
-        authority_evidence_digest=_adjudicator("independent-judge")[1],
             evaluator_provenance=_adjudicator("independent-judge")[0],
             authority_evidence_digest=_adjudicator("independent-judge")[1],
             gate_results=_gates(),
@@ -785,8 +785,6 @@ def test_forge_100_completes_only_after_exactly_100_three_stage_rounds() -> None
         forge.reconcile(
             submitted=None,
             evaluator_id="independent-judge",
-        evaluator_provenance=_adjudicator("independent-judge")[0],
-        authority_evidence_digest=_adjudicator("independent-judge")[1],
             evaluator_provenance=_adjudicator("independent-judge")[0],
             authority_evidence_digest=_adjudicator("independent-judge")[1],
             gate_results=_gates(),
