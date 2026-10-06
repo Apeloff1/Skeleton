@@ -206,6 +206,9 @@ jobs:
           "pydantic-settings==2.15.0"
           "fastapi==0.136.1"
 
+      - name: Validate canonical state topology
+        run: python scripts/check_state_topology.py --json
+
       - name: Run pure recovery and backup contract tests
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
