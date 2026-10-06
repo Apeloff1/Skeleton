@@ -389,18 +389,29 @@
       "implementation_paths": [
         "machine/architecture.json",
         "docs/ARCHITECTURE_MAP.md",
-        "scripts/check_architecture_map.py"
+        "scripts/check_architecture_map.py",
+        ".github/workflows/vol002-architecture-fitness.yml"
       ],
       "tests": [
         "skeleton/testing/test_architecture_map.py",
-        "tests/test_architecture_boundaries.py"
+        "tests/test_architecture_boundaries.py",
+        "skeleton/testing/test_architecture_map.py::test_component_fitness_covers_all_runtime_planes_and_ai_mappings",
+        "skeleton/testing/test_architecture_map.py::test_owner_lookup_resolves_future_path_without_materialization"
       ],
       "evaluations": [
-        "planned:architecture mutation/fault suite",
-        "planned:dependency-cycle regression evaluation"
+        ".github/workflows/vol002-architecture-fitness.yml",
+        "scripts/check_architecture_map.py --json",
+        "skeleton/testing/test_architecture_map.py",
+        "tests/test_architecture_boundaries.py"
       ],
       "evidence": [
-        "https://github.com/Apeloff1/Skeleton/commit/d4334086eaf1c7cbbff46890b727fc954fde1677"
+        "https://github.com/Apeloff1/Skeleton/commit/d4334086eaf1c7cbbff46890b727fc954fde1677",
+        "scripts/check_architecture_map.py",
+        "skeleton/testing/test_architecture_map.py",
+        ".github/workflows/vol002-architecture-fitness.yml",
+        "https://github.com/Apeloff1/Skeleton/commit/ce1a19f26c6b811c189d309440ab5b921c1ef7b8",
+        "https://github.com/Apeloff1/Skeleton/commit/ce6d1736af9137dd07669ff17423ed1decf2a4c5",
+        "https://github.com/Apeloff1/Skeleton/commit/bae16164548a1cf7250c11ff00c0ce5ea970279f"
       ],
       "risks": [
         "documentation/runtime split brain",
@@ -408,8 +419,7 @@
         "cyclic dependency growth"
       ],
       "gaps": [
-        "expand architecture fitness checks to all generated/runtime components",
-        "automate owner lookup for newly created paths"
+        "independent exact-head VOL-002 Architecture Fitness and Ownership Gate qualification remains pending"
       ],
       "accountability_id": "ACC-VOL-002",
       "completion_checkbox": false,

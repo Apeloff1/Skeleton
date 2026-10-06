@@ -13,6 +13,7 @@ from scripts.check_architecture_map import (
     _validate_runtime_dag,
     _validate_structural_blueprint,
     _validate_zone_dag,
+    resolve_architecture_owner,
     validate_architecture,
 )
 from scripts.check_source_path_inventory import classify_path
@@ -61,6 +62,90 @@ def test_architecture_contract_is_valid() -> None:
     assert summary["canonical_roots"] >= 8
     assert summary["zones"] >= 8
     assert summary["runtime_nodes"] == 5
+
+
+def test_owner_lookup_resolves_future_path_without_materialization() -> None:
+    architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
+    future = "skeleton/retrieval/generated/future_adapter.py"
+
+    assert not (REPO_ROOT / future).exists()
+    resolution = resolve_architecture_owner(architecture, future)
+
+    assert resolution["owner_path"] == "skeleton/retrieval"
+    assert resolution["canonical_root"] == "engine-runtime"
+    assert resolution["zone"] == "engine"
+    assert resolution["planes"] == ("retrieval",)
+    assert resolution["authoritative"] is True
+
+
+def test_owner_lookup_uses_most_specific_zone_for_acceleration() -> None:
+    architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
+
+    resolution = resolve_architecture_owner(
+        architecture,
+        "skeleton/native/generated/future_kernel.py",
+    )
+
+    assert resolution["owner_path"] == "skeleton/native"
+    assert resolution["zone"] == "acceleration"
+    assert resolution["authoritative"] is True
+
+
+def test_owner_lookup_marks_transitional_roots_non_authoritative() -> None:
+    architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
+
+    resolution = resolve_architecture_owner(
+        architecture,
+        "core/generated/future_compat.py",
+    )
+
+    assert resolution["owner_kind"] == "policy"
+    assert resolution["policy_class"] == "transitional_roots"
+    assert resolution["authoritative"] is False
+
+
+def test_owner_lookup_rejects_undeclared_new_top_level_root() -> None:
+    architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
+
+    with pytest.raises(ValueError, match="outside declared architecture ownership"):
+        resolve_architecture_owner(
+            architecture,
+            "shadow-runtime/generated/component.py",
+        )
+
+
+def test_component_fitness_covers_all_runtime_planes_and_ai_mappings() -> None:
+    architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
+    construction = _load(REPO_ROOT / "machine/ai_app_construction.json")
+    ai_tree = _load(REPO_ROOT / "machine/ai_file_tree.json")
+
+    errors, summary = validate_architecture(REPO_ROOT)
+
+    assert errors == []
+    fitness = summary["component_fitness"]
+    assert fitness == {
+        "runtime_nodes": len(architecture["runtime_nodes"]),
+        "construction_planes": len(construction["planes"]),
+        "generated_mappings": len(ai_tree["mappings"]),
+        "generated_sources": len(ai_tree["mappings"]),
+        "generated_destinations": len(ai_tree["mappings"]),
+    }
+
+
+def test_owner_lookup_is_deterministic_for_shared_plane_owner() -> None:
+    architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
+    path = "skeleton/intelligence/generated/future_reasoner.py"
+
+    first = resolve_architecture_owner(architecture, path)
+    second = resolve_architecture_owner(deepcopy(architecture), path)
+
+    assert first == second
+    assert first["owner_path"] == "skeleton/intelligence"
+    assert first["planes"] == (
+        "cost-capacity",
+        "orchestration",
+        "reasoning-verification",
+    )
 
 
 def test_runtime_nodes_exactly_match_app_manifest_services() -> None:
