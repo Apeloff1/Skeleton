@@ -541,6 +541,34 @@ async def test_stale_task_callback_cannot_release_newer_generation_lease(
 
 
 @pytest.mark.asyncio
+async def test_engine_lease_release_corruption_fails_lifecycle_closed(
+    tmp_path,
+) -> None:
+    service = _service(tmp_path)
+    lifecycle = RuntimeServiceLifecycle("skeleton")
+    lifecycle.mark_ready(reason="test-ready")
+    foreign = RuntimeServiceLifecycle("foreign")
+    foreign.mark_ready(reason="test-ready")
+    coordinator = EngineExecutionCoordinator(
+        service,
+        provider_registry=_Registry(object()),
+        lifecycle=lifecycle,
+    )
+
+    task = asyncio.create_task(asyncio.sleep(0))
+    await task
+    foreign_lease = foreign.acquire_work("engine-execution:corrupt")
+    coordinator._lifecycle_leases[task] = foreign_lease
+
+    coordinator._task_done("corrupt", task)
+
+    assert lifecycle.snapshot()["phase"] == "failed"
+    assert lifecycle.cancellation.cancelled is True
+    assert foreign.active_work() == (foreign_lease,)
+    foreign.release_work(foreign_lease)
+
+
+@pytest.mark.asyncio
 async def test_engine_lifecycle_draining_fences_new_execution_and_drains_lease(
     tmp_path,
 ) -> None:
@@ -600,7 +628,6 @@ async def test_engine_lifecycle_draining_fences_new_execution_and_drains_lease(
         lifecycle.mark_stopped(reason="too-early")
 
     await coordinator.shutdown()
-    await asyncio.sleep(0)
     assert lifecycle.inflight_work == 0
     lifecycle.mark_stopped(reason="coordinator-drained")
     assert lifecycle.snapshot()["phase"] == "stopped"
