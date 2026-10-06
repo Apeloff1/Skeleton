@@ -43,6 +43,10 @@ from skeleton.contracts.conversation import ConversationAuthorType, Conversation
 from skeleton.context.compiler import ContextCompiler
 from skeleton.context.instruction_policy import InstructionPolicy
 from skeleton.context.sources import artifact_segment, conversation_message_segment
+from skeleton.ai.assistant.response_acceptance import (
+    LiveResponseAcceptancePolicy,
+    evaluate_live_response_acceptance,
+)
 from skeleton.ai.assistant.streaming import (
     ChatStreamError,
     project_turn_page,
@@ -52,10 +56,6 @@ from skeleton.ai.assistant.turn_ownership import (
     TurnLeaseBusy,
     TurnLeaseExpired,
     TurnLeaseStale,
-)
-from skeleton.ai.assistant.response_acceptance import (
-    LiveResponseAcceptancePolicy,
-    evaluate_live_response_acceptance,
 )
 from skeleton.ai.assistant.turn_runtime import TurnState
 from skeleton.persistence.chat_turn_repository import (
