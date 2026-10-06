@@ -2490,7 +2490,7 @@
         "skeleton/testing/test_jvm_accelerator_registry.py",
         "scripts/benchmark_java_accelerators.py",
         ".github/workflows/vol033-jvm-protocol.yml",
-        "PR #3322"
+        "PR #3324"
       ],
       "risks": [
         "classpath drift",
