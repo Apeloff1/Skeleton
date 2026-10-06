@@ -189,7 +189,7 @@ async def test_live_chat_success_reaches_durable_complete(
 
 
 @pytest.mark.asyncio
-async def test_live_chat_engine_outage_is_durable_retryable_failure(
+async def test_live_chat_engine_outage_remains_durable_and_resumable(
     monkeypatch,
     ai_chat_turn_test_authority,
 ):
@@ -231,7 +231,7 @@ async def test_live_chat_engine_outage_is_durable_retryable_failure(
         tenant_id="tenant-a",
         owner_id="owner-a",
     )
-    assert persisted.snapshot.state is TurnState.FAILED_RETRYABLE
+    assert persisted.snapshot.state is TurnState.MODEL_RUNNING
 
 
 @pytest.mark.asyncio
