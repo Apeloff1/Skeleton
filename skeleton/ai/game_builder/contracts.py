@@ -75,6 +75,9 @@ QUALITY_AXES = (
     "technical_correctness",
     "performance",
     "accessibility",
+    "security_privacy",
+    "state_integrity",
+    "reproducibility",
     "replayability",
     "maintainability",
     "testability",
@@ -88,6 +91,9 @@ PROTECTED_AXES = frozenset(
         "longform_consistency",
         "technical_correctness",
         "accessibility",
+        "security_privacy",
+        "state_integrity",
+        "reproducibility",
         "rights_provenance_safety",
     }
 )
@@ -184,10 +190,17 @@ class Candidate:
         parent_candidate_digests: Iterable[str] = (),
     ) -> "Candidate":
         evidence = tuple(evidence_digests)
+        parents = tuple(parent_candidate_digests)
         if not producer_id.strip():
             raise ValueError("producer_id must be non-empty")
-        if not evidence or any(not item.strip() for item in evidence):
-            raise ValueError("candidate requires non-empty evidence digests")
+        if not evidence or any(not item.strip() or len(item) < 16 for item in evidence):
+            raise ValueError("candidate requires stable evidence digests")
+        if len(evidence) != len(set(evidence)):
+            raise ValueError("candidate evidence digests must be unique")
+        if any(not item.strip() or len(item) < 16 for item in parents):
+            raise ValueError("candidate parent digests must be stable")
+        if len(parents) != len(set(parents)):
+            raise ValueError("candidate parent digests must be unique")
         if len(assumption_digest) < 16:
             raise ValueError("assumption_digest must be a stable digest")
         return cls(
@@ -196,7 +209,7 @@ class Candidate:
             quality=normalize_quality(quality),
             evidence_digests=evidence,
             assumption_digest=assumption_digest,
-            parent_candidate_digests=tuple(parent_candidate_digests),
+            parent_candidate_digests=parents,
         )
 
     @property
