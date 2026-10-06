@@ -27,7 +27,7 @@ on:
       - "tests/test_runtime_attestation.py"
       - "tests/test_session_audit.py"
       - "tests/test_session_audit_supersession.py"
-      - "tests/test_ai_evidence_runtime_integrity.py"
+      - "tests/test_ai_evidence_runtime_attestation_integrity.py"
       - ".github/workflows/ai-evidence-runtime-integrity.yml"
   push:
     branches:
@@ -55,7 +55,7 @@ on:
       - "tests/test_runtime_attestation.py"
       - "tests/test_session_audit.py"
       - "tests/test_session_audit_supersession.py"
-      - "tests/test_ai_evidence_runtime_integrity.py"
+      - "tests/test_ai_evidence_runtime_attestation_integrity.py"
       - ".github/workflows/ai-evidence-runtime-integrity.yml"
   workflow_dispatch:
 
@@ -120,7 +120,7 @@ jobs:
           skeleton/learning/school/runtime_capsule.py
           skeleton/ai/learning/school/runtime_attestation.py
           skeleton/learning/school/runtime_attestation.py
-          tests/test_ai_evidence_runtime_integrity.py
+          tests/test_ai_evidence_runtime_attestation_integrity.py
 
       - name: Verify canonical AI namespace parity
         run: |
@@ -153,7 +153,7 @@ jobs:
           tests/test_runtime_attestation.py
           tests/test_session_audit.py
           tests/test_session_audit_supersession.py
-          tests/test_ai_evidence_runtime_integrity.py
+          tests/test_ai_evidence_runtime_attestation_integrity.py
 
       - name: Assert fail-closed identity boundaries
         run: |
