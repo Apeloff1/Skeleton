@@ -94,6 +94,18 @@ Proposer and challenger compete under equal bounded authority. An independent ve
 
 External game sources are reference evidence, not copying authority. Every acquired source carries provenance and rights metadata. Generated assets/code/narrative are similarity-screened; unclear licensing or suspicious similarity quarantines the candidate. Clean-room re-expression and independent verification are required before promotion when influence is material.
 
+## Frontier competition finish line
+
+This plan is not complete merely because all 18 planes, 216 construction units, or 23,328 Pass-2 atoms exist. The integrated product must be evaluated as a direct competitor to current frontier systems using at least three fresh frontier comparators, including the strongest available comparator, with exact model/provider/version, inference configuration, tool policy, hardware/environment, budget, and source-revision identity.
+
+The machine-enforced frontier scorecard covers 12 domains: reasoning/planning; coding/repository engineering; long-context and long-horizon consistency; governed tool use/agentic execution; multimodal capability; game-project construction; gameplay simulation/playtesting/debugging; narrative canon and creative quality; adversarial self-improvement; reliability/recovery/replay; security/safety/privacy/rights/authority; and latency/throughput/cost/resource efficiency.
+
+Frontier claims require a public + private-heldout evaluation mix, contamination controls, multi-hour and multi-session real-project tasks, repository-level coding tasks, end-to-end game creation from brief to reopenable export, adversarial/fault-injection campaigns, blind human pairwise evaluation for subjective quality, deterministic replay/recovery evidence, and cross-platform performance accounting.
+
+Critical domains are non-compensable: an aggregate benchmark score cannot hide a collapse in reasoning, coding, long-horizon consistency, governed execution, game construction, gameplay/debugging, narrative continuity, rival refinement, recovery, or security/rights/authority integrity. The core product targets—coding/repository engineering, long-horizon consistency, and game building—must demonstrate frontier parity or better before a frontier-competition completion claim is allowed. Dual-rival gains must be measured against a single-pass baseline rather than assumed.
+
+Exact-head evidence and independent verification remain mandatory. The manifest intentionally keeps `frontier_competition.completion_claim`, implementation signoff, and independent-verification signoff false until those results exist.
+
 ## Closure
 
 This overlay is complete only as a **specification addition** when its validator passes and its canonical registrations are fresh. It remains implementation-unsigned and verification-unsigned until exact-head executable evidence is produced by the underlying runtime work.
