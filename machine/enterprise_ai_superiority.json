@@ -5432,5 +5432,301 @@
         "promotion/rollback decision receipt"
       ]
     }
-  ]
+  ],
+  "end_to_end_qualification": {
+    "rule": "Enterprise AI completion is a system property. Passing isolated volume gates is insufficient; every golden journey must pass exact-head with production-like identity, authority, state, budgets, telemetry, failure injection and rollback/fallback semantics.",
+    "golden_journeys": [
+      {
+        "id": "ENT-E2E-01",
+        "name": "Governed evidence-backed answer",
+        "volume_refs": [
+          "VOL-007",
+          "VOL-008",
+          "VOL-009",
+          "VOL-010",
+          "VOL-011",
+          "VOL-012",
+          "VOL-013",
+          "VOL-034",
+          "VOL-037",
+          "VOL-038",
+          "VOL-041"
+        ],
+        "must_prove": [
+          "authenticated/authorized request identity survives the full operation",
+          "routing respects privacy, capability, latency and cost constraints",
+          "context preserves trust labels and mandatory policy",
+          "retrieval/memory evidence is authorized, fresh and cited",
+          "final claims are independently verified or explicitly qualified/abstained",
+          "operation can be reconstructed from trace and evidence receipts"
+        ]
+      },
+      {
+        "id": "ENT-E2E-02",
+        "name": "Long-horizon delegated work with crash recovery",
+        "volume_refs": [
+          "VOL-004",
+          "VOL-014",
+          "VOL-016",
+          "VOL-017",
+          "VOL-018",
+          "VOL-029",
+          "VOL-030",
+          "VOL-034"
+        ],
+        "must_prove": [
+          "plan and delegation authority are bounded before execution",
+          "worker leases/fencing prevent stale commits",
+          "checkpoint survives injected process loss",
+          "recovery resumes without duplicate privileged effects",
+          "cancellation terminates descendant work within declared bound",
+          "retry/fan-out/token/time budgets cannot run away"
+        ]
+      },
+      {
+        "id": "ENT-E2E-03",
+        "name": "Privileged tool transaction and compensation",
+        "volume_refs": [
+          "VOL-015",
+          "VOL-025",
+          "VOL-026",
+          "VOL-028",
+          "VOL-029",
+          "VOL-037",
+          "VOL-038",
+          "VOL-379",
+          "VOL-380"
+        ],
+        "must_prove": [
+          "tool description or model output never grants authority",
+          "input, policy, budget and idempotency are validated before side effect",
+          "duplicate/replayed invocation creates no duplicate effect",
+          "postcondition is independently verified",
+          "failed compensation becomes durable reconciliation/incident work",
+          "complete action receipt links principal, authority, operation and result"
+        ]
+      },
+      {
+        "id": "ENT-E2E-04",
+        "name": "Multimodal document intelligence under hostile content",
+        "volume_refs": [
+          "VOL-009",
+          "VOL-011",
+          "VOL-020",
+          "VOL-025",
+          "VOL-026",
+          "VOL-027",
+          "VOL-034",
+          "VOL-036",
+          "VOL-037"
+        ],
+        "must_prove": [
+          "oversized/malformed media is bounded before expensive processing",
+          "embedded or hidden instructions remain untrusted evidence",
+          "cross-modal extraction retains source identity and data classification",
+          "retrieval cannot cross ACL/tenant boundary",
+          "answer cites the originating modality/artifact",
+          "adversarial content cannot modify system/developer policy"
+        ]
+      },
+      {
+        "id": "ENT-E2E-05",
+        "name": "Autonomous repository repair without regression",
+        "volume_refs": [
+          "VOL-014",
+          "VOL-015",
+          "VOL-016",
+          "VOL-021",
+          "VOL-022",
+          "VOL-026",
+          "VOL-034",
+          "VOL-035",
+          "VOL-037",
+          "VOL-038"
+        ],
+        "must_prove": [
+          "inspect-plan-lease-edit-build-test-review-verify sequence is preserved",
+          "workspace/branch mutation is isolated and leased",
+          "impact/ownership graph scopes the change",
+          "focused regression and independent review evidence are produced",
+          "concurrent stale editor cannot commit",
+          "revert/rollback path is known before landing"
+        ]
+      },
+      {
+        "id": "ENT-E2E-06",
+        "name": "Provider outage, shadow migration and failback",
+        "volume_refs": [
+          "VOL-007",
+          "VOL-008",
+          "VOL-025",
+          "VOL-027",
+          "VOL-029",
+          "VOL-034",
+          "VOL-035",
+          "VOL-037",
+          "VOL-413",
+          "VOL-414",
+          "VOL-415"
+        ],
+        "must_prove": [
+          "provider outage triggers bounded fallback without policy/residency downgrade",
+          "fallback route rationale is replayable",
+          "shadow candidate cannot affect authoritative user outcome",
+          "paired quality/latency/cost/privacy evidence gates migration",
+          "cutover has explicit rollback/failback",
+          "provider-specific errors and credentials remain inside adapter boundary"
+        ]
+      },
+      {
+        "id": "ENT-E2E-07",
+        "name": "Tenant isolation, retention and deletion propagation",
+        "volume_refs": [
+          "VOL-005",
+          "VOL-010",
+          "VOL-011",
+          "VOL-025",
+          "VOL-026",
+          "VOL-027",
+          "VOL-028",
+          "VOL-034",
+          "VOL-046"
+        ],
+        "must_prove": [
+          "two hostile tenants cannot cross-read state, memory, retrieval, cache or artifacts",
+          "quota/noisy-neighbor pressure cannot steal another tenant reservation",
+          "deletion propagates to derived indexes/caches/projections under policy",
+          "retention/residency policies survive provider/tool boundaries",
+          "telemetry and support bundles redact/isolate tenant data",
+          "restore does not resurrect data past a durable tombstone policy"
+        ]
+      },
+      {
+        "id": "ENT-E2E-08",
+        "name": "Saturation, admission and cost containment",
+        "volume_refs": [
+          "VOL-004",
+          "VOL-007",
+          "VOL-008",
+          "VOL-029",
+          "VOL-030",
+          "VOL-034",
+          "VOL-390",
+          "VOL-391",
+          "VOL-403",
+          "VOL-404",
+          "VOL-405",
+          "VOL-406"
+        ],
+        "must_prove": [
+          "capacity/cost reservation occurs before expensive execution",
+          "saturation causes bounded queueing, routing or load shedding rather than collapse",
+          "retry amplification remains within declared bound",
+          "tenant/global quotas remain deterministic under concurrency",
+          "autoscaling does not admit beyond warm capacity",
+          "actual usage reconciles to durable cost ledger without double charge"
+        ]
+      },
+      {
+        "id": "ENT-E2E-09",
+        "name": "Authoritative-state disaster recovery and replay",
+        "volume_refs": [
+          "VOL-004",
+          "VOL-005",
+          "VOL-029",
+          "VOL-030",
+          "VOL-034",
+          "VOL-038",
+          "VOL-049"
+        ],
+        "must_prove": [
+          "backup identity and restore target are explicit",
+          "authoritative state is restored before derived projections",
+          "outbox/event replay converges without duplicate business effect",
+          "accepted operations are not silently lost",
+          "recovery verification is machine-executable",
+          "operators receive immutable recovery evidence"
+        ]
+      },
+      {
+        "id": "ENT-E2E-10",
+        "name": "Optimized distributed inference with semantic parity",
+        "volume_refs": [
+          "VOL-007",
+          "VOL-032",
+          "VOL-033",
+          "VOL-381",
+          "VOL-382",
+          "VOL-383",
+          "VOL-384",
+          "VOL-385",
+          "VOL-386",
+          "VOL-387",
+          "VOL-388",
+          "VOL-389",
+          "VOL-390",
+          "VOL-392",
+          "VOL-397"
+        ],
+        "must_prove": [
+          "resource admission prevents OOM/oversubscription",
+          "batch/cache/speculation never changes output beyond declared tolerance",
+          "profile evidence is bound to exact optimized source identity",
+          "throughput/latency/utilization improves against reference baseline",
+          "topology-aware placement survives declared failure domain",
+          "reference decoding/serving remains available when optimization dequalifies"
+        ]
+      },
+      {
+        "id": "ENT-E2E-11",
+        "name": "Adversarial AI security boundary",
+        "volume_refs": [
+          "VOL-009",
+          "VOL-011",
+          "VOL-015",
+          "VOL-020",
+          "VOL-025",
+          "VOL-026",
+          "VOL-027",
+          "VOL-028",
+          "VOL-036",
+          "VOL-037"
+        ],
+        "must_prove": [
+          "prompt/retrieval/tool-result injection cannot escalate authority",
+          "SSRF/local-metadata/egress restrictions fail closed",
+          "secret-bearing data cannot enter undeclared prompt/log/artifact boundary",
+          "malicious tool manifests/results remain untrusted until validated",
+          "security decision remains independent of model persuasion",
+          "discovered exploits become durable regressions"
+        ]
+      },
+      {
+        "id": "ENT-E2E-12",
+        "name": "Immutable release, canary and rollback",
+        "volume_refs": [
+          "VOL-005",
+          "VOL-034",
+          "VOL-035",
+          "VOL-037",
+          "VOL-038",
+          "VOL-047",
+          "VOL-048",
+          "VOL-049",
+          "VOL-411",
+          "VOL-413",
+          "VOL-414",
+          "VOL-415"
+        ],
+        "must_prove": [
+          "source gates and enterprise qualification precede immutable build",
+          "artifact provenance/SBOM and migration preflight are complete",
+          "canary observes SLO, quality, safety and cost regressions",
+          "failed migration or SLO regression can roll back within declared target",
+          "rollback preserves authoritative state compatibility",
+          "release verdict binds exact deployed artifact and evidence"
+        ]
+      }
+    ]
+  }
 }
