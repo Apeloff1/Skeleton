@@ -33,7 +33,12 @@ _load("skeleton.ai.game_builder.atomizer", "skeleton/ai/game_builder/atomizer.py
 _load("skeleton.ai.game_builder.canon", "skeleton/ai/game_builder/canon.py")
 _load("skeleton.ai.game_builder.rights", "skeleton/ai/game_builder/rights.py")
 
-from skeleton.ai.game_builder.atomizer import ArtifactAtom, AtomGraph, AtomGraphError  # noqa: E402
+from skeleton.ai.game_builder.atomizer import (  # noqa: E402
+    ArtifactAtom,
+    AtomGraph,
+    AtomGraphError,
+    AtomSourceBinding,
+)
 from skeleton.ai.game_builder.contracts import (  # noqa: E402
     EvaluatorProvenance,
     canonical_digest,
@@ -76,17 +81,58 @@ def _authority(
     )
 
 
+def _canon_assertion(
+    assertion_id: str,
+    subject: str,
+    predicate: str,
+    value: object,
+    branch_id: str,
+    valid_from_tick: int,
+    valid_to_tick: int | None = None,
+    intentional_contradiction: bool = False,
+    evidence_digests: tuple[str, ...] = (),
+) -> CanonAssertion:
+    evidence = evidence_digests or (_digest(f"canon-{assertion_id}"),)
+    return CanonAssertion(
+        assertion_id=assertion_id,
+        subject=subject,
+        predicate=predicate,
+        value=value,
+        branch_id=branch_id,
+        valid_from_tick=valid_from_tick,
+        valid_to_tick=valid_to_tick,
+        evaluator_provenance=_authority(
+            f"canon-{assertion_id}-authority",
+            *evidence,
+        ),
+        intentional_contradiction=intentional_contradiction,
+        evidence_digests=evidence,
+    )
+
+
+def _source_binding(source_id: str) -> AtomSourceBinding:
+    evidence = _digest(f"lineage-{source_id}")
+    return AtomSourceBinding(
+        source_id=source_id,
+        evidence_digest=evidence,
+        authority_provenance=_authority(
+            f"lineage-{source_id}-authority",
+            evidence,
+        ),
+    )
+
+
 def test_canon_blocks_accidental_same_branch_contradiction() -> None:
     ledger = CanonLedger()
     ledger.add_assertion(
-        CanonAssertion(
+        _canon_assertion(
             "a1", "hero", "alive", True, "root", 0,
             evidence_digests=(_digest("e1"),),
         )
     )
     with pytest.raises(CanonError, match="accidental canon contradiction"):
         ledger.add_assertion(
-            CanonAssertion(
+            _canon_assertion(
                 "a2", "hero", "alive", False, "root", 5,
                 evidence_digests=(_digest("e2"),),
             )
@@ -96,11 +142,11 @@ def test_canon_blocks_accidental_same_branch_contradiction() -> None:
 def test_branch_divergence_isolated_and_effective_state_is_branch_local() -> None:
     ledger = CanonLedger()
     ledger.add_assertion(
-        CanonAssertion("root-fact", "city", "status", "safe", "root", 0)
+        _canon_assertion("root-fact", "city", "status", "safe", "root", 0)
     )
     ledger.add_branch("route-red", fork_tick=10)
     ledger.add_assertion(
-        CanonAssertion("red-fact", "city", "status", "fallen", "route-red", 10)
+        _canon_assertion("red-fact", "city", "status", "fallen", "route-red", 10)
     )
 
     assert ledger.effective(
@@ -115,7 +161,7 @@ def test_branch_divergence_isolated_and_effective_state_is_branch_local() -> Non
 def test_character_cannot_know_fact_before_it_exists_or_across_unrelated_branch() -> None:
     ledger = CanonLedger()
     ledger.add_assertion(
-        CanonAssertion("secret", "vault", "code", 4319, "root", 20)
+        _canon_assertion("secret", "vault", "code", 4319, "root", 20)
     )
     with pytest.raises(CanonError, match="before it exists"):
         ledger.add_knowledge(
@@ -125,7 +171,7 @@ def test_character_cannot_know_fact_before_it_exists_or_across_unrelated_branch(
     ledger.add_branch("a", fork_tick=20)
     ledger.add_branch("b", fork_tick=20)
     ledger.add_assertion(
-        CanonAssertion("branch-secret", "boss", "weakness", "ice", "a", 25)
+        _canon_assertion("branch-secret", "boss", "weakness", "ice", "a", 25)
     )
     with pytest.raises(CanonError, match="unrelated branch"):
         ledger.add_knowledge(
@@ -136,7 +182,7 @@ def test_character_cannot_know_fact_before_it_exists_or_across_unrelated_branch(
 def test_character_knowledge_is_explicit_and_time_bounded() -> None:
     ledger = CanonLedger()
     ledger.add_assertion(
-        CanonAssertion("map", "gate", "location", "north", "root", 0)
+        _canon_assertion("map", "gate", "location", "north", "root", 0)
     )
     ledger.add_knowledge(
         CharacterKnowledge("guide", "map", "root", 12, "saw-map")
@@ -318,6 +364,49 @@ def test_high_risk_similarity_cannot_be_self_cleared_by_detector() -> None:
         )
 
 
+def test_canon_assertion_rejects_unattributed_evidence() -> None:
+    evidence = _digest("canon-unbound")
+    with pytest.raises(CanonError, match="referenced by assertion authority"):
+        CanonAssertion(
+            assertion_id="canon-unbound",
+            subject="hero",
+            predicate="state",
+            value="alive",
+            branch_id="root",
+            valid_from_tick=0,
+            evaluator_provenance=_authority(
+                "canon-wrong-authority",
+                _digest("other-canon-evidence"),
+            ),
+            evidence_digests=(evidence,),
+        )
+
+
+def test_atom_source_requires_lineage_binding() -> None:
+    with pytest.raises(AtomGraphError, match="requires exactly one lineage binding"):
+        ArtifactAtom(
+            "sprite-unbound",
+            "sprite",
+            _digest("sprite-unbound"),
+            "scene-1",
+            _digest("canon"),
+            source_ids=("owned-source",),
+        )
+
+
+def test_atom_source_binding_rejects_unattributed_lineage_evidence() -> None:
+    evidence = _digest("lineage-owned-source")
+    with pytest.raises(AtomGraphError, match="referenced by lineage authority"):
+        AtomSourceBinding(
+            source_id="owned-source",
+            evidence_digest=evidence,
+            authority_provenance=_authority(
+                "lineage-wrong-authority",
+                _digest("other-lineage"),
+            ),
+        )
+
+
 def test_atom_graph_preserves_pixel_to_scene_parent_context() -> None:
     graph = AtomGraph()
     graph.add(
@@ -334,6 +423,7 @@ def test_atom_graph_preserves_pixel_to_scene_parent_context() -> None:
             _digest("canon"),
             parent_id="scene",
             source_ids=("owned-source",),
+            source_bindings=(_source_binding("owned-source"),),
         )
     )
     graph.add(
@@ -409,11 +499,11 @@ def test_atom_graph_rejects_orphan_parent_and_dependency() -> None:
 def test_child_branch_does_not_inherit_parent_events_after_fork() -> None:
     ledger = CanonLedger()
     ledger.add_assertion(
-        CanonAssertion("pre", "door", "state", "closed", "root", 0)
+        _canon_assertion("pre", "door", "state", "closed", "root", 0)
     )
     ledger.add_branch("child", fork_tick=10)
     ledger.add_assertion(
-        CanonAssertion("post", "weather", "storm", True, "root", 15)
+        _canon_assertion("post", "weather", "storm", True, "root", 15)
     )
     ledger.add_knowledge(
         CharacterKnowledge("parent-npc", "post", "root", 15, "radio")
