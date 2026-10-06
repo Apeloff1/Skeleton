@@ -1,0 +1,59 @@
+{
+  "schema_version": "skeleton.masterplan_overlay_reconciliation.v1",
+  "version": "1.0.0",
+  "status": "active",
+  "purpose": "Fail closed if cumulative masterplan overlays, accountability authority, or canonical parse-index identity regress during branch reconciliation.",
+  "minimum_plan_version": "2.5.0",
+  "required_json_authorities": [
+    "machine/ai_master_plan.json",
+    "machine/ai_build_accountability.json",
+    "machine/frontier_96_ai_ladder.json",
+    "machine/advanced_ai_structure_100.json",
+    "machine/advanced_ai_maturity_ledger.json",
+    "machine/cs_300_computer_science_ladder.json",
+    "machine/learning_400_adversarial_400.json",
+    "machine/project_self_improvement_1000.json",
+    "machine/project_self_improvement_epoch_contract.json",
+    "machine/project_self_improvement_idle_scheduler.json",
+    "machine/essentials_1000.json",
+    "machine/essentials_1000_closure_protocol.json",
+    "machine/essentials_1000_execution_frontier.json",
+    "machine/essentials_1000_gap_ledger.json",
+    "machine/essentials_1000_priority_policy.json",
+    "machine/competitive_ai_engineering_ladder.json",
+    "machine/competitive_ai_benchmark_governance.json",
+    "machine/ai_game_builder_500_levels.json",
+    "machine/ai_game_builder_dual_rival_forge.json",
+    "machine/ai_masterplan_parse_index.json"
+  ],
+  "required_human_authorities": [
+    "docs/plan/MASTER_PLAN.md",
+    "docs/plan/MASTER_INDEX.md",
+    "docs/plan/FRONTIER_96_AI_LADDER.md",
+    "docs/plan/ADVANCED_AI_100_LEVELS.md",
+    "docs/plan/CS_300_COMPUTER_SCIENCE_LADDER.md",
+    "docs/plan/LEARNING_400_ADVERSARIAL_400.md",
+    "docs/plan/PROJECT_SELF_IMPROVEMENT_1000.md",
+    "docs/plan/ESSENTIALS_1000.md",
+    "docs/architecture/COMPETITIVE_AI_ENGINEERING_LADDER.md",
+    "docs/architecture/COMPETITIVE_AI_BENCHMARK_GOVERNANCE.md",
+    "docs/architecture/AI_GAME_BUILDER_500_LEVELS.md"
+  ],
+  "required_machine_plan_keys": [
+    "competitive_engineering_ladder",
+    "ai_game_builder_500_levels"
+  ],
+  "required_nonempty_bytes": 2,
+  "parse_index": "machine/ai_masterplan_parse_index.json",
+  "canonical_sources": [
+    "machine/ai_master_plan.json",
+    "machine/ai_build_accountability.json"
+  ],
+  "laws": [
+    "overlay reconciliation is cumulative unless an explicit supersession record is present",
+    "plan version must never silently decrease",
+    "required authorities must be non-empty and parseable",
+    "derived parse-index source blob identities must match the exact working-tree bytes",
+    "incoming feature reconciliation may not erase unrelated live authorities"
+  ]
+}
