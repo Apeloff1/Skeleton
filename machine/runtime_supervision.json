@@ -54,19 +54,17 @@
         {
           "path": "backend/server.py",
           "required_symbols": [
-            "async def lifespan(app: FastAPI):",
             "RuntimeServiceLifecycle(\"backend\")",
-            "runtime_lifecycle.mark_ready(",
-            "runtime_lifecycle.begin_drain(",
-            "runtime_lifecycle.mark_stopped(",
+            "_runtime_lifecycle.mark_ready(",
+            "_runtime_lifecycle.begin_drain(",
+            "_runtime_lifecycle.mark_stopped(",
+            "RuntimeAdmissionMiddleware",
+            "app.add_middleware(",
+            "lifecycle=_runtime_lifecycle",
+            "exempt_prefixes=(\"/api/health\",)",
             "t.cancel()",
             "client.close()",
-            "@api_router.get(\"/health/ready\")",
-            "@app.middleware(\"http\")",
-            "lifecycle.acquire_work(\"http:\"",
-            "lifecycle.release_work(lease)",
-            "\"runtime_not_accepting_work\"",
-            "\"Retry-After\": \"1\""
+            "@api_router.get(\"/health/ready\")"
           ]
         }
       ],
@@ -98,14 +96,14 @@
             "runtime_lifecycle.mark_ready(",
             "runtime_lifecycle.begin_drain(",
             "runtime_lifecycle.mark_stopped(",
+            "RuntimeAdmissionMiddleware",
+            "app.add_middleware(",
+            "lifecycle=runtime_lifecycle",
+            "exempt_prefixes=(\"/api/v1/health\",)",
+            "runtime_lifecycle=runtime_lifecycle",
             "async def close_engine_execution_service",
             "await coordinator.shutdown()",
-            "def close_operation_runtime",
-            "@app.middleware(\"http\")",
-            "runtime_lifecycle.acquire_work(",
-            "runtime_lifecycle.release_work(lease)",
-            "runtime_lifecycle=runtime_lifecycle",
-            "\"runtime_not_accepting_work\""
+            "def close_operation_runtime"
           ]
         },
         {
