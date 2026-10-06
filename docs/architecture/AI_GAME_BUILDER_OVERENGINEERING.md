@@ -11,7 +11,7 @@ The 500 GBL levels define *what* must become excellent. This constitution define
 
 The system is deliberately overdesigned around one constraint: two creative AIs may compete aggressively, but neither may escape project truth, evidence, rights, reproducibility, or whole-game coherence.
 
-## 48 mandatory cross-cutting planes
+## 80 mandatory cross-cutting planes
 
 1. **Rival Isolation** — no hidden scratch-state sharing or side-channel collusion.
 2. **Role Symmetry & Anti-Collusion** — builder/challenger authority rotates every round.
@@ -62,6 +62,40 @@ The system is deliberately overdesigned around one constraint: two creative AIs 
 46. **Cost, Energy & Thermal Efficiency Governance** — use long wall-clock time efficiently by maximizing quality gain per governed resource.
 47. **Quality-Debt Ratchet & Non-Regression Baseline** — unresolved quality debt is typed, bounded, and its promotion ceiling can only tighten.
 48. **Independent Gold-Master Tribunal** — terminal release requires a separate whole-game evidence authority beyond both rivals and routine evaluators.
+
+
+49. **Causal Obligation Proof Ledger** — setup/payoff, quest, rule, character, and world-causality promises become explicit blockers until proven closed.
+50. **Multi-Horizon Consistency Sentinel** — near-, medium-, and far-horizon checks prevent local improvements from creating late-game contradictions.
+51. **Adaptive Effort Portfolio Scheduler** — selects exact Forge-100/1000/10000 modes by risk, uncertainty, blast radius, novelty opportunity, and marginal value.
+52. **Artifact Genealogy & Mutation Lineage** — champions, challengers, syntheses, repairs, and forks remain attributable across thousands of rounds.
+53. **Branch Mutation & Alternate-History Fuzzing** — perturb timelines, quest outcomes, state transitions, and choice branches to expose hidden assumptions.
+54. **Evaluator Independence & Correlated-Failure Detection** — shared providers, methods, sources, or lineage cannot masquerade as independent quorum.
+55. **Counterfactual Regret & Player-Policy Fairness** — measure harm to plausible alternative player policies relative to preserved alternatives.
+56. **Player Population & Preference Pluralism** — optimize across a population of distinct players rather than one synthetic average.
+57. **Emergent Mechanic & Interaction Discovery** — search cross-system interactions for useful emergent play as well as exploits.
+58. **Continuity Repair Planner** — compute the smallest causally sufficient fix set instead of patching visible symptoms.
+59. **Cross-Modal Semantic Synchronization** — shared events synchronize story, animation, camera, UI, VFX, music, SFX, voice, and gameplay.
+60. **Evidence Freshness & Transitive Invalidation** — material source/canon/model/tool/evaluator/dependency drift invalidates dependent evidence.
+61. **Qualification Lease & Evidence Expiry** — high-impact green evidence has explicit validity windows and drift triggers.
+62. **Model, Tool & Method Diversity Anti-Capture** — no single model family, toolchain, corpus, or evaluation method may dominate the whole loop.
+63. **Project Wisdom & Verified Lesson Consolidation** — only independently verified lessons enter reusable project-local wisdom.
+64. **Convergence, Stagnation & Cycle Escape** — cycling and low-gain convergence trigger orthogonal hypotheses, never false completion.
+65. **Minimal Sufficient Complexity & Quality Density** — new state, rules, dependencies, and artifact mass must earn measurable quality or be removed.
+66. **Requirement-to-Artifact Proof Closure** — every declared requirement terminates in exact artifact/evidence identities or remains an explicit blocker.
+67. **Constraint Satisfiability & Conflict-Core Extraction** — hard constraints fail closed and expose the smallest contradictory core for repair.
+68. **Semantic Intent Preservation Under Edits** — refactors, rewrites, localization, optimization, and regeneration cannot silently alter protected design intent.
+69. **Hermetic Transform Sandbox & Reproduction** — material transforms bind exact tool, input, config, environment, and output identities.
+70. **External Game-Knowledge Ingestion Firewall** — broad gaming sources enter only through immutable provenance and rights-classified snapshots.
+71. **Reference Abstraction & Anti-Imitation Compiler** — extract techniques/facts/constraints without reproducing protected franchise/style/level/character/music/code expression.
+72. **Multi-Resolution Visual Coverage** — visual proof spans pixel/texel to frame, shot, scene, sequence, UI state, LOD, and whole-game language.
+73. **Multi-Resolution Narrative Coverage** — narrative proof spans line/beat to scene, act, arc, branch, campaign, ending, and compressed long-horizon memory.
+74. **Player Mental Model & Tutorial Truth** — tutorial/UI/feedback must teach the actual game rules and state, not a misleading approximation.
+75. **Combinatorial Systems Interaction Matrix** — critical pairwise and risk-selected higher-order subsystem combinations require explicit test coverage.
+76. **Rare-Event & Tail-Risk Simulation** — catastrophic low-frequency corruption, softlock, exploit, crash, desync, rights, and security failures remain blockers.
+77. **Privacy-Preserving Telemetry Causal Feedback** — feedback loops use privacy-minimized aggregates and causal hypotheses, not raw surveillance or correlation worship.
+78. **Project Resurrection & Catastrophic Recovery** — prove whole-project reconstruction from content-addressed project/canon/artifact/event/rights snapshots.
+79. **Tamper-Evident Evidence Merkle Transparency** — append-only evidence roots make retrospective proof rewriting detectable.
+80. **Zero-Critical-Gap Terminal Closure Certificate** — terminal completion requires all 50 families, every critical plane, exact identities, zero critical gaps, and independent verification.
 
 ## Non-compensable order of authority
 
@@ -122,11 +156,7 @@ Similarity checks are an ensemble of risk screens across text, code, image, audi
 
 ## Family coverage
 
-All 50 game-builder capability families inherit the 11 critical planes:
-
-`OP01 OP02 OP04 OP05 OP06 OP11 OP14 OP15 OP16 OP22 OP24`
-
-Each family also receives domain-specific planes. The machine authority requires at least 11 planes per family, so no GBL family can exist outside the shared governance spine.
+All 50 game-builder capability families inherit the **38 critical planes** declared by the machine authority. Current family bindings carry **40–53 planes each**, with domain-specific planes layered on top of the shared spine. No GBL family can exist outside that common assurance floor.
 
 ## Evidence rule
 
@@ -146,4 +176,30 @@ The constitution is now partially executable through four additional determinist
 
 The integrated control plane recomputes the canonical panel decision from the bound panel before promotion. A caller cannot fabricate a favorable `PanelDecision` and bypass the judge quorum.
 
-No runtime primitive grants completion by existing. The 48 planes remain individually unsigned until their own exact-head evidence is produced.
+No runtime primitive grants completion by existing. The 80 planes remain individually unsigned until their own exact-head evidence is produced.
+
+
+## Third-generation frontier assurance
+
+`skeleton/ai/game_builder/frontier_assurance.py` executes causal proof ledgers, multi-horizon consistency, adaptive effort portfolios, artifact genealogy, evaluator-independence checks, counterfactual regret, evidence invalidation, cycle detection, and verified project wisdom.
+
+## Fourth-generation deep assurance
+
+`skeleton/ai/game_builder/deep_assurance.py` makes the newest overengineering laws executable:
+
+- complexity growth must pass a quality-density governor;
+- requirements close only through artifact-bound proof;
+- failed critical constraints expose conflict cores;
+- protected design intent is checked across edits;
+- transforms are content-addressed and hermetically reproducible;
+- external gaming knowledge is rights-classified before use, with reference separated from expression incorporation;
+- visual and narrative QA require evidence at every declared granularity;
+- tutorials and UI are tested against the player's mental model of the real rules;
+- cross-system interaction matrices make missing critical pairs visible;
+- rare-event simulation uses conservative tail bounds rather than averages;
+- telemetry feedback rejects raw identifiers and undersized cohorts;
+- catastrophic recovery reconstructs the whole project from exact governed snapshots;
+- promotion evidence accumulates under a deterministic Merkle root;
+- terminal closure requires all 50 families, every critical plane, zero unresolved critical gaps, and independent verification.
+
+The targeted regression suite is `tests/test_ai_game_builder_deep_assurance.py`.
