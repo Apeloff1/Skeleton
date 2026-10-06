@@ -3577,3 +3577,31 @@ Required validation:
 python scripts/check_enterprise_ai_implementation_notes.py --json
 python -m pytest -q tests/test_enterprise_ai_implementation_notes.py
 ```
+
+
+## Enterprise deployment and operations acceptance
+
+The AI construction contract proves capability ownership, execution semantics,
+authority, and AI-specific closure. It is not by itself a production operations
+claim.
+
+Whole-system enterprise readiness is governed by:
+
+- `machine/enterprise_system_architecture.json`;
+- `docs/ENTERPRISE_SYSTEM_ARCHITECTURE.md`;
+- `scripts/check_enterprise_system_architecture.py`;
+- `.github/workflows/enterprise-system-architecture.yml`.
+
+The enterprise layer composes all construction planes with runtime topology,
+tenancy, HA, service identity, SLOs, error budgets, disaster recovery,
+backpressure, incident operations, progressive delivery, supply-chain evidence,
+and production runbooks.
+
+No AI plane may bypass that layer by claiming local completion. A plane can be
+implementation-complete while the assembled deployment remains
+production-ineligible. Conversely, the enterprise layer cannot take ownership
+away from the canonical AI plane merely to satisfy an operational target.
+
+The final production promotion is evidence-only and requires current runtime
+proof. The architectural plan can be complete while `production_claim` remains
+false.
