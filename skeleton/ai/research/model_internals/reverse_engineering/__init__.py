@@ -102,6 +102,30 @@ from .report_export import ReportEnvelope, build_report_envelope, verify_report_
 from .sequential_evidence import SequentialEvidenceReport, SequentialObservation, analyze_sequential_evidence
 from .tool_policy_boundary import ToolPolicyBoundaryReport, ToolPolicyTrial, analyze_tool_policy_boundary
 
+from .ablation_dose_response import DoseResponseReport, DoseResponseTrial, analyze_ablation_dose_response
+from .assignment_balance import AssignmentBalanceReport, BalanceAssignment, analyze_assignment_balance
+from .causal_directionality import DirectionalEffect, DirectionalityReport, analyze_causal_directionality
+from .causal_invariance import CausalInvarianceReport, EnvironmentEffect, analyze_causal_invariance
+from .circuit_discovery import CandidateEdge, CircuitCandidate, CircuitDiscoveryReport, discover_circuit_candidates
+from .drift_response_policy import DriftPolicySignal, DriftResponseDecision, decide_drift_response
+from .evidence_confidence import ConfidenceComponent, EvidenceConfidenceReport, aggregate_evidence_confidence
+from .evidence_ledger import EvidenceLedger, EvidenceLedgerEntry
+from .experiment_coverage import CoverageObservation, ExperimentCoverageReport, analyze_experiment_coverage
+from .experimental_power import PowerPlan, plan_two_group_power
+from .information_gain import InformationGainReport, analyze_information_gain
+from .intervention_equivalence import InterventionEffectPair, InterventionEquivalenceReport, analyze_intervention_equivalence
+from .intervention_specificity import InterventionSpecificityReport, SpecificityObservation, analyze_intervention_specificity
+from .intervention_transfer import InterventionTransferReport, TransferObservation, analyze_intervention_transfer
+from .mediation_graph import MediationEdge, MediationGraphReport, MediationPath, analyze_mediation_graph
+from .multimodal_intervention import MultimodalInterventionObservation, MultimodalInterventionReport, analyze_multimodal_intervention_consistency
+from .multiple_testing import AdjustedHypothesis, HypothesisPValue, MultipleTestingReport, benjamini_hochberg
+from .probe_frontier import FrontierProbe, ProbeFrontierReport, analyze_probe_frontier
+from .probe_redundancy import ProbeOutcomeVector, ProbeRedundancyReport, RedundantProbePair, analyze_probe_redundancy
+from .probe_scheduler import ProbeSchedule, ProbeTask, schedule_probes
+from .provenance_graph import ProvenanceGraphReport, ProvenanceNode, verify_provenance_graph
+from .randomized_assignment import AssignedUnit, AssignmentPlan, AssignmentUnit, build_balanced_assignment
+from .signature_distance import SignatureDistanceReport, analyze_signature_distance
+
 __all__ = [
     "ActivationLayerReport",
     "ActivationSample",
@@ -309,4 +333,74 @@ __all__ = [
     "evaluate_evidence_quorum",
     "permutation_mean_difference",
     "verify_report_envelope",
+    "AdjustedHypothesis",
+    "AssignedUnit",
+    "AssignmentBalanceReport",
+    "AssignmentPlan",
+    "AssignmentUnit",
+    "BalanceAssignment",
+    "CandidateEdge",
+    "CausalInvarianceReport",
+    "CircuitCandidate",
+    "CircuitDiscoveryReport",
+    "ConfidenceComponent",
+    "CoverageObservation",
+    "DirectionalEffect",
+    "DirectionalityReport",
+    "DoseResponseReport",
+    "DoseResponseTrial",
+    "DriftPolicySignal",
+    "DriftResponseDecision",
+    "EnvironmentEffect",
+    "EvidenceConfidenceReport",
+    "EvidenceLedger",
+    "EvidenceLedgerEntry",
+    "ExperimentCoverageReport",
+    "FrontierProbe",
+    "HypothesisPValue",
+    "InformationGainReport",
+    "InterventionEffectPair",
+    "InterventionEquivalenceReport",
+    "InterventionSpecificityReport",
+    "InterventionTransferReport",
+    "MediationEdge",
+    "MediationGraphReport",
+    "MediationPath",
+    "MultimodalInterventionObservation",
+    "MultimodalInterventionReport",
+    "MultipleTestingReport",
+    "PowerPlan",
+    "ProbeFrontierReport",
+    "ProbeOutcomeVector",
+    "ProbeRedundancyReport",
+    "ProbeSchedule",
+    "ProbeTask",
+    "ProvenanceGraphReport",
+    "ProvenanceNode",
+    "RedundantProbePair",
+    "SignatureDistanceReport",
+    "SpecificityObservation",
+    "TransferObservation",
+    "aggregate_evidence_confidence",
+    "analyze_ablation_dose_response",
+    "analyze_assignment_balance",
+    "analyze_causal_directionality",
+    "analyze_causal_invariance",
+    "analyze_experiment_coverage",
+    "analyze_information_gain",
+    "analyze_intervention_equivalence",
+    "analyze_intervention_specificity",
+    "analyze_intervention_transfer",
+    "analyze_mediation_graph",
+    "analyze_multimodal_intervention_consistency",
+    "analyze_probe_frontier",
+    "analyze_probe_redundancy",
+    "analyze_signature_distance",
+    "benjamini_hochberg",
+    "build_balanced_assignment",
+    "decide_drift_response",
+    "discover_circuit_candidates",
+    "plan_two_group_power",
+    "schedule_probes",
+    "verify_provenance_graph",
 ]

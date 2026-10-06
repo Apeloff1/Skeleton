@@ -84,12 +84,35 @@ The lab contains bounded analyzers for:
 - **campaign manifests** — deterministic dependency-linked inventories of reports, claims, and protocols;
 - **report envelopes** — canonical versioned exports with tamper-verifiable payload identity;
 - **drift alarms** — multi-domain threshold aggregation with observe/warning/critical severity.
+- **power planning** — closed-form two-group sample sizing for standardized effects and target power;
+- **balanced randomization** — deterministic stratified assignment with reproducible seeds;
+- **mediation graphs** — path-coefficient products and strongest indirect causal paths;
+- **intervention equivalence** — matched-effect tolerance checks across alternative interventions;
+- **circuit discovery** — thresholded path discovery requiring effect, replication, and sign-consistency evidence;
+- **probe scheduling** — budget-, risk-, prerequisite-, and information-aware deterministic scheduling;
+- **multimodal intervention consistency** — matched semantic intervention effects across modalities;
+- **ablation dose response** — dose/metric slopes, directionality, and monotonicity violations;
+- **experiment coverage** — factorial cell and replicate completeness;
+- **evidence ledger** — append-only hash-chained research-event verification;
+- **conservative evidence confidence** — mandatory-component floors combined with weighted evidence quality;
+- **drift response policy** — fail-closed observe/recheck/revalidate/freeze actions;
+- **causal directionality** — paired forward/reverse effect asymmetry;
+- **intervention specificity** — on-target versus off-target effect concentration;
+- **probe redundancy** — binary outcome agreement and deterministic duplicate-pruning suggestions;
+- **information gain** — prior/posterior entropy reduction across architecture hypotheses;
+- **signature distance** — composite normalized feature distance between authorized model signatures;
+- **causal invariance** — cross-environment effect stability and sign preservation;
+- **intervention transfer** — matched-intervention sign consistency across authorized models;
+- **provenance DAGs** — report→claim→replication ancestry, depth, missing-parent, and cycle checks;
+- **assignment balance** — arm imbalance diagnostics within experimental strata;
+- **probe Pareto frontiers** — non-dominated cost/information/risk probe selection;
+- **multiple-testing correction** — Benjamini–Hochberg false-discovery-rate control.
 
 These surfaces characterize what can be observed or what is available in artifacts
 the operator is authorized to inspect. They do not assert proprietary architecture
 identity, recover hidden weights from inaccessible systems, bypass access controls,
 or create a right to inspect artifacts without ownership or permission.
 
-Future work can deepen automated circuit discovery, causal mediation and path patching,
-multimodal interventions, sequential drift response, experimental power analysis, and
-adversarial replication while preserving the same evidence/inference boundary.
+Future work can deepen adaptive experimental design, nonlinear mediation, circuit search,
+intervention transportability, hierarchical uncertainty, and adversarial replication while
+preserving the same evidence/inference boundary.

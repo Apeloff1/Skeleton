@@ -64,10 +64,8 @@ def analyze_intervention_specificity(
     mean_on = sum(on_target) / len(on_target) if on_target else None
     mean_off = sum(off_target) / len(off_target) if off_target else None
     ratio = None
-    if mean_on is not None and mean_off is not None:
-        ratio = float("inf") if mean_off == 0.0 and mean_on > 0.0 else (
-            mean_on / mean_off if mean_off > 0.0 else 1.0
-        )
+    if mean_on is not None and mean_off is not None and mean_off > 0.0:
+        ratio = mean_on / mean_off
     payload = {
         "observations": [
             {
