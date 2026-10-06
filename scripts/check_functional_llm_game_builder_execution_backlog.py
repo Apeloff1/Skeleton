@@ -185,6 +185,33 @@ def main() -> int:
         frontier_gate["core_targets"]
     ) != 3:
         fail("frontier competition core-target set drift")
+    if frontier_gate.get("protocol_version") != "2.0":
+        fail("frontier competition execution protocol version drift")
+    measurement = frontier_gate.get("measurement_requirements")
+    if not isinstance(measurement, dict):
+        fail("frontier competition measurement requirements missing")
+    if int(measurement.get("comparator_maximum_age_days", 999)) > 45:
+        fail("frontier competition comparator freshness weakened")
+    if int(measurement.get("minimum_independent_runs_per_scored_task", 0)) < 6:
+        fail("frontier competition trial-count floor weakened")
+    if float(measurement.get("confidence_interval_level", 0.0)) < 0.95:
+        fail("frontier competition uncertainty floor weakened")
+    if float(measurement.get("non_inferiority_margin_pp_max", 99.0)) > 2.0:
+        fail("frontier competition non-inferiority margin weakened")
+    if int(measurement.get("minimum_parity_or_better_domains", 0)) < 10:
+        fail("frontier competition parity-domain floor weakened")
+    if int(measurement.get("minimum_superior_core_targets", 0)) < 2:
+        fail("frontier competition superior-core-target floor weakened")
+    for key in (
+        "equal_budget_head_to_head",
+        "compute_normalized_pareto",
+        "hidden_challenge_rotation",
+        "anti_gaming_review",
+        "long_horizon_50_and_80_percent_curves",
+        "evaluator_independence",
+    ):
+        if measurement.get(key) is not True:
+            fail(f"frontier competition measurement control disabled: {key}")
     for task_id in frontier_gate["required_task_ids"]:
         task = next((item for item in tasks if item.get("id") == task_id), None)
         if task is None:
@@ -199,8 +226,19 @@ def main() -> int:
         ):
             if not any(token in str(gate) for gate in gates):
                 fail(f"{task_id} missing frontier closure gate: {token}")
-        if "frontier-competition gate" not in str(task.get("closure_rule", "")):
-            fail(f"{task_id} closure rule is not frontier-bound")
+        closure = str(task.get("closure_rule", "")).lower()
+        if "frontier protocol v2" not in closure:
+            fail(f"{task_id} closure rule is not bound to frontier protocol v2")
+        for token in (
+            "six independent",
+            "50%/80%",
+            "compute-normalized",
+            "anti-gaming",
+            "evaluator independence",
+            "statistical dominance",
+        ):
+            if token not in closure:
+                fail(f"{task_id} frontier protocol v2 closure rule missing: {token}")
 
     print(
         "FLGB execution backlog valid: 18 planes, 216 build units, "
