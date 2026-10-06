@@ -257,6 +257,7 @@ async def test_chat_memory_policy_reaches_delegated_engine_command(
             execution_id=command.execution_request.execution_id,
             verification="verification:memory",
             evidence_refs=("evidence:memory",),
+            provider_receipts=("provider:test:memory",),
             tool_receipts=(),
             memory_refs=("memory:canonical-1",),
             artifact_refs=(),
