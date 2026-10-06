@@ -367,6 +367,7 @@ class LiveResponseAcceptanceReceipt:
 
     policy_id: str
     operation_id: str
+    observed_operation_id: str | None
     expected_execution_id: str
     observed_execution_id: str | None
     context_digest: str
@@ -402,6 +403,16 @@ class LiveResponseAcceptanceReceipt:
             "context_digest",
             _canonical_sha256(self.context_digest, "context_digest"),
         )
+        if self.observed_operation_id is not None:
+            object.__setattr__(
+                self,
+                "observed_operation_id",
+                _canonical_live_text(
+                    self.observed_operation_id,
+                    "observed_operation_id",
+                    maximum=512,
+                ),
+            )
         if self.observed_execution_id is not None:
             object.__setattr__(
                 self,
@@ -464,7 +475,8 @@ class LiveResponseAcceptanceReceipt:
                 "rejected live response must retain at least one reason"
             )
         if self.accepted and (
-            self.observed_execution_id != self.expected_execution_id
+            self.observed_operation_id != self.operation_id
+            or self.observed_execution_id != self.expected_execution_id
             or self.verification_ref_hash is None
             or self.output_sha256 is None
             or self.output_utf8_bytes <= 0
@@ -487,6 +499,7 @@ class LiveResponseAcceptanceReceipt:
             "schema_version": self.schema_version,
             "policy_id": self.policy_id,
             "operation_id": self.operation_id,
+            "observed_operation_id": self.observed_operation_id,
             "expected_execution_id": self.expected_execution_id,
             "observed_execution_id": self.observed_execution_id,
             "context_digest": self.context_digest,
@@ -523,6 +536,7 @@ class LiveResponseAcceptanceReceipt:
 def evaluate_live_response_acceptance(
     *,
     operation_id: str,
+    observed_operation_id: object,
     expected_execution_id: str,
     observed_execution_id: object,
     context_digest: str,
@@ -551,6 +565,24 @@ def evaluate_live_response_acceptance(
     )
     context = _canonical_sha256(context_digest, "context_digest")
     reasons: list[str] = []
+
+    observed_operation: str | None = None
+    if isinstance(observed_operation_id, str):
+        candidate_operation = observed_operation_id.strip()
+        if (
+            candidate_operation
+            and candidate_operation == observed_operation_id
+            and len(candidate_operation) <= 512
+            and not any(
+                ord(ch) < 32 or ord(ch) == 127
+                for ch in candidate_operation
+            )
+        ):
+            observed_operation = candidate_operation
+    if observed_operation is None:
+        reasons.append("operation_identity_missing")
+    elif observed_operation != operation:
+        reasons.append("operation_identity_mismatch")
 
     observed: str | None = None
     if isinstance(observed_execution_id, str):
@@ -630,6 +662,7 @@ def evaluate_live_response_acceptance(
     return LiveResponseAcceptanceReceipt(
         policy_id=effective_policy.policy_id,
         operation_id=operation,
+        observed_operation_id=observed_operation,
         expected_execution_id=expected_execution,
         observed_execution_id=observed,
         context_digest=context,
