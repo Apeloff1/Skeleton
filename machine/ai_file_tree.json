@@ -89,6 +89,7 @@
       "move_batch": "B3-owner-sensitive",
       "source_disposition": "retain_until_explicit_owner_and_import_cutover",
       "volume_refs": [
+        "VOL-004",
         "VOL-007"
       ]
     },
@@ -486,7 +487,10 @@
         "cutover:owner-sensitive"
       ],
       "move_batch": "B3-owner-sensitive",
-      "source_disposition": "canonical_automation_owner_with_legacy_core_shims"
+      "source_disposition": "canonical_automation_owner_with_legacy_core_shims",
+      "volume_refs": [
+        "VOL-004"
+      ]
     },
     {
       "id": "AIFT-ENGINE-API",
@@ -716,6 +720,7 @@
         "swarm"
       ],
       "volume_refs": [
+        "VOL-004",
         "VOL-015",
         "VOL-016",
         "VOL-017",
@@ -1032,7 +1037,10 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-004"
+      ]
     },
     {
       "id": "AIFT-RELIABILITY",
@@ -6638,6 +6646,11 @@
       "path": "skeleton/ops",
       "owner": "operations/release tooling",
       "reason": "operational cockpit, release/preview hygiene, and smoke-verdict tooling stay outside canonical AI runtime ownership"
+    },
+    {
+      "path": "skeleton/verification",
+      "owner": "verification and assurance infrastructure",
+      "reason": "Repository verification/evidence infrastructure remains outside canonical AI runtime ownership; it validates AI and non-AI surfaces without becoming product runtime authority."
     }
   ],
   "classification_coverage": {
@@ -7643,12 +7656,16 @@
       "residual_only": true,
       "role": "Residual canonical AI-native top-level modules not claimed by more-specific migration mappings or native subtree owners; prevents ownership ambiguity while preserving specific descendant authorities.",
       "volume_refs": [
+        "VOL-084",
         "VOL-097",
         "VOL-098",
         "VOL-099",
         "VOL-100",
         "VOL-101",
+        "VOL-102",
         "VOL-113",
+        "VOL-164",
+        "VOL-197",
         "VOL-201",
         "VOL-202",
         "VOL-203",
@@ -7664,21 +7681,41 @@
         "VOL-239",
         "VOL-240",
         "VOL-243",
+        "VOL-248",
+        "VOL-251",
+        "VOL-252",
+        "VOL-258",
         "VOL-259",
         "VOL-261",
         "VOL-263",
         "VOL-264",
         "VOL-265",
         "VOL-266",
+        "VOL-320",
+        "VOL-321",
+        "VOL-322",
+        "VOL-323",
+        "VOL-325",
         "VOL-336",
         "VOL-337",
         "VOL-338",
         "VOL-339",
         "VOL-343",
+        "VOL-361",
+        "VOL-362",
+        "VOL-363",
+        "VOL-364",
+        "VOL-365",
+        "VOL-381",
+        "VOL-382",
+        "VOL-385",
+        "VOL-386",
+        "VOL-398",
         "VOL-400",
         "VOL-411",
         "VOL-412",
-        "VOL-413"
+        "VOL-413",
+        "VOL-414"
       ]
     },
     {
