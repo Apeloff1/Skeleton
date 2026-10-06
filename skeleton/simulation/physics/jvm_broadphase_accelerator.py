@@ -7,7 +7,6 @@ inside Python.
 """
 from __future__ import annotations
 
-import atexit
 import math
 import os
 import queue
