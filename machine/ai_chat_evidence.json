@@ -1,0 +1,26 @@
+{
+  "schema_version": "ai-chat-evidence/v1",
+  "status": "implemented_candidate",
+  "prepared_at_utc": "2026-10-06T01:55:00Z",
+  "prepared_by": "chatgpt:gpt-5.6-sol",
+  "scope": "claim-level AI-chat evidence acceptance, citation integrity, freshness, source authority, independence and contradiction handling",
+  "invariants": [
+    "citation proximity alone never counts as evidence",
+    "citation integrity must pass before a source counts toward support",
+    "freshness-required claims reject missing stale or future timestamps",
+    "authoritative-source claims fail closed for disallowed source classes",
+    "high-assurance claims require independent supporting evidence",
+    "accepted contradicting evidence blocks release by default",
+    "rejected sources never count toward support thresholds",
+    "claim evidence decisions are deterministic and digest bound"
+  ],
+  "files": {
+    "module": "backend/core/chat_evidence.py",
+    "tests": "backend/tests/test_ai_chat_evidence.py",
+    "validator": "scripts/check_ai_chat_evidence.py",
+    "independent_verifier": "scripts/verify_ai_chat_evidence.py",
+    "workflow": ".github/workflows/ai-chat-evidence-closure.yml",
+    "plan": "docs/plan/AI_CHAT_MASTERPLAN_2026-10-06.md"
+  },
+  "promotion_rule": "implemented candidate only; exact-head regression and independent verification must pass before qualification"
+}
