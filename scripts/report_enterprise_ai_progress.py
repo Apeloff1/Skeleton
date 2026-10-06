@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from check_enterprise_ai_superiority import validate
+from check_enterprise_ai_implementation_notes import validate as validate_notes
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,6 +28,7 @@ GRADE_ORDER = {
 def build_report(root: Path = ROOT) -> dict[str, Any]:
     root = Path(root).resolve()
     validation = validate(root)
+    notes_validation = validate_notes(root)
     policy = json.loads(
         (root / "machine" / "enterprise_ai_superiority.json").read_text(
             encoding="utf-8"
@@ -66,6 +68,15 @@ def build_report(root: Path = ROOT) -> dict[str, Any]:
         "volume_count": total,
         "dedicated_superiority_profile_count": critical_total,
         "golden_journey_count": validation["golden_journey_count"],
+        "implementation_dossier_count": notes_validation["dossier_count"],
+        "implementation_dossier_coverage_percent": round(
+            100.0
+            * notes_validation["dossier_count"]
+            / notes_validation["volume_count"],
+            2,
+        ),
+        "implementation_levels_per_volume": notes_validation["required_level_count"],
+        "implementation_notebook_count": notes_validation["depth_pass_count"],
         "design_coverage_percent": round(100.0 * all_graded / total, 2),
         "enterprise_qualified_volume_count": qualified,
         "enterprise_qualification_percent": round(100.0 * qualified / total, 2),
