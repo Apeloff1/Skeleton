@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plan_version": "1.6.3",
+  "plan_version": "1.7.0",
   "status": "active",
   "architecture_lane": "PR-1904",
   "architecture_branch": "integration/architecture-map-v1",
@@ -43,7 +43,8 @@
     "p1_reproducibility_policy": "machine/p1_reproducibility_policy.json",
     "p1_reproducibility_engine": "scripts/check_p1_reproducibility.py",
     "p1_reproducibility_contract": "skeleton/contracts/reproducibility.py",
-    "p1_privileged_tool_transaction_contract": "skeleton/skills/privileged_transaction.py"
+    "p1_privileged_tool_transaction_contract": "skeleton/skills/privileged_transaction.py",
+    "enterprise_ai_superiority": "machine/enterprise_ai_superiority.json"
   },
   "laws": [
     "durable governed state is authoritative",
@@ -53,7 +54,8 @@
     "child authority is a subset of parent authority",
     "writes require idempotency or explicit compensation semantics",
     "self-improvement produces candidates; promotion is gated",
-    "SOTA status requires reproducible comparative evidence"
+    "SOTA status requires reproducible comparative evidence",
+    "enterprise AI qualification requires exact-head comparator-backed superiority evidence with non-compensable security, privacy, authority, tenant-isolation, recovery and rollback gates"
   ],
   "thematic_parts": [
     {
@@ -544,7 +546,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-004",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 5,
@@ -602,7 +607,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-005",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 6,
@@ -660,7 +668,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-006",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 7,
@@ -725,7 +736,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-007",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 8,
@@ -797,7 +811,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-008",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 9,
@@ -867,7 +884,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-009",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 10,
@@ -948,7 +968,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-010",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 11,
@@ -1037,7 +1060,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-011",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 12,
@@ -1107,7 +1133,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-012",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 13,
@@ -1171,7 +1200,10 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-013",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 14,
@@ -1245,7 +1277,10 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-014",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 15,
@@ -1351,7 +1386,10 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-015",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 16,
@@ -1446,7 +1484,10 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-016",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 17,
@@ -1536,7 +1577,10 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-017",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 18,
@@ -1597,7 +1641,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-018",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 19,
@@ -1653,7 +1700,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-019",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 20,
@@ -1707,7 +1757,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-020",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 21,
@@ -1763,7 +1816,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-021",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 22,
@@ -1819,7 +1875,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-022",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 23,
@@ -1878,7 +1937,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-023",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 24,
@@ -1937,7 +1999,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-024",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 25,
@@ -2002,7 +2067,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-025",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 26,
@@ -2060,7 +2128,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-026",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 27,
@@ -2120,7 +2191,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-027",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 28,
@@ -2190,7 +2264,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-028",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 29,
@@ -2251,7 +2328,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-029",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 30,
@@ -2308,7 +2388,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-030",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 31,
@@ -2365,7 +2448,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-031",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 32,
@@ -2438,7 +2524,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-032",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 33,
@@ -2491,7 +2580,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-033",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 34,
@@ -2608,7 +2700,10 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-034",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 35,
@@ -2711,7 +2806,10 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-035",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 36,
@@ -2800,7 +2898,10 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-036",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 37,
@@ -2884,7 +2985,10 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-037",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 38,
@@ -2991,7 +3095,10 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-038",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 39,
@@ -3057,7 +3164,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-039",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 40,
@@ -3121,7 +3231,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-000-040"
+      "depth_pass": "DP-000-040",
+      "enterprise_superiority_profile": "ENT-VOL-040",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 41,
@@ -3184,7 +3297,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-041-080"
+      "depth_pass": "DP-041-080",
+      "enterprise_superiority_profile": "ENT-VOL-041",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 42,
@@ -3257,7 +3373,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-041-080"
+      "depth_pass": "DP-041-080",
+      "enterprise_superiority_profile": "ENT-VOL-042",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 43,
@@ -3316,7 +3435,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-041-080"
+      "depth_pass": "DP-041-080",
+      "enterprise_superiority_profile": "ENT-VOL-043",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 44,
@@ -3389,7 +3511,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-041-080"
+      "depth_pass": "DP-041-080",
+      "enterprise_superiority_profile": "ENT-VOL-044",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 45,
@@ -3467,7 +3592,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-041-080"
+      "depth_pass": "DP-041-080",
+      "enterprise_superiority_profile": "ENT-VOL-045",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 46,
@@ -3529,7 +3657,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-041-080"
+      "depth_pass": "DP-041-080",
+      "enterprise_superiority_profile": "ENT-VOL-046",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 47,
@@ -3585,7 +3716,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-041-080"
+      "depth_pass": "DP-041-080",
+      "enterprise_superiority_profile": "ENT-VOL-047",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 48,
@@ -3649,7 +3783,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-041-080"
+      "depth_pass": "DP-041-080",
+      "enterprise_superiority_profile": "ENT-VOL-048",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 49,
@@ -3706,7 +3843,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-041-080"
+      "depth_pass": "DP-041-080",
+      "enterprise_superiority_profile": "ENT-VOL-049",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 50,
@@ -3761,7 +3901,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-041-080"
+      "depth_pass": "DP-041-080",
+      "enterprise_superiority_profile": "ENT-VOL-050",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 51,
@@ -20863,7 +21006,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-361-400"
+      "depth_pass": "DP-361-400",
+      "enterprise_superiority_profile": "ENT-VOL-381",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 382,
@@ -20917,7 +21063,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-361-400"
+      "depth_pass": "DP-361-400",
+      "enterprise_superiority_profile": "ENT-VOL-382",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 383,
@@ -20964,7 +21113,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-361-400"
+      "depth_pass": "DP-361-400",
+      "enterprise_superiority_profile": "ENT-VOL-383",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 384,
@@ -21011,7 +21163,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-361-400"
+      "depth_pass": "DP-361-400",
+      "enterprise_superiority_profile": "ENT-VOL-384",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 385,
@@ -21065,7 +21220,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-361-400"
+      "depth_pass": "DP-361-400",
+      "enterprise_superiority_profile": "ENT-VOL-385",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 386,
@@ -21120,7 +21278,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-361-400"
+      "depth_pass": "DP-361-400",
+      "enterprise_superiority_profile": "ENT-VOL-386",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 387,
@@ -21167,7 +21328,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-361-400"
+      "depth_pass": "DP-361-400",
+      "enterprise_superiority_profile": "ENT-VOL-387",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 388,
@@ -21214,7 +21378,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-361-400"
+      "depth_pass": "DP-361-400",
+      "enterprise_superiority_profile": "ENT-VOL-388",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 389,
@@ -21261,7 +21428,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-361-400"
+      "depth_pass": "DP-361-400",
+      "enterprise_superiority_profile": "ENT-VOL-389",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 390,
@@ -21316,7 +21486,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-361-400"
+      "depth_pass": "DP-361-400",
+      "enterprise_superiority_profile": "ENT-VOL-390",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 391,
@@ -21370,7 +21543,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-361-400"
+      "depth_pass": "DP-361-400",
+      "enterprise_superiority_profile": "ENT-VOL-391",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 392,
@@ -21424,7 +21600,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-361-400"
+      "depth_pass": "DP-361-400",
+      "enterprise_superiority_profile": "ENT-VOL-392",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 393,
@@ -21471,7 +21650,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-361-400"
+      "depth_pass": "DP-361-400",
+      "enterprise_superiority_profile": "ENT-VOL-393",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 394,
@@ -21518,7 +21700,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-361-400"
+      "depth_pass": "DP-361-400",
+      "enterprise_superiority_profile": "ENT-VOL-394",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 395,
@@ -21565,7 +21750,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-361-400"
+      "depth_pass": "DP-361-400",
+      "enterprise_superiority_profile": "ENT-VOL-395",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 396,
@@ -21612,7 +21800,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-361-400"
+      "depth_pass": "DP-361-400",
+      "enterprise_superiority_profile": "ENT-VOL-396",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 397,
@@ -21666,7 +21857,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-361-400"
+      "depth_pass": "DP-361-400",
+      "enterprise_superiority_profile": "ENT-VOL-397",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 398,
@@ -21721,7 +21915,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-361-400"
+      "depth_pass": "DP-361-400",
+      "enterprise_superiority_profile": "ENT-VOL-398",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 399,
@@ -21775,7 +21972,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-361-400"
+      "depth_pass": "DP-361-400",
+      "enterprise_superiority_profile": "ENT-VOL-399",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 400,
@@ -21822,7 +22022,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-361-400"
+      "depth_pass": "DP-361-400",
+      "enterprise_superiority_profile": "ENT-VOL-400",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 401,
@@ -21869,7 +22072,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-401-420"
+      "depth_pass": "DP-401-420",
+      "enterprise_superiority_profile": "ENT-VOL-401",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 402,
@@ -21916,7 +22122,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-401-420"
+      "depth_pass": "DP-401-420",
+      "enterprise_superiority_profile": "ENT-VOL-402",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 403,
@@ -21970,7 +22179,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-401-420"
+      "depth_pass": "DP-401-420",
+      "enterprise_superiority_profile": "ENT-VOL-403",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 404,
@@ -22025,7 +22237,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-401-420"
+      "depth_pass": "DP-401-420",
+      "enterprise_superiority_profile": "ENT-VOL-404",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 405,
@@ -22081,7 +22296,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-401-420"
+      "depth_pass": "DP-401-420",
+      "enterprise_superiority_profile": "ENT-VOL-405",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 406,
@@ -22137,7 +22355,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-401-420"
+      "depth_pass": "DP-401-420",
+      "enterprise_superiority_profile": "ENT-VOL-406",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 407,
@@ -22184,7 +22405,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-401-420"
+      "depth_pass": "DP-401-420",
+      "enterprise_superiority_profile": "ENT-VOL-407",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 408,
@@ -22231,7 +22455,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-401-420"
+      "depth_pass": "DP-401-420",
+      "enterprise_superiority_profile": "ENT-VOL-408",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 409,
@@ -22287,7 +22514,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-401-420"
+      "depth_pass": "DP-401-420",
+      "enterprise_superiority_profile": "ENT-VOL-409",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 410,
@@ -22335,7 +22565,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-401-420"
+      "depth_pass": "DP-401-420",
+      "enterprise_superiority_profile": "ENT-VOL-410",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 411,
@@ -22382,7 +22615,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-401-420"
+      "depth_pass": "DP-401-420",
+      "enterprise_superiority_profile": "ENT-VOL-411",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 412,
@@ -22430,7 +22666,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-401-420"
+      "depth_pass": "DP-401-420",
+      "enterprise_superiority_profile": "ENT-VOL-412",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 413,
@@ -22477,7 +22716,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-401-420"
+      "depth_pass": "DP-401-420",
+      "enterprise_superiority_profile": "ENT-VOL-413",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 414,
@@ -22532,7 +22774,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-401-420"
+      "depth_pass": "DP-401-420",
+      "enterprise_superiority_profile": "ENT-VOL-414",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 415,
@@ -22590,7 +22835,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-401-420"
+      "depth_pass": "DP-401-420",
+      "enterprise_superiority_profile": "ENT-VOL-415",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 416,
@@ -22637,7 +22885,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-401-420"
+      "depth_pass": "DP-401-420",
+      "enterprise_superiority_profile": "ENT-VOL-416",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 417,
@@ -22685,7 +22936,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-401-420"
+      "depth_pass": "DP-401-420",
+      "enterprise_superiority_profile": "ENT-VOL-417",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 418,
@@ -22733,7 +22987,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-401-420"
+      "depth_pass": "DP-401-420",
+      "enterprise_superiority_profile": "ENT-VOL-418",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 419,
@@ -22791,7 +23048,10 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "depth_pass": "DP-401-420"
+      "depth_pass": "DP-401-420",
+      "enterprise_superiority_profile": "ENT-VOL-419",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     },
     {
       "id": 420,
@@ -22876,7 +23136,10 @@
       "completion_checkbox": true,
       "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "depth_pass": "DP-401-420"
+      "depth_pass": "DP-401-420",
+      "enterprise_superiority_profile": "ENT-VOL-420",
+      "enterprise_grade_state": "designed",
+      "enterprise_grade_target": "superior"
     }
   ],
   "cross_cutting_catalogs": {
@@ -23331,5 +23594,12 @@
     "landed_candidate_task_count": 22,
     "landed_candidate_through_stage": 3,
     "latest_candidate_merge_sha": "a2cb66b9847ff893d750aafbf6ba61d3f1a8eba0"
+  },
+  "enterprise_grade_policy": {
+    "authority": "machine/enterprise_ai_superiority.json",
+    "target_grade": "superior",
+    "rule": "All volumes inherit the enterprise common contract. Dedicated-profile volumes cannot be called enterprise-qualified or superior until their exact-head profile and non-compensable gates pass.",
+    "anti_shortcut": "Implementation status, LOC, a green happy-path test, documentation, or self-scored evaluation cannot satisfy enterprise qualification.",
+    "required_for_product_claim": "A complete enterprise AI claim requires every production-path volume to be at least enterprise_qualified and every dedicated critical profile to satisfy its declared superiority rule."
   }
 }
