@@ -77,7 +77,7 @@ backends and never own business policy.
 
 ## 3. Contract layering
 
-There are five canonical contract layers, each with one job:
+The canonical contract stack has seven linked layers, each with one job:
 
 1. **`skeleton/app/manifest.json` — runtime contract.** Services, runtime modes,
    health paths, required environment, and Compose topology.
@@ -92,13 +92,25 @@ There are five canonical contract layers, each with one job:
    register, and closure evidence.
 5. **`machine/capability_interfaces.json` — interface contract.** Exact runtime
    dependency and acceptance edges, owners, zones, consumed contract surfaces,
-   failure semantics, and maturity. The human build manual is
-   `docs/AI_APP_CONSTRUCTION_MANUAL.md`.
+   failure semantics, and maturity.
+6. **`machine/enterprise_system_architecture.json` — enterprise system
+   contract.** HA, tenancy, security, consistency, SLO, DR, capacity,
+   observability, release, and operational acceptance above the component map.
+7. **`machine/advanced_ai_structure_100.json` — advanced AI promotion
+   contract.** One hundred cognitive maturity levels above the enterprise
+   baseline, without creating new runtime owners by default.
+
+The human construction manual is `docs/AI_APP_CONSTRUCTION_MANUAL.md`; the
+enterprise manual is `docs/ENTERPRISE_SYSTEM_ARCHITECTURE.md`; the advanced AI
+plan is `docs/plan/ADVANCED_AI_100_LEVELS.md`.
 
 `scripts/check_architecture_map.py`, `scripts/check_ai_app_construction.py`,
-`scripts/check_capability_interfaces.py`, and
-`scripts/check_provider_bootstrap.py` link the layers. It rejects drift when the
-architecture service graph no longer exactly matches the runtime manifest.
+`scripts/check_capability_interfaces.py`,
+`scripts/check_enterprise_system_architecture.py`,
+`scripts/check_advanced_ai_structure.py`, and
+`scripts/check_provider_bootstrap.py` link the stack. Validation rejects drift
+between runtime topology, canonical ownership, enterprise operation, and
+advanced-AI promotion structure.
 
 ## 4. Dependency direction
 
