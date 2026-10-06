@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from enum import Enum
+import hashlib
 import json
 from pathlib import Path
 import sqlite3
@@ -36,6 +38,143 @@ class ToolReservation:
             raise ValueError("committed reservation requires receipt")
         if self.status != "committed" and self.receipt is not None:
             raise ValueError("non-committed reservation cannot carry receipt")
+
+
+class ToolReconciliationOutcome(str, Enum):
+    NO_EFFECT = "no_effect"
+    COMMITTED = "committed"
+
+
+@dataclass(frozen=True, slots=True)
+class ToolReconciliationReceipt:
+    reconciliation_id: str
+    tenant_id: str
+    operation_id: str
+    idempotency_key: str
+    request_id: str
+    tool_id: str
+    arguments_digest: str
+    outcome: ToolReconciliationOutcome
+    evidence_ref: str
+    reconciled_at: datetime
+    execution_id: str | None = None
+    turn_id: str | None = None
+    call_id: str | None = None
+    receipt_id: str | None = None
+
+    def __post_init__(self) -> None:
+        for name, maximum in (
+            ("reconciliation_id", 64),
+            ("tenant_id", 512),
+            ("operation_id", 512),
+            ("idempotency_key", 1024),
+            ("request_id", 512),
+            ("tool_id", 128),
+            ("arguments_digest", 64),
+            ("evidence_ref", 2048),
+        ):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must be non-empty text")
+            normalized = value.strip()
+            if normalized != value or len(normalized) > maximum:
+                raise ValueError(f"{name} is invalid")
+        if len(self.reconciliation_id) != 64 or any(
+            ch not in "0123456789abcdef" for ch in self.reconciliation_id
+        ):
+            raise ValueError("reconciliation_id must be lowercase sha256")
+        if len(self.arguments_digest) != 64 or any(
+            ch not in "0123456789abcdef" for ch in self.arguments_digest
+        ):
+            raise ValueError("arguments_digest must be lowercase sha256")
+        if not isinstance(self.outcome, ToolReconciliationOutcome):
+            object.__setattr__(
+                self,
+                "outcome",
+                ToolReconciliationOutcome(str(self.outcome)),
+            )
+        instant = self.reconciled_at
+        if (
+            not isinstance(instant, datetime)
+            or instant.tzinfo is None
+            or instant.utcoffset() is None
+        ):
+            raise ValueError("reconciled_at must be timezone-aware")
+        object.__setattr__(
+            self,
+            "reconciled_at",
+            instant.astimezone(timezone.utc),
+        )
+        lineage = (self.execution_id, self.turn_id, self.call_id)
+        if any(value is not None for value in lineage) and not all(
+            value is not None for value in lineage
+        ):
+            raise ValueError(
+                "execution_id, turn_id and call_id must be supplied together"
+            )
+        for name in ("execution_id", "turn_id", "call_id", "receipt_id"):
+            value = getattr(self, name)
+            if value is not None and (
+                not isinstance(value, str) or not value.strip()
+            ):
+                raise ValueError(f"{name} must be non-empty when supplied")
+        if (
+            self.outcome is ToolReconciliationOutcome.COMMITTED
+            and self.receipt_id is None
+        ):
+            raise ValueError("committed reconciliation requires receipt_id")
+        if (
+            self.outcome is ToolReconciliationOutcome.NO_EFFECT
+            and self.receipt_id is not None
+        ):
+            raise ValueError("no-effect reconciliation cannot carry receipt_id")
+
+    @property
+    def reference(self) -> str:
+        return "tool-reconciliation:" + self.reconciliation_id
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "reconciliation_id": self.reconciliation_id,
+            "tenant_id": self.tenant_id,
+            "operation_id": self.operation_id,
+            "execution_id": self.execution_id,
+            "turn_id": self.turn_id,
+            "call_id": self.call_id,
+            "idempotency_key": self.idempotency_key,
+            "request_id": self.request_id,
+            "tool_id": self.tool_id,
+            "arguments_digest": self.arguments_digest,
+            "outcome": self.outcome.value,
+            "evidence_ref": self.evidence_ref,
+            "receipt_id": self.receipt_id,
+            "reconciled_at": self.reconciled_at.isoformat(),
+        }
+
+
+def _reconciliation_id(
+    request: ToolExecutionRequest,
+    outcome: ToolReconciliationOutcome,
+    evidence_ref: str,
+    receipt_id: str | None,
+) -> str:
+    material = "\x1f".join(
+        (
+            request.tenant_id,
+            request.operation_id,
+            request.execution_id or "",
+            request.turn_id or "",
+            request.call_id or "",
+            request.idempotency_key,
+            request.request_id,
+            request.tool_id,
+            request.arguments_digest,
+            outcome.value,
+            evidence_ref,
+            receipt_id or "",
+        )
+    ).encode("utf-8")
+    return hashlib.sha256(material).hexdigest()
 
 
 def _parse_time(raw: object, field: str) -> datetime:
@@ -147,6 +286,33 @@ class SQLiteToolReceiptStore:
 
                 CREATE INDEX IF NOT EXISTS idx_tool_execution_pending
                 ON tool_execution_receipt(namespace, state, reserved_at);
+
+                CREATE TABLE IF NOT EXISTS tool_execution_reconciliation (
+                    namespace TEXT NOT NULL,
+                    tenant_id TEXT NOT NULL,
+                    operation_id TEXT NOT NULL,
+                    idempotency_key TEXT NOT NULL,
+                    reconciliation_id TEXT NOT NULL,
+                    request_id TEXT NOT NULL,
+                    execution_id TEXT,
+                    turn_id TEXT,
+                    call_id TEXT,
+                    tool_id TEXT NOT NULL,
+                    arguments_digest TEXT NOT NULL,
+                    outcome TEXT NOT NULL,
+                    evidence_ref TEXT NOT NULL,
+                    receipt_id TEXT,
+                    reconciled_at TEXT NOT NULL,
+                    PRIMARY KEY(
+                        namespace, tenant_id, operation_id, idempotency_key
+                    ),
+                    UNIQUE(namespace, reconciliation_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_tool_reconciliation_operation
+                ON tool_execution_reconciliation(
+                    namespace, tenant_id, operation_id, reconciled_at
+                );
                 """
             )
             existing_columns = {
@@ -402,6 +568,335 @@ class SQLiteToolReceiptStore:
                 "durable tool reservation state is corrupt"
             )
 
+    @staticmethod
+    def _assert_request_matches_row(
+        row: sqlite3.Row,
+        request: ToolExecutionRequest,
+    ) -> None:
+        if (
+            row["tool_id"] != request.tool_id
+            or row["arguments_digest"] != request.arguments_digest
+            or row["execution_id"] != request.execution_id
+            or row["turn_id"] != request.turn_id
+            or row["call_id"] != request.call_id
+            or row["data_class"] != request.data_class
+            or row["transfer_purpose"] != request.transfer_purpose
+        ):
+            raise ToolReceiptConflict(
+                "durable reservation does not match reconciliation request"
+            )
+
+    @staticmethod
+    def _reconciliation_from_row(
+        row: sqlite3.Row,
+    ) -> ToolReconciliationReceipt:
+        return ToolReconciliationReceipt(
+            reconciliation_id=row["reconciliation_id"],
+            tenant_id=row["tenant_id"],
+            operation_id=row["operation_id"],
+            execution_id=row["execution_id"],
+            turn_id=row["turn_id"],
+            call_id=row["call_id"],
+            idempotency_key=row["idempotency_key"],
+            request_id=row["request_id"],
+            tool_id=row["tool_id"],
+            arguments_digest=row["arguments_digest"],
+            outcome=ToolReconciliationOutcome(row["outcome"]),
+            evidence_ref=row["evidence_ref"],
+            receipt_id=row["receipt_id"],
+            reconciled_at=_parse_time(
+                row["reconciled_at"],
+                "reconciled_at",
+            ),
+        )
+
+    def reconciliation(
+        self,
+        *,
+        tenant_id: str,
+        operation_id: str,
+        idempotency_key: str,
+    ) -> ToolReconciliationReceipt | None:
+        with self._lock:
+            row = self._connection.execute(
+                """
+                SELECT * FROM tool_execution_reconciliation
+                WHERE namespace = ?
+                  AND tenant_id = ?
+                  AND operation_id = ?
+                  AND idempotency_key = ?
+                """,
+                (
+                    self.namespace,
+                    tenant_id,
+                    operation_id,
+                    idempotency_key,
+                ),
+            ).fetchone()
+        return (
+            None
+            if row is None
+            else self._reconciliation_from_row(row)
+        )
+
+    def resolve_no_effect(
+        self,
+        request: ToolExecutionRequest,
+        *,
+        evidence_ref: str,
+        now: datetime | None = None,
+    ) -> ToolReconciliationReceipt:
+        """Release one in-doubt fence only after durable no-effect evidence."""
+
+        if not isinstance(request, ToolExecutionRequest):
+            raise TypeError("request must be ToolExecutionRequest")
+        evidence = str(evidence_ref).strip()
+        if not evidence:
+            raise ValueError("evidence_ref must be non-empty")
+        instant = (
+            datetime.now(timezone.utc)
+            if now is None
+            else now.astimezone(timezone.utc)
+        )
+        receipt = ToolReconciliationReceipt(
+            reconciliation_id=_reconciliation_id(
+                request,
+                ToolReconciliationOutcome.NO_EFFECT,
+                evidence,
+                None,
+            ),
+            tenant_id=request.tenant_id,
+            operation_id=request.operation_id,
+            execution_id=request.execution_id,
+            turn_id=request.turn_id,
+            call_id=request.call_id,
+            idempotency_key=request.idempotency_key,
+            request_id=request.request_id,
+            tool_id=request.tool_id,
+            arguments_digest=request.arguments_digest,
+            outcome=ToolReconciliationOutcome.NO_EFFECT,
+            evidence_ref=evidence,
+            receipt_id=None,
+            reconciled_at=instant,
+        )
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                existing = self._connection.execute(
+                    """
+                    SELECT * FROM tool_execution_reconciliation
+                    WHERE namespace = ?
+                      AND tenant_id = ?
+                      AND operation_id = ?
+                      AND idempotency_key = ?
+                    """,
+                    (
+                        self.namespace,
+                        request.tenant_id,
+                        request.operation_id,
+                        request.idempotency_key,
+                    ),
+                ).fetchone()
+                if existing is not None:
+                    resolved = self._reconciliation_from_row(existing)
+                    if resolved != receipt:
+                        raise ToolReceiptConflict(
+                            "tool execution was reconciled differently"
+                        )
+                    self._connection.execute("COMMIT")
+                    return resolved
+
+                row = self._connection.execute(
+                    """
+                    SELECT * FROM tool_execution_receipt
+                    WHERE namespace = ?
+                      AND tenant_id = ?
+                      AND operation_id = ?
+                      AND idempotency_key = ?
+                    """,
+                    (
+                        self.namespace,
+                        request.tenant_id,
+                        request.operation_id,
+                        request.idempotency_key,
+                    ),
+                ).fetchone()
+                if row is None:
+                    raise ToolReceiptStoreError(
+                        "no in-doubt reservation exists to reconcile"
+                    )
+                self._assert_request_matches_row(row, request)
+                if row["state"] == "committed":
+                    raise ToolReceiptConflict(
+                        "committed tool execution cannot reconcile as no-effect"
+                    )
+                if row["state"] != "pending":
+                    raise ToolReceiptStoreError(
+                        "durable tool reservation state is corrupt"
+                    )
+
+                self._connection.execute(
+                    """
+                    INSERT INTO tool_execution_reconciliation(
+                        namespace, tenant_id, operation_id,
+                        idempotency_key, reconciliation_id,
+                        request_id, execution_id, turn_id, call_id,
+                        tool_id, arguments_digest, outcome,
+                        evidence_ref, receipt_id, reconciled_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        self.namespace,
+                        receipt.tenant_id,
+                        receipt.operation_id,
+                        receipt.idempotency_key,
+                        receipt.reconciliation_id,
+                        receipt.request_id,
+                        receipt.execution_id,
+                        receipt.turn_id,
+                        receipt.call_id,
+                        receipt.tool_id,
+                        receipt.arguments_digest,
+                        receipt.outcome.value,
+                        receipt.evidence_ref,
+                        receipt.receipt_id,
+                        receipt.reconciled_at.isoformat(),
+                    ),
+                )
+                cursor = self._connection.execute(
+                    """
+                    DELETE FROM tool_execution_receipt
+                    WHERE namespace = ?
+                      AND tenant_id = ?
+                      AND operation_id = ?
+                      AND idempotency_key = ?
+                      AND state = 'pending'
+                    """,
+                    (
+                        self.namespace,
+                        request.tenant_id,
+                        request.operation_id,
+                        request.idempotency_key,
+                    ),
+                )
+                if cursor.rowcount != 1:
+                    raise ToolReceiptConflict(
+                        "in-doubt reservation changed during reconciliation"
+                    )
+                self._connection.execute("COMMIT")
+                return receipt
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+
+    def resolve_committed(
+        self,
+        request: ToolExecutionRequest,
+        receipt: ToolExecutionReceipt,
+        *,
+        evidence_ref: str,
+        now: datetime | None = None,
+    ) -> ToolReconciliationReceipt:
+        """Confirm an in-doubt effect by committing its canonical receipt."""
+
+        if not isinstance(request, ToolExecutionRequest):
+            raise TypeError("request must be ToolExecutionRequest")
+        if not isinstance(receipt, ToolExecutionReceipt):
+            raise TypeError("receipt must be ToolExecutionReceipt")
+        evidence = str(evidence_ref).strip()
+        if not evidence:
+            raise ValueError("evidence_ref must be non-empty")
+        instant = (
+            datetime.now(timezone.utc)
+            if now is None
+            else now.astimezone(timezone.utc)
+        )
+        committed = self.commit(
+            request,
+            receipt,
+            now=instant,
+        )
+        reconciliation = ToolReconciliationReceipt(
+            reconciliation_id=_reconciliation_id(
+                request,
+                ToolReconciliationOutcome.COMMITTED,
+                evidence,
+                committed.receipt_id,
+            ),
+            tenant_id=request.tenant_id,
+            operation_id=request.operation_id,
+            execution_id=request.execution_id,
+            turn_id=request.turn_id,
+            call_id=request.call_id,
+            idempotency_key=request.idempotency_key,
+            request_id=request.request_id,
+            tool_id=request.tool_id,
+            arguments_digest=request.arguments_digest,
+            outcome=ToolReconciliationOutcome.COMMITTED,
+            evidence_ref=evidence,
+            receipt_id=committed.receipt_id,
+            reconciled_at=instant,
+        )
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                existing = self._connection.execute(
+                    """
+                    SELECT * FROM tool_execution_reconciliation
+                    WHERE namespace = ?
+                      AND tenant_id = ?
+                      AND operation_id = ?
+                      AND idempotency_key = ?
+                    """,
+                    (
+                        self.namespace,
+                        request.tenant_id,
+                        request.operation_id,
+                        request.idempotency_key,
+                    ),
+                ).fetchone()
+                if existing is not None:
+                    resolved = self._reconciliation_from_row(existing)
+                    if resolved != reconciliation:
+                        raise ToolReceiptConflict(
+                            "tool execution was reconciled differently"
+                        )
+                    self._connection.execute("COMMIT")
+                    return resolved
+                self._connection.execute(
+                    """
+                    INSERT INTO tool_execution_reconciliation(
+                        namespace, tenant_id, operation_id,
+                        idempotency_key, reconciliation_id,
+                        request_id, execution_id, turn_id, call_id,
+                        tool_id, arguments_digest, outcome,
+                        evidence_ref, receipt_id, reconciled_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        self.namespace,
+                        reconciliation.tenant_id,
+                        reconciliation.operation_id,
+                        reconciliation.idempotency_key,
+                        reconciliation.reconciliation_id,
+                        reconciliation.request_id,
+                        reconciliation.execution_id,
+                        reconciliation.turn_id,
+                        reconciliation.call_id,
+                        reconciliation.tool_id,
+                        reconciliation.arguments_digest,
+                        reconciliation.outcome.value,
+                        reconciliation.evidence_ref,
+                        reconciliation.receipt_id,
+                        reconciliation.reconciled_at.isoformat(),
+                    ),
+                )
+                self._connection.execute("COMMIT")
+                return reconciliation
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+
     def pending(self) -> tuple[tuple[str, str, str], ...]:
         with self._lock:
             rows = self._connection.execute(
@@ -431,5 +926,7 @@ __all__ = [
     "SQLiteToolReceiptStore",
     "ToolReceiptConflict",
     "ToolReceiptStoreError",
+    "ToolReconciliationOutcome",
+    "ToolReconciliationReceipt",
     "ToolReservation",
 ]
