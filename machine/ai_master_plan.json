@@ -51,7 +51,8 @@
     "frontier_96_validator": "scripts/check_frontier_96_ladder.py",
     "cs_300_ladder": "machine/cs_300_computer_science_ladder.json",
     "cs_300_ladder_human": "docs/plan/CS_300_COMPUTER_SCIENCE_LADDER.md",
-    "cs_300_validator": "scripts/check_cs_300_ladder.py"
+    "cs_300_validator": "scripts/check_cs_300_ladder.py",
+    "cs_300_workflow": ".github/workflows/cs-300-authority.yml"
   },
   "laws": [
     "durable governed state is authoritative",
