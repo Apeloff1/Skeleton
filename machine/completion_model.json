@@ -7,8 +7,8 @@
     "volume_ref": "VOL-119",
     "title": "Completion Model",
     "required_gap_texts": [
-      "implement canonical rollup function",
-      "bind UI progress to derived completion only"
+      "independent stale-signoff evaluation remains pending",
+      "independent critical-blocker evaluation remains pending"
     ]
   },
   "sources": [
