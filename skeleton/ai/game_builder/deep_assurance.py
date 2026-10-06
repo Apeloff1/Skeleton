@@ -662,6 +662,10 @@ class ResurrectionVerification:
             raise TypeError("resurrection verification passed state must be boolean")
         if not isinstance(self.verifier_provenance, EvaluatorProvenance):
             raise TypeError("resurrection verifier_provenance must be EvaluatorProvenance")
+        if self.passed != (self.checkpoint_digest == self.reconstructed_digest):
+            raise DeepAssuranceError(
+                "resurrection passed state does not match reconstructed identity"
+            )
         object.__setattr__(
             self,
             "verification_evidence_digest",
