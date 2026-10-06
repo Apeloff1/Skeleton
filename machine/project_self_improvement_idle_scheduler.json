@@ -4,7 +4,8 @@
   "purpose": "Choose the highest-value bounded PSI-1000 mirror-room work whenever a project is foreground-idle while preserving fairness, exploration, preemption and project scope.",
   "authority": {
     "ladder": "machine/project_self_improvement_1000.json",
-    "epoch_contract": "machine/project_self_improvement_epoch_contract.json"
+    "epoch_contract": "machine/project_self_improvement_epoch_contract.json",
+    "essentials": "machine/essentials_1000.json"
   },
   "eligibility": {
     "required": [
@@ -65,6 +66,7 @@
       "repeat_no_gain_probability"
     ],
     "tie_breakers": [
+      "unresolved paired essential first",
       "higher non-compensable risk reduction",
       "older unresolved evidence gap",
       "fewer prior attempts",
@@ -119,6 +121,7 @@
     "regression_rule": "a gain in one dimension cannot compensate for failure of a non-compensable invariant"
   },
   "trigger_sources": [
+    "new_or_reopened_essential_gap",
     "foreground_idle_transition",
     "new_project_evidence",
     "failed_or_regressed_ci",
@@ -161,5 +164,14 @@
       "decision_reason",
       "created_at"
     ]
+  },
+  "essential_priority": {
+    "enabled": true,
+    "mapping": "ESS1000-nnnn -> PSI1000-nnnn",
+    "unresolved_essential_priority": "above_optional_same_domain",
+    "hard_rule": "An unresolved paired ESS level or a regressed previously-signed ESS level is promoted ahead of optional capability polish in the affected PSI domain unless a more severe non-compensable incident elsewhere overrides it.",
+    "evidence_reuse": "PSI may reuse exact current evidence, but ESS completion requires its own independent closure signature.",
+    "stale_evidence": "Stale ESS evidence reopens the essential and restores essential-first scheduling priority.",
+    "disabled_capability_rule": "A disabled optional capability still requires its ESS safe-disabled control path and cannot be skipped as not-applicable."
   }
 }
