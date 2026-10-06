@@ -606,5 +606,11 @@
     "tests": "skeleton/testing/test_ai_game_builder_contracts.py"
   },
   "overengineering_rule": "Every family must inherit the critical cross-cutting planes and at least the configured minimum plane coverage; plane evidence is additive to level-specific evidence and cannot weaken a GBL hard gate.",
-  "overengineering_human_spec": "docs/architecture/AI_GAME_BUILDER_OVERENGINEERING.md"
+  "overengineering_human_spec": "docs/architecture/AI_GAME_BUILDER_OVERENGINEERING.md",
+  "governance_runtime": {
+    "canon": "skeleton/ai/game_builder/canon.py",
+    "rights": "skeleton/ai/game_builder/rights.py",
+    "atom_lineage": "skeleton/ai/game_builder/atomizer.py",
+    "tests": "skeleton/testing/test_ai_game_builder_governance.py"
+  }
 }
