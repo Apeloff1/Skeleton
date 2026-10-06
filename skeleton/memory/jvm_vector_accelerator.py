@@ -7,7 +7,6 @@ batch into a persistent JVM process when the caller explicitly enables it.
 from __future__ import annotations
 
 import array
-import atexit
 import math
 import os
 import queue
