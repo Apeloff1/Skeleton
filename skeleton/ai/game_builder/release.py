@@ -46,6 +46,7 @@ class ForgeReleaseBinding:
     """Content-addressed continuity proof from completed forge to release."""
 
     checkpoint_digest: str
+    origin_champion_digest: str
     project_id: str
     run_id: str
     operation_id: str
@@ -68,6 +69,7 @@ class ForgeReleaseBinding:
     def __post_init__(self) -> None:
         for name in (
             "checkpoint_digest",
+            "origin_champion_digest",
             "execution_identity_digest",
             "finalization_intent_digest",
             "model_identity_digest",
@@ -127,6 +129,13 @@ class ForgeReleaseBinding:
             raise TypeError("forge release round_index must be an integer")
         if completed_rounds != effort_mode.rounds or round_index != effort_mode.rounds:
             raise ValueError("forge release checkpoint is not at exact terminal round")
+        origin_champion_digest = checkpoint.get("origin_champion_digest")
+        if (
+            not isinstance(origin_champion_digest, str)
+            or len(origin_champion_digest) != 64
+            or any(ch not in "0123456789abcdef" for ch in origin_champion_digest)
+        ):
+            raise ValueError("forge release origin champion digest is invalid")
         if checkpoint.get("stage") != "construct":
             raise ValueError("forge release checkpoint must rest at construct boundary")
         if checkpoint.get("pending_construct") is not None or checkpoint.get("pending_challenge") is not None:
@@ -155,6 +164,10 @@ class ForgeReleaseBinding:
                 raise ValueError("forge release receipt rounds must form exact 1..N sequence")
             if receipt.effort_mode is not effort_mode:
                 raise ValueError("forge release receipt effort mode mismatch")
+            if expected_round == 1 and receipt.incumbent_digest != origin_champion_digest:
+                raise ValueError(
+                    "forge release first receipt does not match origin champion"
+                )
             if (
                 previous_promoted_digest is not None
                 and receipt.incumbent_digest != previous_promoted_digest
@@ -215,6 +228,7 @@ class ForgeReleaseBinding:
 
         return cls(
             checkpoint_digest=supplied_digest,
+            origin_champion_digest=origin_champion_digest,
             project_id=required_provenance_text["project_id"],
             run_id=required_provenance_text["run_id"],
             operation_id=required_provenance_text["operation_id"],
@@ -238,6 +252,7 @@ class ForgeReleaseBinding:
     def to_payload(self) -> dict[str, object]:
         return {
             "checkpoint_digest": self.checkpoint_digest,
+            "origin_champion_digest": self.origin_champion_digest,
             "project_id": self.project_id,
             "run_id": self.run_id,
             "operation_id": self.operation_id,
