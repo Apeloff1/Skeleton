@@ -269,3 +269,143 @@ def test_snapshot_is_stable_and_contains_no_mutable_authority_object() -> None:
     assert snapshot["authority_count"] == 1
     assert snapshot["authorities"][0]["authority_digest"] == authority.digest
     assert snapshot["authorities"][0]["usage"]["provider_calls"] == 1
+
+
+
+def _child_authority(
+    parent: ExecutionAuthority,
+    *,
+    capabilities: tuple[str, ...] = ("repo.read",),
+    budget: ResourceBudget | None = None,
+    actor_id: str = "agent.worker",
+    expires_at: datetime | None = None,
+) -> ExecutionAuthority:
+    return ExecutionAuthority(
+        authority_id="authority-child-001",
+        operation_id=parent.operation_id,
+        execution_id=parent.execution_id,
+        actor_id=actor_id,
+        issuer_id=parent.actor_id,
+        issued_at=NOW + timedelta(seconds=1),
+        expires_at=expires_at or (NOW + timedelta(minutes=20)),
+        capabilities=capabilities,
+        budget=budget or _budget(tool_calls=1, parallelism=1),
+        policy_digest=parent.policy_digest,
+        nonce="nonce-child-001",
+        parent_authority_digest=parent.digest,
+    )
+
+
+def test_admission_replay_returns_original_receipt() -> None:
+    guard = ExecutionAuthorityGuard()
+    authority = _authority()
+
+    first = guard.admit(
+        authority=authority,
+        request=_request(),
+        receipt_id="receipt-001",
+        replay_key="admission-001",
+        now=NOW,
+    )
+    replay = guard.admit(
+        authority=authority,
+        request=_request(),
+        receipt_id="receipt-different",
+        replay_key="admission-001",
+        now=NOW + timedelta(seconds=5),
+    )
+
+    assert replay == first
+    assert replay.digest == first.digest
+    assert guard.snapshot()["admission_receipt_count"] == 1
+
+
+def test_delegated_authority_requires_admitted_parent() -> None:
+    guard = ExecutionAuthorityGuard()
+    parent = _authority()
+    child = _child_authority(parent)
+
+    with pytest.raises(ExecutionAuthorityError, match="parent authority has not been admitted"):
+        guard.admit(
+            authority=child,
+            request=_request(),
+            receipt_id="receipt-child",
+            replay_key="admission-child",
+            now=NOW + timedelta(seconds=2),
+        )
+
+
+def test_delegated_authority_can_only_attenuate_parent() -> None:
+    guard = ExecutionAuthorityGuard()
+    parent = _authority()
+    _admit(guard, parent)
+
+    child = _child_authority(parent)
+    receipt = guard.admit(
+        authority=child,
+        request=_request(),
+        receipt_id="receipt-child",
+        replay_key="admission-child",
+        now=NOW + timedelta(seconds=2),
+    )
+
+    assert receipt.authority_digest == child.digest
+
+    escalated = _child_authority(
+        parent,
+        capabilities=("repo.read", "repo.write", "repo.admin"),
+    )
+    with pytest.raises(ExecutionAuthorityError, match="escalates capabilities"):
+        guard.admit(
+            authority=escalated,
+            request=_request(),
+            receipt_id="receipt-escalated",
+            replay_key="admission-escalated",
+            now=NOW + timedelta(seconds=2),
+        )
+
+
+def test_delegated_authority_cannot_outlive_parent_or_expand_budget() -> None:
+    guard = ExecutionAuthorityGuard()
+    parent = _authority()
+    _admit(guard, parent)
+
+    outliving = _child_authority(
+        parent,
+        expires_at=parent.expires_at + timedelta(seconds=1),
+    )
+    with pytest.raises(ExecutionAuthorityError, match="outlives parent"):
+        guard.admit(
+            authority=outliving,
+            request=_request(),
+            receipt_id="receipt-outliving",
+            replay_key="admission-outliving",
+            now=NOW + timedelta(seconds=2),
+        )
+
+    expanded = _child_authority(
+        parent,
+        budget=_budget(tool_calls=parent.budget.tool_calls + 1),
+    )
+    with pytest.raises(ExecutionAuthorityError, match="escalates resource budget"):
+        guard.admit(
+            authority=expanded,
+            request=_request(),
+            receipt_id="receipt-expanded",
+            replay_key="admission-expanded",
+            now=NOW + timedelta(seconds=2),
+        )
+
+
+def test_replay_key_is_bounded_and_canonical() -> None:
+    guard = ExecutionAuthorityGuard()
+    authority = _authority()
+    _admit(guard, authority)
+
+    with pytest.raises(ExecutionAuthorityError, match="invalid replay_key"):
+        guard.authorize(
+            authority=authority,
+            capability="repo.read",
+            replay_key=" contains spaces ",
+            now=NOW,
+        )
