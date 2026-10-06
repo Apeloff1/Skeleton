@@ -364,12 +364,39 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     )
     if not isinstance(volume, dict) or binding.get("title") != volume.get("title"):
         raise RuntimeSupervisionError("runtime supervision must remain bound to VOL-004")
-    gaps = binding.get("required_gap_texts")
-    if not isinstance(gaps, list) or not gaps:
-        raise RuntimeSupervisionError("VOL-004 gap bindings must be non-empty")
-    for gap in gaps:
-        if gap not in volume.get("gaps", []):
-            raise RuntimeSupervisionError(f"VOL-004 masterplan gap drift: {gap!r}")
+    retired = binding.get("retired_implementation_gaps")
+    if not isinstance(retired, list) or len(retired) != 2:
+        raise RuntimeSupervisionError(
+            "VOL-004 retired implementation gaps must contain exactly two entries"
+        )
+    if any(not isinstance(gap, str) or not gap for gap in retired):
+        raise RuntimeSupervisionError(
+            "VOL-004 retired implementation gap entries must be non-empty text"
+        )
+    live_gaps = volume.get("gaps", [])
+    if not isinstance(live_gaps, list):
+        raise RuntimeSupervisionError("VOL-004 masterplan gaps must be a list")
+    reappeared = [gap for gap in retired if gap in live_gaps]
+    if reappeared:
+        raise RuntimeSupervisionError(
+            "retired VOL-004 implementation gap reappeared: "
+            + ", ".join(reappeared)
+        )
+    qualification = binding.get("qualification_gap")
+    if not isinstance(qualification, str) or not qualification:
+        raise RuntimeSupervisionError(
+            "VOL-004 qualification_gap must be non-empty text"
+        )
+    if live_gaps != [qualification]:
+        raise RuntimeSupervisionError(
+            "VOL-004 must retain only the independent qualification gap"
+        )
+    if binding.get("implementation_state") != "implemented_verification_pending":
+        raise RuntimeSupervisionError("VOL-004 implementation_state drifted")
+    if volume.get("completion_checkbox") is not False:
+        raise RuntimeSupervisionError(
+            "VOL-004 cannot be complete while qualification remains pending"
+        )
 
     sources = contract.get("sources")
     if not isinstance(sources, dict):
