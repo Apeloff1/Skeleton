@@ -420,6 +420,8 @@ def test_master_plan_binds_500_level_ai_game_builder_overlay() -> None:
     assert overlay["runtime_contracts"]["resource_governor"] == "skeleton/ai/game_builder/resource_governor.py"
     assert overlay["runtime_contracts"]["quality_debt"] == "skeleton/ai/game_builder/quality_debt.py"
     assert overlay["runtime_contracts"]["integrated_control_plane"] == "skeleton/ai/game_builder/control_plane.py"
+    assert overlay["runtime_contracts"]["resilience"] == "skeleton/ai/game_builder/resilience.py"
+    assert overlay["runtime_contracts"]["gold_master"] == "skeleton/ai/game_builder/release.py"
     assert overlay["runtime_contracts"]["tests"] == [
         "tests/test_ai_game_builder_runtime.py",
         "tests/test_ai_game_builder_overengineering_runtime.py",
