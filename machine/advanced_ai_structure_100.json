@@ -10902,5 +10902,173 @@
     "rollout_rule": "every blueprint has a bounded rollout mode and deterministic rollback/safe-disable mode.",
     "adversarial_rule": "every blueprint includes stratum-specific adversarial focuses in addition to level-specific tests.",
     "closure_rule": "a blueprint closes only through the level promotion state machine and current evidence; completion text cannot override it."
+  },
+  "model_and_runtime_lifecycle": {
+    "identity_fields": [
+      "model_family",
+      "model_build_or_version",
+      "provider",
+      "runtime_backend",
+      "quantization_or_precision",
+      "context_window",
+      "tool_schema_version",
+      "policy_bundle_version",
+      "prompt_or_strategy_version",
+      "hardware_profile",
+      "deployment_release_id"
+    ],
+    "rule": "A maturity or evaluation claim is bound to an explicit model/runtime identity. Swapping a model, provider, runtime backend, precision mode, tool schema, policy bundle, strategy, or hardware profile may require requalification according to risk.",
+    "model_fleet": [
+      "baseline/reference model",
+      "production primary",
+      "compliant fallback",
+      "specialist models",
+      "evaluation/critic models",
+      "embedding/reranking models",
+      "experimental/shadow models"
+    ],
+    "provider_independence": "Capabilities are defined above provider APIs; provider-specific strengths may be used but cannot become undocumented correctness assumptions.",
+    "compatibility_matrix": "Each promoted level records which model/runtime identities it is qualified against and whether evidence is portable, conditional, or non-portable across identities.",
+    "fallback_rule": "Fallback may reduce capability ceiling but may never silently increase permissions, data exposure, or maturity claims."
+  },
+  "data_and_evaluation_lifecycle": {
+    "dataset_identity": [
+      "dataset_id",
+      "version",
+      "content_digest",
+      "provenance",
+      "license_or_usage_right",
+      "data_class",
+      "tenant_scope",
+      "collection_window",
+      "contamination_status",
+      "retention_policy"
+    ],
+    "evaluation_identity": [
+      "suite_id",
+      "suite_version",
+      "evaluator_identity",
+      "rubric_version",
+      "fixture_digest",
+      "sampling_policy",
+      "scoring_policy",
+      "environment_profile"
+    ],
+    "partition_rules": [
+      "training/tuning data is separated from promotion holdouts",
+      "hidden holdouts remain inaccessible to candidate-generation paths",
+      "tenant-private data cannot enter shared evaluation/training without explicit governed authorization",
+      "synthetic data is labeled and cannot be the sole promotion corpus",
+      "benchmark contamination or memorization invalidates affected evidence",
+      "evaluation failures remain visible; retrying until pass without recording attempts is prohibited"
+    ],
+    "lifecycle": [
+      "collect or register",
+      "classify and authorize",
+      "version and digest",
+      "quality/provenance validation",
+      "split/holdout protection",
+      "evaluate",
+      "bind results to candidate identity",
+      "retain evidence",
+      "expire or supersede",
+      "delete according to lifecycle policy"
+    ]
+  },
+  "compatibility_and_portability": {
+    "dimensions": [
+      "model family/version",
+      "provider/runtime",
+      "hardware/accelerator",
+      "operating system/architecture",
+      "tool/API schema",
+      "policy bundle",
+      "memory/retrieval schema",
+      "deployment topology"
+    ],
+    "portability_states": [
+      "PORTABLE",
+      "CONDITIONAL",
+      "NON_PORTABLE",
+      "UNKNOWN"
+    ],
+    "default": "UNKNOWN",
+    "rule": "Evidence is never assumed portable across a changed compatibility dimension. Portability must be demonstrated or the level is requalified.",
+    "hardware_rule": "Hardware-specific acceleration may change performance evidence but cannot alter semantic authority, safety, tenancy, or correctness contracts.",
+    "os_arch_rule": "Supported CPU/GPU/NPU and operating-system variants require equivalent contract tests for paths that can affect numerical behavior, concurrency, filesystem/network isolation, or tool execution.",
+    "downgrade_rule": "If only a lower-qualified compatibility profile is available, the effective capability ceiling is reduced to the highest level qualified for that profile."
+  },
+  "policy_and_prompt_supply_chain": {
+    "governed_artifacts": [
+      "system instruction bundles",
+      "policy bundles",
+      "tool schemas",
+      "routing strategies",
+      "reasoning templates",
+      "memory/retrieval policies",
+      "evaluation rubrics",
+      "safety classifiers/configuration"
+    ],
+    "requirements": [
+      "versioned immutable identity for released artifacts",
+      "source provenance and author/automation identity",
+      "review and approval according to risk",
+      "exact release binding",
+      "rollback target",
+      "sensitive-content/secret scan where applicable",
+      "compatibility and regression tests",
+      "no production mutation from unversioned runtime-generated prompt/policy text"
+    ],
+    "dynamic_generation_rule": "Runtime-generated prompts or strategies may exist as operation-scoped derived artifacts but cannot silently become persistent global policy.",
+    "rollback_rule": "Policy/prompt rollback restores the complete compatible bundle rather than mixing arbitrary versions."
+  },
+  "hardware_aware_execution": {
+    "targets": [
+      "CPU",
+      "GPU",
+      "NPU/accelerator",
+      "vendor-neutral optional specialized inference hardware"
+    ],
+    "discovery_rule": "Hardware is detected through trusted runtime inventory; model output cannot claim or select nonexistent hardware capability.",
+    "scheduler_inputs": [
+      "qualified model/runtime compatibility",
+      "latency target",
+      "memory footprint",
+      "power/cost budget",
+      "tenant/data policy",
+      "precision requirement",
+      "batchability",
+      "availability/failure domain"
+    ],
+    "memory_rule": "Large-context execution may use system RAM, accelerator memory, memory-mapped storage, or other qualified memory tiers, but movement between tiers must preserve isolation, confidentiality, integrity, and deterministic eviction policy.",
+    "fallback_rule": "Hardware fallback is explicit, observable, and bounded; it may lower performance/capability but cannot bypass verification or security controls.",
+    "evidence_rule": "Performance claims are tagged with hardware/runtime profile and are not generalized to untested profiles."
+  },
+  "evaluator_independence": {
+    "tiers": [
+      {
+        "id": "E0",
+        "meaning": "deterministic validator or oracle",
+        "use": "contracts, schemas, invariants, exact outcomes"
+      },
+      {
+        "id": "E1",
+        "meaning": "independent test harness",
+        "use": "runtime behavior, integration, recovery, security"
+      },
+      {
+        "id": "E2",
+        "meaning": "independent model/critic",
+        "use": "semantic quality, reasoning critique, rubric scoring"
+      },
+      {
+        "id": "E3",
+        "meaning": "human/domain review",
+        "use": "high-impact ambiguity, governance, scientific/domain correctness where machine evidence is insufficient"
+      }
+    ],
+    "rule": "Candidate generation and promotion evaluation cannot rely on a single self-evaluating model path for high or critical risk levels.",
+    "conflict_rule": "Evaluator disagreement is recorded and resolved by explicit rubric/authority; majority vote does not override deterministic safety or policy failures.",
+    "calibration_rule": "Model-based evaluators themselves require calibration, contamination controls, versioning, and periodic requalification."
   }
 }
