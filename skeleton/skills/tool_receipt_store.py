@@ -303,15 +303,13 @@ class SQLiteToolReceiptStore:
                     evidence_ref TEXT NOT NULL,
                     receipt_id TEXT,
                     reconciled_at TEXT NOT NULL,
-                    PRIMARY KEY(
-                        namespace, tenant_id, operation_id, idempotency_key
-                    ),
-                    UNIQUE(namespace, reconciliation_id)
+                    PRIMARY KEY(namespace, reconciliation_id)
                 );
 
                 CREATE INDEX IF NOT EXISTS idx_tool_reconciliation_operation
                 ON tool_execution_reconciliation(
-                    namespace, tenant_id, operation_id, reconciled_at
+                    namespace, tenant_id, operation_id,
+                    idempotency_key, reconciled_at
                 );
                 """
             )
@@ -625,6 +623,8 @@ class SQLiteToolReceiptStore:
                   AND tenant_id = ?
                   AND operation_id = ?
                   AND idempotency_key = ?
+                ORDER BY reconciled_at DESC, reconciliation_id DESC
+                LIMIT 1
                 """,
                 (
                     self.namespace,
@@ -685,26 +685,10 @@ class SQLiteToolReceiptStore:
                 existing = self._connection.execute(
                     """
                     SELECT * FROM tool_execution_reconciliation
-                    WHERE namespace = ?
-                      AND tenant_id = ?
-                      AND operation_id = ?
-                      AND idempotency_key = ?
+                    WHERE namespace = ? AND reconciliation_id = ?
                     """,
-                    (
-                        self.namespace,
-                        request.tenant_id,
-                        request.operation_id,
-                        request.idempotency_key,
-                    ),
+                    (self.namespace, receipt.reconciliation_id),
                 ).fetchone()
-                if existing is not None:
-                    resolved = self._reconciliation_from_row(existing)
-                    if resolved != receipt:
-                        raise ToolReceiptConflict(
-                            "tool execution was reconciled differently"
-                        )
-                    self._connection.execute("COMMIT")
-                    return resolved
 
                 row = self._connection.execute(
                     """
@@ -721,6 +705,14 @@ class SQLiteToolReceiptStore:
                         request.idempotency_key,
                     ),
                 ).fetchone()
+                if existing is not None:
+                    resolved = self._reconciliation_from_row(existing)
+                    if row is None:
+                        self._connection.execute("COMMIT")
+                        return resolved
+                    raise ToolReceiptConflict(
+                        "reconciliation evidence was already consumed by an earlier reservation"
+                    )
                 if row is None:
                     raise ToolReceiptStoreError(
                         "no in-doubt reservation exists to reconcile"
@@ -843,24 +835,12 @@ class SQLiteToolReceiptStore:
                 existing = self._connection.execute(
                     """
                     SELECT * FROM tool_execution_reconciliation
-                    WHERE namespace = ?
-                      AND tenant_id = ?
-                      AND operation_id = ?
-                      AND idempotency_key = ?
+                    WHERE namespace = ? AND reconciliation_id = ?
                     """,
-                    (
-                        self.namespace,
-                        request.tenant_id,
-                        request.operation_id,
-                        request.idempotency_key,
-                    ),
+                    (self.namespace, reconciliation.reconciliation_id),
                 ).fetchone()
                 if existing is not None:
                     resolved = self._reconciliation_from_row(existing)
-                    if resolved != reconciliation:
-                        raise ToolReceiptConflict(
-                            "tool execution was reconciled differently"
-                        )
                     self._connection.execute("COMMIT")
                     return resolved
                 self._connection.execute(
