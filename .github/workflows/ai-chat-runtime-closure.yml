@@ -20,6 +20,7 @@ on:
       - "backend/tests/test_ai_chat_turn_persistence.py"
       - "backend/tests/test_ai_chat_turn_lifecycle.py"
       - "backend/tests/test_ai_chat_turn_route_cutover.py"
+      - "backend/tests/test_ai_chat_live_turn_cutover.py"
       - "skeleton/testing/test_ai_assistant_runtime.py"
       - "skeleton/testing/test_ai_assistant_manifest.py"
       - "machine/ai_chat_runtime_contract.json"
@@ -95,6 +96,12 @@ jobs:
           python -m pytest -q
           backend/tests/test_ai_chat_turn_lifecycle.py
           backend/tests/test_ai_chat_turn_route_cutover.py
+          backend/tests/test_ai_chat_live_turn_cutover.py
+          backend/tests/test_ai_chat_conversation_authority.py
+          backend/tests/test_ai_chat_conversation_finalization.py
+          backend/tests/test_ai_chat_engine_cutover.py
+          backend/tests/test_ai_chat_context_idempotency.py
+          backend/tests/test_ai_chat_memory_policy.py
 
       - name: Emit exact-head AI chat runtime evidence
         env:
