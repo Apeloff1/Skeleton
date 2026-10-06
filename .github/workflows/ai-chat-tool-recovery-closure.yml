@@ -62,7 +62,7 @@ jobs:
 
       - name: Run tool recovery regressions
         run: >-
-          python -m pytest -q --noconftest
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin --import-mode=importlib
           skeleton/testing/test_ai_chat_tool_recovery.py
           skeleton/testing/test_tool_receipt_store.py
           skeleton/testing/test_ai_chat_turn_runtime.py
