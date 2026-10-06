@@ -175,6 +175,156 @@
       "claim": "repository history explicitly records completion at verified P1-L0 target with independent CI verification and governed gap evidence",
       "recovery_granularity": "commit_claim_anchor",
       "limitation": "historical ledger blob is truncated through connector; do not synthesize verifier identity, timestamp, run/job, or signature fields from this anchor alone"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-143",
+        "ACC-VOL-144",
+        "ACC-VOL-145",
+        "ACC-VOL-146",
+        "ACC-VOL-147",
+        "ACC-VOL-148",
+        "ACC-VOL-149",
+        "ACC-VOL-150",
+        "ACC-VOL-151",
+        "ACC-VOL-152",
+        "ACC-VOL-153",
+        "ACC-VOL-154",
+        "ACC-VOL-155",
+        "ACC-VOL-156",
+        "ACC-VOL-157",
+        "ACC-VOL-158",
+        "ACC-VOL-161",
+        "ACC-VOL-162",
+        "ACC-VOL-171",
+        "ACC-VOL-179",
+        "ACC-VOL-006",
+        "ACC-VOL-019",
+        "ACC-VOL-022",
+        "ACC-VOL-026",
+        "ACC-VOL-070",
+        "ACC-VOL-071",
+        "ACC-VOL-072",
+        "ACC-VOL-093",
+        "ACC-VOL-099",
+        "ACC-VOL-105",
+        "ACC-VOL-106",
+        "ACC-VOL-107",
+        "ACC-VOL-108",
+        "ACC-VOL-109",
+        "ACC-VOL-111"
+      ],
+      "source_commit": "6f2cc7d07feba38ec2be19e9a8082981306f98e8",
+      "claim": "implementation-agent signoffs and audit history explicitly added for 35 landed volumes",
+      "recovery_granularity": "implementation_signoff_cohort",
+      "verification_state": "explicitly_unsigned",
+      "completion_state": "explicitly_open"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-032",
+        "ACC-VOL-196"
+      ],
+      "source_commit": "704b8f519cc7525441bb31c612b2d790bcde3eb4",
+      "claim": "implementation-sign explicitly recorded",
+      "recovery_granularity": "implementation_signoff_commit",
+      "verification_state": "not_promoted_by_anchor"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-097",
+        "ACC-VOL-098"
+      ],
+      "source_commit": "de822397823ddcb0f9c6b7711647de61cf6b70b1",
+      "claim": "implementation-sign explicitly recorded",
+      "recovery_granularity": "implementation_signoff_commit",
+      "verification_state": "not_promoted_by_anchor"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-100",
+        "ACC-VOL-101",
+        "ACC-VOL-102",
+        "ACC-VOL-103"
+      ],
+      "source_commit": "515092c37d13bc67b1480ede1c8abde94cc6face",
+      "claim": "implementation-sign repaired volumes explicitly recorded",
+      "recovery_granularity": "implementation_signoff_commit",
+      "verification_state": "not_promoted_by_anchor"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-200"
+      ],
+      "source_commit": "fc3b6d17c7a7509f9c2ec658564fbc0016e7a0b1",
+      "claim": "implementation-sign explicitly recorded",
+      "recovery_granularity": "implementation_signoff_commit",
+      "verification_state": "not_promoted_by_anchor"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-003"
+      ],
+      "source_commit": "24fed75d93cc80cbc478c9c3704c29217ad42df0",
+      "claim": "implementation-sign explicitly recorded",
+      "recovery_granularity": "implementation_signoff_commit",
+      "verification_state": "not_promoted_by_anchor"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-039"
+      ],
+      "source_commit": "501852240108902baf293d9ad163b851ec4c37e3",
+      "claim": "implementation-sign explicitly recorded",
+      "recovery_granularity": "implementation_signoff_commit",
+      "verification_state": "not_promoted_by_anchor"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-001"
+      ],
+      "source_commit": "49b7f43cf818f1b472c1b12ce11ccf0b238b2acc",
+      "claim": "implementation-sign explicitly recorded",
+      "recovery_granularity": "implementation_signoff_commit",
+      "verification_state": "not_promoted_by_anchor"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-020"
+      ],
+      "source_commit": "ef8ed4bb1b77a339ee300cc0d5877032b3bb43ce",
+      "claim": "implementation-sign explicitly recorded",
+      "recovery_granularity": "implementation_signoff_commit",
+      "verification_state": "not_promoted_by_anchor"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-104"
+      ],
+      "source_commit": "9699a6109af52fc35e71ba5c0504dede7f6f2d5e",
+      "claim": "implementation-sign explicitly recorded",
+      "recovery_granularity": "implementation_signoff_commit",
+      "verification_state": "not_promoted_by_anchor"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-054"
+      ],
+      "source_commit": "9fa6af86306644656afaf5ecfe0acab75b85bad1",
+      "claim": "implementation signoff signed; verification explicitly UNSIGNED; completion open",
+      "recovery_granularity": "implementation_signoff_commit",
+      "verification_state": "explicitly_unsigned",
+      "completion_state": "explicitly_open"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-021"
+      ],
+      "source_commit": "d189a6cc169efae2382a334cefa0187084a1cb5e",
+      "claim": "implementation-agent signoff explicitly recorded; verifier UNSIGNED; completion open",
+      "recovery_granularity": "implementation_signoff_commit",
+      "verification_state": "explicitly_unsigned",
+      "completion_state": "explicitly_open"
     }
   ]
 }
