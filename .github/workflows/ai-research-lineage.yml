@@ -1,49 +1,165 @@
 name: AI Research Lineage Closure
+
 on:
   pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/research/**"
       - "skeleton/ai/research/**"
-      - "skeleton/testing/test_research_lineage.py"
       - "skeleton/eval/research_acceptance.py"
       - "skeleton/ai/evaluation/research_acceptance.py"
+      - "skeleton/testing/test_research_lineage.py"
       - "skeleton/testing/test_research_system_acceptance.py"
+      - "scripts/check_ai_edge_case_catalog.py"
+      - "scripts/verify_research_lineage_closure.py"
+      - "tests/test_research_lineage_independent_verifier.py"
       - "machine/ai_master_plan.json"
       - ".github/workflows/ai-research-lineage.yml"
   push:
-    branches: [main]
+    branches:
+      - main
     paths:
       - "skeleton/research/**"
       - "skeleton/ai/research/**"
-      - "skeleton/testing/test_research_lineage.py"
       - "skeleton/eval/research_acceptance.py"
       - "skeleton/ai/evaluation/research_acceptance.py"
+      - "skeleton/testing/test_research_lineage.py"
       - "skeleton/testing/test_research_system_acceptance.py"
+      - "scripts/check_ai_edge_case_catalog.py"
+      - "scripts/verify_research_lineage_closure.py"
+      - "tests/test_research_lineage_independent_verifier.py"
       - "machine/ai_master_plan.json"
       - ".github/workflows/ai-research-lineage.yml"
   workflow_dispatch:
+
 permissions:
   contents: read
+
 concurrency:
-  group: ai-research-lineage-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ai-research-lineage-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   research-lineage:
+    name: Canonical research-lineage contracts
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       PYTHONPATH: "."
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
         with:
           persist-credentials: false
           fetch-depth: 0
           ref: "${{ github.event.pull_request.head.sha || github.sha }}"
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11.16"
-      - run: python -m pip install --disable-pip-version-check . "pytest>=8,<9"
-      - run: python -m compileall -q skeleton/research skeleton/ai/research skeleton/eval/research_acceptance.py skeleton/ai/evaluation/research_acceptance.py
-      - run: python scripts/check_ai_master_plan.py
-      - run: python -m pytest -q --noconftest skeleton/testing/test_research_lineage.py skeleton/testing/test_research_system_acceptance.py
+
+      - name: Install focused research runtime
+        run: >-
+          python -m pip install --disable-pip-version-check .
+          "pytest>=8,<9"
+
+      - name: Compile canonical and AI research surfaces
+        run: >-
+          python -m compileall -q
+          skeleton/research
+          skeleton/ai/research
+          skeleton/eval/research_acceptance.py
+          skeleton/ai/evaluation/research_acceptance.py
+
+      - name: Validate canonical masterplan
+        run: python scripts/check_ai_master_plan.py
+
+      - name: Validate historical and edge-case authority
+        run: python scripts/check_ai_edge_case_catalog.py
+
+      - name: Run canonical lineage and acceptance regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_research_lineage.py
+          skeleton/testing/test_research_system_acceptance.py
+
+  research-lineage-independent:
+    name: Independent exact-head research-lineage verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install independent verifier dependency
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+
+      - name: Run independent verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_research_lineage_independent_verifier.py
+
+      - name: Emit independent exact-head receipt
+        run: >-
+          python scripts/verify_research_lineage_closure.py
+          --evidence-out .research-lineage-independent.json
+          --print-evidence
+
+      - name: Assert exact-head receipt identity and coverage
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".research-lineage-independent.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected:
+              raise SystemExit("research-lineage receipt does not bind exact head")
+          if receipt.get("verifier") != "independent-research-lineage-v1":
+              raise SystemExit("unexpected research verifier identity")
+          if receipt.get("volume") != "VOL-001":
+              raise SystemExit("research verifier bound wrong masterplan volume")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("independent research-lineage verification failed")
+          if len(receipt.get("boundary_digests") or {}) != 4:
+              raise SystemExit("research boundary coverage is incomplete")
+          if len(receipt.get("mirror_pairs") or []) != 2:
+              raise SystemExit("research AI mirror coverage is incomplete")
+          binding = receipt.get("volume_binding") or {}
+          if len(binding.get("binding_digest") or "") != 64:
+              raise SystemExit("research masterplan binding digest is missing")
+          if len(receipt.get("receipt_digest") or "") != 64:
+              raise SystemExit("research closure receipt digest is invalid")
+          print(
+              "VOL-001 independent exact-head receipt:",
+              expected,
+              receipt["receipt_digest"],
+          )
+          PY

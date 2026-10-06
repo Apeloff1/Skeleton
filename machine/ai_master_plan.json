@@ -372,7 +372,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "requirements": [
         "Preserve scientific claims with source, method, result, limitation and correction/retraction lineage.",
         "Track historical techniques by problem/mechanism/failure mode/modern analogue instead of citation popularity.",
@@ -397,27 +397,36 @@
       "tests": [
         "skeleton/testing/test_research_lineage.py",
         "skeleton/testing/test_research_system_acceptance.py",
-        "scripts/check_ai_edge_case_catalog.py"
+        "scripts/check_ai_edge_case_catalog.py",
+        "tests/test_research_lineage_independent_verifier.py"
       ],
       "evaluations": [
         "planned:source-quality calibration",
-        "planned:replication-status consistency evaluation"
+        "planned:replication-status consistency evaluation",
+        "scripts/verify_research_lineage_closure.py",
+        ".github/workflows/ai-research-lineage.yml"
       ],
       "evidence": [
         "PR #2721 merged research ingestion/citation lineage implementation",
-        "PR #2950 head 6052b313b9fceacecf06ea4d6f12492c50241325 adds deterministic reconciliation qualification; independent workflow pending"
+        "PR #2950 head 6052b313b9fceacecf06ea4d6f12492c50241325 adds deterministic reconciliation qualification",
+        "scripts/verify_research_lineage_closure.py",
+        "tests/test_research_lineage_independent_verifier.py",
+        ".github/workflows/ai-research-lineage.yml",
+        "git-head:fad73d2f4a2eaf861dbeaf2792dec35ee2456677",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/37531442564",
+        "github-actions-job:112501537878",
+        "github-actions-job:112501538393",
+        "research-lineage-receipt:999ee1005c441f6c3ad4bd8e50a0bd2b597237650c69d2f16cb3d32ea649a8a0"
       ],
       "risks": [
         "cargo-culting historically famous techniques",
         "source selection bias",
         "retracted/corrected findings surviving as current truth"
       ],
-      "gaps": [
-        "independent exact-head AI Research Lineage Closure qualification for reconciliation receipt remains pending"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-001",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
       "depth_pass": "DP-000-040",
       "enterprise_grade_state": "designed",
