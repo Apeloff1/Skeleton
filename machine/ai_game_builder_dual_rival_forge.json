@@ -1,6 +1,6 @@
 {
   "schema_version": "skeleton.ai_game_builder_dual_rival_forge.v1",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "status": "active_design_authority",
   "purpose": "Govern two internal AI systems that adversarially co-create a game by repeatedly producing, attacking, improving, verifying, and promoting every material game artifact under long-form continuity and rights/provenance constraints.",
   "identities": {
@@ -289,9 +289,16 @@
     "skeleton/ai/runtime/intelligence/narrative.py",
     "skeleton/ai/simulation/world/scene.py",
     "skeleton/ai/simulation/game/replay.py",
-    "planned:skeleton/ai/game_builder/dual_rival_forge.py",
+    "skeleton/ai/game_builder/dual_rival_forge.py",
     "planned:skeleton/ai/game_builder/canon.py",
     "planned:skeleton/ai/game_builder/rights.py",
-    "planned:skeleton/ai/game_builder/atomizer.py"
-  ]
+    "planned:skeleton/ai/game_builder/atomizer.py",
+    "skeleton/ai/game_builder/contracts.py"
+  ],
+  "runtime_contracts": {
+    "contracts": "skeleton/ai/game_builder/contracts.py",
+    "state_machine": "skeleton/ai/game_builder/dual_rival_forge.py",
+    "tests": "skeleton/testing/test_ai_game_builder_contracts.py"
+  },
+  "overengineering_authority": "machine/ai_game_builder_overengineering.json"
 }
