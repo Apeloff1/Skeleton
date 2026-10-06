@@ -237,6 +237,33 @@ def _sha256(value: object, field_name: str) -> str:
     return text
 
 
+def provider_receipt_set_ref(receipts: Iterable[str]) -> str | None:
+    """Return an order-independent digest binding for provider receipt refs."""
+
+    if isinstance(receipts, (str, bytes)):
+        raise TurnRuntimeError("provider_receipts must be an iterable of refs")
+    normalized: set[str] = set()
+    for index, raw in enumerate(receipts):
+        if index >= 64:
+            raise TurnRuntimeError("provider_receipts exceeds hard count limit")
+        normalized.add(
+            _text(
+                raw,
+                f"provider_receipts[{index}]",
+                maximum=2048,
+            )
+        )
+    if not normalized:
+        return None
+    digest = digest_json(
+        {
+            "schema_version": "ai-chat-provider-receipt-set/v1",
+            "refs": sorted(normalized),
+        }
+    )
+    return "provider-receipt-set-sha256:" + digest
+
+
 def _utc(value: datetime, field_name: str) -> datetime:
     if not isinstance(value, datetime):
         raise TurnRuntimeError(f"{field_name} must be datetime")
@@ -1171,6 +1198,7 @@ __all__ = [
     "execution_budget_from_dict",
     "make_event",
     "operation_digest",
+    "provider_receipt_set_ref",
     "start_turn",
     "turn_event_from_dict",
     "turn_snapshot_dict",
