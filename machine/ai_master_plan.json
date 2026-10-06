@@ -530,31 +530,40 @@
         "skeleton/contracts/canonical.py",
         "skeleton/ai/runtime/contracts/canonical.py",
         "scripts/check_architecture_contract_conformance.py",
-        "machine/contract_conformance.json"
+        "machine/contract_conformance.json",
+        "scripts/verify_vol003_contract_conformance.py",
+        ".github/workflows/vol003-contract-conformance.yml"
       ],
       "tests": [
         "skeleton/testing/test_contract_serialization_edges.py",
         "skeleton/testing/test_contract_compatibility.py",
         "skeleton/testing/test_contract_unicode_edges.py",
-        "tests/test_architecture_contract_conformance.py"
+        "tests/test_architecture_contract_conformance.py",
+        "tests/test_vol003_contract_conformance_independent.py"
       ],
       "evaluations": [
         "scripts/check_architecture_contract_conformance.py --json",
-        "tests/test_architecture_contract_conformance.py"
+        "tests/test_architecture_contract_conformance.py",
+        ".github/workflows/vol003-contract-conformance.yml",
+        "scripts/verify_vol003_contract_conformance.py"
       ],
       "evidence": [
         "https://github.com/Apeloff1/Skeleton/commit/3118f3d4c5fcbd421c590b7724289abe8c411e11",
         "scripts/check_architecture_contract_conformance.py",
         "machine/contract_conformance.json",
         "skeleton/testing/test_contract_compatibility.py",
-        "tests/test_architecture_contract_conformance.py"
+        "tests/test_architecture_contract_conformance.py",
+        "scripts/verify_vol003_contract_conformance.py",
+        "tests/test_vol003_contract_conformance_independent.py"
       ],
       "risks": [
         "schema drift",
         "privileged defaults from unknown values",
         "cross-language round-trip divergence"
       ],
-      "gaps": [],
+      "gaps": [
+        "independent exact-head VOL-003 Contract Conformance Closure qualification remains pending"
+      ],
       "accountability_id": "ACC-VOL-003",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
