@@ -141,6 +141,7 @@ class DualRivalForge:
         pending_construct: Candidate | None = None,
         pending_challenge: Challenge | None = None,
         receipts: Sequence[PromotionReceipt] = (),
+        origin_champion_digest: str | None = None,
     ) -> None:
         self.effort_mode = EffortMode.parse(effort_mode)
         self.champion = champion
@@ -152,6 +153,17 @@ class DualRivalForge:
         self.pending_construct = pending_construct
         self.pending_challenge = pending_challenge
         self.receipts = list(receipts)
+        self._origin_champion_digest = (
+            champion.digest
+            if origin_champion_digest is None
+            else origin_champion_digest
+        )
+        if (
+            not isinstance(self._origin_champion_digest, str)
+            or len(self._origin_champion_digest) != 64
+            or any(ch not in "0123456789abcdef" for ch in self._origin_champion_digest)
+        ):
+            raise ForgeStateError("origin champion digest must be lowercase sha256")
         self._project_id = champion.producer_provenance.project_id
         self._run_id = champion.producer_provenance.run_id
         self._validate_state()
@@ -199,6 +211,10 @@ class DualRivalForge:
             if receipt.effort_mode is not self.effort_mode:
                 raise ForgeStateError(
                     "promotion receipt effort mode must match forge effort mode"
+                )
+            if expected_round == 1 and receipt.incumbent_digest != self._origin_champion_digest:
+                raise ForgeStateError(
+                    "first promotion receipt incumbent must match forge origin champion"
                 )
             if (
                 previous_promoted_digest is not None
@@ -380,6 +396,7 @@ class DualRivalForge:
                 if self.pending_construct is not None
                 else None
             ),
+            "origin_champion_digest": self._origin_champion_digest,
             "project_id": self._project_id,
             "receipt_digests": [receipt.decision_digest for receipt in self.receipts],
             "round_index": self.round_index,
@@ -440,4 +457,5 @@ class DualRivalForge:
             pending_construct=pending_construct,
             pending_challenge=pending_challenge,
             receipts=receipts,
+            origin_champion_digest=checkpoint.get("origin_champion_digest"),
         )
