@@ -161,7 +161,7 @@ def validate(data: dict) -> list[str]:
             "package": "skeleton/ai/game_builder",
             "contracts": "skeleton/ai/game_builder/contracts.py",
             "dual_rival_state_machine": "skeleton/ai/game_builder/dual_rival_forge.py",
-            "tests": "skeleton/testing/test_ai_game_builder_contracts.py",
+            "tests": "tests/test_ai_game_builder_runtime.py",
         }:
             errors.append("AI game builder runtime contract binding drifted")
         if not GAME_BUILDER_RUNTIME_CONTRACTS.is_file():
@@ -172,7 +172,7 @@ def validate(data: dict) -> list[str]:
             "canon": "skeleton/ai/game_builder/canon.py",
             "rights": "skeleton/ai/game_builder/rights.py",
             "atom_lineage": "skeleton/ai/game_builder/atomizer.py",
-            "tests": "skeleton/testing/test_ai_game_builder_governance.py",
+            "tests": "tests/test_ai_game_builder_governance.py",
         }:
             errors.append("AI game builder governance runtime binding drifted")
         for label, path in (
@@ -225,7 +225,7 @@ def validate(data: dict) -> list[str]:
                     "canon": "skeleton/ai/game_builder/canon.py",
                     "rights": "skeleton/ai/game_builder/rights.py",
                     "atom_lineage": "skeleton/ai/game_builder/atomizer.py",
-                    "tests": "skeleton/testing/test_ai_game_builder_governance.py",
+                    "tests": "tests/test_ai_game_builder_governance.py",
                 }:
                     errors.append("AI game builder authority governance runtime binding drifted")
                 families = builder_authority.get("families")
@@ -244,14 +244,14 @@ def validate(data: dict) -> list[str]:
                 if duel_authority.get("runtime_contracts") != {
                     "contracts": "skeleton/ai/game_builder/contracts.py",
                     "state_machine": "skeleton/ai/game_builder/dual_rival_forge.py",
-                    "tests": "skeleton/testing/test_ai_game_builder_contracts.py",
+                    "tests": "tests/test_ai_game_builder_runtime.py",
                 }:
                     errors.append("AI game builder dual-rival runtime binding drifted")
                 if duel_authority.get("governance_runtime") != {
                     "canon": "skeleton/ai/game_builder/canon.py",
                     "rights": "skeleton/ai/game_builder/rights.py",
                     "atom_lineage": "skeleton/ai/game_builder/atomizer.py",
-                    "tests": "skeleton/testing/test_ai_game_builder_governance.py",
+                    "tests": "tests/test_ai_game_builder_governance.py",
                 }:
                     errors.append("AI game builder dual-rival governance runtime binding drifted")
                 modes = duel_authority.get("effort_modes", {})
