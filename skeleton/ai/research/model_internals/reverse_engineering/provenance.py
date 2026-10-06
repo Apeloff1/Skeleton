@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 from hashlib import sha256
 
-from .contracts import AuthorizationScope, ReverseEngineeringError
+from .contracts import AuthorizationScope, ReverseEngineeringError, is_sha256_digest
 
 
 class RightsBasis(str, Enum):
@@ -29,7 +29,7 @@ class ArtifactProvenance:
     def __post_init__(self) -> None:
         if not self.artifact_id.strip() or not self.source_uri.strip():
             raise ReverseEngineeringError("artifact provenance requires identity and source_uri")
-        if self.content_sha256 is not None and len(self.content_sha256) != 64:
+        if self.content_sha256 is not None and not is_sha256_digest(self.content_sha256):
             raise ReverseEngineeringError("content_sha256 must be a sha256 hex digest")
         if self.rights_basis in {RightsBasis.OPEN_SOURCE, RightsBasis.LICENSED} and not self.license_id:
             raise ReverseEngineeringError("licensed/open-source artifacts require license_id")

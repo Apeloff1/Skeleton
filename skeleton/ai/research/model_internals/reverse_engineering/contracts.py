@@ -25,12 +25,28 @@ class ProbeKind(str, Enum):
 
 
 def canonical_json(value: Any) -> str:
-    """Encode JSON-compatible values deterministically."""
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    """Encode JSON-compatible values deterministically and reject NaN/Infinity."""
+    try:
+        return json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+            allow_nan=False,
+        )
+    except (TypeError, ValueError) as exc:
+        raise ReverseEngineeringError("value is not canonical JSON compatible") from exc
 
 
 def stable_digest(value: Any) -> str:
     return sha256(canonical_json(value).encode("utf-8")).hexdigest()
+
+
+def is_sha256_digest(value: str) -> bool:
+    return (
+        len(value) == 64
+        and all(char in "0123456789abcdefABCDEF" for char in value)
+    )
 
 
 @dataclass(frozen=True)
@@ -77,6 +93,8 @@ class ProbeCase:
     def __post_init__(self) -> None:
         if not self.probe_id.strip():
             raise ReverseEngineeringError("probe_id must be non-empty")
+        canonical_json(self.payload)
+        canonical_json(dict(self.metadata))
         object.__setattr__(self, "tags", tuple(sorted(set(self.tags))))
 
     @property
@@ -100,8 +118,10 @@ class Observation:
     def __post_init__(self) -> None:
         if not self.target_id or not self.probe_id:
             raise ReverseEngineeringError("observation identity must be non-empty")
-        if len(self.input_digest) != 64 or len(self.output_digest) != 64:
+        if not is_sha256_digest(self.input_digest) or not is_sha256_digest(self.output_digest):
             raise ReverseEngineeringError("observation digests must be sha256 hex digests")
+        if self.ordinal < 0:
+            raise ReverseEngineeringError("observation ordinal must be non-negative")
         object.__setattr__(self, "feature_flags", tuple(sorted(set(self.feature_flags))))
 
     def as_dict(self) -> dict[str, Any]:
@@ -155,6 +175,8 @@ class EvidenceBundle:
     def __post_init__(self) -> None:
         if not self.target_id:
             raise ReverseEngineeringError("evidence target_id must be non-empty")
+        if not self.protocol_version:
+            raise ReverseEngineeringError("protocol_version must be non-empty")
         if any(obs.target_id != self.target_id for obs in self.observations):
             raise ReverseEngineeringError("evidence bundle cannot mix targets")
         ordered = tuple(sorted(self.observations, key=lambda o: (o.probe_id, o.ordinal)))

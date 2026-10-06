@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-import json
 from typing import Any
 
 from .contracts import (
@@ -13,6 +12,7 @@ from .contracts import (
     Observation,
     ProbeCase,
     ReverseEngineeringError,
+    canonical_json,
     stable_digest,
 )
 
@@ -30,28 +30,49 @@ def _shape(value: Any) -> str:
     if isinstance(value, bytes):
         return "bytes"
     if isinstance(value, Mapping):
-        keys = sorted(str(key) for key in value.keys())
+        keys = sorted(f"{type(key).__name__}:{key!s}" for key in value.keys())
         return "mapping:" + stable_digest(keys)[:16]
     if isinstance(value, Sequence):
         return f"sequence:{len(value)}"
+    if isinstance(value, set):
+        return f"set:{len(value)}"
     return type(value).__name__
+
+
+def _normalize_mapping_key(value: Any) -> dict[str, Any]:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        canonical_json(value)
+        return {"type": type(value).__name__, "value": value}
+    if isinstance(value, bytes):
+        return {"type": "bytes", "digest": stable_digest(list(value))}
+    raise ReverseEngineeringError(
+        f"unsupported mapping key type for deterministic normalization: {type(value).__name__}"
+    )
 
 
 def _normalized_output(value: Any) -> Any:
     if isinstance(value, bytes):
         return {"bytes_sha256": stable_digest(list(value))}
     if isinstance(value, Mapping):
-        return {str(key): _normalized_output(value[key]) for key in sorted(value, key=str)}
+        entries = [
+            [_normalize_mapping_key(key), _normalized_output(item)]
+            for key, item in value.items()
+        ]
+        entries.sort(key=lambda pair: canonical_json(pair[0]))
+        return {"mapping_entries": entries}
     if isinstance(value, tuple):
-        return [_normalized_output(item) for item in value]
+        return {"tuple": [_normalized_output(item) for item in value]}
     if isinstance(value, list):
-        return [_normalized_output(item) for item in value]
+        return {"list": [_normalized_output(item) for item in value]}
     if isinstance(value, set):
         normalized = [_normalized_output(item) for item in value]
-        return sorted(normalized, key=lambda item: json.dumps(item, sort_keys=True, default=str))
+        return {"set": sorted(normalized, key=canonical_json)}
     if isinstance(value, (str, int, float, bool)) or value is None:
+        canonical_json(value)
         return value
-    return {"type": type(value).__name__, "repr_digest": stable_digest(repr(value))}
+    raise ReverseEngineeringError(
+        f"unsupported output type for deterministic normalization: {type(value).__name__}"
+    )
 
 
 @dataclass
