@@ -1157,3 +1157,290 @@ def test_evidence_seal_cannot_predate_revocation() -> None:
             authority,
             now=NOW + timedelta(seconds=9),
         )
+
+
+
+def test_child_usage_is_charged_against_parent_aggregate_budget() -> None:
+    guard = ExecutionAuthorityGuard()
+    parent = _authority(budget=_budget(tool_calls=2))
+    _admit(guard, parent)
+    child = _child_authority(
+        parent,
+        budget=_budget(tool_calls=2, parallelism=1),
+    )
+    guard.admit(
+        authority=child,
+        request=_request(),
+        receipt_id="receipt-child-budget",
+        replay_key="admission-child-budget",
+        now=NOW + timedelta(seconds=1),
+    )
+
+    parent_use = guard.authorize(
+        authority=parent,
+        capability="repo.write",
+        delta=ResourceUsage(tool_calls=1),
+        replay_key="parent-write-001",
+        now=NOW + timedelta(seconds=2),
+    )
+    denied = guard.authorize(
+        authority=child,
+        capability="repo.write",
+        delta=ResourceUsage(tool_calls=2),
+        replay_key="child-write-too-wide",
+        now=NOW + timedelta(seconds=3),
+    )
+    allowed = guard.authorize(
+        authority=child,
+        capability="repo.write",
+        delta=ResourceUsage(tool_calls=1),
+        replay_key="child-write-001",
+        now=NOW + timedelta(seconds=4),
+    )
+
+    assert parent_use.allowed
+    assert denied.disposition is AuthorizationDisposition.DENY
+    assert denied.reason == "ancestor capability or aggregate resource budget denied"
+    assert allowed.allowed
+    assert guard.usage_for(parent).tool_calls == 1
+    assert guard.usage_for(child).tool_calls == 1
+    assert guard.effective_usage_for(parent).tool_calls == 2
+
+
+def test_sibling_delegations_cannot_multiply_parent_budget() -> None:
+    guard = ExecutionAuthorityGuard()
+    parent = _authority(budget=_budget(tool_calls=2))
+    _admit(guard, parent)
+    child_a = _child_authority(
+        parent,
+        actor_id="agent.worker-a",
+        budget=_budget(tool_calls=2, parallelism=1),
+    )
+    child_b = _child_authority(
+        parent,
+        actor_id="agent.worker-b",
+        budget=_budget(tool_calls=2, parallelism=1),
+    )
+    guard.admit(
+        authority=child_a,
+        request=_request(),
+        receipt_id="receipt-child-a",
+        replay_key="admission-child-a",
+        now=NOW + timedelta(seconds=1),
+    )
+    guard.admit(
+        authority=child_b,
+        request=_request(),
+        receipt_id="receipt-child-b",
+        replay_key="admission-child-b",
+        now=NOW + timedelta(seconds=1),
+    )
+
+    first = guard.authorize(
+        authority=child_a,
+        capability="repo.write",
+        delta=ResourceUsage(tool_calls=1),
+        replay_key="child-a-write-001",
+        now=NOW + timedelta(seconds=2),
+    )
+    second = guard.authorize(
+        authority=child_b,
+        capability="repo.write",
+        delta=ResourceUsage(tool_calls=1),
+        replay_key="child-b-write-001",
+        now=NOW + timedelta(seconds=3),
+    )
+    overflow = guard.authorize(
+        authority=child_a,
+        capability="repo.write",
+        delta=ResourceUsage(tool_calls=1),
+        replay_key="child-a-write-002",
+        now=NOW + timedelta(seconds=4),
+    )
+
+    assert first.allowed
+    assert second.allowed
+    assert overflow.disposition is AuthorizationDisposition.DENY
+    assert guard.effective_usage_for(parent).tool_calls == 2
+    snapshot = guard.snapshot()
+    parent_row = next(
+        item for item in snapshot["authorities"]
+        if item["authority_digest"] == parent.digest
+    )
+    assert parent_row["usage"]["tool_calls"] == 0
+    assert parent_row["descendant_usage"]["tool_calls"] == 2
+    assert parent_row["aggregate_usage"]["tool_calls"] == 2
+
+
+def test_deep_delegation_charges_every_ancestor_once() -> None:
+    guard = ExecutionAuthorityGuard()
+    root = _authority(budget=_budget(tool_calls=2))
+    _admit(guard, root)
+    child = _child_authority(
+        root,
+        actor_id="agent.secretary",
+        budget=_budget(tool_calls=2, parallelism=1),
+    )
+    guard.admit(
+        authority=child,
+        request=_request(),
+        receipt_id="receipt-secretary",
+        replay_key="admission-secretary",
+        now=NOW + timedelta(seconds=1),
+    )
+    grandchild = _child_authority(
+        child,
+        actor_id="agent.worker",
+        budget=_budget(tool_calls=2, parallelism=1),
+    )
+    guard.admit(
+        authority=grandchild,
+        request=_request(),
+        receipt_id="receipt-worker",
+        replay_key="admission-worker",
+        now=NOW + timedelta(seconds=2),
+    )
+
+    decision = guard.authorize(
+        authority=grandchild,
+        capability="repo.write",
+        delta=ResourceUsage(tool_calls=1),
+        replay_key="worker-write-001",
+        now=NOW + timedelta(seconds=3),
+    )
+
+    assert decision.allowed
+    assert guard.usage_for(root).tool_calls == 0
+    assert guard.usage_for(child).tool_calls == 0
+    assert guard.usage_for(grandchild).tool_calls == 1
+    assert guard.effective_usage_for(child).tool_calls == 1
+    assert guard.effective_usage_for(root).tool_calls == 1
+
+
+def test_delegated_replay_does_not_double_charge_ancestor_budget() -> None:
+    guard = ExecutionAuthorityGuard()
+    parent = _authority(budget=_budget(tool_calls=1))
+    _admit(guard, parent)
+    child = _child_authority(
+        parent,
+        budget=_budget(tool_calls=1, parallelism=1),
+    )
+    guard.admit(
+        authority=child,
+        request=_request(),
+        receipt_id="receipt-child-replay",
+        replay_key="admission-child-replay",
+        now=NOW + timedelta(seconds=1),
+    )
+    delta = ResourceUsage(tool_calls=1)
+
+    first = guard.authorize(
+        authority=child,
+        capability="repo.write",
+        delta=delta,
+        replay_key="child-write-replay",
+        now=NOW + timedelta(seconds=2),
+    )
+    replay = guard.authorize(
+        authority=child,
+        capability="repo.write",
+        delta=delta,
+        replay_key="child-write-replay",
+        now=NOW + timedelta(seconds=3),
+    )
+
+    assert first.allowed
+    assert replay.disposition is AuthorizationDisposition.REPLAY
+    assert guard.effective_usage_for(parent).tool_calls == 1
+
+
+def test_checkpoint_restore_reconstructs_ancestor_aggregate_usage() -> None:
+    source = ExecutionAuthorityGuard()
+    parent = _authority(budget=_budget(tool_calls=2))
+    _admit(source, parent)
+    child = _child_authority(
+        parent,
+        budget=_budget(tool_calls=2, parallelism=1),
+    )
+    source.admit(
+        authority=child,
+        request=_request(),
+        receipt_id="receipt-child-aggregate",
+        replay_key="admission-child-aggregate",
+        now=NOW + timedelta(seconds=1),
+    )
+    source.authorize(
+        authority=child,
+        capability="repo.write",
+        delta=ResourceUsage(tool_calls=1),
+        replay_key="child-write-before-checkpoint",
+        now=NOW + timedelta(seconds=2),
+    )
+    parent_checkpoint = source.checkpoint(
+        parent,
+        now=NOW + timedelta(seconds=3),
+    )
+    child_checkpoint = source.checkpoint(
+        child,
+        now=NOW + timedelta(seconds=3),
+    )
+
+    restored = ExecutionAuthorityGuard()
+    restored.restore_checkpoint(parent_checkpoint)
+    restored.restore_checkpoint(child_checkpoint)
+
+    assert restored.effective_usage_for(parent).tool_calls == 1
+    next_use = restored.authorize(
+        authority=child,
+        capability="repo.write",
+        delta=ResourceUsage(tool_calls=1),
+        replay_key="child-write-after-checkpoint",
+        now=NOW + timedelta(seconds=4),
+    )
+    overflow = restored.authorize(
+        authority=child,
+        capability="repo.write",
+        delta=ResourceUsage(tool_calls=1),
+        replay_key="child-write-overflow-after-checkpoint",
+        now=NOW + timedelta(seconds=5),
+    )
+
+    assert next_use.allowed
+    assert overflow.disposition is AuthorizationDisposition.DENY
+    assert restored.effective_usage_for(parent).tool_calls == 2
+
+
+def test_sealed_parent_evidence_reports_descendant_and_aggregate_usage() -> None:
+    guard = ExecutionAuthorityGuard()
+    parent = _authority(budget=_budget(tool_calls=2))
+    _admit(guard, parent)
+    child = _child_authority(
+        parent,
+        budget=_budget(tool_calls=1, parallelism=1),
+    )
+    guard.admit(
+        authority=child,
+        request=_request(),
+        receipt_id="receipt-child-evidence",
+        replay_key="admission-child-evidence",
+        now=NOW + timedelta(seconds=1),
+    )
+    guard.authorize(
+        authority=child,
+        capability="repo.write",
+        delta=ResourceUsage(tool_calls=1),
+        replay_key="child-write-evidence",
+        now=NOW + timedelta(seconds=2),
+    )
+
+    evidence = guard.seal_evidence(
+        parent,
+        now=NOW + timedelta(seconds=3),
+    )
+
+    assert evidence.final_usage.tool_calls == 0
+    assert evidence.descendant_usage.tool_calls == 1
+    assert evidence.aggregate_usage.tool_calls == 1
+    payload = evidence.canonical_payload()
+    assert payload["descendant_usage"]["tool_calls"] == 1
+    assert payload["aggregate_usage"]["tool_calls"] == 1
