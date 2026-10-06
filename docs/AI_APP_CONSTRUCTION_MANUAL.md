@@ -1,10 +1,10 @@
 # Skeleton AI Application Construction Manual
 
-Architecture tag: `arch-map/v3.6`
+Architecture tag: `arch-map/v3.7`
 
 Machine contract: `machine/ai_app_construction.json`
 
-Construction version: `3.6.0`
+Construction version: `3.7.0`
 
 Architecture contract: `machine/architecture.json`
 
