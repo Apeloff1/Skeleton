@@ -73,13 +73,19 @@ Time is an ally because the system may continue careful iteration, not because i
 
 ## Runtime kernel
 
-The branch now contains a deterministic control-plane kernel:
+The branch now contains a deterministic control-plane kernel and three governed project-state foundations:
 
 - `skeleton/ai/game_builder/contracts.py`
 - `skeleton/ai/game_builder/dual_rival_forge.py`
+- `skeleton/ai/game_builder/canon.py`
+- `skeleton/ai/game_builder/rights.py`
+- `skeleton/ai/game_builder/atomizer.py`
 - `skeleton/testing/test_ai_game_builder_contracts.py`
+- `skeleton/testing/test_ai_game_builder_governance.py`
 
-The kernel enforces exact effort budgets, exact three-stage order, alternating roles, independent evaluator identity, non-compensable gate vetoes, Pareto-safe quality promotion, explicit synthesis ancestry, tamper-evident checkpoint digests, and exact completion only when the selected round count is reached.
+The forge kernel enforces exact effort budgets, exact three-stage order, alternating roles, independent evaluator identity, non-compensable gate vetoes, Pareto-safe quality promotion, explicit synthesis ancestry, tamper-evident checkpoint digests, and exact completion only when the selected round count is reached.
+
+The canon ledger implements branch-aware assertions, temporal validity and explicit character knowledge events so accidental contradictions and epistemic leaks fail closed. The rights ledger implements source-rights states, explicit incorporation decisions, unknown-rights quarantine and unresolved-high-similarity release blocking. The atom graph implements stable pixel/content atoms, parent context, dependency closure and deterministic change blast radius.
 
 It intentionally does **not** call model providers. Model execution must plug into this control plane rather than becoming the control plane.
 
