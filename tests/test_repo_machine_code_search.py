@@ -102,7 +102,7 @@ class CodeSearchIndexTests(unittest.TestCase):
             self.assertEqual(hits[0].path, "alpha/service.py")
             self.assertEqual(hits[0].line, 2)
             self.assertEqual(hits[0].match_kind, "definition")
-            self.assertGreaterEqual(hits[0].occurrence_count, 1)
+            self.assertEqual(hits[0].occurrence_count, 3)
 
     def test_path_and_filter_search_are_deterministic(self) -> None:
         temp, root = self.fixture()
@@ -114,6 +114,7 @@ class CodeSearchIndexTests(unittest.TestCase):
             self.assertEqual(first, second)
             self.assertTrue(first)
             self.assertEqual(first[0].path, "alpha/service.py")
+            self.assertEqual(first[0].match_kind, "path")
             self.assertTrue(all(hit.zone == "alpha" for hit in first))
 
     def test_save_load_round_trip_and_fingerprint_binding(self) -> None:
