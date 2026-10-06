@@ -127,26 +127,6 @@ def _finite_nonnegative(value: object, field: str) -> float:
     return result
 
 
-def _check_payload(check: VerificationCheck) -> dict[str, object]:
-    return {
-        "schema_version": check.schema_version,
-        "check_id": check.check_id,
-        "claim_id": check.claim_id,
-        "tenant_id": check.tenant_id,
-        "level": int(check.level),
-        "outcome": check.outcome.value,
-        "verifier_id": check.verifier_id,
-        "verified_at": check.verified_at.isoformat(),
-        "evidence_ids": list(check.evidence_ids),
-        "postcondition_observation_ids": list(
-            check.postcondition_observation_ids
-        ),
-        "independent": check.independent,
-        "issues": list(check.issues),
-        "confidence": check.confidence,
-    }
-
-
 @dataclass(frozen=True, slots=True)
 class VerificationActorIdentity:
     """Observable identity used to prove verifier separation."""
@@ -345,9 +325,7 @@ def build_independent_verification_proof(
         tenant_id=claim.tenant_id,
         receipt_digest=receipt.digest,
         independent_check_id=independent_check.check_id,
-        independent_check_digest=_digest(
-            _check_payload(independent_check)
-        ),
+        independent_check_digest=independent_check.digest,
         independent_check_verified_at=independent_check.verified_at,
         generator=generator,
         verifier=verifier,
