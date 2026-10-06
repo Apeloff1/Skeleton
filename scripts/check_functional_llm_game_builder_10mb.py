@@ -394,6 +394,151 @@ def main() -> int:
         if token not in corpus:
             fail(f"frontier competition contract missing {token}")
 
+
+    if frontier.get("protocol_version") != "2.0":
+        fail("frontier competition protocol version drift")
+
+    measurement = frontier.get("measurement_constitution")
+    if not isinstance(measurement, dict):
+        fail("frontier measurement constitution missing")
+    expected_measurement = {
+        "preregistration_required": True,
+        "immutable_task_manifest_before_candidate_run": True,
+        "minimum_independent_runs_per_scored_task": 6,
+        "paired_task_assignment_required": True,
+        "fixed_seed_set_or_seed_manifest_required": True,
+        "critical_domain_noninferiority_required": True,
+        "equal_budget_head_to_head_required": True,
+        "unconstrained_quality_ceiling_run_required": True,
+        "compute_normalized_pareto_frontier_required": True,
+        "quality_per_cost_and_quality_per_wall_clock_required": True,
+        "raw_trajectory_retention_required": True,
+        "failed_and_aborted_runs_retained": True,
+        "selective_rerun_cherry_picking_forbidden": True,
+    }
+    for key, expected in expected_measurement.items():
+        if measurement.get(key) != expected:
+            fail(f"frontier measurement constitution drift: {key}")
+    if float(measurement.get("confidence_interval_level", 0.0)) < 0.95:
+        fail("frontier confidence interval floor weakened")
+    if float(measurement.get("non_inferiority_margin_pp_max", 99.0)) > 2.0:
+        fail("frontier non-inferiority margin weakened")
+    if int(measurement.get("minimum_parity_or_better_domains", 0)) < 10:
+        fail("frontier parity domain floor weakened")
+    if int(measurement.get("minimum_superior_core_targets", 0)) < 2:
+        fail("frontier superior core-target floor weakened")
+
+    if int(comparator.get("minimum_independent_runs_per_scored_task", 0)) < 6:
+        fail("frontier comparator trial-count floor weakened")
+    for key in (
+        "hidden_challenge_rotation_required",
+        "scaffold_and_tooling_parity_or_disclosure_required",
+        "reward_hacking_review_required",
+        "reusable_heldout_after_exposure_forbidden",
+        "model_family_provider_diversity_documented",
+    ):
+        if comparator.get(key) is not True:
+            fail(f"frontier comparator protocol disabled: {key}")
+    if int(comparator.get("maximum_comparator_age_days", 999)) > 45:
+        fail("frontier comparator freshness must be bounded to 45 days")
+
+    long_horizon = frontier.get("long_horizon_protocol")
+    if not isinstance(long_horizon, dict):
+        fail("frontier long-horizon protocol missing")
+    buckets = long_horizon.get("human_equivalent_duration_buckets_hours")
+    if not isinstance(buckets, list) or len(buckets) < 6 or max(buckets) < 160:
+        fail("frontier long-horizon duration coverage incomplete")
+    for key in (
+        "multi_session_resume_required",
+        "forced_context_reset_trials_required",
+        "checkpoint_reopen_trials_required",
+        "state_drift_measurement_required",
+        "canon_and_requirement_drift_measurement_required",
+        "cumulative_error_growth_curve_required",
+        "recovery_after_interruption_required",
+        "multi_day_project_tasks_required",
+        "long_horizon_score_may_not_be_inferred_from_short_task_average",
+    ):
+        if long_horizon.get(key) is not True:
+            fail(f"frontier long-horizon control disabled: {key}")
+    curves = long_horizon.get("success_curves_required")
+    if not isinstance(curves, list) or "50%-success time horizon" not in curves or "80%-success time horizon" not in curves:
+        fail("frontier long-horizon 50%/80% success curves missing")
+
+    anti_gaming = frontier.get("anti_gaming_protocol")
+    if not isinstance(anti_gaming, dict):
+        fail("frontier anti-gaming protocol missing")
+    for key in (
+        "reward_hacking_detection_required",
+        "benchmark_leakage_scan_required",
+        "test_oracle_introspection_forbidden",
+        "evaluator_manipulation_forbidden",
+        "simulator_or_harness_tampering_forbidden",
+        "unauthorized_external_solution_lookup_forbidden",
+        "hidden_test_inference_without_task_evidence_flagged",
+        "prompt_injection_against_evaluators_tested",
+        "suspicious_success_manual_review_required",
+        "cheating_or_policy_bypass_scores_zero",
+        "raw_tool_and_action_trace_review_required",
+    ):
+        if anti_gaming.get(key) is not True:
+            fail(f"frontier anti-gaming control disabled: {key}")
+
+    evaluator = frontier.get("evaluator_independence")
+    if not isinstance(evaluator, dict):
+        fail("frontier evaluator-independence contract missing")
+    if int(evaluator.get("minimum_independent_evaluator_implementations", 0)) < 2:
+        fail("frontier evaluator independence floor weakened")
+    for key in (
+        "candidate_self_score_never_decisive",
+        "blind_human_tribunal_required_for_subjective_core_outputs",
+        "evaluator_identity_and_version_pinned",
+        "evaluator_prompt_and_rubric_version_pinned",
+        "evaluator_disagreement_report_required",
+        "collusion_and_shared_failure_mode_review_required",
+        "adjudication_receipt_required",
+    ):
+        if evaluator.get(key) is not True:
+            fail(f"frontier evaluator-independence control disabled: {key}")
+
+    dominance = frontier.get("dominance_rule")
+    if not isinstance(dominance, dict):
+        fail("frontier dominance rule missing")
+    if int(dominance.get("minimum_parity_or_better_domains", 0)) < 10:
+        fail("frontier dominance parity floor weakened")
+    if int(dominance.get("minimum_superior_core_targets", 0)) < 2:
+        fail("frontier dominance superiority floor weakened")
+    for key in (
+        "critical_domains_must_meet_preregistered_non_inferiority_margin",
+        "dual_rival_equal_budget_ablation_required",
+        "dual_rival_extra_compute_control_required",
+        "strongest_comparator_head_to_head_required",
+        "current_champion_regression_veto",
+        "aggregate_score_never_overrides_critical_gate",
+    ):
+        if dominance.get(key) is not True:
+            fail(f"frontier dominance control disabled: {key}")
+    core_targets = dominance.get("core_targets")
+    if not isinstance(core_targets, list) or len(core_targets) < 4:
+        fail("frontier dominance core-target set incomplete")
+
+    game_challenge = frontier.get("game_builder_challenge")
+    if not isinstance(game_challenge, dict):
+        fail("frontier game-builder challenge contract missing")
+    for key in (
+        "brief_to_playable_export_required",
+        "reopen_and_continue_after_clean_restart_required",
+        "cross_scene_and_cross_session_canon_consistency_required",
+        "gameplay_loop_quality_and_debugging_required",
+        "asset_code_narrative_rights_provenance_required",
+        "performance_budget_and_frame_time_evidence_required",
+        "accessibility_localization_and_input_equivalence_required",
+        "save_migration_mod_sandbox_and_network_fault_trials_required",
+        "blind_player_or_expert_judging_required",
+    ):
+        if game_challenge.get(key) is not True:
+            fail(f"frontier game-builder challenge disabled: {key}")
+
     shard17 = (ROOT / shards[16]["path"]).read_text(encoding="utf-8")
     for token in ("Forge-100", "Forge-1000", "Forge-10000", "rights", "clean-room"):
         if token.lower() not in shard17.lower():
