@@ -187,6 +187,18 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
 
     if duel.get("schema_version") != "skeleton.ai_game_builder_dual_rival_forge.v1":
         raise GameBuilderAuthorityError("unsupported dual-rival authority schema")
+    bindings = _list(duel.get("implementation_bindings"), "implementation_bindings", 1)
+    if len(bindings) != len(set(bindings)):
+        raise GameBuilderAuthorityError("implementation_bindings must be unique")
+    for raw_binding in bindings:
+        binding = _text(raw_binding, "implementation_binding")
+        if binding.startswith("planned:"):
+            raise GameBuilderAuthorityError(f"materialized runtime binding remains planned: {binding}")
+        binding_path = Path(binding)
+        if binding_path.is_absolute() or ".." in binding_path.parts:
+            raise GameBuilderAuthorityError(f"implementation binding must be a safe repository path: {binding}")
+        if not (root / binding_path).is_file():
+            raise GameBuilderAuthorityError(f"implementation binding is missing: {binding}")
     modes = duel.get("effort_modes")
     if not isinstance(modes, dict):
         raise GameBuilderAuthorityError("dual-rival effort_modes must be an object")
