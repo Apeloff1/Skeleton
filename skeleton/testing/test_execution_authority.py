@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -614,3 +615,125 @@ def test_sealed_evidence_binds_admission_latest_receipt_and_usage() -> None:
     assert evidence.latest_consumption_digest == decision.receipt.digest
     assert evidence.final_usage == guard.usage_for(authority)
     assert evidence.digest
+
+
+
+def test_replay_capacity_fails_closed_instead_of_forgetting_side_effects() -> None:
+    guard = ExecutionAuthorityGuard(max_replay_keys=2)
+    authority = _authority(budget=_budget(tool_calls=3))
+    _admit(guard, authority)
+
+    first = guard.authorize(
+        authority=authority,
+        capability="repo.write",
+        delta=ResourceUsage(tool_calls=1),
+        replay_key="write-001",
+        now=NOW + timedelta(seconds=1),
+    )
+    assert first.allowed
+
+    with pytest.raises(
+        ExecutionAuthorityError,
+        match="replay guard capacity exhausted",
+    ):
+        guard.authorize(
+            authority=authority,
+            capability="repo.write",
+            delta=ResourceUsage(tool_calls=1),
+            replay_key="write-002",
+            now=NOW + timedelta(seconds=2),
+        )
+
+    replay = guard.authorize(
+        authority=authority,
+        capability="repo.write",
+        delta=ResourceUsage(tool_calls=1),
+        replay_key="write-001",
+        now=NOW + timedelta(seconds=3),
+    )
+    assert replay.disposition is AuthorizationDisposition.REPLAY
+    assert guard.usage_for(authority).tool_calls == 1
+
+
+def test_authority_capacity_fails_closed_instead_of_resetting_usage() -> None:
+    guard = ExecutionAuthorityGuard(max_authorities=1, max_replay_keys=4)
+    authority = _authority(budget=_budget(tool_calls=1))
+    _admit(guard, authority)
+    allowed = guard.authorize(
+        authority=authority,
+        capability="repo.write",
+        delta=ResourceUsage(tool_calls=1),
+        replay_key="write-001",
+        now=NOW + timedelta(seconds=1),
+    )
+    assert allowed.allowed
+
+    second = ExecutionAuthority(
+        authority_id="authority-002",
+        operation_id="operation-002",
+        execution_id="execution-002",
+        actor_id="agent.builder",
+        issuer_id="supervisor",
+        issued_at=NOW,
+        expires_at=NOW + timedelta(minutes=30),
+        capabilities=("repo.read",),
+        budget=_budget(),
+        policy_digest=authority.policy_digest,
+        nonce="nonce-002",
+    )
+    second_request = AIExecutionRequest(
+        operation_id="operation-002",
+        execution_id="execution-002",
+        objective="Second authority must not evict first usage state.",
+        context_policy={"mode": "bounded"},
+        tool_policy={"default": "deny"},
+        resource_budget={"profile": "authority-test"},
+        stop_policy={"deadline": "required"},
+        created_at=NOW,
+    )
+    with pytest.raises(
+        ExecutionAuthorityError,
+        match="authority guard capacity exhausted",
+    ):
+        guard.admit(
+            authority=second,
+            request=second_request,
+            receipt_id="receipt-002",
+            replay_key="admission-002",
+            now=NOW + timedelta(seconds=2),
+        )
+
+    assert guard.usage_for(authority).tool_calls == 1
+
+
+def test_concurrent_authorizations_are_serialized_into_one_valid_receipt_chain() -> None:
+    guard = ExecutionAuthorityGuard(max_replay_keys=128)
+    authority = _authority(
+        budget=_budget(tool_calls=32, artifact_bytes=32_000),
+    )
+    _admit(guard, authority)
+
+    def authorize(index: int):
+        return guard.authorize(
+            authority=authority,
+            capability="repo.write",
+            delta=ResourceUsage(tool_calls=1, artifact_bytes=10),
+            replay_key=f"write-{index:03d}",
+            now=NOW + timedelta(seconds=1),
+        )
+
+    with ThreadPoolExecutor(max_workers=16) as executor:
+        decisions = list(executor.map(authorize, range(32)))
+
+    assert all(decision.allowed for decision in decisions)
+    receipts = [decision.receipt for decision in decisions]
+    assert all(receipt is not None for receipt in receipts)
+    ordered = sorted(
+        (receipt for receipt in receipts if receipt is not None),
+        key=lambda receipt: receipt.sequence,
+    )
+    assert [receipt.sequence for receipt in ordered] == list(range(1, 33))
+    reconstructed = verify_authority_receipt_chain(authority, ordered)
+    assert reconstructed.tool_calls == 32
+    assert reconstructed.artifact_bytes == 320
+    assert reconstructed == guard.usage_for(authority)
