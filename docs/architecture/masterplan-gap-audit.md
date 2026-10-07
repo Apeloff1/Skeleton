@@ -1611,3 +1611,18 @@ Temporal research now extends substantially beyond fixed calendar decades:
 - focused regressions cover structural splits, gap segmentation, reversal classification and high-risk historical evidence.
 
 This transforms decade signals from descriptive calendar summaries into a regime-aware historical reasoning plane. Advanced next work: richer event/publication/valid-time extraction, statistically calibrated change-point thresholds, bootstrap uncertainty around regime boundaries, and active acquisition policies that prioritize high-bias or persistently contested historical regimes.
+
+
+### 2026-10-07 deep temporal research and active acquisition tranche
+
+The historical signal plane now includes deeper temporal semantics and research feedback:
+- TemporalSemantics separates observation time from inferred publication time and explicit event-year span, retaining confidence and extraction basis instead of collapsing all dates into one timestamp;
+- deterministic bootstrap intervals provide reproducible uncertainty estimates for evidence-derived signal statistics;
+- lag_scan compares annual signal series across bounded positive/negative offsets and reports correlation/overlap as precursor-lag evidence without asserting causality;
+- active acquisition planning combines learned-regime sparsity, historical/archive bias, persistent contradiction and uncertainty into bounded, explainable historical research priorities;
+- these acquisition targets can be translated into existing year/decade-directed frontier and federated-provider searches, closing analysis-to-acquisition feedback;
+- regressions cover multi-time separation, deterministic uncertainty, shifted annual signals and biased/contested regime acquisition priority.
+
+Research grounding reviewed during this tranche includes recent temporal GraphRAG, temporal-validity/decay, entity-event temporal-causal RAG, dynamic temporal GraphRAG, and agentic event-forecasting work. The implementation deliberately keeps deterministic evidence/provenance contracts and does not equate lag correlation with causation.
+
+Advanced next work: attach TemporalSemantics to EvidenceObservation directly; calibrate event/publication extraction using structured page metadata; propagate uncertainty into regime boundary acceptance; generate acquisition queries from AcquisitionTarget; and add temporal retrieval filters over the canonical knowledge/retrieval bridge.
