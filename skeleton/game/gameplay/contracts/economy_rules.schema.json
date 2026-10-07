@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-13:economy_rules:v1",
+  "title": "FLGB-13 economy rules",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "rule_id",
+    "item_id",
+    "currency_id",
+    "unit_price",
+    "max_quantity"
+  ],
+  "properties": {
+    "rule_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "item_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "currency_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "unit_price": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "max_quantity": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}
