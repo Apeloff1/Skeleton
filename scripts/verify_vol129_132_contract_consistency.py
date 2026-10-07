@@ -235,7 +235,7 @@ def _verify_compatibility(
         "requiredness_tightened",
         "enum_narrowed",
         "constraint_tightened",
-        "breaking transition",
+        "schema transition is not eligible for promotion",
         "eligible_for_promotion",
         "rollback_required",
     ):
