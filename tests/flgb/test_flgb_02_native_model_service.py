@@ -7,6 +7,7 @@ from skeleton.ai.model_runtime import (
     NativeLLMRuntime,
     NativeModelService,
     RuntimeContractError,
+    TokenizerLimits,
 )
 from skeleton.ai.model_runtime.flgb_model_runtime import LocalModelRequest, ModelIdentity
 from skeleton.ai.model_runtime.runtime_service import NativeServiceError
@@ -164,6 +165,40 @@ class TestNativeModelService(unittest.TestCase):
             any(event.kind in {"token", "stopped", "completed"} for event in result.events)
         )
         self.assertEqual([event.kind for event in result.events], ["admitted", "prompt"])
+
+    def test_tokenizer_admission_failure_becomes_sanitized_model_error(self):
+        runtime = self.runtime()
+        runtime.tokenizer.limits = TokenizerLimits(
+            max_chars=3,
+            max_chunks=2,
+            max_chunk_chars=3,
+            max_tokens=8,
+        )
+        service = NativeModelService(runtime)
+        config = GenerationConfig(max_new_tokens=1, temperature=0.0)
+        request = service.request(
+            "op-tokenizer-failure",
+            "alpha",
+            config,
+            deadline_ms=1_000,
+        )
+        result = service.execute(request, "alpha", config)
+        self.assertEqual(result.receipt.terminal_reason, "model_error")
+        self.assertIsNone(result.receipt.output_digest)
+        self.assertIsNone(result.generation)
+        self.assertFalse(any(event.kind == "token" for event in result.events))
+        self.assertEqual(len(result.receipt.usage_digest), 64)
+
+    def test_invalid_unicode_is_rejected_at_request_digest_boundary(self):
+        service = NativeModelService(self.runtime())
+        config = GenerationConfig(max_new_tokens=1, temperature=0.0)
+        with self.assertRaises(NativeServiceError):
+            service.request(
+                "op-invalid-unicode",
+                "\ud800",
+                config,
+                deadline_ms=1_000,
+            )
 
     def test_runtime_contract_failure_becomes_sanitized_model_error(self):
         service = NativeModelService(self.runtime())

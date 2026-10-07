@@ -9,6 +9,7 @@ cancellation state, and deadline.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import sha256
 from threading import Event
 import time
 from typing import Callable
@@ -105,12 +106,15 @@ class NativeModelService:
             raise NativeServiceError("prompt must be a string")
         if not isinstance(config, GenerationConfig):
             raise NativeServiceError("GenerationConfig required")
-        return digest_json(
-            {
-                "prompt": prompt,
-                "generation_config": config.to_dict(),
-            }
-        )
+        try:
+            return digest_json(
+                {
+                    "prompt": prompt,
+                    "generation_config": config.to_dict(),
+                }
+            )
+        except (TypeError, ValueError, UnicodeError) as exc:
+            raise NativeServiceError("request input is not canonically encodable") from exc
 
     def request(
         self,
@@ -136,10 +140,15 @@ class NativeModelService:
         generated_events: int,
         terminal_reason: str,
     ) -> str:
-        prompt_sequence = self.runtime.encode(prompt)
+        """Failure-safe accounting that never re-enters tokenizer/model code."""
+        try:
+            prompt_bytes = prompt.encode("utf-8", errors="strict")
+        except (AttributeError, UnicodeEncodeError) as exc:
+            raise NativeServiceError("prompt is not valid UTF-8 text") from exc
         return digest_json(
             {
-                "prompt_tokens": len(prompt_sequence.token_ids),
+                "prompt_bytes": len(prompt_bytes),
+                "prompt_digest": sha256(prompt_bytes).hexdigest(),
                 "generated_events": generated_events,
                 "terminal_reason": terminal_reason,
                 "model_identity_digest": self.identity_digest,
