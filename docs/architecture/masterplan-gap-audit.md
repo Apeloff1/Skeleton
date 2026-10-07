@@ -1699,3 +1699,17 @@ The research plane now closes the loop between uncertainty, action selection and
 - regressions cover uninformative tests, high-information tests, hard budget exclusion, dependence-adjusted trust, durable action economics and empirical Brier calibration.
 
 This creates a self-measuring research controller: it can estimate uncertainty, choose an information-seeking action, observe its cost/outcome, update action/source models, measure calibration, and improve future action choice. Remaining frontier work is model uncertainty around action sensitivity/specificity themselves, contextual/bandit action learning, multi-hypothesis entropy instead of binary claims, calibration drift detection, and exact-head executable validation.
+
+
+### 2026-10-08 visual crawler / baby-dragon acquisition tranche
+
+The crawler now has a truthful visual-observability protocol designed around a baby dragon rather than a generic graph dashboard:
+- DragonCrawlEvent is a deterministic, content-addressed UI event envelope for frontier discovery, travel, optional visual probing, robots checks, acquisition, rejection, retries and indexing;
+- DragonVisualState maps real crawler events to dragon poses/effects. Fire is reserved for admitted data transformation: accepted payload -> burn_started -> burn_chunk ember stream -> burn_complete/indexed. Rejected/policy-blocked content visibly fizzles and is never represented as ingested;
+- DragonCrawlObserver keeps the crawler headless and exposes an optional instrumentation adapter rather than coupling correctness to animation/UI;
+- CrawlGraphProjection turns frontier/link topology into the dragon's navigable terrain while retaining URL, depth, parent/child and state truth;
+- deterministic regressions verify event IDs, graph state and the accepted-before-burn sequence.
+
+Current 2026 design signals reviewed for this tranche: active DOM/pixel probing in browser agents, live browser-agent views for trust/control, screenshot/action trace interfaces, vision-grounded browser agents, global-view navigation with adaptive budget allocation, and conventional force-directed crawl topology. The intended UI combines those signals without making the mascot authoritative: the event/provenance stream remains the source of truth.
+
+Next: wire observer hooks into CrawlEngine/CanonicalRetrievalBridge; define a frontend event transport/replay contract; add reduced-motion and non-visual accessibility modes; add multi-dragon workers for concurrent leases; visualize policy/robots/budget boundaries; and render provenance embers flowing into temporal/retrieval knowledge stores.
