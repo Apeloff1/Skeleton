@@ -49,7 +49,7 @@ from .runtime_contracts import (
     RuntimeLimits,
     RuntimeUsage,
 )
-from .text_pipeline import PreparedText, TextPipelineConfig, TextTokenPipeline
+from .text_pipeline import ModelInputBatch, PreparedText, TextPipelineConfig, TextTokenPipeline, materialize_model_batch
 from .tokenization import (
     NativeTokenizer,
     StreamingTextFeed,
@@ -81,6 +81,7 @@ __all__ = [
     "ModelIdentity",
     "ModelLifecycle",
     "ModelRegistry",
+    "ModelInputBatch",
     "ModelRuntimeError",
     "NativeLLMRuntime",
     "NativeModelService",
@@ -113,6 +114,7 @@ __all__ = [
     "batch_token_windows",
     "deserialize_token_sequence",
     "iter_context_windows",
+    "materialize_model_batch",
     "plan_continuous_batches",
     "plan_device_placement",
     "plan_kv_admission",
