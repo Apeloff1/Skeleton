@@ -522,9 +522,10 @@
         "FLGB-18-T11",
         "FLGB-18-T12"
       ],
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
-      "independent_verification_signed": false
+      "independent_verification_signed": false,
+      "implementation_note": "T01-T12 integrated product boot/bootstrap/chat-build/evidence/scheduling/foreground/idle-mirror/dependency/installer/update/acceptance/closure targets, schemas, and focused regressions are present; closure fan-in requires exact-head evidence for FLGB-01 through FLGB-18 plus implementation and independent-verification signatures; exact-head qualification remains required."
     }
   ],
   "tasks": [
@@ -13999,7 +14000,7 @@
       "implementation_target": "skeleton/ai/product/product_boot.py",
       "contract_target": "skeleton/ai/product/contracts/product_boot.schema.json",
       "test_target": "tests/flgb/test_flgb_18_product_boot.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -14065,7 +14066,7 @@
       "implementation_target": "skeleton/ai/product/project_bootstrap.py",
       "contract_target": "skeleton/ai/product/contracts/project_bootstrap.schema.json",
       "test_target": "tests/flgb/test_flgb_18_project_bootstrap.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -14131,7 +14132,7 @@
       "implementation_target": "skeleton/ai/product/chat_to_build_transaction.py",
       "contract_target": "skeleton/ai/product/contracts/chat_to_build_transaction.schema.json",
       "test_target": "tests/flgb/test_flgb_18_chat_to_build_transaction.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -14197,7 +14198,7 @@
       "implementation_target": "skeleton/ai/product/build_to_chat_evidence.py",
       "contract_target": "skeleton/ai/product/contracts/build_to_chat_evidence.schema.json",
       "test_target": "tests/flgb/test_flgb_18_build_to_chat_evidence.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -14263,7 +14264,7 @@
       "implementation_target": "skeleton/ai/product/resource_scheduler.py",
       "contract_target": "skeleton/ai/product/contracts/resource_scheduler.schema.json",
       "test_target": "tests/flgb/test_flgb_18_resource_scheduler.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -14329,7 +14330,7 @@
       "implementation_target": "skeleton/ai/product/foreground_priority.py",
       "contract_target": "skeleton/ai/product/contracts/foreground_priority.schema.json",
       "test_target": "tests/flgb/test_flgb_18_foreground_priority.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -14395,7 +14396,7 @@
       "implementation_target": "skeleton/ai/product/idle_mirror_room.py",
       "contract_target": "skeleton/ai/product/contracts/idle_mirror_room.schema.json",
       "test_target": "tests/flgb/test_flgb_18_idle_mirror_room.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -14461,7 +14462,7 @@
       "implementation_target": "skeleton/ai/product/cross_plane_dependency.py",
       "contract_target": "skeleton/ai/product/contracts/cross_plane_dependency.schema.json",
       "test_target": "tests/flgb/test_flgb_18_cross_plane_dependency.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -14527,7 +14528,7 @@
       "implementation_target": "skeleton/ai/product/installer_handoff.py",
       "contract_target": "skeleton/ai/product/contracts/installer_handoff.schema.json",
       "test_target": "tests/flgb/test_flgb_18_installer_handoff.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -14593,7 +14594,7 @@
       "implementation_target": "skeleton/ai/product/update_rollback.py",
       "contract_target": "skeleton/ai/product/contracts/update_rollback.schema.json",
       "test_target": "tests/flgb/test_flgb_18_update_rollback.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -14659,7 +14660,7 @@
       "implementation_target": "skeleton/ai/product/whole_system_acceptance.py",
       "contract_target": "skeleton/ai/product/contracts/whole_system_acceptance.schema.json",
       "test_target": "tests/flgb/test_flgb_18_whole_system_acceptance.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -14738,7 +14739,7 @@
       "implementation_target": "skeleton/ai/product/closure_evidence_fan_in.py",
       "contract_target": "skeleton/ai/product/contracts/closure_evidence_fan_in.schema.json",
       "test_target": "tests/flgb/test_flgb_18_closure_evidence_fan_in.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
