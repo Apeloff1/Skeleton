@@ -353,7 +353,7 @@
   },
   "first_tranche": {
     "name": "P2-T0/T1 Capability Expansion",
-    "scheduled_volume_count": 53,
+    "scheduled_volume_count": 57,
     "scheduled_volume_refs": [
       "VOL-002",
       "VOL-003",
@@ -407,9 +407,13 @@
       "VOL-097",
       "VOL-104",
       "VOL-132",
-      "VOL-134"
+      "VOL-134",
+      "VOL-167",
+      "VOL-169",
+      "VOL-172",
+      "VOL-175"
     ],
-    "queued_volume_count": 261,
+    "queued_volume_count": 257,
     "queued_volume_refs": [
       "VOL-001",
       "VOL-006",
@@ -466,13 +470,9 @@
       "VOL-162",
       "VOL-163",
       "VOL-166",
-      "VOL-167",
-      "VOL-169",
       "VOL-171",
-      "VOL-172",
       "VOL-173",
       "VOL-174",
-      "VOL-175",
       "VOL-176",
       "VOL-177",
       "VOL-178",
