@@ -226,6 +226,14 @@ class TestNativeLLMRuntime(unittest.TestCase):
         with self.assertRaises(RuntimeContractError):
             NativeLLMRuntime.restore(malformed)
 
+        bad_attention = deepcopy(runtime.checkpoint())
+        bad_attention["model"]["layers"][0]["Wq"][0] = (
+            bad_attention["model"]["layers"][0]["Wq"][0][:-1]
+        )
+        bad_attention = _redigest_checkpoint(bad_attention)
+        with self.assertRaises(RuntimeContractError):
+            NativeLLMRuntime.restore(bad_attention)
+
     def test_bpe_state_is_part_of_tokenizer_identity_and_checkpoint(self):
         runtime = _runtime()
         bpe = BytePairEncoder(merges=16)
