@@ -15,6 +15,7 @@ on:
       - "skeleton/intelligence/__init__.py"
       - "skeleton/ai/runtime/intelligence/__init__.py"
       - "skeleton/testing/test_core_intelligence_bundle.py"
+      - "skeleton/testing/test_vol013_cognitive_budget_control.py"
       - ".github/workflows/p1-core-intelligence-bundle.yml"
   pull_request:
     branches:
@@ -31,6 +32,7 @@ on:
       - "skeleton/intelligence/__init__.py"
       - "skeleton/ai/runtime/intelligence/__init__.py"
       - "skeleton/testing/test_core_intelligence_bundle.py"
+      - "skeleton/testing/test_vol013_cognitive_budget_control.py"
       - ".github/workflows/p1-core-intelligence-bundle.yml"
   workflow_dispatch:
 
@@ -277,6 +279,7 @@ jobs:
                   "skeleton/testing/test_routing_context_receipt.py",
                   "skeleton/testing/test_memory_retrieval_knowledge_quality.py",
                   "skeleton/testing/test_reasoning_strategy_registry.py",
+                  "skeleton/testing/test_vol013_cognitive_budget_control.py",
                   "skeleton/testing/test_answer_artifact_quality.py",
                   "skeleton/testing/test_plan_qualification.py",
                   "skeleton/testing/test_core_intelligence_bundle.py",
