@@ -323,7 +323,7 @@
       "source": "skeleton/intelligence",
       "destination": "skeleton/ai/runtime/intelligence",
       "kind": "tree",
-      "source_git_object_sha": "46c83f1615e1769a069e63c88d7b47702366e6b7",
+      "source_git_object_sha": "57fff792974439bfd9b1bdf2103307684ceb3235",
       "role": "admission verification and execution",
       "work_package_refs": [
         "WP-W06",
@@ -786,7 +786,7 @@
       "source": "skeleton/observability",
       "destination": "skeleton/ai/runtime/observability",
       "kind": "tree",
-      "source_git_object_sha": "56d1f3e52a4c65a5674b0c26f0f75ec05009bb7e",
+      "source_git_object_sha": "597cb92672fc0a75183fe517c9871af9a81dfd6e",
       "role": "AI runtime observability, telemetry, audit, provenance-bound explainability, and executable operations runbook plane",
       "work_package_refs": [
         "WP-W00",
@@ -881,7 +881,7 @@
       "source": "skeleton/security",
       "destination": "skeleton/ai/runtime/security",
       "kind": "tree",
-      "source_git_object_sha": "44cecc1c1f9b291e053b8c3d1cf48af7f27be628",
+      "source_git_object_sha": "22a71dacd6fdeafff3a70f5c9e8154df78ff9e4e",
       "role": "AI runtime security and activation controls",
       "work_package_refs": [
         "WP-W00",
@@ -1111,7 +1111,7 @@
       "source": "skeleton/learning",
       "destination": "skeleton/ai/learning",
       "kind": "tree",
-      "source_git_object_sha": "28193016f82b75b4585fcb51dd83aecdf566de62",
+      "source_git_object_sha": "71b3d0b5fe6fe81d221cac53e5f7aa8bce71470b",
       "role": "controlled learning support with evidence-grounded learner-state inference, objective planning, and outcome evaluation",
       "work_package_refs": [
         "WP-W00",
@@ -2670,7 +2670,7 @@
       "source": "skeleton/learning/school",
       "destination": "skeleton/ai/learning/school",
       "kind": "tree",
-      "source_git_object_sha": "caa988b6e01ad0fccee5ba09eafb11f5cc41c257",
+      "source_git_object_sha": "ba044d8906d9b1a10aa6b94a1980d94880f3dbf9",
       "role": "Curriculum, assessment, tutoring, code-intelligence, and learning-control modules deepen the existing controlled-learning owner.",
       "work_package_refs": [
         "WP-W28"
