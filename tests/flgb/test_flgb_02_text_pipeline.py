@@ -709,3 +709,21 @@ def test_causal_training_batch_canonical_serialization_round_trip():
     restored = deserialize_causal_training_batch(payload)
     assert restored == batch
     assert serialize_causal_training_batch(restored) == payload
+
+
+def test_native_tokenizer_rejects_non_integer_native_ids(native_model, monkeypatch):
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    tokenizer = NativeTokenizer(native_model)
+    monkeypatch.setattr(native_model, "_ids", lambda text: [True])
+    with pytest.raises(TokenizerContractError, match="non-integer"):
+        tokenizer.encode_ids("alpha")
+
+
+def test_native_tokenizer_wraps_native_encode_failure(native_model, monkeypatch):
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    tokenizer = NativeTokenizer(native_model)
+    def fail(text):
+        raise RuntimeError("backend exploded")
+    monkeypatch.setattr(native_model, "_ids", fail)
+    with pytest.raises(TokenizerContractError, match="encode failed"):
+        tokenizer.encode_ids("alpha")
