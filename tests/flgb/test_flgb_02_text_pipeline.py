@@ -1048,3 +1048,28 @@ def test_decade_coverage_requires_signal_for_every_document(native_model):
     signal = pipeline.temporal_signal(source_year=2001, observed_year=2001, knowledge_cutoff_year=2026)
     with pytest.raises(TokenizerContractError, match="one temporal signal"):
         pipeline.decade_coverage(corpus, (signal,))
+
+
+def test_temporal_contradiction_is_explicit_and_deterministic(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    old = pipeline.temporal_signal(source_year=1998, observed_year=1999, knowledge_cutoff_year=2026)
+    new = pipeline.temporal_signal(source_year=2024, observed_year=2025, knowledge_cutoff_year=2026)
+    unresolved = pipeline.temporal_contradiction(old, new)
+    resolved = pipeline.temporal_contradiction(old, new, resolution="newer-wins")
+    assert unresolved.resolution == "unresolved"
+    assert resolved.resolution == "newer-wins"
+    assert unresolved.digest != resolved.digest
+
+
+def test_temporal_contradiction_cannot_use_recency_for_same_year(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    left = pipeline.temporal_signal(source_year=2020, observed_year=2020, knowledge_cutoff_year=2026, valid_from_year=2020)
+    right = pipeline.temporal_signal(source_year=2020, observed_year=2021, knowledge_cutoff_year=2026, valid_from_year=2021)
+    with pytest.raises(TokenizerContractError, match="same-year"):
+        pipeline.temporal_contradiction(left, right, resolution="newer-wins")
+    coexist = pipeline.temporal_contradiction(left, right, resolution="coexists-by-validity")
+    assert coexist.resolution == "coexists-by-validity"
