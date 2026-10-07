@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-13:narrative_canon:v1",
+  "title": "FLGB-13 narrative canon",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "fact_id",
+    "statement_digest",
+    "evidence_digest",
+    "revision",
+    "parent_digest"
+  ],
+  "properties": {
+    "fact_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "statement_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "evidence_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "parent_digest": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}
