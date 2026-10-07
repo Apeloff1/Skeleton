@@ -1596,3 +1596,18 @@ The year-signal plane now composes into decade-scale regime intelligence without
 - regressions cover decade aggregation, weighted metrics, absent regimes, decade frontier targeting and provider-level temporal prioritization.
 
 Advanced follow-up: infer regime boundaries from change points rather than fixed calendar decades, separate event-year/publication-year semantics, quantify source survival/archive bias by decade, and build cross-decade contradiction persistence so claims can be tracked as stable, reversed or cyclic across historical regimes.
+
+
+### 2026-10-07 learned historical regime intelligence tranche
+
+Temporal research now extends substantially beyond fixed calendar decades:
+- RegimeDetector derives structural change points from adjacent-year shifts in polarity, source quality, relevance and independent-source coverage;
+- missing-year gaps split regimes without fabricating a measured change point;
+- learned regimes preserve their explicit year membership, mean polarity, quality/relevance and internal coverage strength;
+- regime trajectories classify emerging, stable, strengthening, weakening, transitioning, reversed and rediscovered signal behavior;
+- HistoricalBiasAnalyzer scores sparse-year coverage, source concentration and low-quality evidence to expose archive/survivorship-sensitive historical buckets;
+- cross-regime contradiction history measures independent positive/negative host participation, contestation balance and whether disagreement persists across multiple learned regimes;
+- EvidenceSet exposes learned regimes, trajectory, historical bias and contradiction persistence as first-class research outputs;
+- focused regressions cover structural splits, gap segmentation, reversal classification and high-risk historical evidence.
+
+This transforms decade signals from descriptive calendar summaries into a regime-aware historical reasoning plane. Advanced next work: richer event/publication/valid-time extraction, statistically calibrated change-point thresholds, bootstrap uncertainty around regime boundaries, and active acquisition policies that prioritize high-bias or persistently contested historical regimes.
