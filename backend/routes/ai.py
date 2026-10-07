@@ -43,6 +43,7 @@ from skeleton.contracts.conversation import ConversationAuthorType, Conversation
 from skeleton.context.compiler import ContextCompiler
 from skeleton.context.instruction_policy import InstructionPolicy
 from skeleton.context.sources import artifact_segment, conversation_message_segment
+from skeleton.ai.assistant.live_evidence import bind_provider_receipt_set
 from skeleton.ai.assistant.response_acceptance import (
     LiveResponseAcceptancePolicy,
     evaluate_live_response_acceptance,
@@ -1691,6 +1692,16 @@ async def ai_chat(
             ttl_seconds=lease_ttl_seconds,
         )
         provider_receipts = tuple(result.get("engine_provider_receipts") or ())
+        provider_binding = (
+            bind_provider_receipt_set(
+                operation_id=operation_id,
+                execution_id=execution_id,
+                context_digest=context_envelope.context_digest,
+                provider_receipts=provider_receipts,
+            )
+            if engine_client is not None
+            else None
+        )
         chat_turn = await chat_turn_lifecycle.advance(
             chat_turn,
             TurnState.FINALIZING,
@@ -1702,9 +1713,7 @@ async def ai_chat(
                 else "response-accepted:" + response_acceptance.digest
             ),
             provider_receipt_ref=(
-                provider_receipts[0]
-                if len(provider_receipts) == 1
-                else None
+                None if provider_binding is None else provider_binding.reference
             ),
             lease=turn_lease,
         )
@@ -2283,11 +2292,12 @@ async def get_ai_chat_turn(
                     "response-accepted:"
                     + deferred_response_acceptance.digest
                 ),
-                provider_receipt_ref=(
-                    engine_result.provider_receipts[0]
-                    if len(engine_result.provider_receipts) == 1
-                    else None
-                ),
+                provider_receipt_ref=bind_provider_receipt_set(
+                    operation_id=operation_id,
+                    execution_id=execution_id,
+                    context_digest=binding.context_digest,
+                    provider_receipts=engine_result.provider_receipts,
+                ).reference,
                 lease=poll_lease,
             )
         except Exception as exc:

@@ -261,6 +261,191 @@ def evaluate_response_acceptance(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class LiveClaimEvidenceBinding:
+    """Content-minimized claim/evidence decision bound to live turn lineage."""
+
+    operation_id: str
+    context_digest: str
+    decision_digest: str
+    accepted: bool
+    reasons: tuple[str, ...]
+    required_claim_count: int
+    accepted_claim_count: int
+    qualified_claim_count: int
+    claim_digest_hashes: tuple[str, ...]
+    receipt_digest_hashes: tuple[str, ...]
+    authority_scope: str = "live-claim-evidence-binding-only"
+    production_authority: bool = False
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "operation_id",
+            _canonical_live_text(self.operation_id, "operation_id", maximum=512),
+        )
+        object.__setattr__(
+            self,
+            "context_digest",
+            _canonical_sha256(self.context_digest, "context_digest"),
+        )
+        object.__setattr__(
+            self,
+            "decision_digest",
+            _canonical_sha256(self.decision_digest, "decision_digest"),
+        )
+        if not isinstance(self.accepted, bool):
+            raise ResponseAcceptanceError("claim evidence accepted must be boolean")
+        for field in (
+            "required_claim_count",
+            "accepted_claim_count",
+            "qualified_claim_count",
+        ):
+            value = getattr(self, field)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value < 0
+            ):
+                raise ResponseAcceptanceError(f"{field} must be non-negative integer")
+        if self.accepted_claim_count > self.required_claim_count:
+            raise ResponseAcceptanceError(
+                "accepted claim count cannot exceed required claim count"
+            )
+        if self.qualified_claim_count > self.accepted_claim_count:
+            raise ResponseAcceptanceError(
+                "qualified claim count cannot exceed accepted claim count"
+            )
+        normalized_reasons = tuple(
+            sorted(
+                {
+                    _canonical_live_text(str(reason), "claim_reason", maximum=128)
+                    for reason in self.reasons
+                }
+            )
+        )
+        object.__setattr__(self, "reasons", normalized_reasons)
+        if self.accepted and self.reasons:
+            raise ResponseAcceptanceError(
+                "accepted claim evidence cannot retain rejection reasons"
+            )
+        if not self.accepted and not self.reasons:
+            raise ResponseAcceptanceError(
+                "rejected claim evidence must retain rejection reasons"
+            )
+        for field in ("claim_digest_hashes", "receipt_digest_hashes"):
+            values = tuple(getattr(self, field))
+            if len(set(values)) != len(values):
+                raise ResponseAcceptanceError(f"{field} must be unique")
+            for value in values:
+                _canonical_sha256(value, field)
+            object.__setattr__(self, field, tuple(sorted(values)))
+        if self.authority_scope != "live-claim-evidence-binding-only":
+            raise ResponseAcceptanceError("claim evidence authority scope escalated")
+        if self.production_authority is not False:
+            raise ResponseAcceptanceError(
+                "claim evidence binding cannot commit transcript state"
+            )
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "operation_id": self.operation_id,
+            "context_digest": self.context_digest,
+            "decision_digest": self.decision_digest,
+            "accepted": self.accepted,
+            "reasons": list(self.reasons),
+            "required_claim_count": self.required_claim_count,
+            "accepted_claim_count": self.accepted_claim_count,
+            "qualified_claim_count": self.qualified_claim_count,
+            "claim_digest_hashes": list(self.claim_digest_hashes),
+            "receipt_digest_hashes": list(self.receipt_digest_hashes),
+            "authority_scope": self.authority_scope,
+            "production_authority": self.production_authority,
+        }
+
+    @property
+    def digest(self) -> str:
+        raw = json.dumps(
+            self.as_dict(),
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+        return hashlib.sha256(raw).hexdigest()
+
+
+def bind_live_claim_evidence(
+    *,
+    operation_id: str,
+    context_digest: str,
+    claims: Sequence[VerificationClaim] | Iterable[VerificationClaim],
+    receipts: Sequence[ClaimEvidenceReceipt] | Iterable[ClaimEvidenceReceipt],
+    policy: ResponseAcceptancePolicy,
+    finalized_at: datetime,
+) -> LiveClaimEvidenceBinding:
+    """Bind structured Volume-8 claim evidence to one live operation/context."""
+
+    operation = _canonical_live_text(operation_id, "operation_id", maximum=512)
+    context = _canonical_sha256(context_digest, "context_digest")
+    if not isinstance(policy, ResponseAcceptancePolicy):
+        raise TypeError("policy must be ResponseAcceptancePolicy")
+    claim_values = tuple(claims)
+    receipt_values = tuple(receipts)
+    if any(not isinstance(item, VerificationClaim) for item in claim_values):
+        raise TypeError("claims must contain VerificationClaim")
+    if any(not isinstance(item, ClaimEvidenceReceipt) for item in receipt_values):
+        raise TypeError("receipts must contain ClaimEvidenceReceipt")
+
+    lineage_reasons: list[str] = []
+    required_kinds = frozenset(policy.required_claim_kinds)
+    for claim in claim_values:
+        if claim.kind not in required_kinds:
+            continue
+        if claim.operation_id != operation:
+            lineage_reasons.append("claim_operation_identity_mismatch")
+        if claim.context_digest != context:
+            lineage_reasons.append("claim_context_identity_mismatch")
+
+    decision = evaluate_response_acceptance(
+        claims=claim_values,
+        receipts=receipt_values,
+        policy=policy,
+        finalized_at=finalized_at,
+    )
+    decision_reasons = list(decision.reasons)
+    if decision.missing_receipt_claim_ids:
+        decision_reasons.append("required_claim_receipt_missing")
+    if decision.rejected_claim_ids:
+        decision_reasons.append("required_claim_rejected")
+    combined_reasons = tuple(
+        sorted(set(decision_reasons).union(lineage_reasons))
+    )
+    accepted = decision.accepted and not combined_reasons
+    claim_hashes = tuple(
+        sorted({_hash_ref(claim.digest) for claim in claim_values})
+    )
+    receipt_hashes = tuple(
+        sorted({_hash_ref(receipt.digest) for receipt in receipt_values})
+    )
+    return LiveClaimEvidenceBinding(
+        operation_id=operation,
+        context_digest=context,
+        decision_digest=decision.digest,
+        accepted=accepted,
+        reasons=combined_reasons,
+        required_claim_count=len(decision.required_claim_ids),
+        accepted_claim_count=(
+            len(decision.accepted_claim_ids) if accepted else 0
+        ),
+        qualified_claim_count=(
+            len(decision.qualified_claim_ids) if accepted else 0
+        ),
+        claim_digest_hashes=claim_hashes,
+        receipt_digest_hashes=receipt_hashes,
+    )
+
+
 LIVE_RESPONSE_ACCEPTANCE_SCHEMA_VERSION = 1
 
 
@@ -330,6 +515,7 @@ class LiveResponseAcceptancePolicy:
 
     policy_id: str = "ai-chat-live-response/v1"
     require_provider_receipt: bool = True
+    require_structured_claim_evidence: bool = False
     max_output_utf8_bytes: int = 2_000_000
     max_receipt_refs: int = 64
 
@@ -342,6 +528,10 @@ class LiveResponseAcceptancePolicy:
         if not isinstance(self.require_provider_receipt, bool):
             raise ResponseAcceptanceError(
                 "require_provider_receipt must be boolean"
+            )
+        if not isinstance(self.require_structured_claim_evidence, bool):
+            raise ResponseAcceptanceError(
+                "require_structured_claim_evidence must be boolean"
             )
         for field in ("max_output_utf8_bytes", "max_receipt_refs"):
             value = getattr(self, field)
@@ -377,6 +567,7 @@ class LiveResponseAcceptanceReceipt:
     provider_receipt_ref_hashes: tuple[str, ...]
     tool_receipt_ref_hashes: tuple[str, ...]
     evidence_ref_hashes: tuple[str, ...]
+    claim_evidence_digest: str | None
     accepted: bool
     reasons: tuple[str, ...]
     schema_version: int = LIVE_RESPONSE_ACCEPTANCE_SCHEMA_VERSION
@@ -426,6 +617,7 @@ class LiveResponseAcceptanceReceipt:
         for field in (
             "verification_ref_hash",
             "output_sha256",
+            "claim_evidence_digest",
         ):
             value = getattr(self, field)
             if value is not None:
@@ -511,6 +703,7 @@ class LiveResponseAcceptanceReceipt:
             ),
             "tool_receipt_ref_hashes": list(self.tool_receipt_ref_hashes),
             "evidence_ref_hashes": list(self.evidence_ref_hashes),
+            "claim_evidence_digest": self.claim_evidence_digest,
             "accepted": self.accepted,
             "reasons": list(self.reasons),
             "authority_scope": self.authority_scope,
@@ -545,6 +738,7 @@ def evaluate_live_response_acceptance(
     provider_receipts: Sequence[str] | Iterable[str],
     tool_receipts: Sequence[str] | Iterable[str] = (),
     evidence_refs: Sequence[str] | Iterable[str] = (),
+    claim_evidence: LiveClaimEvidenceBinding | None = None,
     policy: LiveResponseAcceptancePolicy | None = None,
 ) -> LiveResponseAcceptanceReceipt:
     """Evaluate one engine result before it may enter canonical transcript state."""
@@ -658,6 +852,23 @@ def evaluate_live_response_acceptance(
     if effective_policy.require_provider_receipt and not provider_values:
         reasons.append("provider_receipt_missing")
 
+    claim_evidence_digest: str | None = None
+    if claim_evidence is not None:
+        if not isinstance(claim_evidence, LiveClaimEvidenceBinding):
+            raise TypeError("claim_evidence must be LiveClaimEvidenceBinding or None")
+        claim_evidence_digest = claim_evidence.digest
+        if claim_evidence.operation_id != operation:
+            reasons.append("claim_evidence_operation_mismatch")
+        if claim_evidence.context_digest != context:
+            reasons.append("claim_evidence_context_mismatch")
+        if not claim_evidence.accepted:
+            reasons.append("claim_evidence_rejected")
+            reasons.extend(
+                "claim_evidence:" + reason for reason in claim_evidence.reasons
+            )
+    elif effective_policy.require_structured_claim_evidence:
+        reasons.append("claim_evidence_missing")
+
     normalized_reasons = tuple(sorted(set(reasons)))
     return LiveResponseAcceptanceReceipt(
         policy_id=effective_policy.policy_id,
@@ -678,6 +889,7 @@ def evaluate_live_response_acceptance(
         evidence_ref_hashes=tuple(
             _hash_ref(value) for value in evidence_values
         ),
+        claim_evidence_digest=claim_evidence_digest,
         accepted=not normalized_reasons,
         reasons=normalized_reasons,
     )
@@ -685,11 +897,13 @@ def evaluate_live_response_acceptance(
 
 __all__ = [
     "LIVE_RESPONSE_ACCEPTANCE_SCHEMA_VERSION",
+    "LiveClaimEvidenceBinding",
     "LiveResponseAcceptancePolicy",
     "LiveResponseAcceptanceReceipt",
     "ResponseAcceptanceDecision",
     "ResponseAcceptanceError",
     "ResponseAcceptancePolicy",
+    "bind_live_claim_evidence",
     "evaluate_live_response_acceptance",
     "evaluate_response_acceptance",
 ]

@@ -148,7 +148,10 @@ async def test_live_chat_success_reaches_durable_complete(
             execution_id=command.execution_request.execution_id,
             verification="verified",
             evidence_refs=("evidence:1",),
-            provider_receipts=("provider:test:receipt-1",),
+            provider_receipts=(
+                "provider:test:receipt-1",
+                "provider:test:receipt-2",
+            ),
             tool_receipts=(),
             memory_refs=(),
             artifact_refs=(),
@@ -193,6 +196,14 @@ async def test_live_chat_success_reaches_durable_complete(
         TurnState.ASSISTANT_MESSAGE_COMMITTED,
         TurnState.COMPLETE,
     ]
+    finalizing_event = next(
+        event for event in events if event.to_state is TurnState.FINALIZING
+    )
+    assert finalizing_event.provider_receipt_ref is not None
+    assert finalizing_event.provider_receipt_ref.startswith(
+        "provider-set-sha256:"
+    )
+    assert "provider:test:" not in finalizing_event.provider_receipt_ref
 
     ownership = ai_chat_turn_test_authority.repo.list_ownership_receipts(
         response["operation_id"],

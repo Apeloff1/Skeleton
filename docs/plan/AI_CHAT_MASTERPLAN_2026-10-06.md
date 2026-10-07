@@ -388,6 +388,33 @@ One chat turn should trace:
 Default telemetry must avoid raw prompt, file, memory, or secret capture unless
 a governed diagnostic mode explicitly permits it.
 
+## 2026-10-07 evidence-cutover implementation batch
+
+The first post-P0 integration batch closes or narrows four previously declared
+cross-plane gaps without changing canonical authority ownership:
+
+- complete provider receipt sets are reduced to a content-minimized
+  `provider-set-sha256:` binding and persisted in both synchronous and deferred
+  durable turn finalization;
+- crash restart for consequential tools is bound to canonical
+  `ToolReconciliationReceipt` evidence before any retry escape is possible;
+- admitted attachments can be replaced by governed artifact/content references
+  plus hashed governance/extraction receipts, with no raw payload retained by
+  the binding;
+- structured Volume-8 claim/evidence decisions can now be required by the live
+  response acceptance gate and are re-bound to exact operation/context
+  identity;
+- a turn-wide evidence envelope can bind provider, tool-reconciliation,
+  governed-attachment, and claim-acceptance digests without duplicating any
+  authoritative payload;
+- Volume 9 now has deterministic acceptance/quarantine profiles over canonical
+  verification receipts.
+
+This batch intentionally does not sign chat completion. Product attachment
+storage cutover, engine structured claim/receipt handoff, canonical
+`VerificationReceipt` terminal handoff, external reconciliation probes, and
+exact-head CI qualification remain open gates.
+
 ## Closure gates
 
 The completed chat system will require evidence for:
@@ -738,8 +765,34 @@ the engine-to-route structured claim handoff remains pending.
 
 ### Volume 9 — verification plane
 
-Add acceptance profiles, deterministic validators, optional independent model
-critics, and quarantine semantics.
+Status: **acceptance-profile implementation candidate; engine receipt cutover
+pending**.
+
+Implemented in the 2026-10-07 evidence-cutover batch:
+
+- deterministic chat acceptance profiles consume the canonical
+  `VerificationReceipt` contract instead of introducing a second verifier;
+- structural, grounded, high-assurance, and action/postcondition tiers declare
+  explicit minimum verification levels and required modes;
+- operation and execution identity are re-bound before receipt promotion;
+- future and stale receipts fail closed under profile freshness ceilings;
+- policy-unsatisfied, under-level, mode-incomplete, or unsupported receipts are
+  rejected deterministically;
+- contested canonical verification outcomes produce quarantine disposition
+  rather than publication;
+- grounded tiers require canonical supporting-evidence identities;
+- high-assurance tiers require an independent canonical verification receipt;
+- action/postcondition tiers require observed postcondition evidence;
+- duplicate receipt and duplicate claim-verification identities fail closed;
+- decisions are content-minimized, digest-bound, and explicitly carry no
+  publication, provider, tool, or transcript authority;
+- the AI-chat exact-head closure contract now includes the Volume-9 adapter and
+  adversarial regression suite.
+
+Remaining cutover: extend the canonical engine terminal handoff with the
+structured `VerificationReceipt` set, select the risk-appropriate chat
+verification profile, and require an accepted Volume-9 decision before the
+existing live response-acceptance/transcript-commit boundary.
 
 ### Volume 10 — bounded multi-agent runtime
 
