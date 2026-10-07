@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 from typing import Any, Sequence
@@ -105,11 +106,31 @@ def _strict_json(text: str) -> Any:
             result[key] = value
         return result
 
-    return json.loads(
+    value = json.loads(
         text,
         parse_constant=reject_constant,
         object_pairs_hook=reject_duplicates,
     )
+    _validate_portable_scalars(value)
+    return value
+
+
+def _validate_portable_scalars(value: Any) -> None:
+    if isinstance(value, dict):
+        for child in value.values():
+            _validate_portable_scalars(child)
+        return
+    if isinstance(value, list):
+        for child in value:
+            _validate_portable_scalars(child)
+        return
+    if type(value) is int and abs(value) > 9_007_199_254_740_991:
+        raise ValueError("integer exceeds portable JSON range")
+    if type(value) is float:
+        if not math.isfinite(value):
+            raise ValueError("non-finite number")
+        if value == 0.0 and math.copysign(1.0, value) < 0:
+            raise ValueError("negative zero is not portable")
 
 
 def _sample_value(
@@ -385,6 +406,10 @@ def _verify_mirror(root: Path, errors: list[str]) -> dict[str, str]:
         "allow_nan=False",
         "sort_keys=True",
         "def _validate_mapping_keys(",
+        "def _validate_portable_json_scalars(",
+        "MAX_PORTABLE_INTEGER",
+        "integer exceeds portable JSON range",
+        "negative zero is not portable canonical JSON",
         "canonical mappings require string keys",
         "authority_scope",
         "contract-conformance-only",
