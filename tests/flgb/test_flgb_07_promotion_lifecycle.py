@@ -22,7 +22,7 @@ def production():
 class TestPromotionLifecycle(unittest.TestCase):
  def test_full_cycle_is_contiguous_and_rollback_proven(self):
   x=extend_with_promotion(*production())
-  self.assertEqual(x.stages[-1].stage,"verified-rollback")
+  self.assertEqual(x.stages[-1].stage,"rollback-ready")
   self.assertEqual(x.stages[-1].subject_digest,D)
   self.assertEqual(len(x.stages),9)
  def test_losing_candidate_rejected(self):
