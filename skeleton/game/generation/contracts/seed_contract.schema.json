@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-14:seed_contract:v1",
+  "title": "FLGB-14 seed contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "project_id",
+    "generator_id",
+    "generator_version",
+    "seed",
+    "config_digest",
+    "parent_seed_digest"
+  ],
+  "properties": {
+    "project_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "generator_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "generator_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "config_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "parent_seed_digest": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}
