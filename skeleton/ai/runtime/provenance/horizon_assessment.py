@@ -26,20 +26,20 @@ class SignalAssessment:
 _ASSESSMENTS: Final[dict[str, SignalAssessment]] = {
     "h2020.content-addressing": SignalAssessment("h2020.content-addressing","satisfied",("ReplayReceipt.request_digest","ReplayReceipt.output_digest","ReplayReceipt.model_digest","ReplayReceipt.tokenizer_digest")),
     "h2020.replay": SignalAssessment("h2020.replay","satisfied",("ReplayReceipt","NativeLLMRuntime.replay")),
-    "h2030.algorithm-agility": SignalAssessment("h2030.algorithm-agility","partial",("sha256-shaped canonical digests",),"durable receipts do not yet carry an explicit digest algorithm identifier"),
+    "h2030.algorithm-agility": SignalAssessment("h2030.algorithm-agility","satisfied",("ExecutionReceipt.digest_algorithm","SUPPORTED_DIGESTS","AlgorithmPolicy"))),
     "h2030.multi-runtime": SignalAssessment("h2030.multi-runtime","partial",("ReplayReceipt.device_digest","ReplayReceipt.request_digest"),"semantic request identity and execution identity need a first-class cross-runtime receipt"),
     "h2040.provenance-portability": SignalAssessment("h2040.provenance-portability","partial",("ReplayReceipt.to_dict","ContextEnvelope.audit_dict"),"portable verifier package/schema registry is not yet explicit"),
     "h2040.lineage-graph": SignalAssessment("h2040.lineage-graph","satisfied",("ContextSegment.derived_from","ContextEnvelope.source_snapshot")),
     "h2050.archive-verification": SignalAssessment("h2050.archive-verification","partial",("content_digest","source_snapshot"),"archival retention/export contract is not bound to replay receipts"),
-    "h2050.receipt-upconversion": SignalAssessment("h2050.receipt-upconversion","planned",(),"receipt migration and predecessor-digest contract is not implemented"),
-    "h2060.heterogeneous-proof": SignalAssessment("h2060.heterogeneous-proof","planned",(),"receipt supports one digest lineage and no proof-set abstraction"),
-    "h2060.offline-verification": SignalAssessment("h2060.offline-verification","partial",("ReplayReceipt.to_dict","deterministic digest_json"),"standalone verifier API is not yet exposed"),
+    "h2050.receipt-upconversion": SignalAssessment("h2050.receipt-upconversion","satisfied",("ExecutionReceipt.reattest","MigrationResult","migrate_receipt"))),
+    "h2060.heterogeneous-proof": SignalAssessment("h2060.heterogeneous-proof","satisfied",("ProofAttestation","ExecutionReceipt.proofs"))),
+    "h2060.offline-verification": SignalAssessment("h2060.offline-verification","satisfied",("ExecutionReceipt.verify_offline","verify_chain"))),
     "h2070.identity-continuity": SignalAssessment("h2070.identity-continuity","partial",("model_digest","tokenizer_digest","architecture_digest","device_digest"),"semantic artifact identity is not separately versioned from implementation identity"),
-    "h2070.policy-history": SignalAssessment("h2070.policy-history","partial",("ContextEnvelope.compiler_version","context_digest"),"runtime replay receipt does not directly bind admission-policy identity"),
-    "h2080.crypto-retirement": SignalAssessment("h2080.crypto-retirement","planned",(),"algorithm registry and issuance/verification lifecycle are not implemented"),
+    "h2070.policy-history": SignalAssessment("h2070.policy-history","satisfied",("ExecutionReceipt.admission_policy_digest",)),
+    "h2080.crypto-retirement": SignalAssessment("h2080.crypto-retirement","satisfied",("AlgorithmPolicy.can_issue","AlgorithmPolicy.can_verify"))),
     "h2080.format-survivability": SignalAssessment("h2080.format-survivability","partial",("REPLAY_SCHEMA","ReplayReceipt.to_dict"),"no minimal long-term interchange profile is declared"),
-    "h2090.chain-continuity": SignalAssessment("h2090.chain-continuity","planned",(),"re-attestation predecessor chain is not implemented"),
-    "h2090.semantic-preservation": SignalAssessment("h2090.semantic-preservation","planned",(),"migration invariant declarations are not implemented"),
+    "h2090.chain-continuity": SignalAssessment("h2090.chain-continuity","satisfied",("ExecutionReceipt.predecessor_digest","verify_chain"))),
+    "h2090.semantic-preservation": SignalAssessment("h2090.semantic-preservation","satisfied",("CORE_INVARIANTS","MigrationResult","verify_migration"))),
 }
 
 def assess_horizon_signals() -> tuple[SignalAssessment, ...]:
