@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-12:skeletal_animation:v1",
+  "title": "FLGB-12 skeletal animation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "joint_id",
+    "parent_id",
+    "bind_pose_digest"
+  ],
+  "properties": {
+    "joint_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "parent_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "bind_pose_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
