@@ -84,12 +84,25 @@ def test_usage_accounting_difference_does_not_change_semantic_equivalence():
         ("model", "other-model"),
         ("event_chain_digest", "e" * 64),
         ("response_digest", "f" * 64),
-        ("terminal_reason", "provider_error"),
     ],
 )
 def test_any_semantic_divergence_is_rejected(field, value):
     authoritative = result()
     speculative = candidate(authoritative, **{field: value})
+    decision = assess_speculative_candidate(speculative, authoritative)
+    assert decision.equivalent is False
+    assert decision.accepted_tokens == 0
+    with pytest.raises(InferenceContractError, match="diverged"):
+        require_speculative_equivalence(speculative, authoritative)
+
+
+def test_terminal_reason_divergence_is_rejected():
+    authoritative = result()
+    speculative = candidate(
+        authoritative,
+        terminal_reason="provider_error",
+        response_digest=None,
+    )
     decision = assess_speculative_candidate(speculative, authoritative)
     assert decision.equivalent is False
     assert decision.accepted_tokens == 0
@@ -146,3 +159,17 @@ def test_accepted_tokens_cannot_exceed_draft_budget():
     authoritative = result()
     with pytest.raises(InferenceContractError, match="accepted tokens exceed"):
         candidate(authoritative, draft_tokens=1, accepted_tokens=2)
+
+
+@pytest.mark.parametrize(("draft", "accepted"), [(True, 0), (1.5, 0), (1, True)])
+def test_speculation_token_accounting_rejects_type_confusion(draft, accepted):
+    authoritative = result()
+    values = candidate(authoritative)
+    with pytest.raises(InferenceContractError, match="invalid speculation token accounting"):
+        SpeculationDecision(
+            values.candidate_digest,
+            authoritative.result_digest,
+            True,
+            accepted,
+            draft,
+        )
