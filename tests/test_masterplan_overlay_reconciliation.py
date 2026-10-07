@@ -23,7 +23,8 @@ def test_cumulative_overlay_reconciliation_validator_passes():
     assert proc.returncode == 0, proc.stderr or proc.stdout
     result = json.loads(proc.stdout.strip().splitlines()[-1])
     assert result["ok"] is True
-    assert result["plan_version"] == "2.5.0"
+    plan = load("machine/ai_master_plan.json")
+    assert result["plan_version"] == plan["plan_version"]
     assert result["overlay_count"] == 8
 
 
