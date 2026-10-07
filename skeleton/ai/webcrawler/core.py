@@ -474,8 +474,9 @@ class CrawlEngine:
         try:
             from .redirects import fetch_with_policy
             response = fetch_with_policy(self, item.url, now=now)
-        except Exception:
-            self.budget.requests += 1
+        except Exception as exc:
+            from .redirects import RedirectFetchError
+            if isinstance(exc,RedirectFetchError) and exc.request_started:self.budget.requests += 1
             self._retry(item, now=now)
             return None
 
