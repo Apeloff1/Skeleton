@@ -24,7 +24,7 @@ class TestNativeTrainingAdmission(unittest.TestCase):
   self.assertNotEqual(admitted.model_digest,prior)
   self.assertEqual(a.prior_model_digest,prior)
   self.assertEqual(rb.restored_model_digest,prior)
-  self.assertEqual(NativeLLMRuntime.restore(cp).model_digest,prior)\n  executed=execute_rollback(admitted,a,rb,cp)\n  self.assertTrue(executed.executed)\n  self.assertEqual(admitted.model_digest,prior)\n  self.assertEqual(admitted._current_model_digest(),prior)\n def test_declared_digest_cannot_lie_about_observed_weights(self):
+  self.assertEqual(NativeLLMRuntime.restore(cp).model_digest,prior)\n  executed=execute_rollback(admitted,a,rb,cp)\n  self.assertTrue(executed.executed)\n  self.assertEqual(admitted.model_digest,prior)\n  self.assertEqual(admitted._current_model_digest(),prior)\n def test_rollback_refuses_runtime_drift_after_admission(self):\n  rt,cp,prior,c,p,apply=setup()\n  admitted,a,rb=admit_candidate_model(rt,c,p,apply,admission_authority="runtime")\n  admitted.model.E[0][0]+=1\n  with self.assertRaises(RuntimePromotionError): execute_rollback(admitted,a,rb,cp)\n def test_declared_digest_cannot_lie_about_observed_weights(self):
   rt,cp,prior,c,p,apply=setup()
   c=CandidateWeights("candidate","f"*64,c.training_lineage_digest,prior)
   p=PromotionEvidence(c.digest,p.exact_head_commit,p.rights_digest,p.contamination_scan_digest,p.evaluation_digest,p.rollback_digest,p.independent_verifier,True,True,True,True)
