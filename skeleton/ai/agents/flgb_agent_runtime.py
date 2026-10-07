@@ -516,6 +516,8 @@ class WorkerLease:
         return self.issued_sequence <= sequence < self.expires_sequence
 
     def renew(self, *, issued_sequence: int, expires_sequence: int) -> "WorkerLease":
+        if not _is_int(issued_sequence) or not _is_int(expires_sequence):
+            raise AgentContractError("lease renewal sequences must be integers")
         if issued_sequence < self.issued_sequence:
             raise AgentContractError("lease renewal cannot move backwards")
         if self.generation >= MAX_LEASE_SEQUENCE:
@@ -634,6 +636,8 @@ def authorize_handoff(
 ) -> HandoffReceipt:
     if child_authority.parent_digest != parent_authority.digest:
         raise AgentContractError("handoff authority is not delegated from parent")
+    if checkpoint.authority_digest != parent_authority.digest:
+        raise AgentContractError("handoff checkpoint authority drift")
     if not set(child_authority.capabilities).issubset(parent_authority.capabilities):
         raise AgentContractError("handoff authority exceeds parent")
     return HandoffReceipt(
