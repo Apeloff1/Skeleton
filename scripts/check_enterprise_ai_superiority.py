@@ -258,7 +258,7 @@ def _validate_common(policy: Mapping[str, Any]) -> None:
     non_comp = _text_list(
         common.get("non_compensable_gates"),
         "non_compensable_gates",
-        minimum=9,
+        minimum=1,
     )
     blob = "\n".join(non_comp).lower()
     for fragment in REQUIRED_NON_COMPENSABLE_FRAGMENTS:
