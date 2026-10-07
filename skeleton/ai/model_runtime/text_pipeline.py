@@ -292,6 +292,61 @@ class DecadeSamplingPlan:
 
 
 @dataclass(frozen=True)
+class TemporalRetrievalCandidate:
+    """Candidate evidence with independent semantic and temporal relevance."""
+    evidence_digest: str
+    source_year: int
+    valid_from_year: int | None
+    valid_to_year: int | None
+    semantic_score_ppm: int
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.evidence_digest, str) or len(self.evidence_digest) != 64 or any(ch not in "0123456789abcdef" for ch in self.evidence_digest):
+            raise TokenizerContractError("invalid temporal retrieval evidence digest")
+        if isinstance(self.source_year, bool) or not isinstance(self.source_year, int) or not 1000 <= self.source_year <= 9999:
+            raise TokenizerContractError("invalid retrieval source year")
+        for value in (self.valid_from_year, self.valid_to_year):
+            if value is not None and (isinstance(value, bool) or not isinstance(value, int) or not 1000 <= value <= 9999):
+                raise TokenizerContractError("invalid retrieval validity year")
+        if self.valid_from_year is not None and self.valid_to_year is not None and self.valid_to_year < self.valid_from_year:
+            raise TokenizerContractError("invalid retrieval validity interval")
+        if isinstance(self.semantic_score_ppm, bool) or not isinstance(self.semantic_score_ppm, int) or not 0 <= self.semantic_score_ppm <= 1_000_000:
+            raise TokenizerContractError("invalid semantic relevance score")
+
+    def temporally_valid(self, query_year: int) -> bool:
+        if isinstance(query_year, bool) or not isinstance(query_year, int):
+            raise TokenizerContractError("invalid temporal query year")
+        if self.source_year > query_year:
+            return False
+        if self.valid_from_year is not None and query_year < self.valid_from_year:
+            return False
+        if self.valid_to_year is not None and query_year > self.valid_to_year:
+            return False
+        return True
+
+    @property
+    def digest(self) -> str:
+        return digest_json(self.__dict__)
+
+
+@dataclass(frozen=True)
+class TemporalRetrievalPlan:
+    query_year: int
+    candidate_digests: tuple[str, ...]
+    rejected_digests: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if not self.candidate_digests:
+            raise TokenizerContractError("temporal retrieval has no admissible evidence")
+        if set(self.candidate_digests) & set(self.rejected_digests):
+            raise TokenizerContractError("retrieval evidence cannot be admitted and rejected")
+
+    @property
+    def digest(self) -> str:
+        return digest_json({"query_year": self.query_year, "candidate_digests": list(self.candidate_digests), "rejected_digests": list(self.rejected_digests)})
+
+
+@dataclass(frozen=True)
 class TemporalEvaluationSlice:
     """One cutoff-isolated evaluation slice; no example may exceed its horizon."""
     slice_id: str
@@ -994,6 +1049,22 @@ class TextTokenPipeline:
         if not ordered:
             raise TokenizerContractError("decade sampling produced no documents")
         return DecadeSamplingPlan(coverage.digest, tuple(ordered), max_documents_per_decade)
+
+    def temporal_retrieval_plan(self, candidates: Sequence[TemporalRetrievalCandidate], *, query_year: int, limit: int = 8) -> TemporalRetrievalPlan:
+        items = tuple(candidates)
+        if not items or any(not isinstance(item, TemporalRetrievalCandidate) for item in items):
+            raise TokenizerContractError("temporal retrieval candidates required")
+        if isinstance(query_year, bool) or not isinstance(query_year, int) or not 1000 <= query_year <= 9999:
+            raise TokenizerContractError("invalid temporal query year")
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit <= 0:
+            raise TokenizerContractError("invalid temporal retrieval limit")
+        admitted = [item for item in items if item.temporally_valid(query_year)]
+        rejected = [item for item in items if not item.temporally_valid(query_year)]
+        admitted.sort(key=lambda item: (-item.semantic_score_ppm, -item.source_year, item.evidence_digest))
+        selected = admitted[:limit]
+        if not selected:
+            raise TokenizerContractError("no temporally admissible retrieval evidence")
+        return TemporalRetrievalPlan(query_year, tuple(item.digest for item in selected), tuple(item.digest for item in rejected))
 
     def temporal_evaluation_slice(self, slice_id: str, signals: Sequence[TemporalTrainingSignal], example_digests: Sequence[str], *, cutoff_year: int) -> TemporalEvaluationSlice:
         items = tuple(signals)
