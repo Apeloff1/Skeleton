@@ -66,7 +66,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/providers/runtime.py",
       "kind": "file",
-      "source_git_object_sha": "cc15bd41c0f4b945afa5d59ed5473135db04f140",
+      "source_git_object_sha": "6af63338b94878b89635ef799d1dd1acc157e64b",
       "role": "credential-bearing provider runtime",
       "work_package_refs": [
         "WP-W05",
