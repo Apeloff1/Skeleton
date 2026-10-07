@@ -1258,3 +1258,30 @@ Inspired by current public discussion around agentic research, evidence/provenan
 These controls deliberately prevent scraped volume from being mistaken for knowledge quality. A research result is not considered sufficient merely because many documents were collected; corroboration, diversity, relevance and contradiction state are represented separately.
 
 Status remains IMPLEMENTED / UNSIGNED until exact-head CI evidence and durable downstream knowledge-index integration are present.
+
+
+### 2026-10-07 research operating plane — large integration tranche
+
+Landed directly on main:
+- durable SQLite/WAL content-addressed document, URL and checkpoint storage;
+- promotion/quarantine decisions with stable machine-readable receipts;
+- fail-closed retrieval ingestion requiring a matching promotion receipt;
+- adaptive host health budgets so persistently failing sources lose crawl allocation;
+- bounded research sessions with explicit step/crawl/idle/evidence-sufficient termination;
+- adaptive recrawl scheduling driven by observed change and source value;
+- federated authorized source-provider discovery with cross-provider diversity and URL deduplication;
+- regression coverage for persistence/reopen, dedupe, corroboration gates, receipt mismatch,
+  quarantine refusal, adaptive budgets, session termination, recrawl supersession and provider diversity.
+
+External-network sources remain subject to their own authorization and policy contracts. In particular,
+public visibility is not treated as permission to automate access. Provider/API adapters and the generic
+robots-aware crawler share the same downstream evidence, provenance, promotion and ingestion gates.
+
+Remaining before SIGNED COMPLETE:
+- wire a concrete canonical retrieval/index sink already used by the AI runtime;
+- add migration/version management for the durable SQLite schema;
+- richer MIME extraction and C2PA/content-credential adapter;
+- distributed leases for multi-worker frontier ownership;
+- exact-head CI evidence and performance/load characterization.
+
+Status: IMPLEMENTED / UNSIGNED.
