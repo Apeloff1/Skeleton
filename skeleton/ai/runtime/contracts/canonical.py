@@ -9,12 +9,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from dataclasses import asdict, dataclass
 from typing import Any, Mapping
 
 
 SUPPORTED_SCHEMA_VERSIONS = frozenset({1})
 MAX_PAYLOAD_BYTES = 48_000
+MAX_PORTABLE_INTEGER = 9_007_199_254_740_991
 
 
 class CanonicalContractError(ValueError):
@@ -32,9 +34,29 @@ def _validate_mapping_keys(value: Any) -> None:
             _validate_mapping_keys(child)
 
 
+def _validate_portable_json_scalars(value: Any) -> None:
+    """Reject numeric values whose JSON meaning is not portable across runtimes."""
+    if isinstance(value, dict):
+        for child in value.values():
+            _validate_portable_json_scalars(child)
+        return
+    if isinstance(value, (list, tuple)):
+        for child in value:
+            _validate_portable_json_scalars(child)
+        return
+    if type(value) is int and abs(value) > MAX_PORTABLE_INTEGER:
+        raise CanonicalContractError("integer exceeds portable JSON range")
+    if type(value) is float:
+        if not math.isfinite(value):
+            raise CanonicalContractError("non-finite numbers are not canonical JSON")
+        if value == 0.0 and math.copysign(1.0, value) < 0:
+            raise CanonicalContractError("negative zero is not portable canonical JSON")
+
+
 def canonical_json_bytes(value: Any) -> bytes:
     """Return one strict deterministic JSON byte representation."""
     _validate_mapping_keys(value)
+    _validate_portable_json_scalars(value)
     try:
         return json.dumps(
             value,
