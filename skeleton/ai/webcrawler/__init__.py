@@ -1,3 +1,5 @@
+from .durable_frontier import DurableClaim, DurableFrontier
+from .dns_binding import ResolvedTarget, resolve_target, peer_is_planned
 from .content_credentials import CredentialObservation, credential_trust_delta
 from .claiming import ClaimedWork, FrontierClaimer
 from .retrieval_bridge import CanonicalRetrievalBridge, RetrievalBridgeReceipt
