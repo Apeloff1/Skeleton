@@ -8,36 +8,24 @@
   "source_queue_state": "queued_unmodified",
   "volume_refs": [
     "VOL-166",
-    "VOL-167",
-    "VOL-169",
-    "VOL-172",
     "VOL-173",
     "VOL-174",
-    "VOL-175",
     "VOL-176",
     "VOL-177",
     "VOL-178"
   ],
   "primary_implementation_by_volume": {
     "VOL-166": "skeleton/security/policy_simulation.py",
-    "VOL-167": "skeleton/security/threat_model.py",
-    "VOL-169": "skeleton/security/boundaries.py",
-    "VOL-172": "skeleton/security/egress_control.py",
     "VOL-173": "skeleton/security/secret_handles.py",
     "VOL-174": "skeleton/security/key_management.py",
-    "VOL-175": "skeleton/security/tenant_isolation.py",
     "VOL-176": "skeleton/security/privacy_engine.py",
     "VOL-177": "skeleton/security/data_deletion.py",
     "VOL-178": "skeleton/supply_chain/sbom.py"
   },
   "primary_test_by_volume": {
     "VOL-166": "skeleton/testing/test_policy_simulation.py",
-    "VOL-167": "skeleton/testing/test_threat_model.py",
-    "VOL-169": "skeleton/testing/test_security_boundaries.py",
-    "VOL-172": "skeleton/testing/test_egress_control.py",
     "VOL-173": "skeleton/testing/test_secret_security.py",
     "VOL-174": "skeleton/testing/test_key_management.py",
-    "VOL-175": "skeleton/testing/test_tenant_isolation_deep.py",
     "VOL-176": "skeleton/testing/test_privacy_engine.py",
     "VOL-177": "skeleton/testing/test_data_deletion.py",
     "VOL-178": "skeleton/testing/test_sbom.py"
@@ -50,20 +38,59 @@
     "skeleton/testing/test_privacy_deletion_authority.py"
   ],
   "mirror_pairs": [
-    ["skeleton/security/policy_simulation.py", "skeleton/ai/runtime/security/policy_simulation.py"],
-    ["skeleton/security/threat_model.py", "skeleton/ai/runtime/security/threat_model.py"],
-    ["skeleton/security/boundaries.py", "skeleton/ai/runtime/security/boundaries.py"],
-    ["skeleton/security/egress_control.py", "skeleton/ai/runtime/security/egress_control.py"],
-    ["skeleton/security/secret_handles.py", "skeleton/ai/runtime/security/secret_handles.py"],
-    ["skeleton/security/secret_lifecycle.py", "skeleton/ai/runtime/security/secret_lifecycle.py"],
-    ["skeleton/security/key_management.py", "skeleton/ai/runtime/security/key_management.py"],
-    ["skeleton/security/tenant_isolation.py", "skeleton/ai/runtime/security/tenant_isolation.py"],
-    ["skeleton/security/privacy_engine.py", "skeleton/ai/runtime/security/privacy_engine.py"],
-    ["skeleton/security/data_deletion.py", "skeleton/ai/runtime/security/data_deletion.py"],
-    ["skeleton/security/deletion_propagation.py", "skeleton/ai/runtime/security/deletion_propagation.py"],
-    ["skeleton/supply_chain/sbom.py", "skeleton/ai/runtime/extensions/supply_chain/sbom.py"]
+    [
+      "skeleton/security/policy_simulation.py",
+      "skeleton/ai/runtime/security/policy_simulation.py"
+    ],
+    [
+      "skeleton/security/threat_model.py",
+      "skeleton/ai/runtime/security/threat_model.py"
+    ],
+    [
+      "skeleton/security/boundaries.py",
+      "skeleton/ai/runtime/security/boundaries.py"
+    ],
+    [
+      "skeleton/security/egress_control.py",
+      "skeleton/ai/runtime/security/egress_control.py"
+    ],
+    [
+      "skeleton/security/secret_handles.py",
+      "skeleton/ai/runtime/security/secret_handles.py"
+    ],
+    [
+      "skeleton/security/secret_lifecycle.py",
+      "skeleton/ai/runtime/security/secret_lifecycle.py"
+    ],
+    [
+      "skeleton/security/key_management.py",
+      "skeleton/ai/runtime/security/key_management.py"
+    ],
+    [
+      "skeleton/security/tenant_isolation.py",
+      "skeleton/ai/runtime/security/tenant_isolation.py"
+    ],
+    [
+      "skeleton/security/privacy_engine.py",
+      "skeleton/ai/runtime/security/privacy_engine.py"
+    ],
+    [
+      "skeleton/security/data_deletion.py",
+      "skeleton/ai/runtime/security/data_deletion.py"
+    ],
+    [
+      "skeleton/security/deletion_propagation.py",
+      "skeleton/ai/runtime/security/deletion_propagation.py"
+    ],
+    [
+      "skeleton/supply_chain/sbom.py",
+      "skeleton/ai/runtime/extensions/supply_chain/sbom.py"
+    ]
   ],
-  "mapping_ids": ["AIFT-SECURITY", "AIFT-SUPPLY-CHAIN"],
+  "mapping_ids": [
+    "AIFT-SECURITY",
+    "AIFT-SUPPLY-CHAIN"
+  ],
   "evidence_policy": {
     "exact_head_ci_required": true,
     "independent_closure_required": true,

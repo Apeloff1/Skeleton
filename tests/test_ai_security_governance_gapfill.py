@@ -22,7 +22,7 @@ def head()->str:
 
 def test_current_candidate_is_exact_head_valid() -> None:
     result=validate(ROOT,head=head())
-    assert result["volume_count"]==10
+    assert result["volume_count"]==6
     assert result["queued_frontier_preserved"] is True
     assert result["completion_checkbox"] is False
     assert result["production_authority"] is False

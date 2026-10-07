@@ -17,8 +17,7 @@ MASTER=Path("machine/ai_master_plan.json")
 FRONTIER=Path("machine/ai_masterplan_continuation_frontier.json")
 TREE=Path("machine/ai_file_tree.json")
 EXPECTED=(
-    "VOL-166","VOL-167","VOL-169","VOL-172","VOL-173",
-    "VOL-174","VOL-175","VOL-176","VOL-177","VOL-178",
+    "VOL-166","VOL-173","VOL-174","VOL-176","VOL-177","VOL-178",
 )
 SECURITY_VOLUMES=frozenset(EXPECTED[:-1])
 SUPPLY_VOLUMES=frozenset({"VOL-178"})
