@@ -493,12 +493,7 @@
         "evaluations": [
           ".github/workflows/p1-budget-accounting.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102424353",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473820997",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -723,12 +718,7 @@
         "evaluations": [
           ".github/workflows/p1-budget-accounting.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102424353",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473820997",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -954,12 +944,7 @@
         "evaluations": [
           ".github/workflows/p1-forecast-anomaly-loop.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102424052",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473821029",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -1185,12 +1170,7 @@
         "evaluations": [
           ".github/workflows/p1-forecast-anomaly-loop.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102424052",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473821029",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -1860,12 +1840,7 @@
         "evaluations": [
           ".github/workflows/p1-release-attribution.yml"
         ],
-        "existing_evidence": [
-          "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
-          "github-actions-job:109098309784",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36472598091",
-          "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -2980,12 +2955,7 @@
         "evaluations": [
           ".github/workflows/p1-shadow-traffic-isolation.yml"
         ],
-        "existing_evidence": [
-          "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
-          "github-actions-job:109096147623",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36471954568",
-          "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -3213,12 +3183,7 @@
         "evaluations": [
           ".github/workflows/p1-champion-registry.yml"
         ],
-        "existing_evidence": [
-          "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
-          "github-actions-job:109096146862",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36471954486",
-          "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -4114,12 +4079,7 @@
         "evaluations": [
           ".github/workflows/p1-failure-knowledge.yml"
         ],
-        "existing_evidence": [
-          "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
-          "github-actions-job:109096149360",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36471954446",
-          "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -4346,16 +4306,7 @@
         "evaluations": [
           ".github/workflows/p1-scope-freeze.yml"
         ],
-        "existing_evidence": [
-          ".github/workflows/p1-evidence-identity.yml",
-          ".github/workflows/p1-reproducibility-bundle.yml",
-          ".github/workflows/p1-required-gate-authority.yml",
-          ".github/workflows/p1-scope-freeze.yml",
-          "P1-GAP-VOL-420:gap:380b4042e4-aec1dd0a17dab20a",
-          "P1-GAP-VOL-420:gap:7777365012-f77a419f1e16f459",
-          "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
-          "git-head:de1c7870e4c231eaa4d74b25f79b88c09af75fbc"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
