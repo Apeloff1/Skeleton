@@ -1,6 +1,0 @@
-{
-  "name": "cbm26-agent",
-  "version": "1.0.0",
-  "type": "module",
-  "description": "Consumer Baseline Model 2026 agent loop"
-}
