@@ -165,6 +165,18 @@ class EvidenceSet:
         from .decade_signals import DecadeSignalSeries
         return DecadeSignalSeries(self.signals_by_year()).undercovered_decades(start_decade,end_decade,minimum_coverage=minimum_coverage)
 
+    def learned_regimes(self,*,threshold:float=.45):
+        from .regimes import RegimeDetector
+        return RegimeDetector(self.signals_by_year()).regimes(threshold=threshold)
+
+    def historical_bias(self,*,bucket_size:int=10):
+        from .historical_bias import HistoricalBiasAnalyzer
+        return HistoricalBiasAnalyzer().analyze(self.signals_by_year(),bucket_size=bucket_size)
+
+    def regime_trajectory(self,*,threshold:float=.45):
+        from .regime_trajectory import classify_regime_transitions
+        return classify_regime_transitions(self.learned_regimes(threshold=threshold))
+
     def assurance(self, *, now: float) -> Mapping[str, object]:
         ranked=self.ranked(now=now)
         relevant=[o for o in ranked if o.relevance >= self.query.min_relevance and o.source_score >= self.query.min_source_score]
