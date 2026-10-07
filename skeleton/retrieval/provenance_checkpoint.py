@@ -15,7 +15,8 @@ class ProvenanceCheckpoint:
    os.replace(tmp,self.path)
   finally:
    if os.path.exists(tmp):os.unlink(tmp)
- def load(self,bus=None):
-  if not self.path.exists():return ProvenanceLedger(bus)
+ def load(self,bus=None,*,durable=False):
+  persist=self.save if durable else None
+  if not self.path.exists():return ProvenanceLedger(bus,persist=persist)
   with self.path.open("r",encoding="utf-8") as f:payload=json.load(f)
-  return ProvenanceLedger.from_snapshot(payload,bus)
+  return ProvenanceLedger.from_snapshot(payload,bus,persist=persist)
