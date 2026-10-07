@@ -5,6 +5,8 @@ from .runtime_policy import DEFAULT_RUNTIME_POLICY_COMPILER, RuntimePolicy, Runt
 from .runtime_epochs import DEFAULT_RUNTIME_EPOCHS, EpochStatus, RuntimeEpoch, RuntimeEpochRegistry
 from .temporal_policy import DEFAULT_TEMPORAL_RUNTIME_POLICY_COMPILER, TemporalRuntimePolicy, TemporalRuntimePolicyCompiler
 from .serving_policy import PolicyAwareServingPlanner, ServiceClass, ServingPlan, ServingRequest
+from .slo_planner import ResourcePlan, RuntimeEstimate, SLOResourcePlanner, SLOTarget
+from .serving_telemetry import RequestTelemetry, ServingTelemetryWindow
 from .flgb_model_runtime import (
     ALLOWED_TRANSITIONS,
     BatchRequest,
@@ -108,6 +110,9 @@ __all__ = [
     "RuntimeAdmissionScheduler",
     "RuntimeEpoch",
     "RuntimeEpochRegistry",
+    "RequestTelemetry",
+    "ResourcePlan",
+    "RuntimeEstimate",
     "RuntimePolicy",
     "RuntimePolicyCompiler",
     "RuntimeSignal",
@@ -117,10 +122,13 @@ __all__ = [
     "RuntimeEvent",
     "RuntimeLimits",
     "RuntimeUsage",
+    "SLOResourcePlanner",
+    "SLOTarget",
     "ScheduledRequest",
     "ServiceClass",
     "ServingPlan",
     "ServingRequest",
+    "ServingTelemetryWindow",
     "SignalMaturity",
     "SpeculativeReceipt",
     "StreamingTextFeed",
