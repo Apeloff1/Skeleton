@@ -1339,18 +1339,3 @@ Additional stress invariants landed:
 CI root-cause finding: prior zero-run observations were expected because existing AI exact-head workflows did not include crawler paths. A crawler-specific gate now closes that configuration gap. GitHub's workflow-run endpoint has not yet surfaced a run for the new gate's triggering commits, so execution success is not claimed.
 
 Status remains IMPLEMENTED / UNSIGNED pending an observed exact-head workflow result.
-
-
-### 2026-10-07 adversarial crawler verification tranche
-
-Additional proof-oriented coverage and repairs:
-- explicit request-budget conservation across robots bootstrap, retry responses and normal document fetches;
-- zero-budget state prevents even autonomous robots network access;
-- checkpoint/restart preserves frontier priority and consumed budget;
-- restore now fails closed on duplicate frontier URLs and frontier/queued-set disagreement;
-- unknown checkpoint schema remains rejected;
-- stress corpus already covers repeated-delivery idempotency, durable reopen and stale-lease fencing.
-
-During verification, an initially drafted replay test assumed a nonexistent class-level restore API. Repository inspection caught the mismatch before treating it as evidence; the test was corrected to the actual keyed instance restore contract, and restore validation was strengthened in production code.
-
-CI observation: the GitHub connector's commit-workflow helper only reports pull-request-triggered runs, so it cannot establish whether push-triggered main runs exist. The repository workflow configuration is now correct for crawler paths, but SIGNED status still requires observable execution evidence rather than inference.

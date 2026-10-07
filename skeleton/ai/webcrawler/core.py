@@ -507,16 +507,9 @@ class CrawlEngine:
         state = self.store.load_checkpoint(key)
         if not state or state.get("schema") != "skeleton.ai.crawl.checkpoint.v1":
             return False
-        items = [FrontierItem(**x) for x in state["frontier"]]
-        urls = [item.url for item in items]
-        if len(urls) != len(set(urls)):
-            return False
-        queued = set(state["queued"])
-        if queued != set(urls):
-            return False
-        self._frontier = items
+        self._frontier = [FrontierItem(**x) for x in state["frontier"]]
         heapq.heapify(self._frontier)
-        self._queued = queued
+        self._queued = set(state["queued"])
         self._seen = set(state["seen"])
         self._host_ready = {str(k): float(v) for k, v in state["host_ready"].items()}
         self._seq = int(state["sequence"])
