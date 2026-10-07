@@ -1483,3 +1483,47 @@ The crawler outbox is now connected to an idempotent downstream provenance contr
 Remaining durability boundary: ProvenanceLedger itself is currently in-memory. Its idempotency map therefore does not survive reconstruction unless the ledger state is persisted/restored by a higher layer. The durable crawler outbox preserves operation identity across restart, but a newly empty provenance ledger cannot know that a prior process already emitted the side effect. Full process-crash exactly-once provenance requires persistence of provenance entries/idempotency mappings or a durable provenance backend.
 
 SIGNED status remains withheld pending observable exact-head execution and that persistence decision.
+
+
+### 2026-10-07 durable provenance reconstruction tranche
+
+Canonical provenance restart durability is now implemented:
+- ProvenanceLedger exposes deterministic versioned snapshots containing entries, idempotency bindings and statistics;
+- snapshots carry a BLAKE2 integrity digest and restore fails closed on tampering;
+- restore validates unique/non-empty entry IDs, complete parent relationships, idempotency references and statistics;
+- idempotent replay after snapshot reconstruction returns the original entry;
+- ProvenanceCheckpoint persists snapshots atomically using temp file, fsync and os.replace;
+- missing checkpoints produce a clean ledger while corrupt checkpoints fail closed;
+- crawler CI path filters and focused validation now include provenance checkpoint recovery.
+
+Remaining crash-timing boundary: record() mutates the in-memory ledger before a separate checkpoint save call. A hard process death between those calls can still lose the idempotency binding even though the crawler outbox preserves operation identity. Final closure requires a persistence-aware record path (or durable provenance backend transaction) that does not acknowledge mutation until the checkpoint/backend commit succeeds.
+
+SIGNED status remains withheld pending that timing closure and observable exact-head validation.
+
+
+### 2026-10-07 durable provenance acknowledgement closure
+
+The provenance crash-timing window is now closed for checkpoint-backed durable mode:
+- ProvenanceLedger accepts an optional persistence callback;
+- a new record is not acknowledged until persistence succeeds;
+- persistence failure rolls back the entry, idempotency binding, chain membership and recorded statistic before propagating the error;
+- ProvenanceCheckpoint.load(durable=True) automatically returns a persistence-aware ledger;
+- checkpoint save fsyncs file content, atomically replaces the target, then fsyncs the containing directory where supported;
+- regressions prove persistence-before-return, rollback on simulated disk failure, and combined crawler SQLite outbox + durable provenance replay across process reconstruction.
+
+The canonical in-memory ledger remains available for callers that do not request durable mode; the crawler's crash-safe deployment contract should use the durable checkpoint-backed ledger or an equivalent durable backend.
+
+Repository-side architecture for the previously identified provenance crash window is now IMPLEMENTED. SIGNED remains withheld only until observable exact-head validation executes successfully and any resulting failures are resolved.
+
+
+### 2026-10-07 crawler runtime correctness tranche
+
+Adversarial runtime review closed additional non-persistence defects:
+- ResearchQuery now rejects empty text, non-positive source requirements, non-finite/non-positive freshness half-life, out-of-range assurance weights/thresholds, and diversity+contradiction weights exceeding the score budget;
+- contradiction detection now considers qualified evidence only, matching assurance/diversity admission semantics;
+- FederatedDiscovery rejects empty/duplicate provider identities, invalid queries/limits and non-finite candidate scores;
+- CrawlEngine no longer permanently loses a URL when autonomous robots bootstrap fails transiently: seen state is cleared and bounded retry is scheduled when budget permits;
+- request budget is rechecked after robots bootstrap, preventing the robots request from consuming the final allowance followed by an over-budget resource fetch;
+- focused regressions cover contract validation, non-finite discovery scores, duplicate providers, transient robots failure preservation and the one-request robots budget boundary.
+
+These repairs are IMPLEMENTED. Remaining signing blocker is still observable exact-head validation; further runtime audit should examine redirect-hop budget/pacing accounting and Retry-After HTTP-date handling.

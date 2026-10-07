@@ -13,9 +13,16 @@ class ProvenanceCheckpoint:
    with os.fdopen(fd,"w",encoding="utf-8") as f:
     f.write(raw);f.flush();os.fsync(f.fileno())
    os.replace(tmp,self.path)
+   try:
+    dirfd=os.open(str(self.path.parent),os.O_RDONLY)
+    try:os.fsync(dirfd)
+    finally:os.close(dirfd)
+   except OSError:
+    if os.name!="nt":raise
   finally:
    if os.path.exists(tmp):os.unlink(tmp)
- def load(self,bus=None):
-  if not self.path.exists():return ProvenanceLedger(bus)
+ def load(self,bus=None,*,durable=False):
+  persist=self.save if durable else None
+  if not self.path.exists():return ProvenanceLedger(bus,persist=persist)
   with self.path.open("r",encoding="utf-8") as f:payload=json.load(f)
-  return ProvenanceLedger.from_snapshot(payload,bus)
+  return ProvenanceLedger.from_snapshot(payload,bus,persist=persist)

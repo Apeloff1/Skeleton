@@ -1,6 +1,7 @@
 """Source-provider abstraction for authorized APIs, search systems and crawlers."""
 from __future__ import annotations
 from dataclasses import dataclass,replace
+import math
 from typing import Iterable,Protocol,Mapping
 from .core import canonicalize_url
 @dataclass(frozen=True)
@@ -16,7 +17,13 @@ class SourceProvider(Protocol):
 class FederatedDiscovery:
     def __init__(self,providers:Iterable[SourceProvider]):
         self.providers=tuple(providers);self.last_failures:tuple[ProviderFailure,...]=()
+        names=[getattr(p,"name",None) for p in self.providers]
+        if any(not isinstance(x,str) or not x.strip() for x in names):raise ValueError("provider names must be non-empty")
+        if len(set(names))!=len(names):raise ValueError("provider names must be unique")
     def discover(self,query:str,*,per_provider:int=20,total_limit:int=100)->list[SourceCandidate]:
+        if not isinstance(query,str) or not query.strip():raise ValueError("query is required")
+        if isinstance(per_provider,bool) or not isinstance(per_provider,int) or per_provider<1:raise ValueError("per_provider must be positive")
+        if isinstance(total_limit,bool) or not isinstance(total_limit,int) or total_limit<1:raise ValueError("total_limit must be positive")
         merged={};failures=[]
         for provider in self.providers:
             try:candidates=provider.search(query,limit=per_provider)
@@ -26,6 +33,7 @@ class FederatedDiscovery:
                 for raw in candidates:
                     try:url=canonicalize_url(raw.url)
                     except ValueError:continue
+                    if not isinstance(raw.score,(int,float)) or isinstance(raw.score,bool) or not math.isfinite(raw.score):continue
                     c=replace(raw,url=url,provider=provider.name)
                     old=merged.get(url)
                     if old is None or c.score>old.score:merged[url]=c

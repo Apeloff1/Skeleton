@@ -455,6 +455,11 @@ class CrawlEngine:
             return None
         self._seen.add(item.url)
         if not self.robots.known(item.url) and not self.load_robots(item.url):
+            self._seen.discard(item.url)
+            if self.budget.can_request(): self._retry(item, now=now)
+            return None
+        if not self.budget.can_request():
+            self._seen.discard(item.url)
             return None
         if not self.robots.allowed(item.url):
             return None

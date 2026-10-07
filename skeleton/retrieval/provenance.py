@@ -55,12 +55,13 @@ class ProvenanceLedger:
     creating an immutable chain of custody.
     """
 
-    def __init__(self, bus: Optional[EventBus] = None):
+    def __init__(self, bus: Optional[EventBus] = None, persist=None):
         self._entries: Dict[str, ProvenanceEntry] = {}
         self._chains: Dict[str, List[str]] = {}  # root_id -> [entry_ids]
         self._bus = bus
         self._stats = {"recorded": 0, "queries": 0}
         self._idempotency: Dict[str, str] = {}
+        self._persist = persist
 
     def record(self, source: str, operation: str, input_data: Any, output_data: Any, parent_id: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None, idempotency_key: Optional[str] = None) -> ProvenanceEntry:
         """Record a data transformation in the ledger."""
@@ -107,6 +108,19 @@ class ProvenanceLedger:
             chain.append(entry.entry_id)
 
         self._stats["recorded"] += 1
+
+        if self._persist:
+            try:
+                self._persist(self)
+            except Exception:
+                self._stats["recorded"] -= 1
+                if idempotency_key is not None:
+                    self._idempotency.pop(idempotency_key, None)
+                chain.remove(entry.entry_id)
+                if not chain:
+                    self._chains.pop(root, None)
+                self._entries.pop(entry.entry_id, None)
+                raise
 
         if self._bus:
             self._bus.emit("retrieval.provenance.recorded", {
@@ -180,7 +194,7 @@ class ProvenanceLedger:
         return payload
 
     @classmethod
-    def from_snapshot(cls, payload: Dict[str, Any], bus: Optional[EventBus] = None) -> "ProvenanceLedger":
+    def from_snapshot(cls, payload: Dict[str, Any], bus: Optional[EventBus] = None, persist=None) -> "ProvenanceLedger":
         if not isinstance(payload, dict) or payload.get("version") != 1:
             raise ValueError("unsupported provenance snapshot")
         digest = payload.get("digest")
@@ -188,7 +202,7 @@ class ProvenanceLedger:
         encoded = json.dumps(body, sort_keys=True, separators=(",", ":")).encode("utf-8")
         if not isinstance(digest, str) or digest != hashlib.blake2b(encoded, digest_size=16).hexdigest():
             raise ValueError("provenance snapshot digest mismatch")
-        ledger = cls(bus)
+        ledger = cls(bus, persist=persist)
         entries = payload.get("entries")
         idem = payload.get("idempotency")
         stats = payload.get("stats")
