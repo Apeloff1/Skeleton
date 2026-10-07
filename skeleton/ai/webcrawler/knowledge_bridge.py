@@ -20,6 +20,8 @@ class CanonicalKnowledgeBridge:
  def record_document(self,doc:CrawlDocument,decision:PromotionDecision,*,subject:str|None=None):
   if decision.action!="promote" or decision.content_hash!=doc.content_hash:
    raise ValueError("canonical knowledge admission requires matching promotion")
+  if decision.required_sources < 1 or decision.qualified_sources < decision.required_sources:
+   raise ValueError("corroborated knowledge requires qualified independent sources")
   from skeleton.ai.runtime.knowledge.store import (
    KnowledgeClaim,KnowledgeEvidence,VerificationState,
   )
