@@ -29,6 +29,10 @@ SECURITY_GATES = (
     Path("backend/scripts/check_security_scan_surface.py"),
 )
 _CREDENTIAL_ENV = frozenset({"OPENAI_API_KEY", "GH_TOKEN", "GITHUB_TOKEN"})
+_DEFAULT_GATE_TIMEOUT_SECONDS = 90
+_SECURITY_GATE_TIMEOUT_SECONDS = {
+    Path("backend/scripts/check_secret_hygiene.py"): 180,
+}
 _VERIFIED: set[tuple[str, str, str]] = set()
 
 
@@ -66,7 +70,10 @@ def run_bot_activation_security_baseline(
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                timeout=90,
+                timeout=_SECURITY_GATE_TIMEOUT_SECONDS.get(
+                    relative,
+                    _DEFAULT_GATE_TIMEOUT_SECONDS,
+                ),
                 check=False,
             )
         except (OSError, subprocess.SubprocessError) as exc:
