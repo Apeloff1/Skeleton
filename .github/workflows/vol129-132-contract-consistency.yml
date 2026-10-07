@@ -1,0 +1,255 @@
+name: VOL-129-132 Contract Consistency Convergence
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_runtime_schemas.json"
+      - "machine/contract_conformance.json"
+      - "machine/schema_registry.json"
+      - "machine/compatibility_model.json"
+      - "machine/state_topology.json"
+      - "machine/consistency_profiles.json"
+      - "machine/ai_file_tree.json"
+      - "skeleton/contracts/protocol.py"
+      - "skeleton/ai/runtime/contracts/protocol.py"
+      - "skeleton/distributed/network/internal_protocol.py"
+      - "skeleton/ai/runtime/distributed/network/internal_protocol.py"
+      - "skeleton/distributed/network/__init__.py"
+      - "skeleton/ai/runtime/distributed/network/__init__.py"
+      - "skeleton/data/schema_evolution.py"
+      - "skeleton/ai/runtime/data/schema_evolution.py"
+      - "skeleton/persistence/consistency.py"
+      - "skeleton/ai/runtime/persistence/consistency.py"
+      - "skeleton/testing/test_internal_protocols.py"
+      - "skeleton/testing/test_schema_registry.py"
+      - "skeleton/testing/test_compatibility_model.py"
+      - "skeleton/testing/test_consistency_profiles.py"
+      - "scripts/check_architecture_contract_conformance.py"
+      - "scripts/check_traceability_spine.py"
+      - "scripts/check_consistency_profiles.py"
+      - "scripts/verify_vol129_132_contract_consistency.py"
+      - "tests/test_traceability_spine.py"
+      - "tests/test_consistency_profiles.py"
+      - "tests/test_vol129_132_contract_consistency_independent.py"
+      - ".github/workflows/vol129-132-contract-consistency.yml"
+  push:
+    branches: [main]
+    paths:
+      - "machine/ai_runtime_schemas.json"
+      - "machine/contract_conformance.json"
+      - "machine/schema_registry.json"
+      - "machine/compatibility_model.json"
+      - "machine/state_topology.json"
+      - "machine/consistency_profiles.json"
+      - "skeleton/contracts/protocol.py"
+      - "skeleton/ai/runtime/contracts/protocol.py"
+      - "skeleton/distributed/network/internal_protocol.py"
+      - "skeleton/ai/runtime/distributed/network/internal_protocol.py"
+      - "skeleton/data/schema_evolution.py"
+      - "skeleton/ai/runtime/data/schema_evolution.py"
+      - "skeleton/persistence/consistency.py"
+      - "skeleton/ai/runtime/persistence/consistency.py"
+      - "scripts/check_consistency_profiles.py"
+      - "scripts/verify_vol129_132_contract_consistency.py"
+      - ".github/workflows/vol129-132-contract-consistency.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vol129-132-contract-consistency-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  canonical-contract-consistency:
+    name: Canonical schema protocol and consistency behavior
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused test runtime
+        run: >-
+          python -m pip install --disable-pip-version-check --no-input
+          "pytest>=8,<9"
+
+      - name: Compile convergence surfaces
+        run: >-
+          python -m compileall -q
+          skeleton/contracts/protocol.py
+          skeleton/ai/runtime/contracts/protocol.py
+          skeleton/distributed/network/internal_protocol.py
+          skeleton/ai/runtime/distributed/network/internal_protocol.py
+          skeleton/data/schema_evolution.py
+          skeleton/ai/runtime/data/schema_evolution.py
+          skeleton/persistence/consistency.py
+          skeleton/ai/runtime/persistence/consistency.py
+          scripts/check_architecture_contract_conformance.py
+          scripts/check_traceability_spine.py
+          scripts/check_consistency_profiles.py
+          scripts/verify_vol129_132_contract_consistency.py
+          skeleton/testing/test_internal_protocols.py
+          skeleton/testing/test_schema_registry.py
+          skeleton/testing/test_compatibility_model.py
+          skeleton/testing/test_consistency_profiles.py
+          tests/test_consistency_profiles.py
+          tests/test_vol129_132_contract_consistency_independent.py
+
+      - name: Validate canonical contract conformance
+        run: python scripts/check_architecture_contract_conformance.py --json
+
+      - name: Validate P2 schema and compatibility derivation
+        run: python scripts/check_traceability_spine.py --json
+
+      - name: Validate state consistency profiles
+        run: python scripts/check_consistency_profiles.py --json
+
+      - name: Run behavioral and registry regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_internal_protocols.py
+          skeleton/testing/test_schema_registry.py
+          skeleton/testing/test_compatibility_model.py
+          skeleton/testing/test_consistency_profiles.py
+          tests/test_consistency_profiles.py
+          tests/test_traceability_spine.py
+
+      - name: Assert canonical and AI mirrors
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          pairs = (
+              (
+                  Path("skeleton/contracts/protocol.py"),
+                  Path("skeleton/ai/runtime/contracts/protocol.py"),
+              ),
+              (
+                  Path("skeleton/distributed/network/internal_protocol.py"),
+                  Path("skeleton/ai/runtime/distributed/network/internal_protocol.py"),
+              ),
+              (
+                  Path("skeleton/data/schema_evolution.py"),
+                  Path("skeleton/ai/runtime/data/schema_evolution.py"),
+              ),
+              (
+                  Path("skeleton/persistence/consistency.py"),
+                  Path("skeleton/ai/runtime/persistence/consistency.py"),
+              ),
+          )
+          for canonical, mirror in pairs:
+              if canonical.read_bytes() != mirror.read_bytes():
+                  raise SystemExit(
+                      f"contract-consistency mirror drift: {canonical} != {mirror}"
+                  )
+          print("VOL-129-132 canonical/AI mirror parity: OK")
+          PY
+
+  independent-contract-consistency:
+    name: Independent exact-head VOL-129-132 verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused test runtime
+        run: >-
+          python -m pip install --disable-pip-version-check --no-input
+          "pytest>=8,<9"
+
+      - name: Run independent adversarial verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_vol129_132_contract_consistency_independent.py
+
+      - name: Emit independent exact-head receipt
+        run: >-
+          python scripts/verify_vol129_132_contract_consistency.py
+          --evidence-out .vol129-132-contract-consistency.json
+          --print-evidence
+
+      - name: Assert receipt identity and minimum coverage
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".vol129-132-contract-consistency.json")
+              .read_text(encoding="utf-8")
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected:
+              raise SystemExit("contract-consistency receipt does not bind exact head")
+          if receipt.get("verifier") != "independent-vol129-132-contract-consistency-v1":
+              raise SystemExit("unexpected contract-consistency verifier identity")
+          if receipt.get("volumes") != ["VOL-129", "VOL-130", "VOL-131", "VOL-132"]:
+              raise SystemExit("contract-consistency volume binding drift")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("independent contract-consistency verification failed")
+
+          schemas = receipt.get("schemas") or {}
+          if schemas.get("runtime_schema_count") != 40:
+              raise SystemExit("runtime schema coverage is not 40")
+          if schemas.get("registered_schema_count") != 40:
+              raise SystemExit("schema registry coverage is not 40")
+
+          compatibility = receipt.get("compatibility") or {}
+          if compatibility.get("schema_matrix_count") != 40:
+              raise SystemExit("compatibility schema matrix coverage is not 40")
+          if compatibility.get("guard_mirror_parity") is not True:
+              raise SystemExit("schema evolution mirror parity missing")
+
+          consistency = receipt.get("consistency") or {}
+          if consistency.get("profile_count") != 21:
+              raise SystemExit("consistency profile coverage is not 21")
+          if consistency.get("runtime_mirror_parity") is not True:
+              raise SystemExit("consistency runtime mirror parity missing")
+
+          protocol = receipt.get("protocol") or {}
+          if protocol.get("single_envelope_authority") is not True:
+              raise SystemExit("shadow protocol envelope authority detected")
+
+          if len(receipt.get("receipt_digest") or "") != 64:
+              raise SystemExit("contract-consistency receipt digest invalid")
+
+          print(
+              "VOL-129-132 independent exact-head receipt:",
+              expected,
+              receipt["receipt_digest"],
+          )
+          PY

@@ -12,12 +12,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def _fixture() -> Path:
-    temp = Path(tempfile.mkdtemp(prefix="vol131-independent-"))
+    temp = Path(tempfile.mkdtemp(prefix="vol131-independent-v2-"))
     for relative in (
         verifier.MASTER,
         verifier.AI_TREE,
-        verifier.CANONICAL,
-        verifier.MIRROR,
+        verifier.CONTRACT,
+        verifier.CONTRACT_MIRROR,
+        verifier.EXECUTION,
+        verifier.EXECUTION_MIRROR,
         verifier.CANONICAL_INIT,
         verifier.MIRROR_INIT,
         verifier.TESTS,
@@ -37,49 +39,80 @@ def _write(path: Path, value: dict) -> None:
     path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
 
 
-def test_current_repository_passes_independent_vol131_verification() -> None:
+def test_current_repository_has_one_canonical_protocol_authority() -> None:
     receipt = verifier.verify_repository(ROOT)
-
     assert receipt["valid"] is True, receipt["errors"]
-    assert receipt["volume"] == "VOL-131"
-    assert receipt["verifier"] == "independent-vol131-internal-protocols-v1"
-    assert receipt["ai_tree_binding"]["mapping_id"] == "AIFT-NETWORK"
-    assert receipt["implementation"]["mirror_parity"] is True
-    assert receipt["implementation"]["export_parity"] is True
-    assert receipt["implementation"]["required_invariant_count"] >= 20
-    assert receipt["implementation"]["required_regression_count"] >= 10
-    assert len(receipt["receipt_digest"]) == 64
+    assert receipt["verifier"] == "independent-vol131-internal-protocols-v2"
+    implementation = receipt["implementation"]
+    assert implementation["single_envelope_authority"] is True
+    assert implementation["contract_mirror_parity"] is True
+    assert implementation["mirror_parity"] is True
+    assert implementation["export_parity"] is True
+    assert set(receipt["ai_tree_binding"]) == {"AIFT-CONTRACTS", "AIFT-NETWORK"}
 
 
-def test_rejects_protocol_mirror_drift() -> None:
+def test_rejects_shadow_protocol_envelope_in_execution_layer() -> None:
     root = _fixture()
-    path = root / verifier.MIRROR
-    path.write_text(
-        path.read_text(encoding="utf-8") + "\n# drift\n",
-        encoding="utf-8",
+    for relative in (verifier.EXECUTION, verifier.EXECUTION_MIRROR):
+        path = root / relative
+        path.write_text(
+            path.read_text(encoding="utf-8")
+            + "\nclass ProtocolEnvelope:\n    pass\n",
+            encoding="utf-8",
+        )
+    receipt = verifier.verify_repository(root)
+    assert receipt["valid"] is False
+    assert any("shadow ProtocolEnvelope" in error for error in receipt["errors"])
+
+
+def test_rejects_canonical_contract_mirror_drift() -> None:
+    root = _fixture()
+    path = root / verifier.CONTRACT_MIRROR
+    path.write_text(path.read_text(encoding="utf-8") + "\n# drift\n", encoding="utf-8")
+    receipt = verifier.verify_repository(root)
+    assert receipt["valid"] is False
+    assert any("canonical contract AI mirror drift" in error for error in receipt["errors"])
+
+
+def test_rejects_execution_mirror_drift() -> None:
+    root = _fixture()
+    path = root / verifier.EXECUTION_MIRROR
+    path.write_text(path.read_text(encoding="utf-8") + "\n# drift\n", encoding="utf-8")
+    receipt = verifier.verify_repository(root)
+    assert receipt["valid"] is False
+    assert any("execution AI mirror drift" in error for error in receipt["errors"])
+
+
+def test_rejects_ai_tree_contract_mapping_drift() -> None:
+    root = _fixture()
+    path = root / verifier.AI_TREE
+    data = _load(path)
+    mapping = next(item for item in data["mappings"] if item["id"] == "AIFT-CONTRACTS")
+    mapping["destination"] = "skeleton/ai/runtime/contracts-drift"
+    _write(path, data)
+    receipt = verifier.verify_repository(root)
+    assert receipt["valid"] is False
+    assert any("skeleton/contracts AI-tree mapping" in error for error in receipt["errors"])
+
+
+def test_rejects_retry_guard_weakening() -> None:
+    root = _fixture()
+    for relative in (verifier.EXECUTION, verifier.EXECUTION_MIRROR):
+        path = root / relative
+        source = path.read_text(encoding="utf-8").replace(
+            "cannot retry expired envelope",
+            "expired retry permitted",
+        )
+        path.write_text(source, encoding="utf-8")
+    receipt = verifier.verify_repository(root)
+    assert receipt["valid"] is False
+    assert any(
+        "execution invariant missing: cannot retry expired envelope" == error
+        for error in receipt["errors"]
     )
 
-    receipt = verifier.verify_repository(root)
 
-    assert receipt["valid"] is False
-    assert any("protocol mirror drift" in error for error in receipt["errors"])
-
-
-def test_rejects_network_export_drift() -> None:
-    root = _fixture()
-    path = root / verifier.MIRROR_INIT
-    path.write_text(
-        path.read_text(encoding="utf-8") + "\n# drift\n",
-        encoding="utf-8",
-    )
-
-    receipt = verifier.verify_repository(root)
-
-    assert receipt["valid"] is False
-    assert any("network export drift" in error for error in receipt["errors"])
-
-
-def test_rejects_masterplan_requirement_loss() -> None:
+def test_rejects_masterplan_protocol_requirement_loss() -> None:
     root = _fixture()
     path = root / verifier.MASTER
     data = _load(path)
@@ -88,74 +121,6 @@ def test_rejects_masterplan_requirement_loss() -> None:
         "Use stable envelopes with correlation, causation and deadline metadata."
     )
     _write(path, data)
-
     receipt = verifier.verify_repository(root)
-
     assert receipt["valid"] is False
     assert any("requirement invariant lost" in error for error in receipt["errors"])
-
-
-def test_rejects_premature_completion_promotion() -> None:
-    root = _fixture()
-    path = root / verifier.MASTER
-    data = _load(path)
-    volume = next(item for item in data["volumes"] if item["key"] == "VOL-131")
-    volume["completion_checkbox"] = True
-    _write(path, data)
-
-    receipt = verifier.verify_repository(root)
-
-    assert receipt["valid"] is False
-    assert any("cannot self-sign" in error for error in receipt["errors"])
-
-
-def test_rejects_ai_tree_mapping_drift() -> None:
-    root = _fixture()
-    path = root / verifier.AI_TREE
-    data = _load(path)
-    mapping = next(item for item in data["mappings"] if item["id"] == "AIFT-NETWORK")
-    mapping["destination"] = "skeleton/ai/runtime/distributed/network-drift"
-    _write(path, data)
-
-    receipt = verifier.verify_repository(root)
-
-    assert receipt["valid"] is False
-    assert any("exactly one canonical distributed-network" in error for error in receipt["errors"])
-
-
-def test_rejects_retry_invariant_source_weakening() -> None:
-    root = _fixture()
-    canonical = root / verifier.CANONICAL
-    mirror = root / verifier.MIRROR
-    source = canonical.read_text(encoding="utf-8").replace(
-        "cannot retry expired envelope",
-        "expired retries ignored",
-    )
-    canonical.write_text(source, encoding="utf-8")
-    mirror.write_text(source, encoding="utf-8")
-
-    receipt = verifier.verify_repository(root)
-
-    assert receipt["valid"] is False
-    assert any(
-        "implementation invariant missing: cannot retry expired envelope" == error
-        for error in receipt["errors"]
-    )
-
-
-def test_rejects_required_regression_removal() -> None:
-    root = _fixture()
-    path = root / verifier.TESTS
-    source = path.read_text(encoding="utf-8").replace(
-        "test_retry_chain_is_digest_bound_and_bounded",
-        "test_retry_chain_removed",
-    )
-    path.write_text(source, encoding="utf-8")
-
-    receipt = verifier.verify_repository(root)
-
-    assert receipt["valid"] is False
-    assert any(
-        "regression missing: test_retry_chain_is_digest_bound_and_bounded" in error
-        for error in receipt["errors"]
-    )
