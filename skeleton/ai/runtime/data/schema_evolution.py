@@ -460,12 +460,11 @@ class SchemaEvolutionGuard:
                 )
 
         old_supported = window.supports(source)
-        eligible = (
+        eligible = old_supported and (
             result["compatible"]
             or (
                 breaking
                 and plan_valid
-                and old_supported
                 and window.supports(target)
             )
         )
