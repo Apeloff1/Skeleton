@@ -10,10 +10,10 @@ from pathlib import Path
 import tempfile
 from typing import Any, Mapping
 
-from .local import ReferenceNGramModel
+from .local import ReferenceNGramModel\nfrom .native_runtime import NativeRuntimeLocalModel, NativeRuntimeBackendError
 
 
-_MAX_ARTIFACT_BYTES = 128 * 1024 * 1024
+_MAX_ARTIFACT_BYTES = 256 * 1024 * 1024
 
 
 class LocalModelArtifactError(RuntimeError):
@@ -83,6 +83,15 @@ class LoadedLocalModel:
 
 
 def _payload_model(payload: Mapping[str, Any]) -> tuple[object, str]:
+    runtime_schema = payload.get("schema")
+    if runtime_schema == "skeleton.ai.native-llm-runtime.v2":
+        try:
+            return NativeRuntimeLocalModel.from_checkpoint(payload), runtime_schema
+        except (NativeRuntimeBackendError, TypeError, ValueError, RuntimeError) as exc:
+            raise LocalModelArtifactError(
+                "native runtime artifact failed identity validation"
+            ) from exc
+
     schema = payload.get("schema_version")
     if schema == "skeleton.numpy_recurrent_lm.v1":
         try:

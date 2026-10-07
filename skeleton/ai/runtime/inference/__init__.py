@@ -25,6 +25,10 @@ from .llama_cpp import (
     build_llama_cpp_adapter,
     inspect_gguf,
 )
+from .native_runtime import (
+    NativeRuntimeBackendError,
+    NativeRuntimeLocalModel,
+)
 from .local import (
     CallableLocalModel,
     LocalInferenceCancelled,
@@ -58,6 +62,8 @@ __all__ = [
     "LlamaCppRuntimeError",
     "build_llama_cpp_adapter",
     "inspect_gguf",
+    "NativeRuntimeBackendError",
+    "NativeRuntimeLocalModel",
     "CallableLocalModel",
     "LocalInferenceCancelled",
     "LocalInferenceEngine",

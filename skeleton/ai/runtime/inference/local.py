@@ -529,7 +529,21 @@ class LocalInferenceEngine:
         self._cache_lock = asyncio.Lock()
 
     def _key(self, request: LocalInferenceRequest) -> str:
-        return _digest({"model": self.model.model_digest, "request": request.digest})
+        runtime_digest = getattr(self.model, "runtime_digest", None)
+        if runtime_digest is not None:
+            if (
+                not isinstance(runtime_digest, str)
+                or len(runtime_digest) != 64
+                or any(ch not in "0123456789abcdef" for ch in runtime_digest)
+            ):
+                raise ValueError("local runtime digest must be lowercase sha256")
+        return _digest(
+            {
+                "model": self.model.model_digest,
+                "runtime": runtime_digest,
+                "request": request.digest,
+            }
+        )
 
     async def generate(self, request: LocalInferenceRequest) -> LocalInferenceResult:
         if not isinstance(request, LocalInferenceRequest):
