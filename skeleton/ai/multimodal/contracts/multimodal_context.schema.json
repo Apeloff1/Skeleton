@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-08:multimodal_context:v1",
+  "title": "FLGB-08 multimodal context",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "item_id",
+    "modality",
+    "artifact_digest",
+    "token_cost",
+    "byte_cost",
+    "priority",
+    "mandatory"
+  ],
+  "properties": {
+    "item_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "modality": {
+      "enum": [
+        "text",
+        "image",
+        "document",
+        "audio",
+        "video"
+      ]
+    },
+    "artifact_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "token_cost": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "byte_cost": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "priority": {
+      "type": "integer"
+    },
+    "mandatory": {
+      "type": "boolean"
+    }
+  }
+}

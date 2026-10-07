@@ -225,9 +225,10 @@
         "FLGB-08-T11",
         "FLGB-08-T12"
       ],
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
-      "independent_verification_signed": false
+      "independent_verification_signed": false,
+      "implementation_note": "T01-T12 multimodal ingest/grounding/retrieval/fallback targets, schemas, and focused regressions are present; rights/provenance and authority-preserving fallback are explicit; exact-head dependency closure and independent verification remain required."
     },
     {
       "id": "FLGB-09",
@@ -6069,7 +6070,7 @@
       "implementation_target": "skeleton/ai/multimodal/image_ingest.py",
       "contract_target": "skeleton/ai/multimodal/contracts/image_ingest.schema.json",
       "test_target": "tests/flgb/test_flgb_08_image_ingest.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -6135,7 +6136,7 @@
       "implementation_target": "skeleton/ai/multimodal/document_vision.py",
       "contract_target": "skeleton/ai/multimodal/contracts/document_vision.schema.json",
       "test_target": "tests/flgb/test_flgb_08_document_vision.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -6201,7 +6202,7 @@
       "implementation_target": "skeleton/ai/multimodal/ocr_boundary.py",
       "contract_target": "skeleton/ai/multimodal/contracts/ocr_boundary.schema.json",
       "test_target": "tests/flgb/test_flgb_08_ocr_boundary.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -6267,7 +6268,7 @@
       "implementation_target": "skeleton/ai/multimodal/speech_ingest.py",
       "contract_target": "skeleton/ai/multimodal/contracts/speech_ingest.schema.json",
       "test_target": "tests/flgb/test_flgb_08_speech_ingest.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -6333,7 +6334,7 @@
       "implementation_target": "skeleton/ai/multimodal/speech_synthesis.py",
       "contract_target": "skeleton/ai/multimodal/contracts/speech_synthesis.schema.json",
       "test_target": "tests/flgb/test_flgb_08_speech_synthesis.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -6399,7 +6400,7 @@
       "implementation_target": "skeleton/ai/multimodal/audio_understanding.py",
       "contract_target": "skeleton/ai/multimodal/contracts/audio_understanding.schema.json",
       "test_target": "tests/flgb/test_flgb_08_audio_understanding.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -6465,7 +6466,7 @@
       "implementation_target": "skeleton/ai/multimodal/video_sampling.py",
       "contract_target": "skeleton/ai/multimodal/contracts/video_sampling.schema.json",
       "test_target": "tests/flgb/test_flgb_08_video_sampling.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -6531,7 +6532,7 @@
       "implementation_target": "skeleton/ai/multimodal/temporal_grounding.py",
       "contract_target": "skeleton/ai/multimodal/contracts/temporal_grounding.schema.json",
       "test_target": "tests/flgb/test_flgb_08_temporal_grounding.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -6597,7 +6598,7 @@
       "implementation_target": "skeleton/ai/multimodal/cross_modal_retrieval.py",
       "contract_target": "skeleton/ai/multimodal/contracts/cross_modal_retrieval.schema.json",
       "test_target": "tests/flgb/test_flgb_08_cross_modal_retrieval.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -6663,7 +6664,7 @@
       "implementation_target": "skeleton/ai/multimodal/multimodal_context.py",
       "contract_target": "skeleton/ai/multimodal/contracts/multimodal_context.schema.json",
       "test_target": "tests/flgb/test_flgb_08_multimodal_context.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -6729,7 +6730,7 @@
       "implementation_target": "skeleton/ai/multimodal/artifact_alignment.py",
       "contract_target": "skeleton/ai/multimodal/contracts/artifact_alignment.schema.json",
       "test_target": "tests/flgb/test_flgb_08_artifact_alignment.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -6795,7 +6796,7 @@
       "implementation_target": "skeleton/ai/multimodal/modality_fallback.py",
       "contract_target": "skeleton/ai/multimodal/contracts/modality_fallback.schema.json",
       "test_target": "tests/flgb/test_flgb_08_modality_fallback.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
