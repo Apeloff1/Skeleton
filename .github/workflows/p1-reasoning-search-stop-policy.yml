@@ -14,6 +14,7 @@ on:
       - "skeleton/ai/runtime/intelligence/uncertainty.py"
       - "skeleton/intelligence/cognition.py"
       - "skeleton/testing/test_reasoning_strategy_registry.py"
+      - "skeleton/testing/test_vol013_cognitive_budget_control.py"
       - ".github/workflows/p1-reasoning-search-stop-policy.yml"
   pull_request:
     branches:
@@ -29,6 +30,7 @@ on:
       - "skeleton/ai/runtime/intelligence/uncertainty.py"
       - "skeleton/intelligence/cognition.py"
       - "skeleton/testing/test_reasoning_strategy_registry.py"
+      - "skeleton/testing/test_vol013_cognitive_budget_control.py"
       - ".github/workflows/p1-reasoning-search-stop-policy.yml"
   workflow_dispatch:
 
@@ -73,6 +75,7 @@ jobs:
         run: >-
           python -m pytest -q --noconftest
           skeleton/testing/test_reasoning_strategy_registry.py
+          skeleton/testing/test_vol013_cognitive_budget_control.py
           skeleton/testing/test_cognition_control.py
           skeleton/testing/test_jeeves_rational_metareasoning.py
 
@@ -200,6 +203,7 @@ jobs:
               digest(
                   [
                       "skeleton/testing/test_reasoning_strategy_registry.py",
+                      "skeleton/testing/test_vol013_cognitive_budget_control.py",
                       "skeleton/testing/test_cognition_control.py",
                       "skeleton/testing/test_jeeves_rational_metareasoning.py",
                   ]
