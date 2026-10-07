@@ -1,0 +1,256 @@
+name: P1 Release Attribution Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/p1_release_attribution.json"
+      - "scripts/check_p1_release_attribution.py"
+      - "skeleton/release/attribution.py"
+      - "skeleton/release/__init__.py"
+      - "skeleton/testing/test_release_attribution.py"
+      - "tests/test_p1_release_attribution.py"
+      - ".github/workflows/p1-release-attribution.yml"
+  pull_request:
+    branches:
+      - main
+      - p1/learn-lane-materialize-20260928
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/p1_release_attribution.json"
+      - "scripts/check_p1_release_attribution.py"
+      - "skeleton/release/attribution.py"
+      - "skeleton/release/__init__.py"
+      - "skeleton/testing/test_release_attribution.py"
+      - "tests/test_p1_release_attribution.py"
+      - ".github/workflows/p1-release-attribution.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-release-attribution-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate release attribution and notices
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e .
+          "pytest>=8,<9"
+
+      - name: Compile REL-06 contracts
+        run: >-
+          python -m compileall -q
+          skeleton/release/attribution.py
+          scripts/check_p1_release_attribution.py
+
+      - name: Validate exact-head attribution registry
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-rel-06
+          python scripts/check_p1_release_attribution.py \
+            --notice-out .p1-rel-06/NOTICE.txt \
+            --report-out .p1-rel-06/registry-report.json \
+            --print-summary
+
+      - name: Run REL-01 and REL-06 regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_release_qualification.py
+          skeleton/testing/test_release_attribution.py
+          tests/test_p1_release_attribution.py
+
+      - name: Build accepted REL-06 attribution evidence
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          from scripts.check_p1_release_attribution import (
+              discover_license_paths,
+              load_entries,
+          )
+          from skeleton.release.attribution import (
+              ReleaseAttributionManifest,
+              qualify_release_attribution,
+              render_release_notice,
+          )
+          from skeleton.release.qualification import (
+              ReleaseQualificationDecision,
+          )
+
+          expected_sha = os.environ["EXPECTED_SHA"]
+          if len(expected_sha) != 40:
+              raise SystemExit("REL-06 expected head must be a 40-char git SHA")
+
+          release = ReleaseQualificationDecision(
+              accepted=True,
+              reasons=(),
+              source_commit=expected_sha,
+              release_evidence_digest="1" * 64,
+              reproducibility_bundle_digest="2" * 64,
+              reproducibility_evaluation_digest="3" * 64,
+              dependency_evidence_digest="4" * 64,
+              sbom_digest="5" * 64,
+              provenance_digest="6" * 64,
+              installer_metadata_digest="7" * 64,
+              configuration_digest="8" * 64,
+              lifecycle_receipt_digests=("9" * 64,),
+          )
+          _, entries, observed, discovered = load_entries()
+          notice = render_release_notice(entries)
+          manifest = ReleaseAttributionManifest(
+              source_commit=expected_sha,
+              release_qualification_digest=release.decision_digest,
+              entries=entries,
+              notice_digest=hashlib.sha256(
+                  notice.encode("utf-8")
+              ).hexdigest(),
+          )
+          decision = qualify_release_attribution(
+              release_qualification=release,
+              manifest=manifest,
+              observed_license_digests=observed,
+              discovered_license_paths=discovered,
+          )
+          if not decision.accepted:
+              raise SystemExit(
+                  f"REL-06 attribution rejected: {decision.reasons}"
+              )
+          evidence = decision.accepted_evidence_ref()
+          Path(".p1-rel-06/decision.json").write_text(
+              json.dumps(decision.payload(), indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          Path(".p1-rel-06/refs.json").write_text(
+              json.dumps(
+                  [{
+                      "source": evidence.source,
+                      "digest": evidence.digest,
+                      "category": evidence.category,
+                  }],
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Emit exact-head REL-06 evidence receipt
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          def digest(paths):
+              h = hashlib.sha256()
+              for name in paths:
+                  h.update(name.encode())
+                  h.update(b"\0")
+                  h.update(Path(name).read_bytes())
+                  h.update(b"\0")
+              return h.hexdigest()
+
+          Path(".p1-rel-06/config.digest").write_text(
+              hashlib.sha256(
+                  b"p1-rel-06-attribution-v1"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-rel-06/environment.digest").write_text(
+              hashlib.sha256(
+                  b"ubuntu-24.04|python-3.11.16|rel-06"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-rel-06/verifier.digest").write_text(
+              digest([
+                  "machine/p1_release_attribution.json",
+                  "scripts/check_p1_release_attribution.py",
+                  "skeleton/release/attribution.py",
+                  "skeleton/release/qualification.py",
+                  ".github/workflows/p1-release-attribution.yml",
+              ]),
+              encoding="utf-8",
+          )
+          Path(".p1-rel-06/tests.digest").write_text(
+              digest([
+                  "skeleton/testing/test_release_qualification.py",
+                  "skeleton/testing/test_release_attribution.py",
+                  "tests/test_p1_release_attribution.py",
+              ]),
+              encoding="utf-8",
+          )
+          PY
+
+          python scripts/emit_p1_promotion_evidence.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --expected-head "$EXPECTED_SHA" \
+            --task-id P1-REL-06 \
+            --accountability-id ACC-P1-REL-06 \
+            --configuration-digest "$(cat .p1-rel-06/config.digest)" \
+            --environment-digest "$(cat .p1-rel-06/environment.digest)" \
+            --verifier-id github-actions:p1-release-attribution \
+            --verifier-digest "$(cat .p1-rel-06/verifier.digest)" \
+            --test-manifest-digest "$(cat .p1-rel-06/tests.digest)" \
+            --run-id "$RUN_IDENTITY" \
+            --run-attempt "$RUN_ATTEMPT" \
+            --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --evidence-file .p1-rel-06/refs.json \
+            --out .p1-rel-06/receipt.json \
+            > .p1-rel-06/stdout.json
+
+      - name: Assert exact-head REL-06 receipt
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-rel-06/receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("REL-06 receipt head mismatch")
+          if receipt["task_id"] != "P1-REL-06":
+              raise SystemExit("REL-06 task identity mismatch")
+          if receipt["accountability_id"] != "ACC-P1-REL-06":
+              raise SystemExit("REL-06 accountability identity mismatch")
+          for field in ("subject_digest", "evidence_digest", "receipt_digest"):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print("REL-06 exact-head receipt OK", receipt["receipt_digest"])
+          PY

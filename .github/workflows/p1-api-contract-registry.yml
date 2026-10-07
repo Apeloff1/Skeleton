@@ -1,0 +1,196 @@
+name: P1 API Contract Registry Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "backend/core/api_contract_registry.py"
+      - "machine/ai_p1_task_backlog.json"
+      - "backend/core/routes_registry.py"
+      - "backend/routes/operation_stream.py"
+      - "backend/tests/test_api_contract_registry.py"
+      - "machine/p1_api_contract_registry.json"
+      - "machine/ai_runtime_schemas.json"
+      - "scripts/check_p1_api_contract_registry.py"
+      - "tests/test_p1_api_contract_registry.py"
+      - ".github/workflows/p1-api-contract-registry.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/core/api_contract_registry.py"
+      - "machine/ai_p1_task_backlog.json"
+      - "backend/routes/operation_stream.py"
+      - "backend/tests/test_api_contract_registry.py"
+      - "machine/p1_api_contract_registry.json"
+      - "machine/ai_runtime_schemas.json"
+      - "scripts/check_p1_api_contract_registry.py"
+      - "tests/test_p1_api_contract_registry.py"
+      - ".github/workflows/p1-api-contract-registry.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-api-contract-registry-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate P1 API contract compatibility
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      BASE_SHA: "${{ github.event.pull_request.base.sha || '' }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "fastapi>=0.110,<1"
+          "pydantic[email]>=2.13.5"
+          "pydantic-settings>=2.15.0"
+
+      - name: Compile API registry
+        run: >-
+          python -m compileall -q
+          backend/core/api_contract_registry.py
+          scripts/check_p1_api_contract_registry.py
+
+      - name: Run compatibility regressions
+        run: |
+          python -m pytest -q --noconftest backend/tests/test_api_contract_registry.py
+          python -m pytest -q --noconftest tests/test_p1_api_contract_registry.py
+
+      - name: Validate current route inventory
+        run: >-
+          python scripts/check_p1_api_contract_registry.py
+          --print-summary
+
+      - name: Compare with base registry when available
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-prod01
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          if git cat-file -e "$BASE_SHA:machine/p1_api_contract_registry.json" 2>/dev/null; then
+            git show "$BASE_SHA:machine/p1_api_contract_registry.json"               > .p1-prod01/base-registry.json
+            python scripts/check_p1_api_contract_registry.py               --baseline .p1-prod01/base-registry.json               --observed-at-epoch "$(date -u +%s)"               --out .p1-prod01/compatibility.json               --print-summary
+          else
+            echo "Bootstrap registry: no base registry exists yet."
+          fi
+
+      - name: Emit exact-head PROD-01 evidence receipt
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-prod01
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          evidence_files = [
+              "backend/core/api_contract_registry.py",
+              "backend/core/routes_registry.py",
+              "backend/routes/operation_stream.py",
+              "machine/p1_api_contract_registry.json",
+              "machine/ai_runtime_schemas.json",
+              "scripts/check_p1_api_contract_registry.py",
+              "backend/tests/test_api_contract_registry.py",
+              "tests/test_p1_api_contract_registry.py",
+          ]
+          refs = [
+              {
+                  "source": name,
+                  "digest": hashlib.sha256(Path(name).read_bytes()).hexdigest(),
+                  "category": "repository_state",
+              }
+              for name in evidence_files
+          ]
+          Path(".p1-prod01/refs.json").write_text(
+              json.dumps(refs, sort_keys=True),
+              encoding="utf-8",
+          )
+
+          def digest(names):
+              h = hashlib.sha256()
+              for name in names:
+                  h.update(name.encode())
+                  h.update(b"\0")
+                  h.update(Path(name).read_bytes())
+                  h.update(b"\0")
+              return h.hexdigest()
+
+          Path(".p1-prod01/config.digest").write_text(
+              digest(
+                  [
+                      "machine/p1_api_contract_registry.json",
+                      "machine/ai_runtime_schemas.json",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          Path(".p1-prod01/environment.digest").write_text(
+              hashlib.sha256(b"ubuntu-24.04|python-3.11.16").hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-prod01/verifier.digest").write_text(
+              digest(
+                  [
+                      "scripts/check_p1_api_contract_registry.py",
+                      ".github/workflows/p1-api-contract-registry.yml",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          Path(".p1-prod01/tests.digest").write_text(
+              digest(
+                  [
+                      "backend/tests/test_api_contract_registry.py",
+                      "tests/test_p1_api_contract_registry.py",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          PY
+          python scripts/emit_p1_promotion_evidence.py             --repository Apeloff1/Skeleton             --commit-sha "$EXPECTED_SHA"             --expected-head "$EXPECTED_SHA"             --task-id P1-PROD-01             --accountability-id ACC-P1-PROD-01             --configuration-digest "$(cat .p1-prod01/config.digest)"             --environment-digest "$(cat .p1-prod01/environment.digest)"             --verifier-id github-actions:p1-api-contract-registry             --verifier-digest "$(cat .p1-prod01/verifier.digest)"             --test-manifest-digest "$(cat .p1-prod01/tests.digest)"             --run-id "$RUN_IDENTITY"             --run-attempt "$RUN_ATTEMPT"             --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"             --evidence-file .p1-prod01/refs.json             --out .p1-prod01/receipt.json             > .p1-prod01/stdout.json
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-prod01/receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("PROD-01 receipt head mismatch")
+          if receipt["task_id"] != "P1-PROD-01":
+              raise SystemExit("PROD-01 receipt task mismatch")
+          if receipt["accountability_id"] != "ACC-P1-PROD-01":
+              raise SystemExit("PROD-01 accountability mismatch")
+          for field in ("subject_digest", "evidence_digest", "receipt_digest"):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print("PROD-01 exact-head receipt OK", receipt["receipt_digest"])
+          PY

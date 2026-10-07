@@ -1,0 +1,269 @@
+name: P1 Maturity Reconciliation Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_p1_execution_map.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_p1_terminal_closure.json"
+      - "skeleton/contracts/maturity_reconciliation.py"
+      - "skeleton/ai/runtime/contracts/maturity_reconciliation.py"
+      - "skeleton/contracts/__init__.py"
+      - "skeleton/ai/runtime/contracts/__init__.py"
+      - "scripts/reconcile_p1_maturity.py"
+      - "skeleton/testing/test_maturity_reconciliation.py"
+      - "tests/test_p1_maturity_reconciliation.py"
+      - ".github/workflows/p1-maturity-reconciliation.yml"
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_p1_execution_map.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_p1_terminal_closure.json"
+      - "skeleton/contracts/maturity_reconciliation.py"
+      - "skeleton/ai/runtime/contracts/maturity_reconciliation.py"
+      - "skeleton/contracts/__init__.py"
+      - "skeleton/ai/runtime/contracts/__init__.py"
+      - "scripts/reconcile_p1_maturity.py"
+      - "skeleton/testing/test_maturity_reconciliation.py"
+      - "tests/test_p1_maturity_reconciliation.py"
+      - ".github/workflows/p1-maturity-reconciliation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Evidence-critical: exact-head signing verification must survive unrelated main churn.
+  group: p1-maturity-reconciliation-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  validate:
+    name: Validate non-mutating P1 maturity reconciliation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused reconciliation runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pydantic[email]>=2.13.5"
+          "pydantic-settings>=2.15.0"
+
+      - name: Validate canonical planning and accountability inputs
+        run: |
+          set -euo pipefail
+          python scripts/check_ai_master_plan.py
+          python scripts/check_ai_build_accountability.py
+          python scripts/check_ai_p1_execution_map.py --print-summary
+
+      - name: Run maturity reconciliation regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_maturity_reconciliation.py
+          tests/test_p1_maturity_reconciliation.py
+
+      - name: Reconcile full P1 primary frontier
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-maturity
+          python scripts/reconcile_p1_maturity.py             --out .p1-maturity/report.json
+
+      - name: Assert deterministic non-mutating report
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(
+              Path(".p1-maturity/report.json").read_text(encoding="utf-8")
+          )
+          if report["source_mutation_detected"] is not False:
+              raise SystemExit("reconciliation mutated canonical source state")
+          if report["volume_count"] != 107:
+              raise SystemExit("P1 primary frontier count drift")
+          expected_sources = {
+              "master_plan",
+              "accountability",
+              "p1_execution_map",
+              "engine_contract",
+              "engine_runner",
+          }
+          if set(report["source_digests"]) != expected_sources:
+              raise SystemExit("reconciliation source identity drift")
+          if any(len(value) != 64 for value in report["source_digests"].values()):
+              raise SystemExit("invalid reconciliation source digest")
+          if len(report.get("report_digest", "")) != 64:
+              raise SystemExit("invalid reconciliation report digest")
+          for row in report["records"]:
+              if (
+                  row["implementation_status_candidate"] is not None
+                  and row["accountability_maturity_status"] is None
+              ):
+                  raise SystemExit(
+                      "implementation candidate lacks explicit accountability maturity"
+                  )
+          print(
+              "P1 maturity reconciliation OK:",
+              report["volume_count"],
+              report["promotion_candidate_count"],
+              report["target_floor_eligible_count"],
+              report["report_digest"],
+          )
+          PY
+
+      - name: Emit exact-head EVID-02 receipt
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          report = json.loads(
+              Path(".p1-maturity/report.json").read_text(encoding="utf-8")
+          )
+
+          def digest_files(names):
+              h = hashlib.sha256()
+              for name in names:
+                  h.update(name.encode())
+                  h.update(b"\0")
+                  h.update(Path(name).read_bytes())
+                  h.update(b"\0")
+              return h.hexdigest()
+
+          refs = [
+              {
+                  "source": "p1:maturity-reconciliation-report",
+                  "digest": report["report_digest"],
+                  "category": "maturity_reconciliation_report",
+              }
+          ]
+          for name in (
+              "skeleton/contracts/maturity_reconciliation.py",
+              "scripts/reconcile_p1_maturity.py",
+              "skeleton/testing/test_maturity_reconciliation.py",
+              "tests/test_p1_maturity_reconciliation.py",
+          ):
+              refs.append(
+                  {
+                      "source": name,
+                      "digest": hashlib.sha256(Path(name).read_bytes()).hexdigest(),
+                      "category": "repository_state",
+                  }
+              )
+          Path(".p1-maturity/evidence-refs.json").write_text(
+              json.dumps(refs, sort_keys=True),
+              encoding="utf-8",
+          )
+          Path(".p1-maturity/config.digest").write_text(
+              digest_files(
+                  [
+                      "machine/ai_master_plan.json",
+                      "machine/ai_p1_execution_map.json",
+                      "machine/ai_p1_task_backlog.json",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          Path(".p1-maturity/environment.digest").write_text(
+              hashlib.sha256(b"ubuntu-24.04|python-3.11.16").hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-maturity/verifier.digest").write_text(
+              digest_files(
+                  [
+                      "skeleton/contracts/maturity_reconciliation.py",
+                      "scripts/reconcile_p1_maturity.py",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          Path(".p1-maturity/tests.digest").write_text(
+              digest_files(
+                  [
+                      "skeleton/testing/test_maturity_reconciliation.py",
+                      "tests/test_p1_maturity_reconciliation.py",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          PY
+          python scripts/emit_p1_promotion_evidence.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --expected-head "$EXPECTED_SHA" \
+            --task-id P1-EVID-02 \
+            --accountability-id ACC-P1-EVID-02 \
+            --configuration-digest "$(cat .p1-maturity/config.digest)" \
+            --environment-digest "$(cat .p1-maturity/environment.digest)" \
+            --verifier-id github-actions:p1-maturity-reconciliation \
+            --verifier-digest "$(cat .p1-maturity/verifier.digest)" \
+            --test-manifest-digest "$(cat .p1-maturity/tests.digest)" \
+            --run-id "$RUN_IDENTITY" \
+            --run-attempt "$RUN_ATTEMPT" \
+            --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --evidence-file .p1-maturity/evidence-refs.json \
+            --out .p1-maturity/receipt.json \
+            > .p1-maturity/receipt.stdout.json
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(
+              Path(".p1-maturity/report.json").read_text(encoding="utf-8")
+          )
+          receipt = json.loads(
+              Path(".p1-maturity/receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("EVID-02 receipt does not bind exact head")
+          if receipt["task_id"] != "P1-EVID-02":
+              raise SystemExit("EVID-02 receipt task drift")
+          if receipt["accountability_id"] != "ACC-P1-EVID-02":
+              raise SystemExit("EVID-02 accountability identity drift")
+          if not any(
+              item["source"] == "p1:maturity-reconciliation-report"
+              and item["digest"] == report["report_digest"]
+              for item in receipt["evidence"]
+          ):
+              raise SystemExit("EVID-02 receipt does not bind reconciliation report")
+          for field in ("subject_digest", "evidence_digest", "receipt_digest"):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print(
+              "P1 EVID-02 receipt OK:",
+              receipt["subject_digest"],
+              receipt["receipt_digest"],
+          )
+          PY

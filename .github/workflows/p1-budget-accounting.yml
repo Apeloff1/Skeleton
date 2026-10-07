@@ -1,0 +1,297 @@
+name: P1 Budget Accounting Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "machine/ai_p1_task_backlog.json"
+      - "skeleton/observability/budget_accounting.py"
+      - "skeleton/ai/runtime/observability/budget_accounting.py"
+      - "skeleton/intelligence/quota.py"
+      - "skeleton/intelligence/quota_sqlite.py"
+      - "skeleton/intelligence/admission.py"
+      - "skeleton/testing/test_budget_accounting_ledger.py"
+      - ".github/workflows/p1-budget-accounting.yml"
+  pull_request:
+    branches:
+      - main
+      - p1/release-lane-materialize-20260928
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_p1_task_backlog.json"
+      - "skeleton/observability/budget_accounting.py"
+      - "skeleton/ai/runtime/observability/budget_accounting.py"
+      - "skeleton/intelligence/quota.py"
+      - "skeleton/intelligence/quota_sqlite.py"
+      - "skeleton/intelligence/admission.py"
+      - "skeleton/testing/test_budget_accounting_ledger.py"
+      - ".github/workflows/p1-budget-accounting.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-budget-accounting-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate quota and budget accounting
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e .
+          "pytest>=8,<9"
+
+      - name: Compile DIST-05 contracts
+        run: >-
+          python -m compileall -q
+          skeleton/observability/budget_accounting.py
+          skeleton/ai/runtime/observability/budget_accounting.py
+
+      - name: Run quota and accounting regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_budget_accounting_ledger.py
+          skeleton/testing/test_tenant_quota.py
+          skeleton/testing/test_tenant_quota_sqlite.py
+          skeleton/testing/test_cost_admission.py
+          tests/test_gb51_quota.py
+
+      - name: Validate canonical AI file tree parity
+        run: python scripts/check_ai_file_tree.py
+
+      - name: Build accepted DIST-05 accounting evidence
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-dist-05
+          python - <<'PY'
+          import json
+          import tempfile
+          from pathlib import Path
+
+          from skeleton.contracts.canonical import EvidenceRef
+          from skeleton.intelligence.admission import UsageEstimate
+          from skeleton.intelligence.quota import TenantQuota
+          from skeleton.observability.budget_accounting import (
+              DurableBudgetAccountingLedger,
+          )
+
+          root = Path(tempfile.mkdtemp(prefix="p1-dist-05-"))
+          path = root / "quota.sqlite3"
+          first = DurableBudgetAccountingLedger(path)
+          first.configure(
+              "tenant-ci",
+              TenantQuota(
+                  window_id="window-ci",
+                  max_operations=10,
+                  max_input_tokens=10000,
+                  max_output_tokens=10000,
+                  max_cost_usd=100.0,
+                  max_tool_calls=100,
+                  max_artifact_bytes=10000,
+                  max_storage_bytes=10000,
+                  max_concurrent_operations=4,
+              ),
+          )
+          estimate = UsageEstimate(
+              input_tokens=100,
+              output_tokens=10,
+              cost_usd=1.0,
+          )
+          reservation = first.reserve(
+              "tenant-ci",
+              "operation-ci",
+              estimate,
+              now=10.0,
+          )
+          first.charge(
+              reservation.reservation_id,
+              "charge-ci",
+              "provider",
+              UsageEstimate(
+                  input_tokens=90,
+                  output_tokens=8,
+                  cost_usd=0.8,
+              ),
+              now=10.5,
+          )
+          # Prove duplicate delivery is not a second charge.
+          first.charge(
+              reservation.reservation_id,
+              "charge-ci",
+              "provider",
+              UsageEstimate(
+                  input_tokens=90,
+                  output_tokens=8,
+                  cost_usd=0.8,
+              ),
+              now=99.0,
+          )
+
+          restarted = DurableBudgetAccountingLedger(path)
+          replay = restarted.reserve(
+              "tenant-ci",
+              "operation-ci",
+              estimate,
+              now=100.0,
+          )
+          if replay.reservation_id != reservation.reservation_id:
+              raise SystemExit("DIST-05 reservation replay drift")
+          completion = restarted.reconcile(
+              reservation.reservation_id,
+              UsageEstimate(
+                  input_tokens=90,
+                  output_tokens=8,
+                  cost_usd=0.8,
+              ),
+              now=11.0,
+          )
+          decision = restarted.qualification(
+              tenant_id="tenant-ci",
+              operation_id="operation-ci",
+              reservation=reservation,
+              completion=completion,
+              evidence_refs=(
+                  EvidenceRef(
+                      source="ci://dist-05/reconciliation",
+                      digest="a" * 64,
+                      category="cost_reconciliation",
+                  ),
+              ),
+          )
+          if not decision.accepted:
+              raise SystemExit(
+                  f"DIST-05 fixture rejected: {decision.reasons}"
+              )
+          evidence = decision.accepted_evidence_ref()
+          Path(".p1-dist-05/decision.json").write_text(
+              json.dumps(decision.payload(), indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          Path(".p1-dist-05/refs.json").write_text(
+              json.dumps(
+                  [{
+                      "source": evidence.source,
+                      "digest": evidence.digest,
+                      "category": evidence.category,
+                  }],
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Emit exact-head DIST-05 evidence receipt
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          def digest(paths):
+              h = hashlib.sha256()
+              for name in paths:
+                  h.update(name.encode())
+                  h.update(b"\0")
+                  h.update(Path(name).read_bytes())
+                  h.update(b"\0")
+              return h.hexdigest()
+
+          Path(".p1-dist-05/config.digest").write_text(
+              hashlib.sha256(
+                  b"p1-dist-05-budget-accounting-v1"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-dist-05/environment.digest").write_text(
+              hashlib.sha256(
+                  b"ubuntu-24.04|python-3.11.16|dist-05"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-dist-05/verifier.digest").write_text(
+              digest([
+                  "skeleton/observability/budget_accounting.py",
+                  "skeleton/intelligence/quota.py",
+                  "skeleton/intelligence/quota_sqlite.py",
+                  "skeleton/intelligence/admission.py",
+                  ".github/workflows/p1-budget-accounting.yml",
+              ]),
+              encoding="utf-8",
+          )
+          Path(".p1-dist-05/tests.digest").write_text(
+              digest([
+                  "skeleton/testing/test_budget_accounting_ledger.py",
+                  "skeleton/testing/test_tenant_quota.py",
+                  "skeleton/testing/test_tenant_quota_sqlite.py",
+                  "skeleton/testing/test_cost_admission.py",
+                  "tests/test_gb51_quota.py",
+              ]),
+              encoding="utf-8",
+          )
+          PY
+
+          python scripts/emit_p1_promotion_evidence.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --expected-head "$EXPECTED_SHA" \
+            --task-id P1-DIST-05 \
+            --accountability-id ACC-P1-DIST-05 \
+            --configuration-digest "$(cat .p1-dist-05/config.digest)" \
+            --environment-digest "$(cat .p1-dist-05/environment.digest)" \
+            --verifier-id github-actions:p1-budget-accounting \
+            --verifier-digest "$(cat .p1-dist-05/verifier.digest)" \
+            --test-manifest-digest "$(cat .p1-dist-05/tests.digest)" \
+            --run-id "$RUN_IDENTITY" \
+            --run-attempt "$RUN_ATTEMPT" \
+            --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --evidence-file .p1-dist-05/refs.json \
+            --out .p1-dist-05/receipt.json \
+            > .p1-dist-05/stdout.json
+
+      - name: Assert exact-head DIST-05 receipt
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-dist-05/receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("DIST-05 receipt head mismatch")
+          if receipt["task_id"] != "P1-DIST-05":
+              raise SystemExit("DIST-05 task identity mismatch")
+          if receipt["accountability_id"] != "ACC-P1-DIST-05":
+              raise SystemExit("DIST-05 accountability identity mismatch")
+          for field in ("subject_digest", "evidence_digest", "receipt_digest"):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print("DIST-05 exact-head receipt OK", receipt["receipt_digest"])
+          PY

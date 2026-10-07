@@ -1,0 +1,6 @@
+bin/
+obj/
+out/
+audit/
+*.user
+.vs/

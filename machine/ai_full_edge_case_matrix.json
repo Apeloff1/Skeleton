@@ -1,0 +1,2607 @@
+{
+  "schema_version": 1,
+  "matrix_version": "1.0.0",
+  "status": "active",
+  "architecture_lane": "PR-1904",
+  "scope": {
+    "first_work_package": "WP-W00",
+    "last_work_package": "WP-W30"
+  },
+  "sources": {
+    "master_plan": "machine/ai_master_plan.json",
+    "catalog": "machine/ai_edge_case_catalog.json",
+    "p0_matrix": "machine/ai_p0_edge_case_matrix.json",
+    "build_queue": "machine/ai_build_queue.json",
+    "human": "docs/plan/FULL_EDGE_CASE_BUILD_MATRIX.md"
+  },
+  "hardening_policy": {
+    "critical": "all applicable critical cases require evidence or explicit accepted risk",
+    "high": "all applicable high cases require evidence or explicit accepted risk before hardened/production",
+    "medium": "tracked and prioritized by capability maturity/risk",
+    "reference": "historical lessons require design/ADR evidence where materially applicable"
+  },
+  "coverage": {
+    "catalog_total": 240,
+    "mapped_total": 240,
+    "orphan_total": 0,
+    "work_packages": 31,
+    "critical": 36,
+    "high": 21,
+    "medium": 119,
+    "reference": 64
+  },
+  "packages": [
+    {
+      "id": "WP-W00",
+      "name": "Architecture Authority",
+      "priority": "P0",
+      "objective": "Make the human/machine architecture, breadth freeze, traceability and drift rules authoritative and fail-closed.",
+      "exact_paths": [
+        "docs/plan/MASTER_INDEX.md",
+        "docs/plan/MASTER_PLAN.md",
+        "docs/plan/EDGE_CASES_HISTORICAL.md",
+        "machine/ai_master_plan.json",
+        "machine/ai_edge_case_catalog.json",
+        "machine/architecture.json",
+        "scripts/check_ai_master_plan.py",
+        "scripts/check_ai_edge_case_catalog.py",
+        "scripts/check_architecture_map.py",
+        "skeleton/testing/test_ai_master_plan.py",
+        "skeleton/testing/test_ai_edge_case_catalog.py",
+        "skeleton/testing/test_architecture_map.py"
+      ],
+      "historical_ids": [
+        "HIST-SYS-018",
+        "HIST-SYS-019",
+        "HIST-SYS-022",
+        "HIST-SYS-023",
+        "HIST-SYS-025"
+      ],
+      "edge_case_ids": [
+        "EDGE-CONTRACT-008",
+        "EDGE-CONTRACT-009",
+        "EDGE-CONTRACT-010",
+        "EDGE-CONTRACT-019",
+        "EDGE-CONTRACT-020",
+        "EDGE-DATA-004"
+      ],
+      "obscure_ids": [
+        "OBSCURE-011",
+        "OBSCURE-022",
+        "OBSCURE-023",
+        "OBSCURE-029",
+        "OBSCURE-030"
+      ],
+      "invariants": [
+        "Every target-plan artifact has one canonical identity and version.",
+        "Human and machine planning artifacts cannot silently disagree on breadth-freeze or volume identity.",
+        "Architecture documentation never upgrades implementation_status without executable evidence.",
+        "Provider/runtime truth remains owned by existing fail-closed runtime contracts when target plan is ahead of implementation.",
+        "Top-level volume creation after VOL-420 requires an explicit ADR."
+      ],
+      "test_targets": [
+        "skeleton/testing/test_ai_master_plan.py::test_master_plan_machine_contract_is_complete",
+        "skeleton/testing/test_ai_edge_case_catalog.py::test_edge_case_catalog_passes_validator",
+        "planned:skeleton/testing/test_ai_plan_traceability.py::test_human_machine_plan_cross_links_are_bidirectional",
+        "planned:skeleton/testing/test_ai_plan_traceability.py::test_no_implementation_status_without_evidence"
+      ],
+      "acceptance": [
+        "421 contiguous volumes remain addressable",
+        "all cross-cutting catalog references resolve",
+        "breadth freeze cannot be bypassed by undocumented top-level plans",
+        "architecture drift is detected before runtime/build tests"
+      ],
+      "edge_coverage_status": "mapped",
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W01",
+      "name": "Contract Primitives",
+      "priority": "P0",
+      "objective": "Define stable IDs, versions, errors, budgets, authority, deadlines, cancellation, provenance and serialization semantics.",
+      "exact_paths": [
+        "skeleton/contracts/operation.py",
+        "skeleton/contracts/conversation.py",
+        "skeleton/contracts/context.py",
+        "skeleton/contracts",
+        "machine/ai_runtime_schemas.json",
+        "machine/capability_interfaces.json"
+      ],
+      "historical_ids": [
+        "HIST-AI-002",
+        "HIST-AI-008",
+        "HIST-SYS-003",
+        "HIST-SYS-011",
+        "HIST-SYS-012",
+        "HIST-SYS-019"
+      ],
+      "edge_case_ids": [
+        "EDGE-CONTRACT-001",
+        "EDGE-CONTRACT-002",
+        "EDGE-CONTRACT-003",
+        "EDGE-CONTRACT-004",
+        "EDGE-CONTRACT-005",
+        "EDGE-CONTRACT-006",
+        "EDGE-CONTRACT-007",
+        "EDGE-CONTRACT-008",
+        "EDGE-CONTRACT-009",
+        "EDGE-CONTRACT-010",
+        "EDGE-CONTRACT-013",
+        "EDGE-CONTRACT-014",
+        "EDGE-CONTRACT-015",
+        "EDGE-CONTRACT-016",
+        "EDGE-CONTRACT-018",
+        "EDGE-CONTRACT-019",
+        "EDGE-CONTRACT-020"
+      ],
+      "obscure_ids": [
+        "OBSCURE-004",
+        "OBSCURE-011",
+        "OBSCURE-028"
+      ],
+      "invariants": [
+        "Identifiers are opaque; semantic meaning is never inferred from identifier text.",
+        "Absent and explicit-null semantics are defined per field and preserved across serialization.",
+        "Security-sensitive JSON rejects duplicate object keys and non-finite numbers.",
+        "Durations use monotonic time; persisted timestamps use explicit UTC/offset semantics.",
+        "Schema evolution has explicit compatibility policy and unknown values cannot silently become privileged defaults.",
+        "Signing/hashing uses a canonical representation with declared algorithm/version."
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_contract_serialization_edges.py::test_duplicate_json_keys_fail_closed",
+        "planned:skeleton/testing/test_contract_serialization_edges.py::test_null_and_absent_are_not_conflated",
+        "planned:skeleton/testing/test_contract_serialization_edges.py::test_large_integer_round_trip_across_json_client_boundary",
+        "planned:skeleton/testing/test_contract_unicode_edges.py::test_identifier_normalization_and_confusables_policy",
+        "planned:skeleton/testing/test_contract_time_edges.py::test_deadline_duration_uses_monotonic_clock",
+        "planned:skeleton/testing/test_contract_compatibility.py::test_unknown_enum_value_is_not_privilege_escalation"
+      ],
+      "acceptance": [
+        "cross-runtime round trips preserve identity and semantics",
+        "malformed/ambiguous encodings fail deterministically",
+        "time and numeric boundary behavior is platform-independent",
+        "compatibility behavior is tested rather than assumed"
+      ],
+      "edge_coverage_status": "mapped",
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W02",
+      "name": "Kernel & Lifecycle",
+      "priority": "P0",
+      "objective": "Provide deterministic bootstrap, readiness, shutdown, service ownership, cancellation propagation and runtime identity.",
+      "exact_paths": [
+        "skeleton/app/assembly.py",
+        "skeleton/app/health.py",
+        "skeleton/app/cli.py",
+        "skeleton/__main__.py",
+        "skeleton/provider_contract.py",
+        "machine/manifest.json",
+        "skeleton/testing/test_app_assembly.py"
+      ],
+      "historical_ids": [
+        "HIST-SYS-001",
+        "HIST-SYS-002",
+        "HIST-SYS-005",
+        "HIST-SYS-018",
+        "HIST-SYS-022"
+      ],
+      "edge_case_ids": [
+        "EDGE-DIST-011",
+        "EDGE-DIST-030",
+        "EDGE-SEC-015",
+        "EDGE-SEC-016",
+        "EDGE-SEC-020",
+        "EDGE-HW-009",
+        "EDGE-HW-010"
+      ],
+      "obscure_ids": [
+        "OBSCURE-001",
+        "OBSCURE-004",
+        "OBSCURE-015",
+        "OBSCURE-028"
+      ],
+      "invariants": [
+        "LIVE and READY are distinct states.",
+        "Bootstrap fails closed when mandatory contracts/configuration are unavailable or incompatible.",
+        "Shutdown stops admission before draining/cancelling work and closing dependencies.",
+        "Cancellation is propagated as a protocol and never rewrites already committed side effects.",
+        "Child processes receive only explicitly required environment/secret material.",
+        "Suspend/resume or transient provider/network loss can transition runtime to degraded/recovering without corrupting authority state."
+      ],
+      "test_targets": [
+        "skeleton/testing/test_app_assembly.py",
+        "planned:skeleton/testing/test_kernel_lifecycle_edges.py::test_live_not_ready_during_partial_boot",
+        "planned:skeleton/testing/test_kernel_lifecycle_edges.py::test_shutdown_orders_admission_drain_checkpoint_flush",
+        "planned:skeleton/testing/test_kernel_lifecycle_edges.py::test_cancel_race_resolves_one_terminal_state",
+        "planned:skeleton/testing/test_kernel_lifecycle_edges.py::test_child_process_secret_environment_is_minimal",
+        "planned:skeleton/testing/test_kernel_lifecycle_edges.py::test_suspend_resume_reprobes_health"
+      ],
+      "acceptance": [
+        "boot and shutdown are deterministic",
+        "readiness reflects mandatory dependency truth",
+        "cancellation and shutdown are race-safe",
+        "secrets do not spread through ambient process state"
+      ],
+      "edge_coverage_status": "mapped",
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W03",
+      "name": "Durable State",
+      "priority": "P0",
+      "objective": "Make canonical mutable state transactional, recoverable, migration-safe and separable from derived indexes/caches.",
+      "exact_paths": [
+        "skeleton/persistence/operation_store.py",
+        "skeleton/persistence/conversation_repository.py",
+        "skeleton/persistence",
+        "backend/services/database.py",
+        "machine/state_topology.json",
+        "docker-compose.yml"
+      ],
+      "historical_ids": [
+        "HIST-SYS-007",
+        "HIST-SYS-008",
+        "HIST-SYS-009",
+        "HIST-SYS-011",
+        "HIST-SYS-012",
+        "HIST-SYS-027",
+        "HIST-SYS-028",
+        "HIST-SYS-029"
+      ],
+      "edge_case_ids": [
+        "EDGE-DIST-001",
+        "EDGE-DIST-006",
+        "EDGE-DIST-009",
+        "EDGE-DIST-010",
+        "EDGE-DIST-022",
+        "EDGE-DIST-023",
+        "EDGE-DIST-024",
+        "EDGE-DIST-025",
+        "EDGE-DATA-001",
+        "EDGE-DATA-002",
+        "EDGE-DATA-003",
+        "EDGE-DATA-005",
+        "EDGE-DATA-006",
+        "EDGE-DATA-007",
+        "EDGE-HW-001",
+        "EDGE-HW-002"
+      ],
+      "obscure_ids": [
+        "OBSCURE-002",
+        "OBSCURE-006",
+        "OBSCURE-010",
+        "OBSCURE-014",
+        "OBSCURE-029"
+      ],
+      "invariants": [
+        "Acknowledged canonical writes survive restart according to their durability contract.",
+        "Derived stores can be destroyed and rebuilt without inventing canonical state.",
+        "Duplicate/replayed writes cannot multiply canonical side effects.",
+        "Optimistic/MVCC concurrency checks protect global invariants from write skew where required.",
+        "Migration completion is published only after post-migration validation.",
+        "Rollback compatibility is proven before release when old code may read new state.",
+        "Backup success is not recovery evidence until restoration is validated."
+      ],
+      "test_targets": [
+        "skeleton/testing/test_operation_store.py",
+        "skeleton/testing/test_conversation_repository.py",
+        "planned:skeleton/testing/test_persistence_fault_windows.py::test_commit_ack_loss_replay_is_idempotent",
+        "planned:skeleton/testing/test_persistence_fault_windows.py::test_partial_multi_store_failure_preserves_authoritative_source",
+        "planned:skeleton/testing/test_persistence_concurrency.py::test_write_skew_invariant_is_guarded",
+        "planned:skeleton/testing/test_persistence_migrations.py::test_partial_migration_does_not_publish_new_schema_version",
+        "planned:skeleton/testing/test_persistence_restore.py::test_restore_then_rebuild_derived_indexes"
+      ],
+      "acceptance": [
+        "canonical restore succeeds from tested backup",
+        "derived loss is recoverable from authority",
+        "concurrent writes preserve declared invariants",
+        "migration/rollback behavior is executable evidence"
+      ],
+      "edge_coverage_status": "mapped",
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W04",
+      "name": "Events & Streaming Ledger",
+      "priority": "P0",
+      "objective": "Bind state transitions to durable ordered events with outbox/inbox semantics, replay, reconnect and terminal fencing.",
+      "exact_paths": [
+        "skeleton/frontier/operation_stream.py",
+        "skeleton/frontier/operation_stream_store.py",
+        "backend/core/operation_stream_transport.py",
+        "backend/routes/operation_stream.py",
+        "skeleton/testing/test_operation_stream.py",
+        "skeleton/testing/test_operation_stream_store.py",
+        "backend/tests/test_operation_stream_transport.py",
+        "backend/tests/test_operation_stream_route.py"
+      ],
+      "historical_ids": [
+        "HIST-SYS-001",
+        "HIST-SYS-002",
+        "HIST-SYS-011",
+        "HIST-SYS-012",
+        "HIST-SYS-013"
+      ],
+      "edge_case_ids": [
+        "EDGE-DIST-002",
+        "EDGE-DIST-003",
+        "EDGE-DIST-004",
+        "EDGE-DIST-005",
+        "EDGE-DIST-013",
+        "EDGE-DIST-026",
+        "EDGE-DIST-027",
+        "EDGE-DIST-028",
+        "EDGE-DIST-030"
+      ],
+      "obscure_ids": [
+        "OBSCURE-002",
+        "OBSCURE-027",
+        "OBSCURE-028"
+      ],
+      "invariants": [
+        "Per-operation event sequence is monotonic and replayable.",
+        "Duplicate delivery is safe; consumers are idempotent.",
+        "Reconnect resumes from a durable cursor and detects unrecoverable gaps.",
+        "A completed terminal event cannot precede the durable terminal result it represents.",
+        "Outbox publication resumes after crash without losing committed events.",
+        "Cancellation and completion races produce exactly one authoritative terminal state."
+      ],
+      "test_targets": [
+        "skeleton/testing/test_operation_stream.py",
+        "skeleton/testing/test_operation_stream_store.py",
+        "backend/tests/test_operation_stream_transport.py",
+        "backend/tests/test_operation_stream_route.py",
+        "planned:skeleton/testing/test_operation_stream_faults.py::test_duplicate_and_out_of_order_delivery",
+        "planned:skeleton/testing/test_operation_stream_faults.py::test_reconnect_gap_replays_from_cursor",
+        "planned:skeleton/testing/test_operation_stream_faults.py::test_outbox_commit_then_publisher_crash",
+        "planned:skeleton/testing/test_operation_stream_faults.py::test_terminal_event_requires_committed_result"
+      ],
+      "acceptance": [
+        "replay reconstructs the same operation projection",
+        "transport loss does not become state loss",
+        "duplicates/order anomalies cannot corrupt state",
+        "terminal semantics are transactionally fenced"
+      ],
+      "edge_coverage_status": "mapped",
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W05",
+      "name": "Model Runtime",
+      "priority": "P0",
+      "objective": "Normalize provider execution, structured output/tool proposals, usage, errors, cancellation and model identity behind one boundary.",
+      "exact_paths": [
+        "skeleton/provider_runtime.py",
+        "skeleton/provider_contract.py",
+        "backend/core/ai_provider.py",
+        "backend/tests/test_ai_provider_adapter.py",
+        "backend/tests/test_ai_provider_request_validation.py",
+        "backend/tests/test_ai_provider_media.py",
+        "skeleton/testing/test_provider_contract.py"
+      ],
+      "historical_ids": [
+        "HIST-AI-023",
+        "HIST-AI-024",
+        "HIST-AI-025",
+        "HIST-AI-026",
+        "HIST-AI-027"
+      ],
+      "edge_case_ids": [
+        "EDGE-AI-014",
+        "EDGE-AI-015",
+        "EDGE-AI-016",
+        "EDGE-AI-017",
+        "EDGE-AI-018",
+        "EDGE-AI-019",
+        "EDGE-AI-038",
+        "EDGE-HW-003",
+        "EDGE-HW-004",
+        "EDGE-HW-010"
+      ],
+      "obscure_ids": [
+        "OBSCURE-005",
+        "OBSCURE-021",
+        "OBSCURE-023"
+      ],
+      "invariants": [
+        "Provider-native request/result/tool objects never cross the provider boundary.",
+        "Unknown/duplicate provider tool-call identities fail closed.",
+        "Structured output is not committed before terminal schema validation.",
+        "Missing provider usage is represented as unknown, never zero.",
+        "Every result binds immutable provider/model/deployment identity when available.",
+        "Timeout/cancellation does not falsely assert that remote execution never happened.",
+        "GPU/runtime failure cannot reuse corrupted inference state without reinitialization."
+      ],
+      "test_targets": [
+        "skeleton/testing/test_provider_contract.py",
+        "backend/tests/test_ai_provider_adapter.py",
+        "backend/tests/test_ai_provider_request_validation.py",
+        "planned:skeleton/testing/test_provider_normalization_edges.py::test_duplicate_tool_call_ids_rejected",
+        "planned:skeleton/testing/test_provider_normalization_edges.py::test_partial_structured_stream_not_committed",
+        "planned:skeleton/testing/test_provider_usage_edges.py::test_missing_usage_is_unknown",
+        "planned:skeleton/testing/test_provider_identity.py::test_alias_resolution_records_concrete_model_identity",
+        "planned:skeleton/testing/test_provider_recovery.py::test_timeout_outcome_is_ambiguous_not_false_failure"
+      ],
+      "acceptance": [
+        "provider substitution does not alter core contracts",
+        "usage/error/refusal semantics are normalized",
+        "reproduction evidence includes model identity",
+        "provider failure cannot create duplicate downstream actions"
+      ],
+      "edge_coverage_status": "mapped",
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W06",
+      "name": "Model Routing",
+      "priority": "P0",
+      "objective": "Select models only after hard capability/privacy/context/reliability/budget checks, then optimize measured quality/cost/latency.",
+      "exact_paths": [
+        "skeleton/frontier/model_routing.py",
+        "backend/tests/test_model_router.py",
+        "skeleton/intelligence/admission.py",
+        "skeleton/intelligence/admission_runtime.py",
+        "skeleton/intelligence/quota.py"
+      ],
+      "historical_ids": [
+        "HIST-AI-004",
+        "HIST-AI-026",
+        "HIST-AI-034",
+        "HIST-AI-040"
+      ],
+      "edge_case_ids": [
+        "EDGE-AI-018",
+        "EDGE-AI-019",
+        "EDGE-AI-020",
+        "EDGE-AI-021",
+        "EDGE-AI-023",
+        "EDGE-AI-024",
+        "EDGE-AI-025",
+        "EDGE-AI-026"
+      ],
+      "obscure_ids": [
+        "OBSCURE-019",
+        "OBSCURE-021",
+        "OBSCURE-023"
+      ],
+      "invariants": [
+        "Fallback re-evaluates all hard constraints instead of inheriting eligibility from the failed route.",
+        "Privacy/data-transfer constraints are hard constraints and cannot be traded for latency or cost.",
+        "Model aliases resolve to concrete version/deployment evidence for routing and eval records.",
+        "Correlated model agreement is not treated as independent verification evidence.",
+        "Budget admission occurs before expensive provider allocation and consumed budget is monotonic."
+      ],
+      "test_targets": [
+        "backend/tests/test_model_router.py",
+        "skeleton/testing/test_cost_admission.py",
+        "skeleton/testing/test_admission_runtime.py",
+        "skeleton/testing/test_tenant_quota.py",
+        "planned:skeleton/testing/test_model_routing_edges.py::test_fallback_rechecks_modality_and_tool_support",
+        "planned:skeleton/testing/test_model_routing_edges.py::test_fallback_cannot_cross_privacy_ceiling",
+        "planned:skeleton/testing/test_model_routing_edges.py::test_alias_revision_is_part_of_route_receipt",
+        "planned:skeleton/testing/test_model_routing_edges.py::test_correlated_ensemble_not_counted_as_independent_verification"
+      ],
+      "acceptance": [
+        "no route bypasses hard constraints",
+        "fallback remains policy-equivalent or fails explicitly",
+        "routing decisions are reproducible and auditable",
+        "budget/privacy violations are denied pre-I/O"
+      ],
+      "edge_coverage_status": "mapped",
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W07",
+      "name": "Memory",
+      "priority": "P0",
+      "objective": "Make durable memory governed, scoped, provenance-bearing, versioned and resistant to poisoning/staleness/self-reinforcement.",
+      "exact_paths": [
+        "skeleton/memory",
+        "skeleton/contracts/memory_record.py",
+        "skeleton/persistence/memory_repository.py",
+        "skeleton/memory/policy.py",
+        "skeleton/memory/writeback.py",
+        "skeleton/vault/data_governance.py"
+      ],
+      "historical_ids": [
+        "HIST-AI-008",
+        "HIST-AI-010",
+        "HIST-AI-017",
+        "HIST-AI-020",
+        "HIST-AI-027",
+        "HIST-AI-028",
+        "HIST-AI-029"
+      ],
+      "edge_case_ids": [
+        "EDGE-AI-003",
+        "EDGE-AI-004",
+        "EDGE-AI-033",
+        "EDGE-DATA-001",
+        "EDGE-DATA-009",
+        "EDGE-DATA-010"
+      ],
+      "obscure_ids": [
+        "OBSCURE-007",
+        "OBSCURE-018",
+        "OBSCURE-020"
+      ],
+      "invariants": [
+        "Model output alone cannot authorize durable memory.",
+        "Memory records retain source/provenance, scope, confidence/authority source, retention and version.",
+        "New evidence may reinforce/update/contradict/supersede but does not silently overwrite history.",
+        "Deleted/expired memory cannot remain discoverable through derived indexes.",
+        "Memory-derived evidence cannot recursively self-validate without independent source lineage.",
+        "Current explicit user/project intent outranks stale inferred memory where policies conflict."
+      ],
+      "test_targets": [
+        "skeleton/testing/test_data_governance.py",
+        "planned:skeleton/testing/test_memory_writeback.py::test_model_text_alone_cannot_persist",
+        "planned:skeleton/testing/test_memory_writeback.py::test_poisoned_unverified_candidate_not_promoted",
+        "planned:skeleton/testing/test_memory_reconciliation.py::test_stale_memory_does_not_override_current_intent",
+        "planned:skeleton/testing/test_memory_reconciliation.py::test_contradiction_preserves_both_versions",
+        "planned:skeleton/testing/test_memory_deletion.py::test_delete_propagates_to_vector_projection",
+        "planned:skeleton/testing/test_memory_feedback_loop.py::test_generated_memory_cannot_self_corroborate"
+      ],
+      "acceptance": [
+        "memory survives restart only through canonical repository",
+        "poisoning/staleness is represented and testable",
+        "deletion/retention propagates to projections",
+        "memory improves tasks without becoming self-referential evidence authority"
+      ],
+      "edge_coverage_status": "mapped",
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W08",
+      "name": "Retrieval",
+      "priority": "P0",
+      "objective": "Provide authorized hybrid retrieval with provenance, freshness, dedupe, index lifecycle and robust source projection.",
+      "exact_paths": [
+        "skeleton/retrieval",
+        "backend/services/rag_service.py",
+        "skeleton/context/sources",
+        "machine/state_topology.json"
+      ],
+      "historical_ids": [
+        "HIST-AI-030",
+        "HIST-AI-031",
+        "HIST-AI-032",
+        "HIST-AI-027"
+      ],
+      "edge_case_ids": [
+        "EDGE-AI-005",
+        "EDGE-AI-006",
+        "EDGE-AI-007",
+        "EDGE-AI-008",
+        "EDGE-AI-009",
+        "EDGE-AI-010",
+        "EDGE-AI-011",
+        "EDGE-AI-034",
+        "EDGE-DATA-008",
+        "EDGE-DATA-009"
+      ],
+      "obscure_ids": [
+        "OBSCURE-006",
+        "OBSCURE-010",
+        "OBSCURE-018"
+      ],
+      "invariants": [
+        "Authorization is enforced at retrieval time, not only at ingestion.",
+        "Evidence keeps source, scope, time and independent-origin lineage.",
+        "Near-duplicate copies cannot inflate corroboration counts.",
+        "Chunking preserves enough neighborhood/provenance to recover qualifiers and limitations.",
+        "Embedding/index version mismatch is detected rather than silently queried.",
+        "Deleted source content cannot remain active in derived indexes.",
+        "Generated summaries are labeled derived and cannot masquerade as independent sources."
+      ],
+      "test_targets": [
+        "tests/test_retrieval_pipeline_internals.py",
+        "tests/test_quad_retrieval_internals.py",
+        "skeleton/testing/test_retrieval_hot_path.py",
+        "planned:skeleton/testing/test_retrieval_edge_cases.py::test_duplicate_sources_do_not_inflate_independence",
+        "planned:skeleton/testing/test_retrieval_edge_cases.py::test_chunk_preserves_qualifier_context",
+        "planned:skeleton/testing/test_retrieval_edge_cases.py::test_embedding_version_mismatch_fails_closed",
+        "planned:skeleton/testing/test_retrieval_edge_cases.py::test_deleted_source_disappears_from_derived_index",
+        "planned:skeleton/testing/test_retrieval_edge_cases.py::test_generated_summary_is_not_independent_evidence"
+      ],
+      "acceptance": [
+        "hybrid baseline includes sparse retrieval rather than assuming dense superiority",
+        "source deletion/freshness/versioning are explicit",
+        "evidence lineage survives ranking/reranking",
+        "retrieval cannot launder untrusted/generated content into authority"
+      ],
+      "edge_coverage_status": "mapped",
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W09",
+      "name": "Knowledge & Evidence",
+      "priority": "P0",
+      "objective": "Represent claims, evidence, contradictions, scope, temporality and hypotheses without silently collapsing uncertainty.",
+      "exact_paths": [
+        "skeleton/knowledge",
+        "skeleton/retrieval",
+        "skeleton/vault",
+        "machine/ai_capabilities.json"
+      ],
+      "historical_ids": [
+        "HIST-AI-005",
+        "HIST-AI-008",
+        "HIST-AI-016",
+        "HIST-AI-032",
+        "HIST-AI-040"
+      ],
+      "edge_case_ids": [
+        "EDGE-AI-005",
+        "EDGE-AI-006",
+        "EDGE-AI-008",
+        "EDGE-AI-009",
+        "EDGE-AI-023",
+        "EDGE-AI-024",
+        "EDGE-AI-025",
+        "EDGE-AI-033",
+        "EDGE-AI-034"
+      ],
+      "obscure_ids": [
+        "OBSCURE-011",
+        "OBSCURE-019",
+        "OBSCURE-020",
+        "OBSCURE-030"
+      ],
+      "invariants": [
+        "A claim is not VERIFIED solely because a model emitted it.",
+        "Evidence carries temporal/population/environment scope and source lineage.",
+        "Contradictory claims remain representable simultaneously.",
+        "Multiple citations with one originating source count as correlated evidence.",
+        "Hypotheses remain distinct from facts and list predicted observations/experiments.",
+        "Abstention/contested/unknown are valid knowledge outcomes."
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_claim_evidence_graph.py::test_correlated_sources_not_counted_as_independent",
+        "planned:skeleton/testing/test_claim_evidence_graph.py::test_temporal_scope_prevents_historical_fact_as_current",
+        "planned:skeleton/testing/test_claim_evidence_graph.py::test_population_scope_prevents_invalid_generalization",
+        "planned:skeleton/testing/test_claim_evidence_graph.py::test_contradictory_claims_coexist",
+        "planned:skeleton/testing/test_claim_evidence_graph.py::test_model_generated_memory_cannot_self_verify_claim",
+        "planned:skeleton/testing/test_claim_evidence_graph.py::test_unknown_and_contested_are_terminal_valid_states"
+      ],
+      "acceptance": [
+        "claim state is evidence-derived",
+        "scope and time are first-class",
+        "contradictions do not corrupt prior state",
+        "knowledge graph can explain source lineage and uncertainty"
+      ],
+      "edge_coverage_status": "mapped",
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W10",
+      "name": "Context Compiler",
+      "priority": "P0",
+      "objective": "Build deterministic, trust-aware, budgeted provider context without losing authority/provenance through compression or truncation.",
+      "exact_paths": [
+        "skeleton/contracts/context.py",
+        "skeleton/context/compiler.py",
+        "skeleton/context/policy.py",
+        "skeleton/context/sources",
+        "skeleton/testing/test_context_compiler.py"
+      ],
+      "historical_ids": [
+        "HIST-AI-003",
+        "HIST-AI-024",
+        "HIST-AI-027",
+        "HIST-SYS-018"
+      ],
+      "edge_case_ids": [
+        "EDGE-AI-001",
+        "EDGE-AI-002",
+        "EDGE-AI-007",
+        "EDGE-AI-012",
+        "EDGE-AI-013",
+        "EDGE-AI-037",
+        "EDGE-CONTRACT-008",
+        "EDGE-CONTRACT-009",
+        "EDGE-CONTRACT-010"
+      ],
+      "obscure_ids": [
+        "OBSCURE-018",
+        "OBSCURE-024",
+        "OBSCURE-025"
+      ],
+      "invariants": [
+        "Trust is metadata carried through context assembly, not inferred from position in the prompt.",
+        "Untrusted external/retrieved/tool/generated content cannot promote itself to system/developer authority.",
+        "Mandatory policy/authority/operation identity are outside optional trimming.",
+        "Compression preserves source references and cannot silently merge trusted instruction with untrusted evidence.",
+        "Oversized tool/retrieval results are stored/referenced or bounded, not blindly injected.",
+        "Unicode/control-character normalization policy is applied before security-sensitive instruction boundary checks."
+      ],
+      "test_targets": [
+        "skeleton/testing/test_context_compiler.py",
+        "planned:skeleton/testing/test_context_security_edges.py::test_retrieved_prompt_injection_remains_untrusted",
+        "planned:skeleton/testing/test_context_security_edges.py::test_tool_output_instructions_cannot_gain_authority",
+        "planned:skeleton/testing/test_context_budget_edges.py::test_mandatory_policy_never_trimmed",
+        "planned:skeleton/testing/test_context_budget_edges.py::test_compression_retains_exception_and_provenance",
+        "planned:skeleton/testing/test_context_budget_edges.py::test_oversized_tool_result_becomes_reference"
+      ],
+      "acceptance": [
+        "same governed state produces deterministic context ordering under same budget/policy",
+        "trust classes survive compilation",
+        "truncation cannot remove mandatory controls",
+        "context artifacts explain omissions/compression actions"
+      ],
+      "edge_coverage_status": "mapped",
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W11",
+      "name": "Cognitive Runtime",
+      "priority": "P0",
+      "objective": "Execute the bounded observe-context-route-infer-plan-act-observe-verify-finalize loop with durable turn lineage and stagnation/approval/recovery semantics.",
+      "exact_paths": [
+        "skeleton/intelligence",
+        "skeleton/contracts/operation.py",
+        "skeleton/provider_runtime.py",
+        "skeleton/skills",
+        "skeleton/persistence",
+        "backend/core/operation_stream_transport.py",
+        "frontend/src/product"
+      ],
+      "historical_ids": [
+        "HIST-AI-001",
+        "HIST-AI-002",
+        "HIST-AI-009",
+        "HIST-AI-011",
+        "HIST-AI-013",
+        "HIST-AI-014",
+        "HIST-AI-037",
+        "HIST-AI-038",
+        "HIST-AI-039",
+        "HIST-AI-040",
+        "HIST-SYS-003",
+        "HIST-SYS-010"
+      ],
+      "edge_case_ids": [
+        "EDGE-AI-022",
+        "EDGE-AI-023",
+        "EDGE-AI-024",
+        "EDGE-AI-025",
+        "EDGE-AI-026",
+        "EDGE-AI-027",
+        "EDGE-AI-028",
+        "EDGE-AI-029",
+        "EDGE-AI-030",
+        "EDGE-AI-031",
+        "EDGE-AI-032",
+        "EDGE-AI-035",
+        "EDGE-AI-036",
+        "EDGE-AI-039",
+        "EDGE-AI-040",
+        "EDGE-DIST-006",
+        "EDGE-DIST-020",
+        "EDGE-DIST-021",
+        "EDGE-DIST-030",
+        "EDGE-UX-001",
+        "EDGE-UX-002",
+        "EDGE-UX-004",
+        "EDGE-UX-010"
+      ],
+      "obscure_ids": [
+        "OBSCURE-004",
+        "OBSCURE-005",
+        "OBSCURE-012",
+        "OBSCURE-013",
+        "OBSCURE-019",
+        "OBSCURE-020",
+        "OBSCURE-026"
+      ],
+      "invariants": [
+        "Every action traces to operation objective and current plan step or an explicit bounded exception path.",
+        "Model-generated authorization/approval text has no authority.",
+        "Identical failure/proposal cycles trigger stagnation handling before budgets can run indefinitely.",
+        "Verifier independence is measured by evidence/process diversity rather than model count.",
+        "Approval binds exact arguments/tool/risk/version and is invalidated by material change or expiry.",
+        "External timeout/unknown outcome is reconciled before retry.",
+        "Cancellation, completion and crash recovery converge on one durable terminal result.",
+        "Browser/stream loss cannot lose operation truth; clients reconstruct from durable state.",
+        "Goal drift/specification gaming are explicit evaluation failures."
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_cognitive_execution_loop.py::test_prompt_only_completion",
+        "planned:skeleton/testing/test_cognitive_execution_loop.py::test_single_and_multi_tool_turns",
+        "planned:skeleton/testing/test_cognitive_stagnation.py::test_identical_failed_tool_cycle_stops",
+        "planned:skeleton/testing/test_cognitive_approval.py::test_approval_invalid_after_argument_change",
+        "planned:skeleton/testing/test_cognitive_approval.py::test_expired_approval_revalidates",
+        "planned:skeleton/testing/test_cognitive_recovery.py::test_side_effect_before_receipt_is_reconciled_not_blindly_replayed",
+        "planned:skeleton/testing/test_cognitive_recovery.py::test_cancel_complete_race_has_one_terminal_state",
+        "planned:skeleton/testing/test_cognitive_verification.py::test_correlated_verifier_not_treated_as_independent",
+        "planned:skeleton/testing/test_cognitive_goal_drift.py::test_plan_actions_remain_traceable_to_objective",
+        "planned:backend/tests/test_ai_operation_reconnect.py::test_browser_refresh_reconstructs_running_and_terminal_state"
+      ],
+      "acceptance": [
+        "bounded loop cannot spin indefinitely",
+        "tool/approval authority remains external to generated text",
+        "durable turn/checkpoint lineage survives crash/restart",
+        "terminal result binds route/provider/tool/verification/usage/memory/artifact/stream evidence",
+        "VS-001 edge-case families are executable"
+      ],
+      "edge_coverage_status": "mapped",
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W12",
+      "name": "Planning",
+      "priority": "P1",
+      "objective": "Plan DAGs, preconditions/effects, static analysis, simulation, replanning and stopping policies.",
+      "exact_paths": [
+        "skeleton/intelligence",
+        "skeleton/contracts",
+        "skeleton/planning",
+        "machine/ai_app_construction.json"
+      ],
+      "historical_ids": [
+        "HIST-AI-001",
+        "HIST-AI-002",
+        "HIST-AI-004",
+        "HIST-AI-009",
+        "HIST-AI-011",
+        "HIST-AI-012",
+        "HIST-AI-013",
+        "HIST-AI-014",
+        "HIST-AI-018",
+        "HIST-AI-039",
+        "HIST-AI-040",
+        "HIST-SYS-002",
+        "HIST-SYS-003",
+        "HIST-AI-017",
+        "HIST-AI-021",
+        "HIST-AI-031",
+        "HIST-AI-036",
+        "HIST-AI-037",
+        "HIST-AI-038",
+        "HIST-SYS-010",
+        "HIST-SYS-026",
+        "HIST-SYS-030"
+      ],
+      "edge_case_ids": [
+        "EDGE-DIST-020",
+        "EDGE-DIST-021",
+        "EDGE-AI-028",
+        "EDGE-AI-036",
+        "EDGE-AI-020",
+        "EDGE-AI-027",
+        "EDGE-DATA-008"
+      ],
+      "obscure_ids": [
+        "OBSCURE-030"
+      ],
+      "edge_coverage_status": "mapped",
+      "minimum_evidence": {
+        "critical": "all applicable critical cases must have executable evidence or accepted-risk disposition",
+        "high": "all applicable high cases must have executable evidence or accepted-risk disposition before hardened status"
+      },
+      "coverage_stats": {
+        "total": 30,
+        "critical": 0,
+        "high": 4
+      },
+      "required_evidence_modes": [
+        "design_review",
+        "adversarial_eval",
+        "integration",
+        "fault_injection",
+        "property",
+        "fuzz",
+        "recovery_drill"
+      ],
+      "invariants": [
+        "Every applicable WP-W12 catalog case has an explicit disposition.",
+        "Critical/high cases cannot disappear through refactors or documentation changes.",
+        "Planned tests are not counted as passing evidence.",
+        "Accepted risks identify owner, rationale, review trigger and compensating controls."
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w12_edge_contract.py",
+        "planned:tests/wp_w12_failure_injection.py",
+        "planned:benchmarks/wp_w12_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w12-recovery.md"
+      ],
+      "acceptance": [
+        "all mapped catalog IDs resolve",
+        "critical/high dispositions are machine-readable",
+        "required evidence modes are represented by executable evidence before hardening",
+        "cross-package cases retain all applicable owners"
+      ],
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W13",
+      "name": "Tools",
+      "priority": "P1",
+      "objective": "Typed tool manifests, execution receipts, sandboxing, postconditions, idempotency and compensation.",
+      "exact_paths": [
+        "skeleton/skills",
+        "backend/services/tool_registry.py",
+        "skeleton/contracts"
+      ],
+      "historical_ids": [
+        "HIST-SYS-009",
+        "HIST-SYS-010",
+        "HIST-SYS-023",
+        "HIST-AI-002",
+        "HIST-AI-007",
+        "HIST-AI-019",
+        "HIST-AI-020",
+        "HIST-AI-027",
+        "HIST-SYS-002",
+        "HIST-SYS-006",
+        "HIST-SYS-019",
+        "HIST-SYS-020",
+        "HIST-SYS-024"
+      ],
+      "edge_case_ids": [
+        "EDGE-DIST-006",
+        "EDGE-AI-002",
+        "EDGE-AI-014",
+        "EDGE-AI-015",
+        "EDGE-AI-031",
+        "EDGE-AI-032",
+        "EDGE-AI-037",
+        "EDGE-AI-039",
+        "EDGE-AI-040",
+        "EDGE-SEC-002",
+        "EDGE-SEC-003",
+        "EDGE-SEC-004",
+        "EDGE-SEC-005",
+        "EDGE-SEC-006",
+        "EDGE-SEC-007",
+        "EDGE-SEC-008",
+        "EDGE-SEC-016",
+        "EDGE-SEC-017",
+        "EDGE-SEC-018",
+        "EDGE-SEC-019",
+        "EDGE-DIST-011",
+        "EDGE-DIST-021",
+        "EDGE-DIST-027",
+        "EDGE-AI-020",
+        "EDGE-AI-022",
+        "EDGE-AI-023",
+        "EDGE-AI-027",
+        "EDGE-SEC-009",
+        "EDGE-SEC-011",
+        "EDGE-SEC-012",
+        "EDGE-SEC-013",
+        "EDGE-SEC-014",
+        "EDGE-HW-002",
+        "EDGE-HW-009"
+      ],
+      "obscure_ids": [
+        "OBSCURE-004",
+        "OBSCURE-005",
+        "OBSCURE-012",
+        "OBSCURE-013",
+        "OBSCURE-024",
+        "OBSCURE-025"
+      ],
+      "edge_coverage_status": "mapped",
+      "minimum_evidence": {
+        "critical": "all applicable critical cases must have executable evidence or accepted-risk disposition",
+        "high": "all applicable high cases must have executable evidence or accepted-risk disposition before hardened status"
+      },
+      "coverage_stats": {
+        "total": 53,
+        "critical": 21,
+        "high": 4
+      },
+      "required_evidence_modes": [
+        "design_review",
+        "fault_injection",
+        "property",
+        "adversarial_eval",
+        "integration",
+        "adversarial",
+        "negative_test",
+        "fuzz",
+        "platform_test",
+        "recovery_drill",
+        "e2e",
+        "regression"
+      ],
+      "invariants": [
+        "Every applicable WP-W13 catalog case has an explicit disposition.",
+        "Critical/high cases cannot disappear through refactors or documentation changes.",
+        "Planned tests are not counted as passing evidence.",
+        "Accepted risks identify owner, rationale, review trigger and compensating controls."
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w13_edge_contract.py",
+        "planned:tests/wp_w13_failure_injection.py",
+        "planned:benchmarks/wp_w13_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w13-recovery.md"
+      ],
+      "acceptance": [
+        "all mapped catalog IDs resolve",
+        "critical/high dispositions are machine-readable",
+        "required evidence modes are represented by executable evidence before hardening",
+        "cross-package cases retain all applicable owners"
+      ],
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W14",
+      "name": "Policy",
+      "priority": "P1",
+      "objective": "Deterministic authority, approval, risk, scope and policy-version enforcement.",
+      "exact_paths": [
+        "skeleton/vault",
+        "skeleton/security",
+        "skeleton/policy",
+        "skeleton/intelligence/admission.py"
+      ],
+      "historical_ids": [
+        "HIST-AI-005",
+        "HIST-AI-007",
+        "HIST-AI-019",
+        "HIST-SYS-019",
+        "HIST-SYS-020",
+        "HIST-AI-032",
+        "HIST-SYS-021"
+      ],
+      "edge_case_ids": [
+        "EDGE-CONTRACT-017",
+        "EDGE-AI-001",
+        "EDGE-AI-002",
+        "EDGE-AI-030",
+        "EDGE-AI-031",
+        "EDGE-AI-032",
+        "EDGE-SEC-001",
+        "EDGE-SEC-005",
+        "EDGE-SEC-006",
+        "EDGE-SEC-007",
+        "EDGE-SEC-020",
+        "EDGE-CONTRACT-010",
+        "EDGE-DIST-010",
+        "EDGE-DIST-019",
+        "EDGE-AI-011",
+        "EDGE-AI-013",
+        "EDGE-AI-018",
+        "EDGE-AI-038",
+        "EDGE-SEC-011",
+        "EDGE-DATA-010",
+        "EDGE-UX-009"
+      ],
+      "obscure_ids": [
+        "OBSCURE-012",
+        "OBSCURE-022",
+        "OBSCURE-024",
+        "OBSCURE-018",
+        "OBSCURE-023"
+      ],
+      "edge_coverage_status": "mapped",
+      "minimum_evidence": {
+        "critical": "all applicable critical cases must have executable evidence or accepted-risk disposition",
+        "high": "all applicable high cases must have executable evidence or accepted-risk disposition before hardened status"
+      },
+      "coverage_stats": {
+        "total": 33,
+        "critical": 16,
+        "high": 1
+      },
+      "required_evidence_modes": [
+        "design_review",
+        "adversarial_eval",
+        "integration",
+        "adversarial",
+        "negative_test",
+        "property",
+        "fuzz",
+        "fault_injection",
+        "recovery_drill",
+        "regression",
+        "e2e"
+      ],
+      "invariants": [
+        "Every applicable WP-W14 catalog case has an explicit disposition.",
+        "Critical/high cases cannot disappear through refactors or documentation changes.",
+        "Planned tests are not counted as passing evidence.",
+        "Accepted risks identify owner, rationale, review trigger and compensating controls."
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w14_edge_contract.py",
+        "planned:tests/wp_w14_failure_injection.py",
+        "planned:benchmarks/wp_w14_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w14-recovery.md"
+      ],
+      "acceptance": [
+        "all mapped catalog IDs resolve",
+        "critical/high dispositions are machine-readable",
+        "required evidence modes are represented by executable evidence before hardening",
+        "cross-package cases retain all applicable owners"
+      ],
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W15",
+      "name": "Agent Runtime",
+      "priority": "P1",
+      "objective": "Agent identity, bounded lifecycle, handoff, delegation and durable turn state.",
+      "exact_paths": [
+        "skeleton/agents",
+        "skeleton/intelligence",
+        "skeleton/contracts"
+      ],
+      "historical_ids": [
+        "HIST-AI-006",
+        "HIST-AI-033",
+        "HIST-SYS-001",
+        "HIST-AI-012",
+        "HIST-AI-013",
+        "HIST-AI-014",
+        "HIST-AI-015",
+        "HIST-SYS-019",
+        "HIST-SYS-030"
+      ],
+      "edge_case_ids": [
+        "EDGE-DIST-020",
+        "EDGE-AI-022",
+        "EDGE-AI-036",
+        "EDGE-AI-024",
+        "EDGE-AI-027",
+        "EDGE-AI-028"
+      ],
+      "obscure_ids": [
+        "OBSCURE-026"
+      ],
+      "edge_coverage_status": "mapped",
+      "minimum_evidence": {
+        "critical": "all applicable critical cases must have executable evidence or accepted-risk disposition",
+        "high": "all applicable high cases must have executable evidence or accepted-risk disposition before hardened status"
+      },
+      "coverage_stats": {
+        "total": 16,
+        "critical": 1,
+        "high": 1
+      },
+      "required_evidence_modes": [
+        "design_review",
+        "fault_injection",
+        "property",
+        "adversarial_eval",
+        "integration",
+        "fuzz",
+        "adversarial",
+        "negative_test",
+        "regression"
+      ],
+      "invariants": [
+        "Every applicable WP-W15 catalog case has an explicit disposition.",
+        "Critical/high cases cannot disappear through refactors or documentation changes.",
+        "Planned tests are not counted as passing evidence.",
+        "Accepted risks identify owner, rationale, review trigger and compensating controls."
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w15_edge_contract.py",
+        "planned:tests/wp_w15_failure_injection.py",
+        "planned:benchmarks/wp_w15_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w15-recovery.md"
+      ],
+      "acceptance": [
+        "all mapped catalog IDs resolve",
+        "critical/high dispositions are machine-readable",
+        "required evidence modes are represented by executable evidence before hardening",
+        "cross-package cases retain all applicable owners"
+      ],
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W16",
+      "name": "Swarm",
+      "priority": "P1",
+      "objective": "Multi-agent leases, fencing, scheduling, conflict domains, consensus and anti-collision.",
+      "exact_paths": [
+        "skeleton/swarm",
+        "skeleton/agents",
+        "skeleton/resilience"
+      ],
+      "historical_ids": [
+        "HIST-AI-006",
+        "HIST-AI-011",
+        "HIST-AI-012",
+        "HIST-AI-013",
+        "HIST-AI-014",
+        "HIST-AI-015",
+        "HIST-AI-033",
+        "HIST-AI-034",
+        "HIST-AI-035",
+        "HIST-AI-036",
+        "HIST-AI-040",
+        "HIST-SYS-001",
+        "HIST-SYS-004",
+        "HIST-SYS-014",
+        "HIST-SYS-015",
+        "HIST-SYS-016"
+      ],
+      "edge_case_ids": [
+        "EDGE-DIST-007",
+        "EDGE-DIST-008",
+        "EDGE-DIST-020",
+        "EDGE-AI-023",
+        "EDGE-AI-024",
+        "EDGE-AI-025",
+        "EDGE-DIST-018",
+        "EDGE-DIST-019",
+        "EDGE-DIST-021",
+        "EDGE-DIST-022",
+        "EDGE-DATA-007"
+      ],
+      "obscure_ids": [
+        "OBSCURE-003",
+        "OBSCURE-019",
+        "OBSCURE-026",
+        "OBSCURE-027",
+        "OBSCURE-017"
+      ],
+      "edge_coverage_status": "mapped",
+      "minimum_evidence": {
+        "critical": "all applicable critical cases must have executable evidence or accepted-risk disposition",
+        "high": "all applicable high cases must have executable evidence or accepted-risk disposition before hardened status"
+      },
+      "coverage_stats": {
+        "total": 32,
+        "critical": 0,
+        "high": 4
+      },
+      "required_evidence_modes": [
+        "design_review",
+        "fault_injection",
+        "property",
+        "adversarial_eval",
+        "integration",
+        "fuzz",
+        "regression",
+        "recovery_drill"
+      ],
+      "invariants": [
+        "Every applicable WP-W16 catalog case has an explicit disposition.",
+        "Critical/high cases cannot disappear through refactors or documentation changes.",
+        "Planned tests are not counted as passing evidence.",
+        "Accepted risks identify owner, rationale, review trigger and compensating controls."
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w16_edge_contract.py",
+        "planned:tests/wp_w16_failure_injection.py",
+        "planned:benchmarks/wp_w16_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w16-recovery.md"
+      ],
+      "acceptance": [
+        "all mapped catalog IDs resolve",
+        "critical/high dispositions are machine-readable",
+        "required evidence modes are represented by executable evidence before hardening",
+        "cross-package cases retain all applicable owners"
+      ],
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W17",
+      "name": "Verification",
+      "priority": "P1",
+      "objective": "Independent structural/evidence/action verification and postcondition checking.",
+      "exact_paths": [
+        "skeleton/intelligence/verification_runtime.py",
+        "skeleton/contracts/verification.py",
+        "skeleton/testing"
+      ],
+      "historical_ids": [
+        "HIST-AI-002",
+        "HIST-AI-019",
+        "HIST-AI-038",
+        "HIST-AI-039",
+        "HIST-SYS-018",
+        "HIST-AI-005",
+        "HIST-AI-025",
+        "HIST-AI-033"
+      ],
+      "edge_case_ids": [
+        "EDGE-AI-012",
+        "EDGE-AI-023",
+        "EDGE-AI-024",
+        "EDGE-AI-029",
+        "EDGE-AI-037",
+        "EDGE-AI-001",
+        "EDGE-AI-005",
+        "EDGE-AI-006",
+        "EDGE-AI-008",
+        "EDGE-AI-009",
+        "EDGE-AI-033",
+        "EDGE-AI-034",
+        "EDGE-AI-039",
+        "EDGE-DATA-005"
+      ],
+      "obscure_ids": [
+        "OBSCURE-012",
+        "OBSCURE-013",
+        "OBSCURE-019",
+        "OBSCURE-020",
+        "OBSCURE-014",
+        "OBSCURE-018",
+        "OBSCURE-023",
+        "OBSCURE-030"
+      ],
+      "edge_coverage_status": "mapped",
+      "minimum_evidence": {
+        "critical": "all applicable critical cases must have executable evidence or accepted-risk disposition",
+        "high": "all applicable high cases must have executable evidence or accepted-risk disposition before hardened status"
+      },
+      "coverage_stats": {
+        "total": 30,
+        "critical": 2,
+        "high": 3
+      },
+      "required_evidence_modes": [
+        "design_review",
+        "fault_injection",
+        "property",
+        "adversarial_eval",
+        "integration",
+        "fuzz",
+        "adversarial",
+        "negative_test",
+        "recovery_drill"
+      ],
+      "invariants": [
+        "Every applicable WP-W17 catalog case has an explicit disposition.",
+        "Critical/high cases cannot disappear through refactors or documentation changes.",
+        "Planned tests are not counted as passing evidence.",
+        "Accepted risks identify owner, rationale, review trigger and compensating controls."
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w17_edge_contract.py",
+        "planned:tests/wp_w17_failure_injection.py",
+        "planned:benchmarks/wp_w17_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w17-recovery.md"
+      ],
+      "acceptance": [
+        "all mapped catalog IDs resolve",
+        "critical/high dispositions are machine-readable",
+        "required evidence modes are represented by executable evidence before hardening",
+        "cross-package cases retain all applicable owners"
+      ],
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W18",
+      "name": "Evaluation",
+      "priority": "P1",
+      "objective": "Capability, agent, adversarial, contamination-aware and long-horizon evaluation.",
+      "exact_paths": [
+        "skeleton/evaluation",
+        "benchmarks",
+        "tests"
+      ],
+      "historical_ids": [
+        "HIST-AI-018",
+        "HIST-AI-030",
+        "HIST-SYS-003",
+        "HIST-SYS-014",
+        "HIST-SYS-015",
+        "HIST-SYS-016",
+        "HIST-AI-037",
+        "HIST-AI-038",
+        "HIST-SYS-025"
+      ],
+      "edge_case_ids": [
+        "EDGE-CONTRACT-001",
+        "EDGE-CONTRACT-005",
+        "EDGE-CONTRACT-009",
+        "EDGE-DIST-010",
+        "EDGE-DIST-021",
+        "EDGE-DIST-024",
+        "EDGE-AI-015",
+        "EDGE-AI-025",
+        "EDGE-AI-026",
+        "EDGE-AI-027",
+        "EDGE-AI-028",
+        "EDGE-AI-035",
+        "EDGE-AI-018",
+        "EDGE-HW-006"
+      ],
+      "obscure_ids": [
+        "OBSCURE-001",
+        "OBSCURE-019",
+        "OBSCURE-023",
+        "OBSCURE-030"
+      ],
+      "edge_coverage_status": "mapped",
+      "minimum_evidence": {
+        "critical": "all applicable critical cases must have executable evidence or accepted-risk disposition",
+        "high": "all applicable high cases must have executable evidence or accepted-risk disposition before hardened status"
+      },
+      "coverage_stats": {
+        "total": 27,
+        "critical": 2,
+        "high": 5
+      },
+      "required_evidence_modes": [
+        "design_review",
+        "adversarial_eval",
+        "integration",
+        "fault_injection",
+        "property",
+        "fuzz",
+        "adversarial",
+        "negative_test",
+        "regression",
+        "recovery_drill",
+        "platform_test"
+      ],
+      "invariants": [
+        "Every applicable WP-W18 catalog case has an explicit disposition.",
+        "Critical/high cases cannot disappear through refactors or documentation changes.",
+        "Planned tests are not counted as passing evidence.",
+        "Accepted risks identify owner, rationale, review trigger and compensating controls."
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w18_edge_contract.py",
+        "planned:tests/wp_w18_failure_injection.py",
+        "planned:benchmarks/wp_w18_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w18-recovery.md"
+      ],
+      "acceptance": [
+        "all mapped catalog IDs resolve",
+        "critical/high dispositions are machine-readable",
+        "required evidence modes are represented by executable evidence before hardening",
+        "cross-package cases retain all applicable owners"
+      ],
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W19",
+      "name": "Resilience",
+      "priority": "P1",
+      "objective": "Retry budgets, circuit breakers, bulkheads, chaos, recovery and dead-letter handling.",
+      "exact_paths": [
+        "skeleton/resilience",
+        "skeleton/frontier",
+        "skeleton/persistence"
+      ],
+      "historical_ids": [
+        "HIST-SYS-005",
+        "HIST-SYS-006",
+        "HIST-SYS-007",
+        "HIST-SYS-016",
+        "HIST-SYS-027",
+        "HIST-SYS-003",
+        "HIST-SYS-004",
+        "HIST-SYS-009",
+        "HIST-SYS-014",
+        "HIST-SYS-026"
+      ],
+      "edge_case_ids": [
+        "EDGE-CONTRACT-016",
+        "EDGE-CONTRACT-019",
+        "EDGE-DIST-001",
+        "EDGE-DIST-002",
+        "EDGE-DIST-004",
+        "EDGE-DIST-006",
+        "EDGE-DIST-008",
+        "EDGE-DIST-010",
+        "EDGE-DIST-011",
+        "EDGE-DIST-012",
+        "EDGE-DIST-013",
+        "EDGE-DIST-014",
+        "EDGE-DIST-015",
+        "EDGE-DIST-016",
+        "EDGE-DIST-017",
+        "EDGE-DIST-020",
+        "EDGE-DIST-026",
+        "EDGE-DIST-027",
+        "EDGE-DIST-028",
+        "EDGE-DIST-029",
+        "EDGE-DIST-030",
+        "EDGE-AI-040",
+        "EDGE-DATA-003",
+        "EDGE-DATA-005",
+        "EDGE-HW-001",
+        "EDGE-HW-003",
+        "EDGE-HW-006",
+        "EDGE-DIST-021",
+        "EDGE-AI-032",
+        "EDGE-AI-039",
+        "EDGE-DATA-010",
+        "EDGE-UX-003"
+      ],
+      "obscure_ids": [
+        "OBSCURE-001",
+        "OBSCURE-002",
+        "OBSCURE-004",
+        "OBSCURE-005",
+        "OBSCURE-006",
+        "OBSCURE-009",
+        "OBSCURE-014",
+        "OBSCURE-016",
+        "OBSCURE-008",
+        "OBSCURE-015"
+      ],
+      "edge_coverage_status": "mapped",
+      "minimum_evidence": {
+        "critical": "all applicable critical cases must have executable evidence or accepted-risk disposition",
+        "high": "all applicable high cases must have executable evidence or accepted-risk disposition before hardened status"
+      },
+      "coverage_stats": {
+        "total": 52,
+        "critical": 1,
+        "high": 8
+      },
+      "required_evidence_modes": [
+        "design_review",
+        "adversarial_eval",
+        "integration",
+        "fault_injection",
+        "property",
+        "fuzz",
+        "regression",
+        "recovery_drill",
+        "platform_test",
+        "adversarial",
+        "negative_test",
+        "e2e"
+      ],
+      "invariants": [
+        "Every applicable WP-W19 catalog case has an explicit disposition.",
+        "Critical/high cases cannot disappear through refactors or documentation changes.",
+        "Planned tests are not counted as passing evidence.",
+        "Accepted risks identify owner, rationale, review trigger and compensating controls."
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w19_edge_contract.py",
+        "planned:tests/wp_w19_failure_injection.py",
+        "planned:benchmarks/wp_w19_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w19-recovery.md"
+      ],
+      "acceptance": [
+        "all mapped catalog IDs resolve",
+        "critical/high dispositions are machine-readable",
+        "required evidence modes are represented by executable evidence before hardening",
+        "cross-package cases retain all applicable owners"
+      ],
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W20",
+      "name": "Security",
+      "priority": "P1",
+      "objective": "Identity, authorization, prompt/tool isolation, secrets, sandbox, network and supply-chain security.",
+      "exact_paths": [
+        "skeleton/vault",
+        "skeleton/security",
+        "scripts",
+        "machine"
+      ],
+      "historical_ids": [
+        "HIST-AI-005",
+        "HIST-AI-007",
+        "HIST-AI-019",
+        "HIST-SYS-019",
+        "HIST-SYS-020",
+        "HIST-SYS-021",
+        "HIST-SYS-024"
+      ],
+      "edge_case_ids": [
+        "EDGE-CONTRACT-009",
+        "EDGE-CONTRACT-010",
+        "EDGE-CONTRACT-012",
+        "EDGE-CONTRACT-017",
+        "EDGE-CONTRACT-020",
+        "EDGE-AI-001",
+        "EDGE-AI-002",
+        "EDGE-AI-003",
+        "EDGE-AI-011",
+        "EDGE-AI-021",
+        "EDGE-AI-030",
+        "EDGE-AI-032",
+        "EDGE-SEC-001",
+        "EDGE-SEC-002",
+        "EDGE-SEC-003",
+        "EDGE-SEC-004",
+        "EDGE-SEC-005",
+        "EDGE-SEC-006",
+        "EDGE-SEC-007",
+        "EDGE-SEC-008",
+        "EDGE-SEC-009",
+        "EDGE-SEC-010",
+        "EDGE-SEC-011",
+        "EDGE-SEC-012",
+        "EDGE-SEC-013",
+        "EDGE-SEC-014",
+        "EDGE-SEC-015",
+        "EDGE-SEC-016",
+        "EDGE-SEC-017",
+        "EDGE-SEC-018",
+        "EDGE-SEC-019",
+        "EDGE-SEC-020",
+        "EDGE-DATA-001",
+        "EDGE-DATA-002",
+        "EDGE-DATA-009",
+        "EDGE-DATA-010",
+        "EDGE-CONTRACT-001",
+        "EDGE-CONTRACT-011",
+        "EDGE-AI-013",
+        "EDGE-HW-006"
+      ],
+      "obscure_ids": [
+        "OBSCURE-010",
+        "OBSCURE-012",
+        "OBSCURE-022",
+        "OBSCURE-024",
+        "OBSCURE-025",
+        "OBSCURE-018"
+      ],
+      "edge_coverage_status": "mapped",
+      "minimum_evidence": {
+        "critical": "all applicable critical cases must have executable evidence or accepted-risk disposition",
+        "high": "all applicable high cases must have executable evidence or accepted-risk disposition before hardened status"
+      },
+      "coverage_stats": {
+        "total": 53,
+        "critical": 36,
+        "high": 3
+      },
+      "required_evidence_modes": [
+        "design_review",
+        "adversarial_eval",
+        "integration",
+        "adversarial",
+        "negative_test",
+        "property",
+        "fuzz",
+        "fault_injection",
+        "recovery_drill",
+        "platform_test",
+        "e2e",
+        "regression"
+      ],
+      "invariants": [
+        "Every applicable WP-W20 catalog case has an explicit disposition.",
+        "Critical/high cases cannot disappear through refactors or documentation changes.",
+        "Planned tests are not counted as passing evidence.",
+        "Accepted risks identify owner, rationale, review trigger and compensating controls."
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w20_edge_contract.py",
+        "planned:tests/wp_w20_failure_injection.py",
+        "planned:benchmarks/wp_w20_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w20-recovery.md"
+      ],
+      "acceptance": [
+        "all mapped catalog IDs resolve",
+        "critical/high dispositions are machine-readable",
+        "required evidence modes are represented by executable evidence before hardening",
+        "cross-package cases retain all applicable owners"
+      ],
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W21",
+      "name": "Observability",
+      "priority": "P1",
+      "objective": "Trace reconstruction, SLOs, metrics cardinality, cost/usage and incident evidence.",
+      "exact_paths": [
+        "skeleton/observability",
+        "backend",
+        "machine"
+      ],
+      "historical_ids": [
+        "HIST-SYS-013",
+        "HIST-AI-016",
+        "HIST-AI-035",
+        "HIST-SYS-009"
+      ],
+      "edge_case_ids": [
+        "EDGE-DIST-011",
+        "EDGE-AI-017",
+        "EDGE-SEC-015",
+        "EDGE-HW-002",
+        "EDGE-HW-005",
+        "EDGE-HW-006",
+        "EDGE-HW-007",
+        "EDGE-AI-019"
+      ],
+      "obscure_ids": [
+        "OBSCURE-001",
+        "OBSCURE-015",
+        "OBSCURE-016",
+        "OBSCURE-017",
+        "OBSCURE-021"
+      ],
+      "edge_coverage_status": "mapped",
+      "minimum_evidence": {
+        "critical": "all applicable critical cases must have executable evidence or accepted-risk disposition",
+        "high": "all applicable high cases must have executable evidence or accepted-risk disposition before hardened status"
+      },
+      "coverage_stats": {
+        "total": 17,
+        "critical": 1,
+        "high": 1
+      },
+      "required_evidence_modes": [
+        "design_review",
+        "fault_injection",
+        "property",
+        "adversarial_eval",
+        "integration",
+        "adversarial",
+        "negative_test",
+        "platform_test",
+        "fuzz",
+        "regression"
+      ],
+      "invariants": [
+        "Every applicable WP-W21 catalog case has an explicit disposition.",
+        "Critical/high cases cannot disappear through refactors or documentation changes.",
+        "Planned tests are not counted as passing evidence.",
+        "Accepted risks identify owner, rationale, review trigger and compensating controls."
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w21_edge_contract.py",
+        "planned:tests/wp_w21_failure_injection.py",
+        "planned:benchmarks/wp_w21_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w21-recovery.md"
+      ],
+      "acceptance": [
+        "all mapped catalog IDs resolve",
+        "critical/high dispositions are machine-readable",
+        "required evidence modes are represented by executable evidence before hardening",
+        "cross-package cases retain all applicable owners"
+      ],
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W22",
+      "name": "API & Streaming",
+      "priority": "P1",
+      "objective": "Versioned API/streaming protocols, reconnect, idempotency, errors and client reconstruction.",
+      "exact_paths": [
+        "skeleton/api",
+        "backend/routes",
+        "backend/core/operation_stream_transport.py",
+        "frontend"
+      ],
+      "historical_ids": [
+        "HIST-AI-006",
+        "HIST-AI-033",
+        "HIST-SYS-001",
+        "HIST-SYS-002",
+        "HIST-SYS-028"
+      ],
+      "edge_case_ids": [
+        "EDGE-CONTRACT-001",
+        "EDGE-CONTRACT-002",
+        "EDGE-CONTRACT-003",
+        "EDGE-CONTRACT-004",
+        "EDGE-CONTRACT-005",
+        "EDGE-CONTRACT-006",
+        "EDGE-CONTRACT-007",
+        "EDGE-CONTRACT-017",
+        "EDGE-CONTRACT-018",
+        "EDGE-DIST-003",
+        "EDGE-DIST-004",
+        "EDGE-DIST-005",
+        "EDGE-DIST-013",
+        "EDGE-AI-014",
+        "EDGE-AI-016",
+        "EDGE-UX-002",
+        "EDGE-UX-006",
+        "EDGE-UX-008",
+        "EDGE-DIST-002",
+        "EDGE-DIST-007",
+        "EDGE-DIST-012",
+        "EDGE-DIST-017",
+        "EDGE-DIST-023",
+        "EDGE-DIST-026",
+        "EDGE-DIST-027",
+        "EDGE-AI-017",
+        "EDGE-SEC-009",
+        "EDGE-UX-007"
+      ],
+      "obscure_ids": [
+        "OBSCURE-009",
+        "OBSCURE-013",
+        "OBSCURE-027"
+      ],
+      "edge_coverage_status": "mapped",
+      "minimum_evidence": {
+        "critical": "all applicable critical cases must have executable evidence or accepted-risk disposition",
+        "high": "all applicable high cases must have executable evidence or accepted-risk disposition before hardened status"
+      },
+      "coverage_stats": {
+        "total": 36,
+        "critical": 2,
+        "high": 2
+      },
+      "required_evidence_modes": [
+        "design_review",
+        "fault_injection",
+        "property",
+        "adversarial_eval",
+        "integration",
+        "fuzz",
+        "adversarial",
+        "negative_test",
+        "e2e",
+        "regression",
+        "platform_test"
+      ],
+      "invariants": [
+        "Every applicable WP-W22 catalog case has an explicit disposition.",
+        "Critical/high cases cannot disappear through refactors or documentation changes.",
+        "Planned tests are not counted as passing evidence.",
+        "Accepted risks identify owner, rationale, review trigger and compensating controls."
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w22_edge_contract.py",
+        "planned:tests/wp_w22_failure_injection.py",
+        "planned:benchmarks/wp_w22_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w22-recovery.md"
+      ],
+      "acceptance": [
+        "all mapped catalog IDs resolve",
+        "critical/high dispositions are machine-readable",
+        "required evidence modes are represented by executable evidence before hardening",
+        "cross-package cases retain all applicable owners"
+      ],
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W23",
+      "name": "Product",
+      "priority": "P1",
+      "objective": "Long-running AI UX, human control, accessibility, workspaces and honest status.",
+      "exact_paths": [
+        "frontend",
+        "backend/routes",
+        "docs"
+      ],
+      "historical_ids": [
+        "HIST-AI-005",
+        "HIST-SYS-004",
+        "HIST-SYS-024"
+      ],
+      "edge_case_ids": [
+        "EDGE-CONTRACT-008",
+        "EDGE-CONTRACT-013",
+        "EDGE-DIST-004",
+        "EDGE-AI-004",
+        "EDGE-AI-029",
+        "EDGE-UX-001",
+        "EDGE-UX-002",
+        "EDGE-UX-003",
+        "EDGE-UX-004",
+        "EDGE-UX-005",
+        "EDGE-UX-006",
+        "EDGE-UX-007",
+        "EDGE-UX-008",
+        "EDGE-UX-009",
+        "EDGE-CONTRACT-007",
+        "EDGE-CONTRACT-011",
+        "EDGE-SEC-008"
+      ],
+      "obscure_ids": [],
+      "edge_coverage_status": "mapped",
+      "minimum_evidence": {
+        "critical": "all applicable critical cases must have executable evidence or accepted-risk disposition",
+        "high": "all applicable high cases must have executable evidence or accepted-risk disposition before hardened status"
+      },
+      "coverage_stats": {
+        "total": 20,
+        "critical": 1,
+        "high": 1
+      },
+      "required_evidence_modes": [
+        "design_review",
+        "adversarial_eval",
+        "integration",
+        "fault_injection",
+        "property",
+        "fuzz",
+        "e2e",
+        "adversarial",
+        "negative_test",
+        "platform_test"
+      ],
+      "invariants": [
+        "Every applicable WP-W23 catalog case has an explicit disposition.",
+        "Critical/high cases cannot disappear through refactors or documentation changes.",
+        "Planned tests are not counted as passing evidence.",
+        "Accepted risks identify owner, rationale, review trigger and compensating controls."
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w23_edge_contract.py",
+        "planned:tests/wp_w23_failure_injection.py",
+        "planned:benchmarks/wp_w23_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w23-recovery.md"
+      ],
+      "acceptance": [
+        "all mapped catalog IDs resolve",
+        "critical/high dispositions are machine-readable",
+        "required evidence modes are represented by executable evidence before hardening",
+        "cross-package cases retain all applicable owners"
+      ],
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W24",
+      "name": "Desktop",
+      "priority": "P1",
+      "objective": "Desktop process supervision, suspend/resume, local integration and crash recovery.",
+      "exact_paths": [
+        "desktop",
+        "skeleton/app",
+        "installer"
+      ],
+      "historical_ids": [
+        "HIST-AI-022",
+        "HIST-SYS-005",
+        "HIST-SYS-013"
+      ],
+      "edge_case_ids": [
+        "EDGE-CONTRACT-011",
+        "EDGE-SEC-008",
+        "EDGE-SEC-018",
+        "EDGE-HW-009",
+        "EDGE-UX-003",
+        "EDGE-SEC-009",
+        "EDGE-HW-010"
+      ],
+      "obscure_ids": [],
+      "edge_coverage_status": "mapped",
+      "minimum_evidence": {
+        "critical": "all applicable critical cases must have executable evidence or accepted-risk disposition",
+        "high": "all applicable high cases must have executable evidence or accepted-risk disposition before hardened status"
+      },
+      "coverage_stats": {
+        "total": 10,
+        "critical": 3,
+        "high": 0
+      },
+      "required_evidence_modes": [
+        "design_review",
+        "adversarial_eval",
+        "integration",
+        "fault_injection",
+        "property",
+        "fuzz",
+        "adversarial",
+        "negative_test",
+        "platform_test",
+        "e2e"
+      ],
+      "invariants": [
+        "Every applicable WP-W24 catalog case has an explicit disposition.",
+        "Critical/high cases cannot disappear through refactors or documentation changes.",
+        "Planned tests are not counted as passing evidence.",
+        "Accepted risks identify owner, rationale, review trigger and compensating controls."
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w24_edge_contract.py",
+        "planned:tests/wp_w24_failure_injection.py",
+        "planned:benchmarks/wp_w24_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w24-recovery.md"
+      ],
+      "acceptance": [
+        "all mapped catalog IDs resolve",
+        "critical/high dispositions are machine-readable",
+        "required evidence modes are represented by executable evidence before hardening",
+        "cross-package cases retain all applicable owners"
+      ],
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W25",
+      "name": "Installer",
+      "priority": "P1",
+      "objective": "Install/update/repair/uninstall integrity, platform compatibility and rollback.",
+      "exact_paths": [
+        "installer",
+        "skeleton/app",
+        "scripts",
+        "deploy"
+      ],
+      "historical_ids": [
+        "HIST-AI-002",
+        "HIST-SYS-025"
+      ],
+      "edge_case_ids": [
+        "EDGE-DATA-006",
+        "EDGE-DATA-007",
+        "EDGE-HW-009",
+        "EDGE-HW-010",
+        "EDGE-DIST-025",
+        "EDGE-AI-019",
+        "EDGE-DATA-002",
+        "EDGE-UX-005"
+      ],
+      "obscure_ids": [
+        "OBSCURE-029",
+        "OBSCURE-010"
+      ],
+      "edge_coverage_status": "mapped",
+      "minimum_evidence": {
+        "critical": "all applicable critical cases must have executable evidence or accepted-risk disposition",
+        "high": "all applicable high cases must have executable evidence or accepted-risk disposition before hardened status"
+      },
+      "coverage_stats": {
+        "total": 12,
+        "critical": 0,
+        "high": 7
+      },
+      "required_evidence_modes": [
+        "property",
+        "fuzz",
+        "recovery_drill",
+        "integration",
+        "fault_injection",
+        "platform_test",
+        "adversarial_eval",
+        "design_review",
+        "e2e"
+      ],
+      "invariants": [
+        "Every applicable WP-W25 catalog case has an explicit disposition.",
+        "Critical/high cases cannot disappear through refactors or documentation changes.",
+        "Planned tests are not counted as passing evidence.",
+        "Accepted risks identify owner, rationale, review trigger and compensating controls."
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w25_edge_contract.py",
+        "planned:tests/wp_w25_failure_injection.py",
+        "planned:benchmarks/wp_w25_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w25-recovery.md"
+      ],
+      "acceptance": [
+        "all mapped catalog IDs resolve",
+        "critical/high dispositions are machine-readable",
+        "required evidence modes are represented by executable evidence before hardening",
+        "cross-package cases retain all applicable owners"
+      ],
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W26",
+      "name": "Research",
+      "priority": "P1",
+      "objective": "Literature ingestion, claim/evidence graphs, replication, statistics and research integrity.",
+      "exact_paths": [
+        "research",
+        "skeleton/research",
+        "benchmarks",
+        "docs/plan"
+      ],
+      "historical_ids": [
+        "HIST-AI-001",
+        "HIST-AI-002",
+        "HIST-AI-003",
+        "HIST-AI-004",
+        "HIST-AI-005",
+        "HIST-AI-006",
+        "HIST-AI-007",
+        "HIST-AI-008",
+        "HIST-AI-009",
+        "HIST-AI-010",
+        "HIST-AI-011",
+        "HIST-AI-012",
+        "HIST-AI-013",
+        "HIST-AI-014",
+        "HIST-AI-015",
+        "HIST-AI-016",
+        "HIST-AI-017",
+        "HIST-AI-018",
+        "HIST-AI-019",
+        "HIST-AI-020",
+        "HIST-AI-021",
+        "HIST-AI-022",
+        "HIST-AI-023",
+        "HIST-AI-024",
+        "HIST-AI-025",
+        "HIST-AI-026",
+        "HIST-AI-027",
+        "HIST-AI-028",
+        "HIST-AI-029",
+        "HIST-AI-030",
+        "HIST-AI-031",
+        "HIST-AI-032",
+        "HIST-AI-033",
+        "HIST-AI-034",
+        "HIST-AI-035",
+        "HIST-AI-036",
+        "HIST-AI-037",
+        "HIST-AI-038",
+        "HIST-AI-039",
+        "HIST-AI-040",
+        "HIST-SYS-003",
+        "HIST-SYS-030"
+      ],
+      "edge_case_ids": [
+        "EDGE-DIST-030",
+        "EDGE-AI-025",
+        "EDGE-AI-026",
+        "EDGE-AI-027",
+        "EDGE-HW-006",
+        "EDGE-UX-004",
+        "EDGE-AI-005",
+        "EDGE-AI-006",
+        "EDGE-AI-030"
+      ],
+      "obscure_ids": [
+        "OBSCURE-019",
+        "OBSCURE-030"
+      ],
+      "edge_coverage_status": "mapped",
+      "minimum_evidence": {
+        "critical": "all applicable critical cases must have executable evidence or accepted-risk disposition",
+        "high": "all applicable high cases must have executable evidence or accepted-risk disposition before hardened status"
+      },
+      "coverage_stats": {
+        "total": 53,
+        "critical": 1,
+        "high": 2
+      },
+      "required_evidence_modes": [
+        "design_review",
+        "adversarial_eval",
+        "integration",
+        "fault_injection",
+        "property",
+        "fuzz",
+        "regression",
+        "adversarial",
+        "negative_test",
+        "platform_test",
+        "e2e"
+      ],
+      "invariants": [
+        "Every applicable WP-W26 catalog case has an explicit disposition.",
+        "Critical/high cases cannot disappear through refactors or documentation changes.",
+        "Planned tests are not counted as passing evidence.",
+        "Accepted risks identify owner, rationale, review trigger and compensating controls."
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w26_edge_contract.py",
+        "planned:tests/wp_w26_failure_injection.py",
+        "planned:benchmarks/wp_w26_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w26-recovery.md"
+      ],
+      "acceptance": [
+        "all mapped catalog IDs resolve",
+        "critical/high dispositions are machine-readable",
+        "required evidence modes are represented by executable evidence before hardening",
+        "cross-package cases retain all applicable owners"
+      ],
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W27",
+      "name": "Forge",
+      "priority": "P1",
+      "objective": "Candidate generation, artifact lineage, competition, champion/challenger and promotion.",
+      "exact_paths": [
+        "skeleton/forge",
+        "skeleton/artifact_plane",
+        "machine"
+      ],
+      "historical_ids": [
+        "HIST-AI-007",
+        "HIST-AI-018",
+        "HIST-AI-019",
+        "HIST-AI-036",
+        "HIST-SYS-019"
+      ],
+      "edge_case_ids": [
+        "EDGE-AI-035",
+        "EDGE-SEC-001",
+        "EDGE-SEC-005",
+        "EDGE-SEC-006",
+        "EDGE-SEC-007",
+        "EDGE-SEC-009",
+        "EDGE-DATA-002",
+        "EDGE-DATA-003",
+        "EDGE-DATA-004",
+        "EDGE-UX-010",
+        "EDGE-AI-025"
+      ],
+      "obscure_ids": [
+        "OBSCURE-007",
+        "OBSCURE-011",
+        "OBSCURE-029"
+      ],
+      "edge_coverage_status": "mapped",
+      "minimum_evidence": {
+        "critical": "all applicable critical cases must have executable evidence or accepted-risk disposition",
+        "high": "all applicable high cases must have executable evidence or accepted-risk disposition before hardened status"
+      },
+      "coverage_stats": {
+        "total": 19,
+        "critical": 6,
+        "high": 3
+      },
+      "required_evidence_modes": [
+        "design_review",
+        "adversarial_eval",
+        "integration",
+        "adversarial",
+        "negative_test",
+        "recovery_drill",
+        "platform_test",
+        "fault_injection",
+        "property",
+        "regression",
+        "e2e",
+        "fuzz"
+      ],
+      "invariants": [
+        "Every applicable WP-W27 catalog case has an explicit disposition.",
+        "Critical/high cases cannot disappear through refactors or documentation changes.",
+        "Planned tests are not counted as passing evidence.",
+        "Accepted risks identify owner, rationale, review trigger and compensating controls."
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w27_edge_contract.py",
+        "planned:tests/wp_w27_failure_injection.py",
+        "planned:benchmarks/wp_w27_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w27-recovery.md"
+      ],
+      "acceptance": [
+        "all mapped catalog IDs resolve",
+        "critical/high dispositions are machine-readable",
+        "required evidence modes are represented by executable evidence before hardening",
+        "cross-package cases retain all applicable owners"
+      ],
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W28",
+      "name": "Learning",
+      "priority": "P1",
+      "objective": "Outcome learning, curriculum, routing/retrieval adaptation and controlled self-improvement.",
+      "exact_paths": [
+        "skeleton/learning",
+        "skeleton/intelligence",
+        "benchmarks"
+      ],
+      "historical_ids": [
+        "HIST-AI-009",
+        "HIST-AI-011",
+        "HIST-AI-018",
+        "HIST-AI-035",
+        "HIST-AI-023"
+      ],
+      "edge_case_ids": [
+        "EDGE-DIST-020",
+        "EDGE-AI-028",
+        "EDGE-AI-035",
+        "EDGE-AI-036",
+        "EDGE-AI-033",
+        "EDGE-AI-034"
+      ],
+      "obscure_ids": [],
+      "edge_coverage_status": "mapped",
+      "minimum_evidence": {
+        "critical": "all applicable critical cases must have executable evidence or accepted-risk disposition",
+        "high": "all applicable high cases must have executable evidence or accepted-risk disposition before hardened status"
+      },
+      "coverage_stats": {
+        "total": 11,
+        "critical": 0,
+        "high": 1
+      },
+      "required_evidence_modes": [
+        "design_review",
+        "adversarial_eval",
+        "integration",
+        "fault_injection",
+        "property",
+        "recovery_drill"
+      ],
+      "invariants": [
+        "Every applicable WP-W28 catalog case has an explicit disposition.",
+        "Critical/high cases cannot disappear through refactors or documentation changes.",
+        "Planned tests are not counted as passing evidence.",
+        "Accepted risks identify owner, rationale, review trigger and compensating controls."
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w28_edge_contract.py",
+        "planned:tests/wp_w28_failure_injection.py",
+        "planned:benchmarks/wp_w28_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w28-recovery.md"
+      ],
+      "acceptance": [
+        "all mapped catalog IDs resolve",
+        "critical/high dispositions are machine-readable",
+        "required evidence modes are represented by executable evidence before hardening",
+        "cross-package cases retain all applicable owners"
+      ],
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W29",
+      "name": "Distributed Runtime",
+      "priority": "P1",
+      "objective": "Workers, queues, topology-aware scheduling, distributed inference, leases and resource isolation.",
+      "exact_paths": [
+        "skeleton/resilience",
+        "skeleton/agents",
+        "skeleton/provider_runtime.py",
+        "deploy",
+        "infra"
+      ],
+      "historical_ids": [
+        "HIST-AI-026",
+        "HIST-SYS-001",
+        "HIST-SYS-002",
+        "HIST-SYS-004",
+        "HIST-SYS-005",
+        "HIST-SYS-007",
+        "HIST-SYS-008",
+        "HIST-SYS-009",
+        "HIST-SYS-010",
+        "HIST-SYS-011",
+        "HIST-SYS-012",
+        "HIST-SYS-013",
+        "HIST-SYS-014",
+        "HIST-SYS-015",
+        "HIST-SYS-016",
+        "HIST-SYS-017",
+        "HIST-SYS-026",
+        "HIST-SYS-027",
+        "HIST-SYS-028",
+        "HIST-SYS-029",
+        "HIST-SYS-030"
+      ],
+      "edge_case_ids": [
+        "EDGE-CONTRACT-007",
+        "EDGE-CONTRACT-008",
+        "EDGE-CONTRACT-010",
+        "EDGE-CONTRACT-011",
+        "EDGE-CONTRACT-013",
+        "EDGE-CONTRACT-014",
+        "EDGE-CONTRACT-015",
+        "EDGE-CONTRACT-016",
+        "EDGE-CONTRACT-019",
+        "EDGE-DIST-001",
+        "EDGE-DIST-002",
+        "EDGE-DIST-003",
+        "EDGE-DIST-004",
+        "EDGE-DIST-007",
+        "EDGE-DIST-008",
+        "EDGE-DIST-009",
+        "EDGE-DIST-010",
+        "EDGE-DIST-011",
+        "EDGE-DIST-012",
+        "EDGE-DIST-013",
+        "EDGE-DIST-014",
+        "EDGE-DIST-015",
+        "EDGE-DIST-016",
+        "EDGE-DIST-017",
+        "EDGE-DIST-018",
+        "EDGE-DIST-019",
+        "EDGE-DIST-021",
+        "EDGE-DIST-022",
+        "EDGE-DIST-025",
+        "EDGE-DIST-026",
+        "EDGE-DIST-027",
+        "EDGE-DIST-028",
+        "EDGE-DIST-029",
+        "EDGE-SEC-008",
+        "EDGE-HW-001",
+        "EDGE-HW-002",
+        "EDGE-HW-003",
+        "EDGE-HW-004",
+        "EDGE-HW-006",
+        "EDGE-HW-007",
+        "EDGE-HW-008",
+        "EDGE-HW-009",
+        "EDGE-HW-010",
+        "EDGE-UX-009",
+        "EDGE-DIST-020",
+        "EDGE-AI-032",
+        "EDGE-SEC-020",
+        "EDGE-DATA-007",
+        "EDGE-UX-003"
+      ],
+      "obscure_ids": [
+        "OBSCURE-001",
+        "OBSCURE-002",
+        "OBSCURE-003",
+        "OBSCURE-008",
+        "OBSCURE-009",
+        "OBSCURE-016",
+        "OBSCURE-017",
+        "OBSCURE-027",
+        "OBSCURE-028",
+        "OBSCURE-005",
+        "OBSCURE-006",
+        "OBSCURE-010"
+      ],
+      "edge_coverage_status": "mapped",
+      "minimum_evidence": {
+        "critical": "all applicable critical cases must have executable evidence or accepted-risk disposition",
+        "high": "all applicable high cases must have executable evidence or accepted-risk disposition before hardened status"
+      },
+      "coverage_stats": {
+        "total": 82,
+        "critical": 2,
+        "high": 9
+      },
+      "required_evidence_modes": [
+        "design_review",
+        "adversarial_eval",
+        "integration",
+        "fault_injection",
+        "property",
+        "fuzz",
+        "e2e",
+        "adversarial",
+        "negative_test",
+        "platform_test",
+        "regression",
+        "recovery_drill"
+      ],
+      "invariants": [
+        "Every applicable WP-W29 catalog case has an explicit disposition.",
+        "Critical/high cases cannot disappear through refactors or documentation changes.",
+        "Planned tests are not counted as passing evidence.",
+        "Accepted risks identify owner, rationale, review trigger and compensating controls."
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w29_edge_contract.py",
+        "planned:tests/wp_w29_failure_injection.py",
+        "planned:benchmarks/wp_w29_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w29-recovery.md"
+      ],
+      "acceptance": [
+        "all mapped catalog IDs resolve",
+        "critical/high dispositions are machine-readable",
+        "required evidence modes are represented by executable evidence before hardening",
+        "cross-package cases retain all applicable owners"
+      ],
+      "evidence": [],
+      "accepted_risks": []
+    },
+    {
+      "id": "WP-W30",
+      "name": "Production Hardening",
+      "priority": "P0/P1",
+      "objective": "Release qualification, migration, rollback, disaster recovery, SLOs, provenance and operational readiness.",
+      "exact_paths": [
+        "deploy",
+        "scripts",
+        "docs",
+        "machine",
+        ".github/workflows"
+      ],
+      "historical_ids": [
+        "HIST-AI-022",
+        "HIST-SYS-005",
+        "HIST-SYS-006",
+        "HIST-SYS-013",
+        "HIST-SYS-018",
+        "HIST-SYS-025",
+        "HIST-AI-002",
+        "HIST-AI-009",
+        "HIST-AI-023"
+      ],
+      "edge_case_ids": [
+        "EDGE-CONTRACT-015",
+        "EDGE-CONTRACT-020",
+        "EDGE-DIST-011",
+        "EDGE-AI-012",
+        "EDGE-AI-013",
+        "EDGE-AI-018",
+        "EDGE-AI-019",
+        "EDGE-AI-020",
+        "EDGE-AI-021",
+        "EDGE-AI-022",
+        "EDGE-AI-035",
+        "EDGE-AI-038",
+        "EDGE-SEC-010",
+        "EDGE-DATA-003",
+        "EDGE-DATA-004",
+        "EDGE-DATA-005",
+        "EDGE-DATA-006",
+        "EDGE-DATA-007",
+        "EDGE-DATA-010",
+        "EDGE-HW-001",
+        "EDGE-HW-002",
+        "EDGE-HW-007",
+        "EDGE-UX-003",
+        "EDGE-DIST-017",
+        "EDGE-DIST-028",
+        "EDGE-DATA-002"
+      ],
+      "obscure_ids": [
+        "OBSCURE-001",
+        "OBSCURE-006",
+        "OBSCURE-008",
+        "OBSCURE-014",
+        "OBSCURE-015",
+        "OBSCURE-016",
+        "OBSCURE-018",
+        "OBSCURE-021",
+        "OBSCURE-023",
+        "OBSCURE-029",
+        "OBSCURE-030"
+      ],
+      "edge_coverage_status": "mapped",
+      "minimum_evidence": {
+        "critical": "all applicable critical cases must have executable evidence or accepted-risk disposition",
+        "high": "all applicable high cases must have executable evidence or accepted-risk disposition before hardened status"
+      },
+      "coverage_stats": {
+        "total": 46,
+        "critical": 5,
+        "high": 9
+      },
+      "required_evidence_modes": [
+        "design_review",
+        "adversarial_eval",
+        "integration",
+        "fault_injection",
+        "property",
+        "recovery_drill",
+        "fuzz",
+        "adversarial",
+        "negative_test",
+        "regression",
+        "platform_test",
+        "e2e"
+      ],
+      "invariants": [
+        "Every applicable WP-W30 catalog case has an explicit disposition.",
+        "Critical/high cases cannot disappear through refactors or documentation changes.",
+        "Planned tests are not counted as passing evidence.",
+        "Accepted risks identify owner, rationale, review trigger and compensating controls."
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w30_edge_contract.py",
+        "planned:tests/wp_w30_failure_injection.py",
+        "planned:benchmarks/wp_w30_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w30-recovery.md"
+      ],
+      "acceptance": [
+        "all mapped catalog IDs resolve",
+        "critical/high dispositions are machine-readable",
+        "required evidence modes are represented by executable evidence before hardening",
+        "cross-package cases retain all applicable owners"
+      ],
+      "evidence": [],
+      "accepted_risks": []
+    }
+  ]
+}

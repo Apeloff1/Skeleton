@@ -1,0 +1,1872 @@
+{
+  "schema_version": "skeleton.ai.hostile_gap_disposition.v1",
+  "status": "active",
+  "authority": "docs/architecture/masterplan-gap-audit.md",
+  "purpose": "Machine-readable disposition of every canonical hostile masterplan gap. A landed implementation does not imply closure; closure requires independent exact-head evidence and explicit promotion.",
+  "allowed_states": [
+    "open",
+    "implementation_pr_open",
+    "landed_unverified",
+    "verified_closed",
+    "superseded"
+  ],
+  "closure_rule": "verified_closed requires merged implementation, exact-head verifier evidence, and explicit disposition update; no state may be inferred from prose, file presence, or PR title.",
+  "summary": {
+    "total": 200,
+    "p0": 26,
+    "p1": 164,
+    "p2": 10,
+    "implementation_pr_open": 20,
+    "verified_closed": 0
+  },
+  "gaps": [
+    {
+      "id": "G001",
+      "severity": "P0",
+      "title": "Tokenizer / representation contract",
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2353"
+      ],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G002",
+      "severity": "P0",
+      "title": "Dataset lineage and deterministic mixture reconstruction",
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2355"
+      ],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G003",
+      "severity": "P0",
+      "title": "Unified model artifact manifest",
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2353"
+      ],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G004",
+      "severity": "P0",
+      "title": "Durable schema/state migration protocol",
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2362"
+      ],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G005",
+      "severity": "P0",
+      "title": "Evaluation firewall and adaptive-overfitting control",
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2356"
+      ],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G006",
+      "severity": "P0",
+      "title": "Authenticated principal / tenancy / delegation chain",
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2367"
+      ],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G007",
+      "severity": "P0",
+      "title": "Execution sandbox / containment",
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2368"
+      ],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G008",
+      "severity": "P0",
+      "title": "Supply-chain trust root",
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2369"
+      ],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G009",
+      "severity": "P0",
+      "title": "Authoritative storage consistency contract",
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2722"
+      ],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G010",
+      "severity": "P0",
+      "title": "Distributed time, leases, fencing and ordering",
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2723"
+      ],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G011",
+      "severity": "P0",
+      "title": "Secret lifecycle and secret-taint propagation",
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2724"
+      ],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G012",
+      "severity": "P0",
+      "title": "Disaster recovery contract",
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2725"
+      ],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G013",
+      "severity": "P0",
+      "title": "Control-plane / data-plane isolation",
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2749"
+      ],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G014",
+      "severity": "P0",
+      "title": "Configuration authority and immutable config snapshots",
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2747"
+      ],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G015",
+      "severity": "P0",
+      "title": "Non-idempotent side-effect compensation",
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2748"
+      ],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G016",
+      "severity": "P0",
+      "title": "Privacy deletion / tombstone propagation",
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2753"
+      ],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G017",
+      "severity": "P0",
+      "title": "Training-data poisoning / backdoor lane",
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2357"
+      ],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G018",
+      "severity": "P0",
+      "title": "Artifact deserialization / model-load containment",
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2361"
+      ],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G019",
+      "severity": "P0",
+      "title": "Tamper-evident audit log",
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2363"
+      ],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G020",
+      "severity": "P0",
+      "title": "Safe-mode / break-glass operating state",
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2364"
+      ],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G021",
+      "severity": "P1",
+      "title": "Global resource scheduler",
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2752"
+      ],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G022",
+      "severity": "P1",
+      "title": "Backpressure propagation",
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2751"
+      ],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G023",
+      "severity": "P1",
+      "title": "Observability integrity",
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2736"
+      ],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G024",
+      "severity": "P1",
+      "title": "SLO/error-budget authority",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G025",
+      "severity": "P1",
+      "title": "API/event/tool schema compatibility",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G026",
+      "severity": "P1",
+      "title": "Structured decoding contract",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G027",
+      "severity": "P1",
+      "title": "Uncertainty / abstention / OOD contract",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G028",
+      "severity": "P1",
+      "title": "Cross-tenant cache and memory leakage",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G029",
+      "severity": "P1",
+      "title": "Cache coherence and generation invalidation",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G030",
+      "severity": "P1",
+      "title": "Event delivery semantics",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G031",
+      "severity": "P1",
+      "title": "Reconciliation after partial success",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G032",
+      "severity": "P1",
+      "title": "Multi-agent deadlock/livelock/byzantine behavior",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G033",
+      "severity": "P1",
+      "title": "Provenance laundering",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G034",
+      "severity": "P1",
+      "title": "Numeric reproducibility envelope",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G035",
+      "severity": "P1",
+      "title": "Compiler / model IR contract",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G036",
+      "severity": "P1",
+      "title": "Kernel correctness oracle",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G037",
+      "severity": "P1",
+      "title": "Capacity planning / headroom",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G038",
+      "severity": "P1",
+      "title": "Autoscaling oscillation protection",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G039",
+      "severity": "P1",
+      "title": "Denial-of-wallet / cost attacks",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G040",
+      "severity": "P1",
+      "title": "Log/trace/prompt data minimization",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G041",
+      "severity": "P1",
+      "title": "Serialization/parser bombs",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G042",
+      "severity": "P1",
+      "title": "Cancellation semantics after commit point",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G043",
+      "severity": "P1",
+      "title": "Dependency/provider semantic drift",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G044",
+      "severity": "P1",
+      "title": "Release/install ABI compatibility",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G045",
+      "severity": "P1",
+      "title": "Backup age / restore compatibility",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G046",
+      "severity": "P1",
+      "title": "Garbage collection of provenance/state",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G047",
+      "severity": "P1",
+      "title": "Clock-independent TTL/freshness",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G048",
+      "severity": "P1",
+      "title": "Quorum / split-brain semantics",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G049",
+      "severity": "P1",
+      "title": "Partial result semantics",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G050",
+      "severity": "P1",
+      "title": "Human approval race / staleness",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G051",
+      "severity": "P1",
+      "title": "Training run provenance after elastic resize",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G052",
+      "severity": "P1",
+      "title": "Synthetic-data collapse controls",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G053",
+      "severity": "P1",
+      "title": "Reward/verifier gaming in search",
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2358"
+      ],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G054",
+      "severity": "P1",
+      "title": "Evaluator drift/versioning",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G055",
+      "severity": "P1",
+      "title": "Hidden dependency on one hardware vendor",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G056",
+      "severity": "P1",
+      "title": "Network partition matrix",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G057",
+      "severity": "P1",
+      "title": "Filesystem/object-store semantics",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G058",
+      "severity": "P1",
+      "title": "Operator action provenance",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G059",
+      "severity": "P1",
+      "title": "Configuration secret separation",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G060",
+      "severity": "P1",
+      "title": "Bootstrapping trust root",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G061",
+      "severity": "P2",
+      "title": "Multimodal representation contract",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G062",
+      "severity": "P2",
+      "title": "Unicode/confusable normalization",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G063",
+      "severity": "P2",
+      "title": "Locale/timezone/calendar semantics",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G064",
+      "severity": "P2",
+      "title": "Energy/thermal-aware placement",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G065",
+      "severity": "P2",
+      "title": "Offline/degraded provider mode",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G066",
+      "severity": "P2",
+      "title": "Long-term artifact format retirement",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G067",
+      "severity": "P2",
+      "title": "Benchmark saturation/retirement",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G068",
+      "severity": "P2",
+      "title": "Accessibility/interaction invariants",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G069",
+      "severity": "P2",
+      "title": "Model/data license policy engine",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G070",
+      "severity": "P2",
+      "title": "Legal-retention vs deletion conflict",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G071",
+      "severity": "P1",
+      "title": "canonical serialization for signed/hashed objects can drift across language/runtime versions",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G072",
+      "severity": "P1",
+      "title": "TOCTOU between authorization/approval and actual execution",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G073",
+      "severity": "P1",
+      "title": "approval replay against changed arguments, state, principal or policy",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G074",
+      "severity": "P1",
+      "title": "SSRF and DNS rebinding through URL-capable tools/retrievers",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G075",
+      "severity": "P1",
+      "title": "redirect chains can escape an originally allowed origin/network policy",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G076",
+      "severity": "P1",
+      "title": "filesystem path traversal, symlink races and mount-boundary escape",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G077",
+      "severity": "P1",
+      "title": "archive extraction path traversal / zip-slip / archive bombs",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G078",
+      "severity": "P1",
+      "title": "package/plugin dependency confusion and namespace takeover",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G079",
+      "severity": "P1",
+      "title": "generated code can install dependencies with arbitrary install-time scripts",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G080",
+      "severity": "P1",
+      "title": "JIT/kernel/compiled-code cache poisoning or stale binary reuse",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G081",
+      "severity": "P1",
+      "title": "cross-tenant accelerator-memory residue and buffer reuse",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G082",
+      "severity": "P1",
+      "title": "KMS/secret-provider outage during boot, rotation or recovery",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G083",
+      "severity": "P1",
+      "title": "partial key rotation leaves mixed writers/readers and unverifiable artifacts",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G084",
+      "severity": "P0",
+      "title": "root signing/trust key compromise lacks explicit revoke, re-root and re-sign recovery",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G085",
+      "severity": "P1",
+      "title": "distributed checkpoint shards can be individually valid but collectively inconsistent",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G086",
+      "severity": "P1",
+      "title": "snapshot without quiescence/barrier can capture impossible cross-store state",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G087",
+      "severity": "P1",
+      "title": "index rebuild can expose a mixture of old/new generations",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G088",
+      "severity": "P1",
+      "title": "vector embeddings remain after embedding-model/version change",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G089",
+      "severity": "P1",
+      "title": "retrieval index and query encoder can silently disagree on version/normalization",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G090",
+      "severity": "P1",
+      "title": "low-grade memory poisoning accumulates gradually below per-write thresholds",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G091",
+      "severity": "P1",
+      "title": "compaction/GC can accidentally resurrect or discard deletion tombstones",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G092",
+      "severity": "P1",
+      "title": "randomness/seed ownership is not explicit across experiments and production sampling",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G093",
+      "severity": "P1",
+      "title": "elastic resize can duplicate or reuse distributed RNG streams",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G094",
+      "severity": "P1",
+      "title": "data-loader cursor recovery can skip or duplicate training samples",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G095",
+      "severity": "P1",
+      "title": "collectives can hang/partially progress without a consistent recovery boundary",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G096",
+      "severity": "P1",
+      "title": "silent memory/network/storage corruption needs end-to-end checks, not only file hashes",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G097",
+      "severity": "P1",
+      "title": "counters/epochs/sequence IDs can overflow, wrap or be truncated",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G098",
+      "severity": "P1",
+      "title": "unit confusion between bytes/tokens/seconds/ms/currency can defeat resource gates",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G099",
+      "severity": "P1",
+      "title": "feature flags can form invalid combinations not tested individually",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G100",
+      "severity": "P1",
+      "title": "rollout/feature/config skew across replicas can create non-reproducible behavior",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G101",
+      "severity": "P1",
+      "title": "canary traffic may not represent tail users/tasks/hardware/failure conditions",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G102",
+      "severity": "P1",
+      "title": "automated rollback/re-promote can flap between versions without hysteresis",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G103",
+      "severity": "P1",
+      "title": "supposedly independent providers/regions can share correlated dependencies",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G104",
+      "severity": "P1",
+      "title": "DNS/CDN/cache poisoning can change fetched artifacts without changing logical URL",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G105",
+      "severity": "P1",
+      "title": "certificate expiry/rotation can brick bootstrap or recovery paths",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G106",
+      "severity": "P1",
+      "title": "KMS credential bootstrap can become circular during disaster recovery",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G107",
+      "severity": "P1",
+      "title": "audit-log signing-key rotation can break historical verification",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G108",
+      "severity": "P1",
+      "title": "valid old receipts can be replayed as if they authorize a new action",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G109",
+      "severity": "P1",
+      "title": "delayed/replayed events can arrive after policy or lease expiry",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G110",
+      "severity": "P1",
+      "title": "idempotency keys need namespace/scope/TTL rules to prevent collisions and cross-action suppression",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G111",
+      "severity": "P1",
+      "title": "generated IDs can collide or cross namespaces/tenants",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G112",
+      "severity": "P1",
+      "title": "digest/signature algorithms need versioning and cryptographic agility",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G113",
+      "severity": "P1",
+      "title": "semantically identical objects can hash differently without canonical serialization",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G114",
+      "severity": "P1",
+      "title": "consumers can treat an incomplete streamed result as committed data",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G115",
+      "severity": "P1",
+      "title": "speculative output may be externally consumed before later rejection/correction",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G116",
+      "severity": "P1",
+      "title": "prompt/prefix caches can leak across policy/system-prompt versions",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G117",
+      "severity": "P1",
+      "title": "context compression can drop authority/trust labels while keeping imperative text",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G118",
+      "severity": "P1",
+      "title": "summaries can hallucinate provenance or collapse contradictory sources",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G119",
+      "severity": "P1",
+      "title": "retrieval scores from different encoders/indexes are not directly comparable",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G120",
+      "severity": "P1",
+      "title": "learned data-quality filters can drift and silently reshape the training population",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G121",
+      "severity": "P1",
+      "title": "teacher/student synthetic-data loops can create circular evidence and error amplification",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G122",
+      "severity": "P1",
+      "title": "benchmark answers can leak through repository files, tools, search or retrieval at eval time",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G123",
+      "severity": "P1",
+      "title": "test/eval fixtures can later enter training corpora through repository ingestion",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G124",
+      "severity": "P1",
+      "title": "generated evals can self-confirm the model family that generated them",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G125",
+      "severity": "P1",
+      "title": "production behavior→feedback→training loops can amplify popularity rather than correctness",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G126",
+      "severity": "P1",
+      "title": "malicious or low-quality user corrections can poison memory/training promotion",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G127",
+      "severity": "P1",
+      "title": "agent-to-agent messages need authenticated sender identity and anti-impersonation",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G128",
+      "severity": "P1",
+      "title": "workflow checkpoints can replay privileged steps after capability/policy revocation",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G129",
+      "severity": "P1",
+      "title": "stale operator UI state and double-submit can issue obsolete or duplicate commands",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G130",
+      "severity": "P1",
+      "title": "temporary files, local caches and crash residue can retain secrets or sensitive artifacts",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G131",
+      "severity": "P0",
+      "title": "invariant/policy conflicts have no single precedence and conflict-resolution contract",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G132",
+      "severity": "P1",
+      "title": "policy merge from system/developer/operator/tenant layers can be ambiguous",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G133",
+      "severity": "P1",
+      "title": "configuration dependencies can form cycles or impossible combinations",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G134",
+      "severity": "P1",
+      "title": "boot dependencies can deadlock before diagnostics/control plane are available",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G135",
+      "severity": "P0",
+      "title": "recovery path can depend on the same failed storage/network/identity service it is meant to recover",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G136",
+      "severity": "P0",
+      "title": "safe mode/break-glass can become unusable when normal auth/KMS/control plane is unavailable",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G137",
+      "severity": "P1",
+      "title": "break-glass credentials can expire, be lost, or remain untested until disaster",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G138",
+      "severity": "P1",
+      "title": "dual-control requirements can deadlock urgent recovery with no bounded escalation path",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G139",
+      "severity": "P1",
+      "title": "alert storms can hide the causal signal and exhaust operator attention",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G140",
+      "severity": "P1",
+      "title": "incident/runbook procedures can drift from current architecture and permissions",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G141",
+      "severity": "P1",
+      "title": "staging/test can differ materially from production hardware, scale, network and policy",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G142",
+      "severity": "P1",
+      "title": "fault-injection harness itself can be wrong and produce false confidence",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G143",
+      "severity": "P1",
+      "title": "chaos tests need blast-radius boundaries and automatic abort conditions",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G144",
+      "severity": "P1",
+      "title": "mocks/test doubles can provide stronger semantics than real dependencies",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G145",
+      "severity": "P1",
+      "title": "production task distribution can drift away from eval populations",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G146",
+      "severity": "P1",
+      "title": "canary cohort selection can systematically exclude the hardest/tail cases",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G147",
+      "severity": "P1",
+      "title": "shadow execution cannot validate real side effects unless transactional simulators mirror them faithfully",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G148",
+      "severity": "P1",
+      "title": "load tests can saturate data plane without testing protected control-plane reserve",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G149",
+      "severity": "P1",
+      "title": "downstream rate-limit semantics/backoff headers may differ by provider/version",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G150",
+      "severity": "P1",
+      "title": "external provider quota exhaustion can cause correlated fallback cascades",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G151",
+      "severity": "P1",
+      "title": "billing/credit/account limits can be a hidden single point of service failure",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G152",
+      "severity": "P1",
+      "title": "data-residency/region policy is not bound into placement, logs, backups and tools",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G153",
+      "severity": "P1",
+      "title": "failover to another region can violate residency or policy constraints",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G154",
+      "severity": "P1",
+      "title": "backup/restore destinations can cross prohibited boundaries",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G155",
+      "severity": "P1",
+      "title": "encryption-at-rest/in-transit requirements are not explicit per data class",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G156",
+      "severity": "P1",
+      "title": "encryption key scope/tenant/artifact binding is not explicit",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G157",
+      "severity": "P1",
+      "title": "cryptographic randomness/nonce generation is not separated from model RNG",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G158",
+      "severity": "P1",
+      "title": "entropy or secure-random initialization can fail during bootstrap/recovery",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G159",
+      "severity": "P1",
+      "title": "internal service identity/mTLS or equivalent authentication is not a canonical boundary",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G160",
+      "severity": "P1",
+      "title": "certificate rotation/pinning/CA migration can strand old or isolated nodes",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G161",
+      "severity": "P0",
+      "title": "internal service impersonation can bypass capability assumptions if service identity is not cryptographically bound",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G162",
+      "severity": "P1",
+      "title": "inbound webhook/event authenticity and replay protection are not universal",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G163",
+      "severity": "P1",
+      "title": "inbound event signatures can verify while payload canonicalization differs",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G164",
+      "severity": "P1",
+      "title": "outbound callbacks/webhooks can become SSRF/data-exfiltration channels",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G165",
+      "severity": "P1",
+      "title": "prompt/template/system instruction versions are not always bound into evidence/cache identity",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G166",
+      "severity": "P1",
+      "title": "system/developer instruction text can leak through outputs, traces, error messages or tool arguments",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G167",
+      "severity": "P1",
+      "title": "hidden policy/context exfiltration can be induced through model/tool interactions",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G168",
+      "severity": "P1",
+      "title": "sustained probing can extract model/system behavior or sensitive memorized content",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G169",
+      "severity": "P1",
+      "title": "abuse/jailbreak rate controls are not integrated with global resource/economic governors",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G170",
+      "severity": "P1",
+      "title": "public API nested/recursive payloads can bypass simple byte limits",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G171",
+      "severity": "P1",
+      "title": "graph/memory traversal can explode through cycles or adversarial fanout",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G172",
+      "severity": "P1",
+      "title": "retrieval fanout/reranking depth can create denial-of-wallet behavior",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G173",
+      "severity": "P1",
+      "title": "graph/retrieval index can be poisoned through entity/edge creation rather than document content",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G174",
+      "severity": "P1",
+      "title": "adversarial embeddings can create collisions/nearest-neighbor hijacking",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G175",
+      "severity": "P1",
+      "title": "similarity thresholds can drift across embedding model generations",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G176",
+      "severity": "P1",
+      "title": "document/content hashing can differ by normalization/container representation",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G177",
+      "severity": "P1",
+      "title": "aggressive dedupe can delete semantically distinct but similar examples",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G178",
+      "severity": "P1",
+      "title": "weak dedupe can leave benchmark/train leakage and frequency distortion",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G179",
+      "severity": "P1",
+      "title": "source license/consent can be revoked after dataset/checkpoint creation",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G180",
+      "severity": "P1",
+      "title": "model/data lineage needs policy for artifacts trained on later-revoked sources",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G181",
+      "severity": "P1",
+      "title": "adapter merge can destroy separability and complicate rollback/provenance",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G182",
+      "severity": "P1",
+      "title": "quantization/dequantization can be non-reversible and invalidate byte-level rollback assumptions",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G183",
+      "severity": "P1",
+      "title": "multiple adapters can interact nonlinearly despite isolated evaluation",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G184",
+      "severity": "P1",
+      "title": "optimizer state can become invalid after architecture surgery or parameter remapping",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G185",
+      "severity": "P1",
+      "title": "tokenizer extension can break draft/speculative model compatibility",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G186",
+      "severity": "P1",
+      "title": "model/provider router can enter feedback loops based on its own latency/failure observations",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G187",
+      "severity": "P1",
+      "title": "routing optimized for cost/latency can systematically select lower-quality behavior for some populations",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G188",
+      "severity": "P1",
+      "title": "fallback models may not preserve safety, tool, schema, context or capability contracts",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G189",
+      "severity": "P1",
+      "title": "provider fallback mid-conversation/workflow can change semantics without explicit state transition",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G190",
+      "severity": "P1",
+      "title": "one workflow can accidentally mix model/tool/schema versions without a version envelope",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G191",
+      "severity": "P1",
+      "title": "long-running workflows can cross deployments and resume under incompatible code/policy",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G192",
+      "severity": "P1",
+      "title": "workflow resume can use stale approvals/capabilities after revocation",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G193",
+      "severity": "P0",
+      "title": "disaster restore/replay can repeat external side effects unless external-effect offsets/receipts are reconciled",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G194",
+      "severity": "P1",
+      "title": "restored queues/jobs can duplicate work already completed outside the restored state",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G195",
+      "severity": "P1",
+      "title": "VM/container snapshot restore can move wall clock backward",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G196",
+      "severity": "P1",
+      "title": "monotonic-clock assumptions do not survive process/host restart without durable epochs",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G197",
+      "severity": "P1",
+      "title": "restored leases/fencing tokens can regress unless epochs survive restore",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G198",
+      "severity": "P1",
+      "title": "DNS/service-discovery caches can keep traffic on failed/retired endpoints after failover",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G199",
+      "severity": "P1",
+      "title": "eventual-consistent object stores can expose promotion metadata before all referenced shards are readable",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    },
+    {
+      "id": "G200",
+      "severity": "P1",
+      "title": "atomic activation mechanisms differ across Windows/POSIX/object stores and require adapter-specific guarantees",
+      "status": "open",
+      "implementation_refs": [],
+      "evidence_refs": [],
+      "closure_note": null
+    }
+  ]
+}

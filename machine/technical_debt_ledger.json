@@ -1,0 +1,1087 @@
+{
+  "schema_version": "skeleton.technical_debt_ledger.v1",
+  "ledger_version": "0.1.0",
+  "status": "active",
+  "purpose": "Canonical debt IDs seeded from P2 repository-control masterplan gaps with ownership, risk, backlog and ADR disposition.",
+  "masterplan_binding": {
+    "volume_ref": "VOL-115",
+    "title": "Technical Debt Ledger",
+    "required_gap_texts": [
+      "independent cleanup-compatibility evaluation remains pending"
+    ]
+  },
+  "items": [
+    {
+      "id": "DEBT-VOL-021-G01",
+      "source": {
+        "type": "masterplan_gap",
+        "ref": "VOL-021#gap-1",
+        "text": "complete cross-language graph extraction"
+      },
+      "owner": {
+        "accountability_id": "ACC-VOL-021",
+        "role": "repository-machine"
+      },
+      "affected_contracts": [
+        "RepositoryNode",
+        "SymbolRecord",
+        "DependencyRecord",
+        "ImpactQuery"
+      ],
+      "risk_refs": [
+        "VOL-021:risk-1",
+        "VOL-021:risk-2",
+        "VOL-021:risk-3"
+      ],
+      "risk_text": [
+        "stale index",
+        "false dependency confidence",
+        "generated/vendor code pollution"
+      ],
+      "backlog_ref": "BL-GAP-VOL-021-G01",
+      "adr_disposition": {
+        "required": false,
+        "adr_ref": null,
+        "rationale": "This seeded debt item records an existing masterplan gap; ADR becomes required if retirement changes architecture authority, ownership, compatibility, or breadth."
+      },
+      "interest": {
+        "kind": "engineering_risk",
+        "signals": [
+          "unclosed masterplan gap",
+          "stale index",
+          "false dependency confidence",
+          "generated/vendor code pollution"
+        ]
+      },
+      "target_disposition": "close via executable implementation/evidence without bypassing migration, compatibility, rollback or signoff requirements",
+      "status": "open"
+    },
+    {
+      "id": "DEBT-VOL-021-G02",
+      "source": {
+        "type": "masterplan_gap",
+        "ref": "VOL-021#gap-2",
+        "text": "connect ownership/test mapping to change planner"
+      },
+      "owner": {
+        "accountability_id": "ACC-VOL-021",
+        "role": "repository-machine"
+      },
+      "affected_contracts": [
+        "RepositoryNode",
+        "SymbolRecord",
+        "DependencyRecord",
+        "ImpactQuery"
+      ],
+      "risk_refs": [
+        "VOL-021:risk-1",
+        "VOL-021:risk-2",
+        "VOL-021:risk-3"
+      ],
+      "risk_text": [
+        "stale index",
+        "false dependency confidence",
+        "generated/vendor code pollution"
+      ],
+      "backlog_ref": "BL-GAP-VOL-021-G02",
+      "adr_disposition": {
+        "required": false,
+        "adr_ref": null,
+        "rationale": "This seeded debt item records an existing masterplan gap; ADR becomes required if retirement changes architecture authority, ownership, compatibility, or breadth."
+      },
+      "interest": {
+        "kind": "engineering_risk",
+        "signals": [
+          "unclosed masterplan gap",
+          "stale index",
+          "false dependency confidence",
+          "generated/vendor code pollution"
+        ]
+      },
+      "target_disposition": "close via executable implementation/evidence without bypassing migration, compatibility, rollback or signoff requirements",
+      "status": "open"
+    },
+    {
+      "id": "DEBT-VOL-022-G01",
+      "source": {
+        "type": "masterplan_gap",
+        "ref": "VOL-022#gap-1",
+        "text": "transactional workspace layer incomplete"
+      },
+      "owner": {
+        "accountability_id": "ACC-VOL-022",
+        "role": "repository-machine"
+      },
+      "affected_contracts": [
+        "ChangePlan",
+        "EditLease",
+        "PatchReceipt",
+        "ReviewVerdict"
+      ],
+      "risk_refs": [
+        "VOL-022:risk-1",
+        "VOL-022:risk-2",
+        "VOL-022:risk-3",
+        "VOL-022:risk-4"
+      ],
+      "risk_text": [
+        "destructive edits",
+        "test gaming",
+        "merge races",
+        "self-review bias"
+      ],
+      "backlog_ref": "BL-GAP-VOL-022-G01",
+      "adr_disposition": {
+        "required": false,
+        "adr_ref": null,
+        "rationale": "This seeded debt item records an existing masterplan gap; ADR becomes required if retirement changes architecture authority, ownership, compatibility, or breadth."
+      },
+      "interest": {
+        "kind": "engineering_risk",
+        "signals": [
+          "unclosed masterplan gap",
+          "destructive edits",
+          "test gaming",
+          "merge races",
+          "self-review bias"
+        ]
+      },
+      "target_disposition": "close via executable implementation/evidence without bypassing migration, compatibility, rollback or signoff requirements",
+      "status": "open"
+    },
+    {
+      "id": "DEBT-VOL-022-G02",
+      "source": {
+        "type": "masterplan_gap",
+        "ref": "VOL-022#gap-2",
+        "text": "independent reviewer/verifier routing needs full integration"
+      },
+      "owner": {
+        "accountability_id": "ACC-VOL-022",
+        "role": "repository-machine"
+      },
+      "affected_contracts": [
+        "ChangePlan",
+        "EditLease",
+        "PatchReceipt",
+        "ReviewVerdict"
+      ],
+      "risk_refs": [
+        "VOL-022:risk-1",
+        "VOL-022:risk-2",
+        "VOL-022:risk-3",
+        "VOL-022:risk-4"
+      ],
+      "risk_text": [
+        "destructive edits",
+        "test gaming",
+        "merge races",
+        "self-review bias"
+      ],
+      "backlog_ref": "BL-GAP-VOL-022-G02",
+      "adr_disposition": {
+        "required": false,
+        "adr_ref": null,
+        "rationale": "This seeded debt item records an existing masterplan gap; ADR becomes required if retirement changes architecture authority, ownership, compatibility, or breadth."
+      },
+      "interest": {
+        "kind": "engineering_risk",
+        "signals": [
+          "unclosed masterplan gap",
+          "destructive edits",
+          "test gaming",
+          "merge races",
+          "self-review bias"
+        ]
+      },
+      "target_disposition": "close via executable implementation/evidence without bypassing migration, compatibility, rollback or signoff requirements",
+      "status": "open"
+    },
+    {
+      "id": "DEBT-VOL-092-G01",
+      "source": {
+        "type": "masterplan_gap",
+        "ref": "VOL-092#gap-1",
+        "text": "define maintenance ownership registry"
+      },
+      "owner": {
+        "accountability_id": "ACC-VOL-092",
+        "role": "repository-machine"
+      },
+      "affected_contracts": [
+        "MaintenanceTask",
+        "RepositoryOwnership",
+        "MaintenanceReceipt"
+      ],
+      "risk_refs": [
+        "VOL-092:risk-1",
+        "VOL-092:risk-2",
+        "VOL-092:risk-3"
+      ],
+      "risk_text": [
+        "destructive cleanup",
+        "bot churn",
+        "orphan ownership"
+      ],
+      "backlog_ref": "BL-GAP-VOL-092-G01",
+      "adr_disposition": {
+        "required": false,
+        "adr_ref": null,
+        "rationale": "This seeded debt item records an existing masterplan gap; ADR becomes required if retirement changes architecture authority, ownership, compatibility, or breadth."
+      },
+      "interest": {
+        "kind": "engineering_risk",
+        "signals": [
+          "unclosed masterplan gap",
+          "destructive cleanup",
+          "bot churn",
+          "orphan ownership"
+        ]
+      },
+      "target_disposition": "close via executable implementation/evidence without bypassing migration, compatibility, rollback or signoff requirements",
+      "status": "open"
+    },
+    {
+      "id": "DEBT-VOL-092-G02",
+      "source": {
+        "type": "masterplan_gap",
+        "ref": "VOL-092#gap-2",
+        "text": "bind deletion to reachability/retention checks"
+      },
+      "owner": {
+        "accountability_id": "ACC-VOL-092",
+        "role": "repository-machine"
+      },
+      "affected_contracts": [
+        "MaintenanceTask",
+        "RepositoryOwnership",
+        "MaintenanceReceipt"
+      ],
+      "risk_refs": [
+        "VOL-092:risk-1",
+        "VOL-092:risk-2",
+        "VOL-092:risk-3"
+      ],
+      "risk_text": [
+        "destructive cleanup",
+        "bot churn",
+        "orphan ownership"
+      ],
+      "backlog_ref": "BL-GAP-VOL-092-G02",
+      "adr_disposition": {
+        "required": false,
+        "adr_ref": null,
+        "rationale": "This seeded debt item records an existing masterplan gap; ADR becomes required if retirement changes architecture authority, ownership, compatibility, or breadth."
+      },
+      "interest": {
+        "kind": "engineering_risk",
+        "signals": [
+          "unclosed masterplan gap",
+          "destructive cleanup",
+          "bot churn",
+          "orphan ownership"
+        ]
+      },
+      "target_disposition": "close via executable implementation/evidence without bypassing migration, compatibility, rollback or signoff requirements",
+      "status": "open"
+    },
+    {
+      "id": "DEBT-VOL-093-G01",
+      "source": {
+        "type": "masterplan_gap",
+        "ref": "VOL-093#gap-1",
+        "text": "establish canonical backlog IDs"
+      },
+      "owner": {
+        "accountability_id": "ACC-VOL-093",
+        "role": "repository-machine"
+      },
+      "affected_contracts": [
+        "BacklogItem",
+        "BacklogDependency",
+        "BacklogDisposition"
+      ],
+      "risk_refs": [
+        "VOL-093:risk-1",
+        "VOL-093:risk-2",
+        "VOL-093:risk-3"
+      ],
+      "risk_text": [
+        "duplicate work",
+        "orphan tasks",
+        "status inflation"
+      ],
+      "backlog_ref": "BL-GAP-VOL-093-G01",
+      "adr_disposition": {
+        "required": false,
+        "adr_ref": null,
+        "rationale": "This seeded debt item records an existing masterplan gap; ADR becomes required if retirement changes architecture authority, ownership, compatibility, or breadth."
+      },
+      "interest": {
+        "kind": "engineering_risk",
+        "signals": [
+          "unclosed masterplan gap",
+          "duplicate work",
+          "orphan tasks",
+          "status inflation"
+        ]
+      },
+      "target_disposition": "close via executable implementation/evidence without bypassing migration, compatibility, rollback or signoff requirements",
+      "status": "open"
+    },
+    {
+      "id": "DEBT-VOL-093-G02",
+      "source": {
+        "type": "masterplan_gap",
+        "ref": "VOL-093#gap-2",
+        "text": "bind backlog to gap/risk closure"
+      },
+      "owner": {
+        "accountability_id": "ACC-VOL-093",
+        "role": "repository-machine"
+      },
+      "affected_contracts": [
+        "BacklogItem",
+        "BacklogDependency",
+        "BacklogDisposition"
+      ],
+      "risk_refs": [
+        "VOL-093:risk-1",
+        "VOL-093:risk-2",
+        "VOL-093:risk-3"
+      ],
+      "risk_text": [
+        "duplicate work",
+        "orphan tasks",
+        "status inflation"
+      ],
+      "backlog_ref": "BL-GAP-VOL-093-G02",
+      "adr_disposition": {
+        "required": false,
+        "adr_ref": null,
+        "rationale": "This seeded debt item records an existing masterplan gap; ADR becomes required if retirement changes architecture authority, ownership, compatibility, or breadth."
+      },
+      "interest": {
+        "kind": "engineering_risk",
+        "signals": [
+          "unclosed masterplan gap",
+          "duplicate work",
+          "orphan tasks",
+          "status inflation"
+        ]
+      },
+      "target_disposition": "close via executable implementation/evidence without bypassing migration, compatibility, rollback or signoff requirements",
+      "status": "open"
+    },
+    {
+      "id": "DEBT-VOL-094-G01",
+      "source": {
+        "type": "masterplan_gap",
+        "ref": "VOL-094#gap-1",
+        "text": "define priority factor schema"
+      },
+      "owner": {
+        "accountability_id": "ACC-VOL-094",
+        "role": "repository-machine"
+      },
+      "affected_contracts": [
+        "PriorityInput",
+        "PriorityDecision",
+        "PriorityConstraint"
+      ],
+      "risk_refs": [
+        "VOL-094:risk-1",
+        "VOL-094:risk-2",
+        "VOL-094:risk-3"
+      ],
+      "risk_text": [
+        "critical blocker starvation",
+        "metric gaming",
+        "oscillating priorities"
+      ],
+      "backlog_ref": "BL-GAP-VOL-094-G01",
+      "adr_disposition": {
+        "required": false,
+        "adr_ref": null,
+        "rationale": "This seeded debt item records an existing masterplan gap; ADR becomes required if retirement changes architecture authority, ownership, compatibility, or breadth."
+      },
+      "interest": {
+        "kind": "engineering_risk",
+        "signals": [
+          "unclosed masterplan gap",
+          "critical blocker starvation",
+          "metric gaming",
+          "oscillating priorities"
+        ]
+      },
+      "target_disposition": "close via executable implementation/evidence without bypassing migration, compatibility, rollback or signoff requirements",
+      "status": "open"
+    },
+    {
+      "id": "DEBT-VOL-094-G02",
+      "source": {
+        "type": "masterplan_gap",
+        "ref": "VOL-094#gap-2",
+        "text": "add anti-starvation constraints"
+      },
+      "owner": {
+        "accountability_id": "ACC-VOL-094",
+        "role": "repository-machine"
+      },
+      "affected_contracts": [
+        "PriorityInput",
+        "PriorityDecision",
+        "PriorityConstraint"
+      ],
+      "risk_refs": [
+        "VOL-094:risk-1",
+        "VOL-094:risk-2",
+        "VOL-094:risk-3"
+      ],
+      "risk_text": [
+        "critical blocker starvation",
+        "metric gaming",
+        "oscillating priorities"
+      ],
+      "backlog_ref": "BL-GAP-VOL-094-G02",
+      "adr_disposition": {
+        "required": false,
+        "adr_ref": null,
+        "rationale": "This seeded debt item records an existing masterplan gap; ADR becomes required if retirement changes architecture authority, ownership, compatibility, or breadth."
+      },
+      "interest": {
+        "kind": "engineering_risk",
+        "signals": [
+          "unclosed masterplan gap",
+          "critical blocker starvation",
+          "metric gaming",
+          "oscillating priorities"
+        ]
+      },
+      "target_disposition": "close via executable implementation/evidence without bypassing migration, compatibility, rollback or signoff requirements",
+      "status": "open"
+    },
+    {
+      "id": "DEBT-VOL-095-G01",
+      "source": {
+        "type": "masterplan_gap",
+        "ref": "VOL-095#gap-1",
+        "text": "bind all packages to exact requirements"
+      },
+      "owner": {
+        "accountability_id": "ACC-VOL-095",
+        "role": "repository-machine"
+      },
+      "affected_contracts": [
+        "WorkPackage",
+        "WorkPackageDependency",
+        "WorkPackageEvidence"
+      ],
+      "risk_refs": [
+        "VOL-095:risk-1",
+        "VOL-095:risk-2",
+        "VOL-095:risk-3"
+      ],
+      "risk_text": [
+        "oversized package",
+        "hidden dependency",
+        "manual completion claim"
+      ],
+      "backlog_ref": "BL-GAP-VOL-095-G01",
+      "adr_disposition": {
+        "required": false,
+        "adr_ref": null,
+        "rationale": "This seeded debt item records an existing masterplan gap; ADR becomes required if retirement changes architecture authority, ownership, compatibility, or breadth."
+      },
+      "interest": {
+        "kind": "engineering_risk",
+        "signals": [
+          "unclosed masterplan gap",
+          "oversized package",
+          "hidden dependency",
+          "manual completion claim"
+        ]
+      },
+      "target_disposition": "close via executable implementation/evidence without bypassing migration, compatibility, rollback or signoff requirements",
+      "status": "open"
+    },
+    {
+      "id": "DEBT-VOL-095-G02",
+      "source": {
+        "type": "masterplan_gap",
+        "ref": "VOL-095#gap-2",
+        "text": "materialize package evidence rollup"
+      },
+      "owner": {
+        "accountability_id": "ACC-VOL-095",
+        "role": "repository-machine"
+      },
+      "affected_contracts": [
+        "WorkPackage",
+        "WorkPackageDependency",
+        "WorkPackageEvidence"
+      ],
+      "risk_refs": [
+        "VOL-095:risk-1",
+        "VOL-095:risk-2",
+        "VOL-095:risk-3"
+      ],
+      "risk_text": [
+        "oversized package",
+        "hidden dependency",
+        "manual completion claim"
+      ],
+      "backlog_ref": "BL-GAP-VOL-095-G02",
+      "adr_disposition": {
+        "required": false,
+        "adr_ref": null,
+        "rationale": "This seeded debt item records an existing masterplan gap; ADR becomes required if retirement changes architecture authority, ownership, compatibility, or breadth."
+      },
+      "interest": {
+        "kind": "engineering_risk",
+        "signals": [
+          "unclosed masterplan gap",
+          "oversized package",
+          "hidden dependency",
+          "manual completion claim"
+        ]
+      },
+      "target_disposition": "close via executable implementation/evidence without bypassing migration, compatibility, rollback or signoff requirements",
+      "status": "open"
+    },
+    {
+      "id": "DEBT-VOL-108-G01",
+      "source": {
+        "type": "masterplan_gap",
+        "ref": "VOL-108#gap-1",
+        "text": "seed registry from historical failures"
+      },
+      "owner": {
+        "accountability_id": "ACC-VOL-108",
+        "role": "repository-machine"
+      },
+      "affected_contracts": [
+        "AntiPattern",
+        "AntiPatternFinding",
+        "AntiPatternException"
+      ],
+      "risk_refs": [
+        "VOL-108:risk-1",
+        "VOL-108:risk-2",
+        "VOL-108:risk-3"
+      ],
+      "risk_text": [
+        "prose-only guidance",
+        "exception normalization",
+        "false-positive detector fatigue"
+      ],
+      "backlog_ref": "BL-GAP-VOL-108-G01",
+      "adr_disposition": {
+        "required": false,
+        "adr_ref": null,
+        "rationale": "This seeded debt item records an existing masterplan gap; ADR becomes required if retirement changes architecture authority, ownership, compatibility, or breadth."
+      },
+      "interest": {
+        "kind": "engineering_risk",
+        "signals": [
+          "unclosed masterplan gap",
+          "prose-only guidance",
+          "exception normalization",
+          "false-positive detector fatigue"
+        ]
+      },
+      "target_disposition": "close via executable implementation/evidence without bypassing migration, compatibility, rollback or signoff requirements",
+      "status": "open"
+    },
+    {
+      "id": "DEBT-VOL-108-G02",
+      "source": {
+        "type": "masterplan_gap",
+        "ref": "VOL-108#gap-2",
+        "text": "bind detectable patterns to CI"
+      },
+      "owner": {
+        "accountability_id": "ACC-VOL-108",
+        "role": "repository-machine"
+      },
+      "affected_contracts": [
+        "AntiPattern",
+        "AntiPatternFinding",
+        "AntiPatternException"
+      ],
+      "risk_refs": [
+        "VOL-108:risk-1",
+        "VOL-108:risk-2",
+        "VOL-108:risk-3"
+      ],
+      "risk_text": [
+        "prose-only guidance",
+        "exception normalization",
+        "false-positive detector fatigue"
+      ],
+      "backlog_ref": "BL-GAP-VOL-108-G02",
+      "adr_disposition": {
+        "required": false,
+        "adr_ref": null,
+        "rationale": "This seeded debt item records an existing masterplan gap; ADR becomes required if retirement changes architecture authority, ownership, compatibility, or breadth."
+      },
+      "interest": {
+        "kind": "engineering_risk",
+        "signals": [
+          "unclosed masterplan gap",
+          "prose-only guidance",
+          "exception normalization",
+          "false-positive detector fatigue"
+        ]
+      },
+      "target_disposition": "close via executable implementation/evidence without bypassing migration, compatibility, rollback or signoff requirements",
+      "status": "open"
+    },
+    {
+      "id": "DEBT-VOL-109-G01",
+      "source": {
+        "type": "masterplan_gap",
+        "ref": "VOL-109#gap-1",
+        "text": "bind every AIQ task into construction DAG"
+      },
+      "owner": {
+        "accountability_id": "ACC-VOL-109",
+        "role": "repository-machine"
+      },
+      "affected_contracts": [
+        "BuildOrder",
+        "BuildDependency",
+        "BuildStopCondition"
+      ],
+      "risk_refs": [
+        "VOL-109:risk-1",
+        "VOL-109:risk-2",
+        "VOL-109:risk-3"
+      ],
+      "risk_text": [
+        "hidden cycle",
+        "premature downstream promotion",
+        "stale sequence"
+      ],
+      "backlog_ref": "BL-GAP-VOL-109-G01",
+      "adr_disposition": {
+        "required": false,
+        "adr_ref": null,
+        "rationale": "This seeded debt item records an existing masterplan gap; ADR becomes required if retirement changes architecture authority, ownership, compatibility, or breadth."
+      },
+      "interest": {
+        "kind": "engineering_risk",
+        "signals": [
+          "unclosed masterplan gap",
+          "hidden cycle",
+          "premature downstream promotion",
+          "stale sequence"
+        ]
+      },
+      "target_disposition": "close via executable implementation/evidence without bypassing migration, compatibility, rollback or signoff requirements",
+      "status": "open"
+    },
+    {
+      "id": "DEBT-VOL-109-G02",
+      "source": {
+        "type": "masterplan_gap",
+        "ref": "VOL-109#gap-2",
+        "text": "materialize cycle/blocked-state reporting"
+      },
+      "owner": {
+        "accountability_id": "ACC-VOL-109",
+        "role": "repository-machine"
+      },
+      "affected_contracts": [
+        "BuildOrder",
+        "BuildDependency",
+        "BuildStopCondition"
+      ],
+      "risk_refs": [
+        "VOL-109:risk-1",
+        "VOL-109:risk-2",
+        "VOL-109:risk-3"
+      ],
+      "risk_text": [
+        "hidden cycle",
+        "premature downstream promotion",
+        "stale sequence"
+      ],
+      "backlog_ref": "BL-GAP-VOL-109-G02",
+      "adr_disposition": {
+        "required": false,
+        "adr_ref": null,
+        "rationale": "This seeded debt item records an existing masterplan gap; ADR becomes required if retirement changes architecture authority, ownership, compatibility, or breadth."
+      },
+      "interest": {
+        "kind": "engineering_risk",
+        "signals": [
+          "unclosed masterplan gap",
+          "hidden cycle",
+          "premature downstream promotion",
+          "stale sequence"
+        ]
+      },
+      "target_disposition": "close via executable implementation/evidence without bypassing migration, compatibility, rollback or signoff requirements",
+      "status": "open"
+    },
+    {
+      "id": "DEBT-VOL-110-G01",
+      "source": {
+        "type": "masterplan_gap",
+        "ref": "VOL-110#gap-1",
+        "text": "unify maturity and DoD rules"
+      },
+      "owner": {
+        "accountability_id": "ACC-VOL-110",
+        "role": "repository-machine"
+      },
+      "affected_contracts": [
+        "DefinitionOfDone",
+        "DoDRequirement",
+        "CompletionEvidence"
+      ],
+      "risk_refs": [
+        "VOL-110:risk-1",
+        "VOL-110:risk-2",
+        "VOL-110:risk-3"
+      ],
+      "risk_text": [
+        "checkbox completion",
+        "evidence omission",
+        "scope-dependent requirement lost"
+      ],
+      "backlog_ref": "BL-GAP-VOL-110-G01",
+      "adr_disposition": {
+        "required": false,
+        "adr_ref": null,
+        "rationale": "This seeded debt item records an existing masterplan gap; ADR becomes required if retirement changes architecture authority, ownership, compatibility, or breadth."
+      },
+      "interest": {
+        "kind": "engineering_risk",
+        "signals": [
+          "unclosed masterplan gap",
+          "checkbox completion",
+          "evidence omission",
+          "scope-dependent requirement lost"
+        ]
+      },
+      "target_disposition": "close via executable implementation/evidence without bypassing migration, compatibility, rollback or signoff requirements",
+      "status": "open"
+    },
+    {
+      "id": "DEBT-VOL-110-G02",
+      "source": {
+        "type": "masterplan_gap",
+        "ref": "VOL-110#gap-2",
+        "text": "bind change-impact triggers to DoD"
+      },
+      "owner": {
+        "accountability_id": "ACC-VOL-110",
+        "role": "repository-machine"
+      },
+      "affected_contracts": [
+        "DefinitionOfDone",
+        "DoDRequirement",
+        "CompletionEvidence"
+      ],
+      "risk_refs": [
+        "VOL-110:risk-1",
+        "VOL-110:risk-2",
+        "VOL-110:risk-3"
+      ],
+      "risk_text": [
+        "checkbox completion",
+        "evidence omission",
+        "scope-dependent requirement lost"
+      ],
+      "backlog_ref": "BL-GAP-VOL-110-G02",
+      "adr_disposition": {
+        "required": false,
+        "adr_ref": null,
+        "rationale": "This seeded debt item records an existing masterplan gap; ADR becomes required if retirement changes architecture authority, ownership, compatibility, or breadth."
+      },
+      "interest": {
+        "kind": "engineering_risk",
+        "signals": [
+          "unclosed masterplan gap",
+          "checkbox completion",
+          "evidence omission",
+          "scope-dependent requirement lost"
+        ]
+      },
+      "target_disposition": "close via executable implementation/evidence without bypassing migration, compatibility, rollback or signoff requirements",
+      "status": "open"
+    },
+    {
+      "id": "DEBT-VOL-115-G01",
+      "source": {
+        "type": "masterplan_gap",
+        "ref": "VOL-115#gap-1",
+        "text": "establish debt IDs and ownership"
+      },
+      "owner": {
+        "accountability_id": "ACC-VOL-115",
+        "role": "repository-machine"
+      },
+      "affected_contracts": [
+        "DebtItem",
+        "DebtImpact",
+        "DebtRetirement"
+      ],
+      "risk_refs": [
+        "VOL-115:risk-1",
+        "VOL-115:risk-2",
+        "VOL-115:risk-3"
+      ],
+      "risk_text": [
+        "unowned debt",
+        "debt inflation",
+        "unsafe cleanup"
+      ],
+      "backlog_ref": "BL-GAP-VOL-115-G01",
+      "adr_disposition": {
+        "required": false,
+        "adr_ref": null,
+        "rationale": "This seeded debt item records an existing masterplan gap; ADR becomes required if retirement changes architecture authority, ownership, compatibility, or breadth."
+      },
+      "interest": {
+        "kind": "engineering_risk",
+        "signals": [
+          "unclosed masterplan gap",
+          "unowned debt",
+          "debt inflation",
+          "unsafe cleanup"
+        ]
+      },
+      "target_disposition": "close via executable implementation/evidence without bypassing migration, compatibility, rollback or signoff requirements",
+      "status": "open"
+    },
+    {
+      "id": "DEBT-VOL-115-G02",
+      "source": {
+        "type": "masterplan_gap",
+        "ref": "VOL-115#gap-2",
+        "text": "bind debt to risk/backlog/ADR"
+      },
+      "owner": {
+        "accountability_id": "ACC-VOL-115",
+        "role": "repository-machine"
+      },
+      "affected_contracts": [
+        "DebtItem",
+        "DebtImpact",
+        "DebtRetirement"
+      ],
+      "risk_refs": [
+        "VOL-115:risk-1",
+        "VOL-115:risk-2",
+        "VOL-115:risk-3"
+      ],
+      "risk_text": [
+        "unowned debt",
+        "debt inflation",
+        "unsafe cleanup"
+      ],
+      "backlog_ref": "BL-GAP-VOL-115-G02",
+      "adr_disposition": {
+        "required": false,
+        "adr_ref": null,
+        "rationale": "This seeded debt item records an existing masterplan gap; ADR becomes required if retirement changes architecture authority, ownership, compatibility, or breadth."
+      },
+      "interest": {
+        "kind": "engineering_risk",
+        "signals": [
+          "unclosed masterplan gap",
+          "unowned debt",
+          "debt inflation",
+          "unsafe cleanup"
+        ]
+      },
+      "target_disposition": "close via executable implementation/evidence without bypassing migration, compatibility, rollback or signoff requirements",
+      "status": "open"
+    },
+    {
+      "id": "DEBT-VOL-118-G01",
+      "source": {
+        "type": "masterplan_gap",
+        "ref": "VOL-118#gap-1",
+        "text": "bind roadmap to build DAG"
+      },
+      "owner": {
+        "accountability_id": "ACC-VOL-118",
+        "role": "repository-machine"
+      },
+      "affected_contracts": [
+        "RoadmapItem",
+        "RoadmapDependency",
+        "RoadmapRevision"
+      ],
+      "risk_refs": [
+        "VOL-118:risk-1",
+        "VOL-118:risk-2",
+        "VOL-118:risk-3"
+      ],
+      "risk_text": [
+        "schedule fiction",
+        "hidden scope growth",
+        "lost revision rationale"
+      ],
+      "backlog_ref": "BL-GAP-VOL-118-G01",
+      "adr_disposition": {
+        "required": false,
+        "adr_ref": null,
+        "rationale": "This seeded debt item records an existing masterplan gap; ADR becomes required if retirement changes architecture authority, ownership, compatibility, or breadth."
+      },
+      "interest": {
+        "kind": "engineering_risk",
+        "signals": [
+          "unclosed masterplan gap",
+          "schedule fiction",
+          "hidden scope growth",
+          "lost revision rationale"
+        ]
+      },
+      "target_disposition": "close via executable implementation/evidence without bypassing migration, compatibility, rollback or signoff requirements",
+      "status": "open"
+    },
+    {
+      "id": "DEBT-VOL-118-G02",
+      "source": {
+        "type": "masterplan_gap",
+        "ref": "VOL-118#gap-2",
+        "text": "materialize revision lineage"
+      },
+      "owner": {
+        "accountability_id": "ACC-VOL-118",
+        "role": "repository-machine"
+      },
+      "affected_contracts": [
+        "RoadmapItem",
+        "RoadmapDependency",
+        "RoadmapRevision"
+      ],
+      "risk_refs": [
+        "VOL-118:risk-1",
+        "VOL-118:risk-2",
+        "VOL-118:risk-3"
+      ],
+      "risk_text": [
+        "schedule fiction",
+        "hidden scope growth",
+        "lost revision rationale"
+      ],
+      "backlog_ref": "BL-GAP-VOL-118-G02",
+      "adr_disposition": {
+        "required": false,
+        "adr_ref": null,
+        "rationale": "This seeded debt item records an existing masterplan gap; ADR becomes required if retirement changes architecture authority, ownership, compatibility, or breadth."
+      },
+      "interest": {
+        "kind": "engineering_risk",
+        "signals": [
+          "unclosed masterplan gap",
+          "schedule fiction",
+          "hidden scope growth",
+          "lost revision rationale"
+        ]
+      },
+      "target_disposition": "close via executable implementation/evidence without bypassing migration, compatibility, rollback or signoff requirements",
+      "status": "open"
+    },
+    {
+      "id": "DEBT-VOL-119-G01",
+      "source": {
+        "type": "masterplan_gap",
+        "ref": "VOL-119#gap-1",
+        "text": "implement canonical rollup function"
+      },
+      "owner": {
+        "accountability_id": "ACC-VOL-119",
+        "role": "repository-machine"
+      },
+      "affected_contracts": [
+        "CompletionState",
+        "CompletionRollup",
+        "CompletionBlocker"
+      ],
+      "risk_refs": [
+        "VOL-119:risk-1",
+        "VOL-119:risk-2",
+        "VOL-119:risk-3"
+      ],
+      "risk_text": [
+        "manual status drift",
+        "averaged-away blocker",
+        "double counting"
+      ],
+      "backlog_ref": "BL-GAP-VOL-119-G01",
+      "adr_disposition": {
+        "required": false,
+        "adr_ref": null,
+        "rationale": "This seeded debt item records an existing masterplan gap; ADR becomes required if retirement changes architecture authority, ownership, compatibility, or breadth."
+      },
+      "interest": {
+        "kind": "engineering_risk",
+        "signals": [
+          "unclosed masterplan gap",
+          "manual status drift",
+          "averaged-away blocker",
+          "double counting"
+        ]
+      },
+      "target_disposition": "close via executable implementation/evidence without bypassing migration, compatibility, rollback or signoff requirements",
+      "status": "open"
+    },
+    {
+      "id": "DEBT-VOL-119-G02",
+      "source": {
+        "type": "masterplan_gap",
+        "ref": "VOL-119#gap-2",
+        "text": "bind UI progress to derived completion only"
+      },
+      "owner": {
+        "accountability_id": "ACC-VOL-119",
+        "role": "repository-machine"
+      },
+      "affected_contracts": [
+        "CompletionState",
+        "CompletionRollup",
+        "CompletionBlocker"
+      ],
+      "risk_refs": [
+        "VOL-119:risk-1",
+        "VOL-119:risk-2",
+        "VOL-119:risk-3"
+      ],
+      "risk_text": [
+        "manual status drift",
+        "averaged-away blocker",
+        "double counting"
+      ],
+      "backlog_ref": "BL-GAP-VOL-119-G02",
+      "adr_disposition": {
+        "required": false,
+        "adr_ref": null,
+        "rationale": "This seeded debt item records an existing masterplan gap; ADR becomes required if retirement changes architecture authority, ownership, compatibility, or breadth."
+      },
+      "interest": {
+        "kind": "engineering_risk",
+        "signals": [
+          "unclosed masterplan gap",
+          "manual status drift",
+          "averaged-away blocker",
+          "double counting"
+        ]
+      },
+      "target_disposition": "close via executable implementation/evidence without bypassing migration, compatibility, rollback or signoff requirements",
+      "status": "open"
+    }
+  ],
+  "policy": {
+    "ownership": "Every debt item has a canonical accountability owner.",
+    "backlog": "Every debt item links exactly to its canonical backlog gap item.",
+    "adr": "Each item either names an ADR or explicitly states why no ADR is yet required; architecture-changing retirement requires ADR.",
+    "retirement": "Debt retirement cannot bypass compatibility, migration, rollback, tests or signed verification."
+  }
+}

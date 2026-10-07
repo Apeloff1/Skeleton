@@ -1,0 +1,19 @@
+{
+  "game": "Astra",
+  "files": [
+    {
+      "game_name": "Astra",
+      "filename": "loop.json",
+      "content": "a crisp coherent core loop spec",
+      "metadata": {
+        "game_name": "Astra",
+        "kind": "spec",
+        "step_id": null,
+        "evaluation": "accept",
+        "content_id": "Astra:loop.json:1784551051"
+      },
+      "ts": 1784551051.7174528
+    }
+  ],
+  "built_at": 1784569334.5254884
+}

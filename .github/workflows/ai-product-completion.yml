@@ -1,0 +1,237 @@
+name: AI Product Completion Acceptance
+
+on:
+  pull_request:
+    paths:
+      - "skeleton/ai/runtime/learning_foundation/**"
+      - "skeleton/context/**"
+      - "skeleton/contracts/conversation.py"
+      - "skeleton/persistence/conversation_repository.py"
+      - "skeleton/ai/runtime/functional_ai.py"
+      - "skeleton/ai/runtime/inference/**"
+      - "skeleton/ai/runtime/training/**"
+      - "skeleton/ai/runtime/multimodal/**"
+      - "skeleton/api/engine_runtime.py"
+      - "skeleton/ai/runtime/api/engine_runtime.py"
+      - "skeleton/api/engine_routes.py"
+      - "skeleton/api/engine_service.py"
+      - "skeleton/api/server.py"
+      - "skeleton/ai/runtime/api/server.py"
+      - "skeleton/testing/test_server_governance_binding.py"
+      - "docker-compose.yml"
+      - "skeleton/ai/runtime/api/engine_routes.py"
+      - "backend/core/engine_client.py"
+      - "backend/core/engine_text.py"
+      - "backend/core/engine_chat.py"
+      - "backend/core/conversations.py"
+      - "backend/tests/test_engine_client.py"
+      - "backend/tests/test_ai_chat_context_idempotency.py"
+      - "backend/tests/test_ai_chat_engine_cutover.py"
+      - "backend/tests/test_conversation_provider_receipt_identity.py"
+      - "backend/routes/ai.py"
+      - "backend/routes/conversations.py"
+      - "backend/routes/jeeves_compose.py"
+      - "frontend/src/product/conversationClient.ts"
+      - "backend/tests/test_ai_chat_local_engine_e2e.py"
+      - "backend/tests/test_jeeves_ai_completion.py"
+      - "backend/tests/test_jeeves_local_engine_selection.py"
+      - "backend/tests/test_engine_text.py"
+      - "backend/tests/test_engine_chat.py"
+      - "skeleton/testing/test_engine_execution_coordinator.py"
+      - "skeleton/provider_runtime.py"
+      - "skeleton/ai/runtime/provider_runtime.py"
+      - "machine/ai_app_construction.json"
+      - "skeleton/testing/test_local_provider_activation.py"
+      - "skeleton/intelligence/execution_runtime.py"
+      - "skeleton/testing/test_evaluation_firewall.py"
+      - "skeleton/testing/test_learning_contracts.py"
+      - "skeleton/testing/test_learning_evidence.py"
+      - "skeleton/testing/test_learning_control.py"
+      - "skeleton/testing/test_p3_learning_foundation_acceptance.py"
+      - "skeleton/testing/test_p3_learning_programs.py"
+      - "skeleton/testing/test_p3_local_training_evaluation.py"
+      - "skeleton/testing/test_p3_model_foundation.py"
+      - "skeleton/testing/test_p3_model_lifecycle.py"
+      - "skeleton/testing/test_p3_post_training.py"
+      - "skeleton/testing/test_p3_training_control.py"
+      - "skeleton/testing/test_p3_training_data.py"
+      - "skeleton/testing/test_mirror_room_core.py"
+      - "skeleton/testing/test_local_model_builder.py"
+      - "skeleton/testing/test_local_model_deployment.py"
+      - "skeleton/testing/test_model_identity.py"
+      - "skeleton/testing/test_model_placement.py"
+      - "skeleton/testing/test_model_rollback_compatibility.py"
+      - "skeleton/eval/firewall.py"
+      - "skeleton/ai/evaluation/firewall.py"
+      - "skeleton/learning/mirror_room/**"
+      - "skeleton/ai/learning/mirror_room/**"
+      - "skeleton/testing/test_context_compiler.py"
+      - "skeleton/testing/test_conversation_repository.py"
+      - ".github/workflows/ai-product-completion.yml"
+      - "docs/plan/AI_PRODUCT_COMPLETION_FRONTIER.md"
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/ai/runtime/learning_foundation/**"
+      - "skeleton/context/**"
+      - "skeleton/contracts/conversation.py"
+      - "skeleton/persistence/conversation_repository.py"
+      - "skeleton/ai/runtime/functional_ai.py"
+      - "skeleton/ai/runtime/inference/**"
+      - "skeleton/ai/runtime/training/**"
+      - "skeleton/ai/runtime/multimodal/**"
+      - "skeleton/api/engine_runtime.py"
+      - "skeleton/ai/runtime/api/engine_runtime.py"
+      - "skeleton/api/engine_routes.py"
+      - "skeleton/api/engine_service.py"
+      - "skeleton/api/server.py"
+      - "skeleton/ai/runtime/api/server.py"
+      - "skeleton/testing/test_server_governance_binding.py"
+      - "docker-compose.yml"
+      - "skeleton/ai/runtime/api/engine_routes.py"
+      - "backend/core/engine_client.py"
+      - "backend/core/engine_text.py"
+      - "backend/core/engine_chat.py"
+      - "backend/core/conversations.py"
+      - "backend/tests/test_engine_client.py"
+      - "backend/tests/test_ai_chat_context_idempotency.py"
+      - "backend/tests/test_ai_chat_engine_cutover.py"
+      - "backend/tests/test_conversation_provider_receipt_identity.py"
+      - "backend/routes/ai.py"
+      - "backend/routes/conversations.py"
+      - "backend/routes/jeeves_compose.py"
+      - "frontend/src/product/conversationClient.ts"
+      - "backend/tests/test_ai_chat_local_engine_e2e.py"
+      - "backend/tests/test_jeeves_ai_completion.py"
+      - "backend/tests/test_jeeves_local_engine_selection.py"
+      - "backend/tests/test_engine_text.py"
+      - "backend/tests/test_engine_chat.py"
+      - "skeleton/testing/test_engine_execution_coordinator.py"
+      - "skeleton/provider_runtime.py"
+      - "skeleton/ai/runtime/provider_runtime.py"
+      - "machine/ai_app_construction.json"
+      - "skeleton/testing/test_local_provider_activation.py"
+      - "skeleton/intelligence/execution_runtime.py"
+      - "skeleton/testing/test_evaluation_firewall.py"
+      - "skeleton/testing/test_learning_contracts.py"
+      - "skeleton/testing/test_learning_evidence.py"
+      - "skeleton/testing/test_learning_control.py"
+      - "skeleton/testing/test_p3_learning_foundation_acceptance.py"
+      - "skeleton/testing/test_p3_learning_programs.py"
+      - "skeleton/testing/test_p3_local_training_evaluation.py"
+      - "skeleton/testing/test_p3_model_foundation.py"
+      - "skeleton/testing/test_p3_model_lifecycle.py"
+      - "skeleton/testing/test_p3_post_training.py"
+      - "skeleton/testing/test_p3_training_control.py"
+      - "skeleton/testing/test_p3_training_data.py"
+      - "skeleton/testing/test_mirror_room_core.py"
+      - "skeleton/testing/test_local_model_builder.py"
+      - "skeleton/testing/test_local_model_deployment.py"
+      - "skeleton/testing/test_model_identity.py"
+      - "skeleton/testing/test_model_placement.py"
+      - "skeleton/testing/test_model_rollback_compatibility.py"
+      - "skeleton/eval/firewall.py"
+      - "skeleton/ai/evaluation/firewall.py"
+      - "skeleton/learning/mirror_room/**"
+      - "skeleton/ai/learning/mirror_room/**"
+      - "skeleton/testing/test_context_compiler.py"
+      - "skeleton/testing/test_conversation_repository.py"
+      - ".github/workflows/ai-product-completion.yml"
+      - "docs/plan/AI_PRODUCT_COMPLETION_FRONTIER.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-product-completion-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  product-completion:
+    name: Canonical Reverse End-to-End Product Path
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      OPENAI_API_KEY: ""
+      XAI_API_KEY: ""
+      ANTHROPIC_API_KEY: ""
+      GOOGLE_API_KEY: ""
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install project and focused test dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e ".[dev,local-inference]"
+          "matplotlib>=3.8,<4"
+          "networkx>=3.2,<4"
+          "bcrypt>=4,<6"
+          "PyJWT==2.15.0"
+      - name: Compile canonical product and compatibility runtimes
+        run: >-
+          python -m compileall -q
+          skeleton/ai/runtime/learning_foundation
+          skeleton/ai/runtime/inference
+          backend/core/engine_client.py
+          backend/core/engine_text.py
+          backend/core/engine_chat.py
+          backend/routes/ai.py
+          backend/routes/jeeves_compose.py
+      - name: Verify canonical provider mirror and bootstrap contract
+        run: |
+          cmp skeleton/provider_runtime.py skeleton/ai/runtime/provider_runtime.py
+          cmp skeleton/api/engine_runtime.py skeleton/ai/runtime/api/engine_runtime.py
+          cmp skeleton/api/engine_routes.py skeleton/ai/runtime/api/engine_routes.py
+          cmp skeleton/api/server.py skeleton/ai/runtime/api/server.py
+          cmp skeleton/contracts/conversation.py skeleton/ai/runtime/contracts/conversation.py
+          cmp skeleton/persistence/conversation_repository.py skeleton/ai/runtime/persistence/conversation_repository.py
+          cmp skeleton/context/sources/conversation.py skeleton/ai/runtime/context/sources/conversation.py
+          python scripts/check_provider_bootstrap.py
+          python scripts/verify_provider_surface_closure.py
+      - name: Run canonical reverse product-path acceptance
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_context_compiler.py
+          skeleton/testing/test_local_inference.py
+          skeleton/testing/test_local_provider_activation.py
+          skeleton/testing/test_engine_execution_coordinator.py
+          skeleton/testing/test_server_governance_binding.py
+          backend/tests/test_engine_client.py
+          backend/tests/test_ai_chat_context_idempotency.py
+          backend/tests/test_ai_chat_engine_cutover.py
+          backend/tests/test_conversation_provider_receipt_identity.py
+          backend/tests/test_engine_text.py
+          backend/tests/test_engine_chat.py
+          backend/tests/test_ai_chat_local_engine_e2e.py
+          backend/tests/test_jeeves_ai_completion.py
+          backend/tests/test_jeeves_local_engine_selection.py
+          skeleton/testing/test_conversation_repository.py
+          skeleton/testing/test_evaluation_firewall.py
+          skeleton/testing/test_learning_contracts.py
+          skeleton/testing/test_learning_evidence.py
+          skeleton/testing/test_learning_control.py
+          skeleton/testing/test_p3_learning_foundation_acceptance.py
+          skeleton/testing/test_p3_learning_programs.py
+          skeleton/testing/test_p3_local_training_evaluation.py
+          skeleton/testing/test_p3_model_foundation.py
+          skeleton/testing/test_p3_model_lifecycle.py
+          skeleton/testing/test_p3_post_training.py
+          skeleton/testing/test_p3_training_control.py
+          skeleton/testing/test_p3_training_data.py
+          skeleton/testing/test_mirror_room_core.py
+          skeleton/testing/test_local_model_builder.py
+          skeleton/testing/test_local_model_deployment.py
+          skeleton/testing/test_model_identity.py
+          skeleton/testing/test_model_placement.py
+          skeleton/testing/test_model_rollback_compatibility.py

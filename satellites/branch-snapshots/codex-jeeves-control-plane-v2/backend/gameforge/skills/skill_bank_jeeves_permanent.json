@@ -1,0 +1,9 @@
+{
+  "skill_bank_type": "permanent_jeeves",
+  "owner": "Jeeves",
+  "description": "Permanent skill bank for Jeeves across all projects and time. Contains all unlocked skills from rooms, GitHub, and self-improvement.",
+  "skills": [],
+  "unlocked_from_rooms": {},
+  "github_sources": [],
+  "last_updated": "2026-07-19"
+}

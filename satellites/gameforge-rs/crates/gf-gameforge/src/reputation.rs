@@ -1,0 +1,8 @@
+use std::collections::HashMap;use chrono::{DateTime,Utc};use serde::{Deserialize,Serialize};use tokio::sync::RwLock;
+#[derive(Debug,Clone,Serialize,Deserialize)]pub struct Deed{pub actor:String,pub kind:DeedKind,pub weight:f64,pub at:DateTime<Utc>}
+#[derive(Debug,Clone,Copy,PartialEq,Eq,Serialize,Deserialize)]pub enum DeedKind{Service,Distinction,Lapse,Treason}impl DeedKind{fn base_delta(&self)->f64{match self{Self::Service=>0.15,Self::Distinction=>0.45,Self::Lapse=>-0.35,Self::Treason=>-1.6}}}
+const DEED_CAP:usize=4096;pub struct Reputation{deeds:RwLock<Vec<Deed>>}impl Default for Reputation{fn default()->Self{Self::new()}}
+impl Reputation{pub fn new()->Self{Self{deeds:RwLock::new(Vec::with_capacity(1024))}}pub async fn record(&self,actor:&str,kind:DeedKind,weight:f64){let mut ds=self.deeds.write().await;if ds.len()>=DEED_CAP{ds.drain(0..DEED_CAP/4);}ds.push(Deed{actor:actor.to_string(),kind,weight:weight.clamp(0.0,1.0),at:Utc::now()});}
+ pub async fn standing(&self,actor:&str)->f64{let ds=self.deeds.read().await;let now=Utc::now();let mut s=0.0;for d in ds.iter().filter(|d|d.actor==actor){let days=(now-d.at).num_seconds().max(0) as f64/86400.0;let decay=0.5f64.powf(days/90.0);s+=d.kind.base_delta()*d.weight*decay}(s/4.0).tanh()}
+ pub async fn ledger_of(&self,actor:&str,limit:usize)->Vec<Deed>{self.deeds.read().await.iter().filter(|d|d.actor==actor).rev().take(limit).cloned().collect()}
+ pub async fn roll(&self)->serde_json::Value{let ds=self.deeds.read().await;let mut actors:HashMap<&str,(u64,u64)>=HashMap::new();for d in ds.iter(){let e=actors.entry(d.actor.as_str()).or_default();match d.kind{DeedKind::Service|DeedKind::Distinction=>e.0+=1,DeedKind::Lapse|DeedKind::Treason=>e.1+=1}}serde_json::json!(actors)}}

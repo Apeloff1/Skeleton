@@ -1,0 +1,267 @@
+{
+ "generations": [
+  {
+   "key": "8bit",
+   "label": "8-Bit",
+   "order": 0,
+   "platforms": [
+    "NES",
+    "SMS"
+   ],
+   "tagline": "Hand-drawn sprites, chiptune, cartridge-tight.",
+   "storage_label": "8 KB \u2013 1 MB",
+   "color_label": "25\u201364 colors",
+   "poly_label": "2D \u00b7 no polygons",
+   "resolution": "256x240",
+   "viewport": [
+    256,
+    240
+   ],
+   "audio_format": "Chiptune synth",
+   "asset_types": [
+    "sprite_sheet",
+    "icon",
+    "thumbnail",
+    "sfx",
+    "palette_swatch"
+   ],
+   "texture_res": "8x8\u201332x32 indexed",
+   "max_sprites": 64,
+   "asset_capacity": 1400,
+   "usual_max_assets": 1000,
+   "outshine_pct": 40,
+   "file_count_standard": 200,
+   "max_poly": 0
+  },
+  {
+   "key": "16bit",
+   "label": "16-Bit",
+   "order": 1,
+   "platforms": [
+    "SNES",
+    "Genesis"
+   ],
+   "tagline": "Bigger sprites, compressed PCM, Mode-7 dreams.",
+   "storage_label": "512 KB \u2013 6 MB",
+   "color_label": "256\u2013512 colors",
+   "poly_label": "2D \u00b7 no polygons",
+   "resolution": "320x224",
+   "viewport": [
+    320,
+    224
+   ],
+   "audio_format": "Compressed 8-bit PCM",
+   "asset_types": [
+    "sprite_sheet",
+    "icon",
+    "thumbnail",
+    "anim_clip",
+    "sfx",
+    "vfx",
+    "palette_swatch"
+   ],
+   "texture_res": "up to 64x64 indexed",
+   "max_sprites": 128,
+   "asset_capacity": 5600,
+   "usual_max_assets": 4000,
+   "outshine_pct": 40,
+   "file_count_standard": 1200,
+   "max_poly": 0
+  },
+  {
+   "key": "early3d",
+   "label": "Early 3D",
+   "order": 2,
+   "platforms": [
+    "PS1",
+    "N64",
+    "Saturn"
+   ],
+   "tagline": "Polygons arrive \u2014 low-res textures, MIDI & ADPCM.",
+   "storage_label": "12 MB \u2013 650 MB",
+   "color_label": "16-bit color",
+   "poly_label": "300\u20133,000 polys / model",
+   "resolution": "320x240\u2013640x480",
+   "viewport": [
+    640,
+    480
+   ],
+   "audio_format": "Sequenced MIDI & 11\u201332kHz",
+   "asset_types": [
+    "sprite_sheet",
+    "normal_map",
+    "icon",
+    "thumbnail",
+    "sfx",
+    "vfx",
+    "material",
+    "lod_mesh",
+    "anim_clip",
+    "palette_swatch"
+   ],
+   "texture_res": "64x64\u2013256x256",
+   "max_sprites": 0,
+   "asset_capacity": 21000,
+   "usual_max_assets": 15000,
+   "outshine_pct": 40,
+   "file_count_standard": 3500,
+   "max_poly": 3000
+  },
+  {
+   "key": "64bit",
+   "label": "64-Bit / DVD",
+   "order": 3,
+   "platforms": [
+    "PS2",
+    "Xbox",
+    "GameCube"
+   ],
+   "tagline": "DVD-scale worlds, true-color, Dolby Pro Logic.",
+   "storage_label": "1.4 GB \u2013 4.7 GB",
+   "color_label": "24-bit color",
+   "poly_label": "3,000\u201310,000 polys / model",
+   "resolution": "480i\u2013480p",
+   "viewport": [
+    640,
+    480
+   ],
+   "audio_format": "ADPCM Dolby Pro Logic",
+   "asset_types": [
+    "sprite_sheet",
+    "normal_map",
+    "icon",
+    "thumbnail",
+    "sfx",
+    "vfx",
+    "material",
+    "lod_mesh",
+    "anim_clip",
+    "palette_swatch"
+   ],
+   "texture_res": "256x256\u2013512x512",
+   "max_sprites": 0,
+   "asset_capacity": 84000,
+   "usual_max_assets": 60000,
+   "outshine_pct": 40,
+   "file_count_standard": 12000,
+   "max_poly": 10000
+  },
+  {
+   "key": "earlyhd",
+   "label": "Early HD",
+   "order": 4,
+   "platforms": [
+    "PS3",
+    "Xbox 360"
+   ],
+   "tagline": "Normal maps, dynamic lighting, 5.1 surround.",
+   "storage_label": "8.5 GB \u2013 50 GB",
+   "color_label": "true-color HD",
+   "poly_label": "10,000\u201350,000 polys / model",
+   "resolution": "720p\u20131080p",
+   "viewport": [
+    1280,
+    720
+   ],
+   "audio_format": "Uncompressed 5.1 Surround",
+   "asset_types": [
+    "sprite_sheet",
+    "normal_map",
+    "icon",
+    "thumbnail",
+    "sfx",
+    "vfx",
+    "material",
+    "lod_mesh",
+    "anim_clip",
+    "palette_swatch"
+   ],
+   "texture_res": "1024x1024\u20132048x2048",
+   "max_sprites": 0,
+   "asset_capacity": 350000,
+   "usual_max_assets": 250000,
+   "outshine_pct": 40,
+   "file_count_standard": 45000,
+   "max_poly": 50000
+  },
+  {
+   "key": "modern",
+   "label": "Modern",
+   "order": 5,
+   "platforms": [
+    "PS5",
+    "Xbox Series",
+    "PC"
+   ],
+   "tagline": "4K textures, photogrammetry, real-time ray tracing.",
+   "storage_label": "50 GB \u2013 150 GB+",
+   "color_label": "10-bit HDR / 4K",
+   "poly_label": "Millions of polys (Nanite/Virtual)",
+   "resolution": "2160p (4K)",
+   "viewport": [
+    1280,
+    720
+   ],
+   "audio_format": "Spatial 3D audio (Atmos)",
+   "asset_types": [
+    "sprite_sheet",
+    "normal_map",
+    "icon",
+    "thumbnail",
+    "sfx",
+    "vfx",
+    "material",
+    "lod_mesh",
+    "anim_clip",
+    "palette_swatch"
+   ],
+   "texture_res": "4096x4096 (4K)",
+   "max_sprites": 0,
+   "asset_capacity": 1400000,
+   "usual_max_assets": 1000000,
+   "outshine_pct": 40,
+   "file_count_standard": 250000,
+   "max_poly": 10000000
+  },
+  {
+   "key": "nextgen",
+   "label": "Next-Gen",
+   "order": 6,
+   "platforms": [
+    "PS6?",
+    "Next Xbox",
+    "PC"
+   ],
+   "tagline": "8K textures, path tracing, object-based 3D audio.",
+   "storage_label": "250 GB \u2013 500 GB",
+   "color_label": "12-bit HDR / 8K",
+   "poly_label": "Billions virtualized (micropoly)",
+   "resolution": "4320p (8K)",
+   "viewport": [
+    1280,
+    720
+   ],
+   "audio_format": "Object-based 3D audio (path-traced)",
+   "asset_types": [
+    "sprite_sheet",
+    "normal_map",
+    "icon",
+    "thumbnail",
+    "sfx",
+    "vfx",
+    "material",
+    "lod_mesh",
+    "anim_clip",
+    "palette_swatch"
+   ],
+   "texture_res": "8192x8192 (8K)",
+   "max_sprites": 0,
+   "asset_capacity": 5600000,
+   "usual_max_assets": 4000000,
+   "outshine_pct": 40,
+   "file_count_standard": 600000,
+   "max_poly": 100000000
+  }
+ ],
+ "count": 7
+}

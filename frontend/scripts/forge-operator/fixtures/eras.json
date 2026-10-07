@@ -1,0 +1,293 @@
+{
+ "eras": [
+  {
+   "id": "extraction_now",
+   "primary_dps": 108.0,
+   "speed": 195.0,
+   "ttk": {
+    "trash": 1.1,
+    "elite": 4.5,
+    "boss": 60.0,
+    "player_glass": 1.8
+   },
+   "philosophy": "risk_session_value"
+  },
+  {
+   "id": "soulslike",
+   "primary_dps": 85.8,
+   "speed": 155.0,
+   "ttk": {
+    "trash": 1.5,
+    "elite": 6.0,
+    "boss": 120.0,
+    "player_glass": 1.0
+   },
+   "philosophy": "loss_forward"
+  },
+  {
+   "id": "boomer_shooter",
+   "primary_dps": 121.8,
+   "speed": 220.0,
+   "ttk": {
+    "trash": 0.4,
+    "elite": 2.0,
+    "boss": 25.0,
+    "player_glass": 1.0
+   },
+   "philosophy": "movement_gun_poetry"
+  },
+  {
+   "id": "arcade_golden_age",
+   "primary_dps": 88.6,
+   "speed": 160.0,
+   "ttk": {
+    "trash": 0.3,
+    "elite": 2.0,
+    "boss": 15.0,
+    "player_glass": 0.4
+   },
+   "philosophy": "score_attack"
+  },
+  {
+   "id": "cozy_wholesome",
+   "primary_dps": 77.5,
+   "speed": 140.0,
+   "ttk": {
+    "trash": 3.0,
+    "elite": 8.0,
+    "boss": 30.0,
+    "player_glass": 10.0
+   },
+   "philosophy": "low_stress_mastery"
+  },
+  {
+   "id": "modern_aaa",
+   "primary_dps": 110.8,
+   "speed": 200.0,
+   "ttk": {
+    "trash": 1.0,
+    "elite": 4.0,
+    "boss": 70.0,
+    "player_glass": 2.0
+   },
+   "philosophy": "assisted_mastery"
+  },
+  {
+   "id": "horror_survival",
+   "primary_dps": 83.1,
+   "speed": 150.0,
+   "ttk": {
+    "trash": 2.5,
+    "elite": 8.0,
+    "boss": 90.0,
+    "player_glass": 0.8
+   },
+   "philosophy": "scarcity_dread"
+  },
+  {
+   "id": "indie_experimental",
+   "primary_dps": 116.3,
+   "speed": 210.0,
+   "ttk": {
+    "trash": 0.8,
+    "elite": 5.0,
+    "boss": 45.0,
+    "player_glass": 1.3
+   },
+   "philosophy": "author_expression"
+  },
+  {
+   "id": "metroidvania",
+   "primary_dps": 94.2,
+   "speed": 170.0,
+   "ttk": {
+    "trash": 0.9,
+    "elite": 5.0,
+    "boss": 80.0,
+    "player_glass": 1.5
+   },
+   "philosophy": "ability_gated_backtrack"
+  },
+  {
+   "id": "roguelike",
+   "primary_dps": 99.7,
+   "speed": 180.0,
+   "ttk": {
+    "trash": 0.8,
+    "elite": 3.5,
+    "boss": 40.0,
+    "player_glass": 0.9
+   },
+   "philosophy": "run_knowledge"
+  },
+  {
+   "id": "jrpg",
+   "primary_dps": 72.0,
+   "speed": 130.0,
+   "ttk": {
+    "trash": 4.0,
+    "elite": 12.0,
+    "boss": 180.0,
+    "player_glass": 8.0
+   },
+   "philosophy": "party_attrition"
+  },
+  {
+   "id": "crpg",
+   "primary_dps": 77.5,
+   "speed": 140.0,
+   "ttk": {
+    "trash": 3.0,
+    "elite": 10.0,
+    "boss": 150.0,
+    "player_glass": 5.0
+   },
+   "philosophy": "build_expression"
+  },
+  {
+   "id": "immersive_sim",
+   "primary_dps": 91.4,
+   "speed": 165.0,
+   "ttk": {
+    "trash": 1.8,
+    "elite": 6.0,
+    "boss": 70.0,
+    "player_glass": 1.4
+   },
+   "philosophy": "systemic_emergence"
+  },
+  {
+   "id": "stealth",
+   "primary_dps": 80.3,
+   "speed": 145.0,
+   "ttk": {
+    "trash": 0.5,
+    "elite": 3.0,
+    "boss": 50.0,
+    "player_glass": 0.6
+   },
+   "philosophy": "unseen_agency"
+  },
+  {
+   "id": "tactics_grid",
+   "primary_dps": 55.4,
+   "speed": 100.0,
+   "ttk": {
+    "trash": 2.0,
+    "elite": 6.0,
+    "boss": 90.0,
+    "player_glass": 3.0
+   },
+   "philosophy": "positional_certainty"
+  },
+  {
+   "id": "fighting_game",
+   "primary_dps": 132.9,
+   "speed": 240.0,
+   "ttk": {
+    "trash": 0.6,
+    "elite": 2.5,
+    "boss": 20.0,
+    "player_glass": 0.7
+   },
+   "philosophy": "frame_truth"
+  },
+  {
+   "id": "bullet_heaven",
+   "primary_dps": 110.8,
+   "speed": 200.0,
+   "ttk": {
+    "trash": 0.2,
+    "elite": 1.5,
+    "boss": 35.0,
+    "player_glass": 1.2
+   },
+   "philosophy": "build_as_firehose"
+  },
+  {
+   "id": "deckbuilder",
+   "primary_dps": 83.1,
+   "speed": 150.0,
+   "ttk": {
+    "trash": 2.5,
+    "elite": 7.0,
+    "boss": 80.0,
+    "player_glass": 3.0
+   },
+   "philosophy": "card_as_verb"
+  },
+  {
+   "id": "battle_royale",
+   "primary_dps": 105.2,
+   "speed": 190.0,
+   "ttk": {
+    "trash": 0.9,
+    "elite": 3.0,
+    "boss": 25.0,
+    "player_glass": 1.1
+   },
+   "philosophy": "shrinking_agency"
+  },
+  {
+   "id": "mmorpg",
+   "primary_dps": 96.9,
+   "speed": 175.0,
+   "ttk": {
+    "trash": 2.0,
+    "elite": 8.0,
+    "boss": 300.0,
+    "player_glass": 4.0
+   },
+   "philosophy": "raid_as_social_machine"
+  },
+  {
+   "id": "visual_novel",
+   "primary_dps": 44.3,
+   "speed": 80.0,
+   "ttk": {
+    "trash": 8.0,
+    "elite": 8.0,
+    "boss": 8.0,
+    "player_glass": 99.0
+   },
+   "philosophy": "choice_as_combat"
+  },
+  {
+   "id": "walking_sim",
+   "primary_dps": 60.9,
+   "speed": 110.0,
+   "ttk": {
+    "trash": 12.0,
+    "elite": 12.0,
+    "boss": 12.0,
+    "player_glass": 99.0
+   },
+   "philosophy": "presence"
+  },
+  {
+   "id": "grand_strategy",
+   "primary_dps": 49.8,
+   "speed": 90.0,
+   "ttk": {
+    "trash": 10.0,
+    "elite": 40.0,
+    "boss": 600.0,
+    "player_glass": 20.0
+   },
+   "philosophy": "systems_as_history"
+  },
+  {
+   "id": "city_builder",
+   "primary_dps": 55.4,
+   "speed": 100.0,
+   "ttk": {
+    "trash": 15.0,
+    "elite": 40.0,
+    "boss": 200.0,
+    "player_glass": 30.0
+   },
+   "philosophy": "growth_under_constraint"
+  }
+ ],
+ "count": 24
+}

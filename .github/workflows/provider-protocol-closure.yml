@@ -1,0 +1,94 @@
+name: Provider Interaction Protocol Closure Gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/provider_contract.py"
+      - "skeleton/providers/contract.py"
+      - "skeleton/provider_runtime.py"
+      - "skeleton/ai/runtime/provider_runtime.py"
+      - "skeleton/testing/test_provider_contract.py"
+      - "skeleton/testing/test_provider_runtime_schema_parity.py"
+      - "machine/ai_runtime_schemas.json"
+      - "machine/ai_app_construction.json"
+      - "machine/ai_implementation_handoff.json"
+      - "machine/ai_closure_evidence.json"
+      - "scripts/verify_provider_protocol_closure.py"
+      - "tests/test_provider_protocol_independent_verifier.py"
+      - ".github/workflows/provider-protocol-closure.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: provider-protocol-closure-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  provider-protocol-contracts:
+    name: Provider-neutral protocol contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused provider runtime
+        run: python -m pip install --disable-pip-version-check -e ".[dev]"
+
+      - name: Run provider-neutral interaction regressions
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_provider_contract.py
+          skeleton/testing/test_provider_runtime_schema_parity.py
+
+      - name: Run independent verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_provider_protocol_independent_verifier.py
+
+      - name: Emit exact-head provider protocol receipt
+        env:
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_provider_protocol_closure.py
+          --evidence-out .provider-protocol-closure.json
+          --print-evidence
+
+      - name: Assert exact-head provider protocol receipt
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".provider-protocol-closure.json").read_text(encoding="utf-8")
+          )
+          if receipt.get("head_sha") != os.environ["EXPECTED_SHA"].strip():
+              raise SystemExit("provider protocol receipt is not exact-head")
+          if receipt.get("verifier") != "independent-provider-protocol-v1":
+              raise SystemExit("unexpected provider protocol verifier identity")
+          if receipt.get("gap_id") != "gap-provider-interaction-protocol":
+              raise SystemExit("provider protocol verifier lost gap binding")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("provider protocol closure verification failed")
+          if not receipt.get("provider_mirror_digest"):
+              raise SystemExit("provider protocol mirror evidence is missing")
+          PY

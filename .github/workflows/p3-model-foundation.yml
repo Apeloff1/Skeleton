@@ -1,0 +1,65 @@
+name: P3 Model Foundation
+
+on:
+  pull_request:
+    paths:
+      - "skeleton/ai/learning/model_program.py"
+      - "skeleton/ai/research/source_lineage.py"
+      - "skeleton/ai/simulation/environment.py"
+      - "skeleton/ai/runtime/multimodal/**"
+      - "skeleton/testing/test_p3_model_foundation.py"
+      - "machine/ai_p3_execution_map.json"
+      - "machine/ai_p3_task_backlog.json"
+      - ".github/workflows/p3-model-foundation.yml"
+  push:
+    branches:
+      - main
+      - feat/p3-autonomous-intelligence-expansion-atomic
+    paths:
+      - "skeleton/ai/learning/model_program.py"
+      - "skeleton/ai/research/source_lineage.py"
+      - "skeleton/ai/simulation/environment.py"
+      - "skeleton/ai/runtime/multimodal/**"
+      - "skeleton/testing/test_p3_model_foundation.py"
+      - "machine/ai_p3_execution_map.json"
+      - "machine/ai_p3_task_backlog.json"
+      - ".github/workflows/p3-model-foundation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p3-model-foundation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  model-foundation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: "."
+      OPENAI_API_KEY: ""
+      XAI_API_KEY: ""
+      ANTHROPIC_API_KEY: ""
+      GOOGLE_API_KEY: ""
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install focused model-foundation runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pydantic==2.13.5"
+          "pydantic-settings==2.15.0"
+          "fastapi==0.136.1"
+      - name: Run provider-independent P3 model foundation
+        run: python -m unittest -q skeleton.testing.test_p3_model_foundation
+      - name: Revalidate P3 authority
+        run: python scripts/check_p3_execution_map.py --json

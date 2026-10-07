@@ -1,0 +1,111 @@
+{
+  "schema_version": "skeleton.architecture.manifest_reference_policy.v1",
+  "policy_version": "0.1.0",
+  "status": "active",
+  "purpose": "Unify critical machine-manifest reference validation and bind architecture documents to exact Git-blob digests of their machine authority.",
+  "masterplan_binding": {
+    "volume_ref": "VOL-054",
+    "title": "Machine Architecture Manifests",
+    "required_gap_texts": [
+      "unify manifest reference validation",
+      "bind generated docs to manifest digests"
+    ]
+  },
+  "reference_groups": [
+    {
+      "id": "ARCH-RULE-AUTHORITY",
+      "manifest": "machine/architecture_rule_registry.json",
+      "json_pointer": "/authority",
+      "kind": "repo_path_map"
+    },
+    {
+      "id": "ARCH-SOURCES",
+      "manifest": "machine/architecture.json",
+      "json_pointer": "/sources",
+      "kind": "repo_path_map"
+    },
+    {
+      "id": "CONTRACT-CONFORMANCE-SOURCES",
+      "manifest": "machine/contract_conformance.json",
+      "json_pointer": "/sources",
+      "kind": "repo_path_map"
+    },
+    {
+      "id": "MASTER-BUILD-CONTRACT",
+      "manifest": "machine/ai_master_plan.json",
+      "json_pointer": "/build_depth_sequence/contract",
+      "kind": "repo_path"
+    },
+    {
+      "id": "MASTER-BUILD-HUMAN",
+      "manifest": "machine/ai_master_plan.json",
+      "json_pointer": "/build_depth_sequence/human",
+      "kind": "repo_path"
+    },
+    {
+      "id": "OWNERSHIP-SOURCES",
+      "manifest": "machine/architecture_ownership.json",
+      "json_pointer": "/sources",
+      "kind": "repo_path_map"
+    },
+    {
+      "id": "P2-AUTHORITY",
+      "manifest": "machine/ai_p2_execution_map.json",
+      "json_pointer": "/authority",
+      "kind": "repo_path_map"
+    },
+    {
+      "id": "P2-BUILD-CONTRACT",
+      "manifest": "machine/ai_p2_execution_map.json",
+      "json_pointer": "/masterplan_alignment/master_build_sequence/contract",
+      "kind": "repo_path"
+    },
+    {
+      "id": "RUNTIME-SUPERVISION-SOURCES",
+      "manifest": "machine/runtime_supervision.json",
+      "json_pointer": "/sources",
+      "kind": "repo_path_map"
+    },
+    {
+      "id": "SCOPE-FREEZE-REGISTER",
+      "manifest": "machine/ai_master_plan.json",
+      "json_pointer": "/breadth_freeze/exception_register",
+      "kind": "repo_path"
+    }
+  ],
+  "doc_bindings": [
+    {
+      "source": "machine/adr_index.json",
+      "doc": "docs/adr/README.md"
+    },
+    {
+      "source": "machine/architecture_ownership.json",
+      "doc": "docs/architecture/ARCHITECTURE_OWNERSHIP.md"
+    },
+    {
+      "source": "machine/architecture_rule_registry.json",
+      "doc": "docs/architecture/ARCHITECTURE_RULE_REGISTRY.md"
+    },
+    {
+      "source": "machine/contract_conformance.json",
+      "doc": "docs/architecture/CONTRACT_CONFORMANCE.md"
+    },
+    {
+      "source": "machine/manifest_reference_policy.json",
+      "doc": "docs/architecture/MANIFEST_REFERENCE_INTEGRITY.md"
+    },
+    {
+      "source": "machine/python_package_layers.json",
+      "doc": "docs/architecture/PYTHON_PACKAGE_LAYERS.md"
+    },
+    {
+      "source": "machine/runtime_supervision.json",
+      "doc": "docs/architecture/RUNTIME_SUPERVISION.md"
+    }
+  ],
+  "policy": {
+    "reference_rule": "Every declared reference resolves to a normalized repository-relative path that exists at validation time.",
+    "digest_rule": "Each bound document contains exactly one machine-git-blob marker matching the current Git blob identity of its source manifest.",
+    "anti_shortcut": "A valid path or matching digest does not promote capability maturity; it only proves reference/document identity."
+  }
+}

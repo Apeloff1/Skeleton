@@ -1,0 +1,659 @@
+name: Actions Housekeeping CLI
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Six-hour safety sweep; event-driven queue recovery handles urgent demand.
+    - cron: '23 */6 * * *'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/actions-housekeeping-cli.yml'
+
+concurrency:
+  # v2 intentionally escapes any pre-existing queued v1 housekeeping run so
+  # stale-run recovery can acquire an independent lane. Future v2 triggers
+  # remain non-preemptive and coalesce normally.
+  group: actions-housekeeping-cli-v2-${{ github.repository }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  cleanup:
+    name: Prune cold Actions state
+    # Housekeeping uses an independent ARM recovery lane so provider-stuck
+    # x64 queue entries cannot prevent the cleanup that retires them.
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    permissions:
+      actions: write
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      CACHE_RETENTION_DAYS: '14'
+      ARTIFACT_RETENTION_DAYS: '14'
+      FAILED_RUN_RETENTION_DAYS: '21'
+      MAX_CACHE_DELETES: '500'
+      MAX_RUN_DELETES: '1000'
+      LIVE_RUN_STALE_MINUTES: '10'
+      LIVE_FORCE_CANCEL_STALE_MINUTES: '1440'
+      # Provider-stuck runs can reject force-cancel indefinitely. Keep a
+      # bounded retry for transient races without monopolizing the ARM lane.
+      FORCE_CANCEL_ATTEMPTS: '2'
+      FORCE_CANCEL_REJECT_BACKOFF_SECONDS: '1'
+      FORCE_CANCEL_POLL_SECONDS: '1'
+      MAX_LIVE_CANCELS: '100'
+    steps:
+      - name: Verify GitHub CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh --version
+          gh auth status
+
+      - name: Cancel obsolete live PR runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          cutoff=$(date -u -d "${LIVE_RUN_STALE_MINUTES} minutes ago" +%s)
+          force_cutoff=$(date -u -d "${LIVE_FORCE_CANCEL_STALE_MINUTES} minutes ago" +%s)
+          inventory="$RUNNER_TEMP/live-runs.tsv"
+          : > "$inventory"
+
+          fetch_live_status() {
+            local status_name="$1"
+            local attempt=1 delay=2 status tmp="$RUNNER_TEMP/live-${status_name}.candidate.tsv"
+            while true; do
+              : > "$tmp"
+              if gh api --paginate "/repos/${REPO}/actions/runs?status=${status_name}&per_page=100" \
+                --jq '.workflow_runs[] | [.id, .name, .event, .head_sha, .head_branch, .created_at] | @tsv' > "$tmp"; then
+                cat "$tmp" >> "$inventory"
+                rm -f "$tmp"
+                return 0
+              else
+                status=$?
+              fi
+              if (( attempt >= 4 )); then
+                rm -f "$tmp"
+                echo "Failed to fetch ${status_name} live runs after ${attempt} attempts (exit ${status})." >&2
+                return "$status"
+              fi
+              sleep "$delay"
+              attempt=$((attempt + 1))
+              delay=$((delay * 2))
+            done
+          }
+
+          for status_name in queued in_progress waiting pending requested; do
+            fetch_live_status "$status_name"
+          done
+          sort -t $'\t' -k1,1n -u -o "$inventory" "$inventory"
+
+          inspected=0
+          cancelled=0
+          forced=0
+          force_stuck=0
+          force_transitioned=0
+          moved=0
+          preserved_errors=0
+          kept_current=0
+          kept_security=0
+          kept_unlinked=0
+          kept_recent=0
+          recovery_cache_hits=0
+          recovery_cache_misses=0
+
+          pr_contains_sha() {
+            local pr_number="$1" target_sha="$2" page page_json count
+            for page in $(seq 1 10); do
+              page_json="$RUNNER_TEMP/pr-${pr_number}-commits-${page}.json"
+              if ! gh api "/repos/${REPO}/pulls/${pr_number}/commits?per_page=100&page=${page}" > "$page_json"; then
+                return 2
+              fi
+              if jq -e --arg sha "$target_sha" '.[] | select(.sha == $sha)' "$page_json" >/dev/null; then
+                return 0
+              fi
+              count=$(jq -r 'length' "$page_json")
+              [[ "$count" =~ ^[0-9]+$ ]] || return 2
+              if (( count < 100 )); then
+                return 1
+              fi
+            done
+            return 2
+          }
+
+          recover_pr_numbers() {
+            local head_branch="$1" target_sha="$2" output="$3"
+            local owner page page_json count pr_number membership commit_pr_json
+            owner="${REPO%%/*}"
+            : > "$output"
+
+            # Fast path: GitHub can map a commit directly to associated PRs.
+            # Keep the historical branch/commit walk as a fail-closed fallback
+            # because closed/unmerged PR ancestry is not guaranteed to appear.
+            commit_pr_json="$RUNNER_TEMP/commit-prs-${target_sha}.json"
+            if gh api --method GET               "/repos/${REPO}/commits/${target_sha}/pulls?per_page=100"               > "$commit_pr_json" 2>/dev/null &&
+              jq -e 'type == "array"' "$commit_pr_json" >/dev/null; then
+              jq -r                 --arg repo "$REPO"                 --arg branch "$head_branch"                 '.[] | select(
+                  (.number | type == "number") and
+                  .number > 0 and
+                  .head.repo.full_name == $repo and
+                  .head.ref == $branch
+                ) | .number' "$commit_pr_json" >> "$output"
+              if [[ -s "$output" ]]; then
+                sort -n -u -o "$output" "$output"
+                return 0
+              fi
+            fi
+
+            for page in $(seq 1 10); do
+              page_json="$RUNNER_TEMP/pr-history-${page}.json"
+              if ! gh api --method GET "/repos/${REPO}/pulls" \
+                -f state=all \
+                -f "head=${owner}:${head_branch}" \
+                -f per_page=100 \
+                -f page="$page" > "$page_json"; then
+                return 2
+              fi
+              if ! jq -e 'type == "array"' "$page_json" >/dev/null; then
+                return 2
+              fi
+              count=$(jq -r 'length' "$page_json")
+              [[ "$count" =~ ^[0-9]+$ ]] || return 2
+
+              while IFS= read -r pr_number; do
+                [[ "$pr_number" =~ ^[0-9]+$ ]] || return 2
+                if pr_contains_sha "$pr_number" "$target_sha"; then
+                  printf '%s\n' "$pr_number" >> "$output"
+                else
+                  membership=$?
+                  if (( membership == 2 )); then
+                    return 2
+                  fi
+                fi
+              done < <(
+                jq -r \
+                  --arg repo "$REPO" \
+                  --arg branch "$head_branch" \
+                  '.[] | select(
+                    (.number | type == "number") and
+                    .number > 0 and
+                    .head.repo.full_name == $repo and
+                    .head.ref == $branch
+                  ) | .number' "$page_json"
+              )
+
+              if (( count < 100 )); then
+                sort -n -u -o "$output" "$output"
+                return 0
+              fi
+            done
+            return 2
+          }
+
+          while IFS=$'\t' read -r id name event head_sha head_branch created; do
+            [[ -n "${id:-}" && -n "${created:-}" ]] || continue
+            [[ "$id" != "$GITHUB_RUN_ID" ]] || continue
+            inspected=$((inspected + 1))
+
+            if [[ ! "$head_sha" =~ ^[0-9a-fA-F]{40}$ ]]; then
+              preserved_errors=$((preserved_errors + 1))
+              continue
+            fi
+
+            created_epoch=$(date -u -d "$created" +%s)
+            if (( created_epoch >= cutoff )); then
+              kept_recent=$((kept_recent + 1))
+              continue
+            fi
+
+            security_pr_candidate=false
+            case "$name" in
+              *Malware*|*Secret*|*Security*|*CodeQL*|*Provenance*|*Artifact\ Policy*|*Dependency*|*Repository\ Hygiene*|*Workflow\ Input\ Security*)
+                security_pr_candidate=true
+                ;;
+            esac
+
+            case "$event" in
+              pull_request) ;;
+              *)
+                if [[ "$security_pr_candidate" == "true" ]]; then
+                  kept_security=$((kept_security + 1))
+                else
+                  kept_unlinked=$((kept_unlinked + 1))
+                fi
+                continue
+                ;;
+            esac
+
+            run_json="$RUNNER_TEMP/run-${id}.json"
+            if ! gh api "/repos/${REPO}/actions/runs/${id}" > "$run_json"; then
+              preserved_errors=$((preserved_errors + 1))
+              continue
+            fi
+
+            mapfile -t pr_numbers < <(jq -r '.pull_requests[]?.number | select(type == "number" and . > 0)' "$run_json" | sort -n -u)
+            if (( ${#pr_numbers[@]} == 0 )); then
+              recovery_key=$(printf '%s:%s' "$head_branch" "$head_sha" | sha256sum | cut -d ' ' -f 1)
+              recovered_prs="$RUNNER_TEMP/recovered-prs-${recovery_key}.txt"
+              if [[ -e "$recovered_prs" ]]; then
+                recovery_cache_hits=$((recovery_cache_hits + 1))
+              else
+                recovery_cache_misses=$((recovery_cache_misses + 1))
+                if ! recover_pr_numbers "$head_branch" "$head_sha" "$recovered_prs"; then
+                  rm -f "$recovered_prs"
+                  preserved_errors=$((preserved_errors + 1))
+                  continue
+                fi
+              fi
+              mapfile -t pr_numbers < "$recovered_prs"
+            fi
+            if (( ${#pr_numbers[@]} == 0 )); then
+              kept_unlinked=$((kept_unlinked + 1))
+              continue
+            fi
+
+            obsolete=true
+            for pr_number in "${pr_numbers[@]}"; do
+              pr_json="$RUNNER_TEMP/pr-${pr_number}.json"
+              if ! gh api "/repos/${REPO}/pulls/${pr_number}" > "$pr_json"; then
+                obsolete=false
+                break
+              fi
+
+              pr_state=$(jq -r '.state // empty' "$pr_json")
+              pr_head_sha=$(jq -r '.head.sha // empty' "$pr_json")
+              pr_head_repo=$(jq -r '.head.repo.full_name // empty' "$pr_json")
+              pr_head_ref=$(jq -r '.head.ref // empty' "$pr_json")
+
+              if [[ "$pr_head_repo" != "$REPO" || "$pr_head_ref" != "$head_branch" ]]; then
+                obsolete=false
+                break
+              fi
+              if [[ "$pr_state" == "open" && "$pr_head_sha" == "$head_sha" ]]; then
+                obsolete=false
+                kept_current=$((kept_current + 1))
+                break
+              fi
+              if [[ "$pr_state" != "open" && "$pr_state" != "closed" ]]; then
+                obsolete=false
+                break
+              fi
+            done
+
+            [[ "$obsolete" == "true" ]] || continue
+            if (( cancelled + forced >= MAX_LIVE_CANCELS )); then
+              break
+            fi
+
+            if gh api --method POST "/repos/${REPO}/actions/runs/${id}/cancel" >/dev/null 2>&1; then
+              cancelled=$((cancelled + 1))
+              continue
+            fi
+
+            status_now=$(gh api "/repos/${REPO}/actions/runs/${id}" --jq '.status // empty' 2>/dev/null || true)
+            if [[ "$status_now" == "completed" ]]; then
+              moved=$((moved + 1))
+              continue
+            fi
+
+            # Security/provenance/artifact/dependency PR runs may be normally
+            # cancelled once exact stale identity is proven, but never escalate
+            # them through force-cancel. Provider ambiguity on a security lane
+            # preserves the run rather than weakening evidence custody.
+            if [[ "$security_pr_candidate" == "true" ]]; then
+              kept_security=$((kept_security + 1))
+              preserved_errors=$((preserved_errors + 1))
+              echo "security PR preserve after ordinary cancel failure: run=${id} status=${status_now:-unknown}"
+              continue
+            fi
+
+            # GitHub can leave old queued runs in a provider-stuck state where
+            # ordinary cancellation returns 409/422 indefinitely. Escalation is
+            # deliberately much narrower than ordinary cleanup: only a run that
+            # is still exactly queued, older than 24 hours, and freshly proven
+            # obsolete against every linked same-repository PR may be force-cancelled.
+            if [[ "$status_now" != "queued" || "$created_epoch" -ge "$force_cutoff" ]]; then
+              preserved_errors=$((preserved_errors + 1))
+              continue
+            fi
+
+            force_accepted=false
+            force_done=false
+            for force_attempt in $(seq 1 "$FORCE_CANCEL_ATTEMPTS"); do
+              # Re-prove PR authority before every retry. A reopen or head move
+              # wins over cleanup even after an earlier force request was accepted.
+              force_obsolete=true
+              for pr_number in "${pr_numbers[@]}"; do
+                force_pr_json="$RUNNER_TEMP/force-pr-${id}-${force_attempt}-${pr_number}.json"
+                if ! gh api "/repos/${REPO}/pulls/${pr_number}" > "$force_pr_json"; then
+                  force_obsolete=false
+                  break
+                fi
+                force_pr_state=$(jq -r '.state // empty' "$force_pr_json")
+                force_pr_head_sha=$(jq -r '.head.sha // empty' "$force_pr_json")
+                force_pr_head_repo=$(jq -r '.head.repo.full_name // empty' "$force_pr_json")
+                force_pr_head_ref=$(jq -r '.head.ref // empty' "$force_pr_json")
+
+                if [[ "$force_pr_head_repo" != "$REPO" || "$force_pr_head_ref" != "$head_branch" ]]; then
+                  force_obsolete=false
+                  break
+                fi
+                if [[ "$force_pr_state" == "open" && "$force_pr_head_sha" == "$head_sha" ]]; then
+                  force_obsolete=false
+                  break
+                fi
+                if [[ "$force_pr_state" != "open" && "$force_pr_state" != "closed" ]]; then
+                  force_obsolete=false
+                  break
+                fi
+              done
+              if [[ "$force_obsolete" != "true" ]]; then
+                echo "force-cancel preserve: run=${id} attempt=${force_attempt} reason=pr-authority-changed"
+                force_done=true
+                preserved_errors=$((preserved_errors + 1))
+                break
+              fi
+
+              force_run_json="$RUNNER_TEMP/force-run-${id}-${force_attempt}.json"
+              if ! gh api "/repos/${REPO}/actions/runs/${id}" > "$force_run_json"; then
+                echo "force-cancel preserve: run=${id} attempt=${force_attempt} reason=run-read-failed"
+                force_done=true
+                preserved_errors=$((preserved_errors + 1))
+                break
+              fi
+              force_status=$(jq -r '.status // empty' "$force_run_json")
+              force_sha=$(jq -r '.head_sha // empty' "$force_run_json")
+              force_branch=$(jq -r '.head_branch // empty' "$force_run_json")
+              force_event=$(jq -r '.event // empty' "$force_run_json")
+              if [[ "$force_status" != "queued" || "$force_sha" != "$head_sha" || "$force_branch" != "$head_branch" || "$force_event" != "pull_request" ]]; then
+                if [[ "$force_status" == "completed" ]]; then
+                  moved=$((moved + 1))
+                  echo "force-cancel moved: run=${id} attempt=${force_attempt} status=completed"
+                else
+                  force_transitioned=$((force_transitioned + 1))
+                  echo "force-cancel preserve: run=${id} attempt=${force_attempt} status=${force_status:-unknown}"
+                fi
+                force_done=true
+                break
+              fi
+
+              if gh api --method POST "/repos/${REPO}/actions/runs/${id}/force-cancel" >/dev/null 2>&1; then
+                if [[ "$force_accepted" != "true" ]]; then
+                  forced=$((forced + 1))
+                  force_accepted=true
+                fi
+                echo "force-cancel accepted: run=${id} attempt=${force_attempt} branch=${head_branch} sha=${head_sha}"
+              else
+                echo "force-cancel rejected: run=${id} attempt=${force_attempt}; skipping completion polls"
+                if (( force_attempt < FORCE_CANCEL_ATTEMPTS )); then
+                  sleep "$FORCE_CANCEL_REJECT_BACKOFF_SECONDS"
+                fi
+                continue
+              fi
+
+              # Only an accepted provider request can produce an asynchronous
+              # cancellation transition. Rejected requests skip these polls so
+              # provider-stuck tombstones cannot monopolize the recovery lane.
+              for force_poll in 1 2 3; do
+                sleep "$FORCE_CANCEL_POLL_SECONDS"
+                force_poll_json="$RUNNER_TEMP/force-poll-${id}-${force_attempt}-${force_poll}.json"
+                if ! gh api "/repos/${REPO}/actions/runs/${id}" > "$force_poll_json"; then
+                  continue
+                fi
+                poll_status=$(jq -r '.status // empty' "$force_poll_json")
+                poll_sha=$(jq -r '.head_sha // empty' "$force_poll_json")
+                poll_branch=$(jq -r '.head_branch // empty' "$force_poll_json")
+                poll_event=$(jq -r '.event // empty' "$force_poll_json")
+                if [[ "$poll_sha" != "$head_sha" || "$poll_branch" != "$head_branch" || "$poll_event" != "pull_request" ]]; then
+                  echo "force-cancel preserve: run=${id} reason=identity-changed-during-poll"
+                  preserved_errors=$((preserved_errors + 1))
+                  force_done=true
+                  break
+                fi
+                if [[ "$poll_status" == "completed" ]]; then
+                  moved=$((moved + 1))
+                  echo "force-cancel completed: run=${id} attempt=${force_attempt} poll=${force_poll}"
+                  force_done=true
+                  break
+                fi
+                if [[ "$poll_status" != "queued" ]]; then
+                  force_transitioned=$((force_transitioned + 1))
+                  echo "force-cancel transitioned: run=${id} status=${poll_status:-unknown}"
+                  force_done=true
+                  break
+                fi
+              done
+
+              [[ "$force_done" == "true" ]] && break
+            done
+
+            if [[ "$force_done" != "true" ]]; then
+              force_stuck=$((force_stuck + 1))
+              preserved_errors=$((preserved_errors + 1))
+              echo "force-cancel stuck: run=${id} remained queued after ${FORCE_CANCEL_ATTEMPTS} freshly revalidated attempts"
+            fi
+          done < "$inventory"
+
+          {
+            echo '## Live Actions reaper'
+            echo "- Live runs inspected: $inspected"
+            echo "- Obsolete PR runs cancelled normally: $cancelled"
+            echo "- Provider-stuck queued PR runs with accepted force requests: $forced"
+            echo "- Force-cancelled runs still queued after all retries: $force_stuck"
+            echo "- Force-cancel targets that transitioned out of queued without completing: $force_transitioned"
+            echo "- Runs that completed before/during cancellation: $moved"
+            echo "- Ambiguous/API/cancellation runs preserved: $preserved_errors"
+            echo "- Current PR-head runs preserved: $kept_current"
+            echo "- Security/provenance/artifact/dependency runs preserved from force escalation: $kept_security"
+            echo "- Unlinked/non-PR live runs preserved: $kept_unlinked"
+            echo "- Recent live runs preserved: $kept_recent"
+            echo "- PR-recovery cache hits: $recovery_cache_hits"
+            echo "- PR-recovery cache misses: $recovery_cache_misses"
+            echo "- Stale threshold: ${LIVE_RUN_STALE_MINUTES} minutes"
+            echo "- Force-cancel threshold: ${LIVE_FORCE_CANCEL_STALE_MINUTES} minutes"
+            echo "- Force-cancel attempts per proven target: ${FORCE_CANCEL_ATTEMPTS}"
+            echo "- Force-cancel reject backoff: ${FORCE_CANCEL_REJECT_BACKOFF_SECONDS}s"
+            echo "- Force-cancel poll interval after accepted request: ${FORCE_CANCEL_POLL_SECONDS}s"
+            echo "- Cancellation cap: ${MAX_LIVE_CANCELS}"
+            echo '- Ordinary cancellation requires every linked same-repository PR to be closed or moved to a different head SHA, including security-class PR runs.'
+            echo '- Security/provenance/artifact/dependency PR runs are never force-cancelled after an ordinary cancellation failure.'
+            echo '- Force-cancel for non-security runs additionally requires a fresh queued-only run check and a fresh PR-state revalidation after ordinary cancellation fails.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if (( preserved_errors > 0 )); then
+            echo "::warning::Live-run reaper preserved ${preserved_errors} ambiguous/API/cancellation candidate(s); no uncertain run was cancelled."
+          fi
+
+      - name: Prune only cold Actions caches
+        shell: bash
+        run: |
+          set -euo pipefail
+          cutoff=$(date -u -d "${CACHE_RETENTION_DAYS} days ago" +%s)
+          inventory="$RUNNER_TEMP/caches.tsv"
+          deleted=0
+          failed=0
+          kept=0
+          reclaimed=0
+
+          fetch_inventory() {
+            local attempt=1 delay=2 status tmp="${inventory}.candidate"
+            while true; do
+              : > "$tmp"
+              if gh api --paginate "/repos/${REPO}/actions/caches?per_page=100" --jq '.actions_caches[] | [.id, .last_accessed_at, .created_at, .size_in_bytes] | @tsv' > "$tmp"; then
+                mv "$tmp" "$inventory"
+                return 0
+              else
+                status=$?
+              fi
+              if (( attempt >= 4 )); then
+                rm -f "$tmp"
+                echo "Failed to fetch cache inventory after ${attempt} attempts (exit ${status})." >&2
+                return "$status"
+              fi
+              sleep "$delay"
+              attempt=$((attempt + 1))
+              delay=$((delay * 2))
+            done
+          }
+
+          fetch_inventory
+          while IFS=$'\t' read -r id last_accessed created size; do
+            [[ -n "${id:-}" ]] || continue
+            accessed="${last_accessed:-$created}"
+            accessed_epoch=$(date -u -d "$accessed" +%s)
+            size=${size:-0}
+            if (( accessed_epoch < cutoff && deleted < MAX_CACHE_DELETES )); then
+              if gh api --method DELETE "/repos/${REPO}/actions/caches/${id}" >/dev/null 2>&1; then
+                deleted=$((deleted + 1))
+                reclaimed=$((reclaimed + size))
+              else
+                failed=$((failed + 1))
+              fi
+            else
+              kept=$((kept + 1))
+            fi
+          done < "$inventory"
+
+          reclaimed_mib=$((reclaimed / 1024 / 1024))
+          {
+            echo '## Actions housekeeping'
+            echo "- Cold caches deleted: $deleted"
+            echo "- Hot/recent caches preserved: $kept"
+            echo "- Cache deletion failures: $failed"
+            echo "- Approximate cache space reclaimed: ${reclaimed_mib} MiB"
+            echo "- Cache inactivity threshold: ${CACHE_RETENTION_DAYS} days"
+            echo '- Active caches are intentionally preserved to avoid CI cold starts.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Delete stale workflow artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          cutoff=$(date -u -d "${ARTIFACT_RETENTION_DAYS} days ago" +%s)
+          inventory="$RUNNER_TEMP/artifacts.tsv"
+          deleted=0
+          failed=0
+          kept=0
+
+          fetch_inventory() {
+            local attempt=1 delay=2 status tmp="${inventory}.candidate"
+            while true; do
+              : > "$tmp"
+              if gh api --paginate "/repos/${REPO}/actions/artifacts?per_page=100" --jq '.artifacts[] | [.id, .created_at, .expired] | @tsv' > "$tmp"; then
+                mv "$tmp" "$inventory"
+                return 0
+              else
+                status=$?
+              fi
+              if (( attempt >= 4 )); then
+                rm -f "$tmp"
+                echo "Failed to fetch artifact inventory after ${attempt} attempts (exit ${status})." >&2
+                return "$status"
+              fi
+              sleep "$delay"
+              attempt=$((attempt + 1))
+              delay=$((delay * 2))
+            done
+          }
+
+          fetch_inventory
+          while IFS=$'\t' read -r id created expired; do
+            [[ -n "${id:-}" && -n "${created:-}" ]] || continue
+            created_epoch=$(date -u -d "$created" +%s)
+            if [[ "$expired" == 'true' || "$created_epoch" -lt "$cutoff" ]]; then
+              if gh api --method DELETE "/repos/${REPO}/actions/artifacts/${id}" >/dev/null 2>&1; then
+                deleted=$((deleted + 1))
+              else
+                failed=$((failed + 1))
+              fi
+            else
+              kept=$((kept + 1))
+            fi
+          done < "$inventory"
+
+          {
+            echo "- Stale/expired artifacts deleted: $deleted"
+            echo "- Recent artifacts preserved: $kept"
+            echo "- Artifact deletion failures: $failed"
+            echo "- Artifact retention threshold: ${ARTIFACT_RETENTION_DAYS} days"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Prune stale unsuccessful workflow runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          cutoff=$(date -u -d "${FAILED_RUN_RETENTION_DAYS} days ago" +%s)
+          cutoff_iso=$(date -u -d "${FAILED_RUN_RETENTION_DAYS} days ago" +%Y-%m-%dT%H:%M:%SZ)
+          inventory="$RUNNER_TEMP/runs.tsv"
+          : > "$inventory"
+
+          fetch_status() {
+            local status_name="$1"
+            local attempt=1 delay=2 status tmp="$RUNNER_TEMP/runs-${status_name}.candidate.tsv"
+            while true; do
+              : > "$tmp"
+              # Query the stale side of the retention boundary directly. Asking
+              # for the newest 1,000 runs first can permanently starve older
+              # runs in a busy repository before local age filtering sees them.
+              if gh run list --repo "$REPO" \
+                --limit "$MAX_RUN_DELETES" \
+                --status "$status_name" \
+                --created "<${cutoff_iso}" \
+                --json databaseId,createdAt,conclusion,name \
+                --jq '.[] | [.databaseId, .createdAt, .conclusion, .name] | @tsv' > "$tmp"; then
+                cat "$tmp" >> "$inventory"
+                rm -f "$tmp"
+                return 0
+              else
+                status=$?
+              fi
+              if (( attempt >= 4 )); then
+                rm -f "$tmp"
+                echo "Failed to fetch ${status_name} runs after ${attempt} attempts (exit ${status})." >&2
+                return "$status"
+              fi
+              sleep "$delay"
+              attempt=$((attempt + 1))
+              delay=$((delay * 2))
+            done
+          }
+
+          for status_name in failure cancelled timed_out action_required stale; do
+            fetch_status "$status_name"
+          done
+          # Consume the global deletion cap oldest-first across conclusions so a
+          # noisy recent status cannot monopolize every housekeeping pass.
+          sort -t $'\t' -k2,2 -k1,1n -u -o "$inventory" "$inventory"
+
+          deleted=0
+          failed=0
+          kept=0
+          while IFS=$'\t' read -r id created conclusion name; do
+            [[ -n "${id:-}" && -n "${created:-}" ]] || continue
+            [[ "$id" != "$GITHUB_RUN_ID" ]] || continue
+            created_epoch=$(date -u -d "$created" +%s)
+            # Keep a local age guard even though the server query is already
+            # bounded, so malformed or unexpectedly broad results cannot delete
+            # a recent run.
+            if (( created_epoch >= cutoff || deleted >= MAX_RUN_DELETES )); then
+              kept=$((kept + 1))
+              continue
+            fi
+            if gh run delete "$id" --repo "$REPO"; then
+              deleted=$((deleted + 1))
+            else
+              failed=$((failed + 1))
+            fi
+          done < "$inventory"
+
+          {
+            echo "- Old unsuccessful runs deleted: $deleted"
+            echo "- Recent/over-cap unsuccessful runs preserved: $kept"
+            echo "- Run deletion failures: $failed"
+            echo "- Unsuccessful-run retention threshold: ${FAILED_RUN_RETENTION_DAYS} days"
+            echo "- Per-sweep run deletion cap: ${MAX_RUN_DELETES}"
+            echo "- Server-side stale-run cutoff: <${cutoff_iso}"
+          } >> "$GITHUB_STEP_SUMMARY"

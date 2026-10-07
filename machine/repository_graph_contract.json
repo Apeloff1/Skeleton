@@ -1,0 +1,73 @@
+{
+  "schema_version": "skeleton.repository_graph_contract.v1",
+  "contract_version": "0.1.0",
+  "status": "active",
+  "purpose": "Bind repository files, symbols, imports, dependencies, ownership, tests and trace impact into one freshness-aware code-intelligence contract.",
+  "masterplan_binding": {
+    "volume_ref": "VOL-021",
+    "title": "Code Intelligence",
+    "required_gap_texts": [
+      "independent cross-language repository-graph, ownership/test impact, and change-planner verification remains pending"
+    ]
+  },
+  "sources": [
+    {
+      "path": "skeleton/automation/backlog_index.py",
+      "git_blob_sha": "c0eeb9e32ecba9659157bec71a3ccb22eb5b8910",
+      "role": "bounded static file/symbol/import/dependency/test/workflow index"
+    },
+    {
+      "path": "skeleton/repo_intelligence/git_index.py",
+      "git_blob_sha": "5c2fcf39fa4b02dfd8b5fa77b79f1d93c64490d4",
+      "role": "Git-aware repository index"
+    },
+    {
+      "path": "machine/architecture_ownership.json",
+      "git_blob_sha": "a40faf5fc7ec9ef4f6ad2e73a9f9cb076a9c53a6",
+      "role": "canonical physical/semantic ownership"
+    },
+    {
+      "path": "machine/master_traceability.json",
+      "git_blob_sha": "bb6115a18d5acda6b7c1f73310f56cc3e7763906",
+      "role": "requirement/capability change-impact authority"
+    }
+  ],
+  "node_kinds": [
+    "file",
+    "symbol",
+    "dependency",
+    "reference",
+    "workflow",
+    "test",
+    "owner",
+    "trace_authority"
+  ],
+  "edge_kinds": [
+    "contains",
+    "imports",
+    "depends_on",
+    "owned_by",
+    "tested_by",
+    "traces_to"
+  ],
+  "freshness_policy": {
+    "identity": "source Git blob identities plus repository HEAD",
+    "stale_when": [
+      "any bound source Git blob changes",
+      "repository HEAD changes without index regeneration",
+      "index reports truncated/unreadable inputs"
+    ],
+    "heuristic_rule": "Heuristic import/dependency inference carries confidence metadata and never becomes ownership or authority truth.",
+    "generated_vendor_rule": "Generated/vendor/satellite content must be classified separately and cannot pollute canonical dependency confidence."
+  },
+  "impact_policy": {
+    "ownership_source": "machine/architecture_ownership.json",
+    "trace_source": "machine/master_traceability.json",
+    "test_sources": [
+      "skeleton/automation/backlog_index.py",
+      "machine/ai_build_queue.json"
+    ],
+    "planner_source": "skeleton/repo_machine/planner.py",
+    "rule": "Change planning combines code edges, semantic ownership, mapped tests and trace impact; missing mappings remain explicit unknowns."
+  }
+}

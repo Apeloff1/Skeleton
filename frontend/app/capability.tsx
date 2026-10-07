@@ -1,0 +1,206 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+
+import { capabilityById } from '../src/product/productCatalog';
+import { getProductReadiness } from '../src/product/productControlClient';
+import type { PublicActionReadiness } from '../src/product/productControlClient';
+
+const PILLAR_COPY = {
+  create: 'CREATE',
+  play: 'PLAY',
+  learn: 'LEARN',
+  operate: 'OPERATE',
+} as const;
+
+export default function CapabilityRoute() {
+  const router = useRouter();
+  const params = useLocalSearchParams<{ id?: string | string[] }>();
+  const id = Array.isArray(params.id) ? params.id[0] : params.id;
+  const capability = useMemo(() => (id ? capabilityById(id) : undefined), [id]);
+  const [readiness, setReadiness] = useState<readonly PublicActionReadiness[] | null>(null);
+
+  useEffect(() => {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    getProductReadiness(controller?.signal)
+      .then((result) => {
+        if (!controller?.signal.aborted && result.ok && result.data) {
+          setReadiness(result.data.actions);
+        }
+      })
+      .catch(() => {
+        // Readiness is operator telemetry, not a navigation prerequisite.
+      });
+    return () => {
+      try { controller?.abort(); } catch {}
+    };
+  }, []);
+
+  const capabilityReadiness = useMemo(
+    () => readiness?.filter((item) => item.capability_id === capability?.id) ?? null,
+    [capability?.id, readiness],
+  );
+  const nativeReadyCount = capabilityReadiness?.filter((item) => item.state === 'native_ready').length ?? null;
+
+  if (!capability) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.empty}>
+          <Text style={styles.eyebrow}>SKELETON</Text>
+          <Text style={styles.title}>Unknown capability</Text>
+          <Text style={styles.description}>This product surface is not part of the canonical capability catalog.</Text>
+          <TouchableOpacity style={styles.primaryButton} onPress={() => router.replace('/product' as never)}>
+            <Text style={styles.primaryButtonText}>Back to product</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <ScrollView contentContainerStyle={styles.page}>
+        <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
+          <Text style={styles.back}>‹ Product</Text>
+        </TouchableOpacity>
+
+        <View style={styles.hero}>
+          <Text style={styles.eyebrow}>{PILLAR_COPY[capability.pillar]}</Text>
+          <Text style={styles.title}>{capability.title}</Text>
+          <Text style={styles.description}>{capability.description}</Text>
+          <View style={styles.contractRow}>
+            <Text style={styles.contractLabel}>Backend contract</Text>
+            <Text style={styles.contractValue}>{capability.backendSurface ?? 'local runtime'}</Text>
+          </View>
+        </View>
+
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Actions</Text>
+          <Text style={styles.sectionMeta}>
+            {capability.actions.length} canonical
+            {nativeReadyCount !== null ? ` · ${nativeReadyCount} native ready` : ''}
+          </Text>
+        </View>
+
+        {capability.actions.map((action) => {
+          const actionReadiness = capabilityReadiness?.find((item) => item.action === action.operation);
+          const readinessLabel = actionReadiness?.state === 'native_ready'
+            ? 'NATIVE READY'
+            : actionReadiness
+              ? actionReadiness.state.replace(/_/g, ' ').toUpperCase()
+              : 'READINESS UNKNOWN';
+          return (
+          <View key={action.id} style={styles.actionCard}>
+            <View style={styles.actionTop}>
+              <Text style={styles.actionTitle}>{action.title}</Text>
+              <Text
+                style={[
+                  styles.readinessBadge,
+                  actionReadiness?.state === 'native_ready'
+                    ? styles.readinessReady
+                    : actionReadiness
+                      ? styles.readinessBlocked
+                      : styles.readinessUnknown,
+                ]}
+              >
+                {readinessLabel}
+              </Text>
+            </View>
+            <Text style={styles.actionDescription}>{action.description}</Text>
+            <View style={styles.operationPill}>
+              <Text style={styles.operationText}>{action.operation}</Text>
+            </View>
+            <View style={styles.buttonRow}>
+              {action.href ? (
+                <TouchableOpacity
+                  style={[styles.nativeActionButton, styles.flexButton]}
+                  onPress={() => router.push(action.href as never)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.nativeActionButtonText}>Open product surface</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.flexButton]}
+                  onPress={() => router.push(`/operation?capability=${encodeURIComponent(capability.id)}&action=${encodeURIComponent(action.id)}` as never)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.actionButtonText}>Governed action</Text>
+                </TouchableOpacity>
+              )}
+              {action.legacyHref ? (
+                <TouchableOpacity
+                  style={[styles.legacyActionButton, styles.flexButton]}
+                  onPress={() => router.push(action.legacyHref as never)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.legacyActionButtonText}>Legacy UI</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </View>
+          );
+        })}
+
+        <View style={styles.footerCard}>
+          <Text style={styles.footerTitle}>Compatibility escape hatch</Text>
+          <Text style={styles.footerText}>
+            The legacy hub remains available while individual systems are promoted behind canonical capability contracts.
+          </Text>
+          <TouchableOpacity style={styles.secondaryButton} onPress={() => router.push('/hub' as never)}>
+            <Text style={styles.secondaryButtonText}>Open legacy hub</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: '#080A0F' },
+  page: { paddingHorizontal: 18, paddingTop: 18, paddingBottom: 48, gap: 14 },
+  back: { color: '#99A7FF', fontSize: 13, fontWeight: '800', paddingVertical: 5 },
+  hero: { borderWidth: 1, borderColor: '#232838', borderRadius: 24, padding: 22, backgroundColor: '#0D111A' },
+  eyebrow: { color: '#8B9AFF', fontSize: 11, fontWeight: '900', letterSpacing: 2.2, marginBottom: 8 },
+  title: { color: '#F8FAFC', fontSize: 30, lineHeight: 35, fontWeight: '900' },
+  description: { color: '#AAB3C5', fontSize: 14, lineHeight: 21, marginTop: 9 },
+  contractRow: { marginTop: 18, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#202737' },
+  contractLabel: { color: '#69758A', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.8 },
+  contractValue: { color: '#B5C0D3', fontSize: 11, fontFamily: 'monospace', marginTop: 5 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
+  sectionTitle: { color: '#F1F5F9', fontSize: 19, fontWeight: '900' },
+  sectionMeta: { color: '#69758A', fontSize: 11, fontWeight: '700' },
+  actionCard: { borderWidth: 1, borderColor: '#202737', borderRadius: 18, backgroundColor: '#0F141F', padding: 16 },
+  actionTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  actionTitle: { color: '#F8FAFC', fontSize: 16, fontWeight: '800', flex: 1 },
+  readinessBadge: { fontSize: 8, fontWeight: '900', letterSpacing: 0.6, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 5, overflow: 'hidden' },
+  readinessReady: { color: '#87E3A9', backgroundColor: '#12271D' },
+  readinessBlocked: { color: '#F2A0AE', backgroundColor: '#2B151A' },
+  readinessUnknown: { color: '#8E9AAF', backgroundColor: '#181E2A' },
+  actionDescription: { color: '#95A1B4', fontSize: 12, lineHeight: 18, marginTop: 5 },
+  operationPill: { alignSelf: 'flex-start', marginTop: 12, borderRadius: 9, backgroundColor: '#151B2B', paddingHorizontal: 9, paddingVertical: 6 },
+  operationText: { color: '#8F9DFF', fontFamily: 'monospace', fontSize: 10 },
+  buttonRow: { flexDirection: 'row', gap: 8, marginTop: 14 },
+  flexButton: { flex: 1 },
+  actionButton: { borderRadius: 12, backgroundColor: '#6D5CE7', paddingHorizontal: 14, paddingVertical: 11, alignItems: 'center' },
+  actionButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+  nativeActionButton: { borderRadius: 12, backgroundColor: '#247A5A', paddingHorizontal: 14, paddingVertical: 11, alignItems: 'center' },
+  nativeActionButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+  legacyActionButton: { borderRadius: 12, borderWidth: 1, borderColor: '#334059', paddingHorizontal: 14, paddingVertical: 11, alignItems: 'center' },
+  legacyActionButtonText: { color: '#AAB4C7', fontSize: 12, fontWeight: '800' },
+  footerCard: { marginTop: 6, borderRadius: 18, borderWidth: 1, borderColor: '#30374A', padding: 16, backgroundColor: '#111622' },
+  footerTitle: { color: '#DDE3EE', fontSize: 14, fontWeight: '800' },
+  footerText: { color: '#7E899B', fontSize: 11, lineHeight: 17, marginTop: 5 },
+  secondaryButton: { marginTop: 13, borderRadius: 12, borderWidth: 1, borderColor: '#343D54', paddingVertical: 11, alignItems: 'center' },
+  secondaryButtonText: { color: '#AAB4C7', fontSize: 12, fontWeight: '800' },
+  empty: { flex: 1, justifyContent: 'center', paddingHorizontal: 26 },
+  primaryButton: { marginTop: 22, borderRadius: 14, backgroundColor: '#6D5CE7', paddingVertical: 13, alignItems: 'center' },
+  primaryButtonText: { color: '#FFFFFF', fontWeight: '800' },
+});

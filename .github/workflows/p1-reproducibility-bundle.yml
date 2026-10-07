@@ -1,0 +1,347 @@
+name: P1 Reproducibility Bundle Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "machine/p1_reproducibility_policy.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_p1_terminal_closure.json"
+      - "skeleton/contracts/reproducibility.py"
+      - "skeleton/ai/runtime/contracts/reproducibility.py"
+      - "scripts/check_p1_reproducibility.py"
+      - "scripts/emit_p1_promotion_evidence.py"
+      - "scripts/run_provenance_evidence.py"
+      - "skeleton/testing/test_reproducibility.py"
+      - "tests/test_p1_reproducibility_bundle.py"
+      - ".github/workflows/p1-reproducibility-bundle.yml"
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/p1_reproducibility_policy.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_p1_terminal_closure.json"
+      - "skeleton/contracts/reproducibility.py"
+      - "skeleton/ai/runtime/contracts/reproducibility.py"
+      - "scripts/check_p1_reproducibility.py"
+      - "scripts/emit_p1_promotion_evidence.py"
+      - "scripts/run_provenance_evidence.py"
+      - "skeleton/testing/test_reproducibility.py"
+      - "tests/test_p1_reproducibility_bundle.py"
+      - ".github/workflows/p1-reproducibility-bundle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Evidence-critical: exact-head signing verification must survive unrelated main churn.
+  group: p1-reproducibility-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  validate:
+    name: Validate deterministic P1 evidence replay
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused reproducibility runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pydantic[email]>=2.13.5"
+          "pydantic-settings>=2.15.0"
+
+      - name: Validate replay policy and regressions
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from scripts.check_p1_reproducibility import ROOT, validate_policy
+
+          runners, budgets = validate_policy(ROOT)
+          assert "p1-reproducibility-verifier" in runners
+          assert "focused-ci" in budgets
+          print("P1 reproducibility policy OK")
+          PY
+          python -m pytest -q --noconftest \
+            skeleton/testing/test_reproducibility.py \
+            tests/test_p1_reproducibility_bundle.py
+
+      - name: Prepare exact replay inputs
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-repro
+          SOURCE_DATE_EPOCH="$(git show -s --format=%ct "$EXPECTED_SHA")"
+          printf '%s' "$SOURCE_DATE_EPOCH" > .p1-repro/source-date-epoch.txt
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          evidence_files = [
+              "machine/p1_reproducibility_policy.json",
+              "skeleton/contracts/reproducibility.py",
+              "scripts/check_p1_reproducibility.py",
+              "skeleton/testing/test_reproducibility.py",
+              "tests/test_p1_reproducibility_bundle.py",
+          ]
+          refs = []
+          for name in evidence_files:
+              refs.append(
+                  {
+                      "source": name,
+                      "digest": hashlib.sha256(Path(name).read_bytes()).hexdigest(),
+                      "category": "reproducibility_input",
+                  }
+              )
+          Path(".p1-repro/refs.json").write_text(
+              json.dumps(refs, sort_keys=True),
+              encoding="utf-8",
+          )
+
+          def digest(names):
+              h = hashlib.sha256()
+              for name in names:
+                  h.update(name.encode("utf-8"))
+                  h.update(b"\0")
+                  h.update(Path(name).read_bytes())
+                  h.update(b"\0")
+              return h.hexdigest()
+
+          Path(".p1-repro/config.digest").write_text(
+              digest(
+                  [
+                      "machine/p1_reproducibility_policy.json",
+                      "machine/ai_p1_task_backlog.json",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          Path(".p1-repro/environment.digest").write_text(
+              hashlib.sha256(
+                  b"ubuntu-24.04|python-3.11.16|reproducibility-v1"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-repro/verifier.digest").write_text(
+              digest(
+                  [
+                      "skeleton/contracts/reproducibility.py",
+                      "scripts/check_p1_reproducibility.py",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          Path(".p1-repro/tests.digest").write_text(
+              digest(
+                  [
+                      "skeleton/testing/test_reproducibility.py",
+                      "tests/test_p1_reproducibility_bundle.py",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Emit baseline and independent replay receipts
+        run: |
+          set -euo pipefail
+          OBSERVED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          common_args=(
+            --repository Apeloff1/Skeleton
+            --commit-sha "$EXPECTED_SHA"
+            --expected-head "$EXPECTED_SHA"
+            --task-id P1-EVID-05
+            --accountability-id ACC-P1-EVID-05
+            --configuration-digest "$(cat .p1-repro/config.digest)"
+            --environment-digest "$(cat .p1-repro/environment.digest)"
+            --verifier-id github-actions:p1-reproducibility
+            --verifier-digest "$(cat .p1-repro/verifier.digest)"
+            --test-manifest-digest "$(cat .p1-repro/tests.digest)"
+            --run-attempt "$RUN_ATTEMPT"
+            --observed-at "$OBSERVED_AT"
+            --evidence-file .p1-repro/refs.json
+          )
+          python scripts/emit_p1_promotion_evidence.py \
+            "${common_args[@]}" \
+            --run-id "baseline-$RUN_IDENTITY" \
+            --out .p1-repro/baseline-receipt.json \
+            > .p1-repro/baseline-stdout.json
+          python scripts/emit_p1_promotion_evidence.py \
+            "${common_args[@]}" \
+            --run-id "replay-$RUN_IDENTITY" \
+            --out .p1-repro/replay-receipt.json \
+            > .p1-repro/replay-stdout.json
+
+      - name: Build bundle and reproduce evidence
+        run: |
+          set -euo pipefail
+          EPOCH="$(cat .p1-repro/source-date-epoch.txt)"
+          python scripts/check_p1_reproducibility.py build \
+            --receipt .p1-repro/baseline-receipt.json \
+            --inputs .p1-repro/refs.json \
+            --runner-id p1-reproducibility-verifier \
+            --budget-id focused-ci \
+            --source-date-epoch "$EPOCH" \
+            --out .p1-repro/bundle.json \
+            > .p1-repro/build-stdout.json
+          python scripts/check_p1_reproducibility.py verify \
+            --bundle .p1-repro/bundle.json \
+            --receipt .p1-repro/replay-receipt.json \
+            --runner-id p1-reproducibility-verifier \
+            --budget-id focused-ci \
+            --source-date-epoch "$EPOCH" \
+            --out .p1-repro/evaluation.json \
+            > .p1-repro/verify-stdout.json
+
+      - name: Prove resource-profile drift is incompatible
+        run: |
+          set -euo pipefail
+          EPOCH="$(cat .p1-repro/source-date-epoch.txt)"
+          if python scripts/check_p1_reproducibility.py verify \
+            --bundle .p1-repro/bundle.json \
+            --receipt .p1-repro/replay-receipt.json \
+            --runner-id p1-reproducibility-verifier \
+            --budget-id independent-replay \
+            --source-date-epoch "$EPOCH" \
+            --out .p1-repro/incompatible.json; then
+            echo "different resource profile unexpectedly reproduced evidence" >&2
+            exit 1
+          fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          payload = json.loads(
+              Path(".p1-repro/incompatible.json").read_text(encoding="utf-8")
+          )
+          if payload["disposition"] != "incompatible":
+              raise SystemExit("budget drift did not produce incompatibility")
+          if not any(
+              "budget_" in item
+              for item in payload["incompatibilities"]
+          ):
+              raise SystemExit("budget incompatibility was not explained")
+          PY
+
+      - name: Assert independent replay semantics
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          baseline = json.loads(
+              Path(".p1-repro/baseline-receipt.json").read_text(encoding="utf-8")
+          )
+          replay = json.loads(
+              Path(".p1-repro/replay-receipt.json").read_text(encoding="utf-8")
+          )
+          evaluation = json.loads(
+              Path(".p1-repro/evaluation.json").read_text(encoding="utf-8")
+          )
+          if baseline["run"]["id"] == replay["run"]["id"]:
+              raise SystemExit("replay did not use an independent run identity")
+          if baseline["receipt_digest"] == replay["receipt_digest"]:
+              raise SystemExit("independent receipts unexpectedly have same digest")
+          if baseline["subject_digest"] != replay["subject_digest"]:
+              raise SystemExit("independent replay subject drift")
+          if baseline["evidence_digest"] != replay["evidence_digest"]:
+              raise SystemExit("independent replay evidence drift")
+          if evaluation["disposition"] != "reproduced":
+              raise SystemExit("independent replay was not reproduced")
+          if evaluation["reproduced"] is not True:
+              raise SystemExit("reproduced flag is false")
+          for field in ("bundle_digest", "evaluation_digest"):
+              if len(evaluation.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print(
+              "P1 reproducibility replay OK:",
+              evaluation["bundle_digest"],
+              evaluation["evaluation_digest"],
+          )
+          PY
+
+      - name: Emit exact-head EVID-05 evidence receipt
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          refs = []
+          for name, category in (
+              (".p1-repro/bundle.json", "reproducibility_bundle"),
+              (".p1-repro/evaluation.json", "replay_evaluation"),
+              ("machine/p1_reproducibility_policy.json", "reproducibility_policy"),
+          ):
+              refs.append(
+                  {
+                      "source": name,
+                      "digest": hashlib.sha256(Path(name).read_bytes()).hexdigest(),
+                      "category": category,
+                  }
+              )
+          Path(".p1-repro/final-refs.json").write_text(
+              json.dumps(refs, sort_keys=True),
+              encoding="utf-8",
+          )
+          PY
+          python scripts/emit_p1_promotion_evidence.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --expected-head "$EXPECTED_SHA" \
+            --task-id P1-EVID-05 \
+            --accountability-id ACC-P1-EVID-05 \
+            --configuration-digest "$(cat .p1-repro/config.digest)" \
+            --environment-digest "$(cat .p1-repro/environment.digest)" \
+            --verifier-id github-actions:p1-reproducibility \
+            --verifier-digest "$(cat .p1-repro/verifier.digest)" \
+            --test-manifest-digest "$(cat .p1-repro/tests.digest)" \
+            --run-id "$RUN_IDENTITY" \
+            --run-attempt "$RUN_ATTEMPT" \
+            --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --evidence-file .p1-repro/final-refs.json \
+            --out .p1-repro/final-receipt.json \
+            > .p1-repro/final-stdout.json
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-repro/final-receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("EVID-05 receipt does not bind exact head")
+          if receipt["task_id"] != "P1-EVID-05":
+              raise SystemExit("EVID-05 task identity drift")
+          for field in ("subject_digest", "evidence_digest", "receipt_digest"):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          PY

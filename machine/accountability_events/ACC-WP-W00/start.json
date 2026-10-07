@@ -1,0 +1,14 @@
+{
+  "actor_id": "chatgpt:gpt-5.6-sol",
+  "actor_type": "agent",
+  "role": "implementation-agent",
+  "signature_method": "github_identity",
+  "note": "Executed by the ChatGPT agent through the user-authorized GitHub connector. This is an agent attestation, not a personal human signature.",
+  "baseline_git_sha": "481890ed75961d798cb92c195af7b325e5667213",
+  "timestamp_source": "GitHub commit created_at for this start-marker commit",
+  "accountability_id": "ACC-WP-W00",
+  "event_type": "start_marker",
+  "from_status": "planned",
+  "intended_to_status": "in_progress",
+  "statement": "Begin WP-W00 Architecture Authority construction and accountability enforcement."
+}

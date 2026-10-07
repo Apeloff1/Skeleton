@@ -1,0 +1,117 @@
+name: Privacy Deletion Propagation
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "machine/privacy_deletion_contract.json"
+      - "machine/privacy_deletion_propagation_contract.json"
+      - "skeleton/security/deletion_propagation.py"
+      - "skeleton/ai/runtime/security/deletion_propagation.py"
+      - "skeleton/testing/test_deletion_propagation.py"
+      - "machine/privacy_deletion_propagation_contract.json"
+      - "skeleton/security/deletion_propagation.py"
+      - "skeleton/ai/runtime/security/deletion_propagation.py"
+      - "skeleton/testing/test_deletion_propagation.py"
+      - "scripts/verify_privacy_deletion_contract.py"
+      - "skeleton/persistence/privacy_deletion.py"
+      - "skeleton/ai/runtime/persistence/privacy_deletion.py"
+      - "skeleton/jeeves/agent/memory.py"
+      - "skeleton/ai/agents/jeeves/agent/memory.py"
+      - "skeleton/jeeves/agent/context_repository.py"
+      - "skeleton/ai/agents/jeeves/agent/context_repository.py"
+      - "skeleton/testing/test_privacy_deletion_authority.py"
+      - "skeleton/testing/test_privacy_deletion_jeeves_integration.py"
+      - "machine/ai_hostile_gap_disposition.json"
+      - ".github/workflows/privacy-deletion-propagation.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "machine/privacy_deletion_contract.json"
+      - "machine/privacy_deletion_propagation_contract.json"
+      - "scripts/verify_privacy_deletion_contract.py"
+      - "skeleton/security/deletion_propagation.py"
+      - "skeleton/ai/runtime/security/deletion_propagation.py"
+      - "skeleton/testing/test_deletion_propagation.py"
+      - "skeleton/persistence/privacy_deletion.py"
+      - "skeleton/ai/runtime/persistence/privacy_deletion.py"
+      - "skeleton/jeeves/agent/memory.py"
+      - "skeleton/ai/agents/jeeves/agent/memory.py"
+      - "skeleton/jeeves/agent/context_repository.py"
+      - "skeleton/ai/agents/jeeves/agent/context_repository.py"
+      - "skeleton/testing/test_privacy_deletion_authority.py"
+      - "skeleton/testing/test_privacy_deletion_jeeves_integration.py"
+      - "machine/ai_hostile_gap_disposition.json"
+      - ".github/workflows/privacy-deletion-propagation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: privacy-deletion-propagation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  privacy-deletion-propagation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install focused runtime dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9" "pydantic>=2,<3" "pydantic-settings>=2,<3"
+      - name: Compile privacy deletion surfaces
+        run: >-
+          python -m compileall -q
+          skeleton/persistence/privacy_deletion.py
+          skeleton/ai/runtime/persistence/privacy_deletion.py
+          skeleton/jeeves/agent/memory.py
+          skeleton/ai/agents/jeeves/agent/memory.py
+          skeleton/jeeves/agent/context_repository.py
+          skeleton/ai/agents/jeeves/agent/context_repository.py
+          scripts/verify_privacy_deletion_contract.py
+          skeleton/testing/test_privacy_deletion_authority.py
+          skeleton/testing/test_privacy_deletion_jeeves_integration.py
+          skeleton/security/deletion_propagation.py
+          skeleton/ai/runtime/security/deletion_propagation.py
+          skeleton/testing/test_deletion_propagation.py
+      - name: Verify G016 contract
+        run: python scripts/verify_privacy_deletion_contract.py --json
+      - name: Run privacy deletion regressions
+        run: >-
+          python -m unittest -q
+          skeleton.testing.test_privacy_deletion_authority
+          skeleton.testing.test_privacy_deletion_jeeves_integration
+      - name: Run anti-resurrection generation regressions
+        run: >-
+          python -m pytest -q -p no:cacheprovider
+          skeleton/testing/test_deletion_propagation.py
+      - name: Verify anti-resurrection AI mirror
+        run: >-
+          cmp
+          skeleton/security/deletion_propagation.py
+          skeleton/ai/runtime/security/deletion_propagation.py
+      - name: Run Jeeves regression coverage
+        run: >-
+          python -m unittest -q
+          skeleton.testing.test_jeeves_context_repository_hot_path
+          skeleton.testing.test_jeeves_memory_hot_path
+      - name: Verify governed AI file-tree parity
+        run: python scripts/check_ai_file_tree.py
+      - name: Verify hostile-gap disposition
+        run: python scripts/verify_ai_hostile_gap_disposition.py

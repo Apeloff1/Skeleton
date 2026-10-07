@@ -1,0 +1,291 @@
+name: Stage 7 Golden Journeys Closure Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/testing/test_ai_golden_journeys.py"
+      - "skeleton/testing/test_execution_runtime.py"
+      - "skeleton/testing/test_governance_runtime_binding.py"
+      - "skeleton/testing/test_execution_repository.py"
+      - "skeleton/testing/test_engine_execution_coordinator.py"
+      - "skeleton/api/engine_service.py"
+      - "skeleton/ai/runtime/api/engine_service.py"
+      - "backend/tests/test_engine_cross_service_closure.py"
+      - "backend/tests/test_ai_chat_engine_cutover.py"
+      - "backend/tests/test_operation_stream_mongo_stage7.py"
+      - "backend/tests/test_operation_stream_mongo_integration.py"
+      - "backend/core/operation_stream_transport.py"
+      - "skeleton/ai/runtime/frontier/operation_stream_store_mongo.py"
+      - "skeleton/frontier/operation_stream_store_mongo.py"
+      - "skeleton/testing/test_operation_stream_store_mongo.py"
+      - "skeleton/testing/test_engine_execution_service.py"
+      - "backend/tests/test_engine_live_process_boundary.py"
+      - "frontend/services/operationStreamSession.ts"
+      - "frontend/services/operationStream.ts"
+      - "frontend/scripts/test-operation-stream-session.mjs"
+      - "frontend/scripts/test-operation-stream-reducer.mjs"
+      - "frontend/package.json"
+      - "scripts/verify_stage7_golden_journeys.py"
+      - "tests/test_stage7_golden_journeys_independent_verifier.py"
+      - "machine/ai_app_construction.json"
+      - "machine/ai_closure_evidence.json"
+      - "machine/ai_implementation_handoff.json"
+      - ".github/workflows/stage7-golden-journeys-closure.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stage7-golden-journeys-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stage7-golden-contracts:
+    name: Stage 7 golden journey contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused Stage-7 dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e ".[dev]"
+          "httpx==0.28.1"
+          "PyJWT==2.14.0"
+          "python-dotenv==1.2.3"
+          "bcrypt==4.3.0"
+
+      - name: Run deterministic engine golden journeys
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_ai_golden_journeys.py
+          skeleton/testing/test_execution_runtime.py::test_crash_after_provider_response_before_checkpoint_fails_closed_without_retry
+
+      - name: Run authenticated cross-service golden journeys
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          backend/tests/test_engine_cross_service_closure.py
+          backend/tests/test_ai_chat_engine_cutover.py
+
+      - name: Run approval renewal and real engine restart evidence
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_engine_execution_service.py::test_expired_persisted_approval_can_be_safely_reauthorized
+          backend/tests/test_engine_live_process_boundary.py::test_engine_state_survives_real_process_restart
+
+      - name: Run process and database restart fault journeys
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_engine_execution_coordinator.py::test_coordinator_restart_recovery_uses_durable_submission
+          skeleton/testing/test_engine_execution_coordinator.py::test_coordinator_durable_approval_resumes_effect_once_after_restart
+          skeleton/testing/test_engine_execution_coordinator.py::test_coordinator_rehydrates_execution_admission_after_local_restart
+          skeleton/testing/test_execution_repository.py::test_repository_survives_restart_and_preserves_execution_version
+          skeleton/testing/test_execution_repository.py::test_staged_finalization_survives_restart_and_binds_terminal_lineage
+          skeleton/testing/test_governance_runtime_binding.py::test_server_state_restores_durable_governance_audit_chain
+
+  stage7-browser-contracts:
+    name: Stage 7 browser stream journeys
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+
+      - name: Run reducer and browser-session golden journeys
+        working-directory: frontend
+        run: >-
+          node --test
+          scripts/test-operation-stream-reducer.mjs
+          scripts/test-operation-stream-session.mjs
+
+  stage7-independent:
+    name: Independent Stage 7 golden journey verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install independent verifier dependency
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=7.0.0"
+
+      - name: Run independent verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_stage7_golden_journeys_independent_verifier.py
+
+      - name: Run independent exact-head Stage-7 scan
+        env:
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_stage7_golden_journeys.py
+          --evidence-out .stage7-golden-independent.json
+          --print-evidence
+
+      - name: Assert independent exact-head receipt
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".stage7-golden-independent.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected:
+              raise SystemExit("Stage-7 receipt does not match exact PR head")
+          if (
+              receipt.get("verifier")
+              != "independent-stage7-golden-journeys-v1"
+          ):
+              raise SystemExit("unexpected Stage-7 verifier identity")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("independent Stage-7 verification failed")
+          if len(receipt.get("boundary_digests") or {}) < 6:
+              raise SystemExit("Stage-7 boundary coverage is incomplete")
+          if len(receipt.get("mirror_pairs") or []) < 3:
+              raise SystemExit("Stage-7 mirror coverage is incomplete")
+          if set(receipt.get("dependency_graph") or []) != {
+              "gap-state-authority-convergence",
+              "gap-governance-registry",
+              "gap-cost-admission",
+              "gap-provider-surface-convergence",
+              "gap-conversation-state-authority",
+              "gap-memory-durable-authority",
+              "gap-tool-runtime-convergence",
+              "gap-context-compiler-convergence",
+              "gap-provider-interaction-protocol",
+              "gap-verification-evidence-contract",
+              "gap-cognitive-execution-loop",
+              "gap-engine-application-execution-boundary",
+              "gap-streaming-protocol",
+          }:
+              raise SystemExit("Stage-7 dependency graph receipt is invalid")
+          if not receipt.get("handoff_digest"):
+              raise SystemExit("Stage-7 handoff digest is missing")
+          print(
+              "independent Stage-7 exact-head receipt:",
+              expected,
+              "boundaries=",
+              len(receipt["boundary_digests"]),
+          )
+          PY
+
+
+  stage7-mongo-authority:
+    name: Stage 7 Mongo shared authority fault journey
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      STAGE7_MONGO_URI: "mongodb://localhost:27017/?replicaSet=rs0&retryWrites=false"
+      CODEDOCK_TEST_MONGO_URI: "mongodb://localhost:27017/?replicaSet=rs0"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused Mongo journey dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e ".[dev]"
+
+      - name: Start pinned transaction-capable Mongo replica set
+        run: |
+          docker run -d --name stage7-mongo -p 27017:27017 \
+            mongo:7.0.41@sha256:b096b4cb9269f3ebcf363be63f1c50920f786879d03a1890347a3bf33f1f0df0 \
+            --replSet rs0 --bind_ip_all --setParameter enableTestCommands=1
+          for attempt in $(seq 1 40); do
+            if docker exec stage7-mongo mongosh --quiet \
+              --eval 'db.adminCommand({ping:1}).ok' | grep -q 1; then
+              break
+            fi
+            if [ "$attempt" -eq 40 ]; then
+              docker logs stage7-mongo
+              exit 1
+            fi
+            sleep 1
+          done
+          docker exec stage7-mongo mongosh --quiet --eval \
+            'rs.initiate({_id:"rs0",members:[{_id:0,host:"localhost:27017"}]})'
+          for attempt in $(seq 1 40); do
+            if docker exec stage7-mongo mongosh --quiet \
+              --eval 'db.hello().isWritablePrimary' | grep -q true; then
+              break
+            fi
+            if [ "$attempt" -eq 40 ]; then
+              docker logs stage7-mongo
+              exit 1
+            fi
+            sleep 1
+          done
+
+      - name: Run Mongo transaction preflight unit contracts
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_operation_stream_store_mongo.py
+
+      - name: Run shared-authority transient-failure and cross-worker journeys
+        run: >-
+          python -m pytest -q --noconftest
+          backend/tests/test_operation_stream_mongo_stage7.py
+          backend/tests/test_operation_stream_mongo_integration.py
+
+      - name: Print Mongo logs on failure
+        if: failure()
+        run: docker logs stage7-mongo
