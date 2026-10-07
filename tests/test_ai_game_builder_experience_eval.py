@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from skeleton.ai.game_builder.contracts import EvaluatorProvenance, canonical_digest
 from skeleton.ai.game_builder.experience_eval import (
     EXPERIENCE_METRICS,
     ExperienceDefect,
@@ -10,6 +11,26 @@ from skeleton.ai.game_builder.experience_eval import (
     build_experience_report,
     evaluate_experience_promotion,
 )
+
+
+def _authority(
+    evaluator_id: str,
+    evidence_digest: str,
+    *,
+    method_id: str = "playtest-v1",
+) -> EvaluatorProvenance:
+    return EvaluatorProvenance(
+        evaluator_id=evaluator_id,
+        operation_id=f"operation:{evaluator_id}",
+        execution_id=f"execution:{evaluator_id}",
+        execution_identity_digest=canonical_digest({"execution": evaluator_id}),
+        finalization_intent_digest=canonical_digest({"finalization": evaluator_id}),
+        authority_kind="deterministic_control",
+        authority_identity_digest=canonical_digest({"authority": evaluator_id}),
+        method_id=method_id,
+        source_revision=canonical_digest({"source": evaluator_id})[:40],
+        output_evidence_refs=(evidence_digest,),
+    )
 
 
 def _metrics(*, engagement: float, friction: float, learning: float, value: float) -> dict[str, float]:
@@ -46,6 +67,7 @@ def _observation(
             learning=0.80,
             value=0.72,
         ),
+        evaluator_provenance=_authority(evaluator_id, "e" * 64),
         evidence_digest="e" * 64,
     )
 
@@ -67,6 +89,7 @@ def test_observation_requires_exact_metric_contract_and_parent_traceability() ->
             observed_facts=("fact",),
             interpretations=(),
             metrics={"engagement_proxy": 0.5},
+            evaluator_provenance=_authority("eval-a", "e" * 64),
             evidence_digest="e" * 64,
         )
 
@@ -82,7 +105,86 @@ def test_observation_requires_exact_metric_contract_and_parent_traceability() ->
             observed_facts=("fact",),
             interpretations=(),
             metrics=_metrics(engagement=0.5, friction=0.5, learning=0.5, value=0.5),
+            evaluator_provenance=_authority("eval-a", "e" * 64),
             evidence_digest="e" * 64,
+        )
+
+
+def test_observation_rejects_evidence_or_identity_detached_from_provenance() -> None:
+    with pytest.raises(
+        ExperienceEvaluationError,
+        match="evidence must be referenced",
+    ):
+        ExperienceObservation.create(
+            observation_id="OBS-unbound",
+            artifact_digest="a" * 64,
+            project_revision="rev-1",
+            evaluator_id="eval-a",
+            method_id="playtest-v1",
+            atomic_target_id="beat:1",
+            parent_context=("scene:1",),
+            observed_facts=("fact",),
+            interpretations=(),
+            metrics=_metrics(
+                engagement=0.5,
+                friction=0.5,
+                learning=0.5,
+                value=0.5,
+            ),
+            evaluator_provenance=_authority("eval-a", "x" * 64),
+            evidence_digest="e" * 64,
+        )
+
+    with pytest.raises(
+        ExperienceEvaluationError,
+        match="identity does not match provenance",
+    ):
+        ExperienceObservation.create(
+            observation_id="OBS-wrong-identity",
+            artifact_digest="a" * 64,
+            project_revision="rev-1",
+            evaluator_id="eval-a",
+            method_id="playtest-v1",
+            atomic_target_id="beat:1",
+            parent_context=("scene:1",),
+            observed_facts=("fact",),
+            interpretations=(),
+            metrics=_metrics(
+                engagement=0.5,
+                friction=0.5,
+                learning=0.5,
+                value=0.5,
+            ),
+            evaluator_provenance=_authority("eval-b", "e" * 64),
+            evidence_digest="e" * 64,
+        )
+
+
+def test_critical_defect_resolution_requires_independent_attributed_authority() -> None:
+    evidence = "f" * 64
+    resolution = "r" * 64
+    with pytest.raises(
+        ExperienceEvaluationError,
+        match="requires independent authority",
+    ):
+        ExperienceDefect(
+            defect_id="DEF-critical",
+            artifact_digest="b" * 64,
+            severity=8,
+            summary="Critical progression failure.",
+            evidence_digest=evidence,
+            affected_context=("scene:tutorial",),
+            evaluator_provenance=_authority(
+                "same-reviewer",
+                evidence,
+                method_id="critical-defect-review",
+            ),
+            resolved_by_digest=resolution,
+            resolution_authority=_authority(
+                "same-reviewer",
+                resolution,
+                method_id="defect-resolution",
+            ),
         )
 
 
@@ -109,6 +211,21 @@ def test_report_is_order_stable_and_requires_independent_evaluator_diversity() -
         "player_value_density": 0.75,
     }
     assert first.evaluator_ids == ("eval-a", "eval-b")
+
+    with pytest.raises(ExperienceEvaluationError, match="report digest mismatch"):
+        type(first)(
+            artifact_digest=first.artifact_digest,
+            project_revision=first.project_revision,
+            evaluator_ids=first.evaluator_ids,
+            observation_digests=first.observation_digests,
+            defect_digests=first.defect_digests,
+            aggregate_metrics=tuple(
+                (name, value + 0.01 if name == "engagement_proxy" else value)
+                for name, value in first.aggregate_metrics
+            ),
+            unresolved_critical_defects=first.unresolved_critical_defects,
+            report_digest=first.report_digest,
+        )
 
     with pytest.raises(ExperienceEvaluationError, match="diversity"):
         build_experience_report((left,))
@@ -162,6 +279,21 @@ def test_promotion_requires_pareto_safe_gain() -> None:
     assert decision.regressed_metrics == ()
     assert set(decision.improved_metrics) == set(EXPERIENCE_METRICS)
 
+    with pytest.raises(
+        ExperienceEvaluationError,
+        match="promotion decision digest mismatch",
+    ):
+        type(decision)(
+            baseline_report_digest=decision.baseline_report_digest,
+            candidate_report_digest=decision.candidate_report_digest,
+            eligible=False,
+            pareto_safe=decision.pareto_safe,
+            improved_metrics=decision.improved_metrics,
+            regressed_metrics=decision.regressed_metrics,
+            blockers=decision.blockers,
+            decision_digest=decision.decision_digest,
+        )
+
 
 def test_promotion_blocks_metric_regression_and_unresolved_critical_defect() -> None:
     baseline = build_experience_report(
@@ -201,6 +333,11 @@ def test_promotion_blocks_metric_regression_and_unresolved_critical_defect() -> 
         summary="Critical onboarding trap blocks progress.",
         evidence_digest="f" * 64,
         affected_context=("scene:tutorial", "project:demo"),
+        evaluator_provenance=_authority(
+            "critical-defect-evaluator",
+            "f" * 64,
+            method_id="critical-defect-review",
+        ),
     )
     candidate = build_experience_report(rows, defects=(defect,))
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from .contracts import canonical_digest, canonical_json
+from .contracts import EvaluatorProvenance, canonical_digest, canonical_json
 
 
 class CanonError(RuntimeError):
@@ -37,6 +37,7 @@ class CanonAssertion:
     value: Any
     branch_id: str
     valid_from_tick: int
+    evaluator_provenance: EvaluatorProvenance
     valid_to_tick: int | None = None
     intentional_contradiction: bool = False
     evidence_digests: tuple[str, ...] = ()
@@ -50,14 +51,39 @@ class CanonAssertion:
         if self.valid_to_tick is not None and self.valid_to_tick < self.valid_from_tick:
             raise ValueError("valid_to_tick cannot precede valid_from_tick")
         canonical_json(self.value)
-        if any(len(item) < 16 for item in self.evidence_digests):
+        if not isinstance(self.intentional_contradiction, bool):
+            raise TypeError("intentional_contradiction must be boolean")
+        if not isinstance(self.evaluator_provenance, EvaluatorProvenance):
+            raise TypeError("canon assertion evaluator_provenance must be EvaluatorProvenance")
+        if not self.evidence_digests:
+            raise CanonError("canon assertion requires evidence")
+        if any(not isinstance(item, str) or len(item) < 16 for item in self.evidence_digests):
             raise ValueError("evidence digests must be stable")
         if len(self.evidence_digests) != len(set(self.evidence_digests)):
             raise ValueError("evidence digests must be unique")
+        if set(self.evidence_digests) - set(self.evaluator_provenance.output_evidence_refs):
+            raise CanonError("canon evidence must be referenced by assertion authority")
 
     @property
     def value_digest(self) -> str:
         return canonical_digest(self.value)
+
+    @property
+    def evidence_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "assertion_id": self.assertion_id,
+                "branch_id": self.branch_id,
+                "evaluator_provenance_digest": self.evaluator_provenance.digest,
+                "evidence_digests": list(self.evidence_digests),
+                "intentional_contradiction": self.intentional_contradiction,
+                "predicate": self.predicate,
+                "subject": self.subject,
+                "valid_from_tick": self.valid_from_tick,
+                "valid_to_tick": self.valid_to_tick,
+                "value_digest": self.value_digest,
+            }
+        )
 
     def active_at(self, tick: int) -> bool:
         return self.valid_from_tick <= tick and (
@@ -74,6 +100,8 @@ class CanonAssertion:
             "assertion_id": self.assertion_id,
             "branch_id": self.branch_id,
             "evidence_digests": list(self.evidence_digests),
+            "evidence_binding_digest": self.evidence_binding_digest,
+            "evaluator_provenance_digest": self.evaluator_provenance.digest,
             "intentional_contradiction": self.intentional_contradiction,
             "predicate": self.predicate,
             "subject": self.subject,
@@ -90,16 +118,48 @@ class CharacterKnowledge:
     branch_id: str
     learned_tick: int
     source_id: str
+    authority_provenance: EvaluatorProvenance
+    evidence_digest: str
     certainty: float = 1.0
 
     def __post_init__(self) -> None:
         for label in ("character_id", "assertion_id", "branch_id", "source_id"):
-            if not getattr(self, label).strip():
+            value = getattr(self, label)
+            if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"{label} must be non-empty")
+        if isinstance(self.learned_tick, bool) or not isinstance(self.learned_tick, int):
+            raise TypeError("learned_tick must be an integer")
         if self.learned_tick < 0:
             raise ValueError("learned_tick must be non-negative")
-        if not 0.0 <= self.certainty <= 1.0:
+        if not isinstance(self.authority_provenance, EvaluatorProvenance):
+            raise TypeError("knowledge authority_provenance must be EvaluatorProvenance")
+        if not isinstance(self.evidence_digest, str) or len(self.evidence_digest) < 16:
+            raise ValueError("knowledge evidence_digest must be stable")
+        if self.evidence_digest not in self.authority_provenance.output_evidence_refs:
+            raise CanonError(
+                "character knowledge evidence must be referenced by observation authority"
+            )
+        if isinstance(self.certainty, bool) or not isinstance(self.certainty, (int, float)):
+            raise TypeError("certainty must be numeric")
+        certainty = float(self.certainty)
+        if not 0.0 <= certainty <= 1.0:
             raise ValueError("certainty must be within [0,1]")
+        object.__setattr__(self, "certainty", certainty)
+
+    @property
+    def evidence_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "assertion_id": self.assertion_id,
+                "authority_provenance_digest": self.authority_provenance.digest,
+                "branch_id": self.branch_id,
+                "certainty": self.certainty,
+                "character_id": self.character_id,
+                "evidence_digest": self.evidence_digest,
+                "learned_tick": self.learned_tick,
+                "source_id": self.source_id,
+            }
+        )
 
 
 class CanonLedger:
@@ -278,6 +338,9 @@ class CanonLedger:
                     "character_id": item.character_id,
                     "learned_tick": item.learned_tick,
                     "source_id": item.source_id,
+                    "evidence_digest": item.evidence_digest,
+                    "evidence_binding_digest": item.evidence_binding_digest,
+                    "authority_provenance_digest": item.authority_provenance.digest,
                 }
                 for item in sorted(
                     self._knowledge,

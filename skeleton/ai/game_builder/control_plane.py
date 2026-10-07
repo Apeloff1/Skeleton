@@ -4,7 +4,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Sequence
 
-from .contracts import Candidate, Challenge, GateResult, PromotionReceipt, canonical_digest
+from .contracts import (
+    Candidate,
+    Challenge,
+    EvaluatorProvenance,
+    GateResult,
+    PromotionReceipt,
+    canonical_digest,
+)
 from .dual_rival_forge import DualRivalForge, ForgeStatus
 from .evaluation import EvaluationPanel, PanelDecision
 from .quality_debt import QualityDebtLedger
@@ -31,6 +38,48 @@ class ControlledStatus:
             "quality_debt_score": self.quality_debt_score,
             "resources": self.resources.to_payload(),
         }
+
+
+def _deterministic_evaluator_provenance(
+    *,
+    evaluator_id: str,
+    method_id: str,
+    evidence_refs: tuple[str, ...],
+    input_digest: str,
+) -> EvaluatorProvenance:
+    authority_identity = canonical_digest(
+        {
+            "component": "skeleton.ai.game_builder.control_plane",
+            "method_id": method_id,
+            "schema": "skeleton.ai_game_builder.control_plane.v1",
+        }
+    )
+    execution_identity = canonical_digest(
+        {
+            "authority_identity": authority_identity,
+            "evaluator_id": evaluator_id,
+            "input_digest": input_digest,
+            "method_id": method_id,
+        }
+    )
+    finalization = canonical_digest(
+        {
+            "evidence_refs": list(evidence_refs),
+            "execution_identity": execution_identity,
+        }
+    )
+    return EvaluatorProvenance(
+        evaluator_id=evaluator_id,
+        operation_id=f"control-plane:{method_id}",
+        execution_id=f"deterministic:{execution_identity[:32]}",
+        execution_identity_digest=execution_identity,
+        finalization_intent_digest=finalization,
+        authority_kind="deterministic_control",
+        authority_identity_digest=authority_identity,
+        method_id=method_id,
+        source_revision=authority_identity,
+        output_evidence_refs=evidence_refs,
+    )
 
 
 class ForgeControlPlane:
@@ -98,6 +147,20 @@ class ForgeControlPlane:
                     "panel decision must be absent when no candidate is submitted"
                 )
             evaluator_id = "control-plane-retain"
+            authority_evidence_digest = canonical_digest(
+                {
+                    "champion": self.forge.champion.digest,
+                    "decision": "retain_incumbent",
+                    "round_index": self.forge.round_index,
+                }
+            )
+            evaluator_provenance = _deterministic_evaluator_provenance(
+                evaluator_id=evaluator_id,
+                method_id="retain-without-submission",
+                evidence_refs=(authority_evidence_digest,),
+                input_digest=self.forge.champion.digest,
+            )
+            evaluation_decision_digest = None
         else:
             if panel_decision is None:
                 raise ControlPlaneError(
@@ -113,45 +176,6 @@ class ForgeControlPlane:
                     "panel decision is not the canonical decision from the bound evaluator panel"
                 )
             panel_decision = canonical_panel_decision
-            gates.append(
-                GateResult(
-                    "evaluator_panel",
-                    panel_decision.eligible,
-                    panel_decision.decision_digest,
-                    non_compensable=True,
-                )
-            )
-            debt_payload = self.quality_debt.snapshot()
-            gates.append(
-                GateResult(
-                    "quality_debt",
-                    self.quality_debt.promotion_allowed(),
-                    str(debt_payload["debt_digest"]),
-                    non_compensable=True,
-                )
-            )
-            declared = submitted.quality_map
-            adjudicated = panel_decision.quality_map
-            max_drift = max(
-                abs(declared[axis] - adjudicated[axis])
-                for axis in declared
-            )
-            gates.append(
-                GateResult(
-                    "quality_calibration",
-                    max_drift <= 0.15,
-                    canonical_digest(
-                        {
-                            "candidate": submitted.digest,
-                            "declared": declared,
-                            "adjudicated": adjudicated,
-                            "max_drift": max_drift,
-                            "threshold": 0.15,
-                        }
-                    ),
-                    non_compensable=True,
-                )
-            )
             evaluator_id = (
                 "panel:"
                 + canonical_digest(
@@ -162,16 +186,86 @@ class ForgeControlPlane:
                     }
                 )[:32]
             )
+            evaluator_provenance = _deterministic_evaluator_provenance(
+                evaluator_id=evaluator_id,
+                method_id="panel-aggregation",
+                evidence_refs=(
+                    panel_decision.decision_digest,
+                    panel_decision.evidence_root,
+                ),
+                input_digest=panel_decision.evidence_root,
+            )
+            authority_evidence_digest = panel_decision.decision_digest
+            evaluation_decision_digest = panel_decision.decision_digest
+            gates.append(
+                GateResult(
+                    "evaluator_panel",
+                    panel_decision.eligible,
+                    panel_decision.decision_digest,
+                    evaluator_provenance=evaluator_provenance,
+                    non_compensable=True,
+                )
+            )
+            debt_payload = self.quality_debt.snapshot()
+            debt_digest = str(debt_payload["debt_digest"])
+            debt_provenance = _deterministic_evaluator_provenance(
+                evaluator_id="control-plane:quality-debt",
+                method_id="quality-debt-gate",
+                evidence_refs=(debt_digest,),
+                input_digest=debt_digest,
+            )
+            gates.append(
+                GateResult(
+                    "quality_debt",
+                    self.quality_debt.promotion_allowed(),
+                    debt_digest,
+                    evaluator_provenance=debt_provenance,
+                    non_compensable=True,
+                )
+            )
+            declared = submitted.quality_map
+            adjudicated = panel_decision.quality_map
+            max_drift = max(
+                abs(declared[axis] - adjudicated[axis])
+                for axis in declared
+            )
+            calibration_digest = canonical_digest(
+                {
+                    "candidate": submitted.digest,
+                    "declared": declared,
+                    "adjudicated": adjudicated,
+                    "max_drift": max_drift,
+                    "threshold": 0.15,
+                }
+            )
+            calibration_provenance = _deterministic_evaluator_provenance(
+                evaluator_id="control-plane:quality-calibration",
+                method_id="quality-calibration-gate",
+                evidence_refs=(calibration_digest,),
+                input_digest=submitted.digest,
+            )
+            gates.append(
+                GateResult(
+                    "quality_calibration",
+                    max_drift <= 0.15,
+                    calibration_digest,
+                    evaluator_provenance=calibration_provenance,
+                    non_compensable=True,
+                )
+            )
 
         return self.forge.reconcile(
             submitted=submitted,
             evaluator_id=evaluator_id,
+            evaluator_provenance=evaluator_provenance,
+            authority_evidence_digest=authority_evidence_digest,
             gate_results=tuple(gates),
             evaluated_quality=(
                 panel_decision.quality_map
                 if submitted is not None and panel_decision is not None
                 else None
             ),
+            evaluation_decision_digest=evaluation_decision_digest,
         )
 
     def checkpoint_bundle(self) -> dict[str, object]:

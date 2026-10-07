@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from skeleton.ai.game_builder.contracts import EvaluatorProvenance, canonical_digest
 from skeleton.ai.game_builder.resilience import (
     DissentLedger,
     ImpactGraph,
@@ -14,11 +15,35 @@ from skeleton.ai.game_builder.resilience import (
 )
 
 
+def _authority(
+    evaluator_id: str,
+    *evidence_refs: str,
+) -> EvaluatorProvenance:
+    return EvaluatorProvenance(
+        evaluator_id=evaluator_id,
+        operation_id=f"operation:{evaluator_id}",
+        execution_id=f"execution:{evaluator_id}",
+        execution_identity_digest=canonical_digest({"execution": evaluator_id}),
+        finalization_intent_digest=canonical_digest({"finalization": evaluator_id}),
+        authority_kind="deterministic_control",
+        authority_identity_digest=canonical_digest({"authority": evaluator_id}),
+        method_id="resilience-assurance",
+        source_revision=canonical_digest({"source": evaluator_id})[:40],
+        output_evidence_refs=tuple(evidence_refs),
+    )
+
+
 def _novelty(digest: str, quality: float, x: float, y: float) -> NoveltyRecord:
+    evidence = "novelty-" + digest[:16] + "-evidence"
     return NoveltyRecord.create(
         candidate_digest=digest,
         quality_score=quality,
         features={"x": x, "y": y},
+        evaluator_provenance=_authority(
+            "novelty-" + digest[:8] + "-judge",
+            evidence,
+        ),
+        evidence_digest=evidence,
     )
 
 
@@ -46,6 +71,21 @@ def test_novelty_identity_reuse_with_changed_payload_fails_closed() -> None:
         reservoir.admit(changed)
 
 
+def test_novelty_record_rejects_unattributed_evaluation() -> None:
+    evidence = "novelty-evidence-" + "e" * 24
+    with pytest.raises(ResilienceError, match="referenced by evaluator authority"):
+        NoveltyRecord.create(
+            candidate_digest="n" * 64,
+            quality_score=0.7,
+            features={"x": 0.2},
+            evaluator_provenance=_authority(
+                "wrong-novelty-judge",
+                "other-novelty-" + "x" * 24,
+            ),
+            evidence_digest=evidence,
+        )
+
+
 def test_dissent_ledger_preserves_blocker_until_explicit_resolution() -> None:
     ledger = DissentLedger()
     objection = Objection(
@@ -54,6 +94,7 @@ def test_dissent_ledger_preserves_blocker_until_explicit_resolution() -> None:
         evidence_digest="2" * 64,
         summary="Continuity break survives local improvement.",
         severity=8,
+        authority_provenance=_authority("dissent-authority", "2" * 64),
         dependency_ids=("canon:chapter-2",),
     )
     ledger.add(objection)
@@ -67,9 +108,97 @@ def test_dissent_ledger_preserves_blocker_until_explicit_resolution() -> None:
         )
     ] == ["OBJ-1"]
 
-    ledger.resolve("OBJ-1", resolution_digest="3" * 64)
+    ledger.resolve(
+        "OBJ-1",
+        resolution_digest="3" * 64,
+        resolution_authority=_authority("independent-resolver", "3" * 64),
+    )
     assert ledger.blockers_for(artifact_digest="1" * 64) == ()
     assert ledger.snapshot()["items"][0]["resolved_by_digest"] == "3" * 64
+
+
+def test_dissent_rejects_unattributed_objection_evidence() -> None:
+    with pytest.raises(ResilienceError, match="referenced by dissent authority"):
+        Objection(
+            objection_id="OBJ-UNBOUND",
+            artifact_digest="1" * 64,
+            evidence_digest="2" * 64,
+            summary="Unattributed evidence.",
+            severity=4,
+            authority_provenance=_authority("wrong-dissent-authority", "9" * 64),
+        )
+
+
+def test_critical_dissent_requires_independent_resolution_authority() -> None:
+    ledger = DissentLedger()
+    objection = Objection(
+        objection_id="OBJ-CRITICAL",
+        artifact_digest="1" * 64,
+        evidence_digest="2" * 64,
+        summary="Critical blocker.",
+        severity=8,
+        authority_provenance=_authority("same-authority", "2" * 64),
+    )
+    ledger.add(objection)
+    with pytest.raises(
+        ResilienceError,
+        match="critical objection resolution requires independent authority",
+    ):
+        ledger.resolve(
+            "OBJ-CRITICAL",
+            resolution_digest="3" * 64,
+            resolution_authority=_authority("same-authority", "3" * 64),
+        )
+
+
+def test_impact_calibration_receipt_binds_observed_evidence() -> None:
+    evidence = "impact-evidence-" + "e" * 32
+    authority = _authority("impact-calibrator", evidence)
+    receipt = ImpactGraph.calibration_receipt(
+        ("project", "scene"),
+        ("project", "quest"),
+        evaluator_provenance=authority,
+        evidence_digest=evidence,
+    )
+    assert receipt.precision == 0.5
+    assert receipt.recall == 0.5
+    assert canonical_digest(receipt.payload()) == receipt.receipt_digest
+
+    with pytest.raises(ResilienceError, match="referenced by evaluator authority"):
+        ImpactGraph.calibration_receipt(
+            ("project",),
+            ("project",),
+            evaluator_provenance=_authority("wrong-impact-calibrator", "other-" + "x" * 32),
+            evidence_digest=evidence,
+        )
+
+
+def test_impact_calibration_receipt_rejects_self_consistent_false_scores() -> None:
+    evidence = "impact-evidence-" + "e" * 32
+    authority = _authority("impact-calibrator", evidence)
+    payload = {
+        "evaluator_provenance_digest": authority.digest,
+        "evidence_digest": evidence,
+        "observed_ids": ["project", "quest"],
+        "precision": 1.0,
+        "predicted_ids": ["project", "scene"],
+        "recall": 1.0,
+    }
+    with pytest.raises(
+        ResilienceError,
+        match="precision does not match recorded sets",
+    ):
+        from skeleton.ai.game_builder.resilience import ImpactCalibrationReceipt
+
+        ImpactCalibrationReceipt(
+            predicted_ids=("project", "scene"),
+            observed_ids=("project", "quest"),
+            precision=1.0,
+            recall=1.0,
+            evaluator_provenance=authority,
+            evidence_digest=evidence,
+            receipt_digest=canonical_digest(payload),
+        )
 
 
 def test_impact_graph_computes_transitive_blast_radius_and_rejects_unknown_dependency() -> None:
@@ -90,24 +219,81 @@ def test_impact_graph_computes_transitive_blast_radius_and_rejects_unknown_depen
         graph.add_node("bad", depends_on=("missing",))
 
 
+def test_invariant_revision_requires_attributed_change_authority() -> None:
+    registry = InvariantRegistry()
+    evidence = "invariant-base-" + "a" * 24
+    base = Invariant(
+        invariant_id="INV-REV",
+        scope="combat",
+        expression="health >= 0",
+        source_pillar="mechanics",
+        severity=8,
+        authority_provenance=_authority("invariant-author", evidence),
+        evidence_digest=evidence,
+    )
+    registry.add(base)
+
+    revised_evidence = "invariant-revised-" + "b" * 24
+    revised = Invariant(
+        invariant_id="INV-REV",
+        scope="combat",
+        expression="health >= -1",
+        source_pillar="mechanics",
+        severity=8,
+        authority_provenance=_authority("invariant-revised-author", revised_evidence),
+        evidence_digest=revised_evidence,
+    )
+    with pytest.raises(
+        ResilienceError,
+        match="revision evidence must be referenced",
+    ):
+        registry.revise(
+            revised,
+            authority_provenance=_authority(
+                "wrong-change-authority",
+                "other-change-" + "x" * 24,
+            ),
+            evidence_digest="change-evidence-" + "c" * 24,
+        )
+
+    change_evidence = "change-evidence-" + "c" * 24
+    receipt = registry.revise(
+        revised,
+        authority_provenance=_authority(
+            "invariant-change-authority",
+            change_evidence,
+        ),
+        evidence_digest=change_evidence,
+    )
+    assert receipt.prior_digest == base.digest
+    assert receipt.revised_digest == revised.digest
+    assert canonical_digest(receipt.payload()) == receipt.receipt_digest
+
+
 def test_invariant_registry_rejects_cross_pillar_duplicate_and_is_order_stable() -> None:
     left = InvariantRegistry()
     right = InvariantRegistry()
 
+    a_evidence = "invariant-a-" + "a" * 24
     a = Invariant(
         invariant_id="INV-A",
         scope="combat",
         expression="health >= 0",
         source_pillar="mechanics",
         severity=8,
+        authority_provenance=_authority("invariant-a-author", a_evidence),
+        evidence_digest=a_evidence,
         inherited_by=("boss",),
     )
+    b_evidence = "invariant-b-" + "b" * 24
     b = Invariant(
         invariant_id="INV-B",
         scope="narrative",
         expression="knowledge <= observed_events",
         source_pillar="canon",
         severity=8,
+        authority_provenance=_authority("invariant-b-author", b_evidence),
+        evidence_digest=b_evidence,
     )
 
     left.add(a)
@@ -127,5 +313,10 @@ def test_invariant_registry_rejects_cross_pillar_duplicate_and_is_order_stable()
                 expression="health >= 0",
                 source_pillar="narrative",
                 severity=8,
+                authority_provenance=_authority(
+                    "invariant-c-author",
+                    "invariant-c-" + "c" * 24,
+                ),
+                evidence_digest="invariant-c-" + "c" * 24,
             )
         )

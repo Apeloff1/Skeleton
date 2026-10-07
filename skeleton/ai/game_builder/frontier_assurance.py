@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import Iterable, Mapping, Sequence
 
-from .contracts import EffortMode, canonical_digest
+from .contracts import EvaluatorProvenance, EffortMode, canonical_digest
 
 
 class FrontierAssuranceError(ValueError):
@@ -45,13 +45,23 @@ class CausalObligation:
     premise_ids: tuple[str, ...]
     consequence_ids: tuple[str, ...]
     evidence_digest: str
+    authority_provenance: EvaluatorProvenance
     severity: ObligationSeverity = ObligationSeverity.MATERIAL
     resolved: bool = False
     resolution_digest: str | None = None
+    resolution_authority: EvaluatorProvenance | None = None
 
     def __post_init__(self) -> None:
         _stable(self.obligation_id, "obligation_id")
         _stable(self.evidence_digest, "evidence_digest")
+        if not isinstance(self.authority_provenance, EvaluatorProvenance):
+            raise TypeError("causal obligation authority_provenance must be EvaluatorProvenance")
+        if self.evidence_digest not in self.authority_provenance.output_evidence_refs:
+            raise FrontierAssuranceError(
+                "causal evidence must be referenced by obligation authority"
+            )
+        if not isinstance(self.severity, ObligationSeverity):
+            raise TypeError("causal obligation severity must be ObligationSeverity")
         if not self.premise_ids or not self.consequence_ids:
             raise FrontierAssuranceError("causal obligation requires premises and consequences")
         if len(set(self.premise_ids)) != len(self.premise_ids):
@@ -60,16 +70,41 @@ class CausalObligation:
             raise FrontierAssuranceError("causal consequence ids must be unique")
         if self.resolved != (self.resolution_digest is not None):
             raise FrontierAssuranceError("resolved state and resolution digest must agree")
+        if self.resolved:
+            if not isinstance(self.resolution_authority, EvaluatorProvenance):
+                raise TypeError("resolved causal obligation requires resolution authority")
+            if self.resolution_digest not in self.resolution_authority.output_evidence_refs:
+                raise FrontierAssuranceError(
+                    "causal resolution evidence must be referenced by resolution authority"
+                )
+            if (
+                self.severity is ObligationSeverity.CRITICAL
+                and self.resolution_authority.evaluator_id
+                == self.authority_provenance.evaluator_id
+            ):
+                raise FrontierAssuranceError(
+                    "critical causal resolution requires independent authority"
+                )
+        elif self.resolution_authority is not None:
+            raise FrontierAssuranceError(
+                "unresolved causal obligation cannot carry resolution authority"
+            )
 
     @property
     def digest(self) -> str:
         return canonical_digest(
             {
                 "consequence_ids": self.consequence_ids,
+                "authority_provenance_digest": self.authority_provenance.digest,
                 "evidence_digest": self.evidence_digest,
                 "obligation_id": self.obligation_id,
                 "premise_ids": self.premise_ids,
                 "resolution_digest": self.resolution_digest,
+                "resolution_authority_digest": (
+                    self.resolution_authority.digest
+                    if self.resolution_authority is not None
+                    else None
+                ),
                 "resolved": self.resolved,
                 "severity": int(self.severity),
             }
@@ -87,7 +122,13 @@ class CausalProofLedger:
             raise FrontierAssuranceError("duplicate causal obligation")
         self._items[item.obligation_id] = item
 
-    def resolve(self, obligation_id: str, resolution_digest: str) -> None:
+    def resolve(
+        self,
+        obligation_id: str,
+        resolution_digest: str,
+        *,
+        resolution_authority: EvaluatorProvenance,
+    ) -> None:
         item = self._items.get(obligation_id)
         if item is None:
             raise FrontierAssuranceError("unknown causal obligation")
@@ -97,9 +138,11 @@ class CausalProofLedger:
             premise_ids=item.premise_ids,
             consequence_ids=item.consequence_ids,
             evidence_digest=item.evidence_digest,
+            authority_provenance=item.authority_provenance,
             severity=item.severity,
             resolved=True,
             resolution_digest=digest,
+            resolution_authority=resolution_authority,
         )
 
     def blockers_for(self, changed_ids: Iterable[str]) -> tuple[CausalObligation, ...]:
@@ -129,12 +172,19 @@ class HorizonProbe:
     distant_ids: tuple[str, ...]
     minimum_distance: int
     evidence_digest: str
+    evaluator_provenance: EvaluatorProvenance
     passed: bool
 
     def __post_init__(self) -> None:
         _stable(self.probe_id, "probe_id")
         _stable(self.anchor_id, "anchor_id")
         _stable(self.evidence_digest, "evidence_digest")
+        if not isinstance(self.evaluator_provenance, EvaluatorProvenance):
+            raise TypeError("horizon probe evaluator_provenance must be EvaluatorProvenance")
+        if self.evidence_digest not in self.evaluator_provenance.output_evidence_refs:
+            raise FrontierAssuranceError(
+                "horizon evidence must be referenced by evaluator authority"
+            )
         if not isinstance(self.passed, bool):
             raise TypeError("horizon probe passed state must be boolean")
         if self.minimum_distance < 1:
@@ -181,17 +231,57 @@ class EffortSignal:
     blast_radius: float
     novelty: float
     marginal_gain: float
+    evaluator_provenance: EvaluatorProvenance
+    evidence_digest: str
 
     def __post_init__(self) -> None:
         for label in ("risk", "uncertainty", "blast_radius", "novelty", "marginal_gain"):
             object.__setattr__(self, label, _unit(getattr(self, label), label))
+        if not isinstance(self.evaluator_provenance, EvaluatorProvenance):
+            raise TypeError("effort evaluator_provenance must be EvaluatorProvenance")
+        _stable(self.evidence_digest, "evidence_digest")
+        if self.evidence_digest not in self.evaluator_provenance.output_evidence_refs:
+            raise FrontierAssuranceError(
+                "effort evidence must be referenced by evaluator authority"
+            )
+
+    @property
+    def binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "blast_radius": self.blast_radius,
+                "evaluator_provenance_digest": self.evaluator_provenance.digest,
+                "evidence_digest": self.evidence_digest,
+                "marginal_gain": self.marginal_gain,
+                "novelty": self.novelty,
+                "risk": self.risk,
+                "uncertainty": self.uncertainty,
+            }
+        )
 
 
 @dataclass(frozen=True, slots=True)
 class EffortDecision:
     mode: EffortMode
     score: float
+    signal_binding_digest: str
     reason_digest: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.mode, EffortMode):
+            raise TypeError("effort decision mode must be EffortMode")
+        object.__setattr__(self, "score", _unit(self.score, "score"))
+        _stable(self.signal_binding_digest, "signal_binding_digest")
+        _stable(self.reason_digest, "reason_digest")
+        expected = canonical_digest(
+            {
+                "mode": int(self.mode),
+                "score": self.score,
+                "signal_binding_digest": self.signal_binding_digest,
+            }
+        )
+        if self.reason_digest != expected:
+            raise FrontierAssuranceError("effort decision reason digest mismatch")
 
 
 class EffortPortfolioScheduler:
@@ -219,20 +309,16 @@ class EffortPortfolioScheduler:
             mode = EffortMode.FORGE_1000
         else:
             mode = EffortMode.FORGE_100
+        signal_binding_digest = signal.binding_digest
         return EffortDecision(
             mode=mode,
             score=score,
+            signal_binding_digest=signal_binding_digest,
             reason_digest=canonical_digest(
                 {
                     "mode": int(mode),
                     "score": score,
-                    "signal": {
-                        "blast_radius": signal.blast_radius,
-                        "marginal_gain": signal.marginal_gain,
-                        "novelty": signal.novelty,
-                        "risk": signal.risk,
-                        "uncertainty": signal.uncertainty,
-                    },
+                    "signal_binding_digest": signal_binding_digest,
                 }
             ),
         )
@@ -244,14 +330,42 @@ class GenealogyNode:
     parent_digests: tuple[str, ...]
     mutation_digest: str
     round_index: int
+    mutation_authority: EvaluatorProvenance
+    mutation_evidence_digest: str
 
     def __post_init__(self) -> None:
         _stable(self.candidate_digest, "candidate_digest")
         _stable(self.mutation_digest, "mutation_digest")
+        _stable(self.mutation_evidence_digest, "mutation_evidence_digest")
+        if isinstance(self.round_index, bool) or not isinstance(self.round_index, int):
+            raise TypeError("round_index must be an integer")
         if self.round_index < 0:
             raise FrontierAssuranceError("round_index must be non-negative")
+        if not isinstance(self.mutation_authority, EvaluatorProvenance):
+            raise TypeError("genealogy mutation_authority must be EvaluatorProvenance")
+        if self.mutation_evidence_digest not in self.mutation_authority.output_evidence_refs:
+            raise FrontierAssuranceError(
+                "genealogy mutation evidence must be referenced by mutation authority"
+            )
+        if len(self.parent_digests) != len(set(self.parent_digests)):
+            raise FrontierAssuranceError("genealogy parent digests must be unique")
+        for parent in self.parent_digests:
+            _stable(parent, "parent_digest")
         if self.candidate_digest in self.parent_digests:
             raise FrontierAssuranceError("candidate cannot parent itself")
+
+    @property
+    def mutation_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "candidate_digest": self.candidate_digest,
+                "mutation_authority_digest": self.mutation_authority.digest,
+                "mutation_digest": self.mutation_digest,
+                "mutation_evidence_digest": self.mutation_evidence_digest,
+                "parent_digests": list(self.parent_digests),
+                "round_index": self.round_index,
+            }
+        )
 
 
 class ArtifactGenealogy:
@@ -282,6 +396,21 @@ class ArtifactGenealogy:
             seen.add(current)
             stack.extend(self._nodes[current].parent_digests)
         return tuple(sorted(seen))
+
+    @property
+    def digest(self) -> str:
+        return canonical_digest(
+            [
+                {
+                    "candidate_digest": row.candidate_digest,
+                    "mutation_binding_digest": row.mutation_binding_digest,
+                }
+                for row in sorted(
+                    self._nodes.values(),
+                    key=lambda item: item.candidate_digest,
+                )
+            ]
+        )
 
 
 class EvaluatorIndependenceGraph:
@@ -329,14 +458,37 @@ class RegretObservation:
     policy_id: str
     champion_score: float
     alternative_score: float
+    evaluator_provenance: EvaluatorProvenance
+    evidence_digest: str
     weight: float = 1.0
 
     def __post_init__(self) -> None:
         _stable(self.policy_id, "policy_id")
         object.__setattr__(self, "champion_score", _unit(self.champion_score, "champion_score"))
         object.__setattr__(self, "alternative_score", _unit(self.alternative_score, "alternative_score"))
+        if not isinstance(self.evaluator_provenance, EvaluatorProvenance):
+            raise TypeError("regret evaluator_provenance must be EvaluatorProvenance")
+        _stable(self.evidence_digest, "evidence_digest")
+        if self.evidence_digest not in self.evaluator_provenance.output_evidence_refs:
+            raise FrontierAssuranceError(
+                "regret evidence must be referenced by evaluator authority"
+            )
         if isinstance(self.weight, bool) or not isinstance(self.weight, (int, float)) or self.weight <= 0:
             raise FrontierAssuranceError("weight must be positive")
+        object.__setattr__(self, "weight", float(self.weight))
+
+    @property
+    def binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "alternative_score": self.alternative_score,
+                "champion_score": self.champion_score,
+                "evaluator_provenance_digest": self.evaluator_provenance.digest,
+                "evidence_digest": self.evidence_digest,
+                "policy_id": self.policy_id,
+                "weight": self.weight,
+            }
+        )
 
 
 class RegretLedger:
@@ -361,17 +513,126 @@ class RegretLedger:
             for row in self._rows.values()
         ) / total_weight
 
+    @property
+    def digest(self) -> str:
+        return canonical_digest(
+            {
+                "maximum_weighted_regret": self.maximum_weighted_regret,
+                "observations": [
+                    self._rows[key].binding_digest
+                    for key in sorted(self._rows)
+                ],
+                "weighted_regret": self.weighted_regret,
+            }
+        )
+
     def promotion_allowed(self) -> bool:
         return bool(self._rows) and self.weighted_regret <= self.maximum_weighted_regret
 
 
+@dataclass(frozen=True, slots=True)
+class EvidenceInvalidationReceipt:
+    node_id: str
+    affected_ids: tuple[str, ...]
+    graph_edges: tuple[tuple[str, tuple[str, ...]], ...]
+    authority_provenance: EvaluatorProvenance
+    evidence_digest: str
+    receipt_digest: str
+
+    def __post_init__(self) -> None:
+        _stable(self.node_id, "node_id")
+        _stable(self.evidence_digest, "evidence_digest")
+        if not isinstance(self.authority_provenance, EvaluatorProvenance):
+            raise TypeError("invalidation authority_provenance must be EvaluatorProvenance")
+        if self.evidence_digest not in self.authority_provenance.output_evidence_refs:
+            raise FrontierAssuranceError(
+                "invalidation evidence must be referenced by invalidation authority"
+            )
+        if not self.graph_edges:
+            raise FrontierAssuranceError("invalidation receipt requires graph snapshot")
+        nodes = tuple(node for node, _ in self.graph_edges)
+        if nodes != tuple(sorted(set(nodes))):
+            raise FrontierAssuranceError(
+                "invalidation graph nodes must be unique canonical order"
+            )
+        graph = {node: tuple(parents) for node, parents in self.graph_edges}
+        for node, parents in self.graph_edges:
+            _stable(node, "graph node")
+            if parents != tuple(sorted(set(parents))):
+                raise FrontierAssuranceError(
+                    "invalidation graph dependencies must be unique canonical order"
+                )
+            unknown = set(parents) - set(graph)
+            if unknown:
+                raise FrontierAssuranceError(
+                    f"invalidation graph has unknown dependencies: {sorted(unknown)}"
+                )
+        if self.node_id not in graph:
+            raise FrontierAssuranceError(
+                "invalidation source node is absent from graph snapshot"
+            )
+        reverse: dict[str, set[str]] = {node: set() for node in graph}
+        for child, parents in graph.items():
+            for parent in parents:
+                reverse[parent].add(child)
+        expected: set[str] = set()
+        stack = [self.node_id]
+        while stack:
+            current = stack.pop()
+            if current in expected:
+                continue
+            expected.add(current)
+            stack.extend(reverse[current])
+        expected_ids = tuple(sorted(expected))
+        if self.affected_ids != expected_ids:
+            raise FrontierAssuranceError(
+                "invalidation affected ids do not match graph dependency closure"
+            )
+        if self.receipt_digest != canonical_digest(self.payload()):
+            raise FrontierAssuranceError("invalidation receipt digest mismatch")
+
+    @property
+    def graph_digest(self) -> str:
+        return canonical_digest(
+            [
+                {"node_id": node, "depends_on": list(parents)}
+                for node, parents in self.graph_edges
+            ]
+        )
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "affected_ids": list(self.affected_ids),
+            "authority_provenance_digest": self.authority_provenance.digest,
+            "evidence_digest": self.evidence_digest,
+            "graph_digest": self.graph_digest,
+            "node_id": self.node_id,
+        }
+
+
 class EvidenceInvalidationGraph:
-    """Propagates material source/evidence drift into dependent qualifications."""
+    """Propagates attributed source/evidence drift into dependent qualifications."""
 
     def __init__(self) -> None:
         self._deps: dict[str, set[str]] = {}
         self._reverse: dict[str, set[str]] = {}
         self._invalid: set[str] = set()
+
+    @property
+    def graph_edges(self) -> tuple[tuple[str, tuple[str, ...]], ...]:
+        return tuple(
+            (node, tuple(sorted(self._deps[node])))
+            for node in sorted(self._deps)
+        )
+
+    @property
+    def graph_digest(self) -> str:
+        return canonical_digest(
+            [
+                {"node_id": node, "depends_on": list(parents)}
+                for node, parents in self.graph_edges
+            ]
+        )
 
     def add(self, node_id: str, *, depends_on: Iterable[str] = ()) -> None:
         node = _stable(node_id, "node_id")
@@ -386,10 +647,23 @@ class EvidenceInvalidationGraph:
         for parent in parents:
             self._reverse.setdefault(parent, set()).add(node)
 
-    def invalidate(self, node_id: str) -> tuple[str, ...]:
+    def invalidate(
+        self,
+        node_id: str,
+        *,
+        authority_provenance: EvaluatorProvenance,
+        evidence_digest: str,
+    ) -> EvidenceInvalidationReceipt:
         node = _stable(node_id, "node_id")
         if node not in self._deps:
             raise FrontierAssuranceError("unknown evidence node")
+        if not isinstance(authority_provenance, EvaluatorProvenance):
+            raise TypeError("invalidation authority_provenance must be EvaluatorProvenance")
+        _stable(evidence_digest, "evidence_digest")
+        if evidence_digest not in authority_provenance.output_evidence_refs:
+            raise FrontierAssuranceError(
+                "invalidation evidence must be referenced by invalidation authority"
+            )
         affected: set[str] = set()
         stack = [node]
         while stack:
@@ -398,8 +672,25 @@ class EvidenceInvalidationGraph:
                 continue
             affected.add(current)
             stack.extend(self._reverse.get(current, ()))
+        affected_ids = tuple(sorted(affected))
         self._invalid.update(affected)
-        return tuple(sorted(affected))
+        graph_edges = self.graph_edges
+        graph_digest = self.graph_digest
+        payload = {
+            "affected_ids": list(affected_ids),
+            "authority_provenance_digest": authority_provenance.digest,
+            "evidence_digest": evidence_digest,
+            "graph_digest": graph_digest,
+            "node_id": node,
+        }
+        return EvidenceInvalidationReceipt(
+            node_id=node,
+            affected_ids=affected_ids,
+            graph_edges=graph_edges,
+            authority_provenance=authority_provenance,
+            evidence_digest=evidence_digest,
+            receipt_digest=canonical_digest(payload),
+        )
 
     def is_valid(self, node_id: str) -> bool:
         if node_id not in self._deps:
@@ -449,15 +740,64 @@ class WisdomRecord:
     scope_ids: tuple[str, ...]
     evidence_digests: tuple[str, ...]
     statement_digest: str
+    evidence_authority: EvaluatorProvenance
     independently_verified: bool
+    verification_evidence_digest: str | None = None
+    verifier_provenance: EvaluatorProvenance | None = None
 
     def __post_init__(self) -> None:
         _stable(self.lesson_id, "lesson_id")
         _stable(self.statement_digest, "statement_digest")
+        if not isinstance(self.evidence_authority, EvaluatorProvenance):
+            raise TypeError("wisdom evidence_authority must be EvaluatorProvenance")
         if not isinstance(self.independently_verified, bool):
             raise TypeError("wisdom independent verification state must be boolean")
         if not self.scope_ids or not self.evidence_digests:
             raise FrontierAssuranceError("wisdom record requires scope and evidence")
+        if set(self.evidence_digests) - set(self.evidence_authority.output_evidence_refs):
+            raise FrontierAssuranceError(
+                "wisdom evidence must be referenced by evidence authority"
+            )
+        if self.independently_verified:
+            if not isinstance(self.verifier_provenance, EvaluatorProvenance):
+                raise TypeError("verified wisdom requires verifier provenance")
+            if (
+                not isinstance(self.verification_evidence_digest, str)
+                or len(self.verification_evidence_digest.strip()) < 8
+            ):
+                raise FrontierAssuranceError(
+                    "verified wisdom requires stable verification evidence"
+                )
+            if self.verification_evidence_digest not in self.verifier_provenance.output_evidence_refs:
+                raise FrontierAssuranceError(
+                    "wisdom verification evidence must be referenced by verifier authority"
+                )
+            if self.verifier_provenance.evaluator_id == self.evidence_authority.evaluator_id:
+                raise FrontierAssuranceError(
+                    "wisdom verification requires independent authority"
+                )
+        elif self.verification_evidence_digest is not None or self.verifier_provenance is not None:
+            raise FrontierAssuranceError(
+                "unverified wisdom cannot carry verifier authority state"
+            )
+
+    @property
+    def evidence_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "evidence_authority_digest": self.evidence_authority.digest,
+                "evidence_digests": list(self.evidence_digests),
+                "lesson_id": self.lesson_id,
+                "scope_ids": list(self.scope_ids),
+                "statement_digest": self.statement_digest,
+                "verification_evidence_digest": self.verification_evidence_digest,
+                "verifier_provenance_digest": (
+                    self.verifier_provenance.digest
+                    if self.verifier_provenance is not None
+                    else None
+                ),
+            }
+        )
 
 
 class ProjectWisdomLedger:
@@ -487,9 +827,17 @@ class ProjectWisdomLedger:
             [
                 {
                     "evidence_digests": row.evidence_digests,
+                    "evidence_binding_digest": row.evidence_binding_digest,
+                    "evidence_authority_digest": row.evidence_authority.digest,
                     "lesson_id": row.lesson_id,
                     "scope_ids": row.scope_ids,
                     "statement_digest": row.statement_digest,
+                    "verification_evidence_digest": row.verification_evidence_digest,
+                    "verifier_provenance_digest": (
+                        row.verifier_provenance.digest
+                        if row.verifier_provenance is not None
+                        else None
+                    ),
                 }
                 for row in sorted(self._records.values(), key=lambda value: value.lesson_id)
             ]

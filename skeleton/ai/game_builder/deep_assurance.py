@@ -16,6 +16,8 @@ import json
 import math
 from typing import Iterable, Mapping, Sequence
 
+from .contracts import EvaluatorProvenance, canonical_digest
+
 
 class DeepAssuranceError(RuntimeError):
     """Fail-closed error raised by fourth-generation assurance controls."""
@@ -113,22 +115,41 @@ class RequirementProof:
     requirement_id: str
     artifact_digest: str
     evidence_digests: tuple[str, ...]
+    evaluator_provenance: EvaluatorProvenance
     critical: bool = False
     passed: bool = True
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "requirement_id", _text(self.requirement_id, "requirement_id"))
         object.__setattr__(self, "artifact_digest", _digest(self.artifact_digest, "artifact_digest"))
+        if not isinstance(self.evaluator_provenance, EvaluatorProvenance):
+            raise TypeError("requirement proof evaluator_provenance must be EvaluatorProvenance")
         if not isinstance(self.critical, bool):
             raise TypeError("requirement proof critical state must be boolean")
         if not isinstance(self.passed, bool):
             raise TypeError("requirement proof passed state must be boolean")
         if not self.evidence_digests:
             raise DeepAssuranceError("requirement proof needs evidence")
-        object.__setattr__(
-            self,
-            "evidence_digests",
-            tuple(_digest(x, "evidence_digest") for x in self.evidence_digests),
+        evidence = tuple(_digest(x, "evidence_digest") for x in self.evidence_digests)
+        if len(evidence) != len(set(evidence)):
+            raise DeepAssuranceError("requirement proof evidence digests must be unique")
+        if set(evidence) - set(self.evaluator_provenance.output_evidence_refs):
+            raise DeepAssuranceError(
+                "requirement proof evidence must be referenced by evaluator authority"
+            )
+        object.__setattr__(self, "evidence_digests", evidence)
+
+    @property
+    def evidence_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "artifact_digest": self.artifact_digest,
+                "critical": self.critical,
+                "evaluator_provenance_digest": self.evaluator_provenance.digest,
+                "evidence_digests": list(self.evidence_digests),
+                "passed": self.passed,
+                "requirement_id": self.requirement_id,
+            }
         )
 
 
@@ -169,6 +190,8 @@ class RequirementClosureLedger:
                     "evidence": proof.evidence_digests,
                     "critical": proof.critical,
                     "passed": proof.passed,
+                    "evidence_binding_digest": proof.evidence_binding_digest,
+                    "evaluator_provenance_digest": proof.evaluator_provenance.digest,
                 }
                 for key, proof in sorted(self._proofs.items())
             },
@@ -180,17 +203,37 @@ class ConstraintResult:
     constraint_id: str
     passed: bool
     evidence_digest: str
+    evaluator_provenance: EvaluatorProvenance
     critical: bool = True
     conflict_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "constraint_id", _text(self.constraint_id, "constraint_id"))
         object.__setattr__(self, "evidence_digest", _digest(self.evidence_digest, "evidence_digest"))
+        if not isinstance(self.evaluator_provenance, EvaluatorProvenance):
+            raise TypeError("constraint evaluator_provenance must be EvaluatorProvenance")
+        if self.evidence_digest not in self.evaluator_provenance.output_evidence_refs:
+            raise DeepAssuranceError(
+                "constraint evidence must be referenced by evaluator authority"
+            )
         if not isinstance(self.passed, bool):
             raise TypeError("constraint passed state must be boolean")
         if not isinstance(self.critical, bool):
             raise TypeError("constraint critical state must be boolean")
         object.__setattr__(self, "conflict_ids", tuple(_text(x, "conflict_id") for x in self.conflict_ids))
+
+    @property
+    def evidence_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "conflict_ids": list(self.conflict_ids),
+                "constraint_id": self.constraint_id,
+                "critical": self.critical,
+                "evaluator_provenance_digest": self.evaluator_provenance.digest,
+                "evidence_digest": self.evidence_digest,
+                "passed": self.passed,
+            }
+        )
 
 
 class ConstraintProofSet:
@@ -220,16 +263,56 @@ class ConstraintProofSet:
     def promotable(self) -> bool:
         return bool(self._rows) and not self.blocking
 
+    @property
+    def evidence_root(self) -> str:
+        if not self._rows:
+            return canonical_digest({"constraints": []})
+        return canonical_digest(
+            {
+                "constraints": [
+                    self._rows[key].evidence_binding_digest
+                    for key in sorted(self._rows)
+                ]
+            }
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class IntentInvariant:
     invariant_id: str
     semantic_digest: str
+    authority_provenance: EvaluatorProvenance
+    evidence_digest: str
     protected: bool = True
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "invariant_id", _text(self.invariant_id, "invariant_id"))
         object.__setattr__(self, "semantic_digest", _digest(self.semantic_digest, "semantic_digest"))
+        if not isinstance(self.authority_provenance, EvaluatorProvenance):
+            raise TypeError("intent invariant authority_provenance must be EvaluatorProvenance")
+        object.__setattr__(
+            self,
+            "evidence_digest",
+            _digest(self.evidence_digest, "evidence_digest"),
+        )
+        if self.evidence_digest not in self.authority_provenance.output_evidence_refs:
+            raise DeepAssuranceError(
+                "intent invariant evidence must be referenced by authoring authority"
+            )
+        if not isinstance(self.protected, bool):
+            raise TypeError("intent invariant protected state must be boolean")
+
+    @property
+    def authority_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "authority_provenance_digest": self.authority_provenance.digest,
+                "evidence_digest": self.evidence_digest,
+                "invariant_id": self.invariant_id,
+                "protected": self.protected,
+                "semantic_digest": self.semantic_digest,
+            }
+        )
 
 
 class IntentPreservationGate:
@@ -259,10 +342,37 @@ class TransformReceipt:
     config_digest: str
     output_digest: str
     environment_digest: str
+    executor_provenance: EvaluatorProvenance
+    execution_evidence_digest: str
 
     def __post_init__(self) -> None:
         for name in ("tool_digest", "input_digest", "config_digest", "output_digest", "environment_digest"):
             object.__setattr__(self, name, _digest(getattr(self, name), name))
+        if not isinstance(self.executor_provenance, EvaluatorProvenance):
+            raise TypeError("transform executor_provenance must be EvaluatorProvenance")
+        object.__setattr__(
+            self,
+            "execution_evidence_digest",
+            _digest(self.execution_evidence_digest, "execution_evidence_digest"),
+        )
+        if self.execution_evidence_digest not in self.executor_provenance.output_evidence_refs:
+            raise DeepAssuranceError(
+                "transform execution evidence must be referenced by executor authority"
+            )
+
+    @property
+    def authority_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "config_digest": self.config_digest,
+                "environment_digest": self.environment_digest,
+                "execution_evidence_digest": self.execution_evidence_digest,
+                "executor_provenance_digest": self.executor_provenance.digest,
+                "input_digest": self.input_digest,
+                "output_digest": self.output_digest,
+                "tool_digest": self.tool_digest,
+            }
+        )
 
     @property
     def digest(self) -> str:
@@ -272,6 +382,7 @@ class TransformReceipt:
             "config": self.config_digest,
             "output": self.output_digest,
             "environment": self.environment_digest,
+            "authority_binding_digest": self.authority_binding_digest,
         })
 
 
@@ -323,6 +434,8 @@ class KnowledgeSource:
     rights_state: str
     source_class: str
     snapshot_digest: str
+    source_authority: EvaluatorProvenance
+    source_evidence_digest: str
     factual_only: bool = False
 
     def __post_init__(self) -> None:
@@ -331,6 +444,34 @@ class KnowledgeSource:
         object.__setattr__(self, "snapshot_digest", _digest(self.snapshot_digest, "snapshot_digest"))
         object.__setattr__(self, "source_class", _text(self.source_class, "source_class"))
         object.__setattr__(self, "rights_state", _text(self.rights_state, "rights_state"))
+        if not isinstance(self.source_authority, EvaluatorProvenance):
+            raise TypeError("knowledge source_authority must be EvaluatorProvenance")
+        object.__setattr__(
+            self,
+            "source_evidence_digest",
+            _digest(self.source_evidence_digest, "source_evidence_digest"),
+        )
+        if self.source_evidence_digest not in self.source_authority.output_evidence_refs:
+            raise DeepAssuranceError(
+                "knowledge source evidence must be referenced by source authority"
+            )
+        if not isinstance(self.factual_only, bool):
+            raise TypeError("knowledge factual_only state must be boolean")
+
+    @property
+    def authority_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "content_digest": self.content_digest,
+                "factual_only": self.factual_only,
+                "rights_state": self.rights_state,
+                "snapshot_digest": self.snapshot_digest,
+                "source_authority_digest": self.source_authority.digest,
+                "source_class": self.source_class,
+                "source_evidence_digest": self.source_evidence_digest,
+                "source_id": self.source_id,
+            }
+        )
 
 
 class KnowledgeIngestionFirewall:
@@ -362,6 +503,7 @@ class KnowledgeIngestionFirewall:
     def snapshot_digest(self) -> str:
         return _stable({
             key: {
+                "authority_binding_digest": row.authority_binding_digest,
                 "content": row.content_digest,
                 "rights": row.rights_state,
                 "class": row.source_class,
@@ -461,13 +603,51 @@ class RareEventObservation:
     samples: int
     critical_failures: int
     threshold: float
+    evaluator_provenance: EvaluatorProvenance
+    evidence_digest: str
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "scenario_id", _text(self.scenario_id, "scenario_id"))
-        if self.samples <= 0 or self.critical_failures < 0 or self.critical_failures > self.samples:
+        if (
+            isinstance(self.samples, bool)
+            or not isinstance(self.samples, int)
+            or isinstance(self.critical_failures, bool)
+            or not isinstance(self.critical_failures, int)
+            or self.samples <= 0
+            or self.critical_failures < 0
+            or self.critical_failures > self.samples
+        ):
             raise DeepAssuranceError("invalid rare-event sample counts")
-        if not 0.0 <= self.threshold <= 1.0:
+        if isinstance(self.threshold, bool) or not isinstance(self.threshold, (int, float)):
+            raise TypeError("rare-event threshold must be numeric")
+        threshold = float(self.threshold)
+        if not 0.0 <= threshold <= 1.0:
             raise DeepAssuranceError("threshold must be in [0,1]")
+        object.__setattr__(self, "threshold", threshold)
+        if not isinstance(self.evaluator_provenance, EvaluatorProvenance):
+            raise TypeError("rare-event evaluator_provenance must be EvaluatorProvenance")
+        object.__setattr__(
+            self,
+            "evidence_digest",
+            _digest(self.evidence_digest, "evidence_digest"),
+        )
+        if self.evidence_digest not in self.evaluator_provenance.output_evidence_refs:
+            raise DeepAssuranceError(
+                "rare-event evidence must be referenced by evaluator authority"
+            )
+
+    @property
+    def authority_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "critical_failures": self.critical_failures,
+                "evaluator_provenance_digest": self.evaluator_provenance.digest,
+                "evidence_digest": self.evidence_digest,
+                "samples": self.samples,
+                "scenario_id": self.scenario_id,
+                "threshold": self.threshold,
+            }
+        )
 
     @property
     def observed_rate(self) -> float:
@@ -499,13 +679,48 @@ class TelemetryAggregate:
     cohort_digest: str
     sample_count: int
     value: float
+    collector_provenance: EvaluatorProvenance
+    evidence_digest: str
     contains_raw_identifier: bool = False
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "metric_id", _text(self.metric_id, "metric_id"))
         object.__setattr__(self, "cohort_digest", _digest(self.cohort_digest, "cohort_digest"))
-        if self.sample_count <= 0 or not math.isfinite(self.value):
+        if isinstance(self.sample_count, bool) or not isinstance(self.sample_count, int):
+            raise TypeError("telemetry sample_count must be an integer")
+        if isinstance(self.value, bool) or not isinstance(self.value, (int, float)):
+            raise TypeError("telemetry value must be numeric")
+        value = float(self.value)
+        if self.sample_count <= 0 or not math.isfinite(value):
             raise DeepAssuranceError("invalid telemetry aggregate")
+        if not isinstance(self.collector_provenance, EvaluatorProvenance):
+            raise TypeError("telemetry collector_provenance must be EvaluatorProvenance")
+        object.__setattr__(
+            self,
+            "evidence_digest",
+            _digest(self.evidence_digest, "evidence_digest"),
+        )
+        if self.evidence_digest not in self.collector_provenance.output_evidence_refs:
+            raise DeepAssuranceError(
+                "telemetry evidence must be referenced by collector authority"
+            )
+        if not isinstance(self.contains_raw_identifier, bool):
+            raise TypeError("telemetry raw-identifier state must be boolean")
+        object.__setattr__(self, "value", value)
+
+    @property
+    def authority_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "cohort_digest": self.cohort_digest,
+                "collector_provenance_digest": self.collector_provenance.digest,
+                "contains_raw_identifier": self.contains_raw_identifier,
+                "evidence_digest": self.evidence_digest,
+                "metric_id": self.metric_id,
+                "sample_count": self.sample_count,
+                "value": self.value,
+            }
+        )
 
 
 class TelemetryFeedbackGate:
@@ -525,6 +740,8 @@ class ResurrectionPoint:
     artifact_graph_digest: str
     event_chain_digest: str
     rights_snapshot_digest: str
+    checkpoint_authority: EvaluatorProvenance
+    checkpoint_evidence_digest: str
 
     def __post_init__(self) -> None:
         for name in (
@@ -535,6 +752,17 @@ class ResurrectionPoint:
             "rights_snapshot_digest",
         ):
             object.__setattr__(self, name, _digest(getattr(self, name), name))
+        if not isinstance(self.checkpoint_authority, EvaluatorProvenance):
+            raise TypeError("resurrection checkpoint_authority must be EvaluatorProvenance")
+        object.__setattr__(
+            self,
+            "checkpoint_evidence_digest",
+            _digest(self.checkpoint_evidence_digest, "checkpoint_evidence_digest"),
+        )
+        if self.checkpoint_evidence_digest not in self.checkpoint_authority.output_evidence_refs:
+            raise DeepAssuranceError(
+                "resurrection checkpoint evidence must be referenced by checkpoint authority"
+            )
 
     @property
     def digest(self) -> str:
@@ -544,7 +772,52 @@ class ResurrectionPoint:
             "artifacts": self.artifact_graph_digest,
             "events": self.event_chain_digest,
             "rights": self.rights_snapshot_digest,
+            "checkpoint_authority_digest": self.checkpoint_authority.digest,
+            "checkpoint_evidence_digest": self.checkpoint_evidence_digest,
         })
+
+
+@dataclass(frozen=True, slots=True)
+class ResurrectionVerification:
+    checkpoint_digest: str
+    reconstructed_digest: str
+    passed: bool
+    verifier_provenance: EvaluatorProvenance
+    verification_evidence_digest: str
+    proof_digest: str
+
+    def __post_init__(self) -> None:
+        for name in ("checkpoint_digest", "reconstructed_digest", "proof_digest"):
+            object.__setattr__(self, name, _digest(getattr(self, name), name))
+        if not isinstance(self.passed, bool):
+            raise TypeError("resurrection verification passed state must be boolean")
+        if not isinstance(self.verifier_provenance, EvaluatorProvenance):
+            raise TypeError("resurrection verifier_provenance must be EvaluatorProvenance")
+        if self.passed != (self.checkpoint_digest == self.reconstructed_digest):
+            raise DeepAssuranceError(
+                "resurrection passed state does not match reconstructed identity"
+            )
+        object.__setattr__(
+            self,
+            "verification_evidence_digest",
+            _digest(self.verification_evidence_digest, "verification_evidence_digest"),
+        )
+        if self.verification_evidence_digest not in self.verifier_provenance.output_evidence_refs:
+            raise DeepAssuranceError(
+                "resurrection verification evidence must be referenced by verifier authority"
+            )
+        expected = canonical_digest(self.proof_payload())
+        if self.proof_digest != expected:
+            raise DeepAssuranceError("resurrection proof digest mismatch")
+
+    def proof_payload(self) -> dict[str, object]:
+        return {
+            "checkpoint_digest": self.checkpoint_digest,
+            "passed": self.passed,
+            "reconstructed_digest": self.reconstructed_digest,
+            "verification_evidence_digest": self.verification_evidence_digest,
+            "verifier_provenance_digest": self.verifier_provenance.digest,
+        }
 
 
 class ProjectResurrectionRegistry:
@@ -557,19 +830,62 @@ class ProjectResurrectionRegistry:
         self._points[point.digest] = point
         return point.digest
 
-    def verify(self, digest: str, reconstructed: ResurrectionPoint) -> bool:
-        original = self._points.get(_text(digest, "digest"))
-        return original == reconstructed
+    def verify(
+        self,
+        digest: str,
+        reconstructed: ResurrectionPoint,
+        *,
+        verifier_provenance: EvaluatorProvenance,
+        verification_evidence_digest: str,
+    ) -> ResurrectionVerification:
+        checkpoint_digest = _text(digest, "digest")
+        original = self._points.get(checkpoint_digest)
+        if original is None:
+            raise DeepAssuranceError("unknown resurrection checkpoint")
+        passed = original == reconstructed
+        payload = {
+            "checkpoint_digest": checkpoint_digest,
+            "passed": passed,
+            "reconstructed_digest": reconstructed.digest,
+            "verification_evidence_digest": verification_evidence_digest,
+            "verifier_provenance_digest": verifier_provenance.digest,
+        }
+        return ResurrectionVerification(
+            checkpoint_digest=checkpoint_digest,
+            reconstructed_digest=reconstructed.digest,
+            passed=passed,
+            verifier_provenance=verifier_provenance,
+            verification_evidence_digest=verification_evidence_digest,
+            proof_digest=canonical_digest(payload),
+        )
 
 
 class EvidenceMerkleLedger:
-    """OP79: append-only tamper-evident evidence root."""
+    """OP79: append-only evidence root over authority-bound evidence leaves."""
 
     def __init__(self) -> None:
         self._leaves: list[str] = []
 
-    def append(self, evidence_digest: str) -> str:
-        self._leaves.append(_digest(evidence_digest, "evidence_digest"))
+    def append(
+        self,
+        evidence_digest: str,
+        *,
+        evaluator_provenance: EvaluatorProvenance,
+    ) -> str:
+        evidence = _digest(evidence_digest, "evidence_digest")
+        if not isinstance(evaluator_provenance, EvaluatorProvenance):
+            raise TypeError("evidence ledger evaluator_provenance must be EvaluatorProvenance")
+        if evidence not in evaluator_provenance.output_evidence_refs:
+            raise DeepAssuranceError(
+                "evidence ledger leaf must be referenced by evaluator authority"
+            )
+        binding = canonical_digest(
+            {
+                "evaluator_provenance_digest": evaluator_provenance.digest,
+                "evidence_digest": evidence,
+            }
+        )
+        self._leaves.append(binding)
         return self.root
 
     @property
@@ -599,17 +915,43 @@ class ClosureCertificate:
     evidence_root: str
     family_ids: tuple[str, ...]
     critical_plane_ids: tuple[str, ...]
+    verifier_provenance: EvaluatorProvenance
+    verification_evidence_digest: str
     unresolved_critical_gaps: tuple[str, ...] = ()
     independently_verified: bool = False
 
     def __post_init__(self) -> None:
         for name in ("artifact_digest", "canon_digest", "provenance_digest", "evidence_root"):
             object.__setattr__(self, name, _digest(getattr(self, name), name))
+        if not isinstance(self.verifier_provenance, EvaluatorProvenance):
+            raise TypeError("closure verifier_provenance must be EvaluatorProvenance")
+        object.__setattr__(
+            self,
+            "verification_evidence_digest",
+            _digest(self.verification_evidence_digest, "verification_evidence_digest"),
+        )
+        if self.verification_evidence_digest not in self.verifier_provenance.output_evidence_refs:
+            raise DeepAssuranceError(
+                "closure verification evidence must be referenced by verifier authority"
+            )
         if not isinstance(self.independently_verified, bool):
             raise TypeError("closure independent verification state must be boolean")
         object.__setattr__(self, "family_ids", tuple(_text(x, "family_id") for x in self.family_ids))
         object.__setattr__(self, "critical_plane_ids", tuple(_text(x, "critical_plane_id") for x in self.critical_plane_ids))
         object.__setattr__(self, "unresolved_critical_gaps", tuple(_text(x, "gap") for x in self.unresolved_critical_gaps))
+
+    @property
+    def verification_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "artifact_digest": self.artifact_digest,
+                "canon_digest": self.canon_digest,
+                "evidence_root": self.evidence_root,
+                "provenance_digest": self.provenance_digest,
+                "verification_evidence_digest": self.verification_evidence_digest,
+                "verifier_provenance_digest": self.verifier_provenance.digest,
+            }
+        )
 
     def validate(self, *, required_critical_planes: Sequence[str]) -> None:
         expected_families = tuple(f"GB{i:02d}" for i in range(1, 51))
@@ -634,4 +976,6 @@ class ClosureCertificate:
             "critical_planes": self.critical_plane_ids,
             "gaps": self.unresolved_critical_gaps,
             "independent": self.independently_verified,
+            "verification_binding_digest": self.verification_binding_digest,
+            "verifier_provenance_digest": self.verifier_provenance.digest,
         })
