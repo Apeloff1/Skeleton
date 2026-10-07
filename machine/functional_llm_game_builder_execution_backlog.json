@@ -480,9 +480,10 @@
         "FLGB-17-T11",
         "FLGB-17-T12"
       ],
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
-      "independent_verification_signed": false
+      "independent_verification_signed": false,
+      "implementation_note": "T01-T12 rival proposer/challenger/verifier, Forge-100/1000/10000, quality delta, stop policy, rights fingerprint, source provenance, clean-room transformation, and promotion arbitration targets, schemas, and focused regressions are present; exact-head dependency closure and independent verification remain required."
     },
     {
       "id": "FLGB-18",
@@ -13206,7 +13207,7 @@
       "implementation_target": "skeleton/ai/forge/rival_proposer.py",
       "contract_target": "skeleton/ai/forge/contracts/rival_proposer.schema.json",
       "test_target": "tests/flgb/test_flgb_17_rival_proposer.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -13272,7 +13273,7 @@
       "implementation_target": "skeleton/ai/forge/rival_challenger.py",
       "contract_target": "skeleton/ai/forge/contracts/rival_challenger.schema.json",
       "test_target": "tests/flgb/test_flgb_17_rival_challenger.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -13338,7 +13339,7 @@
       "implementation_target": "skeleton/ai/forge/rival_verifier.py",
       "contract_target": "skeleton/ai/forge/contracts/rival_verifier.schema.json",
       "test_target": "tests/flgb/test_flgb_17_rival_verifier.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -13404,7 +13405,7 @@
       "implementation_target": "skeleton/ai/forge/forge_100_cycle.py",
       "contract_target": "skeleton/ai/forge/contracts/forge_100_cycle.schema.json",
       "test_target": "tests/flgb/test_flgb_17_forge_100_cycle.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -13470,7 +13471,7 @@
       "implementation_target": "skeleton/ai/forge/forge_1000_cycle.py",
       "contract_target": "skeleton/ai/forge/contracts/forge_1000_cycle.schema.json",
       "test_target": "tests/flgb/test_flgb_17_forge_1000_cycle.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -13536,7 +13537,7 @@
       "implementation_target": "skeleton/ai/forge/forge_10000_cycle.py",
       "contract_target": "skeleton/ai/forge/contracts/forge_10000_cycle.schema.json",
       "test_target": "tests/flgb/test_flgb_17_forge_10000_cycle.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -13602,7 +13603,7 @@
       "implementation_target": "skeleton/ai/forge/quality_delta.py",
       "contract_target": "skeleton/ai/forge/contracts/quality_delta.schema.json",
       "test_target": "tests/flgb/test_flgb_17_quality_delta.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -13668,7 +13669,7 @@
       "implementation_target": "skeleton/ai/forge/stop_policy.py",
       "contract_target": "skeleton/ai/forge/contracts/stop_policy.schema.json",
       "test_target": "tests/flgb/test_flgb_17_stop_policy.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -13734,7 +13735,7 @@
       "implementation_target": "skeleton/ai/forge/rights_fingerprint.py",
       "contract_target": "skeleton/ai/forge/contracts/rights_fingerprint.schema.json",
       "test_target": "tests/flgb/test_flgb_17_rights_fingerprint.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -13800,7 +13801,7 @@
       "implementation_target": "skeleton/ai/forge/source_provenance.py",
       "contract_target": "skeleton/ai/forge/contracts/source_provenance.schema.json",
       "test_target": "tests/flgb/test_flgb_17_source_provenance.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -13866,7 +13867,7 @@
       "implementation_target": "skeleton/ai/forge/clean_room_transformation.py",
       "contract_target": "skeleton/ai/forge/contracts/clean_room_transformation.schema.json",
       "test_target": "tests/flgb/test_flgb_17_clean_room_transformation.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -13932,7 +13933,7 @@
       "implementation_target": "skeleton/ai/forge/promotion_arbitration.py",
       "contract_target": "skeleton/ai/forge/contracts/promotion_arbitration.schema.json",
       "test_target": "tests/flgb/test_flgb_17_promotion_arbitration.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
