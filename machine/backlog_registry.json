@@ -1394,96 +1394,6 @@
       "dedupe_key": "masterplan_gap:VOL-021#gap-1"
     },
     {
-      "id": "BL-GAP-VOL-021-G02",
-      "source_type": "masterplan_gap",
-      "source_ref": "VOL-021#gap-2",
-      "rationale": "connect ownership/test mapping to change planner",
-      "owner": "repository-machine",
-      "owner_ref": "ACC-VOL-021",
-      "dependency_refs": [],
-      "status": "open",
-      "priority_class": "P2",
-      "provenance": [
-        "machine/ai_master_plan.json",
-        "volume:VOL-021",
-        "accountability:ACC-VOL-021"
-      ],
-      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
-      "dedupe_key": "masterplan_gap:VOL-021#gap-2"
-    },
-    {
-      "id": "BL-GAP-VOL-022-G01",
-      "source_type": "masterplan_gap",
-      "source_ref": "VOL-022#gap-1",
-      "rationale": "transactional workspace layer incomplete",
-      "owner": "repository-machine",
-      "owner_ref": "ACC-VOL-022",
-      "dependency_refs": [],
-      "status": "open",
-      "priority_class": "P2",
-      "provenance": [
-        "machine/ai_master_plan.json",
-        "volume:VOL-022",
-        "accountability:ACC-VOL-022"
-      ],
-      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
-      "dedupe_key": "masterplan_gap:VOL-022#gap-1"
-    },
-    {
-      "id": "BL-GAP-VOL-022-G02",
-      "source_type": "masterplan_gap",
-      "source_ref": "VOL-022#gap-2",
-      "rationale": "independent reviewer/verifier routing needs full integration",
-      "owner": "repository-machine",
-      "owner_ref": "ACC-VOL-022",
-      "dependency_refs": [],
-      "status": "open",
-      "priority_class": "P2",
-      "provenance": [
-        "machine/ai_master_plan.json",
-        "volume:VOL-022",
-        "accountability:ACC-VOL-022"
-      ],
-      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
-      "dedupe_key": "masterplan_gap:VOL-022#gap-2"
-    },
-    {
-      "id": "BL-GAP-VOL-092-G01",
-      "source_type": "masterplan_gap",
-      "source_ref": "VOL-092#gap-1",
-      "rationale": "define maintenance ownership registry",
-      "owner": "repository-machine",
-      "owner_ref": "ACC-VOL-092",
-      "dependency_refs": [],
-      "status": "open",
-      "priority_class": "P2",
-      "provenance": [
-        "machine/ai_master_plan.json",
-        "volume:VOL-092",
-        "accountability:ACC-VOL-092"
-      ],
-      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
-      "dedupe_key": "masterplan_gap:VOL-092#gap-1"
-    },
-    {
-      "id": "BL-GAP-VOL-092-G02",
-      "source_type": "masterplan_gap",
-      "source_ref": "VOL-092#gap-2",
-      "rationale": "bind deletion to reachability/retention checks",
-      "owner": "repository-machine",
-      "owner_ref": "ACC-VOL-092",
-      "dependency_refs": [],
-      "status": "open",
-      "priority_class": "P2",
-      "provenance": [
-        "machine/ai_master_plan.json",
-        "volume:VOL-092",
-        "accountability:ACC-VOL-092"
-      ],
-      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
-      "dedupe_key": "masterplan_gap:VOL-092#gap-2"
-    },
-    {
       "id": "BL-GAP-VOL-093-G01",
       "source_type": "masterplan_gap",
       "source_ref": "VOL-093#gap-1",
@@ -1500,96 +1410,6 @@
       ],
       "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
       "dedupe_key": "masterplan_gap:VOL-093#gap-1"
-    },
-    {
-      "id": "BL-GAP-VOL-093-G02",
-      "source_type": "masterplan_gap",
-      "source_ref": "VOL-093#gap-2",
-      "rationale": "bind backlog to gap/risk closure",
-      "owner": "repository-machine",
-      "owner_ref": "ACC-VOL-093",
-      "dependency_refs": [],
-      "status": "open",
-      "priority_class": "P2",
-      "provenance": [
-        "machine/ai_master_plan.json",
-        "volume:VOL-093",
-        "accountability:ACC-VOL-093"
-      ],
-      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
-      "dedupe_key": "masterplan_gap:VOL-093#gap-2"
-    },
-    {
-      "id": "BL-GAP-VOL-094-G01",
-      "source_type": "masterplan_gap",
-      "source_ref": "VOL-094#gap-1",
-      "rationale": "define priority factor schema",
-      "owner": "repository-machine",
-      "owner_ref": "ACC-VOL-094",
-      "dependency_refs": [],
-      "status": "open",
-      "priority_class": "P2",
-      "provenance": [
-        "machine/ai_master_plan.json",
-        "volume:VOL-094",
-        "accountability:ACC-VOL-094"
-      ],
-      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
-      "dedupe_key": "masterplan_gap:VOL-094#gap-1"
-    },
-    {
-      "id": "BL-GAP-VOL-094-G02",
-      "source_type": "masterplan_gap",
-      "source_ref": "VOL-094#gap-2",
-      "rationale": "add anti-starvation constraints",
-      "owner": "repository-machine",
-      "owner_ref": "ACC-VOL-094",
-      "dependency_refs": [],
-      "status": "open",
-      "priority_class": "P2",
-      "provenance": [
-        "machine/ai_master_plan.json",
-        "volume:VOL-094",
-        "accountability:ACC-VOL-094"
-      ],
-      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
-      "dedupe_key": "masterplan_gap:VOL-094#gap-2"
-    },
-    {
-      "id": "BL-GAP-VOL-095-G01",
-      "source_type": "masterplan_gap",
-      "source_ref": "VOL-095#gap-1",
-      "rationale": "bind all packages to exact requirements",
-      "owner": "repository-machine",
-      "owner_ref": "ACC-VOL-095",
-      "dependency_refs": [],
-      "status": "open",
-      "priority_class": "P2",
-      "provenance": [
-        "machine/ai_master_plan.json",
-        "volume:VOL-095",
-        "accountability:ACC-VOL-095"
-      ],
-      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
-      "dedupe_key": "masterplan_gap:VOL-095#gap-1"
-    },
-    {
-      "id": "BL-GAP-VOL-095-G02",
-      "source_type": "masterplan_gap",
-      "source_ref": "VOL-095#gap-2",
-      "rationale": "materialize package evidence rollup",
-      "owner": "repository-machine",
-      "owner_ref": "ACC-VOL-095",
-      "dependency_refs": [],
-      "status": "open",
-      "priority_class": "P2",
-      "provenance": [
-        "machine/ai_master_plan.json",
-        "volume:VOL-095",
-        "accountability:ACC-VOL-095"
-      ],
-      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
-      "dedupe_key": "masterplan_gap:VOL-095#gap-2"
     },
     {
       "id": "BL-GAP-VOL-108-G01",
@@ -1610,24 +1430,6 @@
       "dedupe_key": "masterplan_gap:VOL-108#gap-1"
     },
     {
-      "id": "BL-GAP-VOL-108-G02",
-      "source_type": "masterplan_gap",
-      "source_ref": "VOL-108#gap-2",
-      "rationale": "bind detectable patterns to CI",
-      "owner": "repository-machine",
-      "owner_ref": "ACC-VOL-108",
-      "dependency_refs": [],
-      "status": "open",
-      "priority_class": "P2",
-      "provenance": [
-        "machine/ai_master_plan.json",
-        "volume:VOL-108",
-        "accountability:ACC-VOL-108"
-      ],
-      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
-      "dedupe_key": "masterplan_gap:VOL-108#gap-2"
-    },
-    {
       "id": "BL-GAP-VOL-109-G01",
       "source_type": "masterplan_gap",
       "source_ref": "VOL-109#gap-1",
@@ -1644,60 +1446,6 @@
       ],
       "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
       "dedupe_key": "masterplan_gap:VOL-109#gap-1"
-    },
-    {
-      "id": "BL-GAP-VOL-109-G02",
-      "source_type": "masterplan_gap",
-      "source_ref": "VOL-109#gap-2",
-      "rationale": "materialize cycle/blocked-state reporting",
-      "owner": "repository-machine",
-      "owner_ref": "ACC-VOL-109",
-      "dependency_refs": [],
-      "status": "open",
-      "priority_class": "P2",
-      "provenance": [
-        "machine/ai_master_plan.json",
-        "volume:VOL-109",
-        "accountability:ACC-VOL-109"
-      ],
-      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
-      "dedupe_key": "masterplan_gap:VOL-109#gap-2"
-    },
-    {
-      "id": "BL-GAP-VOL-110-G01",
-      "source_type": "masterplan_gap",
-      "source_ref": "VOL-110#gap-1",
-      "rationale": "unify maturity and DoD rules",
-      "owner": "repository-machine",
-      "owner_ref": "ACC-VOL-110",
-      "dependency_refs": [],
-      "status": "open",
-      "priority_class": "P2",
-      "provenance": [
-        "machine/ai_master_plan.json",
-        "volume:VOL-110",
-        "accountability:ACC-VOL-110"
-      ],
-      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
-      "dedupe_key": "masterplan_gap:VOL-110#gap-1"
-    },
-    {
-      "id": "BL-GAP-VOL-110-G02",
-      "source_type": "masterplan_gap",
-      "source_ref": "VOL-110#gap-2",
-      "rationale": "bind change-impact triggers to DoD",
-      "owner": "repository-machine",
-      "owner_ref": "ACC-VOL-110",
-      "dependency_refs": [],
-      "status": "open",
-      "priority_class": "P2",
-      "provenance": [
-        "machine/ai_master_plan.json",
-        "volume:VOL-110",
-        "accountability:ACC-VOL-110"
-      ],
-      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
-      "dedupe_key": "masterplan_gap:VOL-110#gap-2"
     },
     {
       "id": "BL-GAP-VOL-115-G01",
@@ -1718,24 +1466,6 @@
       "dedupe_key": "masterplan_gap:VOL-115#gap-1"
     },
     {
-      "id": "BL-GAP-VOL-115-G02",
-      "source_type": "masterplan_gap",
-      "source_ref": "VOL-115#gap-2",
-      "rationale": "bind debt to risk/backlog/ADR",
-      "owner": "repository-machine",
-      "owner_ref": "ACC-VOL-115",
-      "dependency_refs": [],
-      "status": "open",
-      "priority_class": "P2",
-      "provenance": [
-        "machine/ai_master_plan.json",
-        "volume:VOL-115",
-        "accountability:ACC-VOL-115"
-      ],
-      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
-      "dedupe_key": "masterplan_gap:VOL-115#gap-2"
-    },
-    {
       "id": "BL-GAP-VOL-118-G01",
       "source_type": "masterplan_gap",
       "source_ref": "VOL-118#gap-1",
@@ -1752,24 +1482,6 @@
       ],
       "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
       "dedupe_key": "masterplan_gap:VOL-118#gap-1"
-    },
-    {
-      "id": "BL-GAP-VOL-118-G02",
-      "source_type": "masterplan_gap",
-      "source_ref": "VOL-118#gap-2",
-      "rationale": "materialize revision lineage",
-      "owner": "repository-machine",
-      "owner_ref": "ACC-VOL-118",
-      "dependency_refs": [],
-      "status": "open",
-      "priority_class": "P2",
-      "provenance": [
-        "machine/ai_master_plan.json",
-        "volume:VOL-118",
-        "accountability:ACC-VOL-118"
-      ],
-      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
-      "dedupe_key": "masterplan_gap:VOL-118#gap-2"
     },
     {
       "id": "BL-GAP-VOL-119-G01",
