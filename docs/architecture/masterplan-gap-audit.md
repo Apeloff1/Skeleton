@@ -1453,3 +1453,18 @@ Cross-process retrieval admission is now durable and fenced:
 Correctness boundary: this provides durable exactly-once admission and replay. It cannot make mutations to an unrelated downstream index/provenance store transactionally atomic with SQLite. A crash after downstream mutation but before receipt commit can still require downstream idempotent writes or a shared transactional/outbox contract. This boundary remains explicit and is not mislabeled as globally atomic exactly-once delivery.
 
 SIGNED status remains withheld pending observable exact-head verification execution.
+
+
+### 2026-10-07 crash-recovery outbox tranche
+
+The remaining cross-store crash window now has an explicit durable recovery protocol:
+- crawler schema advanced to v5 with a persistent ingestion_outbox;
+- each downstream chunk operation receives a deterministic SHA-256 operation ID derived from ingestion key, ordinal and canonical payload;
+- complete chunk plans are persisted before execution;
+- once persisted, a changed payload for the same ingestion ordinal fails closed;
+- per-operation completion/result data survives restart and can be replayed;
+- regressions cover deterministic IDs across restart, plan-drift rejection and completed-result replay.
+
+This establishes deterministic resumable intent, but does not yet claim exactly-once external side effects. The canonical ProvenanceLedger currently generates random entry IDs and exposes no idempotency-key record API; therefore a process death after ledger mutation but before outbox completion can still duplicate provenance. Closing that final boundary requires an idempotent operation-key contract in the downstream provenance layer (and equivalent semantics for any non-replacing index implementation), then wiring the crawler outbox executor to it.
+
+SIGNED status remains withheld pending exact-head execution evidence and closure/acceptance of that downstream idempotency boundary.
