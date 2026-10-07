@@ -127,6 +127,8 @@ model authority boundaries.
 - `matrix_frechet.py` — block-exponential Fréchet derivatives with centered finite-difference evidence and condition proxies.
 - `robust_regression.py` — Huber IRLS and Theil-Sen linear-regression references with robust residual evidence.
 - `multiple_testing.py` — Bonferroni, Holm, Benjamini-Hochberg and Benjamini-Yekutieli corrections.
+- `constrained_qp.py` — equality-KKT and box active-set convex quadratic-programming references with residual evidence.
+- `finite_volume1d.py` — periodic Rusanov finite-volume conservation laws with explicit CFL and mass-drift evidence.
 - `validation.py` — parity evidence against existing optimized runtime kernels.
 
 ## Guarantees
@@ -231,6 +233,8 @@ model authority boundaries.
 - Matrix-exponential Fréchet derivatives use the exact block identity and carry an independent centered-difference residual.
 - Robust regression exposes coefficients, weights, robust scale and convergence rather than silently hiding outlier influence.
 - Multiple-testing corrections return adjusted p-values and rejections only; experiment/promotion authority remains outside this layer.
+- Quadratic-programming solvers validate convexity and expose KKT/projected-gradient residuals rather than hiding constraint activity.
+- Finite-volume stepping is flux-conservative and rejects CFL-unstable updates before evolving state.
 - `audit_runtime_kernels()` compares optimized runtime softmax, matmul and attention against
   this reference substrate without replacing those kernels.
 

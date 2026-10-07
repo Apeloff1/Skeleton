@@ -94,6 +94,13 @@ from .conditioning import (
     matrix_one_norm,
 )
 from .contracts import MathInvariantError, Matrix, Vector
+from .constrained_qp import (
+    BoxQPReport,
+    EqualityQPReport,
+    quadratic_objective,
+    solve_box_quadratic_active_set,
+    solve_equality_constrained_qp,
+)
 from .cosine_transforms import dct2, dct_ii, dct_iv, inverse_dct2, inverse_dct_ii
 from .cubature import CubatureReport, integrate_rectangle_2d, tensor_gauss_legendre_cubature
 from .decompositions import (
@@ -178,6 +185,12 @@ from .eigensystems import (
     SymmetricEigensystemReport,
     principal_components,
     symmetric_eigensystem,
+)
+from .finite_volume1d import (
+    FiniteVolumeReport,
+    burgers_finite_volume,
+    linear_advection_finite_volume,
+    rusanov_periodic,
 )
 from .finite_element1d import (
     FEMPoissonReport,
@@ -713,6 +726,11 @@ __all__ = [
     "dual_sqrt",
     "dual_tanh",
     "value_and_gradient",
+    "BoxQPReport",
+    "EqualityQPReport",
+    "quadratic_objective",
+    "solve_box_quadratic_active_set",
+    "solve_equality_constrained_qp",
     "dct2",
     "dct_ii",
     "dct_iv",
@@ -784,6 +802,10 @@ __all__ = [
     "SymmetricEigensystemReport",
     "principal_components",
     "symmetric_eigensystem",
+    "FiniteVolumeReport",
+    "burgers_finite_volume",
+    "linear_advection_finite_volume",
+    "rusanov_periodic",
     "FEMPoissonReport",
     "LinearFEMAssembly",
     "assemble_linear_fem_1d",
