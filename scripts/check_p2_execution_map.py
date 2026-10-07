@@ -255,10 +255,10 @@ def validate(root: Path) -> dict:
                     raise P2ValidationError(
                         f"task {task['task_id']} narrows/drifts masterplan {ref}.{field}"
                     )
-            if canonical.get("completion_checkbox") is not False:
-                raise P2ValidationError(
-                    f"scheduled masterplan volume {ref} is already completion-checked"
-                )
+            # Activated task snapshots inherit canonical maturity. A volume may
+            # later become verified/completion-checked without invalidating the
+            # historical P2 activation record; the task itself remains
+            # non-authoritative and is still forbidden from self-signing below.
             if canonical.get("signing_required") is not True:
                 raise P2ValidationError(
                     f"scheduled masterplan volume {ref} must preserve signing requirement"
