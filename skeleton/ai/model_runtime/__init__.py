@@ -49,7 +49,7 @@ from .runtime_contracts import (
     RuntimeLimits,
     RuntimeUsage,
 )
-from .text_pipeline import CausalTrainingBatch, CorpusTrainingReceipt, GovernedTrainingInput, ModelInputBatch, PipelineReplayCheckpoint, PreparedCorpus, PreparedText, PromotionAuthorizationRequest, SupervisedTextExample, TextPipelineConfig, TextTokenPipeline, TrainingInputReceipt, deserialize_causal_training_batch, deserialize_model_input_batch, mask_causal_prefix, materialize_causal_training_batch, materialize_model_batch, serialize_causal_training_batch, serialize_model_input_batch
+from .text_pipeline import CausalTrainingBatch, CorpusTrainingReceipt, GovernedTrainingInput, ModelInputBatch, PipelineReplayCheckpoint, PreparedCorpus, PreparedText, PromotionAuthorizationRequest, SupervisedTextExample, TemporalTrainingSignal, TextPipelineConfig, TextTokenPipeline, TrainingInputReceipt, deserialize_causal_training_batch, deserialize_model_input_batch, mask_causal_prefix, materialize_causal_training_batch, materialize_model_batch, serialize_causal_training_batch, serialize_model_input_batch
 from .tokenization import (
     NativeTokenizer,
     StreamingTextFeed,
@@ -107,6 +107,7 @@ __all__ = [
     "SpeculativeReceipt",
     "StreamingTextFeed",
     "SupervisedTextExample",
+    "TemporalTrainingSignal",
     "TextPipelineConfig",
     "TextTokenPipeline",
     "TokenBatch",
