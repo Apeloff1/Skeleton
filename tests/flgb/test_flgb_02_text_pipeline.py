@@ -486,3 +486,47 @@ def test_failed_risk_gate_cannot_qualify_promotion(native_model):
     assert evaluation.candidate_wins is False
     assert evidence.evaluation_passed is False
     assert evidence.qualified is False
+
+
+def _qualified_promotion_fixture(native_model):
+    pipeline, candidate = _candidate_fixture(native_model)
+    evaluation = pipeline.mirror_evaluation(
+        candidate, evaluation_id="eval-1", champion_digest="8" * 64,
+        candidate_score_ppm=700000, champion_score_ppm=600000,
+        risk_gate_passed=True, independent_verifier="mirror-verifier", evidence_digest="9" * 64,
+    )
+    evidence = pipeline.promotion_evidence(
+        candidate, evaluation, exact_head_commit="a" * 64, rights_digest="b" * 64,
+        contamination_scan_digest="c" * 64, rollback_digest="d" * 64,
+        independent_verifier="promotion-verifier", rights_passed=True,
+        contamination_clear=True, rollback_ready=True,
+    )
+    return pipeline, candidate, evidence
+
+
+def test_qualified_evidence_creates_non_authorizing_handoff(native_model):
+    pipeline, candidate, evidence = _qualified_promotion_fixture(native_model)
+    request = pipeline.promotion_authorization_request(candidate, evidence, requester="release-authority")
+    assert request.candidate_digest == candidate.digest
+    assert request.promotion_evidence_digest == evidence.digest
+    assert request.exact_head_commit == evidence.exact_head_commit
+    assert len(request.digest) == 64
+    assert candidate.production_authorized() is False
+
+
+def test_unqualified_evidence_cannot_request_authorization(native_model):
+    from dataclasses import replace
+    from skeleton.ai.model_runtime.tokenization import TokenizerContractError
+    pipeline, candidate, evidence = _qualified_promotion_fixture(native_model)
+    failed = replace(evidence, rollback_ready=False)
+    with pytest.raises(TokenizerContractError, match="unqualified"):
+        pipeline.promotion_authorization_request(candidate, failed, requester="release-authority")
+
+
+def test_foreign_candidate_evidence_cannot_request_authorization(native_model):
+    from dataclasses import replace
+    from skeleton.ai.model_runtime.tokenization import TokenizerContractError
+    pipeline, candidate, evidence = _qualified_promotion_fixture(native_model)
+    foreign = replace(evidence, candidate_digest="e" * 64)
+    with pytest.raises(TokenizerContractError, match="does not belong"):
+        pipeline.promotion_authorization_request(candidate, foreign, requester="release-authority")
