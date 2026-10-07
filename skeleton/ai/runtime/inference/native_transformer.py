@@ -95,20 +95,45 @@ class NativeTransformerModel:
         self._assert_identity()
 
         text = result.text
+        output_tokens = len(result.generated_ids)
+        finish_reason = (
+            result.finish_reason
+            if result.finish_reason in {"completed", "length"}
+            else "completed"
+        )
         for marker in request.stop:
             index = text.find(marker)
             if index >= 0:
                 text = text[:index]
+                # String stops are a compatibility surface above token generation.
+                # Re-tokenize the published prefix so usage and response identity
+                # describe exactly the content returned to the caller.
+                output_tokens = 0 if not text else len(self.runtime.tokenizer.encode_ids(text))
+                finish_reason = "completed"
                 break
 
-        response_id = "local-native:" + result.output_digest[:32]
+        published_digest = hashlib.sha256(
+            json.dumps(
+                {
+                    "model_digest": self.model_digest,
+                    "runtime_digest": self.runtime_digest,
+                    "text": text,
+                    "output_tokens": output_tokens,
+                    "finish_reason": finish_reason,
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+            ).encode("utf-8")
+        ).hexdigest()
+        response_id = "local-native:" + published_digest[:32]
         return LocalInferenceResult(
             text=text,
             model_id=self.model_id,
             model_digest=self.model_digest,
             input_tokens=len(prompt_sequence.token_ids),
-            output_tokens=len(result.generated_ids),
-            finish_reason=result.finish_reason if result.finish_reason in {"completed", "length"} else "completed",
+            output_tokens=output_tokens,
+            finish_reason=finish_reason,
             response_id=response_id,
             latency_ms=(time.perf_counter() - started) * 1000.0,
         )
