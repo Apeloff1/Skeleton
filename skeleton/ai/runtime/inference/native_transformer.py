@@ -8,7 +8,13 @@ import time
 
 from skeleton.ai.model_runtime import GenerationConfig, NativeLLMRuntime, RuntimeContractError
 
-from .local import LocalInferenceCancelled, LocalInferenceRequest, LocalInferenceResult
+from .local import (
+    LocalInferenceCancelled,
+    LocalInferenceEngine,
+    LocalInferenceRequest,
+    LocalInferenceResult,
+    LocalModelAdapter,
+)
 
 
 class NativeTransformerModel:
@@ -108,4 +114,28 @@ class NativeTransformerModel:
         )
 
 
-__all__ = ["NativeTransformerModel"]
+def build_native_transformer_adapter(
+    runtime: NativeLLMRuntime,
+    *,
+    model_id: str = "skeleton-native-transformer",
+    cache_size: int = 128,
+    default_seed: int = 0,
+) -> LocalModelAdapter:
+    """Build the canonical provider-neutral adapter for the owned transformer."""
+    backend = NativeTransformerModel(runtime, model_id=model_id)
+    engine = LocalInferenceEngine(backend, cache_size=cache_size)
+    return LocalModelAdapter(
+        engine,
+        default_seed=default_seed,
+        artifact_status={
+            "kind": "native_transformer",
+            "model_digest": backend.model_digest,
+            "runtime_digest": backend.runtime_digest,
+            "tokenizer_digest": runtime.tokenizer.digest,
+            "architecture_digest": runtime.architecture.digest,
+            "device": runtime.device.to_dict(),
+        },
+    )
+
+
+__all__ = ["NativeTransformerModel", "build_native_transformer_adapter"]
