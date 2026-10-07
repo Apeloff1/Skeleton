@@ -178,6 +178,30 @@ class DecadeTrainingSignal:
         return digest_json(self.__dict__)
 
 
+@dataclass(frozen=True)
+class DecadeSignalVector:
+    """Model-facing temporal feature vector derived without changing token identity."""
+    source_decade: int
+    cutoff_decade: int
+    distance_decades: int
+    recency_ppm: int
+    chronology_digest: str
+
+    def __post_init__(self) -> None:
+        if self.source_decade % 10 or self.cutoff_decade % 10:
+            raise TokenizerContractError("decade vector requires aligned decades")
+        if self.distance_decades != (self.cutoff_decade - self.source_decade) // 10 or self.distance_decades < 0:
+            raise TokenizerContractError("decade vector distance mismatch")
+        if isinstance(self.recency_ppm, bool) or not isinstance(self.recency_ppm, int) or not 0 < self.recency_ppm <= 1_000_000:
+            raise TokenizerContractError("invalid decade vector recency weight")
+        if not isinstance(self.chronology_digest, str) or len(self.chronology_digest) != 64 or any(ch not in "0123456789abcdef" for ch in self.chronology_digest):
+            raise TokenizerContractError("invalid decade vector chronology digest")
+
+    @property
+    def digest(self) -> str:
+        return digest_json(self.__dict__)
+
+
 def decade_weight_ppm(signal: DecadeTrainingSignal) -> int:
     if not isinstance(signal, DecadeTrainingSignal):
         raise TokenizerContractError("DecadeTrainingSignal required")
@@ -739,6 +763,17 @@ class TextTokenPipeline:
             (signal.knowledge_cutoff_year // 10) * 10,
             signal.source_year,
             signal.knowledge_cutoff_year,
+        )
+
+    def decade_signal_vector(self, signal: TemporalTrainingSignal) -> DecadeSignalVector:
+        """Derive a bounded decade feature while preserving exact-year provenance."""
+        decade = self.decade_signal(signal)
+        return DecadeSignalVector(
+            source_decade=decade.source_decade,
+            cutoff_decade=decade.cutoff_decade,
+            distance_decades=decade.distance_decades,
+            recency_ppm=decade_weight_ppm(decade),
+            chronology_digest=signal.digest,
         )
 
     def temporal_supersession(self, older: TemporalTrainingSignal, newer: TemporalTrainingSignal, *, supersedes: bool) -> TemporalSupersession:
