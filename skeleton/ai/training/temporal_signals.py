@@ -116,10 +116,28 @@ def assess_decade_signals(signals,*,policy:DecadePolicy,policy_year:int):
     oldest=min(included) if included else policy.policy_decade
     return DecadeAssessment(policy.policy_decade,policy.subject,policy.digest,tuple(sorted(s.digest for s in signals)),support,oppose,excluded,oldest,support>0 and oppose>0)
 
+@dataclass(frozen=True)
+class TemporalConsensus:
+    subject:str; policy_year:int; year_assessment_digest:str; decade_assessment_digest:str
+    support_floor_ppm:int; opposition_ceiling_ppm:int; contradiction:bool
+    @property
+    def digest(self): return _digest(self.__dict__)
+
+def reconcile_temporal_scales(year_assessment,decade_assessment):
+    if year_assessment.subject!=decade_assessment.subject: raise TemporalSignalError("temporal scale subject mismatch")
+    if decade_of(year_assessment.policy_year)!=decade_assessment.policy_decade: raise TemporalSignalError("temporal scale period mismatch")
+    return TemporalConsensus(year_assessment.subject,year_assessment.policy_year,year_assessment.digest,decade_assessment.digest,min(year_assessment.support_ppm,decade_assessment.support_ppm),max(year_assessment.oppose_ppm,decade_assessment.oppose_ppm),year_assessment.contradiction or decade_assessment.contradiction)
+
+def require_consensus_authority(consensus,*,min_support_ppm=700_000,max_oppose_ppm=100_000):
+    if consensus.support_floor_ppm<min_support_ppm: raise TemporalSignalError("cross-scale temporal support insufficient")
+    if consensus.opposition_ceiling_ppm>max_oppose_ppm: raise TemporalSignalError("cross-scale temporal opposition exceeds policy")
+    if consensus.contradiction: raise TemporalSignalError("cross-scale temporal contradiction")
+    return consensus.digest
+
 def require_signal_authority(a,*,min_support_ppm=700_000,max_oppose_ppm=100_000,allow_contradiction=False):
     if a.support_ppm<min_support_ppm: raise TemporalSignalError("insufficient temporal support")
     if a.oppose_ppm>max_oppose_ppm: raise TemporalSignalError("temporal opposition exceeds policy")
     if a.contradiction and not allow_contradiction: raise TemporalSignalError("contradictory temporal evidence")
     return a.digest
 
-__all__=["TemporalSignalError","YearSignal","EraBoundary","DecadePolicy","SignalAssessment","DecadeAssessment","decade_of","assess_year_signals","assess_decade_signals","require_signal_authority"]
+__all__=["TemporalSignalError","YearSignal","EraBoundary","DecadePolicy","SignalAssessment","DecadeAssessment","decade_of","assess_year_signals","assess_decade_signals","TemporalConsensus","reconcile_temporal_scales","require_consensus_authority","require_signal_authority"]
