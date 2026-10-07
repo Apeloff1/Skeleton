@@ -22,15 +22,17 @@ operation.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
+import threading
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from enum import Enum
+from types import MappingProxyType
 from typing import Any
 
 from skeleton.kernel.errors import KernelError
-from skeleton.retrieval.provenance import ProvenanceEntry
 
 MAX_ID_CHARS = 128
 MAX_CLAIM_CHARS = 4_096
@@ -152,14 +154,56 @@ def _json_scalar(name: str, value: Any) -> object:
     )
 
 
+def _canonical_json_value(value: Any) -> object:
+    if value is None or isinstance(value, (bool, str, int)):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise LearningEvidenceError(
+                "fingerprint payload contains non-finite number",
+                context={"reason": "invalid_number"},
+            )
+        return float(value)
+    if isinstance(value, Mapping):
+        normalized: dict[str, object] = {}
+        for raw_key, item in value.items():
+            key = _text("fingerprint key", raw_key, MAX_ID_CHARS)
+            if key in normalized:
+                raise LearningEvidenceError(
+                    "fingerprint keys collide after normalization",
+                    context={"reason": "duplicate_key", "key": key},
+                )
+            normalized[key] = _canonical_json_value(item)
+        return dict(sorted(normalized.items()))
+    if isinstance(value, (list, tuple)):
+        return [_canonical_json_value(item) for item in value]
+    raise LearningEvidenceError(
+        "fingerprint payload contains unsupported value",
+        context={"reason": "unsupported_value", "type": type(value).__name__},
+    )
+
+
 def canonical_fingerprint(payload: Mapping[str, object] | object) -> str:
-    """Deterministic content fingerprint via retrieval provenance hashing."""
+    """Deterministic fingerprint that rejects unsupported runtime objects."""
 
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
-    return ProvenanceEntry.hash_data(encoded)
+    canonical = _canonical_json_value(payload)
+    try:
+        encoded = json.dumps(
+            canonical,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        )
+    except (TypeError, ValueError) as exc:
+        raise LearningEvidenceError(
+            "fingerprint payload is not deterministic JSON",
+            context={"reason": "invalid_payload"},
+        ) from exc
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
-def _freeze_payload(payload: Mapping[str, object]) -> dict[str, object]:
+def _freeze_payload(payload: Mapping[str, object]) -> Mapping[str, object]:
     if not isinstance(payload, Mapping):
         raise LearningEvidenceError(
             "payload must be a mapping of factual fields",
@@ -173,8 +217,13 @@ def _freeze_payload(payload: Mapping[str, object]) -> dict[str, object]:
     frozen: dict[str, object] = {}
     for key, value in payload.items():
         name = _text("payload key", key, MAX_ID_CHARS)
+        if name in frozen:
+            raise LearningEvidenceError(
+                "payload keys collide after normalization",
+                context={"reason": "duplicate_key", "key": name},
+            )
         frozen[name] = _json_scalar(f"payload[{name}]", value)
-    return frozen
+    return MappingProxyType(dict(sorted(frozen.items())))
 
 
 def _ids(name: str, values: Iterable[str]) -> tuple[str, ...]:
@@ -218,6 +267,21 @@ class EvidenceProvenance:
         if self.uri is not None:
             object.__setattr__(self, "uri", _text("uri", self.uri, MAX_SOURCE_CHARS))
 
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "source_id": self.source_id,
+            "source_kind": self.source_kind,
+            "observed_at": self.observed_at,
+            "clock_version": self.clock_version,
+            "fingerprint": self.fingerprint,
+            "parent_ids": list(self.parent_ids),
+            "uri": self.uri,
+        }
+
+    @property
+    def digest(self) -> str:
+        return canonical_fingerprint(self.as_dict())
+
 
 @dataclass(frozen=True, slots=True)
 class Observation:
@@ -239,6 +303,18 @@ class Observation:
                 "observations are root facts and must not declare parents",
                 context={"reason": "invalid_parent", "observation_id": self.observation_id},
             )
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "observation_id": self.observation_id,
+            "subject_id": self.subject_id,
+            "payload": dict(self.payload),
+            "provenance": self.provenance.as_dict(),
+        }
+
+    @property
+    def digest(self) -> str:
+        return canonical_fingerprint(self.as_dict())
 
 
 @dataclass(frozen=True, slots=True)
@@ -270,6 +346,20 @@ class Feature:
             ),
         )
         _require_parents(self.provenance, self.observation_ids, record_id=self.feature_id)
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "feature_id": self.feature_id,
+            "subject_id": self.subject_id,
+            "name": self.name,
+            "value": self.value,
+            "observation_ids": list(self.observation_ids),
+            "provenance": self.provenance.as_dict(),
+        }
+
+    @property
+    def digest(self) -> str:
+        return canonical_fingerprint(self.as_dict())
 
 
 @dataclass(frozen=True, slots=True)
@@ -314,6 +404,21 @@ class Hypothesis:
         )
         _require_parents(self.provenance, self.feature_ids, record_id=self.hypothesis_id)
 
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "hypothesis_id": self.hypothesis_id,
+            "subject_id": self.subject_id,
+            "claim": self.claim,
+            "feature_ids": list(self.feature_ids),
+            "confidence": self.confidence,
+            "polarity": self.polarity,
+            "provenance": self.provenance.as_dict(),
+        }
+
+    @property
+    def digest(self) -> str:
+        return canonical_fingerprint(self.as_dict())
+
 
 @dataclass(frozen=True, slots=True)
 class Calibration:
@@ -346,6 +451,20 @@ class Calibration:
                 "last_outcome_id",
                 _text("last_outcome_id", self.last_outcome_id, MAX_ID_CHARS),
             )
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "channel": self.channel,
+            "stated_confidence": self.stated_confidence,
+            "empirical_rate": self.empirical_rate,
+            "sample_count": self.sample_count,
+            "expected_calibration_error": self.expected_calibration_error,
+            "last_outcome_id": self.last_outcome_id,
+        }
+
+    @property
+    def digest(self) -> str:
+        return canonical_fingerprint(self.as_dict())
 
 
 @dataclass(frozen=True, slots=True)
@@ -384,6 +503,21 @@ class Prediction:
         )
         _require_parents(self.provenance, (self.hypothesis_id,), record_id=self.prediction_id)
 
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "prediction_id": self.prediction_id,
+            "hypothesis_id": self.hypothesis_id,
+            "expected": self.expected,
+            "confidence": self.confidence,
+            "channel": self.channel,
+            "calibration": self.calibration.as_dict(),
+            "provenance": self.provenance.as_dict(),
+        }
+
+    @property
+    def digest(self) -> str:
+        return canonical_fingerprint(self.as_dict())
+
 
 @dataclass(frozen=True, slots=True)
 class Outcome:
@@ -412,6 +546,19 @@ class Outcome:
         )
         _require_parents(self.provenance, (self.prediction_id,), record_id=self.outcome_id)
 
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "outcome_id": self.outcome_id,
+            "prediction_id": self.prediction_id,
+            "actual": self.actual,
+            "correct": self.correct,
+            "provenance": self.provenance.as_dict(),
+        }
+
+    @property
+    def digest(self) -> str:
+        return canonical_fingerprint(self.as_dict())
+
 
 @dataclass(frozen=True, slots=True)
 class UpdateRecord:
@@ -423,6 +570,9 @@ class UpdateRecord:
     timestamp: float
     previous_version: int | None = None
     reversible: bool = True
+    state_digest: str | None = None
+    previous_state_digest: str | None = None
+    rollback_target_digest: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "version", _positive_int("version", self.version))
@@ -439,6 +589,44 @@ class UpdateRecord:
                 "previous_version",
                 _positive_int("previous_version", self.previous_version),
             )
+        if not isinstance(self.reversible, bool):
+            raise LearningEvidenceError(
+                "reversible must be boolean",
+                context={"reason": "invalid_update"},
+            )
+        for field_name in (
+            "state_digest",
+            "previous_state_digest",
+            "rollback_target_digest",
+        ):
+            value = getattr(self, field_name)
+            if value is not None:
+                if (
+                    not isinstance(value, str)
+                    or len(value) != 64
+                    or any(ch not in "0123456789abcdef" for ch in value)
+                ):
+                    raise LearningEvidenceError(
+                        f"{field_name} must be lowercase sha256",
+                        context={"reason": "invalid_update", "field": field_name},
+                    )
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "version": self.version,
+            "kind": self.kind.value,
+            "target_id": self.target_id,
+            "timestamp": self.timestamp,
+            "previous_version": self.previous_version,
+            "reversible": self.reversible,
+            "state_digest": self.state_digest,
+            "previous_state_digest": self.previous_state_digest,
+            "rollback_target_digest": self.rollback_target_digest,
+        }
+
+    @property
+    def digest(self) -> str:
+        return canonical_fingerprint(self.as_dict())
 
 
 @dataclass(frozen=True, slots=True)
@@ -451,6 +639,84 @@ class _Snapshot:
     calibrations: dict[str, Calibration]
     samples: dict[str, tuple[tuple[float, bool], ...]]
     clock_version: int
+    state_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class EvidenceStateReceipt:
+    version: int
+    clock_version: int
+    state_digest: str
+    history_digest: str
+    observation_digests: tuple[str, ...]
+    feature_digests: tuple[str, ...]
+    hypothesis_digests: tuple[str, ...]
+    prediction_digests: tuple[str, ...]
+    outcome_digests: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if (
+            isinstance(self.version, bool)
+            or not isinstance(self.version, int)
+            or self.version < 0
+        ):
+            raise LearningEvidenceError(
+                "state receipt version must be non-negative integer",
+                context={"reason": "invalid_state_receipt"},
+            )
+        object.__setattr__(
+            self,
+            "clock_version",
+            _positive_int("clock_version", self.clock_version),
+        )
+        for field_name in ("state_digest", "history_digest"):
+            value = getattr(self, field_name)
+            if (
+                not isinstance(value, str)
+                or len(value) != 64
+                or any(ch not in "0123456789abcdef" for ch in value)
+            ):
+                raise LearningEvidenceError(
+                    f"{field_name} must be lowercase sha256",
+                    context={"reason": "invalid_state_receipt"},
+                )
+        for field_name in (
+            "observation_digests",
+            "feature_digests",
+            "hypothesis_digests",
+            "prediction_digests",
+            "outcome_digests",
+        ):
+            values = tuple(getattr(self, field_name))
+            if any(
+                not isinstance(value, str)
+                or len(value) != 64
+                or any(ch not in "0123456789abcdef" for ch in value)
+                for value in values
+            ):
+                raise LearningEvidenceError(
+                    f"{field_name} contains invalid digest",
+                    context={"reason": "invalid_state_receipt"},
+                )
+            object.__setattr__(self, field_name, values)
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "schema_version": "skeleton.learning_evidence_state.v1",
+            "version": self.version,
+            "clock_version": self.clock_version,
+            "state_digest": self.state_digest,
+            "history_digest": self.history_digest,
+            "observation_digests": list(self.observation_digests),
+            "feature_digests": list(self.feature_digests),
+            "hypothesis_digests": list(self.hypothesis_digests),
+            "prediction_digests": list(self.prediction_digests),
+            "outcome_digests": list(self.outcome_digests),
+        }
+
+    @property
+    def receipt_digest(self) -> str:
+        return canonical_fingerprint(self.as_dict())
 
 
 def _require_provenance(
@@ -573,6 +839,7 @@ class LearningEvidenceStore:
         self._history: list[UpdateRecord] = []
         self._snapshots: dict[int, _Snapshot] = {}
         self._version = 0
+        self._lock = threading.RLock()
 
     @property
     def version(self) -> int:
@@ -617,7 +884,55 @@ class LearningEvidenceStore:
         return tuple(self._outcomes[key] for key in sorted(self._outcomes))
 
     def history(self) -> tuple[UpdateRecord, ...]:
-        return tuple(self._history)
+        with self._lock:
+            return tuple(self._history)
+
+    def state_digest(self) -> str:
+        with self._lock:
+            return self._state_digest()
+
+    def state_receipt(self) -> EvidenceStateReceipt:
+        with self._lock:
+            observations = tuple(
+                self._observations[key].digest
+                for key in sorted(self._observations)
+            )
+            features = tuple(
+                self._features[key].digest
+                for key in sorted(self._features)
+            )
+            hypotheses = tuple(
+                self._hypotheses[key].digest
+                for key in sorted(self._hypotheses)
+            )
+            predictions = tuple(
+                self._predictions[key].digest
+                for key in sorted(self._predictions)
+            )
+            outcomes = tuple(
+                self._outcomes[key].digest
+                for key in sorted(self._outcomes)
+            )
+            history_digest = canonical_fingerprint(
+                [record.as_dict() for record in self._history]
+            )
+            return EvidenceStateReceipt(
+                version=self._version,
+                clock_version=self._clock_version,
+                state_digest=self._state_digest(),
+                history_digest=history_digest,
+                observation_digests=observations,
+                feature_digests=features,
+                hypothesis_digests=hypotheses,
+                prediction_digests=predictions,
+                outcome_digests=outcomes,
+            )
+
+    def verify_state_receipt(self, receipt: EvidenceStateReceipt) -> bool:
+        if not isinstance(receipt, EvidenceStateReceipt):
+            raise TypeError("receipt must be EvidenceStateReceipt")
+        with self._lock:
+            return receipt == self.state_receipt()
 
     def calibration(self, channel: str) -> Calibration | None:
         return self._calibrations.get(_text("channel", channel, MAX_ID_CHARS))
@@ -637,131 +952,190 @@ class LearningEvidenceStore:
     def advance_clock_version(self) -> int:
         """Explicit epoch bump. Prior clock versions become stale on ingest."""
 
-        self._clock_version += 1
-        return self._clock_version
+        with self._lock:
+            self._clock_version += 1
+            return self._clock_version
 
     def record_observation(self, observation: Observation) -> UpdateRecord:
-        commit_time = self._reject_stale(observation.provenance)
-        self._reject_duplicate(observation.observation_id)
-        self._observations[observation.observation_id] = observation
-        return self._commit(
-            UpdateKind.OBSERVATION,
-            observation.observation_id,
-            timestamp=commit_time,
-        )
+        with self._lock:
+            commit_time = self._reject_stale(observation.provenance)
+            self._reject_duplicate(observation.observation_id)
+            previous_state = self._state_digest()
+            self._observations[observation.observation_id] = observation
+            return self._commit(
+                UpdateKind.OBSERVATION,
+                observation.observation_id,
+                timestamp=commit_time,
+                previous_state_digest=previous_state,
+            )
 
     def record_feature(self, feature: Feature) -> UpdateRecord:
-        commit_time = self._reject_stale(feature.provenance)
-        self._reject_duplicate(feature.feature_id)
-        self._require_existing(feature.observation_ids, self._observations, kind="observation")
-        self._reject_feature_contradiction(feature)
-        self._features[feature.feature_id] = feature
-        return self._commit(
-            UpdateKind.FEATURE,
-            feature.feature_id,
-            timestamp=commit_time,
-        )
+        with self._lock:
+            commit_time = self._reject_stale(feature.provenance)
+            self._reject_duplicate(feature.feature_id)
+            self._require_existing(
+                feature.observation_ids,
+                self._observations,
+                kind="observation",
+            )
+            self._reject_feature_contradiction(feature)
+            previous_state = self._state_digest()
+            self._features[feature.feature_id] = feature
+            return self._commit(
+                UpdateKind.FEATURE,
+                feature.feature_id,
+                timestamp=commit_time,
+                previous_state_digest=previous_state,
+            )
 
     def record_hypothesis(self, hypothesis: Hypothesis) -> UpdateRecord:
-        commit_time = self._reject_stale(hypothesis.provenance)
-        self._reject_duplicate(hypothesis.hypothesis_id)
-        self._require_existing(hypothesis.feature_ids, self._features, kind="feature")
-        mismatched = [
-            feature_id
-            for feature_id in hypothesis.feature_ids
-            if self._features[feature_id].subject_id != hypothesis.subject_id
-        ]
-        if mismatched:
-            raise LearningEvidenceError(
-                "hypothesis subject must match every cited feature",
-                context={
-                    "reason": "subject_mismatch",
-                    "hypothesis_id": hypothesis.hypothesis_id,
-                    "mismatched_features": mismatched,
-                },
+        with self._lock:
+            commit_time = self._reject_stale(hypothesis.provenance)
+            self._reject_duplicate(hypothesis.hypothesis_id)
+            self._require_existing(
+                hypothesis.feature_ids,
+                self._features,
+                kind="feature",
             )
-        self._reject_hypothesis_contradiction(hypothesis)
-        self._hypotheses[hypothesis.hypothesis_id] = hypothesis
-        return self._commit(
-            UpdateKind.HYPOTHESIS,
-            hypothesis.hypothesis_id,
-            timestamp=commit_time,
-        )
+            mismatched = [
+                feature_id
+                for feature_id in hypothesis.feature_ids
+                if self._features[feature_id].subject_id != hypothesis.subject_id
+            ]
+            if mismatched:
+                raise LearningEvidenceError(
+                    "hypothesis subject must match every cited feature",
+                    context={
+                        "reason": "subject_mismatch",
+                        "hypothesis_id": hypothesis.hypothesis_id,
+                        "mismatched_features": mismatched,
+                    },
+                )
+            self._reject_hypothesis_contradiction(hypothesis)
+            previous_state = self._state_digest()
+            self._hypotheses[hypothesis.hypothesis_id] = hypothesis
+            return self._commit(
+                UpdateKind.HYPOTHESIS,
+                hypothesis.hypothesis_id,
+                timestamp=commit_time,
+                previous_state_digest=previous_state,
+            )
 
     def record_prediction(self, prediction: Prediction) -> UpdateRecord:
-        commit_time = self._reject_stale(prediction.provenance)
-        self._reject_duplicate(prediction.prediction_id)
-        self._require_existing((prediction.hypothesis_id,), self._hypotheses, kind="hypothesis")
-        existing = [
-            item
-            for item in self._predictions.values()
-            if item.hypothesis_id == prediction.hypothesis_id
-            and not _values_equal(item.expected, prediction.expected)
-        ]
-        if existing:
-            raise LearningEvidenceError(
-                "contradictory prediction for the same hypothesis",
-                context={
-                    "reason": "contradictory_signal",
-                    "hypothesis_id": prediction.hypothesis_id,
-                    "existing": existing[0].expected,
-                    "incoming": prediction.expected,
-                },
+        with self._lock:
+            commit_time = self._reject_stale(prediction.provenance)
+            self._reject_duplicate(prediction.prediction_id)
+            self._require_existing(
+                (prediction.hypothesis_id,),
+                self._hypotheses,
+                kind="hypothesis",
             )
-        self._predictions[prediction.prediction_id] = prediction
-        return self._commit(
-            UpdateKind.PREDICTION,
-            prediction.prediction_id,
-            timestamp=commit_time,
-        )
+            existing = [
+                item
+                for item in self._predictions.values()
+                if item.hypothesis_id == prediction.hypothesis_id
+                and not _values_equal(item.expected, prediction.expected)
+            ]
+            if existing:
+                raise LearningEvidenceError(
+                    "contradictory prediction for the same hypothesis",
+                    context={
+                        "reason": "contradictory_signal",
+                        "hypothesis_id": prediction.hypothesis_id,
+                        "existing": existing[0].expected,
+                        "incoming": prediction.expected,
+                    },
+                )
+            previous_state = self._state_digest()
+            self._predictions[prediction.prediction_id] = prediction
+            return self._commit(
+                UpdateKind.PREDICTION,
+                prediction.prediction_id,
+                timestamp=commit_time,
+                previous_state_digest=previous_state,
+            )
 
     def record_outcome(self, outcome: Outcome) -> UpdateRecord:
-        commit_time = self._reject_stale(outcome.provenance)
-        self._reject_duplicate(outcome.outcome_id)
-        prediction = self._predictions.get(outcome.prediction_id)
-        if prediction is None:
-            raise LearningEvidenceError(
-                "outcome cites an unknown prediction",
-                context={"reason": "unknown_parent", "prediction_id": outcome.prediction_id},
+        with self._lock:
+            commit_time = self._reject_stale(outcome.provenance)
+            self._reject_duplicate(outcome.outcome_id)
+            prediction = self._predictions.get(outcome.prediction_id)
+            if prediction is None:
+                raise LearningEvidenceError(
+                    "outcome cites an unknown prediction",
+                    context={
+                        "reason": "unknown_parent",
+                        "prediction_id": outcome.prediction_id,
+                    },
+                )
+            derived = _values_equal(outcome.actual, prediction.expected)
+            if outcome.correct is not derived:
+                raise LearningEvidenceError(
+                    "outcome.correct contradicts the prediction comparison",
+                    context={
+                        "reason": "contradictory_signal",
+                        "outcome_id": outcome.outcome_id,
+                        "expected": prediction.expected,
+                        "actual": outcome.actual,
+                    },
+                )
+            previous_state = self._state_digest()
+            samples = self._samples.get(prediction.channel, ()) + (
+                (prediction.confidence, outcome.correct),
             )
-        derived = _values_equal(outcome.actual, prediction.expected)
-        if outcome.correct is not derived:
-            raise LearningEvidenceError(
-                "outcome.correct contradicts the prediction comparison",
-                context={
-                    "reason": "contradictory_signal",
-                    "outcome_id": outcome.outcome_id,
-                    "expected": prediction.expected,
-                    "actual": outcome.actual,
-                },
+            self._samples[prediction.channel] = samples
+            self._calibrations[prediction.channel] = _summarize_calibration(
+                prediction.channel,
+                samples,
+                last_outcome_id=outcome.outcome_id,
+                stated_confidence=prediction.confidence,
             )
-        samples = self._samples.get(prediction.channel, ()) + ((prediction.confidence, outcome.correct),)
-        self._samples[prediction.channel] = samples
-        self._calibrations[prediction.channel] = _summarize_calibration(
-            prediction.channel,
-            samples,
-            last_outcome_id=outcome.outcome_id,
-            stated_confidence=prediction.confidence,
-        )
-        self._outcomes[outcome.outcome_id] = outcome
-        return self._commit(
-            UpdateKind.OUTCOME,
-            outcome.outcome_id,
-            timestamp=commit_time,
-        )
+            self._outcomes[outcome.outcome_id] = outcome
+            return self._commit(
+                UpdateKind.OUTCOME,
+                outcome.outcome_id,
+                timestamp=commit_time,
+                previous_state_digest=previous_state,
+            )
 
-    def rollback(self, version: int) -> UpdateRecord:
-        snapshot = self._snapshots.get(version)
-        if snapshot is None:
-            raise LearningEvidenceError(
-                "rollback target is outside bounded history",
-                context={"reason": "rollback_unavailable", "version": version, "retained": sorted(self._snapshots)},
+    def rollback(
+        self,
+        version: int,
+        *,
+        expected_state_digest: str | None = None,
+    ) -> UpdateRecord:
+        with self._lock:
+            snapshot = self._snapshots.get(version)
+            if snapshot is None:
+                raise LearningEvidenceError(
+                    "rollback target is outside bounded history",
+                    context={
+                        "reason": "rollback_unavailable",
+                        "version": version,
+                        "retained": sorted(self._snapshots),
+                    },
+                )
+            if (
+                expected_state_digest is not None
+                and expected_state_digest != snapshot.state_digest
+            ):
+                raise LearningEvidenceError(
+                    "rollback target state digest mismatch",
+                    context={
+                        "reason": "rollback_identity_mismatch",
+                        "version": version,
+                    },
+                )
+            commit_time = _non_negative("clock", self._clock())
+            previous_state = self._state_digest()
+            self._restore(snapshot)
+            return self._commit(
+                UpdateKind.ROLLBACK,
+                f"v{version}",
+                timestamp=commit_time,
+                previous_state_digest=previous_state,
+                rollback_target_digest=snapshot.state_digest,
             )
-        # Validate the journal timestamp before restoring any snapshot. A failed
-        # clock must leave the current store, version, and history untouched.
-        commit_time = _non_negative("clock", self._clock())
-        self._restore(snapshot)
-        return self._commit(UpdateKind.ROLLBACK, f"v{version}", timestamp=commit_time)
 
     def lineage(self, record_id: str) -> tuple[str, ...]:
         """Walk provenance parents from roots to ``record_id``."""
@@ -916,6 +1290,8 @@ class LearningEvidenceStore:
         target_id: str,
         *,
         timestamp: float,
+        previous_state_digest: str | None = None,
+        rollback_target_digest: str | None = None,
     ) -> UpdateRecord:
         """Append one already-validated mutation to the bounded journal.
 
@@ -925,6 +1301,13 @@ class LearningEvidenceStore:
         """
         previous = self._version if self._version > 0 else None
         new_version = self._version + 1
+        before_digest = (
+            previous_state_digest
+            if previous_state_digest is not None
+            else self._state_digest()
+        )
+        self._version = new_version
+        after_digest = self._state_digest()
         record = UpdateRecord(
             version=new_version,
             kind=kind,
@@ -932,12 +1315,58 @@ class LearningEvidenceStore:
             timestamp=timestamp,
             previous_version=previous,
             reversible=True,
+            state_digest=after_digest,
+            previous_state_digest=before_digest,
+            rollback_target_digest=rollback_target_digest,
         )
-        self._version = new_version
         self._history.append(record)
         self._snapshots[new_version] = self._capture()
         self._prune()
         return record
+
+    def _state_payload(self) -> dict[str, object]:
+        return {
+            "schema_version": "skeleton.learning_evidence_store_state.v1",
+            "version": self._version,
+            "clock_version": self._clock_version,
+            "observations": [
+                [key, self._observations[key].digest]
+                for key in sorted(self._observations)
+            ],
+            "features": [
+                [key, self._features[key].digest]
+                for key in sorted(self._features)
+            ],
+            "hypotheses": [
+                [key, self._hypotheses[key].digest]
+                for key in sorted(self._hypotheses)
+            ],
+            "predictions": [
+                [key, self._predictions[key].digest]
+                for key in sorted(self._predictions)
+            ],
+            "outcomes": [
+                [key, self._outcomes[key].digest]
+                for key in sorted(self._outcomes)
+            ],
+            "calibrations": [
+                [key, self._calibrations[key].digest]
+                for key in sorted(self._calibrations)
+            ],
+            "samples": [
+                [
+                    key,
+                    [
+                        [confidence, correct]
+                        for confidence, correct in self._samples[key]
+                    ],
+                ]
+                for key in sorted(self._samples)
+            ],
+        }
+
+    def _state_digest(self) -> str:
+        return canonical_fingerprint(self._state_payload())
 
     def _capture(self) -> _Snapshot:
         return _Snapshot(
@@ -949,6 +1378,7 @@ class LearningEvidenceStore:
             calibrations=dict(self._calibrations),
             samples=dict(self._samples),
             clock_version=self._clock_version,
+            state_digest=self._state_digest(),
         )
 
     def _restore(self, snapshot: _Snapshot) -> None:
