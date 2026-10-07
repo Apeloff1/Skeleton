@@ -868,3 +868,46 @@ def test_supervised_example_identity_binds_temporal_signal(native_model):
     assert left.temporal_signal_digest == old.digest
     assert right.temporal_signal_digest == new.digest
     assert left.digest != right.digest
+
+
+def test_temporal_weight_ppm_uses_deterministic_year_bands(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline, temporal_weight_ppm
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    cases = ((2026, 1_000_000), (2025, 850_000), (2022, 650_000), (2018, 400_000), (2000, 200_000))
+    for source_year, expected in cases:
+        signal = pipeline.temporal_signal(source_year=source_year, observed_year=source_year, knowledge_cutoff_year=2026)
+        assert temporal_weight_ppm(signal) == expected
+
+
+def test_temporal_supersession_binds_order_and_cutoff(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    old = pipeline.temporal_signal(source_year=2020, observed_year=2020, knowledge_cutoff_year=2026)
+    new = pipeline.temporal_signal(source_year=2026, observed_year=2026, knowledge_cutoff_year=2026)
+    relation = pipeline.temporal_supersession(old, new, supersedes=True)
+    assert relation.relation == "supersedes"
+    assert relation.year_distance == 6
+    assert relation.older_signal_digest == old.digest
+    assert relation.newer_signal_digest == new.digest
+
+
+def test_temporal_supersession_rejects_reverse_chronology(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    old = pipeline.temporal_signal(source_year=2020, observed_year=2020, knowledge_cutoff_year=2026)
+    new = pipeline.temporal_signal(source_year=2026, observed_year=2026, knowledge_cutoff_year=2026)
+    with pytest.raises(TokenizerContractError, match="runs backward"):
+        pipeline.temporal_supersession(new, old, supersedes=True)
+
+
+def test_temporal_supersession_rejects_mixed_cutoffs(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    old = pipeline.temporal_signal(source_year=2020, observed_year=2020, knowledge_cutoff_year=2025)
+    new = pipeline.temporal_signal(source_year=2025, observed_year=2025, knowledge_cutoff_year=2026)
+    with pytest.raises(TokenizerContractError, match="different knowledge cutoffs"):
+        pipeline.temporal_supersession(old, new, supersedes=True)
