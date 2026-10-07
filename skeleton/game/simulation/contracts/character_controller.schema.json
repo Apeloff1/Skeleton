@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-10:character_controller:v1",
+  "title": "FLGB-10 character controller",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "entity_id",
+    "max_speed",
+    "max_step",
+    "grounded"
+  ],
+  "properties": {
+    "entity_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "max_speed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "max_step": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "grounded": {
+      "type": "boolean"
+    }
+  }
+}
