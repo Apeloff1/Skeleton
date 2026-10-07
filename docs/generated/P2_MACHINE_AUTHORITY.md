@@ -10,7 +10,7 @@ This document is a deterministic projection of machine authority. It has no comp
 
 | Source | Git blob SHA-1 |
 | --- | --- |
-| `machine/ai_master_plan.json` | `e1855e1f231ad2af7fe49ef5cd415ecd8b451fec` |
+| `machine/ai_master_plan.json` | `606001a5bc5ddddc3da662551433614689f0819a` |
 | `machine/ai_p2_execution_map.json` | `7b552eead507b38ace326af50fb200bc50bf42ce` |
 | `machine/ai_p2_task_backlog.json` | `a21f8528c5d644ac65ad97138c8504c79b9bf889` |
 
@@ -42,7 +42,7 @@ This document is a deterministic projection of machine authority. It has no comp
 
 | Volume | Title | Implementation status |
 | --- | --- | --- |
-| `VOL-002` | System Architecture | `verified` |
+| `VOL-002` | System Architecture | `implemented` |
 | `VOL-003` | Canonical Contract System | `implemented` |
 | `VOL-004` | Kernel & Execution Foundation | `implemented` |
 | `VOL-051` | Repository Architecture | `unverified` |
