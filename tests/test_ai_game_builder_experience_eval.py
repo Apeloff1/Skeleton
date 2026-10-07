@@ -212,6 +212,21 @@ def test_report_is_order_stable_and_requires_independent_evaluator_diversity() -
     }
     assert first.evaluator_ids == ("eval-a", "eval-b")
 
+    with pytest.raises(ExperienceEvaluationError, match="report digest mismatch"):
+        type(first)(
+            artifact_digest=first.artifact_digest,
+            project_revision=first.project_revision,
+            evaluator_ids=first.evaluator_ids,
+            observation_digests=first.observation_digests,
+            defect_digests=first.defect_digests,
+            aggregate_metrics=tuple(
+                (name, value + 0.01 if name == "engagement_proxy" else value)
+                for name, value in first.aggregate_metrics
+            ),
+            unresolved_critical_defects=first.unresolved_critical_defects,
+            report_digest=first.report_digest,
+        )
+
     with pytest.raises(ExperienceEvaluationError, match="diversity"):
         build_experience_report((left,))
 
@@ -263,6 +278,21 @@ def test_promotion_requires_pareto_safe_gain() -> None:
     assert decision.pareto_safe is True
     assert decision.regressed_metrics == ()
     assert set(decision.improved_metrics) == set(EXPERIENCE_METRICS)
+
+    with pytest.raises(
+        ExperienceEvaluationError,
+        match="promotion decision digest mismatch",
+    ):
+        type(decision)(
+            baseline_report_digest=decision.baseline_report_digest,
+            candidate_report_digest=decision.candidate_report_digest,
+            eligible=False,
+            pareto_safe=decision.pareto_safe,
+            improved_metrics=decision.improved_metrics,
+            regressed_metrics=decision.regressed_metrics,
+            blockers=decision.blockers,
+            decision_digest=decision.decision_digest,
+        )
 
 
 def test_promotion_blocks_metric_regression_and_unresolved_critical_defect() -> None:
