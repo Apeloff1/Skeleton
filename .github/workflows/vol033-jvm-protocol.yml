@@ -242,7 +242,10 @@ jobs:
           contract = (
               root / "skeleton/native/jvm_protocol.py"
           ).read_text(encoding="utf-8")
-          required = (
+          registry = (
+              root / "skeleton/native/jvm_registry.py"
+          ).read_text(encoding="utf-8")
+          protocol_required = (
               '"protocol-version-incompatible"',
               '"semantic-equivalence-failed"',
               '"jvm-speedup-insufficient"',
@@ -251,13 +254,16 @@ jobs:
               '"request-negotiated-protocol-mismatch"',
               '"jvm-admission-only"',
               "production_authority: bool = False",
-              "get_selected",
               "profile_selected_unpromoted",
               "automatic-selection-disabled",
           )
-          for token in required:
+          for token in protocol_required:
               if token not in contract:
                   raise SystemExit(f"VOL-033 fail-closed token missing: {token}")
+          if "get_selected" not in registry:
+              raise SystemExit(
+                  "VOL-033 registry selection gate missing: get_selected"
+              )
 
           for token in ("subprocess.", "os.system(", "requests.", "httpx."):
               if token in contract:
