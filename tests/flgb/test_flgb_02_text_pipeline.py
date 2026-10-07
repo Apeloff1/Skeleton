@@ -592,3 +592,15 @@ def test_pipeline_replay_checkpoint_rejects_different_payload(native_model):
     checkpoint = pipeline.replay_checkpoint(pipeline.prepare("alpha beta"))
     with pytest.raises(TokenizerContractError, match="checkpoint mismatch"):
         pipeline.verify_replay_checkpoint(pipeline.prepare("gamma delta"), checkpoint)
+
+
+def test_causal_pipeline_skips_untrainable_windows_without_exception_matching(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextPipelineConfig, TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+
+    pipeline = TextTokenPipeline(
+        NativeTokenizer(native_model),
+        TextPipelineConfig(context_size=1, max_batch_size=8),
+    )
+    prepared = pipeline.prepare("alpha beta gamma")
+    assert pipeline.causal_training_batches(prepared) == ()
