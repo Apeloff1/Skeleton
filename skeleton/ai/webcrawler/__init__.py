@@ -9,6 +9,9 @@ from .ingestion_registry import DurableIngestionRegistry,IngestionLease
 from .outbox import IngestionOutbox,OutboxOperation
 from .year_signals import YearSignalSeries,YearSignalDelta
 from .decade_signals import DecadeSignalSeries,DecadeSignalDelta
+from .regimes import RegimeDetector,Regime,ChangePoint
+from .historical_bias import HistoricalBiasAnalyzer,HistoricalBias
+from .regime_trajectory import RegimeTransition,classify_regime_transitions
 from .session import ResearchSession,SessionLimits
 from .recrawl import RecrawlItem,RecrawlScheduler
 from .knowledge_bridge import CanonicalKnowledgeBridge,KnowledgeBridgeReceipt
