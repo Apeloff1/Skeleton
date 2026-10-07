@@ -122,6 +122,90 @@ def canonical_digest(value: object) -> str:
     return sha256(canonical_json(value).encode("ascii")).hexdigest()
 
 
+def _normalized_identity_text(name: str, value: object, *, maximum: int = 192) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{name} must be non-empty text")
+    normalized = value.strip()
+    if normalized != value or len(normalized) > maximum:
+        raise ValueError(f"{name} must be normalized bounded text")
+    return normalized
+
+
+def _sha256_identity(name: str, value: object) -> str:
+    if not isinstance(value, str) or len(value) != 64:
+        raise ValueError(f"{name} must be lowercase sha256")
+    if any(ch not in "0123456789abcdef" for ch in value):
+        raise ValueError(f"{name} must be lowercase sha256")
+    return value
+
+
+@dataclass(frozen=True, slots=True)
+class ProducerProvenance:
+    """Immutable bridge from canonical AI execution/model identity into a candidate."""
+
+    project_id: str
+    run_id: str
+    operation_id: str
+    execution_id: str
+    execution_identity_digest: str
+    finalization_intent_digest: str
+    model_identity_digest: str
+    producer_behavior_digest: str
+    source_revision: str
+    provider_receipt_refs: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        for name in ("project_id", "run_id", "operation_id", "execution_id"):
+            object.__setattr__(
+                self,
+                name,
+                _normalized_identity_text(name, getattr(self, name)),
+            )
+        for name in (
+            "execution_identity_digest",
+            "finalization_intent_digest",
+            "model_identity_digest",
+            "producer_behavior_digest",
+        ):
+            object.__setattr__(
+                self,
+                name,
+                _sha256_identity(name, getattr(self, name)),
+            )
+        source_revision = self.source_revision
+        if (
+            not isinstance(source_revision, str)
+            or len(source_revision) not in {40, 64}
+            or any(ch not in "0123456789abcdef" for ch in source_revision)
+        ):
+            raise ValueError("source_revision must be a lowercase git object id")
+        refs = tuple(
+            _normalized_identity_text("provider_receipt_ref", ref, maximum=2048)
+            for ref in self.provider_receipt_refs
+        )
+        if len(refs) != len(set(refs)):
+            raise ValueError("provider receipt refs must be unique")
+        object.__setattr__(self, "provider_receipt_refs", refs)
+
+    def to_payload(self) -> dict[str, object]:
+        return {
+            "execution_id": self.execution_id,
+            "execution_identity_digest": self.execution_identity_digest,
+            "finalization_intent_digest": self.finalization_intent_digest,
+            "model_identity_digest": self.model_identity_digest,
+            "operation_id": self.operation_id,
+            "producer_behavior_digest": self.producer_behavior_digest,
+            "project_id": self.project_id,
+            "provider_receipt_refs": list(self.provider_receipt_refs),
+            "run_id": self.run_id,
+            "source_revision": self.source_revision,
+        }
+
+    @property
+    def digest(self) -> str:
+        return canonical_digest(self.to_payload())
+
+
 @dataclass(frozen=True, slots=True)
 class ArtifactIdentity:
     artifact_digest: str
@@ -172,17 +256,27 @@ def normalize_quality(values: Mapping[str, float]) -> tuple[tuple[str, float], .
 @dataclass(frozen=True, slots=True)
 class Candidate:
     producer_id: str
+    producer_provenance: ProducerProvenance
     artifact: ArtifactIdentity
     quality: tuple[tuple[str, float], ...]
     evidence_digests: tuple[str, ...]
     assumption_digest: str
     parent_candidate_digests: tuple[str, ...] = ()
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.producer_id, str) or not self.producer_id.strip():
+            raise ValueError("producer_id must be non-empty")
+        if not isinstance(self.producer_provenance, ProducerProvenance):
+            raise TypeError("producer_provenance must be ProducerProvenance")
+        if not isinstance(self.artifact, ArtifactIdentity):
+            raise TypeError("artifact must be ArtifactIdentity")
+
     @classmethod
     def create(
         cls,
         *,
         producer_id: str,
+        producer_provenance: ProducerProvenance,
         artifact: ArtifactIdentity,
         quality: Mapping[str, float],
         evidence_digests: Iterable[str],
@@ -191,9 +285,16 @@ class Candidate:
     ) -> "Candidate":
         evidence = tuple(evidence_digests)
         parents = tuple(parent_candidate_digests)
-        if not producer_id.strip():
+        if not isinstance(producer_id, str) or not producer_id.strip():
             raise ValueError("producer_id must be non-empty")
-        if not evidence or any(not item.strip() or len(item) < 16 for item in evidence):
+        if not isinstance(producer_provenance, ProducerProvenance):
+            raise TypeError("producer_provenance must be ProducerProvenance")
+        if not isinstance(artifact, ArtifactIdentity):
+            raise TypeError("artifact must be ArtifactIdentity")
+        if not evidence or any(
+            not isinstance(item, str) or not item.strip() or len(item) < 16
+            for item in evidence
+        ):
             raise ValueError("candidate requires stable evidence digests")
         if len(evidence) != len(set(evidence)):
             raise ValueError("candidate evidence digests must be unique")
@@ -205,6 +306,7 @@ class Candidate:
             raise ValueError("assumption_digest must be a stable digest")
         return cls(
             producer_id=producer_id,
+            producer_provenance=producer_provenance,
             artifact=artifact,
             quality=normalize_quality(quality),
             evidence_digests=evidence,
@@ -227,6 +329,7 @@ class Candidate:
             "evidence_digests": list(self.evidence_digests),
             "parent_candidate_digests": list(self.parent_candidate_digests),
             "producer_id": self.producer_id,
+            "producer_provenance": self.producer_provenance.to_payload(),
             "quality": {key: value for key, value in self.quality},
         }
 

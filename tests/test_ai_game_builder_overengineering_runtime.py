@@ -42,6 +42,7 @@ from skeleton.ai.game_builder.contracts import (  # noqa: E402
     Candidate,
     Challenge,
     GateResult,
+    ProducerProvenance,
     QUALITY_AXES,
     Rival,
     canonical_digest,
@@ -93,10 +94,31 @@ def _quality(value: float) -> dict[str, float]:
     return {axis: value for axis in QUALITY_AXES}
 
 
+def _producer_provenance(
+    token: str,
+    *,
+    project_id: str = "project:test-game",
+    run_id: str = "run:test-forge",
+) -> ProducerProvenance:
+    return ProducerProvenance(
+        project_id=project_id,
+        run_id=run_id,
+        operation_id=f"operation:{token}",
+        execution_id=f"execution:{token}",
+        execution_identity_digest=canonical_digest({"execution": token}),
+        finalization_intent_digest=canonical_digest({"finalization": token}),
+        model_identity_digest=canonical_digest({"model": token}),
+        producer_behavior_digest=canonical_digest({"behavior": token}),
+        source_revision=canonical_digest({"source": token})[:40],
+        provider_receipt_refs=(f"provider-receipt:{token}",),
+    )
+
+
 def _candidate(producer: str, token: str, quality: float) -> Candidate:
     suffix = (token * 40)[:40]
     return Candidate.create(
         producer_id=producer,
+        producer_provenance=_producer_provenance(token),
         artifact=ArtifactIdentity(
             artifact_digest=f"artifact-{suffix}",
             canon_digest=f"canon-{suffix}",
@@ -459,6 +481,7 @@ def _forge_release_binding(
 ) -> ForgeReleaseBinding:
     champion = Candidate.create(
         producer_id="release-champion",
+        producer_provenance=_producer_provenance("release-champion"),
         artifact=ArtifactIdentity(
             artifact_digest=artifact_digest,
             canon_digest=canon_digest,
@@ -619,6 +642,31 @@ def test_completed_forge_release_binding_matches_terminal_champion() -> None:
 
     binding = forge.release_binding()
     assert binding.champion_candidate_digest == forge.champion.digest
+    assert binding.project_id == forge.champion.producer_provenance.project_id
+    assert binding.run_id == forge.champion.producer_provenance.run_id
+    assert binding.operation_id == forge.champion.producer_provenance.operation_id
+    assert binding.execution_id == forge.champion.producer_provenance.execution_id
+    assert (
+        binding.execution_identity_digest
+        == forge.champion.producer_provenance.execution_identity_digest
+    )
+    assert (
+        binding.finalization_intent_digest
+        == forge.champion.producer_provenance.finalization_intent_digest
+    )
+    assert (
+        binding.model_identity_digest
+        == forge.champion.producer_provenance.model_identity_digest
+    )
+    assert (
+        binding.producer_behavior_digest
+        == forge.champion.producer_provenance.producer_behavior_digest
+    )
+    assert binding.source_revision == forge.champion.producer_provenance.source_revision
+    assert (
+        binding.champion_producer_provenance_digest
+        == forge.champion.producer_provenance.digest
+    )
     assert binding.champion_artifact_digest == forge.champion.artifact.artifact_digest
     assert binding.champion_canon_digest == forge.champion.artifact.canon_digest
     assert binding.champion_provenance_digest == forge.champion.artifact.provenance_digest

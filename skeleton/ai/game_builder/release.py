@@ -46,6 +46,17 @@ class ForgeReleaseBinding:
     """Content-addressed continuity proof from completed forge to release."""
 
     checkpoint_digest: str
+    origin_champion_digest: str
+    project_id: str
+    run_id: str
+    operation_id: str
+    execution_id: str
+    execution_identity_digest: str
+    finalization_intent_digest: str
+    model_identity_digest: str
+    producer_behavior_digest: str
+    source_revision: str
+    champion_producer_provenance_digest: str
     champion_candidate_digest: str
     champion_artifact_digest: str
     champion_canon_digest: str
@@ -58,15 +69,39 @@ class ForgeReleaseBinding:
     def __post_init__(self) -> None:
         for name in (
             "checkpoint_digest",
+            "origin_champion_digest",
+            "execution_identity_digest",
+            "finalization_intent_digest",
+            "model_identity_digest",
+            "producer_behavior_digest",
+            "champion_producer_provenance_digest",
             "champion_candidate_digest",
+            "promotion_chain_digest",
+        ):
+            value = getattr(self, name)
+            if (
+                not isinstance(value, str)
+                or len(value) != 64
+                or any(ch not in "0123456789abcdef" for ch in value)
+            ):
+                raise ValueError(f"{name} must be lowercase sha256")
+        for name in (
             "champion_artifact_digest",
             "champion_canon_digest",
             "champion_provenance_digest",
-            "promotion_chain_digest",
         ):
             value = getattr(self, name)
             if not isinstance(value, str) or len(value) < 16:
                 raise ValueError(f"{name} must be a stable digest")
+        for name in ("project_id", "run_id", "operation_id", "execution_id", "source_revision"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must be non-empty text")
+        if len(self.source_revision) not in {40, 64} or any(
+            ch not in "0123456789abcdef"
+            for ch in self.source_revision
+        ):
+            raise ValueError("source_revision must be a lowercase git object id")
         if not isinstance(self.effort_mode, EffortMode):
             raise TypeError("forge release effort_mode must be EffortMode")
         if self.completed_rounds != self.effort_mode.rounds:
@@ -103,6 +138,13 @@ class ForgeReleaseBinding:
             raise TypeError("forge release round_index must be an integer")
         if completed_rounds != effort_mode.rounds or round_index != effort_mode.rounds:
             raise ValueError("forge release checkpoint is not at exact terminal round")
+        origin_champion_digest = checkpoint.get("origin_champion_digest")
+        if (
+            not isinstance(origin_champion_digest, str)
+            or len(origin_champion_digest) != 64
+            or any(ch not in "0123456789abcdef" for ch in origin_champion_digest)
+        ):
+            raise ValueError("forge release origin champion digest is invalid")
         if checkpoint.get("stage") != "construct":
             raise ValueError("forge release checkpoint must rest at construct boundary")
         if checkpoint.get("pending_construct") is not None or checkpoint.get("pending_challenge") is not None:
@@ -131,6 +173,10 @@ class ForgeReleaseBinding:
                 raise ValueError("forge release receipt rounds must form exact 1..N sequence")
             if receipt.effort_mode is not effort_mode:
                 raise ValueError("forge release receipt effort mode mismatch")
+            if expected_round == 1 and receipt.incumbent_digest != origin_champion_digest:
+                raise ValueError(
+                    "forge release first receipt does not match origin champion"
+                )
             if (
                 previous_promoted_digest is not None
                 and receipt.incumbent_digest != previous_promoted_digest
@@ -141,6 +187,15 @@ class ForgeReleaseBinding:
         champion = checkpoint.get("champion")
         if not isinstance(champion, Mapping):
             raise ValueError("forge release checkpoint champion is missing")
+        producer_provenance = champion.get("producer_provenance")
+        if not isinstance(producer_provenance, Mapping):
+            raise ValueError("forge release champion producer provenance is missing")
+        project_id = producer_provenance.get("project_id")
+        run_id = producer_provenance.get("run_id")
+        if checkpoint.get("project_id") != project_id:
+            raise ValueError("forge release project scope does not match champion provenance")
+        if checkpoint.get("run_id") != run_id:
+            raise ValueError("forge release run scope does not match champion provenance")
         artifact = champion.get("artifact")
         if not isinstance(artifact, Mapping):
             raise ValueError("forge release checkpoint champion artifact is missing")
@@ -154,9 +209,45 @@ class ForgeReleaseBinding:
         champion_candidate_digest = canonical_digest(champion)
         if previous_promoted_digest != champion_candidate_digest:
             raise ValueError("forge release terminal receipt does not match champion")
+        required_provenance_text = {
+            name: producer_provenance.get(name)
+            for name in ("project_id", "run_id", "operation_id", "execution_id", "source_revision")
+        }
+        if any(
+            not isinstance(value, str) or not value.strip()
+            for value in required_provenance_text.values()
+        ):
+            raise ValueError("forge release champion producer text identity is incomplete")
+        required_provenance_digests = {
+            name: producer_provenance.get(name)
+            for name in (
+                "execution_identity_digest",
+                "finalization_intent_digest",
+                "model_identity_digest",
+                "producer_behavior_digest",
+            )
+        }
+        if any(
+            not isinstance(value, str)
+            or len(value) != 64
+            or any(ch not in "0123456789abcdef" for ch in value)
+            for value in required_provenance_digests.values()
+        ):
+            raise ValueError("forge release champion producer digest identity is incomplete")
 
         return cls(
             checkpoint_digest=supplied_digest,
+            origin_champion_digest=origin_champion_digest,
+            project_id=required_provenance_text["project_id"],
+            run_id=required_provenance_text["run_id"],
+            operation_id=required_provenance_text["operation_id"],
+            execution_id=required_provenance_text["execution_id"],
+            execution_identity_digest=required_provenance_digests["execution_identity_digest"],
+            finalization_intent_digest=required_provenance_digests["finalization_intent_digest"],
+            model_identity_digest=required_provenance_digests["model_identity_digest"],
+            producer_behavior_digest=required_provenance_digests["producer_behavior_digest"],
+            source_revision=required_provenance_text["source_revision"],
+            champion_producer_provenance_digest=canonical_digest(producer_provenance),
             champion_candidate_digest=champion_candidate_digest,
             champion_artifact_digest=identities["artifact_digest"],
             champion_canon_digest=identities["canon_digest"],
@@ -170,6 +261,17 @@ class ForgeReleaseBinding:
     def to_payload(self) -> dict[str, object]:
         return {
             "checkpoint_digest": self.checkpoint_digest,
+            "origin_champion_digest": self.origin_champion_digest,
+            "project_id": self.project_id,
+            "run_id": self.run_id,
+            "operation_id": self.operation_id,
+            "execution_id": self.execution_id,
+            "execution_identity_digest": self.execution_identity_digest,
+            "finalization_intent_digest": self.finalization_intent_digest,
+            "model_identity_digest": self.model_identity_digest,
+            "producer_behavior_digest": self.producer_behavior_digest,
+            "source_revision": self.source_revision,
+            "champion_producer_provenance_digest": self.champion_producer_provenance_digest,
             "champion_artifact_digest": self.champion_artifact_digest,
             "champion_candidate_digest": self.champion_candidate_digest,
             "champion_canon_digest": self.champion_canon_digest,

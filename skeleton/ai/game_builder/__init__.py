@@ -14,6 +14,7 @@ from .contracts import (
     EffortMode,
     GateResult,
     PromotionReceipt,
+    ProducerProvenance,
     Rival,
     Stage,
     canonical_digest,
@@ -99,6 +100,10 @@ from .deep_assurance import (
     TelemetryFeedbackGate,
     TransformReceipt,
 )
+from .producer_provenance import (
+    ProducerProvenanceBindingError,
+    producer_provenance_from_canonical_execution,
+)
 from .rights import (
     IncorporationDecision,
     RightsError,
@@ -127,6 +132,9 @@ __all__ = [
     "GateResult",
     "IncorporationDecision",
     "PromotionReceipt",
+    "ProducerProvenance",
+    "ProducerProvenanceBindingError",
+    "producer_provenance_from_canonical_execution",
     "RightsError",
     "RightsLedger",
     "RightsState",
