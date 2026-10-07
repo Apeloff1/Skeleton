@@ -334,9 +334,10 @@
         "FLGB-12-T11",
         "FLGB-12-T12"
       ],
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
-      "independent_verification_signed": false
+      "independent_verification_signed": false,
+      "implementation_note": "T01-T12 animation/audio/UI/input/controller/accessibility/haptics/replay targets, schemas, and regressions are present; graph ambiguity, input equivalence, focus order, haptic monotonicity, and replay chain integrity fail closed; exact-head dependency closure and independent verification remain required."
     },
     {
       "id": "FLGB-13",
@@ -9241,7 +9242,7 @@
       "implementation_target": "skeleton/game/presentation/animation_graph.py",
       "contract_target": "skeleton/game/presentation/contracts/animation_graph.schema.json",
       "test_target": "tests/flgb/test_flgb_12_animation_graph.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -9307,7 +9308,7 @@
       "implementation_target": "skeleton/game/presentation/skeletal_animation.py",
       "contract_target": "skeleton/game/presentation/contracts/skeletal_animation.schema.json",
       "test_target": "tests/flgb/test_flgb_12_skeletal_animation.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -9373,7 +9374,7 @@
       "implementation_target": "skeleton/game/presentation/procedural_animation.py",
       "contract_target": "skeleton/game/presentation/contracts/procedural_animation.schema.json",
       "test_target": "tests/flgb/test_flgb_12_procedural_animation.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -9439,7 +9440,7 @@
       "implementation_target": "skeleton/game/presentation/audio_graph.py",
       "contract_target": "skeleton/game/presentation/contracts/audio_graph.schema.json",
       "test_target": "tests/flgb/test_flgb_12_audio_graph.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -9505,7 +9506,7 @@
       "implementation_target": "skeleton/game/presentation/music_state.py",
       "contract_target": "skeleton/game/presentation/contracts/music_state.schema.json",
       "test_target": "tests/flgb/test_flgb_12_music_state.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -9571,7 +9572,7 @@
       "implementation_target": "skeleton/game/presentation/spatial_audio.py",
       "contract_target": "skeleton/game/presentation/contracts/spatial_audio.schema.json",
       "test_target": "tests/flgb/test_flgb_12_spatial_audio.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -9637,7 +9638,7 @@
       "implementation_target": "skeleton/game/presentation/ui_layout.py",
       "contract_target": "skeleton/game/presentation/contracts/ui_layout.schema.json",
       "test_target": "tests/flgb/test_flgb_12_ui_layout.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -9703,7 +9704,7 @@
       "implementation_target": "skeleton/game/presentation/input_mapping.py",
       "contract_target": "skeleton/game/presentation/contracts/input_mapping.schema.json",
       "test_target": "tests/flgb/test_flgb_12_input_mapping.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -9769,7 +9770,7 @@
       "implementation_target": "skeleton/game/presentation/controller_support.py",
       "contract_target": "skeleton/game/presentation/contracts/controller_support.schema.json",
       "test_target": "tests/flgb/test_flgb_12_controller_support.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -9835,7 +9836,7 @@
       "implementation_target": "skeleton/game/presentation/accessibility_semantics.py",
       "contract_target": "skeleton/game/presentation/contracts/accessibility_semantics.schema.json",
       "test_target": "tests/flgb/test_flgb_12_accessibility_semantics.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -9901,7 +9902,7 @@
       "implementation_target": "skeleton/game/presentation/haptics.py",
       "contract_target": "skeleton/game/presentation/contracts/haptics.schema.json",
       "test_target": "tests/flgb/test_flgb_12_haptics.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -9967,7 +9968,7 @@
       "implementation_target": "skeleton/game/presentation/presentation_replay.py",
       "contract_target": "skeleton/game/presentation/contracts/presentation_replay.schema.json",
       "test_target": "tests/flgb/test_flgb_12_presentation_replay.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
