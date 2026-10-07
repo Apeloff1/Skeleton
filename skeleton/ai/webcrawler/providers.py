@@ -20,6 +20,16 @@ class FederatedDiscovery:
         names=[getattr(p,"name",None) for p in self.providers]
         if any(not isinstance(x,str) or not x.strip() for x in names):raise ValueError("provider names must be non-empty")
         if len(set(names))!=len(names):raise ValueError("provider names must be unique")
+    def discover_temporal(self,query:str,*,target_decades:Iterable[int]=(),per_provider:int=20,total_limit:int=100)->list[SourceCandidate]:
+        decades=tuple(sorted({int(d) for d in target_decades}))
+        if any(d%10 for d in decades):raise ValueError("target decades must be decade starts")
+        base=self.discover(query,per_provider=per_provider,total_limit=max(total_limit,total_limit*2))
+        if not decades:return base[:total_limit]
+        def temporal_score(candidate):
+            text=(candidate.url+" "+candidate.title+" "+candidate.snippet).lower()
+            hits=sum(1 for d in decades if any(str(y) in text for y in range(d,d+10)) or f"{d}s" in text)
+            return (hits,candidate.score)
+        return sorted(base,key=lambda x:(-temporal_score(x)[0],-temporal_score(x)[1],x.url))[:total_limit]
     def discover(self,query:str,*,per_provider:int=20,total_limit:int=100)->list[SourceCandidate]:
         if not isinstance(query,str) or not query.strip():raise ValueError("query is required")
         if isinstance(per_provider,bool) or not isinstance(per_provider,int) or per_provider<1:raise ValueError("per_provider must be positive")
