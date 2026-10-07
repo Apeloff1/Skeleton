@@ -59,8 +59,9 @@ class ProvenanceLedger:
         self._chains: Dict[str, List[str]] = {}  # root_id -> [entry_ids]
         self._bus = bus
         self._stats = {"recorded": 0, "queries": 0}
+        self._idempotency: Dict[str, str] = {}
 
-    def record(self, source: str, operation: str, input_data: Any, output_data: Any, parent_id: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None) -> ProvenanceEntry:
+    def record(self, source: str, operation: str, input_data: Any, output_data: Any, parent_id: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None, idempotency_key: Optional[str] = None) -> ProvenanceEntry:
         """Record a data transformation in the ledger."""
         if not isinstance(source, str) or not source.strip():
             raise ValueError("source is required")
@@ -70,6 +71,18 @@ class ProvenanceLedger:
             raise ValueError("parent is not recorded")
         if metadata is not None and not isinstance(metadata, dict):
             raise ValueError("metadata must be an object")
+        if idempotency_key is not None:
+            if not isinstance(idempotency_key, str) or not idempotency_key.strip():
+                raise ValueError("idempotency_key must be a non-empty string")
+            prior_id = self._idempotency.get(idempotency_key)
+            if prior_id is not None:
+                prior = self._entries[prior_id]
+                if (prior.source != source or prior.operation != operation or
+                    prior.input_hash != ProvenanceEntry.hash_data(input_data) or
+                    prior.output_hash != ProvenanceEntry.hash_data(output_data) or
+                    prior.parent_id != parent_id or prior.metadata != (metadata or {})):
+                    raise ValueError("idempotency_key reused with different provenance payload")
+                return prior
         import uuid
         entry = ProvenanceEntry(
             entry_id=str(uuid.uuid4())[:12],
@@ -83,6 +96,8 @@ class ProvenanceLedger:
         )
 
         self._entries[entry.entry_id] = entry
+        if idempotency_key is not None:
+            self._idempotency[idempotency_key] = entry.entry_id
 
         # A child of a non-root parent still belongs to the original chain.
         root = self._chain_root(entry.entry_id)
