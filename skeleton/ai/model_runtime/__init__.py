@@ -7,6 +7,8 @@ from .temporal_policy import DEFAULT_TEMPORAL_RUNTIME_POLICY_COMPILER, TemporalR
 from .serving_policy import PolicyAwareServingPlanner, ServiceClass, ServingPlan, ServingRequest
 from .slo_planner import ResourcePlan, RuntimeEstimate, SLOResourcePlanner, SLOTarget
 from .serving_telemetry import RequestTelemetry, ServingTelemetryWindow
+from .runtime_feedback import DeterministicRuntimeEstimator, FeedbackLimits, FeedbackReceipt
+from .closed_loop_serving import ClosedLoopServingController, ControlDecision
 from .flgb_model_runtime import (
     ALLOWED_TRANSITIONS,
     BatchRequest,
@@ -78,14 +80,19 @@ __all__ = [
     "BatchGenerationResult",
     "CancellationToken",
     "BatchRequest",
+    "ClosedLoopServingController",
+    "ControlDecision",
     "DEFAULT_RUNTIME_EPOCHS",
     "DEFAULT_RUNTIME_POLICY_COMPILER",
     "DEFAULT_TEMPORAL_RUNTIME_POLICY_COMPILER",
     "DEFAULT_RUNTIME_SIGNALS",
+    "DeterministicRuntimeEstimator",
     "DeviceDescriptor",
     "DevicePolicy",
     "DeviceReceipt",
     "EpochStatus",
+    "FeedbackLimits",
+    "FeedbackReceipt",
     "GenerationConfig",
     "GenerationResult",
     "GenerationStream",
