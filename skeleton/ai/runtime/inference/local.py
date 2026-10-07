@@ -834,6 +834,7 @@ class LocalModelAdapter(ProviderAdapter):
             model=result.model_id,
             request_id="local-request:" + local_request.digest[:24],
             response_id=result.response_id,
+            execution_receipt_digest=result.execution_receipt_digest,
             structured_output=(
                 dict(result.structured_output)
                 if result.structured_output is not None
