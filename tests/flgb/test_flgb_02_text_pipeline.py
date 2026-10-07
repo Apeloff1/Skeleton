@@ -1107,3 +1107,35 @@ def test_temporal_evaluation_metrics_are_integer_deterministic():
     assert result.accuracy_ppm == 666_666
     assert result.inconsistency_ppm == 0
     assert result.digest == TemporalEvaluationResult("a" * 64, 2, 1, 0, 0).digest
+
+
+def test_temporal_retrieval_rejects_future_and_expired_evidence(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TemporalRetrievalCandidate, TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    valid = TemporalRetrievalCandidate("a" * 64, 1999, 1999, 2005, 700_000)
+    future = TemporalRetrievalCandidate("b" * 64, 2003, 2003, None, 1_000_000)
+    expired = TemporalRetrievalCandidate("c" * 64, 1980, 1980, 1990, 900_000)
+    plan = pipeline.temporal_retrieval_plan((future, expired, valid), query_year=2000)
+    assert plan.candidate_digests == (valid.digest,)
+    assert set(plan.rejected_digests) == {future.digest, expired.digest}
+
+
+def test_temporal_retrieval_ranks_semantics_then_recency_deterministically(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TemporalRetrievalCandidate, TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    older = TemporalRetrievalCandidate("a" * 64, 1990, None, None, 800_000)
+    newer = TemporalRetrievalCandidate("b" * 64, 2000, None, None, 800_000)
+    stronger = TemporalRetrievalCandidate("c" * 64, 1980, None, None, 900_000)
+    plan = pipeline.temporal_retrieval_plan((older, newer, stronger), query_year=2001)
+    assert plan.candidate_digests == (stronger.digest, newer.digest, older.digest)
+
+
+def test_temporal_retrieval_fails_closed_when_nothing_is_valid(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TemporalRetrievalCandidate, TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    future = TemporalRetrievalCandidate("d" * 64, 2025, 2025, None, 1_000_000)
+    with pytest.raises(TokenizerContractError, match="no temporally admissible"):
+        pipeline.temporal_retrieval_plan((future,), query_year=2020)
