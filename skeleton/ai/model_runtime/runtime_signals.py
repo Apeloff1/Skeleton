@@ -64,6 +64,18 @@ _SIGNALS = (
         SignalMaturity.VALIDATED, "speculative decoding serving lineage", False,
     ),
     RuntimeSignal(
+        "chunked-prefill", 2024, "chunked_prefill",
+        SignalMaturity.VALIDATED, "Sarathi-Serve arXiv:2403.02310", True,
+    ),
+    RuntimeSignal(
+        "slo-aware-admission", 2024, "slo_admission",
+        SignalMaturity.VALIDATED, "Mooncake arXiv:2407.00079", True,
+    ),
+    RuntimeSignal(
+        "kv-compression", 2025, "kv_compression",
+        SignalMaturity.EXPERIMENTAL, "arXiv:2503.24000 production caveats", False,
+    ),
+    RuntimeSignal(
         "heterogeneous-pd-serving", 2025, "heterogeneous_phase_placement",
         SignalMaturity.EMERGING, "arXiv:2509.17542", False,
     ),
