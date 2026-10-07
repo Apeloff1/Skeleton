@@ -399,6 +399,54 @@ class TextTokenPipeline:
             raise TokenizerContractError("checkpoint does not belong to training manifest")
         return checkpoint.next(weights_digest, optimizer_digest, rng_digest)
 
+    def mirror_evaluation(self, candidate, *, evaluation_id: str, champion_digest: str, candidate_score_ppm: int, champion_score_ppm: int, risk_gate_passed: bool, independent_verifier: str, evidence_digest: str):
+        from skeleton.ai.training.flgb_training_runtime import CandidateWeights, MirrorEvaluation
+        if not isinstance(candidate, CandidateWeights):
+            raise TokenizerContractError("CandidateWeights required")
+        if candidate.status != "candidate":
+            raise TokenizerContractError("only candidate weights may enter mirror evaluation")
+        return MirrorEvaluation(
+            evaluation_id=evaluation_id,
+            candidate_digest=candidate.digest,
+            champion_digest=champion_digest,
+            candidate_score_ppm=candidate_score_ppm,
+            champion_score_ppm=champion_score_ppm,
+            risk_gate_passed=risk_gate_passed,
+            independent_verifier=independent_verifier,
+            evidence_digest=evidence_digest,
+        )
+
+    def promotion_evidence(self, candidate, evaluation, *, exact_head_commit: str, rights_digest: str, contamination_scan_digest: str, rollback_digest: str, independent_verifier: str, rights_passed: bool, contamination_clear: bool, rollback_ready: bool):
+        from skeleton.ai.training.flgb_training_runtime import CandidateWeights, MirrorEvaluation, PromotionEvidence
+        if not isinstance(candidate, CandidateWeights) or not isinstance(evaluation, MirrorEvaluation):
+            raise TokenizerContractError("candidate/evaluation required")
+        if evaluation.candidate_digest != candidate.digest:
+            raise TokenizerContractError("evaluation does not belong to candidate")
+        if evaluation.independent_verifier == independent_verifier:
+            raise TokenizerContractError("promotion requires verifier separation")
+        return PromotionEvidence(
+            candidate_digest=candidate.digest,
+            exact_head_commit=exact_head_commit,
+            rights_digest=rights_digest,
+            contamination_scan_digest=contamination_scan_digest,
+            evaluation_digest=digest_json({
+                "evaluation_id": evaluation.evaluation_id,
+                "candidate_digest": evaluation.candidate_digest,
+                "champion_digest": evaluation.champion_digest,
+                "candidate_score_ppm": evaluation.candidate_score_ppm,
+                "champion_score_ppm": evaluation.champion_score_ppm,
+                "risk_gate_passed": evaluation.risk_gate_passed,
+                "independent_verifier": evaluation.independent_verifier,
+                "evidence_digest": evaluation.evidence_digest,
+            }),
+            rollback_digest=rollback_digest,
+            independent_verifier=independent_verifier,
+            rights_passed=rights_passed,
+            contamination_clear=contamination_clear,
+            evaluation_passed=evaluation.candidate_wins,
+            rollback_ready=rollback_ready,
+        )
+
     def decode(self, sequence: TokenSequence, *, require_identity: bool = True) -> str:
         if not isinstance(sequence, TokenSequence):
             raise TokenizerContractError("TokenSequence required")
