@@ -3,7 +3,7 @@ import threading
 import unittest
 
 from skeleton.cortex.transformer import TinyTransformer
-from skeleton.ai.model_runtime import DevicePolicy, NativeLLMRuntime, RuntimeContractError
+from skeleton.ai.model_runtime import DevicePolicy, NativeLLMRuntime, RuntimeContractError, TokenizerContractError
 from skeleton.ai.runtime.inference import (
     LocalInferenceCancelled,
     LocalInferenceEngine,
@@ -90,7 +90,7 @@ class TestNativeTransformerLocalBackend(unittest.TestCase):
     def test_tokenizer_mutation_is_rejected_after_backend_binding(self):
         backend = self.backend()
         backend.runtime.model.itos[0] = "mutated-token"
-        with self.assertRaises(Exception):
+        with self.assertRaises(TokenizerContractError):
             backend.infer(LocalInferenceRequest(prompt="hello"), threading.Event())
 
     def test_model_id_is_normalized_once_at_binding(self):
