@@ -37,9 +37,12 @@ from skeleton.ai.game_builder.contracts import (  # noqa: E402
     Challenge,
     EffortMode,
     GateResult,
+    PromotionReceipt,
+    ProducerProvenance,
     QUALITY_AXES,
     Rival,
     Stage,
+    canonical_digest,
 )
 from skeleton.ai.game_builder.dual_rival_forge import DualRivalForge, ForgeStateError  # noqa: E402
 
@@ -48,6 +51,26 @@ def _quality(value: float = 0.5, **updates: float) -> dict[str, float]:
     result = {axis: value for axis in QUALITY_AXES}
     result.update(updates)
     return result
+
+
+def _producer_provenance(
+    token: str,
+    *,
+    project_id: str = "project:test-game",
+    run_id: str = "run:test-forge",
+) -> ProducerProvenance:
+    return ProducerProvenance(
+        project_id=project_id,
+        run_id=run_id,
+        operation_id=f"operation:{token}",
+        execution_id=f"execution:{token}",
+        execution_identity_digest=canonical_digest({"execution": token}),
+        finalization_intent_digest=canonical_digest({"finalization": token}),
+        model_identity_digest=canonical_digest({"model": token}),
+        producer_behavior_digest=canonical_digest({"behavior": token}),
+        source_revision=canonical_digest({"source": token})[:40],
+        provider_receipt_refs=(f"provider-receipt:{token}",),
+    )
 
 
 def _candidate(
@@ -60,6 +83,7 @@ def _candidate(
     suffix = (token * 32)[:32]
     return Candidate.create(
         producer_id=producer,
+        producer_provenance=_producer_provenance(token),
         artifact=ArtifactIdentity(
             artifact_digest=f"artifact-{suffix}",
             canon_digest=f"canon-{suffix}",
@@ -209,6 +233,76 @@ def test_malformed_gate_object_is_rejected_before_promotion() -> None:
         )
 
 
+def test_construct_rejects_cross_project_candidate_injection() -> None:
+    forge = DualRivalForge(effort_mode=100, champion=_candidate("seed", "seed"))
+    candidate = Candidate.create(
+        producer_id=Rival.A.value,
+        producer_provenance=_producer_provenance(
+            "cross-project",
+            project_id="project:other",
+        ),
+        artifact=ArtifactIdentity(
+            artifact_digest="artifact-cross-project-0000000000000000",
+            canon_digest="canon-cross-project-000000000000000000",
+            provenance_digest="provenance-cross-project-0000000000000",
+            family_id="GB03",
+            level_id="GBL-021",
+        ),
+        quality=_quality(),
+        evidence_digests=("evidence-cross-project-000000000000000",),
+        assumption_digest="assumption-cross-project-0000000000000",
+    )
+    with pytest.raises(ForgeStateError, match="project_id does not match forge scope"):
+        forge.submit_construct(candidate)
+
+
+def test_attack_rejects_cross_run_candidate_injection() -> None:
+    forge = DualRivalForge(effort_mode=100, champion=_candidate("seed", "seed"))
+    built = _candidate(Rival.A.value, "built")
+    forge.submit_construct(built)
+    improved = Candidate.create(
+        producer_id=Rival.B.value,
+        producer_provenance=_producer_provenance(
+            "cross-run",
+            run_id="run:other-forge",
+        ),
+        artifact=ArtifactIdentity(
+            artifact_digest="artifact-cross-run-0000000000000000000",
+            canon_digest="canon-cross-run-000000000000000000000",
+            provenance_digest="provenance-cross-run-0000000000000000",
+            family_id="GB03",
+            level_id="GBL-021",
+        ),
+        quality=_quality(),
+        evidence_digests=("evidence-cross-run-000000000000000000",),
+        assumption_digest="assumption-cross-run-000000000000000",
+    )
+    challenge = Challenge(
+        challenger_id=Rival.B.value,
+        target_candidate_digest=built.digest,
+        attack_digest="attack-cross-run-000000000000000000000",
+        improved_candidate=improved,
+        counterexample_digests=("counter-cross-run-0000000000000000000",),
+    )
+    with pytest.raises(ForgeStateError, match="run_id does not match forge scope"):
+        forge.submit_attack(challenge)
+
+
+def test_candidate_digest_commits_to_producer_provenance() -> None:
+    base = _candidate(Rival.A.value, "provenance-base")
+    altered = Candidate.create(
+        producer_id=base.producer_id,
+        producer_provenance=_producer_provenance("provenance-altered"),
+        artifact=base.artifact,
+        quality=base.quality_map,
+        evidence_digests=base.evidence_digests,
+        assumption_digest=base.assumption_digest,
+        parent_candidate_digests=base.parent_candidate_digests,
+    )
+    assert altered.artifact == base.artifact
+    assert altered.digest != base.digest
+
+
 def test_non_compensable_gate_failure_retains_incumbent() -> None:
     incumbent = _candidate("seed", "s", quality=_quality(0.4))
     forge = DualRivalForge(effort_mode=100, champion=incumbent)
@@ -325,6 +419,113 @@ def test_checkpoint_round_trip_preserves_pending_attack_state() -> None:
     tampered = dict(checkpoint)
     tampered["round_index"] = 999
     with pytest.raises(ForgeStateError, match="checkpoint digest mismatch"):
+        DualRivalForge.restore(tampered)
+
+
+def test_promotion_receipt_rehashes_public_decision_evidence() -> None:
+    incumbent = _candidate("seed", "s", quality=_quality(0.4))
+    forge = DualRivalForge(effort_mode=100, champion=incumbent)
+    built = _candidate(Rival.A.value, "a", quality=_quality(0.5))
+    forge.submit_construct(built)
+    challenge = _challenge(Rival.B, built, "b")
+    forge.submit_attack(challenge)
+    receipt = forge.reconcile(
+        submitted=challenge.improved_candidate,
+        evaluator_id="independent-judge",
+        gate_results=_gates(),
+    )
+
+    assert canonical_digest(receipt.decision_payload()) == receipt.decision_digest
+    with pytest.raises(ValueError, match="decision digest mismatch"):
+        PromotionReceipt(
+            round_index=receipt.round_index,
+            effort_mode=receipt.effort_mode,
+            incumbent_digest=receipt.incumbent_digest,
+            submitted_digest=receipt.submitted_digest,
+            promoted_digest=receipt.promoted_digest,
+            evaluator_id=receipt.evaluator_id,
+            gate_results=receipt.gate_results,
+            evaluated_submitted_quality=receipt.evaluated_submitted_quality,
+            decision=receipt.decision,
+            decision_digest="tampered-" + "0" * 64,
+        )
+
+
+def test_forge_rejects_completed_round_count_without_receipt_history() -> None:
+    with pytest.raises(
+        ForgeStateError,
+        match="completed_rounds must equal promotion receipt count",
+    ):
+        DualRivalForge(
+            effort_mode=100,
+            champion=_candidate("seed", "s"),
+            completed_rounds=1,
+            round_index=2,
+        )
+
+
+def test_forge_rejects_terminal_champion_not_bound_to_receipt_chain() -> None:
+    incumbent = _candidate("seed", "s", quality=_quality(0.4))
+    forge = DualRivalForge(effort_mode=100, champion=incumbent)
+    built = _candidate(Rival.A.value, "a", quality=_quality(0.5))
+    forge.submit_construct(built)
+    challenge = _challenge(Rival.B, built, "b")
+    forge.submit_attack(challenge)
+    receipt = forge.reconcile(
+        submitted=None,
+        evaluator_id="independent-judge",
+        gate_results=_gates(),
+    )
+
+    with pytest.raises(
+        ForgeStateError,
+        match="forge champion must match terminal promotion receipt",
+    ):
+        DualRivalForge(
+            effort_mode=100,
+            champion=_candidate("seed", "different"),
+            builder=Rival.B,
+            completed_rounds=1,
+            round_index=2,
+            receipts=(receipt,),
+        )
+
+
+def test_self_consistent_forged_checkpoint_cannot_invent_completed_rounds() -> None:
+    forge = DualRivalForge(effort_mode=100, champion=_candidate("seed", "s"))
+    checkpoint = forge.checkpoint()
+    forged = {
+        key: value
+        for key, value in checkpoint.items()
+        if key != "checkpoint_digest"
+    }
+    forged["completed_rounds"] = 1
+    forged["round_index"] = 2
+    forged["receipt_digests"] = []
+    forged["checkpoint_digest"] = canonical_digest(
+        {key: value for key, value in forged.items() if key != "checkpoint_digest"}
+    )
+
+    with pytest.raises(
+        ForgeStateError,
+        match="completed_rounds must equal promotion receipt count",
+    ):
+        DualRivalForge.restore(forged)
+
+
+def test_checkpoint_scope_substitution_is_rejected_even_when_rehashed() -> None:
+    forge = DualRivalForge(effort_mode=100, champion=_candidate("seed", "scope-check"))
+    checkpoint = forge.checkpoint()
+    tampered = {
+        key: value
+        for key, value in checkpoint.items()
+        if key != "checkpoint_digest"
+    }
+    tampered["project_id"] = "project:substituted"
+    tampered["checkpoint_digest"] = canonical_digest(
+        {key: value for key, value in tampered.items() if key != "checkpoint_digest"}
+    )
+    with pytest.raises(ForgeStateError, match="project_id does not match champion provenance"):
         DualRivalForge.restore(tampered)
 
 
