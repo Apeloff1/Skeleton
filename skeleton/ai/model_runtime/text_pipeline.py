@@ -84,6 +84,41 @@ class PreparedText:
 
 
 @dataclass(frozen=True)
+class SupervisedTextExample:
+    """One prompt/response example with a deterministic normalized boundary."""
+    example_id: str
+    prepared: PreparedText
+    prompt_token_count: int
+    prompt_digest: str
+    response_digest: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.example_id, str) or not self.example_id or self.example_id != self.example_id.strip():
+            raise TokenizerContractError("invalid supervised example id")
+        if not isinstance(self.prepared, PreparedText):
+            raise TokenizerContractError("PreparedText required")
+        if isinstance(self.prompt_token_count, bool) or not isinstance(self.prompt_token_count, int) or self.prompt_token_count <= 0:
+            raise TokenizerContractError("invalid prompt token count")
+        if self.prompt_token_count >= len(self.prepared.sequence.token_ids):
+            raise TokenizerContractError("supervised example requires response tokens")
+        for name in ("prompt_digest", "response_digest"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value):
+                raise TokenizerContractError(f"invalid {name}")
+
+    @property
+    def digest(self) -> str:
+        return digest_json({
+            "example_id": self.example_id,
+            "sequence_digest": self.prepared.sequence.digest,
+            "prompt_token_count": self.prompt_token_count,
+            "prompt_digest": self.prompt_digest,
+            "response_digest": self.response_digest,
+            "pipeline_digest": self.prepared.pipeline_digest,
+        })
+
+
+@dataclass(frozen=True)
 class ModelInputBatch:
     """Rectangular model-ready token ids with explicit attention semantics."""
     input_ids: tuple[tuple[int, ...], ...]
@@ -528,6 +563,45 @@ class TextTokenPipeline:
             sha256(text.encode("utf-8")).hexdigest(),
             sha256(normalized.encode("utf-8")).hexdigest(),
         )
+
+    def prepare_supervised_example(self, example_id: str, prompt: str, response: str) -> SupervisedTextExample:
+        if not isinstance(prompt, str) or not isinstance(response, str) or not prompt or not response:
+            raise TokenizerContractError("supervised prompt and response required")
+        normalized_prompt = self.normalize(prompt)
+        normalized_response = self.normalize(response)
+        prompt_sequence = self.tokenizer.encode_sequence(normalized_prompt)
+        prepared = self.prepare(prompt + response)
+        prompt_count = len(prompt_sequence.token_ids)
+        if tuple(prepared.sequence.token_ids[:prompt_count]) != tuple(prompt_sequence.token_ids):
+            raise TokenizerContractError("tokenizer is not prefix-stable across prompt/response boundary")
+        return SupervisedTextExample(
+            example_id,
+            prepared,
+            prompt_count,
+            sha256(normalized_prompt.encode("utf-8")).hexdigest(),
+            sha256(normalized_response.encode("utf-8")).hexdigest(),
+        )
+
+    def supervised_training_batches(self, example: SupervisedTextExample, *, pad_token_id: int | None = None, ignore_index: int = -100) -> tuple[CausalTrainingBatch, ...]:
+        if not isinstance(example, SupervisedTextExample) or example.prepared.pipeline_digest != self.digest:
+            raise TokenizerContractError("supervised example belongs to another pipeline")
+        batches = self.causal_training_batches(example.prepared, pad_token_id=pad_token_id, ignore_index=ignore_index)
+        output, consumed = [], 0
+        for batch in batches:
+            prefix_lengths = []
+            for mask in batch.loss_mask:
+                row_source_tokens = len(mask) + 1
+                remaining_prompt = max(0, example.prompt_token_count - consumed)
+                prefix_lengths.append(min(row_source_tokens, remaining_prompt))
+                consumed += row_source_tokens
+            try:
+                output.append(mask_causal_prefix(batch, tuple(prefix_lengths)))
+            except TokenizerContractError as exc:
+                if str(exc) != "prefix masking removed all supervised targets":
+                    raise
+        if not output:
+            raise TokenizerContractError("supervised example produced no response targets")
+        return tuple(output)
 
     def prepare_corpus(self, documents: Iterable[tuple[str, str]]) -> PreparedCorpus:
         prepared, document_ids = [], []
