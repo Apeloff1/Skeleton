@@ -71,6 +71,9 @@ class CrawlPolicy:
     min_host_delay_seconds: float = 1.0
     max_retries: int = 3
     retry_base_seconds: float = 2.0
+    max_retry_delay_seconds: float = 300.0
+    max_links_per_document: int = 500
+    retry_statuses: tuple[int, ...] = (408, 425, 429, 500, 502, 503, 504)
     allowed_content_types: tuple[str, ...] = (
         "text/html", "text/plain", "application/xhtml+xml",
     )
@@ -367,16 +370,45 @@ class CrawlEngine:
         return True
 
     def _next(self, now: float) -> FrontierItem | None:
-        if not self._frontier:
+        """Select the best ready item without one delayed host blocking all others."""
+        blocked: list[FrontierItem] = []
+        selected = None
+        while self._frontier:
+            item = heapq.heappop(self._frontier)
+            host = urlsplit(item.url).hostname or ""
+            ready = max(item.ready_at, self._host_ready.get(host, 0.0))
+            if ready <= now:
+                selected = item
+                break
+            blocked.append(item)
+        for item in blocked:
+            heapq.heappush(self._frontier, item)
+        if selected is not None:
+            self._queued.discard(selected.url)
+        return selected
+
+    def _retry(self, item: FrontierItem, *, now: float, delay: float | None = None) -> None:
+        if item.attempts >= self.policy.max_retries:
+            return
+        self._seen.discard(item.url)
+        fallback = self.policy.retry_base_seconds * (2 ** item.attempts)
+        retry = min(self.policy.max_retry_delay_seconds, max(0.0, fallback if delay is None else delay))
+        self._seq += 1
+        heapq.heappush(self._frontier, FrontierItem(
+            now + retry, item.priority, self._seq, item.url,
+            item.depth, item.parent_url, item.attempts + 1,
+        ))
+        self._queued.add(item.url)
+
+    @staticmethod
+    def _retry_after(headers: Mapping[str, str]) -> float | None:
+        raw = headers.get("retry-after")
+        if raw is None:
             return None
-        item = self._frontier[0]
-        host = urlsplit(item.url).hostname or ""
-        ready = max(item.ready_at, self._host_ready.get(host, 0.0))
-        if ready > now:
+        try:
+            return max(0.0, float(raw.strip()))
+        except (ValueError, TypeError):
             return None
-        heapq.heappop(self._frontier)
-        self._queued.discard(item.url)
-        return item
 
     def step(self, *, now: float | None = None) -> CrawlDocument | None:
         now = time.time() if now is None else now
@@ -400,18 +432,14 @@ class CrawlEngine:
             )
         except Exception:
             self.budget.requests += 1
-            if item.attempts < self.policy.max_retries:
-                self._seen.discard(item.url)
-                retry = self.policy.retry_base_seconds * (2 ** item.attempts)
-                self._seq += 1
-                heapq.heappush(self._frontier, FrontierItem(
-                    now + retry, item.priority, self._seq, item.url,
-                    item.depth, item.parent_url, item.attempts + 1,
-                ))
-                self._queued.add(item.url)
+            self._retry(item, now=now)
             return None
 
         body = response.body[: self.policy.max_response_bytes]
+        if response.status in self.policy.retry_statuses:
+            self.budget.charge_response(len(body), accepted=False)
+            self._retry(item, now=now, delay=self._retry_after(response.headers))
+            return None
         ctype = response.headers.get("content-type", "").split(";", 1)[0].lower()
         accepted_type = ctype in self.policy.allowed_content_types
         successful = 200 <= response.status < 300 and accepted_type
@@ -425,7 +453,7 @@ class CrawlEngine:
             return None
         self.store.put(doc)
         if novel and item.depth < self.policy.max_depth and not self.budget.exhausted:
-            for link in doc.links:
+            for link in doc.links[: self.policy.max_links_per_document]:
                 self.enqueue(link, depth=item.depth + 1, parent_url=item.url)
         return doc if novel else None
 
