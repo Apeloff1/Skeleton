@@ -74,6 +74,10 @@ class CrawlPolicy:
     retry_base_seconds: float = 2.0
     max_retry_delay_seconds: float = 300.0
     max_links_per_document: int = 500
+    max_url_length: int = 4096
+    max_query_pairs: int = 32
+    max_path_segments: int = 64
+    robots_ttl_seconds: float = 86_400.0
     retry_statuses: tuple[int, ...] = (408, 425, 429, 500, 502, 503, 504)
     allowed_content_types: tuple[str, ...] = (
         "text/html", "text/plain", "application/xhtml+xml",
@@ -84,6 +88,12 @@ class CrawlPolicy:
         try:
             p = urlsplit(canonicalize_url(url))
         except (ValueError, UnicodeError):
+            return False
+        if len(url) > self.max_url_length:
+            return False
+        if len(parse_qsl(p.query, keep_blank_values=True)) > self.max_query_pairs:
+            return False
+        if len([x for x in p.path.split("/") if x]) > self.max_path_segments:
             return False
         if not destination_allowed(p.hostname or ""):
             return False
