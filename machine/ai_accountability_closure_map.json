@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "map_version": "1.0.0",
+  "map_version": "1.0.1",
   "status": "active",
   "objective": "Map every atomic AI build queue task to one closed canonical gap and one independent exact-head verification gate before any accountability sign-off or completion.",
   "rules": {
@@ -23,7 +23,7 @@
       "workflow_name": "State Recovery Drill",
       "verifier_script": "scripts/verify_state_authority_closure.py",
       "expected_receipt_verifier": "independent-state-authority-v1",
-      "expected_script_sha256": "8c6242a7d030bc090bbb9b8ad05f6adbbe0485f2a7d337132c1939469595f7fe"
+      "expected_script_sha256": "59851271d8b5b8640b127b4dc3a16d2fcf4c20408823119d62488f35548b27e1"
     },
     {
       "key": "S0-GOV",

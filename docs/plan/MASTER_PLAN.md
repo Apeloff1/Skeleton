@@ -1,6 +1,6 @@
 # Skeleton AI Master Plan
 
-Plan version: **2.5.0**
+Plan version: **2.6.6**
 
 Architecture lane: `PR #1904 / integration/architecture-map-v1`
 
@@ -698,6 +698,12 @@ The fields may contain planned targets; they are planning depth, not evidence. `
 
 Sequential depth is now complete across **VOL-000..VOL-420**. Future work must increase implementation, verification, hardening and production evidence inside the frozen domains; new top-level breadth requires the existing scope-freeze ADR exception.
 
+**2026-10-07 reconciliation:** VOL-361..419 now resolve to concrete implementation/test surfaces in the machine plan. Previously stale `unverified` records in VOL-366..380 and VOL-383..418 were promoted to `implemented`; VOL-420 remains `verified`. No open-gap volume was promoted to `verified` or signed solely from file presence.
+
+**Runtime hardening slice:** VOL-383, VOL-384, VOL-387, VOL-388 and VOL-389 now carry stronger production-side invariants and regression coverage for GPU reservations/accounting, safe model eviction, KV/prefix cache isolation and speculative target verification. Exact-head verification and integration gaps remain open.
+
+**Governance hardening slice:** VOL-393..402 and VOL-407..413 now add deterministic topology/locality controls, reproducible build consensus, homogeneous eval aggregation, research-compute class isolation, license/rights fail-closed semantics, ethics admission, lifecycle receipts, deprecation validation and staged provider cutover/rollback. These remain implementation-depth gains until exact-head qualification closes.
+
 ## 24.4 Exotic systems depth layer
 
 The breadth-frozen plan now includes a dedicated exotic-mechanism reservoir at `docs/plan/EXOTIC_SYSTEMS_DEPTH.md`, with a machine mirror at `machine/ai_exotic_systems_catalog.json`.
@@ -900,3 +906,5 @@ The FLGB validator additionally enforces 18 planes × 12 registered subsystems, 
 
 
 The FLGB construction bridge is `machine/functional_llm_game_builder_execution_backlog.json`: **216 planned build units** (18 planes × 12 subsystems). Each unit names implementation, contract, and focused-test targets and inherits the atlas lifecycle, evidence, stress, recovery, rights, and independent-verification obligations. The backlog is deliberately 0/216 implementation-signed until exact-head executable evidence exists.
+
+**Experimental lifecycle hardening slice:** VOL-416..418 now enforce monotonic kill-switch behavior, evidence-bearing research promotion receipts and stricter technique retirement inventories/archive evidence. Integration and exact-head qualification remain independently gated.

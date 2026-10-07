@@ -2,7 +2,7 @@
   "schema_version": "skeleton.enterprise_ai.implementation_notes.v1",
   "standard_version": "2026.10",
   "depth_pass": "DP-201-240",
-  "generated_from_master_plan": "2.6.0",
+  "generated_from_master_plan": "2.6.6",
   "volume_count": 40,
   "dossiers": [
     {
@@ -54,12 +54,7 @@
         "evaluations": [
           ".github/workflows/p1-agent-delegation-qualification.yml"
         ],
-        "existing_evidence": [
-          "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
-          "github-actions-job:109064006805",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36462413037",
-          "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -288,12 +283,7 @@
         "evaluations": [
           ".github/workflows/p1-agent-delegation-qualification.yml"
         ],
-        "existing_evidence": [
-          "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
-          "github-actions-job:109064006805",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36462413037",
-          "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -515,11 +505,7 @@
         "evaluations": [
           "skeleton/testing/test_agent_performance_evidence.py"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/d47eeb44feb4e1846d15657cefe92dd6eb725d40",
-          "skeleton/ai/agents/performance_evidence.py",
-          "skeleton/testing/test_agent_performance_evidence.py"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -741,11 +727,7 @@
         "evaluations": [
           "skeleton/testing/test_agent_economics.py"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/35170cf6cabe5bbe04cf3def3c99d0bd5a74cddc",
-          "skeleton/ai/agents/economics.py",
-          "skeleton/testing/test_agent_economics.py"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -974,12 +956,7 @@
         "evaluations": [
           ".github/workflows/p1-agent-delegation-qualification.yml"
         ],
-        "existing_evidence": [
-          "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
-          "github-actions-job:109064006805",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36462413037",
-          "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -1201,11 +1178,7 @@
         "evaluations": [
           "skeleton/testing/test_consensus_disagreement.py"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/0fbac57d5bdd3394a23d1243c6ff72e35dd0a6a6",
-          "skeleton/ai/agents/consensus.py",
-          "skeleton/testing/test_consensus_disagreement.py"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -1435,12 +1408,7 @@
         "evaluations": [
           ".github/workflows/p1-blast-radius-alignment.yml"
         ],
-        "existing_evidence": [
-          "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
-          "github-actions-job:109064006200",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36462412966",
-          "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -1673,14 +1641,7 @@
           ".github/workflows/p1-blast-radius-alignment.yml",
           ".github/workflows/p1-safe-autonomy-bundle.yml"
         ],
-        "existing_evidence": [
-          "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
-          "github-actions-job:109064006200",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36462412966",
-          "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
-          "github-actions-job:109064006336",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36462413031"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -1901,11 +1862,7 @@
         "evaluations": [
           "skeleton/testing/test_artifact_review_workflow.py"
         ],
-        "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/2c04246776357c1d4cf6a90e9b7d6b66f035a837",
-          "skeleton/ai/artifact_review.py",
-          "skeleton/testing/test_artifact_review_workflow.py"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {

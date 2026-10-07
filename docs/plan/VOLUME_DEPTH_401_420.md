@@ -62,3 +62,37 @@ production-promotion gates remain in force.
 - finish AI-tree ownership cutover only after parity/import/recovery evidence;
 - build vertical slices VS-000..VS-007 and the final assembly acceptance bundle;
 - keep breadth frozen at **VOL-420** while increasing verified construction depth.
+
+## Implementation reconciliation snapshot — 2026-10-07
+
+Machine plan version: `2.6.5`. This snapshot reports implementation binding only; open gaps remain qualification obligations and are **not** silently converted into signed completion.
+
+Status distribution: `implemented` 19 · `verified` 1.
+
+| Volume | Domain | Implementation | Evidence refs | Open gaps | Enterprise maturity |
+| --- | --- | --- | ---: | ---: | --- |
+| VOL-401 | Evaluation Farm | implemented | 3 | 2 | designed → superior |
+| VOL-402 | Research Compute Queue | implemented | 2 | 2 | designed → superior |
+| VOL-403 | Compute Quotas | implemented | 4 | 2 | designed → superior |
+| VOL-404 | Budget Accounting Ledger | implemented | 4 | 2 | designed → superior |
+| VOL-405 | Forecasting Engine | implemented | 4 | 2 | designed → superior |
+| VOL-406 | Cost Anomaly Detection | implemented | 4 | 2 | designed → superior |
+| VOL-407 | License Intelligence | implemented | 3 | 2 | designed → superior |
+| VOL-408 | Data Usage Rights | implemented | 3 | 1 | designed → superior |
+| VOL-409 | Attribution Engine | implemented | 4 | 2 | designed → superior |
+| VOL-410 | Research Ethics Review | implemented | 3 | 2 | designed → superior |
+| VOL-411 | Model Lifecycle Governance | implemented | 2 | 1 | designed → superior |
+| VOL-412 | Model Deprecation | implemented | 2 | 2 | designed → superior |
+| VOL-413 | Provider Migration | implemented | 2 | 1 | designed → superior |
+| VOL-414 | Shadow Traffic | implemented | 4 | 2 | designed → superior |
+| VOL-415 | Champion / Challenger Registry | implemented | 4 | 2 | designed → superior |
+| VOL-416 | Experimental Feature Sandbox | implemented | 2 | 1 | designed → superior |
+| VOL-417 | Research Branching Model | implemented | 2 | 2 | designed → superior |
+| VOL-418 | Technique Retirement | implemented | 2 | 2 | designed → superior |
+| VOL-419 | Knowledge of Failure | implemented | 4 | 2 | designed → superior |
+| VOL-420 | Architecture Scope Freeze | verified | 32 | 0 | designed → superior |
+
+Enterprise implementation notebook:
+[`docs/architecture/enterprise-volume-notes/DP-401-420.md`](../architecture/enterprise-volume-notes/DP-401-420.md).
+
+Closure rule: implementation presence is necessary but not sufficient. `verified`/signed completion requires closed gaps plus exact-head tests, fault/recovery evidence, applicable SLO/economic evidence, and accountability proof.

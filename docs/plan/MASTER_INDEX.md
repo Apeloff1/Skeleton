@@ -105,6 +105,10 @@ Final governance/scope-freeze depth pass: [`VOLUME_DEPTH_401_420.md`](VOLUME_DEP
 
 Sequential depth closure: **VOL-000..420 complete** across DP-000-040 through DP-401-420.
 
+Implementation reconciliation (2026-10-07): **VOL-361..419 now all bind to concrete implementation/test surfaces in machine plan v2.6.6; VOL-420 remains verified. Verification/signing for VOL-361..419 remains evidence-gated until open obligations and exact-head qualification close.**
+
+Runtime hardening (2026-10-07): **VOL-383/384/387/388/389 strengthened with additional fail-closed invariants and regression tests; these are implementation-depth gains, not verification signatures.**
+
 Engineering pass: [`ENGINEERING_PASS.md`](ENGINEERING_PASS.md)
 
 Machine engineering contract: [`machine/ai_engineering_pass.json`](../../machine/ai_engineering_pass.json)
@@ -865,3 +869,7 @@ Exact-head workflow: [`.github/workflows/functional-llm-game-builder-masterplan.
 Functional LLM + Game Builder execution backlog: [`machine/functional_llm_game_builder_execution_backlog.json`](../../machine/functional_llm_game_builder_execution_backlog.json)
 
 Execution-backlog validator: [`scripts/check_functional_llm_game_builder_execution_backlog.py`](../../scripts/check_functional_llm_game_builder_execution_backlog.py)
+
+Governance/runtime hardening (2026-10-07): **VOL-393..402 and VOL-407..413 strengthened with deterministic, fail-closed runtime and governance invariants plus adversarial regression coverage. Machine plan v2.6.6 preserves independent verification/signing gates.**
+
+Experimental lifecycle hardening (2026-10-07): **VOL-416..418 strengthened with monotonic kill-switch, promotion-receipt and retirement-inventory controls. Machine plan v2.6.6 keeps verification/signing separate.**

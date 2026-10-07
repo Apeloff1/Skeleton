@@ -2,7 +2,7 @@
   "schema_version": "skeleton.enterprise_ai.implementation_notes.v1",
   "standard_version": "2026.10",
   "depth_pass": "DP-401-420",
-  "generated_from_master_plan": "2.6.0",
+  "generated_from_master_plan": "2.6.6",
   "volume_count": 20,
   "dossiers": [
     {
@@ -10,7 +10,7 @@
       "title": "Evaluation Farm",
       "depth_pass": "DP-401-420",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-401",
@@ -31,7 +31,9 @@
         ],
         "canonical_paths": [
           "skeleton/eval",
-          "skeleton/runtime"
+          "skeleton/runtime",
+          "skeleton/eval/evaluation_farm.py",
+          "skeleton/ai/evaluation/evaluation_farm.py"
         ],
         "risks": [
           "worker scorer drift",
@@ -42,7 +44,7 @@
           "reuse worker attestation"
         ],
         "tests": [
-          "planned:skeleton/testing/test_evaluation_farm.py"
+          "skeleton/testing/test_evaluation_farm.py"
         ],
         "evaluations": [
           "planned:multi-worker result reproducibility"
@@ -232,7 +234,7 @@
       "title": "Research Compute Queue",
       "depth_pass": "DP-401-420",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-402",
@@ -253,18 +255,19 @@
         ],
         "canonical_paths": [
           "experiments",
-          "skeleton/runtime"
+          "skeleton/runtime",
+          "skeleton/runtime/research_queue.py"
         ],
         "risks": [
           "research starvation",
           "research overloads production"
         ],
         "gaps": [
-          "define research classes",
-          "bind quotas/fairness"
+          "bind quotas/fairness",
+          "bind research workload classes to quota/fairness policy and durable allocation receipts"
         ],
         "tests": [
-          "planned:skeleton/testing/test_research_compute_queue.py"
+          "skeleton/testing/test_research_compute_queue.py"
         ],
         "evaluations": [
           "planned:mixed research/production load evaluation"
@@ -493,12 +496,7 @@
         "evaluations": [
           ".github/workflows/p1-budget-accounting.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102424353",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473820997",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -723,12 +721,7 @@
         "evaluations": [
           ".github/workflows/p1-budget-accounting.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102424353",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473820997",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -954,12 +947,7 @@
         "evaluations": [
           ".github/workflows/p1-forecast-anomaly-loop.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102424052",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473821029",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -1185,12 +1173,7 @@
         "evaluations": [
           ".github/workflows/p1-forecast-anomaly-loop.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102424052",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473821029",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -1375,7 +1358,7 @@
       "title": "License Intelligence",
       "depth_pass": "DP-401-420",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-407",
@@ -1396,7 +1379,9 @@
         ],
         "canonical_paths": [
           "machine",
-          "skeleton/ai/runtime/deferred/lifecycle_governance.py"
+          "skeleton/ai/runtime/deferred/lifecycle_governance.py",
+          "skeleton/artifacts/license_intelligence.py",
+          "skeleton/ai/runtime/extensions/artifacts/license_intelligence.py"
         ],
         "risks": [
           "missing license provenance",
@@ -1407,7 +1392,8 @@
           "define review policy"
         ],
         "tests": [
-          "skeleton/testing/test_lifecycle_governance.py"
+          "skeleton/testing/test_lifecycle_governance.py",
+          "skeleton/testing/test_license_intelligence.py"
         ],
         "evaluations": [
           "planned:license conflict evaluation"
@@ -1597,7 +1583,7 @@
       "title": "Data Usage Rights",
       "depth_pass": "DP-401-420",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-408",
@@ -1619,17 +1605,20 @@
         "canonical_paths": [
           "skeleton/data",
           "skeleton/security",
-          "skeleton/ai/runtime/deferred/lifecycle_governance.py"
+          "skeleton/ai/runtime/deferred/lifecycle_governance.py",
+          "skeleton/data/usage_rights.py",
+          "skeleton/ai/runtime/data/usage_rights.py"
         ],
         "risks": [
           "rights lost on transform",
           "unauthorized training"
         ],
         "gaps": [
-          "bind lineage/training/exports"
+          "bind rights lineage and grant decisions to training/export admission, derivative registries and revocation evidence"
         ],
         "tests": [
-          "skeleton/testing/test_lifecycle_governance.py"
+          "skeleton/testing/test_lifecycle_governance.py",
+          "skeleton/testing/test_data_usage_rights.py"
         ],
         "evaluations": [
           "planned:derived-data rights evaluation"
@@ -1860,12 +1849,7 @@
         "evaluations": [
           ".github/workflows/p1-release-attribution.yml"
         ],
-        "existing_evidence": [
-          "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
-          "github-actions-job:109098309784",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36472598091",
-          "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -2050,7 +2034,7 @@
       "title": "Research Ethics Review",
       "depth_pass": "DP-401-420",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-410",
@@ -2072,18 +2056,21 @@
         "canonical_paths": [
           "experiments",
           "docs",
-          "skeleton/ai/runtime/deferred/lifecycle_governance.py"
+          "skeleton/ai/runtime/deferred/lifecycle_governance.py",
+          "skeleton/eval/research_ethics.py",
+          "skeleton/ai/evaluation/research_ethics.py"
         ],
         "risks": [
           "unreviewed sensitive study",
           "ethics process becomes checkbox"
         ],
         "gaps": [
-          "define trigger criteria",
-          "bind research proposals"
+          "bind research proposals",
+          "bind explicit sensitive-research triggers to proposal admission, oversight identity and durable review receipts"
         ],
         "tests": [
-          "skeleton/testing/test_lifecycle_governance.py"
+          "skeleton/testing/test_lifecycle_governance.py",
+          "skeleton/testing/test_research_ethics_review.py"
         ],
         "evaluations": [
           "planned:sensitive-research scenario review"
@@ -2273,7 +2260,7 @@
       "title": "Model Lifecycle Governance",
       "depth_pass": "DP-401-420",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-411",
@@ -2295,7 +2282,8 @@
         "canonical_paths": [
           "machine",
           "skeleton/ai/providers",
-          "skeleton/ai/runtime/deferred/lifecycle_governance.py"
+          "skeleton/ai/runtime/deferred/lifecycle_governance.py",
+          "skeleton/ai/providers/model_lifecycle.py"
         ],
         "risks": [
           "untracked production model",
@@ -2305,7 +2293,8 @@
           "bind model ops/MBOM"
         ],
         "tests": [
-          "skeleton/testing/test_lifecycle_governance.py"
+          "skeleton/testing/test_lifecycle_governance.py",
+          "skeleton/testing/test_model_lifecycle_governance.py"
         ],
         "evaluations": [
           "planned:invalid transition evaluation"
@@ -2495,7 +2484,7 @@
       "title": "Model Deprecation",
       "depth_pass": "DP-401-420",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-412",
@@ -2517,7 +2506,8 @@
         "canonical_paths": [
           "skeleton/ai/providers",
           "machine",
-          "skeleton/ai/runtime/deferred/lifecycle_governance.py"
+          "skeleton/ai/runtime/deferred/lifecycle_governance.py",
+          "skeleton/ai/providers/model_deprecation.py"
         ],
         "risks": [
           "forced migration regression",
@@ -2528,7 +2518,8 @@
           "bind provider/model cards"
         ],
         "tests": [
-          "skeleton/testing/test_lifecycle_governance.py"
+          "skeleton/testing/test_lifecycle_governance.py",
+          "skeleton/testing/test_model_deprecation.py"
         ],
         "evaluations": [
           "planned:consumer migration evaluation"
@@ -2718,7 +2709,7 @@
       "title": "Provider Migration",
       "depth_pass": "DP-401-420",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-413",
@@ -2740,17 +2731,19 @@
         "canonical_paths": [
           "skeleton/ai/providers",
           "skeleton/eval",
-          "skeleton/ai/runtime/deferred/lifecycle_governance.py"
+          "skeleton/ai/runtime/deferred/lifecycle_governance.py",
+          "skeleton/ai/providers/provider_migration.py"
         ],
         "risks": [
           "behavior drift",
           "data residency regression"
         ],
         "gaps": [
-          "bind shadow traffic"
+          "bind shadow/canary promotion and rollback receipts to live provider routing, parity evidence and release gates"
         ],
         "tests": [
-          "skeleton/testing/test_lifecycle_governance.py"
+          "skeleton/testing/test_lifecycle_governance.py",
+          "skeleton/testing/test_provider_migration.py"
         ],
         "evaluations": [
           "planned:provider parity benchmark"
@@ -2980,12 +2973,7 @@
         "evaluations": [
           ".github/workflows/p1-shadow-traffic-isolation.yml"
         ],
-        "existing_evidence": [
-          "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
-          "github-actions-job:109096147623",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36471954568",
-          "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -3213,12 +3201,7 @@
         "evaluations": [
           ".github/workflows/p1-champion-registry.yml"
         ],
-        "existing_evidence": [
-          "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
-          "github-actions-job:109096146862",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36471954486",
-          "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -3403,7 +3386,7 @@
       "title": "Experimental Feature Sandbox",
       "depth_pass": "DP-401-420",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-416",
@@ -3425,17 +3408,19 @@
         "canonical_paths": [
           "experiments",
           "skeleton/security",
-          "skeleton/ai/runtime/deferred/lifecycle_governance.py"
+          "skeleton/ai/runtime/deferred/lifecycle_governance.py",
+          "skeleton/security/experimental_features.py"
         ],
         "risks": [
           "experiment leaks authority",
           "experiment becomes permanent"
         ],
         "gaps": [
-          "bind feature flags/technology radar"
+          "bind monotonic kill-switch exposure receipts to feature routing, operator controls and technology-radar lifecycle"
         ],
         "tests": [
-          "skeleton/testing/test_lifecycle_governance.py"
+          "skeleton/testing/test_lifecycle_governance.py",
+          "skeleton/testing/test_experimental_feature_sandbox.py"
         ],
         "evaluations": [
           "planned:kill-switch/isolation evaluation"
@@ -3625,7 +3610,7 @@
       "title": "Research Branching Model",
       "depth_pass": "DP-401-420",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-417",
@@ -3647,7 +3632,8 @@
         "canonical_paths": [
           "experiments",
           "docs/plan",
-          "skeleton/ai/runtime/deferred/lifecycle_governance.py"
+          "skeleton/ai/runtime/deferred/lifecycle_governance.py",
+          "skeleton/ai/research_branching.py"
         ],
         "risks": [
           "branch sprawl",
@@ -3655,10 +3641,11 @@
         ],
         "gaps": [
           "define branch naming/retention",
-          "bind evidence packages"
+          "bind research promotion receipts/evidence packages to PR/release gates and branch-retention policy"
         ],
         "tests": [
-          "skeleton/testing/test_lifecycle_governance.py"
+          "skeleton/testing/test_lifecycle_governance.py",
+          "skeleton/testing/test_research_branching_model.py"
         ],
         "evaluations": [
           "planned:research-to-production promotion audit"
@@ -3848,7 +3835,7 @@
       "title": "Technique Retirement",
       "depth_pass": "DP-401-420",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-418",
@@ -3870,7 +3857,8 @@
         "canonical_paths": [
           "machine",
           "docs",
-          "skeleton/ai/runtime/deferred/lifecycle_governance.py"
+          "skeleton/ai/runtime/deferred/lifecycle_governance.py",
+          "skeleton/ai/technique_retirement.py"
         ],
         "risks": [
           "dead technique remains critical path",
@@ -3881,7 +3869,8 @@
           "define archive policy"
         ],
         "tests": [
-          "skeleton/testing/test_lifecycle_governance.py"
+          "skeleton/testing/test_lifecycle_governance.py",
+          "skeleton/testing/test_technique_retirement.py"
         ],
         "evaluations": [
           "planned:retired-tech reference audit"
@@ -4114,12 +4103,7 @@
         "evaluations": [
           ".github/workflows/p1-failure-knowledge.yml"
         ],
-        "existing_evidence": [
-          "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
-          "github-actions-job:109096149360",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36471954446",
-          "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -4346,16 +4330,7 @@
         "evaluations": [
           ".github/workflows/p1-scope-freeze.yml"
         ],
-        "existing_evidence": [
-          ".github/workflows/p1-evidence-identity.yml",
-          ".github/workflows/p1-reproducibility-bundle.yml",
-          ".github/workflows/p1-required-gate-authority.yml",
-          ".github/workflows/p1-scope-freeze.yml",
-          "P1-GAP-VOL-420:gap:380b4042e4-aec1dd0a17dab20a",
-          "P1-GAP-VOL-420:gap:7777365012-f77a419f1e16f459",
-          "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
-          "git-head:de1c7870e4c231eaa4d74b25f79b88c09af75fbc"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {

@@ -2,7 +2,7 @@
   "schema_version": "skeleton.enterprise_ai.implementation_notes.v1",
   "standard_version": "2026.10",
   "depth_pass": "DP-361-400",
-  "generated_from_master_plan": "2.6.0",
+  "generated_from_master_plan": "2.6.6",
   "volume_count": 40,
   "dossiers": [
     {
@@ -55,15 +55,7 @@
         "evaluations": [
           ".github/workflows/p1-memory-retrieval-knowledge-quality.yml"
         ],
-        "existing_evidence": [
-          "skeleton/memory/reconciliation.py",
-          "tests/test_memory_reconciliation.py",
-          "git-head:939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
-          "github-actions-job:108732888770",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36359213635",
-          "https://github.com/Apeloff1/Skeleton/commit/939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
-          "https://github.com/Apeloff1/Skeleton/commit/fb6b42094c41139d866ebbbdce402f51af7dd140"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -298,16 +290,7 @@
           ".github/workflows/p1-memory-retrieval-knowledge-quality.yml",
           ".github/workflows/p1-core-intelligence-bundle.yml"
         ],
-        "existing_evidence": [
-          "skeleton/memory/reconciliation.py",
-          "tests/test_memory_reconciliation.py",
-          "git-head:939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
-          "github-actions-job:108732888770",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36359213635",
-          "https://github.com/Apeloff1/Skeleton/commit/939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
-          "https://github.com/Apeloff1/Skeleton/commit/fb6b42094c41139d866ebbbdce402f51af7dd140",
-          "git-head:0338bd4519e33e574ced4705b414f4b7345b4a7b"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -537,13 +520,7 @@
         "evaluations": [
           ".github/workflows/p1-memory-retrieval-knowledge-quality.yml"
         ],
-        "existing_evidence": [
-          "git-head:939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
-          "github-actions-job:108732888770",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36359213635",
-          "https://github.com/Apeloff1/Skeleton/commit/939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
-          "https://github.com/Apeloff1/Skeleton/commit/fb6b42094c41139d866ebbbdce402f51af7dd140"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -768,13 +745,7 @@
         "evaluations": [
           "planned:concurrent update evaluation"
         ],
-        "existing_evidence": [
-          "skeleton/contracts/memory_record.py",
-          "skeleton/persistence/memory_repository.py",
-          "skeleton/testing/test_memory_repository.py",
-          "skeleton/testing/test_mongo_memory_repository.py",
-          "https://github.com/Apeloff1/Skeleton/commit/39f4b48424133d3823c1d9dc17952135778852fc"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -998,12 +969,7 @@
         "evaluations": [
           "planned:conflict resolution benchmark"
         ],
-        "existing_evidence": [
-          "skeleton/memory/reconciliation.py",
-          "skeleton/persistence/memory_repository.py",
-          "tests/test_memory_reconciliation.py",
-          "https://github.com/Apeloff1/Skeleton/commit/fb6b42094c41139d866ebbbdce402f51af7dd140"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -1188,7 +1154,7 @@
       "title": "Cognitive Strategy Registry",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -1208,18 +1174,20 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "machine"
+          "machine",
+          "skeleton/ai/cognitive_strategy.py"
         ],
         "risks": [
           "strategy sprawl",
           "untested strategy used"
         ],
         "gaps": [
-          "inventory current strategies",
-          "bind selection engine"
+          "bind selection engine",
+          "bind the registry to production selection and benchmark-backed promotion evidence"
         ],
         "tests": [
-          "planned:skeleton/testing/test_cognitive_strategy_registry.py"
+          "planned:skeleton/testing/test_cognitive_strategy_registry.py",
+          "skeleton/testing/test_cognitive_strategy_registry.py"
         ],
         "evaluations": [
           "planned:strategy conformance evaluation"
@@ -1409,7 +1377,7 @@
       "title": "Strategy Selection",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -1429,18 +1397,20 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "skeleton/eval"
+          "skeleton/eval",
+          "skeleton/ai/strategy_selection.py"
         ],
         "risks": [
           "wrong strategy cost explosion",
           "selection overfits eval"
         ],
         "gaps": [
-          "define baseline selector",
-          "bind performance evidence"
+          "bind performance evidence",
+          "bind selector decisions to runtime routing receipts and comparative performance evidence"
         ],
         "tests": [
-          "planned:skeleton/testing/test_strategy_selection.py"
+          "planned:skeleton/testing/test_strategy_selection.py",
+          "skeleton/testing/test_strategy_selection.py"
         ],
         "evaluations": [
           "planned:multi-strategy benchmark"
@@ -1630,7 +1600,7 @@
       "title": "Reasoning Cost Accounting",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -1650,18 +1620,21 @@
         ],
         "canonical_paths": [
           "skeleton/observability",
-          "skeleton/ai"
+          "skeleton/ai",
+          "skeleton/observability/reasoning_cost.py",
+          "skeleton/ai/runtime/observability/reasoning_cost.py"
         ],
         "risks": [
           "double counting",
           "cost telemetry leaks content"
         ],
         "gaps": [
-          "define stage IDs",
-          "bind cost governor"
+          "bind cost governor",
+          "bind reasoning-cost attribution to the runtime budget governor and aggregate telemetry"
         ],
         "tests": [
-          "planned:skeleton/testing/test_reasoning_cost.py"
+          "planned:skeleton/testing/test_reasoning_cost.py",
+          "skeleton/testing/test_reasoning_cost.py"
         ],
         "evaluations": [
           "planned:cost attribution audit"
@@ -1902,16 +1875,7 @@
           ".github/workflows/p1-core-intelligence-bundle.yml",
           ".github/workflows/p1-regression-corpus.yml"
         ],
-        "existing_evidence": [
-          "git-head:0338bd4519e33e574ced4705b414f4b7345b4a7b",
-          "github-actions-job:109014996463",
-          "github-actions-job:109014994255",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36447945816",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36447945487",
-          "https://github.com/Apeloff1/Skeleton/commit/0338bd4519e33e574ced4705b414f4b7345b4a7b",
-          "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
-          "github-actions-job:109096147873"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -2146,16 +2110,7 @@
           ".github/workflows/p1-plan-verification.yml",
           ".github/workflows/p1-core-intelligence-bundle.yml"
         ],
-        "existing_evidence": [
-          "skeleton/intelligence/plan_verifier.py",
-          "skeleton/ai/runtime/intelligence/plan_verifier.py",
-          "skeleton/testing/test_plan_static_analyzer.py",
-          "skeleton/testing/test_plan_cycles.py",
-          "skeleton/testing/test_plan_simulation.py",
-          "skeleton/testing/test_plan_qualification.py",
-          "skeleton/testing/test_plan_execution_admission.py",
-          ".github/workflows/p1-plan-verification.yml"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -2340,7 +2295,7 @@
       "title": "Plan Static Analyzer",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -2360,18 +2315,21 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "scripts"
+          "scripts",
+          "skeleton/ai/plan_static_analysis.py"
         ],
         "risks": [
           "false negatives",
           "rule drift"
         ],
         "gaps": [
-          "seed core lint rules",
-          "bind workflow compiler"
+          "bind workflow compiler",
+          "bind static analysis to canonical plan admission and CI with versioned rule policy"
         ],
         "tests": [
-          "planned:skeleton/testing/test_plan_static_analyzer.py"
+          "planned:skeleton/testing/test_plan_static_analyzer.py",
+          "skeleton/testing/test_plan_static_analyzer.py",
+          "skeleton/testing/test_plan_static_analyzer_vol371.py"
         ],
         "evaluations": [
           "planned:plan mutation tests"
@@ -2561,7 +2519,7 @@
       "title": "Plan Simulation",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -2581,7 +2539,9 @@
         ],
         "canonical_paths": [
           "skeleton/simulation",
-          "skeleton/ai"
+          "skeleton/ai",
+          "skeleton/simulation/plan_simulation.py",
+          "skeleton/ai/simulation/plan_simulation.py"
         ],
         "risks": [
           "simulation mismatch",
@@ -2592,7 +2552,9 @@
           "define promotion thresholds"
         ],
         "tests": [
-          "planned:skeleton/testing/test_plan_simulation.py"
+          "planned:skeleton/testing/test_plan_simulation.py",
+          "skeleton/testing/test_plan_simulation.py",
+          "skeleton/testing/test_plan_simulation_vol372.py"
         ],
         "evaluations": [
           "planned:risky-plan simulation suite"
@@ -2782,7 +2744,7 @@
       "title": "Tool Composition Engine",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -2802,18 +2764,20 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "skeleton/tools"
+          "skeleton/tools",
+          "skeleton/ai/tool_composition.py"
         ],
         "risks": [
           "authority amplification",
           "schema mismatch"
         ],
         "gaps": [
-          "define composition IR",
-          "bind tool SDK/workflows"
+          "bind tool SDK/workflows",
+          "bind composition validation into the executable tool runtime and authorization receipts"
         ],
         "tests": [
-          "planned:skeleton/testing/test_tool_composition.py"
+          "planned:skeleton/testing/test_tool_composition.py",
+          "skeleton/testing/test_tool_composition.py"
         ],
         "evaluations": [
           "planned:confused-deputy composition suite"
@@ -3003,7 +2967,7 @@
       "title": "Tool Dependency Graph",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -3023,7 +2987,8 @@
         ],
         "canonical_paths": [
           "machine",
-          "skeleton/ai"
+          "skeleton/ai",
+          "skeleton/ai/tool_dependency_graph.py"
         ],
         "risks": [
           "hidden dependency",
@@ -3034,7 +2999,8 @@
           "bind impact/failover"
         ],
         "tests": [
-          "planned:skeleton/testing/test_tool_dependency_graph.py"
+          "planned:skeleton/testing/test_tool_dependency_graph.py",
+          "skeleton/testing/test_tool_dependency_graph.py"
         ],
         "evaluations": [
           "planned:dependency outage evaluation"
@@ -3224,7 +3190,7 @@
       "title": "Tool Health",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -3244,18 +3210,21 @@
         ],
         "canonical_paths": [
           "skeleton/observability",
-          "skeleton/ai"
+          "skeleton/ai",
+          "skeleton/observability/tool_health.py",
+          "skeleton/ai/runtime/observability/tool_health.py"
         ],
         "risks": [
           "200-OK but wrong result",
           "probe causes side effect"
         ],
         "gaps": [
-          "define safe probes",
-          "bind tool routing"
+          "bind tool routing",
+          "bind safe health probes to tool admission without granting authority from liveness alone"
         ],
         "tests": [
-          "planned:skeleton/testing/test_tool_health.py"
+          "planned:skeleton/testing/test_tool_health.py",
+          "skeleton/testing/test_tool_health.py"
         ],
         "evaluations": [
           "planned:semantic failure evaluation"
@@ -3445,7 +3414,7 @@
       "title": "Tool Capability Discovery",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -3465,18 +3434,20 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "skeleton/security"
+          "skeleton/security",
+          "skeleton/ai/tool_discovery.py"
         ],
         "risks": [
           "prompt injection via metadata",
           "capability=authority confusion"
         ],
         "gaps": [
-          "define discovery trust contract",
-          "bind tool SDK"
+          "bind tool SDK",
+          "bind discovery manifests to the canonical capability registry and signed/verified attestation sources"
         ],
         "tests": [
-          "planned:skeleton/testing/test_tool_discovery.py"
+          "planned:skeleton/testing/test_tool_discovery.py",
+          "skeleton/testing/test_tool_discovery.py"
         ],
         "evaluations": [
           "planned:malicious manifest evaluation"
@@ -3666,7 +3637,7 @@
       "title": "Tool Result Trust",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -3686,18 +3657,20 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "skeleton/security"
+          "skeleton/security",
+          "skeleton/ai/tool_trust_admission.py"
         ],
         "risks": [
           "tool output injection",
           "stale result trusted"
         ],
         "gaps": [
-          "define result trust levels",
-          "bind context compiler"
+          "bind context compiler",
+          "bind result-trust admission to provenance/evidence policy across all high-impact tool consumers"
         ],
         "tests": [
-          "planned:skeleton/testing/test_tool_result_trust.py"
+          "planned:skeleton/testing/test_tool_result_trust.py",
+          "skeleton/testing/test_tool_trust_admission.py"
         ],
         "evaluations": [
           "planned:malicious/incorrect tool result suite"
@@ -3887,7 +3860,7 @@
       "title": "Side-Effect Ledger",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -3907,18 +3880,22 @@
         ],
         "canonical_paths": [
           "skeleton/persistence",
-          "skeleton/ai"
+          "skeleton/ai",
+          "skeleton/ai/side_effect_ledger.py",
+          "skeleton/persistence/side_effect_ledger.py",
+          "skeleton/ai/runtime/persistence/side_effect_ledger.py"
         ],
         "risks": [
           "effect executed twice",
           "unknown marked failed"
         ],
         "gaps": [
-          "define effect state machine",
-          "bind tools/sagas"
+          "bind tools/sagas",
+          "bind side-effect receipts to durable operation finalization and retry/compensation policy"
         ],
         "tests": [
-          "planned:skeleton/testing/test_side_effect_ledger.py"
+          "planned:skeleton/testing/test_side_effect_ledger.py",
+          "skeleton/testing/test_side_effect_ledger.py"
         ],
         "evaluations": [
           "planned:network-loss-after-effect evaluation"
@@ -4108,7 +4085,7 @@
       "title": "Compensation Engine",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -4128,7 +4105,10 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "skeleton/reliability"
+          "skeleton/reliability",
+          "skeleton/ai/compensation_engine.py",
+          "skeleton/reliability/compensation.py",
+          "skeleton/ai/runtime/reliability/compensation.py"
         ],
         "risks": [
           "compensation duplicates harm",
@@ -4139,7 +4119,8 @@
           "bind side-effect ledger"
         ],
         "tests": [
-          "planned:skeleton/testing/test_compensation_engine.py"
+          "planned:skeleton/testing/test_compensation_engine.py",
+          "skeleton/testing/test_compensation_engine.py"
         ],
         "evaluations": [
           "planned:compensation failure campaign"
@@ -4329,7 +4310,7 @@
       "title": "Saga Workflows",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -4349,7 +4330,11 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "skeleton/persistence"
+          "skeleton/persistence",
+          "skeleton/ai/saga_workflows.py",
+          "skeleton/ai/saga_control.py",
+          "skeleton/kernel/saga.py",
+          "skeleton/ai/runtime/kernel/saga.py"
         ],
         "risks": [
           "orphan saga",
@@ -4360,7 +4345,10 @@
           "materialize saga runtime"
         ],
         "tests": [
-          "planned:skeleton/testing/test_saga_workflows.py"
+          "planned:skeleton/testing/test_saga_workflows.py",
+          "skeleton/testing/test_saga_workflows.py",
+          "skeleton/testing/test_effect_saga_control.py",
+          "tests/test_saga_registry.py"
         ],
         "evaluations": [
           "planned:crash-every-step saga evaluation"
@@ -4590,12 +4578,7 @@
         "evaluations": [
           ".github/workflows/p1-model-placement.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102424008",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473821015",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -4819,12 +4802,7 @@
         "evaluations": [
           ".github/workflows/p1-model-placement.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102424008",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473821015",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -5009,7 +4987,7 @@
       "title": "GPU Memory Manager",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-383",
@@ -5030,18 +5008,19 @@
         ],
         "canonical_paths": [
           "skeleton/runtime",
-          "skeleton/ai"
+          "skeleton/ai",
+          "skeleton/runtime/gpu_memory.py"
         ],
         "risks": [
           "GPU OOM",
           "reservation leak"
         ],
         "gaps": [
-          "define memory accounting",
-          "bind model/KV caches"
+          "bind model/KV caches",
+          "bind GPU reservation accounting to model/KV allocation lifecycle and stress/fault evidence"
         ],
         "tests": [
-          "planned:skeleton/testing/test_gpu_memory_manager.py"
+          "skeleton/testing/test_gpu_memory_manager.py"
         ],
         "evaluations": [
           "planned:fragmentation/pressure evaluation"
@@ -5231,7 +5210,7 @@
       "title": "Model Eviction",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-384",
@@ -5252,18 +5231,19 @@
         ],
         "canonical_paths": [
           "skeleton/runtime",
-          "skeleton/ai"
+          "skeleton/ai",
+          "skeleton/runtime/model_eviction.py"
         ],
         "risks": [
           "evict in-flight model",
           "thrashing"
         ],
         "gaps": [
-          "define pin/drain semantics",
-          "bind warming"
+          "bind warming",
+          "bind safe eviction decisions to warming/placement state and pressure telemetry"
         ],
         "tests": [
-          "planned:skeleton/testing/test_model_eviction.py"
+          "skeleton/testing/test_model_eviction.py"
         ],
         "evaluations": [
           "planned:load/evict thrash evaluation"
@@ -5492,12 +5472,7 @@
         "evaluations": [
           ".github/workflows/p1-model-placement.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102424008",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473821015",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -5722,12 +5697,7 @@
         "evaluations": [
           ".github/workflows/p1-batching-autoscaling.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102423944",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473821066",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -5912,7 +5882,7 @@
       "title": "KV Cache Service",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-387",
@@ -5933,18 +5903,19 @@
         ],
         "canonical_paths": [
           "skeleton/runtime",
-          "skeleton/kv"
+          "skeleton/kv",
+          "skeleton/kv/cache_service.py"
         ],
         "risks": [
           "context leak",
           "wrong model cache reuse"
         ],
         "gaps": [
-          "formalize key identity",
-          "bind GPU memory manager"
+          "bind GPU memory manager",
+          "bind KV allocation identity to GPU reservation receipts and eviction invalidation"
         ],
         "tests": [
-          "planned:skeleton/testing/test_kv_cache_service.py"
+          "skeleton/testing/test_kv_cache_service.py"
         ],
         "evaluations": [
           "planned:cross-session isolation evaluation"
@@ -6134,7 +6105,7 @@
       "title": "Prefix Cache",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-388",
@@ -6155,18 +6126,19 @@
         ],
         "canonical_paths": [
           "skeleton/kv",
-          "skeleton/ai"
+          "skeleton/ai",
+          "skeleton/kv/prefix_cache.py"
         ],
         "risks": [
           "stale prompt prefix",
           "sensitive prefix leak"
         ],
         "gaps": [
-          "define key composition",
-          "bind instruction registry"
+          "bind instruction registry",
+          "bind instruction/tokenizer/version digests to canonical registry issuance"
         ],
         "tests": [
-          "planned:skeleton/testing/test_prefix_cache.py"
+          "skeleton/testing/test_prefix_cache.py"
         ],
         "evaluations": [
           "planned:cache contamination evaluation"
@@ -6356,7 +6328,7 @@
       "title": "Speculative Inference",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-389",
@@ -6377,7 +6349,8 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "experiments"
+          "experiments",
+          "skeleton/ai/speculative_inference.py"
         ],
         "risks": [
           "semantic drift",
@@ -6388,7 +6361,7 @@
           "bind eval/cost gates"
         ],
         "tests": [
-          "planned:skeleton/testing/test_speculative_inference.py"
+          "skeleton/testing/test_speculative_inference.py"
         ],
         "evaluations": [
           "planned:quality-equivalence benchmark"
@@ -6618,12 +6591,7 @@
         "evaluations": [
           ".github/workflows/p1-batching-autoscaling.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102423944",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473821066",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -6847,12 +6815,7 @@
         "evaluations": [
           ".github/workflows/p1-capacity-qualification.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102424598",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473820988",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -7076,12 +7039,7 @@
         "evaluations": [
           ".github/workflows/p1-model-placement.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102424008",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473821015",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -7266,7 +7224,7 @@
       "title": "NUMA Awareness",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-393",
@@ -7287,7 +7245,8 @@
         ],
         "canonical_paths": [
           "skeleton/runtime",
-          "benchmarks"
+          "benchmarks",
+          "skeleton/runtime/numa.py"
         ],
         "risks": [
           "incorrect pinning hurts throughput",
@@ -7298,7 +7257,7 @@
           "bind hardware topology"
         ],
         "tests": [
-          "planned:skeleton/testing/test_numa_awareness.py"
+          "skeleton/testing/test_numa_awareness.py"
         ],
         "evaluations": [
           "planned:NUMA locality benchmark"
@@ -7488,7 +7447,7 @@
       "title": "GPU Interconnect Awareness",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-394",
@@ -7509,18 +7468,19 @@
         ],
         "canonical_paths": [
           "skeleton/runtime",
-          "training"
+          "training",
+          "skeleton/runtime/gpu_interconnect.py"
         ],
         "risks": [
           "slow link bottleneck",
           "topology mismatch"
         ],
         "gaps": [
-          "model interconnect graph",
-          "bind distributed inference/training"
+          "bind distributed inference/training",
+          "bind measured interconnect discovery, topology refresh and distributed-runtime placement receipts"
         ],
         "tests": [
-          "planned:skeleton/testing/test_gpu_interconnect.py"
+          "skeleton/testing/test_gpu_interconnect.py"
         ],
         "evaluations": [
           "planned:multi-GPU topology benchmark"
@@ -7710,7 +7670,7 @@
       "title": "Storage Tiering",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-395",
@@ -7731,18 +7691,19 @@
         ],
         "canonical_paths": [
           "planned:skeleton/storage",
-          "planned:skeleton/artifacts"
+          "planned:skeleton/artifacts",
+          "skeleton/storage/tiering.py"
         ],
         "risks": [
           "cold tier unexpectedly unavailable",
           "duplicate stale copies"
         ],
         "gaps": [
-          "define tiers",
-          "bind CAS/model/data registries"
+          "bind CAS/model/data registries",
+          "bind typed storage tiers to CAS/model/data registries, migration receipts and capacity telemetry"
         ],
         "tests": [
-          "planned:skeleton/testing/test_storage_tiering.py"
+          "skeleton/testing/test_storage_tiering.py"
         ],
         "evaluations": [
           "planned:tier failure/latency evaluation"
@@ -7932,7 +7893,7 @@
       "title": "Data Locality",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-396",
@@ -7953,7 +7914,8 @@
         ],
         "canonical_paths": [
           "skeleton/runtime",
-          "skeleton/data"
+          "skeleton/data",
+          "skeleton/data/locality.py"
         ],
         "risks": [
           "data copied across forbidden boundary",
@@ -7964,7 +7926,7 @@
           "integrate scheduler"
         ],
         "tests": [
-          "planned:skeleton/testing/test_data_locality.py"
+          "skeleton/testing/test_data_locality.py"
         ],
         "evaluations": [
           "planned:remote/local tradeoff benchmark"
@@ -8193,12 +8155,7 @@
         "evaluations": [
           ".github/workflows/p1-model-placement.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102424008",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473821015",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -8423,12 +8380,7 @@
         "evaluations": [
           ".github/workflows/p1-remote-worker-trust.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102424893",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473820961",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -8652,12 +8604,7 @@
         "evaluations": [
           ".github/workflows/p1-remote-worker-trust.yml"
         ],
-        "existing_evidence": [
-          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
-          "github-actions-job:109102424893",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36473820961",
-          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -8842,7 +8789,7 @@
       "title": "Build Farm",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-400",
@@ -8863,7 +8810,8 @@
         ],
         "canonical_paths": [
           "skeleton/ai/build",
-          "scripts"
+          "scripts",
+          "skeleton/ai/build/build_farm.py"
         ],
         "risks": [
           "worker contamination",
@@ -8871,10 +8819,10 @@
         ],
         "gaps": [
           "bind hermetic build profile",
-          "integrate worker attestation"
+          "bind reproducibility consensus and attestation evidence to release provenance and remote-execution identity"
         ],
         "tests": [
-          "planned:skeleton/testing/test_build_farm.py"
+          "skeleton/testing/test_build_farm.py"
         ],
         "evaluations": [
           "planned:multi-worker reproducibility evaluation"

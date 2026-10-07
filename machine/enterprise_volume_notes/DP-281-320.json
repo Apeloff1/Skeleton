@@ -2,7 +2,7 @@
   "schema_version": "skeleton.enterprise_ai.implementation_notes.v1",
   "standard_version": "2026.10",
   "depth_pass": "DP-281-320",
-  "generated_from_master_plan": "2.6.0",
+  "generated_from_master_plan": "2.6.6",
   "volume_count": 40,
   "dossiers": [
     {
@@ -8230,12 +8230,7 @@
         "evaluations": [
           ".github/workflows/p1-autonomy-deescalation.yml"
         ],
-        "existing_evidence": [
-          "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
-          "github-actions-job:109064005856",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36462412846",
-          "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -8684,12 +8679,7 @@
         "evaluations": [
           ".github/workflows/p1-autonomy-deescalation.yml"
         ],
-        "existing_evidence": [
-          "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
-          "github-actions-job:109064005856",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36462412846",
-          "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
