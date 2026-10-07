@@ -49,7 +49,7 @@ from .runtime_contracts import (
     RuntimeLimits,
     RuntimeUsage,
 )
-from .text_pipeline import CausalTrainingBatch, CorpusTrainingReceipt, DecadeCorpusBucket, DecadeCoverageReceipt, DecadeSamplingPlan, DecadeSignalVector, DecadeTrainingSignal, GovernedTrainingInput, ModelInputBatch, PipelineReplayCheckpoint, PreparedCorpus, PreparedText, PromotionAuthorizationRequest, SupervisedTextExample, TemporalContradiction, TemporalSupersession, TemporalTrainingSignal, TextPipelineConfig, TextTokenPipeline, TrainingInputReceipt, deserialize_causal_training_batch, decade_weight_ppm, deserialize_model_input_batch, mask_causal_prefix, materialize_causal_training_batch, materialize_model_batch, serialize_causal_training_batch, serialize_model_input_batch
+from .text_pipeline import CausalTrainingBatch, CorpusTrainingReceipt, DecadeCorpusBucket, DecadeCoverageReceipt, DecadeSamplingPlan, DecadeSignalVector, DecadeTrainingSignal, GovernedTrainingInput, ModelInputBatch, PipelineReplayCheckpoint, PreparedCorpus, PreparedText, PromotionAuthorizationRequest, SupervisedTextExample, TemporalContradiction, TemporalEvaluationGate, TemporalEvaluationResult, TemporalEvaluationSlice, TemporalRetrievalCandidate, TemporalRetrievalPlan, TemporalSupersession, TemporalTrainingSignal, TextPipelineConfig, TextTokenPipeline, TrainingInputReceipt, deserialize_causal_training_batch, decade_weight_ppm, deserialize_model_input_batch, mask_causal_prefix, materialize_causal_training_batch, materialize_model_batch, serialize_causal_training_batch, serialize_model_input_batch
 from .tokenization import (
     NativeTokenizer,
     StreamingTextFeed,
@@ -113,6 +113,11 @@ __all__ = [
     "StreamingTextFeed",
     "SupervisedTextExample",
     "TemporalContradiction",
+    "TemporalEvaluationGate",
+    "TemporalEvaluationResult",
+    "TemporalEvaluationSlice",
+    "TemporalRetrievalCandidate",
+    "TemporalRetrievalPlan",
     "TemporalSupersession",
     "TemporalTrainingSignal",
     "TextPipelineConfig",
