@@ -172,18 +172,23 @@ class VisionResult:
         if not isinstance(region, ImageRegion) or not isinstance(asset, ImageAsset):
             raise VisionError("typed region and asset required")
         region.validate(asset)
+        if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
+            raise VisionError("invalid confidence")
+        if not math.isfinite(confidence) or not 0 <= confidence <= 1:
+            raise VisionError("invalid confidence")
+        normalized_confidence = float(confidence)
         body = {
             "asset_id": region.asset_id,
             "source_digest": asset.source_digest,
             "region": (region.x, region.y, region.width, region.height, region.transform_digest),
             "model_digest": _sha(model_digest, "model_digest"),
-            "confidence": float(confidence),
+            "confidence": normalized_confidence,
             "payload_digest": _sha(payload_digest, "payload_digest"),
         }
         digest = hashlib.sha256(
             json.dumps(body, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
         ).hexdigest()
-        return cls(region, asset.source_digest, model_digest, confidence, payload_digest, digest)
+        return cls(region, asset.source_digest, model_digest, normalized_confidence, payload_digest, digest)
 
 
 __all__ = ["ImageAsset", "ImageLimits", "ImageRegion", "VisionError", "VisionResult"]
