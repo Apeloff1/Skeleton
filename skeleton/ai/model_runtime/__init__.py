@@ -49,7 +49,7 @@ from .runtime_contracts import (
     RuntimeLimits,
     RuntimeUsage,
 )
-from .text_pipeline import CausalTrainingBatch, GovernedTrainingInput, ModelInputBatch, PreparedCorpus, PreparedText, PromotionAuthorizationRequest, TextPipelineConfig, TextTokenPipeline, TrainingInputReceipt, materialize_causal_training_batch, materialize_model_batch
+from .text_pipeline import CausalTrainingBatch, GovernedTrainingInput, ModelInputBatch, PipelineReplayCheckpoint, PreparedCorpus, PreparedText, PromotionAuthorizationRequest, TextPipelineConfig, TextTokenPipeline, TrainingInputReceipt, materialize_causal_training_batch, materialize_model_batch
 from .tokenization import (
     NativeTokenizer,
     StreamingTextFeed,
@@ -92,6 +92,7 @@ __all__ = [
     "PreparedCorpus",
     "PreparedText",
     "PromotionAuthorizationRequest",
+    "PipelineReplayCheckpoint",
     "Placement",
     "QuantizationProfile",
     "ReplayMismatch",
