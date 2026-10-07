@@ -1626,3 +1626,19 @@ The historical signal plane now includes deeper temporal semantics and research 
 Research grounding reviewed during this tranche includes recent temporal GraphRAG, temporal-validity/decay, entity-event temporal-causal RAG, dynamic temporal GraphRAG, and agentic event-forecasting work. The implementation deliberately keeps deterministic evidence/provenance contracts and does not equate lag correlation with causation.
 
 Advanced next work: attach TemporalSemantics to EvidenceObservation directly; calibrate event/publication extraction using structured page metadata; propagate uncertainty into regime boundary acceptance; generate acquisition queries from AcquisitionTarget; and add temporal retrieval filters over the canonical knowledge/retrieval bridge.
+
+
+### 2026-10-07 deep research methodology tranche
+
+Temporal research now includes methodology-level controls beyond calendar/regime aggregation:
+- BitemporalFact separates valid/event time from knowledge/transaction time, supporting questions of both "when was this true?" and "what was known as of this point?";
+- TemporalScope provides explicit event-range and as-of filtering for evidence selection;
+- source-dependence analysis clusters identical-content, same-host and high-overlap evidence so mirrors/syndication cannot inflate corroboration merely by appearing on distinct hosts;
+- EvidenceSet assurance now exposes and requires dependence-adjusted independent evidence clusters for source sufficiency;
+- regime change points can be assurance-gated using independent-host support and uncertainty, preventing high-variance historical shifts from becoming accepted boundaries solely on point estimates;
+- active historical acquisition targets can be compiled into bounded deterministic search queries with explicit year spans and reasons;
+- regression coverage exercises bitemporal visibility, temporal scope, mirror collapse, bounded query synthesis and uncertainty-aware regime rejection.
+
+Research grounding for this tranche reviewed current work on temporal GraphRAG/time-consistent retrieval, temporal knowledge-store planning, evidence-retroactive RAG, and change-point inference. The implementation retains explicit deterministic contracts and avoids interpreting lag/correlation as causal evidence.
+
+Next research depth: provenance lineage beyond textual similarity (citation/reference relationships), structured date metadata extraction into EvidenceObservation, temporal scope propagation through canonical retrieval indexes, counterfactual evidence tests, calibration metrics (Brier/ECE) for historical confidence, and evidence-revision receipts so retroactive research changes are auditable.
