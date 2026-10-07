@@ -410,5 +410,46 @@ class TestNativeLLMRuntime(unittest.TestCase):
             runtime.generate_sequence(invalid, GenerationConfig(max_new_tokens=1))
 
 
+    def test_inference_graph_cached_uncached_and_checkpoint_parity(self):
+        runtime = self.runtime(ctx=8)
+        prompt = "hello world again"
+        cached = runtime.infer_text(prompt, use_cache=True)
+        uncached = runtime.infer_text(prompt, use_cache=False)
+        self.assertEqual(len(cached.logits), runtime.tokenizer.vocab_size)
+        self.assertEqual(cached.argmax_token_id, uncached.argmax_token_id)
+        for left, right in zip(cached.logits, uncached.logits):
+            self.assertAlmostEqual(left, right, places=8)
+        restored = NativeLLMRuntime.restore(runtime.checkpoint())
+        after = restored.infer_text(prompt, use_cache=False)
+        self.assertEqual(uncached.digest, after.digest)
+
+    def test_inference_graph_context_and_identity_fail_closed(self):
+        runtime = self.runtime(ctx=4)
+        with self.assertRaises(RuntimeContractError):
+            runtime.infer_text("hello world again small runtime")
+        with self.assertRaises(RuntimeContractError):
+            runtime.infer_sequence(runtime.encode("hello"), use_cache="yes")
+        sequence = runtime.encode("hello")
+        foreign = TokenSequence("0" * 64, sequence.token_ids, sequence.source_text_digest)
+        with self.assertRaises(RuntimeContractError):
+            runtime.infer_sequence(foreign)
+        runtime.model.bout[0] += 0.1
+        with self.assertRaises(RuntimeContractError):
+            runtime.infer_sequence(sequence)
+
+    def test_token_sequence_stream_matches_text_stream(self):
+        runtime = self.runtime()
+        cfg = GenerationConfig(max_new_tokens=3, temperature=0.0, seed=19)
+        direct = runtime.generate("hello world", cfg)
+        sequence = runtime.encode("hello world")
+        tokenized = runtime.generate_sequence(sequence, cfg)
+        self.assertEqual(direct.generated_ids, tokenized.generated_ids)
+        self.assertEqual(direct.output_digest, tokenized.output_digest)
+        self.assertEqual(
+            [(event.kind, event.token_id) for event in direct.events],
+            [(event.kind, event.token_id) for event in tokenized.events],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
