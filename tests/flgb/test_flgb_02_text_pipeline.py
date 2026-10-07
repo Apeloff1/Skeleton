@@ -1376,3 +1376,21 @@ def test_provenance_graph_digest_is_input_order_independent():
     a = SourceProvenanceNode("a")
     b = SourceProvenanceNode("b", ("a",))
     assert SourceProvenanceGraph((a, b)).digest == SourceProvenanceGraph((b, a)).digest
+
+
+def test_provenance_derived_evidence_prevents_mirror_confidence_inflation(native_model):
+    from hashlib import sha256
+    from skeleton.ai.model_runtime.text_pipeline import SourceProvenanceGraph, SourceProvenanceNode, TemporalEvidence, TextTokenPipeline, independent_confidence_ppm, source_evidence_from_provenance
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    graph = SourceProvenanceGraph((
+        SourceProvenanceNode("wire"),
+        SourceProvenanceNode("mirror-a", ("wire",)),
+        SourceProvenanceNode("mirror-b", ("wire",)),
+    ))
+    signal = pipeline.temporal_signal(source_year=2026, observed_year=2026, knowledge_cutoff_year=2026)
+    value = sha256(b"same").hexdigest()
+    a = source_evidence_from_provenance(TemporalEvidence("a", "claim:x", value, signal, 800_000, True), source_id="mirror-a", graph=graph)
+    b = source_evidence_from_provenance(TemporalEvidence("b", "claim:x", value, signal, 700_000, True), source_id="mirror-b", graph=graph)
+    assert a.independence_group == b.independence_group
+    assert independent_confidence_ppm((a, b)) == 800_000
