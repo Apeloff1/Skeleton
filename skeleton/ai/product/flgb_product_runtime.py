@@ -16,6 +16,7 @@ MAX_ITERATIONS=10_000
 MAX_PLATFORMS=128
 MAX_GATES=100_000
 MAX_EVIDENCE=100_000
+EXPECTED_FLGB_PLANES=tuple(f"FLGB-{index:02d}" for index in range(1,19))
 
 class ProductContractError(ValueError):
     """Fail-closed FLGB-18 contract error."""
@@ -69,6 +70,7 @@ class ProductBootManifest:
         if not self.plane_evidence or len(self.plane_evidence)>MAX_PLANES: raise ProductContractError("plane boot evidence count out of bounds")
         ids=[p.plane_id for p in self.plane_evidence]
         if len(set(ids))!=len(ids): raise ProductContractError("duplicate plane boot evidence")
+        if set(ids)!=set(EXPECTED_FLGB_PLANES): raise ProductContractError("product boot requires FLGB-01 through FLGB-18 evidence")
         object.__setattr__(self,"plane_evidence",tuple(sorted(self.plane_evidence,key=lambda p:p.plane_id)))
 
     @property
@@ -351,6 +353,7 @@ def fan_in_closure(evidence:Sequence[PlaneClosureEvidence],acceptance:WholeSyste
     if not evidence or len(evidence)>MAX_EVIDENCE: raise ProductContractError("closure evidence count out of bounds")
     ids=[e.plane_id for e in evidence]
     if len(set(ids))!=len(ids): raise ProductContractError("duplicate plane closure evidence")
+    if set(ids)!=set(EXPECTED_FLGB_PLANES): raise ProductContractError("closure fan-in requires FLGB-01 through FLGB-18 evidence")
     if not acceptance.accepted: raise ProductContractError("whole-system acceptance has not passed")
     if any(e.exact_head_commit!=acceptance.exact_head_commit for e in evidence): raise ProductContractError("closure exact-head mismatch")
     open_planes=[e.plane_id for e in evidence if not e.closed]
