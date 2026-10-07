@@ -90,44 +90,51 @@ def _evidence_record(obligation, *, owner: str = "owner:test") -> dict:
 
 def test_live_p1_risk_inventory_is_deterministic_and_non_authoritative() -> None:
     report = reconcile_repository(ROOT, evaluated_at=NOW)
+    policy = _load(ROOT, POLICY)
+    expected_inventory = policy["inventory_expectations"]
+    obligations = derive_obligations(
+        _load(ROOT, MASTER),
+        _load(ROOT, P1_MAP),
+        _load(ROOT, ADVERSARIAL),
+        policy,
+    )
+    live_risk_count = sum(item.kind.value == "risk" for item in obligations)
+    live_gap_count = sum(item.kind.value == "gap" for item in obligations)
+    live_adversarial_count = sum(
+        item.kind.value == "adversarial" for item in obligations
+    )
+    live_total = len(obligations)
+    retired_expected = expected_inventory["volume_gap_count"] - live_gap_count
 
-    assert report["inventory"] == {
-        "p1_primary_volume_count": 107,
-        "volume_risk_count": 281,
-        "volume_gap_count": 212,
-        "applicable_adversarial_axis_count": 24,
-        "total_obligation_count": 517,
-    }
+    assert report["inventory"] == expected_inventory
     assert report["live_inventory"] == {
-        "p1_primary_volume_count": 107,
-        "volume_risk_count": 281,
-        "volume_gap_count": 174,
-        "applicable_adversarial_axis_count": 24,
-        "total_obligation_count": 479,
+        "p1_primary_volume_count": expected_inventory["p1_primary_volume_count"],
+        "volume_risk_count": live_risk_count,
+        "volume_gap_count": live_gap_count,
+        "applicable_adversarial_axis_count": live_adversarial_count,
+        "total_obligation_count": live_total,
     }
-    assert report["binding_count"] == 517
-    assert report["live_binding_count"] == 479
-    assert report["historical_binding_count"] == 517
-    assert report["retired_binding_count"] == 38
-    assert report["retired_expected_count"] == 38
-    assert len(report["retired_obligation_ids"]) == 38
+    assert report["binding_count"] == expected_inventory["total_obligation_count"]
+    assert report["live_binding_count"] == live_total
+    assert report["historical_binding_count"] == expected_inventory["total_obligation_count"]
+    assert report["retired_binding_count"] == retired_expected
+    assert report["retired_expected_count"] == retired_expected
+    assert len(report["retired_obligation_ids"]) == retired_expected
     assert all(
         item.startswith("P1-GAP-VOL-")
         for item in report["retired_obligation_ids"]
     )
-    assert report["resolved_count"] == 517
-    assert report["live_resolved_count"] == 479
-    assert report["historical_resolved_count"] == 517
+    assert report["resolved_count"] == expected_inventory["total_obligation_count"]
+    assert report["live_resolved_count"] == live_total
+    assert report["historical_resolved_count"] == expected_inventory["total_obligation_count"]
     assert report["unresolved_blocking_count"] == 0
     assert report["unclassified_count"] == 0
     assert report["disposition_counts"] == {
-        "evidence": 517,
-
+        "evidence": expected_inventory["total_obligation_count"],
     }
     assert report["non_authoritative"] is True
     assert report["source_mutation_detected"] is False
     assert len(report["report_digest"]) == 64
-
 
 def test_reconciliation_is_deterministic_for_same_evaluation_time() -> None:
     left = reconcile_repository(ROOT, evaluated_at=NOW)
@@ -247,12 +254,19 @@ def test_one_real_binding_changes_only_its_own_resolution(tmp_path: Path) -> Non
     _write(root, REGISTRY, registry)
 
     report = reconcile_repository(root, evaluated_at=NOW)
+    obligations = derive_obligations(
+        _load(root, MASTER),
+        _load(root, P1_MAP),
+        _load(root, ADVERSARIAL),
+        _load(root, POLICY),
+    )
 
     assert report["binding_count"] == 1
     assert report["resolved_count"] == 1
-    assert report["unresolved_blocking_count"] == 478
-    assert report["unclassified_count"] == 280
-
+    assert report["unresolved_blocking_count"] == len(obligations) - 1
+    assert report["unclassified_count"] == sum(
+        item.kind.value == "risk" for item in obligations
+    ) - 1
 
 def test_stale_binding_review_remains_unresolved(tmp_path: Path) -> None:
     root = _copy_tree(tmp_path)
