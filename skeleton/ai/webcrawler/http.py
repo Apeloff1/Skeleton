@@ -21,7 +21,11 @@ class SafeHttpFetcher:
     timeout_seconds:float=15.0
     max_redirects:int=5
     allowed_hosts:frozenset[str]|None=None
+    bind_dns_to_socket:bool=True
     def fetch_once(self,url,*,user_agent,max_bytes):
+        if self.bind_dns_to_socket:
+            from .bound_http import SocketBoundFetcher
+            return SocketBoundFetcher(self.timeout_seconds,self.allowed_hosts).fetch_once(url,user_agent=user_agent,max_bytes=max_bytes)
         current=_validate_destination(url,self.allowed_hosts)
         opener=urllib.request.build_opener(_NoRedirect)
         request=urllib.request.Request(current,headers={"User-Agent":user_agent,"Accept":"text/html,text/plain,application/xhtml+xml;q=0.9,*/*;q=0.1","Accept-Encoding":"identity"},method="GET")
