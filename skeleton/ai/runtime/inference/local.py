@@ -91,6 +91,7 @@ class LocalInferenceRequest:
     stop: tuple[str, ...] = ()
     tools: tuple[Mapping[str, Any], ...] = ()
     structured_output_schema: Mapping[str, Any] | None = None
+    context_digest: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.prompt, str) or not self.prompt.strip():
@@ -119,6 +120,13 @@ class LocalInferenceRequest:
             tuple(dict.fromkeys(item for item in self.stop if isinstance(item, str) and item)),
         )
         object.__setattr__(self, "tools", tuple(dict(item) for item in self.tools))
+        if self.context_digest is not None:
+            if (
+                not isinstance(self.context_digest, str)
+                or len(self.context_digest) != 64
+                or any(ch not in "0123456789abcdef" for ch in self.context_digest)
+            ):
+                raise ValueError("context_digest must be lowercase sha256")
         if self.structured_output_schema is not None:
             if not isinstance(self.structured_output_schema, Mapping):
                 raise TypeError("structured_output_schema must be an object")
@@ -150,6 +158,7 @@ class LocalInferenceRequest:
                 "stop": self.stop,
                 "tools": self.tools,
                 "structured_output_schema": self.structured_output_schema,
+                "context_digest": self.context_digest,
             }
         )
 
@@ -800,6 +809,7 @@ class LocalModelAdapter(ProviderAdapter):
                 if request.structured_output_schema is None
                 else dict(request.structured_output_schema)
             ),
+            context_digest=request.context_digest,
         )
         result = await self.engine.generate(local_request)
         tool_calls = tuple(
