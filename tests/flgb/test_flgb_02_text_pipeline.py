@@ -566,3 +566,29 @@ def test_prepared_corpus_digest_is_order_sensitive(native_model):
     left = pipeline.prepare_corpus((("a", "alpha beta"), ("b", "gamma delta")))
     right = pipeline.prepare_corpus((("b", "gamma delta"), ("a", "alpha beta")))
     assert left.digest != right.digest
+
+
+def test_pipeline_replay_checkpoint_verifies_text_and_corpus(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    prepared = pipeline.prepare("alpha beta gamma")
+    corpus = pipeline.prepare_corpus((("a", "alpha beta"), ("b", "gamma delta")))
+    text_checkpoint = pipeline.replay_checkpoint(prepared)
+    corpus_checkpoint = pipeline.replay_checkpoint(corpus)
+
+    assert text_checkpoint.payload_kind == "prepared-text"
+    assert corpus_checkpoint.payload_kind == "prepared-corpus"
+    pipeline.verify_replay_checkpoint(prepared, text_checkpoint)
+    pipeline.verify_replay_checkpoint(corpus, corpus_checkpoint)
+
+
+def test_pipeline_replay_checkpoint_rejects_different_payload(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    checkpoint = pipeline.replay_checkpoint(pipeline.prepare("alpha beta"))
+    with pytest.raises(TokenizerContractError, match="checkpoint mismatch"):
+        pipeline.verify_replay_checkpoint(pipeline.prepare("gamma delta"), checkpoint)
