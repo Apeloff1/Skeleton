@@ -689,6 +689,80 @@ def resolve_temporal_evolution_at(chain: TemporalEvolutionChain, year: int) -> T
 
 
 @dataclass(frozen=True)
+class TemporalSourceEvidence:
+    """Evidence plus an independence-group identity for corroboration accounting."""
+    evidence: TemporalEvidence
+    source_id: str
+    independence_group: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.evidence, TemporalEvidence):
+            raise TokenizerContractError("TemporalEvidence required")
+        for name in ("source_id", "independence_group"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value or value != value.strip() or any(ord(ch) < 32 for ch in value):
+                raise TokenizerContractError(f"invalid {name}")
+
+    @property
+    def digest(self) -> str:
+        return digest_json({"evidence_digest": self.evidence.digest, "source_id": self.source_id, "independence_group": self.independence_group})
+
+
+@dataclass(frozen=True)
+class WalkForwardSnapshot:
+    """Leakage-safe evidence view containing only observations knowable by cutoff."""
+    cutoff_year: int
+    evidence_digests: tuple[str, ...]
+    excluded_future_digests: tuple[str, ...]
+    independent_groups: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if isinstance(self.cutoff_year, bool) or not isinstance(self.cutoff_year, int) or not 1000 <= self.cutoff_year <= 9999:
+            raise TokenizerContractError("invalid walk-forward cutoff")
+        if len(set(self.evidence_digests)) != len(self.evidence_digests) or len(set(self.excluded_future_digests)) != len(self.excluded_future_digests):
+            raise TokenizerContractError("duplicate snapshot evidence")
+        if set(self.evidence_digests) & set(self.excluded_future_digests):
+            raise TokenizerContractError("snapshot included/excluded overlap")
+        if len(set(self.independent_groups)) != len(self.independent_groups):
+            raise TokenizerContractError("duplicate snapshot independence group")
+
+    @property
+    def digest(self) -> str:
+        return digest_json({"cutoff_year": self.cutoff_year, "evidence_digests": list(self.evidence_digests), "excluded_future_digests": list(self.excluded_future_digests), "independent_groups": list(self.independent_groups)})
+
+
+def walk_forward_snapshot(items: Sequence[TemporalSourceEvidence], *, cutoff_year: int) -> WalkForwardSnapshot:
+    if isinstance(cutoff_year, bool) or not isinstance(cutoff_year, int) or not 1000 <= cutoff_year <= 9999:
+        raise TokenizerContractError("invalid walk-forward cutoff")
+    sources = tuple(items)
+    if any(not isinstance(item, TemporalSourceEvidence) for item in sources):
+        raise TokenizerContractError("TemporalSourceEvidence required")
+    ordered = tuple(sorted(sources, key=lambda item: (item.evidence.signal.observed_year, item.source_id, item.evidence.evidence_id)))
+    included = tuple(item.digest for item in ordered if item.evidence.signal.observed_year <= cutoff_year)
+    excluded = tuple(item.digest for item in ordered if item.evidence.signal.observed_year > cutoff_year)
+    groups = tuple(sorted({item.independence_group for item in ordered if item.evidence.signal.observed_year <= cutoff_year}))
+    return WalkForwardSnapshot(cutoff_year, included, excluded, groups)
+
+
+def independent_confidence_ppm(items: Sequence[TemporalSourceEvidence]) -> int:
+    """Fuse corroboration by independent group, counting mirrors only once."""
+    sources = tuple(items)
+    if not sources or any(not isinstance(item, TemporalSourceEvidence) for item in sources):
+        raise TokenizerContractError("temporal source evidence required")
+    claim = sources[0].evidence.claim_key
+    if any(item.evidence.claim_key != claim for item in sources):
+        raise TokenizerContractError("cannot fuse different claims")
+    best_by_group: dict[str, int] = {}
+    for item in sources:
+        best_by_group[item.independence_group] = max(best_by_group.get(item.independence_group, 0), item.evidence.confidence_ppm)
+    # Integer noisy-OR over genuinely independent groups.
+    remaining = 1_000_000
+    for confidence in sorted(best_by_group.values(), reverse=True):
+        remaining = (remaining * (1_000_000 - confidence)) // 1_000_000
+    return 1_000_000 - remaining
+
+
+@dataclass(frozen=True)
 class SupervisedTextExample:
     """One prompt/response example with a deterministic normalized boundary."""
     example_id: str
