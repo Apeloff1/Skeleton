@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-09:world_identity:v1",
+  "title": "FLGB-09 world identity",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "project_id",
+    "world_id",
+    "world_revision",
+    "seed_digest",
+    "schema_digest",
+    "parent_world_digest"
+  ],
+  "properties": {
+    "project_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "world_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "world_revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "seed_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "schema_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "parent_world_digest": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}
