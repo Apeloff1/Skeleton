@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-18:resource_scheduler:v1",
+  "title": "FLGB-18 resource scheduler",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id",
+    "cpu_units",
+    "memory_bytes",
+    "priority",
+    "foreground",
+    "preemptible"
+  ],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "cpu_units": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "memory_bytes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "priority": {
+      "type": "integer"
+    },
+    "foreground": {
+      "type": "boolean"
+    },
+    "preemptible": {
+      "type": "boolean"
+    }
+  }
+}
