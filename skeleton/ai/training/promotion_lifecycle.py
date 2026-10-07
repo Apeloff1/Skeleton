@@ -49,7 +49,8 @@ def extend_with_promotion(
     if promotion.rollback_digest!=admission.checkpoint_digest: raise LifecycleProofError("promotion rollback checkpoint mismatch")
     if rollback.admission_digest!=admission.digest or rollback.checkpoint_digest!=admission.checkpoint_digest: raise LifecycleProofError("rollback/admission mismatch")
     if not rollback.verified or rollback.restored_model_digest!=admission.prior_model_digest: raise LifecycleProofError("rollback is not proven ready for prior model")
-    if evaluation.independent_verifier==admission.admission_authority: raise LifecycleProofError("evaluation and runtime admission authorities must be separate")\n    if rollback.verifier_id in {evaluation.independent_verifier,admission.admission_authority}: raise LifecycleProofError("rollback verifier must be independent")
+    if evaluation.independent_verifier==admission.admission_authority: raise LifecycleProofError("evaluation and runtime admission authorities must be separate")
+    if rollback.verifier_id in {evaluation.independent_verifier,admission.admission_authority}: raise LifecycleProofError("rollback verifier must be independent")
     prev=proof.stages[-1].digest
     extra=(
       LifecycleStage("candidate-weights",candidate.digest,candidate.training_lineage_digest,prev),
