@@ -25,6 +25,7 @@ from .llama_cpp import (
     build_llama_cpp_adapter,
     inspect_gguf,
 )
+from .native_transformer import NativeTransformerModel, build_native_transformer_adapter
 from .local import (
     CallableLocalModel,
     LocalInferenceCancelled,
@@ -68,4 +69,6 @@ __all__ = [
     "LocalModelBackend",
     "LocalToolCall",
     "ReferenceNGramModel",
+    "NativeTransformerModel",
+    "build_native_transformer_adapter",
 ]
