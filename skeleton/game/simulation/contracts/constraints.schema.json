@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-10:constraints:v1",
+  "title": "FLGB-10 constraints",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "constraint_id",
+    "left_id",
+    "right_id",
+    "target_distance",
+    "tolerance"
+  ],
+  "properties": {
+    "constraint_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "left_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "right_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "target_distance": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tolerance": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}
