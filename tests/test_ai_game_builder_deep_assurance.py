@@ -320,11 +320,33 @@ def test_transform_receipt_rejects_unattributed_execution_evidence() -> None:
         )
 
 
+def _knowledge_source(
+    source_id: str,
+    content_digest: str,
+    rights_state: str,
+    source_class: str,
+    snapshot_digest: str,
+    *,
+    factual_only: bool = False,
+) -> KnowledgeSource:
+    evidence = _d(f"knowledge-source-{source_id}")
+    return KnowledgeSource(
+        source_id,
+        content_digest,
+        rights_state,
+        source_class,
+        snapshot_digest,
+        _authority(f"knowledge-source-{source_id}-authority", evidence),
+        evidence,
+        factual_only=factual_only,
+    )
+
+
 def test_knowledge_firewall_quarantines_unknown_and_separates_reference_from_incorporation() -> None:
     fw = KnowledgeIngestionFirewall()
     with pytest.raises(DeepAssuranceError, match="quarantined or forbidden"):
         fw.admit(
-            KnowledgeSource(
+            _knowledge_source(
                 "unknown-web",
                 _d("content"),
                 "unknown_quarantine",
@@ -333,7 +355,7 @@ def test_knowledge_firewall_quarantines_unknown_and_separates_reference_from_inc
             )
         )
     fw.admit(
-        KnowledgeSource(
+        _knowledge_source(
             "official-doc",
             _d("content2"),
             "facts_and_ideas_reference_only",
@@ -345,6 +367,23 @@ def test_knowledge_firewall_quarantines_unknown_and_separates_reference_from_inc
     assert fw.may_use_as_reference("official-doc")
     assert fw.may_incorporate_expression("official-doc") is False
     assert len(fw.snapshot_digest) == 64
+
+
+def test_knowledge_source_rejects_unattributed_rights_snapshot() -> None:
+    evidence = _d("knowledge-source-unbound")
+    with pytest.raises(
+        DeepAssuranceError,
+        match="referenced by source authority",
+    ):
+        KnowledgeSource(
+            "official-doc",
+            _d("content"),
+            "facts_and_ideas_reference_only",
+            "official_documentation",
+            _d("snapshot"),
+            _authority("wrong-source-authority", _d("other-source-evidence")),
+            evidence,
+        )
 
 
 def test_multiresolution_coverage_requires_every_declared_scale() -> None:
@@ -379,11 +418,43 @@ def test_interaction_matrix_requires_all_pairs() -> None:
 
 
 def test_tail_risk_uses_conservative_upper_bound() -> None:
-    unsafe = RareEventObservation("save-corruption", samples=100, critical_failures=0, threshold=0.01)
-    safe = RareEventObservation("save-corruption", samples=1000, critical_failures=0, threshold=0.01)
+    unsafe_evidence = _d("rare-unsafe")
+    safe_evidence = _d("rare-safe")
+    unsafe = RareEventObservation(
+        "save-corruption",
+        samples=100,
+        critical_failures=0,
+        threshold=0.01,
+        evaluator_provenance=_authority("rare-unsafe-evaluator", unsafe_evidence),
+        evidence_digest=unsafe_evidence,
+    )
+    safe = RareEventObservation(
+        "save-corruption",
+        samples=1000,
+        critical_failures=0,
+        threshold=0.01,
+        evaluator_provenance=_authority("rare-safe-evaluator", safe_evidence),
+        evidence_digest=safe_evidence,
+    )
     assert unsafe.passed is False
     assert safe.passed is True
     assert TailRiskLab.blockers((unsafe, safe)) == ("save-corruption",)
+
+
+def test_tail_risk_rejects_unattributed_sample_evidence() -> None:
+    evidence = _d("rare-unbound")
+    with pytest.raises(
+        DeepAssuranceError,
+        match="referenced by evaluator authority",
+    ):
+        RareEventObservation(
+            "save-corruption",
+            samples=1000,
+            critical_failures=0,
+            threshold=0.01,
+            evaluator_provenance=_authority("wrong-rare-evaluator", _d("other-rare")),
+            evidence_digest=evidence,
+        )
 
 
 def test_telemetry_feedback_rejects_raw_identity_and_tiny_cohorts() -> None:
