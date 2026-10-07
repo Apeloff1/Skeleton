@@ -34,6 +34,8 @@ class TestNativeTrainingAdmission(unittest.TestCase):
   rt,cp,prior,c,p,apply=setup()
   def bad(m): m.E[0][0]+=9; raise RuntimeError("training loader failed")
   with self.assertRaises(RuntimeError): admit_candidate_model(rt,c,p,bad,admission_authority="runtime")
+  self.assertEqual(rt.model_digest,prior)
+  self.assertEqual(rt._current_model_digest(),prior)
   self.assertEqual(NativeLLMRuntime.restore(cp).model_digest,prior)
  def test_unqualified_promotion_cannot_touch_model(self):
   rt,cp,prior,c,p,apply=setup()
