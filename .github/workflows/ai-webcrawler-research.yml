@@ -1,0 +1,52 @@
+name: AI Webcrawler Research Plane
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "skeleton/ai/webcrawler/**"
+      - "tests/test_ai_webcrawler_*.py"
+      - ".github/workflows/ai-webcrawler-research.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "skeleton/ai/webcrawler/**"
+      - "tests/test_ai_webcrawler_*.py"
+      - ".github/workflows/ai-webcrawler-research.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-webcrawler-research-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  validate:
+    name: Exact-head crawler validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Assert exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install focused test runtime
+        run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+      - name: Compile crawler plane
+        run: python -m compileall -q skeleton/ai/webcrawler
+      - name: Run crawler regression corpus
+        run: python -m pytest -q --noconftest tests/test_ai_webcrawler_*.py
