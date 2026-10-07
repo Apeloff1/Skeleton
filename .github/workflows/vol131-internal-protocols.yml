@@ -1,0 +1,179 @@
+name: VOL-131 Internal Protocols
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_file_tree.json"
+      - "skeleton/distributed/network/internal_protocol.py"
+      - "skeleton/distributed/network/__init__.py"
+      - "skeleton/ai/runtime/distributed/network/internal_protocol.py"
+      - "skeleton/ai/runtime/distributed/network/__init__.py"
+      - "skeleton/testing/test_internal_protocols.py"
+      - "scripts/verify_vol131_internal_protocols.py"
+      - "tests/test_vol131_internal_protocols_independent.py"
+      - ".github/workflows/vol131-internal-protocols.yml"
+  push:
+    branches: [main]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_file_tree.json"
+      - "skeleton/distributed/network/internal_protocol.py"
+      - "skeleton/distributed/network/__init__.py"
+      - "skeleton/ai/runtime/distributed/network/internal_protocol.py"
+      - "skeleton/ai/runtime/distributed/network/__init__.py"
+      - "skeleton/testing/test_internal_protocols.py"
+      - "scripts/verify_vol131_internal_protocols.py"
+      - "tests/test_vol131_internal_protocols_independent.py"
+      - ".github/workflows/vol131-internal-protocols.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vol131-internal-protocols-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  protocol-behavior:
+    name: Canonical protocol behavior and mirror parity
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused test runtime
+        run: >-
+          python -m pip install --disable-pip-version-check --no-input
+          "pytest>=8,<9"
+
+      - name: Compile protocol surfaces
+        run: >-
+          python -m compileall -q
+          skeleton/distributed/network/internal_protocol.py
+          skeleton/ai/runtime/distributed/network/internal_protocol.py
+          skeleton/testing/test_internal_protocols.py
+          scripts/verify_vol131_internal_protocols.py
+          tests/test_vol131_internal_protocols_independent.py
+
+      - name: Run protocol behavioral regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_internal_protocols.py
+
+      - name: Assert canonical and AI runtime package parity
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          pairs = (
+              (
+                  Path("skeleton/distributed/network/internal_protocol.py"),
+                  Path("skeleton/ai/runtime/distributed/network/internal_protocol.py"),
+              ),
+              (
+                  Path("skeleton/distributed/network/__init__.py"),
+                  Path("skeleton/ai/runtime/distributed/network/__init__.py"),
+              ),
+          )
+          for canonical, mirror in pairs:
+              if canonical.read_bytes() != mirror.read_bytes():
+                  raise SystemExit(
+                      f"VOL-131 mirror drift: {canonical} != {mirror}"
+                  )
+          print("VOL-131 canonical/AI network parity: OK")
+          PY
+
+  protocol-independent:
+    name: Independent exact-head VOL-131 verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused test runtime
+        run: >-
+          python -m pip install --disable-pip-version-check --no-input
+          "pytest>=8,<9"
+
+      - name: Run independent verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_vol131_internal_protocols_independent.py
+
+      - name: Emit independent exact-head receipt
+        run: >-
+          python scripts/verify_vol131_internal_protocols.py
+          --evidence-out .vol131-internal-protocols.json
+          --print-evidence
+
+      - name: Assert exact-head receipt identity
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".vol131-internal-protocols.json").read_text(encoding="utf-8")
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected:
+              raise SystemExit("VOL-131 receipt does not bind exact head")
+          if receipt.get("volume") != "VOL-131":
+              raise SystemExit("VOL-131 verifier bound wrong volume")
+          if receipt.get("verifier") != "independent-vol131-internal-protocols-v1":
+              raise SystemExit("unexpected VOL-131 verifier identity")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("independent VOL-131 verification failed")
+          implementation = receipt.get("implementation") or {}
+          if implementation.get("mirror_parity") is not True:
+              raise SystemExit("VOL-131 protocol mirror parity missing")
+          if implementation.get("export_parity") is not True:
+              raise SystemExit("VOL-131 export mirror parity missing")
+          if implementation.get("required_invariant_count", 0) < 20:
+              raise SystemExit("VOL-131 implementation invariant coverage too small")
+          if implementation.get("required_regression_count", 0) < 10:
+              raise SystemExit("VOL-131 regression coverage too small")
+          mapping = receipt.get("ai_tree_binding") or {}
+          if mapping.get("mapping_id") != "AIFT-NETWORK":
+              raise SystemExit("VOL-131 AI-tree mapping identity missing")
+          if len(receipt.get("receipt_digest") or "") != 64:
+              raise SystemExit("VOL-131 receipt digest invalid")
+          print(
+              "VOL-131 independent exact-head receipt:",
+              expected,
+              receipt["receipt_digest"],
+          )
+          PY
