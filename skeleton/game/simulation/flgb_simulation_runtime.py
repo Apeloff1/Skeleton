@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 import json
+from math import isqrt
 from types import MappingProxyType
 from typing import Any, Mapping, Sequence
 
@@ -217,9 +218,7 @@ def sphere_contact(left:SphereCollider,right:SphereCollider)->Contact|None:
     distance_sq=dx*dx+dy*dy+dz*dz; radius=left.radius+right.radius
     if distance_sq>radius*radius: return None
     # Integer lower bound on penetration avoids platform floating point drift.
-    root=int(distance_sq**0.5)
-    while (root+1)*(root+1)<=distance_sq: root+=1
-    while root*root>distance_sq: root-=1
+    root=isqrt(distance_sq)
     a,b=sorted((left.entity_id,right.entity_id))
     return Contact(a,b,max(0,radius-root))
 
