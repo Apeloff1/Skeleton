@@ -60,9 +60,10 @@
         "FLGB-02-T11",
         "FLGB-02-T12"
       ],
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
-      "independent_verification_signed": false
+      "independent_verification_signed": false,
+      "implementation_note": "T01-T12 model-runtime/serving control contracts, versioned schemas, and focused regressions are present; FLGB-01 dependency and exact-head independent verification remain required before signoff."
     },
     {
       "id": "FLGB-03",
@@ -1311,7 +1312,7 @@
       "implementation_target": "skeleton/ai/model_runtime/tokenization.py",
       "contract_target": "skeleton/ai/model_runtime/contracts/tokenization.schema.json",
       "test_target": "tests/flgb/test_flgb_02_tokenization.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -1377,7 +1378,7 @@
       "implementation_target": "skeleton/ai/model_runtime/vocabulary_governance.py",
       "contract_target": "skeleton/ai/model_runtime/contracts/vocabulary_governance.schema.json",
       "test_target": "tests/flgb/test_flgb_02_vocabulary_governance.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -1443,7 +1444,7 @@
       "implementation_target": "skeleton/ai/model_runtime/model_registry.py",
       "contract_target": "skeleton/ai/model_runtime/contracts/model_registry.schema.json",
       "test_target": "tests/flgb/test_flgb_02_model_registry.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -1509,7 +1510,7 @@
       "implementation_target": "skeleton/ai/model_runtime/weight_loading.py",
       "contract_target": "skeleton/ai/model_runtime/contracts/weight_loading.schema.json",
       "test_target": "tests/flgb/test_flgb_02_weight_loading.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -1575,7 +1576,7 @@
       "implementation_target": "skeleton/ai/model_runtime/device_placement.py",
       "contract_target": "skeleton/ai/model_runtime/contracts/device_placement.schema.json",
       "test_target": "tests/flgb/test_flgb_02_device_placement.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -1641,7 +1642,7 @@
       "implementation_target": "skeleton/ai/model_runtime/kv_cache.py",
       "contract_target": "skeleton/ai/model_runtime/contracts/kv_cache.schema.json",
       "test_target": "tests/flgb/test_flgb_02_kv_cache.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -1707,7 +1708,7 @@
       "implementation_target": "skeleton/ai/model_runtime/continuous_batching.py",
       "contract_target": "skeleton/ai/model_runtime/contracts/continuous_batching.schema.json",
       "test_target": "tests/flgb/test_flgb_02_continuous_batching.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -1773,7 +1774,7 @@
       "implementation_target": "skeleton/ai/model_runtime/quantization.py",
       "contract_target": "skeleton/ai/model_runtime/contracts/quantization.schema.json",
       "test_target": "tests/flgb/test_flgb_02_quantization.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -1839,7 +1840,7 @@
       "implementation_target": "skeleton/ai/model_runtime/speculative_decoding.py",
       "contract_target": "skeleton/ai/model_runtime/contracts/speculative_decoding.schema.json",
       "test_target": "tests/flgb/test_flgb_02_speculative_decoding.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -1905,7 +1906,7 @@
       "implementation_target": "skeleton/ai/model_runtime/distributed_serving.py",
       "contract_target": "skeleton/ai/model_runtime/contracts/distributed_serving.schema.json",
       "test_target": "tests/flgb/test_flgb_02_distributed_serving.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -1971,7 +1972,7 @@
       "implementation_target": "skeleton/ai/model_runtime/local_model_bridge.py",
       "contract_target": "skeleton/ai/model_runtime/contracts/local_model_bridge.schema.json",
       "test_target": "tests/flgb/test_flgb_02_local_model_bridge.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -2037,7 +2038,7 @@
       "implementation_target": "skeleton/ai/model_runtime/model_lifecycle.py",
       "contract_target": "skeleton/ai/model_runtime/contracts/model_lifecycle.schema.json",
       "test_target": "tests/flgb/test_flgb_02_model_lifecycle.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
