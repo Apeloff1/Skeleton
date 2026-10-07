@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-12:input_mapping:v1",
+  "title": "FLGB-12 input mapping",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "binding_id",
+    "action_id",
+    "device_class",
+    "control",
+    "modifiers"
+  ],
+  "properties": {
+    "binding_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "action_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "device_class": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "control": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "modifiers": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    }
+  }
+}
