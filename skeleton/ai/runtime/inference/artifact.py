@@ -10,10 +10,16 @@ from pathlib import Path
 import tempfile
 from typing import Any, Mapping
 
-from .local import ReferenceNGramModel\nfrom .native_runtime import NativeRuntimeLocalModel, NativeRuntimeBackendError
+from skeleton.ai.model_runtime.runtime_contracts import (
+    MAX_CHECKPOINT_BYTES,
+    RUNTIME_SCHEMA,
+)
+
+from .local import ReferenceNGramModel
+from .native_runtime import NativeRuntimeBackendError, NativeRuntimeLocalModel
 
 
-_MAX_ARTIFACT_BYTES = 256 * 1024 * 1024
+_MAX_ARTIFACT_BYTES = MAX_CHECKPOINT_BYTES
 
 
 class LocalModelArtifactError(RuntimeError):
@@ -84,7 +90,7 @@ class LoadedLocalModel:
 
 def _payload_model(payload: Mapping[str, Any]) -> tuple[object, str]:
     runtime_schema = payload.get("schema")
-    if runtime_schema == "skeleton.ai.native-llm-runtime.v2":
+    if runtime_schema == RUNTIME_SCHEMA:
         try:
             return NativeRuntimeLocalModel.from_checkpoint(payload), runtime_schema
         except (NativeRuntimeBackendError, TypeError, ValueError, RuntimeError) as exc:
