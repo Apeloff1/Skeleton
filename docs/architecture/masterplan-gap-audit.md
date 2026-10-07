@@ -1672,3 +1672,16 @@ Research assurance now closes several gaps between descriptive evidence analysis
 - focused regressions cover citation-collapse of cross-host independence, robust stop/continue decisions and temporal fragment filtering.
 
 This moves the plane toward research assurance rather than feature accumulation: acquisition, stopping, retrieval and confidence are all conditioned on evidence independence and temporal validity. Remaining SOTA work includes durable persistence for temporal metadata/revision receipts, calibrated empirical outcome datasets, structured metadata extraction for publication/event dates, interaction-aware acquisition value, and exact-head executable validation.
+
+
+### 2026-10-07 decision-theoretic autonomous research tranche
+
+The research plane now reasons about the value and sufficiency of future evidence rather than only ranking existing evidence:
+- ResearchAction/ActionValue rank candidate research actions by bounded expected information gain times success probability minus configurable cost and latency penalties;
+- sequential_bernoulli implements a bounded sequential likelihood-ratio decision with accept-high, accept-low and continue states, avoiding a fixed evidence sample count;
+- SourcePosterior updates source reliability from resolved correct/incorrect outcomes using a Beta posterior, with conservative shrinkage for operational scoring;
+- schema v6 durably persists temporal retrieval metadata, deterministic evidence-revision receipts and learned source-quality posterior state;
+- ResearchStateStore round-trips these assurance artifacts and rejects deterministic revision-ID collisions;
+- regressions cover information-value ranking, sequential evidence continuation/acceptance, posterior source learning and durable assurance-state restart.
+
+This enables a future orchestrator to choose the next research action based on expected uncertainty reduction per cost, update source priors when claims resolve, and preserve learned assurance state across restarts. Remaining work: derive information gain from current posterior entropy instead of accepting it as an action input; combine dependence clusters with source posteriors; persist calibrated outcomes; and integrate the action ranker with acquisition targets/provider budgets.
