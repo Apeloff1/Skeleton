@@ -64,5 +64,27 @@ class FunctionalLLMGameBuilderExecutionBacklogTest(unittest.TestCase):
             self.assertIn("statistical dominance", closure)
 
 
+    def test_plane_01_implementation_inventory_is_present_but_unsigned(self) -> None:
+        backlog = json.loads(
+            (ROOT / "machine/functional_llm_game_builder_execution_backlog.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        plane = next(item for item in backlog["planes"] if item["id"] == "FLGB-01")
+        self.assertEqual(plane["state"], "implemented-pending-verification")
+        self.assertFalse(plane["implementation_signed"])
+        self.assertFalse(plane["independent_verification_signed"])
+
+        tasks = [item for item in backlog["tasks"] if item["plane_id"] == "FLGB-01"]
+        self.assertEqual(len(tasks), 12)
+        for task in tasks:
+            self.assertEqual(task["state"], "implemented-pending-verification")
+            self.assertFalse(task["implementation_signed"])
+            self.assertFalse(task["independent_verification_signed"])
+            self.assertTrue((ROOT / task["implementation_target"]).is_file())
+            self.assertTrue((ROOT / task["contract_target"]).is_file())
+            self.assertTrue((ROOT / task["test_target"]).is_file())
+
+
 if __name__ == "__main__":
     unittest.main()
