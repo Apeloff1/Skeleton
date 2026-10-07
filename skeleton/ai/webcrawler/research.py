@@ -177,6 +177,11 @@ class EvidenceSet:
         from .regime_trajectory import classify_regime_transitions
         return classify_regime_transitions(self.learned_regimes(threshold=threshold))
 
+    def contradiction_history(self,*,threshold:float=.45):
+        from .contradiction_history import contradiction_persistence,persistent_contestation
+        rows=contradiction_persistence(self.qualified(),self.learned_regimes(threshold=threshold))
+        return {"regimes":rows,**persistent_contestation(rows)}
+
     def assurance(self, *, now: float) -> Mapping[str, object]:
         ranked=self.ranked(now=now)
         relevant=[o for o in ranked if o.relevance >= self.query.min_relevance and o.source_score >= self.query.min_source_score]
