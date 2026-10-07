@@ -370,6 +370,7 @@ from .proximal import (
     soft_threshold,
     soft_threshold_vector,
 )
+from .parametric_surfaces import BSplineSurface, BezierSurface
 from .polynomials import (
     PolynomialRootsReport,
     polynomial_add,
@@ -614,6 +615,7 @@ from .statistics import (
     quantile,
     standardize,
 )
+from .tensor_decomposition import HOSVDReport, hosvd, tucker_reconstruct, unfold_tensor
 from .tensor_contract import mode_product, tensor_contract, tensor_dot, tensor_outer
 from .tensor import (
     DenseTensor,
@@ -965,6 +967,8 @@ __all__ = [
     "proximal_elastic_net",
     "soft_threshold",
     "soft_threshold_vector",
+    "BSplineSurface",
+    "BezierSurface",
     "PolynomialRootsReport",
     "polynomial_add",
     "polynomial_derivative",
@@ -1156,6 +1160,10 @@ __all__ = [
     "moments",
     "quantile",
     "standardize",
+    "HOSVDReport",
+    "hosvd",
+    "tucker_reconstruct",
+    "unfold_tensor",
     "mode_product",
     "tensor_contract",
     "tensor_dot",

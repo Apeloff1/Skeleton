@@ -129,6 +129,8 @@ model authority boundaries.
 - `multiple_testing.py` — Bonferroni, Holm, Benjamini-Hochberg and Benjamini-Yekutieli corrections.
 - `constrained_qp.py` — equality-KKT and box active-set convex quadratic-programming references with residual evidence.
 - `finite_volume1d.py` — periodic Rusanov finite-volume conservation laws with explicit CFL and mass-drift evidence.
+- `parametric_surfaces.py` — tensor-product Bezier/B-spline surface evaluation plus exact Bezier partial derivatives.
+- `tensor_decomposition.py` — mode unfoldings and HOSVD/Tucker compression with retained-energy and reconstruction evidence.
 - `validation.py` — parity evidence against existing optimized runtime kernels.
 
 ## Guarantees
@@ -235,6 +237,8 @@ model authority boundaries.
 - Multiple-testing corrections return adjusted p-values and rejections only; experiment/promotion authority remains outside this layer.
 - Quadratic-programming solvers validate convexity and expose KKT/projected-gradient residuals rather than hiding constraint activity.
 - Finite-volume stepping is flux-conservative and rejects CFL-unstable updates before evolving state.
+- Parametric surfaces reuse canonical Bezier/B-spline basis semantics rather than creating parallel curve mathematics.
+- HOSVD/Tucker decomposition reuses canonical SVD/mode products and reports retained axis energy plus full reconstruction residual.
 - `audit_runtime_kernels()` compares optimized runtime softmax, matmul and attention against
   this reference substrate without replacing those kernels.
 
