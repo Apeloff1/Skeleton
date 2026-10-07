@@ -49,6 +49,8 @@ class SourceRecord:
     rights_state: RightsState
     allowed_uses: frozenset[UseKind]
     source_class: str
+    rights_authority: EvaluatorProvenance
+    rights_evidence_digest: str
     license_id: str | None = None
     attribution_text: str | None = None
     attribution_required: bool = False
@@ -56,10 +58,32 @@ class SourceRecord:
     consent_digest: str | None = None
 
     def __post_init__(self) -> None:
-        if not self.source_id.strip() or not self.source_class.strip():
+        if (
+            not isinstance(self.source_id, str)
+            or not self.source_id.strip()
+            or not isinstance(self.source_class, str)
+            or not self.source_class.strip()
+        ):
             raise ValueError("source identity and source_class must be non-empty")
-        if len(self.content_digest) < 16:
+        if not isinstance(self.content_digest, str) or len(self.content_digest) < 16:
             raise ValueError("content_digest must be stable")
+        if not isinstance(self.rights_state, RightsState):
+            raise TypeError("rights_state must be RightsState")
+        if not isinstance(self.allowed_uses, frozenset) or any(
+            not isinstance(item, UseKind) for item in self.allowed_uses
+        ):
+            raise TypeError("allowed_uses must be a frozenset of UseKind")
+        if not isinstance(self.rights_authority, EvaluatorProvenance):
+            raise TypeError("rights_authority must be EvaluatorProvenance")
+        if (
+            not isinstance(self.rights_evidence_digest, str)
+            or len(self.rights_evidence_digest) < 16
+        ):
+            raise ValueError("rights_evidence_digest must be stable")
+        if self.rights_evidence_digest not in self.rights_authority.output_evidence_refs:
+            raise RightsError(
+                "rights evidence must be referenced by rights authority"
+            )
         if not isinstance(self.attribution_required, bool):
             raise TypeError("attribution_required must be boolean")
         if not isinstance(self.consent_required, bool):
@@ -68,11 +92,22 @@ class SourceRecord:
             raise ValueError("required attribution text is missing")
         if self.consent_required and not self.consent_digest:
             raise ValueError("required consent evidence is missing")
-        if self.consent_digest is not None and len(self.consent_digest) < 16:
+        if self.consent_digest is not None and (
+            not isinstance(self.consent_digest, str)
+            or len(self.consent_digest) < 16
+        ):
             raise ValueError("consent_digest must be stable")
+        if self.rights_state is RightsState.LICENSED_REUSE and not (
+            self.license_id or ""
+        ).strip():
+            raise ValueError("licensed reuse requires license identity")
         if self.rights_state in {RightsState.UNKNOWN_QUARANTINE, RightsState.FORBIDDEN}:
             if self.allowed_uses:
                 raise ValueError("quarantined/forbidden sources cannot declare allowed uses")
+
+    @property
+    def rights_binding_digest(self) -> str:
+        return canonical_digest(self.to_payload())
 
     def to_payload(self) -> dict[str, object]:
         return {
@@ -83,6 +118,8 @@ class SourceRecord:
             "consent_required": self.consent_required,
             "content_digest": self.content_digest,
             "license_id": self.license_id,
+            "rights_authority_digest": self.rights_authority.digest,
+            "rights_evidence_digest": self.rights_evidence_digest,
             "rights_state": self.rights_state.value,
             "source_class": self.source_class,
             "source_id": self.source_id,
