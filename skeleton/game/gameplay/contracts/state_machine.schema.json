@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-13:state_machine:v1",
+  "title": "FLGB-13 state machine",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "transition_id",
+    "source",
+    "target",
+    "guard_digest"
+  ],
+  "properties": {
+    "transition_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "target": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "guard_digest": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}
