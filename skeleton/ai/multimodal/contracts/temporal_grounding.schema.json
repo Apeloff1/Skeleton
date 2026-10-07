@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-08:temporal_grounding:v1",
+  "title": "FLGB-08 temporal grounding",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "grounding_id",
+    "artifact_digest",
+    "start_ms",
+    "end_ms",
+    "claim_digest",
+    "evidence_digest"
+  ],
+  "properties": {
+    "grounding_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "artifact_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "start_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "end_ms": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "claim_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "evidence_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
