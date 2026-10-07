@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Callable
 from skeleton.ai.training.flgb_training_runtime import CandidateWeights, PromotionEvidence, digest_json, require_digest, require_id
 from skeleton.ai.training.promotion_lifecycle import RuntimeAdmission, RollbackProof
-from .native_llm_runtime import NativeLLMRuntime
+from .native_llm_runtime import NativeLLMRuntime\nfrom .runtime_checkpoint import validate_checkpoint
 
 class RuntimePromotionError(ValueError): pass
 
@@ -54,7 +54,7 @@ def admit_candidate_model(runtime:NativeLLMRuntime,candidate:CandidateWeights,pr
     if restored.model_digest!=prior: raise RuntimePromotionError("rollback verification failed")
     return runtime,admission,RollbackProof(admission.digest,checkpoint["digest"],prior,"native-runtime-restore",True,False)
 
-def execute_rollback(runtime,admission,rollback,checkpoint,*,verifier_id=None):\n    verifier_id=verifier_id or rollback.verifier_id\n    require_id(verifier_id,"rollback_verifier")\n    if verifier_id==admission.admission_authority: raise RuntimePromotionError("rollback verifier must differ from admission authority")
+def execute_rollback(runtime,admission,rollback,checkpoint,*,verifier_id=None):\n    body=validate_checkpoint(checkpoint)\n    if checkpoint.get("digest")!=admission.checkpoint_digest or checkpoint.get("digest")!=rollback.checkpoint_digest: raise RuntimePromotionError("rollback checkpoint identity mismatch")\n    if body["model_digest"]!=admission.prior_model_digest: raise RuntimePromotionError("rollback checkpoint model mismatch")\n    verifier_id=verifier_id or rollback.verifier_id\n    require_id(verifier_id,"rollback_verifier")\n    if verifier_id==admission.admission_authority: raise RuntimePromotionError("rollback verifier must differ from admission authority")
     if rollback.executed: raise RuntimePromotionError("rollback receipt already executed")
     if runtime.model_digest!=admission.admitted_model_digest or runtime._current_model_digest()!=admission.admitted_model_digest: raise RuntimePromotionError("runtime no longer matches admitted model")
     if rollback.admission_digest!=admission.digest or rollback.checkpoint_digest!=admission.checkpoint_digest or not rollback.verified: raise RuntimePromotionError("rollback authority mismatch")
