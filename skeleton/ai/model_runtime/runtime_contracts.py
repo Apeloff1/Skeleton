@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import math
 from typing import Any, Mapping
 
-from .flgb_model_runtime import digest_json, require_digest, require_id
+from .flgb_model_runtime import digest_json, require_id
 
 MAX_CONTEXT = 1_000_000
 MAX_NEW_TOKENS = 1_000_000
@@ -41,6 +41,23 @@ def nonnegative_int(value: Any, name: str, upper: int) -> int:
     if not is_int(value) or not 0 <= value <= upper:
         raise RuntimeContractError(f"invalid {name}")
     return int(value)
+
+
+def runtime_id(value: Any, name: str) -> str:
+    try:
+        return require_id(value, name)
+    except ValueError as exc:
+        raise RuntimeContractError(f"invalid {name}") from exc
+
+
+def runtime_digest(value: Any, name: str) -> str:
+    if (
+        not isinstance(value, str)
+        or len(value) != 64
+        or any(ch not in "0123456789abcdef" for ch in value)
+    ):
+        raise RuntimeContractError(f"invalid {name}")
+    return value
 
 
 @dataclass(frozen=True)
@@ -150,7 +167,7 @@ class RuntimeArchitecture:
             raise RuntimeContractError("unsupported runtime norm")
         if self.ffn_kind not in {"gelu", "swiglu"}:
             raise RuntimeContractError("unsupported runtime FFN")
-        require_id(self.positional, "positional")
+        runtime_id(self.positional, "positional")
 
     @property
     def digest(self) -> str:
@@ -304,7 +321,7 @@ class ReplayReceipt:
             "config_digest",
             "device_digest",
         ):
-            require_digest(getattr(self, name), name)
+            runtime_digest(getattr(self, name), name)
         if not is_int(self.seed):
             raise RuntimeContractError("replay seed must be an integer")
         if self.schema != REPLAY_SCHEMA:
@@ -335,7 +352,7 @@ class BatchGenerationRequest:
     config: GenerationConfig = GenerationConfig()
 
     def __post_init__(self) -> None:
-        require_id(self.request_id, "request_id")
+        runtime_id(self.request_id, "request_id")
         if not isinstance(self.prompt, str):
             raise RuntimeContractError("batch prompt must be a string")
         if not isinstance(self.config, GenerationConfig):
@@ -360,4 +377,6 @@ __all__ = [
     "is_int",
     "nonnegative_int",
     "positive_int",
+    "runtime_digest",
+    "runtime_id",
 ]
