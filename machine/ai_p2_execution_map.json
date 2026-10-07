@@ -407,7 +407,11 @@
       "VOL-097",
       "VOL-104",
       "VOL-132",
-      "VOL-134"
+      "VOL-134",
+      "VOL-167",
+      "VOL-169",
+      "VOL-172",
+      "VOL-175"
     ],
     "queued_volume_count": 261,
     "queued_volume_refs": [
@@ -466,13 +470,9 @@
       "VOL-162",
       "VOL-163",
       "VOL-166",
-      "VOL-167",
-      "VOL-169",
       "VOL-171",
-      "VOL-172",
       "VOL-173",
       "VOL-174",
-      "VOL-175",
       "VOL-176",
       "VOL-177",
       "VOL-178",
