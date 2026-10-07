@@ -13,3 +13,10 @@ def test_native_runtime_reaches_local_inference_contract():
     assert backend.tokenizer_digest == runtime.tokenizer.digest
     assert result.output_tokens == 2
     assert result.response_id.startswith("native:")
+
+def test_native_bridge_identity_is_bound():
+    model=TinyTransformer(vocab=("user:","hello","assistant:","world"),dim=8,ctx=16,seed=12,n_heads=2,n_layers=2,d_ff=16)
+    runtime=NativeLLMRuntime(model,device_policy=DevicePolicy("cpu"))
+    backend=NativeRuntimeBackend(runtime)
+    assert backend.model_digest == runtime.model_digest
+    assert backend.tokenizer_digest == runtime.tokenizer.digest
