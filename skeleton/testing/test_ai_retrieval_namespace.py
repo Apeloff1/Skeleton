@@ -24,6 +24,6 @@ def test_ai_retrieval_index_and_ingestor_use_ai_tree_types() -> None:
 
 def test_ai_retrieval_core_has_no_legacy_retrieval_imports() -> None:
     from pathlib import Path
-    for relative in ("pipeline.py","index.py","ingest.py"):
+    for relative in ("pipeline.py","index.py","ingest.py","query.py"):
         source=Path("skeleton/ai/runtime/retrieval",relative).read_text(encoding="utf-8")
         assert "skeleton.retrieval" not in source
