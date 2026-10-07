@@ -38,23 +38,26 @@ class TestAdmissionCheckpoint(unittest.TestCase):
     def test_active_without_kv_fails_closed(self):
         snapshot = self.build().snapshot()
         snapshot["kv"] = []
-        snapshot["capacity"]["kv_used_bytes"] = 0
-        snapshot["capacity"]["kv_free_bytes"] = 200
-        with self.assertRaisesRegex(ModelRuntimeError, "missing KV"):
+        with self.assertRaisesRegex(ModelRuntimeError, "digest mismatch"):
             restore_admission_scheduler(snapshot)
 
     def test_capacity_tamper_fails_closed(self):
         snapshot = self.build().snapshot()
         snapshot["capacity"]["queued_tokens"] += 1
-        with self.assertRaisesRegex(ModelRuntimeError, "capacity mismatch"):
+        with self.assertRaisesRegex(ModelRuntimeError, "digest mismatch"):
             restore_admission_scheduler(snapshot)
 
     def test_duplicate_cross_state_identity_fails_closed(self):
         snapshot = self.build().snapshot()
         snapshot["queued"].append(copy.deepcopy(snapshot["active"][0]))
-        with self.assertRaisesRegex(ModelRuntimeError, "queued and active"):
+        with self.assertRaisesRegex(ModelRuntimeError, "digest mismatch"):
             restore_admission_scheduler(snapshot)
 
+    def test_missing_snapshot_digest_fails_closed(self):
+        snapshot = self.build().snapshot()
+        snapshot.pop("digest")
+        with self.assertRaisesRegex(ModelRuntimeError, "snapshot digest"):
+            restore_admission_scheduler(snapshot)
 
 if __name__ == "__main__":
     unittest.main()
