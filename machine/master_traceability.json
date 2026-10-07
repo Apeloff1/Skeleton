@@ -11,8 +11,8 @@
     "volume_ref": "VOL-112",
     "title": "Master Traceability Matrix",
     "required_gap_texts": [
-      "materialize canonical trace graph",
-      "bind PR impact checks to trace edges"
+      "repository-wide trace population remains separate",
+      "independent completeness audit remains pending"
     ]
   },
   "policy": {
