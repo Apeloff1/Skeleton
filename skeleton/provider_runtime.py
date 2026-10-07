@@ -251,6 +251,7 @@ class ProviderResponse:
     model: str
     request_id: str | None = None
     response_id: str | None = None
+    execution_receipt_digest: str | None = None
     structured_output: Mapping[str, Any] | None = None
     tool_calls: tuple[ProviderToolCall, ...] = field(default_factory=tuple)
     finish_reason: FinishReason = FinishReason.UNKNOWN
