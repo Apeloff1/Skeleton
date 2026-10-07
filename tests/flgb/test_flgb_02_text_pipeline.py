@@ -238,3 +238,23 @@ def test_governed_training_input_rejects_wrong_transform(native_model):
     revision = DatasetRevision("dataset", 0, prepared.raw_text_digest, "1" * 64, "2" * 64)
     with pytest.raises(TokenizerContractError, match="transform"):
         pipeline.governed_training_input(prepared, revision)
+
+
+def test_training_manifest_binds_pipeline_and_dataset(native_model):
+    from skeleton.ai.model_runtime.flgb_model_runtime import digest_json
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    from skeleton.ai.training.flgb_training_runtime import DatasetRevision
+
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    prepared = pipeline.prepare("alpha beta gamma")
+    revision = DatasetRevision("dataset", 0, prepared.raw_text_digest, "1" * 64, pipeline.digest)
+    governed = pipeline.governed_training_input(prepared, revision)
+    manifest = pipeline.training_manifest(
+        prepared, revision, run_id="run-1", base_model_digest="2" * 64,
+        code_digest="3" * 64, seed_manifest_digest="4" * 64, max_steps=10,
+    )
+
+    assert manifest.dataset_revision_digests == (revision.digest,)
+    assert manifest.config_digest == digest_json({"pipeline_digest": pipeline.digest, "training_input_digest": governed.digest})
+    assert manifest.output_kind == "candidate-only"
