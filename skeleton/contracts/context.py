@@ -6,10 +6,11 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 import hashlib
+import hmac
 import json
 import math
 from typing import Any, Iterable
-from uuid import UUID
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 
 CONTEXT_SCHEMA_VERSION = 1
@@ -394,6 +395,32 @@ class ContextEnvelope:
             raise ContextContractError("selected segment tenant mismatch")
         if sum(segment.token_estimate for segment in selected) != self.selected_tokens_estimate:
             raise ContextContractError("selected token estimate does not match segments")
+        expected_snapshot = tuple(
+            sorted(
+                ((segment.segment_id, segment.content_digest) for segment in selected),
+                key=lambda item: item[0],
+            )
+        )
+        selected_snapshot = tuple(
+            item for item in self.source_snapshot if item[0] in set(ids)
+        )
+        if tuple(sorted(selected_snapshot, key=lambda item: item[0])) != expected_snapshot:
+            raise ContextContractError("source_snapshot does not bind selected segments")
+        expected_digest = context_digest_payload(
+            operation_id=self.operation_id,
+            execution_id=self.execution_id,
+            turn_id=self.turn_id,
+            tenant_id=self.tenant_id,
+            budget=self.budget,
+            selected=selected,
+            omitted_segment_ids=self.omitted_segment_ids,
+            compiler_version=self.compiler_version,
+        )
+        if not hmac.compare_digest(self.context_digest, expected_digest):
+            raise ContextContractError("context_digest does not match envelope")
+        expected_context_id = str(uuid5(NAMESPACE_URL, "skeleton-context:" + expected_digest))
+        if self.context_id != expected_context_id:
+            raise ContextContractError("context_id does not match context_digest")
 
     @property
     def selected_segments(self) -> tuple[ContextSegment, ...]:
