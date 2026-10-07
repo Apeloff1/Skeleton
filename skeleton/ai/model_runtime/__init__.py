@@ -40,6 +40,7 @@ from .native_llm_runtime import (
     BatchGenerationResult,
     GenerationResult,
     GenerationStream,
+    InferenceResult,
     NativeLLMRuntime,
 )
 from .runtime_checkpoint import validate_model_snapshot
@@ -100,6 +101,7 @@ __all__ = [
     "GenerationConfig",
     "GenerationResult",
     "GenerationStream",
+    "InferenceResult",
     "InferencePhase",
     "IterationPlan",
     "IterationScheduler",
