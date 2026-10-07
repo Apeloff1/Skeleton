@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-08:speech_ingest:v1",
+  "title": "FLGB-08 speech ingest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_id",
+    "content_digest",
+    "mime_type",
+    "duration_ms",
+    "sample_rate_hz",
+    "channels",
+    "provenance_digest",
+    "consent_digest"
+  ],
+  "properties": {
+    "artifact_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "content_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "mime_type": {
+      "enum": [
+        "audio/wav",
+        "audio/mpeg",
+        "audio/ogg",
+        "audio/flac",
+        "audio/mp4"
+      ]
+    },
+    "duration_ms": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "sample_rate_hz": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 768000
+    },
+    "channels": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 64
+    },
+    "provenance_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "consent_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
