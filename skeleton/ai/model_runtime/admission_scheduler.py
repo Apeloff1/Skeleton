@@ -161,6 +161,61 @@ class RuntimeAdmissionScheduler:
             token_demand, kv_demand, _digest(payload)
         )
 
+    def cancel(self, request_id: str) -> str:
+        """Withdraw queued work or terminate active work and release its KV state."""
+        if request_id in self._queued:
+            self._queued.pop(request_id)
+            self._sequence += 1
+            return "queued"
+        if request_id in self._active:
+            self._active.pop(request_id)
+            self._kv.pop(request_id, None)
+            self._sequence += 1
+            return "active"
+        raise ModelRuntimeError("cannot cancel unknown request")
+
+    def retry(self, request_id: str, *, priority_delta: int = 0) -> None:
+        """Move active work back to the queue with a fresh sequence and no stale KV."""
+        item = self._active.get(request_id)
+        if item is None:
+            raise ModelRuntimeError("cannot retry inactive request")
+        if isinstance(priority_delta, bool) or not isinstance(priority_delta, int):
+            raise ModelRuntimeError("priority_delta must be integer")
+        priority = item.request.priority + priority_delta
+        if not -1_000_000 <= priority <= 1_000_000:
+            raise ModelRuntimeError("retry priority outside supported range")
+        self._active.pop(request_id)
+        self._kv.pop(request_id, None)
+        request = BatchRequest(request_id, item.request.prompt_tokens, item.request.max_new_tokens, priority)
+        self._queued[request_id] = ScheduledRequest(request, item.kv_bytes, self._sequence, item.pinned_kv)
+        self._sequence += 1
+
+    def set_kv_pinned(self, request_id: str, pinned: bool) -> None:
+        if not isinstance(pinned, bool):
+            raise ModelRuntimeError("pinned must be boolean")
+        entry = self._kv.get(request_id)
+        if entry is None:
+            raise ModelRuntimeError("KV entry not found")
+        self._kv[request_id] = KVCacheEntry(entry.request_id, entry.bytes, self._sequence, pinned)
+        active = self._active.get(request_id)
+        if active is not None:
+            self._active[request_id] = ScheduledRequest(active.request, active.kv_bytes, active.enqueue_sequence, pinned)
+        self._sequence += 1
+
+    def capacity(self) -> dict[str, int]:
+        kv_used = sum(entry.bytes for entry in self._kv.values())
+        queued_tokens = sum(item.request.prompt_tokens + item.request.max_new_tokens for item in self._queued.values())
+        active_tokens = sum(item.request.prompt_tokens + item.request.max_new_tokens for item in self._active.values())
+        return {
+            "queued_requests": len(self._queued),
+            "active_requests": len(self._active),
+            "active_slots_free": self.limits.max_active_requests - len(self._active),
+            "queued_tokens": queued_tokens,
+            "active_tokens": active_tokens,
+            "kv_used_bytes": kv_used,
+            "kv_free_bytes": self.limits.kv_capacity_bytes - kv_used,
+        }
+
     def complete(self, request_id: str, *, retain_kv: bool = False) -> None:
         if request_id not in self._active:
             raise ModelRuntimeError("cannot complete inactive request")
@@ -187,6 +242,7 @@ class RuntimeAdmissionScheduler:
                 "max_age_boost": self.limits.max_age_boost,
             },
             "sequence": self._sequence,
+            "capacity": self.capacity(),
             "queued": list(self.queued_ids),
             "active": list(self.active_ids),
             "kv": [
