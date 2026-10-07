@@ -7,8 +7,7 @@
     "volume_ref": "VOL-054",
     "title": "Machine Architecture Manifests",
     "required_gap_texts": [
-      "unify manifest reference validation",
-      "bind generated docs to manifest digests"
+      "independent manifest-reference drift, schema-downgrade, and doc-digest verification remains pending"
     ]
   },
   "reference_groups": [
