@@ -1,6 +1,6 @@
 from hashlib import sha256
 import pytest
-from skeleton.automation.transactional_workspace import TransactionalWorkspace, WorkspaceBudgetExceeded, WorkspaceConflict, WorkspaceError, MAX_CONTENT_BYTES
+from skeleton.automation.transactional_workspace import EditLease, EditLeaseRegistry, TransactionalWorkspace, WorkspaceBudgetExceeded, WorkspaceConflict, WorkspaceError, MAX_CONTENT_BYTES
 
 def d(v: bytes)->str: return sha256(v).hexdigest()
 
@@ -40,3 +40,40 @@ def test_commit_closes_mutation_and_receipt_cannot_escalate():
     assert r.authority_scope=="workspace-proposal-only"
     with pytest.raises(WorkspaceError): w.write("a",b"y",expected_digest=d(b"x"))
     with pytest.raises(WorkspaceError): type(r)(r.base_digest,r.result_digest,r.changed_paths,r.operation_digest,"execution")
+
+
+def test_shared_edit_lease_registry_rejects_overlapping_paths():
+    registry=EditLeaseRegistry()
+    a=TransactionalWorkspace({"a":b"x"},lease_registry=registry)
+    b=TransactionalWorkspace({"a":b"x"},lease_registry=registry)
+    a.acquire_lease(lease_id="lease-a",owner_id="worker-a",paths=("a",))
+    with pytest.raises(WorkspaceConflict,match="path conflict"):
+        b.acquire_lease(lease_id="lease-b",owner_id="worker-b",paths=("a",))
+
+def test_lease_aware_workspace_requires_leased_mutation_and_releases_on_commit():
+    registry=EditLeaseRegistry()
+    w=TransactionalWorkspace({"a":b"old"},lease_registry=registry)
+    lease=w.acquire_lease(lease_id="lease-a",owner_id="worker-a",paths=("a",))
+    with pytest.raises(WorkspaceError,match="write_leased"):
+        w.write("a",b"new",expected_digest=d(b"old"))
+    w.write_leased(lease,"a",b"new",expected_digest=d(b"old"))
+    receipt=w.commit_leased(lease)
+    assert receipt.changed_paths==("a",)
+    assert receipt.authority_scope=="workspace-proposal-only"
+    other=TransactionalWorkspace({"a":b"old"},lease_registry=registry)
+    next_lease=other.acquire_lease(lease_id="lease-b",owner_id="worker-b",paths=("a",))
+    assert next_lease.owner_id=="worker-b"
+
+def test_edit_lease_is_bound_to_workspace_base_and_path_allowlist():
+    registry=EditLeaseRegistry()
+    source=TransactionalWorkspace({"a":b"old","b":b"x"},lease_registry=registry)
+    lease=source.acquire_lease(lease_id="lease-a",owner_id="worker-a",paths=("a",))
+    with pytest.raises(WorkspaceConflict,match="outside edit lease"):
+        source.write_leased(lease,"b",b"y",expected_digest=d(b"x"))
+    other=TransactionalWorkspace({"a":b"different"},lease_registry=EditLeaseRegistry())
+    with pytest.raises(WorkspaceConflict,match="stale or inactive"):
+        other.write_leased(lease,"a",b"new",expected_digest=d(b"different"))
+
+def test_edit_lease_cannot_escalate_repository_authority():
+    with pytest.raises(WorkspaceError,match="cannot grant repository authority"):
+        EditLease("lease","worker","0"*64,("a",),"repository-write")
