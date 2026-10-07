@@ -767,3 +767,34 @@ def test_corpus_training_receipt_rejects_foreign_corpus(native_model):
     receipt = first.corpus_training_receipt(corpus, pad_token_id=native_model.unk)
     with pytest.raises(TokenizerContractError):
         second.verify_corpus_training_receipt(corpus, receipt, pad_token_id=native_model.unk)
+
+
+def test_prompt_prefix_mask_keeps_context_but_removes_prompt_loss():
+    from skeleton.ai.model_runtime.text_pipeline import mask_causal_prefix, materialize_causal_training_batch, materialize_model_batch
+    from skeleton.ai.model_runtime.tokenization import TokenWindow
+    model = materialize_model_batch((TokenWindow(0, 5, (10, 11, 12, 13, 14), "c" * 64),), pad_token_id=0)
+    causal = materialize_causal_training_batch(model)
+    masked = mask_causal_prefix(causal, (3,))
+    assert masked.input_ids == causal.input_ids
+    assert masked.loss_mask == ((0, 0, 1, 1),)
+    assert masked.labels == ((-100, -100, 13, 14),)
+    assert masked.digest != causal.digest
+
+
+def test_prompt_prefix_mask_rejects_all_loss_removed():
+    from skeleton.ai.model_runtime.text_pipeline import mask_causal_prefix, materialize_causal_training_batch, materialize_model_batch
+    from skeleton.ai.model_runtime.tokenization import TokenizerContractError, TokenWindow
+    model = materialize_model_batch((TokenWindow(0, 3, (10, 11, 12), "d" * 64),), pad_token_id=0)
+    causal = materialize_causal_training_batch(model)
+    with pytest.raises(TokenizerContractError, match="removed all supervised"):
+        mask_causal_prefix(causal, (3,))
+
+
+@pytest.mark.parametrize("prefix_lengths", [(), (1, 2), (-1,), (True,)])
+def test_prompt_prefix_mask_rejects_invalid_policy(prefix_lengths):
+    from skeleton.ai.model_runtime.text_pipeline import mask_causal_prefix, materialize_causal_training_batch, materialize_model_batch
+    from skeleton.ai.model_runtime.tokenization import TokenizerContractError, TokenWindow
+    model = materialize_model_batch((TokenWindow(0, 3, (10, 11, 12), "e" * 64),), pad_token_id=0)
+    causal = materialize_causal_training_batch(model)
+    with pytest.raises(TokenizerContractError):
+        mask_causal_prefix(causal, prefix_lengths)
