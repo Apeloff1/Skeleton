@@ -46,3 +46,8 @@ from .evidence_revision import RevisionReceipt,revision_receipt
 from .shapley import SourceAttribution,approximate_shapley
 from .stopping import ResearchStopDecision,decide_research_stop
 from .temporal_retrieval import TemporalFragment,TemporalRetrievalCatalog
+
+from .value_of_information import ResearchAction,ActionValue,rank_actions
+from .sequential_evidence import SequentialDecision,sequential_bernoulli
+from .source_quality import SourcePosterior,update_source_quality,conservative_quality
+from .research_state import ResearchStateStore
