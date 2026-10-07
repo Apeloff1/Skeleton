@@ -2,6 +2,7 @@ import unittest
 from dataclasses import replace
 
 from skeleton.ai.webcrawler.core import CrawlDocument
+from skeleton.ai.webcrawler.governance import PromotionDecision
 from skeleton.ai.webcrawler.retrieval_bridge import (
     CrawlRetrievalBridgeError,
     bridge_crawl_document,
@@ -92,3 +93,36 @@ class TestCrawlerRetrievalBridge(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+    def test_governed_promotion_is_bound_to_exact_content(self):
+        doc = self.document()
+        promotion = PromotionDecision(
+            "d" * 64, doc.content_hash, "promote", (), 101.0, 0.9,
+            "skeleton.ai.crawl.provenance.v1",
+        )
+        record = bridge_crawl_document(doc, token_cost=1, promotion=promotion)
+        self.assertEqual(record.candidate.content_digest, doc.content_hash)
+
+    def test_quarantined_content_cannot_enter_retrieval(self):
+        doc = self.document()
+        decision = PromotionDecision(
+            "d" * 64, doc.content_hash, "quarantine", ("low_assurance",),
+            101.0, 0.1, "skeleton.ai.crawl.provenance.v1",
+        )
+        with self.assertRaises(CrawlRetrievalBridgeError):
+            bridge_crawl_document(doc, token_cost=1, promotion=decision)
+
+    def test_promotion_rebinding_and_schema_drift_fail_closed(self):
+        doc = self.document()
+        wrong_content = PromotionDecision(
+            "d" * 64, "0" * 64, "promote", (), 101.0, 0.9,
+            "skeleton.ai.crawl.provenance.v1",
+        )
+        with self.assertRaises(CrawlRetrievalBridgeError):
+            bridge_crawl_document(doc, token_cost=1, promotion=wrong_content)
+        wrong_schema = PromotionDecision(
+            "d" * 64, doc.content_hash, "promote", (), 101.0, 0.9, "other",
+        )
+        with self.assertRaises(CrawlRetrievalBridgeError):
+            bridge_crawl_document(doc, token_cost=1, promotion=wrong_schema)
