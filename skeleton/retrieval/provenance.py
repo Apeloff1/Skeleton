@@ -216,8 +216,19 @@ class ProvenanceLedger:
         for entry in ledger._entries.values():
             if entry.parent_id is not None and entry.parent_id not in ledger._entries:
                 raise ValueError("provenance snapshot has missing parent")
-            root = ledger._chain_root(entry.entry_id)
-            ledger._chains.setdefault(root, []).append(entry.entry_id)
+        # Rebuild each chain in parent-before-child order; entry IDs are opaque.
+        children = {}
+        roots = []
+        for entry in ledger._entries.values():
+            if entry.parent_id is None: roots.append(entry.entry_id)
+            else: children.setdefault(entry.parent_id, []).append(entry.entry_id)
+        visited = set()
+        def walk(root, current):
+            if current in visited: raise ValueError("provenance snapshot has cycle or shared child")
+            visited.add(current);ledger._chains.setdefault(root, []).append(current)
+            for child in sorted(children.get(current, ())): walk(root, child)
+        for root in sorted(roots): walk(root, root)
+        if visited != set(ledger._entries): raise ValueError("provenance snapshot has unreachable cycle")
         for key, entry_id in idem.items():
             if not isinstance(key, str) or not key or entry_id not in ledger._entries:
                 raise ValueError("invalid provenance idempotency binding")
