@@ -56,7 +56,12 @@ class TestNativeTrainingAdmission(unittest.TestCase):
   rt,cp,prior,c,p,apply=setup()
   with self.assertRaisesRegex(RuntimePromotionError,"authorities must be separate"):
    admit_candidate_model(rt,c,p,apply,admission_authority=p.independent_verifier)
- def test_admitter_cannot_certify_own_live_rollback(self):\n  rt,cp,prior,c,p,apply=setup()\n  admitted,a,rb=admit_candidate_model(rt,c,p,apply,admission_authority="runtime")\n  with self.assertRaisesRegex(RuntimePromotionError,"must differ"):\n   execute_rollback(admitted,a,rb,cp,verifier_id="runtime")\n def test_rollback_rejects_different_valid_checkpoint(self):
+ def test_admitter_cannot_certify_own_live_rollback(self):
+  rt,cp,prior,c,p,apply=setup()
+  admitted,a,rb=admit_candidate_model(rt,c,p,apply,admission_authority="runtime")
+  with self.assertRaisesRegex(RuntimePromotionError,"must differ"):
+   execute_rollback(admitted,a,rb,cp,verifier_id="runtime")
+ def test_rollback_rejects_different_valid_checkpoint(self):
   rt,cp,prior,c,p,apply=setup()
   admitted,a,rb=admit_candidate_model(rt,c,p,apply,admission_authority="runtime")
   other=NativeLLMRuntime(TinyTransformer(["a","b"],dim=4,ctx=4,seed=2)).checkpoint()
