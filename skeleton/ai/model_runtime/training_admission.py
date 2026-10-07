@@ -1,7 +1,7 @@
 """Atomic promoted-candidate admission bound to observed native runtime state."""
 from __future__ import annotations
 from typing import Callable
-from skeleton.ai.training.flgb_training_runtime import CandidateWeights, PromotionEvidence, digest_json
+from skeleton.ai.training.flgb_training_runtime import CandidateWeights, PromotionEvidence, digest_json, require_digest, require_id
 from skeleton.ai.training.promotion_lifecycle import RuntimeAdmission, RollbackProof
 from .native_llm_runtime import NativeLLMRuntime
 
@@ -37,7 +37,7 @@ def admit_candidate_model(runtime:NativeLLMRuntime,candidate:CandidateWeights,pr
     if not isinstance(runtime,NativeLLMRuntime): raise RuntimePromotionError("NativeLLMRuntime required")
     if not isinstance(candidate,CandidateWeights) or not isinstance(promotion,PromotionEvidence): raise RuntimePromotionError("typed candidate and promotion evidence required")
     if candidate.status not in {"candidate","promoted"}: raise RuntimePromotionError("candidate not admissible")
-    if promotion.candidate_digest!=candidate.digest or not promotion.qualified: raise RuntimePromotionError("candidate lacks qualified promotion")
+    if promotion.candidate_digest!=candidate.digest or not promotion.qualified: raise RuntimePromotionError("candidate lacks qualified promotion")\n    require_id(admission_authority,"admission_authority")\n    if promotion.independent_verifier==admission_authority: raise RuntimePromotionError("evaluation and admission authorities must be separate")
     if ledger is not None: ledger.reserve_promotion(promotion.digest)
     checkpoint=runtime.checkpoint(); prior=runtime.model_digest
     try:
