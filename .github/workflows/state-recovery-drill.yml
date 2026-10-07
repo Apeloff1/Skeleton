@@ -697,7 +697,8 @@ jobs:
               )
           )
           assert receipt["schema_version"] == 1
-          assert receipt["verifier"] == "independent-state-authority-v1"
+          assert receipt["verifier"] == "independent-state-authority-v2"
+          assert receipt["volume"] == "VOL-005"
           assert receipt["head_sha"] == os.environ["EXPECTED_SHA"]
           assert receipt["valid"] is True
           assert receipt["errors"] == []
@@ -705,6 +706,10 @@ jobs:
           assert len(receipt["authoritative_domains"]) >= 12
           assert len(receipt["derived_domains"]) == 3
           assert len(receipt["backup_stores"]) == 8
-          print("independent-state-authority: exact-head receipt OK")
+          assert len(receipt["volume_binding"]["binding_digest"]) == 64
+          assert len(receipt["receipt_digest"]) == 64
+          print("independent-state-authority: exact-head VOL-005 receipt OK")
           print("authority digest:", receipt["authority_digest"])
+          print("volume binding:", receipt["volume_binding"]["binding_digest"])
+          print("receipt digest:", receipt["receipt_digest"])
           PY

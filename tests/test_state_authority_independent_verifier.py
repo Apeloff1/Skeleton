@@ -27,8 +27,14 @@ def _fixture_root(tmp_path: Path) -> Path:
             encoding="utf-8"
         )
     )
+    master = json.loads(
+        (verifier.ROOT / verifier.MASTERPLAN_PATH).read_text(
+            encoding="utf-8"
+        )
+    )
     _write_json(root / verifier.TOPOLOGY_PATH, topology)
     _write_json(root / verifier.BACKUP_POLICY_PATH, policy)
+    _write_json(root / verifier.MASTERPLAN_PATH, master)
 
     for relative in (
         verifier.COMPOSE_PATH,
@@ -81,13 +87,23 @@ def _mutate_policy(root: Path, mutate) -> None:
     _write_json(path, payload)
 
 
+def _mutate_masterplan(root: Path, mutate) -> None:
+    path = root / verifier.MASTERPLAN_PATH
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    mutate(payload)
+    _write_json(path, payload)
+
+
 def test_repository_state_authority_verifier_accepts_current_contract() -> None:
     receipt = verifier.verify_repository(verifier.ROOT)
 
     assert receipt["valid"] is True
     assert receipt["errors"] == []
-    assert receipt["verifier"] == "independent-state-authority-v1"
+    assert receipt["verifier"] == "independent-state-authority-v2"
+    assert receipt["volume"] == "VOL-005"
     assert len(receipt["authority_digest"]) == 64
+    assert len(receipt["volume_binding"]["binding_digest"]) == 64
+    assert len(receipt["receipt_digest"]) == 64
     assert {
         item["id"]
         for item in receipt["authoritative_domains"]
@@ -331,3 +347,64 @@ def test_verifier_rejects_topology_migration_contract_drift(
         "migration_compatibility.release_workflow" in error
         for error in receipt["errors"]
     )
+
+
+def test_verifier_rejects_vol005_binding_drift(tmp_path: Path) -> None:
+    root = _fixture_root(tmp_path)
+
+    def mutate(payload):
+        volume = next(
+            row for row in payload["volumes"] if row["key"] == "VOL-005"
+        )
+        volume["tests"].remove(
+            "tests/test_state_authority_independent_verifier.py"
+        )
+
+    _mutate_masterplan(root, mutate)
+    receipt = verifier.verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "VOL-005 test binding incomplete" in error
+        for error in receipt["errors"]
+    )
+
+
+def test_verifier_rejects_cleared_vol005_gap_without_signoff(
+    tmp_path: Path,
+) -> None:
+    root = _fixture_root(tmp_path)
+
+    def mutate(payload):
+        volume = next(
+            row for row in payload["volumes"] if row["key"] == "VOL-005"
+        )
+        volume["gaps"] = []
+        volume["completion_checkbox"] = False
+        volume["completion_checkbox_mark"] = "[ ]"
+
+    _mutate_masterplan(root, mutate)
+    receipt = verifier.verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert "VOL-005 cannot clear qualification gap before signoff" in receipt["errors"]
+
+
+def test_verifier_accepts_signed_vol005_binding(tmp_path: Path) -> None:
+    root = _fixture_root(tmp_path)
+
+    def mutate(payload):
+        volume = next(
+            row for row in payload["volumes"] if row["key"] == "VOL-005"
+        )
+        volume["gaps"] = []
+        volume["completion_checkbox"] = True
+        volume["completion_checkbox_mark"] = "[x]"
+        volume["implementation_status"] = "verified"
+
+    _mutate_masterplan(root, mutate)
+    receipt = verifier.verify_repository(root)
+
+    assert receipt["valid"] is True
+    assert receipt["errors"] == []
+    assert receipt["volume_binding"]["completion_checkbox"] is True
