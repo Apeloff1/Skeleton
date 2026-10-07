@@ -9,6 +9,7 @@ Provides:
 from __future__ import annotations
 
 import hashlib
+import json
 import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
@@ -164,6 +165,55 @@ class ProvenanceLedger:
 
         current_hash = ProvenanceEntry.hash_data(current_data)
         return current_hash == entry.output_hash
+
+    def snapshot(self) -> Dict[str, Any]:
+        """Return deterministic restart state including idempotency bindings."""
+        entries = [self._entries[key].to_dict() for key in sorted(self._entries)]
+        payload = {
+            "version": 1,
+            "entries": entries,
+            "idempotency": dict(sorted(self._idempotency.items())),
+            "stats": {"recorded": self._stats["recorded"], "queries": self._stats["queries"]},
+        }
+        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        payload["digest"] = hashlib.blake2b(encoded, digest_size=16).hexdigest()
+        return payload
+
+    @classmethod
+    def from_snapshot(cls, payload: Dict[str, Any], bus: Optional[EventBus] = None) -> "ProvenanceLedger":
+        if not isinstance(payload, dict) or payload.get("version") != 1:
+            raise ValueError("unsupported provenance snapshot")
+        digest = payload.get("digest")
+        body = {k: v for k, v in payload.items() if k != "digest"}
+        encoded = json.dumps(body, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        if not isinstance(digest, str) or digest != hashlib.blake2b(encoded, digest_size=16).hexdigest():
+            raise ValueError("provenance snapshot digest mismatch")
+        ledger = cls(bus)
+        entries = payload.get("entries")
+        idem = payload.get("idempotency")
+        stats = payload.get("stats")
+        if not isinstance(entries, list) or not isinstance(idem, dict) or not isinstance(stats, dict):
+            raise ValueError("invalid provenance snapshot shape")
+        for raw in entries:
+            entry = ProvenanceEntry(**raw)
+            if not entry.entry_id or entry.entry_id in ledger._entries:
+                raise ValueError("duplicate or empty provenance entry id")
+            ledger._entries[entry.entry_id] = entry
+        for entry in ledger._entries.values():
+            if entry.parent_id is not None and entry.parent_id not in ledger._entries:
+                raise ValueError("provenance snapshot has missing parent")
+            root = ledger._chain_root(entry.entry_id)
+            ledger._chains.setdefault(root, []).append(entry.entry_id)
+        for key, entry_id in idem.items():
+            if not isinstance(key, str) or not key or entry_id not in ledger._entries:
+                raise ValueError("invalid provenance idempotency binding")
+            ledger._idempotency[key] = entry_id
+        recorded = stats.get("recorded")
+        queries = stats.get("queries")
+        if not isinstance(recorded, int) or recorded < len(entries) or not isinstance(queries, int) or queries < 0:
+            raise ValueError("invalid provenance statistics")
+        ledger._stats = {"recorded": recorded, "queries": queries}
+        return ledger
 
     def stats(self) -> Dict[str, Any]:
         return {
