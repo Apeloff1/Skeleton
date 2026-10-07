@@ -11,7 +11,6 @@ from .flgb_model_runtime import (
     ModelRegistry,
     ModelRuntimeError,
     Placement,
-    ProviderCandidate if False else ModelRuntimeError,
     QuantizationProfile,
     Replica,
     SpeculativeReceipt,
