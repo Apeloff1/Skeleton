@@ -6,7 +6,7 @@ const C={ink:'#f8fafc',muted:'#cbd5e1',shell:'#f5d9a7',shellShade:'#c99a63',drag
 export default function DragonCompanion({state,reducedMotion=false}:{state:DragonCompanionState;reducedMotion?:boolean}){
  const bob=useRef(new Animated.Value(0)).current;const glow=useRef(new Animated.Value(.35)).current;
  useEffect(()=>{if(reducedMotion){bob.setValue(0);return}const a=Animated.loop(Animated.sequence([Animated.timing(bob,{toValue:-5,duration:900,easing:Easing.inOut(Easing.sin),useNativeDriver:true}),Animated.timing(bob,{toValue:2,duration:900,easing:Easing.inOut(Easing.sin),useNativeDriver:true})]));a.start();return()=>a.stop()},[bob,reducedMotion,state.phase]);
- useEffect(()=>{const a=Animated.loop(Animated.sequence([Animated.timing(glow,{toValue:.9,duration:state.fire?260:900,useNativeDriver:true}),Animated.timing(glow,{toValue:.3,duration:state.fire?260:900,useNativeDriver:true})]));a.start();return()=>a.stop()},[glow,state.fire]);
+ useEffect(()=>{if(reducedMotion){glow.stopAnimation();glow.setValue(1);return}const a=Animated.loop(Animated.sequence([Animated.timing(glow,{toValue:.9,duration:state.fire?260:900,useNativeDriver:true}),Animated.timing(glow,{toValue:.3,duration:state.fire?260:900,useNativeDriver:true})]));a.start();return()=>a.stop()},[glow,state.fire,reducedMotion]);
  return <View style={s.wrap} accessibilityRole="summary" accessibilityLabel={`Dragon companion. ${state.label}. ${state.detail}`}>
   <View style={s.scene}>
    <View style={s.eggBack}/><View style={s.nest}><Text style={s.nestText}>✦  ·  ✧  ·  ✦</Text></View>
