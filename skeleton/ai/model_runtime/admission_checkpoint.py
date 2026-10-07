@@ -1,7 +1,7 @@
 """Validated persistence for runtime admission scheduler state."""
 from __future__ import annotations
 
-from .admission_scheduler import AdmissionLimits, RuntimeAdmissionScheduler, ScheduledRequest
+from .admission_scheduler import AdmissionLimits, RuntimeAdmissionScheduler, ScheduledRequest, _digest
 from .flgb_model_runtime import BatchRequest, KVCacheEntry, ModelRuntimeError
 from .runtime_policy import RuntimePolicy
 
@@ -9,6 +9,13 @@ from .runtime_policy import RuntimePolicy
 def restore_admission_scheduler(snapshot: dict[str, object]) -> RuntimeAdmissionScheduler:
     if not isinstance(snapshot, dict) or snapshot.get("schema") != "skeleton.ai.runtime-admission-scheduler.v1":
         raise ModelRuntimeError("invalid admission scheduler snapshot schema")
+    supplied_digest = snapshot.get("digest")
+    if not isinstance(supplied_digest, str) or len(supplied_digest) != 64:
+        raise ModelRuntimeError("invalid admission scheduler snapshot digest")
+    unsigned = dict(snapshot)
+    unsigned.pop("digest", None)
+    if _digest(unsigned) != supplied_digest:
+        raise ModelRuntimeError("admission scheduler snapshot digest mismatch")
     try:
         raw_limits = snapshot["limits"]
         sequence = snapshot["sequence"]
