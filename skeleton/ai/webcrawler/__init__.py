@@ -1,3 +1,4 @@
+from .claiming import ClaimedWork, FrontierClaimer
 from .retrieval_bridge import CanonicalRetrievalBridge, RetrievalBridgeReceipt
 from .mime import ExtractedPayload, MimeExtractor
 from .leases import Lease, SqliteLeaseStore
