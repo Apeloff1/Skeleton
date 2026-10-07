@@ -213,6 +213,7 @@ def test_governed_training_input_binds_dataset_lineage(native_model):
     assert governed.dataset_revision_digest == revision.digest
     assert governed.transform_digest == pipeline.digest
     assert governed.rights_digest == rights_digest
+    assert governed.authorized_scope == "training"
     assert governed.receipt_digest == pipeline.training_receipt(prepared).digest
     assert len(governed.digest) == 64
 
@@ -633,3 +634,18 @@ def test_governed_training_rejects_mismatched_rights_identity(native_model):
     revision = DatasetRevision("dataset", 0, prepared.raw_text_digest, rights.digest, pipeline.digest)
     with pytest.raises(TokenizerContractError, match="rights identity mismatch"):
         pipeline.governed_training_input(prepared, revision, rights)
+
+
+def test_governed_training_scope_changes_durable_identity(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    from skeleton.ai.training.flgb_training_runtime import DatasetRevision, DatasetRights
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    prepared = pipeline.prepare("alpha beta gamma")
+    rights = DatasetRights("dataset", "source", "allowed", "license", ("training", "continued-training"), "9" * 64)
+    revision = DatasetRevision("dataset", 0, prepared.raw_text_digest, rights.digest, pipeline.digest)
+    training = pipeline.governed_training_input(prepared, revision, rights, scope="training")
+    continued = pipeline.governed_training_input(prepared, revision, rights, scope="continued-training")
+    assert training.authorized_scope == "training"
+    assert continued.authorized_scope == "continued-training"
+    assert training.digest != continued.digest
