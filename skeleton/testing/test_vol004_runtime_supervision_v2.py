@@ -393,6 +393,16 @@ def test_runtime_admission_middleware_rejects_starting_and_drain() -> None:
     lifecycle.begin_drain(reason="shutdown")
     messages = _run_asgi(middleware, path="/api/projects")
     assert messages[0]["status"] == 503
+    payload = json.loads(messages[1]["body"].decode("utf-8"))
+    assert payload["lifecycle"] == {
+        "service_id": "backend",
+        "phase": "draining",
+        "generation": 1,
+        "admits_work": False,
+        "inflight_work": 0,
+    }
+    assert "active_work_ids" not in payload["lifecycle"]
+    assert "cancellation" not in payload["lifecycle"]
     assert calls == []
 
 

@@ -37,6 +37,9 @@ class ReasoningStrategy(str, Enum):
     DECOMPOSE = "decompose"
     SEARCH = "search"
     VERIFY = "verify"
+    REFLECT = "reflect"
+    CRITIQUE = "critique"
+    REPAIR = "repair"
 
 
 class StopDisposition(str, Enum):
@@ -528,6 +531,473 @@ class StoppingDecision:
         )
 
 
+
+@dataclass(frozen=True, slots=True)
+class ReasoningBudgetSnapshot:
+    """Replay-stable view of consumed and residual cognitive budget."""
+
+    policy_digest: str
+    history_digest: str
+    steps_used: int
+    tokens_used: int
+    cost_used: float
+    time_used_s: float
+    steps_remaining: int
+    tokens_remaining: int
+    cost_remaining: float
+    time_remaining_s: float
+
+    def __post_init__(self) -> None:
+        for field in ("policy_digest", "history_digest"):
+            value = getattr(self, field)
+            if (
+                not isinstance(value, str)
+                or len(value) != 64
+                or any(ch not in "0123456789abcdef" for ch in value)
+            ):
+                raise ReasoningPolicyError(f"{field} must be lowercase sha256")
+        for field in (
+            "steps_used",
+            "tokens_used",
+            "steps_remaining",
+            "tokens_remaining",
+        ):
+            object.__setattr__(
+                self,
+                field,
+                _nonnegative_int(getattr(self, field), field),
+            )
+        for field in (
+            "cost_used",
+            "time_used_s",
+            "cost_remaining",
+            "time_remaining_s",
+        ):
+            object.__setattr__(
+                self,
+                field,
+                _nonnegative(getattr(self, field), field),
+            )
+
+    @property
+    def exhausted(self) -> bool:
+        return (
+            self.steps_remaining == 0
+            or self.tokens_remaining == 0
+            or self.cost_remaining <= 0.0
+            or self.time_remaining_s <= 0.0
+        )
+
+    def payload(self) -> dict[str, Any]:
+        return {
+            "policy_digest": self.policy_digest,
+            "history_digest": self.history_digest,
+            "steps_used": self.steps_used,
+            "tokens_used": self.tokens_used,
+            "cost_used": self.cost_used,
+            "time_used_s": self.time_used_s,
+            "steps_remaining": self.steps_remaining,
+            "tokens_remaining": self.tokens_remaining,
+            "cost_remaining": self.cost_remaining,
+            "time_remaining_s": self.time_remaining_s,
+            "exhausted": self.exhausted,
+        }
+
+    @property
+    def digest(self) -> str:
+        return _canonical_digest(self.payload())
+
+
+@dataclass(frozen=True, slots=True)
+class StrategyReservation:
+    """Hard residual-budget envelope for one selected cognitive strategy."""
+
+    strategy: ReasoningStrategy
+    policy_digest: str
+    history_digest: str
+    selection_digest: str
+    expected_tokens: int
+    expected_cost_units: float
+    expected_wall_time_s: float
+    token_ceiling: int
+    cost_ceiling: float
+    time_ceiling_s: float
+
+    def __post_init__(self) -> None:
+        try:
+            object.__setattr__(self, "strategy", ReasoningStrategy(self.strategy))
+        except ValueError as exc:
+            raise ReasoningPolicyError("reservation strategy is invalid") from exc
+        for field in ("policy_digest", "history_digest", "selection_digest"):
+            value = getattr(self, field)
+            if (
+                not isinstance(value, str)
+                or len(value) != 64
+                or any(ch not in "0123456789abcdef" for ch in value)
+            ):
+                raise ReasoningPolicyError(f"{field} must be lowercase sha256")
+        object.__setattr__(
+            self,
+            "expected_tokens",
+            _nonnegative_int(self.expected_tokens, "expected_tokens"),
+        )
+        object.__setattr__(
+            self,
+            "expected_cost_units",
+            _nonnegative(self.expected_cost_units, "expected_cost_units"),
+        )
+        object.__setattr__(
+            self,
+            "expected_wall_time_s",
+            _nonnegative(self.expected_wall_time_s, "expected_wall_time_s"),
+        )
+        object.__setattr__(
+            self,
+            "token_ceiling",
+            _nonnegative_int(self.token_ceiling, "token_ceiling"),
+        )
+        object.__setattr__(
+            self,
+            "cost_ceiling",
+            _nonnegative(self.cost_ceiling, "cost_ceiling"),
+        )
+        object.__setattr__(
+            self,
+            "time_ceiling_s",
+            _nonnegative(self.time_ceiling_s, "time_ceiling_s"),
+        )
+        if self.expected_tokens > self.token_ceiling:
+            raise ReasoningPolicyError("expected tokens exceed reservation ceiling")
+        if self.expected_cost_units > self.cost_ceiling:
+            raise ReasoningPolicyError("expected cost exceeds reservation ceiling")
+        if self.expected_wall_time_s > self.time_ceiling_s:
+            raise ReasoningPolicyError("expected wall time exceeds reservation ceiling")
+
+    def payload(self) -> dict[str, Any]:
+        return {
+            "strategy": self.strategy.value,
+            "policy_digest": self.policy_digest,
+            "history_digest": self.history_digest,
+            "selection_digest": self.selection_digest,
+            "expected_tokens": self.expected_tokens,
+            "expected_cost_units": self.expected_cost_units,
+            "expected_wall_time_s": self.expected_wall_time_s,
+            "token_ceiling": self.token_ceiling,
+            "cost_ceiling": self.cost_ceiling,
+            "time_ceiling_s": self.time_ceiling_s,
+        }
+
+    @property
+    def digest(self) -> str:
+        return _canonical_digest(self.payload())
+
+
+@dataclass(frozen=True, slots=True)
+class CognitiveControlDecision:
+    """One hash-chainable metacognitive control decision.
+
+    The object records only structured policy state, not hidden reasoning text.
+    A continuing decision must carry both a strategy selection and a hard
+    reservation bounded by the residual policy envelope.
+    """
+
+    decision_index: int
+    risk: ReasoningRisk
+    stopping: StoppingDecision
+    candidates_digest: str
+    previous_decision_digest: str
+    candidates: tuple[StrategyCandidate, ...] = ()
+    selection: StrategySelection | None = None
+    reservation: StrategyReservation | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "decision_index",
+            _positive_int(self.decision_index, "decision_index"),
+        )
+        try:
+            object.__setattr__(self, "risk", ReasoningRisk(self.risk))
+        except ValueError as exc:
+            raise ReasoningPolicyError("control decision risk is invalid") from exc
+        if not isinstance(self.stopping, StoppingDecision):
+            raise ReasoningPolicyError("stopping must be StoppingDecision")
+        for field in ("candidates_digest", "previous_decision_digest"):
+            value = getattr(self, field)
+            if (
+                not isinstance(value, str)
+                or len(value) != 64
+                or any(ch not in "0123456789abcdef" for ch in value)
+            ):
+                raise ReasoningPolicyError(f"{field} must be lowercase sha256")
+        if not isinstance(self.candidates, tuple):
+            raise ReasoningPolicyError("candidates must be a bounded tuple")
+        if len(self.candidates) > _MAX_STRATEGIES:
+            raise ReasoningPolicyError("candidates exceed bounded manifest limit")
+        if any(not isinstance(row, StrategyCandidate) for row in self.candidates):
+            raise ReasoningPolicyError(
+                "candidates must contain StrategyCandidate values"
+            )
+        if len({row.strategy for row in self.candidates}) != len(self.candidates):
+            raise ReasoningPolicyError("strategy candidates must be unique")
+        canonical_candidates = tuple(
+            sorted(self.candidates, key=lambda row: row.strategy.value)
+        )
+        object.__setattr__(self, "candidates", canonical_candidates)
+        if _candidate_digest(canonical_candidates) != self.candidates_digest:
+            raise ReasoningPolicyError("candidate manifest identity drift")
+        continuing = self.stopping.disposition is StopDisposition.CONTINUE
+        if continuing:
+            if not isinstance(self.selection, StrategySelection):
+                raise ReasoningPolicyError(
+                    "continuing decision requires strategy selection"
+                )
+            if not isinstance(self.reservation, StrategyReservation):
+                raise ReasoningPolicyError(
+                    "continuing decision requires strategy reservation"
+                )
+            if self.selection.policy_digest != self.stopping.policy_digest:
+                raise ReasoningPolicyError("selection policy identity drift")
+            if self.selection.candidates_digest != self.candidates_digest:
+                raise ReasoningPolicyError("candidate identity drift")
+            if self.reservation.policy_digest != self.stopping.policy_digest:
+                raise ReasoningPolicyError("reservation policy identity drift")
+            if self.reservation.history_digest != self.stopping.history_digest:
+                raise ReasoningPolicyError("reservation history identity drift")
+            if self.reservation.selection_digest != self.selection.digest:
+                raise ReasoningPolicyError("reservation selection identity drift")
+            if self.reservation.strategy is not self.selection.strategy:
+                raise ReasoningPolicyError("reservation strategy drift")
+            selected = tuple(
+                row
+                for row in canonical_candidates
+                if row.strategy is self.selection.strategy
+            )
+            if len(selected) != 1:
+                raise ReasoningPolicyError(
+                    "selection missing from candidate manifest"
+                )
+            selected_candidate = selected[0]
+            if self.reservation.expected_tokens != selected_candidate.expected_tokens:
+                raise ReasoningPolicyError("reservation token estimate drift")
+            if (
+                self.reservation.expected_cost_units
+                != selected_candidate.expected_cost_units
+            ):
+                raise ReasoningPolicyError("reservation cost estimate drift")
+            if (
+                self.reservation.expected_wall_time_s
+                != selected_candidate.expected_wall_time_s
+            ):
+                raise ReasoningPolicyError("reservation time estimate drift")
+        elif self.selection is not None or self.reservation is not None:
+            raise ReasoningPolicyError(
+                "terminal decision cannot reserve another reasoning step"
+            )
+
+    def payload(self) -> dict[str, Any]:
+        return {
+            "decision_index": self.decision_index,
+            "risk": self.risk.value,
+            "stopping": self.stopping.payload(),
+            "candidates_digest": self.candidates_digest,
+            "previous_decision_digest": self.previous_decision_digest,
+            "candidates": [row.payload() for row in self.candidates],
+            "selection": self.selection.payload() if self.selection else None,
+            "reservation": self.reservation.payload() if self.reservation else None,
+        }
+
+    @property
+    def decision_digest(self) -> str:
+        return _canonical_digest(self.payload())
+
+
+def _validate_reasoning_history(
+    rows: tuple[ReasoningStep, ...],
+    *,
+    require_nonempty: bool,
+) -> None:
+    if require_nonempty and not rows:
+        raise ReasoningPolicyError(
+            "history must contain at least one ReasoningStep"
+        )
+    if any(not isinstance(row, ReasoningStep) for row in rows):
+        raise ReasoningPolicyError("history contains non-ReasoningStep value")
+    expected_indices = tuple(range(1, len(rows) + 1))
+    if tuple(row.step_index for row in rows) != expected_indices:
+        raise ReasoningPolicyError(
+            "reasoning history step indices must be contiguous from one"
+        )
+
+    previous_tokens = -1
+    previous_cost = -1.0
+    previous_elapsed = -1.0
+    for row in rows:
+        if row.cumulative_tokens < previous_tokens:
+            raise ReasoningPolicyError("cumulative_tokens cannot decrease")
+        if row.cumulative_cost_units < previous_cost:
+            raise ReasoningPolicyError("cumulative_cost_units cannot decrease")
+        if row.elapsed_s < previous_elapsed:
+            raise ReasoningPolicyError("elapsed_s cannot decrease")
+        previous_tokens = row.cumulative_tokens
+        previous_cost = row.cumulative_cost_units
+        previous_elapsed = row.elapsed_s
+
+
+def reasoning_budget_snapshot(
+    policy: ReasoningPolicy,
+    history: Iterable[ReasoningStep] = (),
+) -> ReasoningBudgetSnapshot:
+    """Compute a deterministic residual budget from cumulative step history."""
+
+    if not isinstance(policy, ReasoningPolicy):
+        raise TypeError("policy must be ReasoningPolicy")
+    rows = tuple(history)
+    _validate_reasoning_history(rows, require_nonempty=False)
+    latest = rows[-1] if rows else None
+    steps_used = latest.step_index if latest else 0
+    tokens_used = latest.cumulative_tokens if latest else 0
+    cost_used = latest.cumulative_cost_units if latest else 0.0
+    time_used = latest.elapsed_s if latest else 0.0
+    return ReasoningBudgetSnapshot(
+        policy_digest=policy.digest,
+        history_digest=_canonical_digest([row.payload() for row in rows]),
+        steps_used=steps_used,
+        tokens_used=tokens_used,
+        cost_used=round(cost_used, 8),
+        time_used_s=round(time_used, 8),
+        steps_remaining=max(0, policy.max_steps - steps_used),
+        tokens_remaining=max(0, policy.max_tokens - tokens_used),
+        cost_remaining=round(max(0.0, policy.max_cost_units - cost_used), 8),
+        time_remaining_s=round(max(0.0, policy.max_wall_time_s - time_used), 8),
+    )
+
+
+def _candidate_digest(rows: Iterable[StrategyCandidate]) -> str:
+    ordered = sorted(tuple(rows), key=lambda item: item.strategy.value)
+    return _canonical_digest([row.payload() for row in ordered])
+
+
+def evaluate_cognitive_control(
+    policy: ReasoningPolicy,
+    candidates: Iterable[StrategyCandidate],
+    history: Iterable[ReasoningStep],
+    *,
+    risk: ReasoningRisk,
+    decision_index: int = 1,
+    previous_decision_digest: str = "0" * 64,
+) -> CognitiveControlDecision:
+    """Atomically decide whether to stop or reserve one bounded next step."""
+
+    rows = tuple(history)
+    candidate_rows = tuple(candidates)
+    if any(not isinstance(row, StrategyCandidate) for row in candidate_rows):
+        raise ReasoningPolicyError(
+            "candidates must contain StrategyCandidate values"
+        )
+    if len({row.strategy for row in candidate_rows}) != len(candidate_rows):
+        raise ReasoningPolicyError("strategy candidates must be unique")
+    candidates_digest = _candidate_digest(candidate_rows)
+    stopping = evaluate_stopping(policy, rows, risk=risk)
+
+    if stopping.disposition is not StopDisposition.CONTINUE:
+        return CognitiveControlDecision(
+            decision_index=decision_index,
+            risk=risk,
+            stopping=stopping,
+            candidates_digest=candidates_digest,
+            previous_decision_digest=previous_decision_digest,
+            candidates=candidate_rows,
+        )
+
+    budget = reasoning_budget_snapshot(policy, rows)
+    try:
+        selection = select_strategy(
+            policy,
+            candidate_rows,
+            risk=risk,
+            history=rows,
+        )
+    except ReasoningPolicyError as exc:
+        if str(exc) != "no admissible reasoning strategy":
+            raise
+        stopping = StoppingDecision(
+            disposition=StopDisposition.BUDGET_EXHAUSTED,
+            reason="no-admissible-strategy-fits-residual-budget",
+            policy_digest=policy.digest,
+            history_digest=budget.history_digest,
+            steps_remaining=budget.steps_remaining,
+            tokens_remaining=budget.tokens_remaining,
+            cost_remaining=budget.cost_remaining,
+            time_remaining_s=budget.time_remaining_s,
+        )
+        return CognitiveControlDecision(
+            decision_index=decision_index,
+            risk=risk,
+            stopping=stopping,
+            candidates_digest=candidates_digest,
+            previous_decision_digest=previous_decision_digest,
+            candidates=candidate_rows,
+        )
+
+    selected = next(
+        row for row in candidate_rows if row.strategy is selection.strategy
+    )
+    reservation = StrategyReservation(
+        strategy=selection.strategy,
+        policy_digest=policy.digest,
+        history_digest=budget.history_digest,
+        selection_digest=selection.digest,
+        expected_tokens=selected.expected_tokens,
+        expected_cost_units=selected.expected_cost_units,
+        expected_wall_time_s=selected.expected_wall_time_s,
+        token_ceiling=budget.tokens_remaining,
+        cost_ceiling=budget.cost_remaining,
+        time_ceiling_s=budget.time_remaining_s,
+    )
+    return CognitiveControlDecision(
+        decision_index=decision_index,
+        risk=risk,
+        stopping=stopping,
+        candidates_digest=candidates_digest,
+        previous_decision_digest=previous_decision_digest,
+        candidates=candidate_rows,
+        selection=selection,
+        reservation=reservation,
+    )
+
+
+def verify_cognitive_control_chain(
+    decisions: Iterable[CognitiveControlDecision],
+) -> bool:
+    """Verify decision ordering, hash linkage and terminal finality."""
+
+    rows = tuple(decisions)
+    if not rows:
+        return False
+    previous = "0" * 64
+    terminal_seen = False
+    policy_digest: str | None = None
+    for expected_index, decision in enumerate(rows, start=1):
+        if not isinstance(decision, CognitiveControlDecision):
+            return False
+        if decision.decision_index != expected_index:
+            return False
+        if decision.previous_decision_digest != previous:
+            return False
+        if terminal_seen:
+            return False
+        current_policy = decision.stopping.policy_digest
+        if policy_digest is None:
+            policy_digest = current_policy
+        elif current_policy != policy_digest:
+            return False
+        if decision.stopping.disposition is not StopDisposition.CONTINUE:
+            terminal_seen = True
+        previous = decision.decision_digest
+    return True
+
+
 class ReasoningPolicyRegistry:
     """Versioned immutable-by-key policy registry."""
 
@@ -583,6 +1053,7 @@ def select_strategy(
     candidates: Iterable[StrategyCandidate],
     *,
     risk: ReasoningRisk,
+    history: Iterable[ReasoningStep] | None = None,
 ) -> StrategySelection:
     """Choose the best admissible strategy deterministically."""
 
@@ -604,15 +1075,22 @@ def select_strategy(
         policy.require_verification_for_high_risk
         and resolved_risk in {ReasoningRisk.HIGH, ReasoningRisk.CRITICAL}
     )
+    budget = (
+        reasoning_budget_snapshot(policy, ())
+        if history is None
+        else reasoning_budget_snapshot(policy, history)
+    )
+    if budget.steps_remaining == 0:
+        raise ReasoningPolicyError("no admissible reasoning strategy")
     admissible: list[StrategyCandidate] = []
     for row in rows:
         if row.strategy not in policy.allowed_strategies:
             continue
-        if row.expected_tokens > policy.max_tokens:
+        if row.expected_tokens > budget.tokens_remaining:
             continue
-        if row.expected_cost_units > policy.max_cost_units:
+        if row.expected_cost_units > budget.cost_remaining:
             continue
-        if row.expected_wall_time_s > policy.max_wall_time_s:
+        if row.expected_wall_time_s > budget.time_remaining_s:
             continue
         if require_verification and not row.verification_capable:
             continue
@@ -666,29 +1144,7 @@ def evaluate_stopping(
     except ValueError as exc:
         raise ReasoningPolicyError("risk is invalid") from exc
     rows = tuple(history)
-    if not rows or any(not isinstance(row, ReasoningStep) for row in rows):
-        raise ReasoningPolicyError(
-            "history must contain at least one ReasoningStep"
-        )
-    expected_indices = tuple(range(1, len(rows) + 1))
-    if tuple(row.step_index for row in rows) != expected_indices:
-        raise ReasoningPolicyError(
-            "reasoning history step indices must be contiguous from one"
-        )
-
-    previous_tokens = -1
-    previous_cost = -1.0
-    previous_elapsed = -1.0
-    for row in rows:
-        if row.cumulative_tokens < previous_tokens:
-            raise ReasoningPolicyError("cumulative_tokens cannot decrease")
-        if row.cumulative_cost_units < previous_cost:
-            raise ReasoningPolicyError("cumulative_cost_units cannot decrease")
-        if row.elapsed_s < previous_elapsed:
-            raise ReasoningPolicyError("elapsed_s cannot decrease")
-        previous_tokens = row.cumulative_tokens
-        previous_cost = row.cumulative_cost_units
-        previous_elapsed = row.elapsed_s
+    _validate_reasoning_history(rows, require_nonempty=True)
 
     latest = rows[-1]
     steps_remaining = max(0, policy.max_steps - latest.step_index)
@@ -782,6 +1238,8 @@ __all__ = [
     "REASONING_POLICY_ACCOUNTABILITY_ID",
     "REASONING_POLICY_SCHEMA_VERSION",
     "REASONING_POLICY_TASK_ID",
+    "CognitiveControlDecision",
+    "ReasoningBudgetSnapshot",
     "ReasoningPolicy",
     "ReasoningPolicyError",
     "ReasoningPolicyRegistry",
@@ -791,7 +1249,11 @@ __all__ = [
     "StopDisposition",
     "StoppingDecision",
     "StrategyCandidate",
+    "StrategyReservation",
     "StrategySelection",
+    "evaluate_cognitive_control",
     "evaluate_stopping",
+    "reasoning_budget_snapshot",
     "select_strategy",
+    "verify_cognitive_control_chain",
 ]

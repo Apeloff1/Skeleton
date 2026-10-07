@@ -183,11 +183,19 @@ class RuntimeAdmissionMiddleware:
         try:
             lease = self.lifecycle.acquire_generated_work("http")
         except RuntimeSupervisionError:
+            snapshot = self.lifecycle.snapshot()
+            public_lifecycle = {
+                "service_id": snapshot["service_id"],
+                "phase": snapshot["phase"],
+                "generation": snapshot["generation"],
+                "admits_work": snapshot["admits_work"],
+                "inflight_work": snapshot["inflight_work"],
+            }
             body = json.dumps(
                 {
                     "error": "service_unavailable",
                     "reason": "runtime_not_accepting_work",
-                    "lifecycle": self.lifecycle.snapshot(),
+                    "lifecycle": public_lifecycle,
                 },
                 sort_keys=True,
                 separators=(",", ":"),
