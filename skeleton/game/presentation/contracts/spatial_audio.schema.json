@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-12:spatial_audio:v1",
+  "title": "FLGB-12 spatial audio",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "source_id",
+    "position",
+    "gain_milli",
+    "max_distance",
+    "clip_digest"
+  ],
+  "properties": {
+    "source_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "position": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "integer"
+      }
+    },
+    "gain_milli": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "max_distance": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "clip_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
