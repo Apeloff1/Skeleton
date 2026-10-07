@@ -331,3 +331,70 @@ def test_checkpoint_advancement_forms_hash_chain(native_model):
     assert second.prior_checkpoint_digest == genesis.digest
     assert second.run_manifest_digest == manifest.digest
     assert second.digest != genesis.digest
+
+
+def _candidate_fixture(native_model):
+    pipeline, manifest = _training_lineage_fixture(native_model)
+    checkpoint = pipeline.initial_training_checkpoint(
+        manifest, weights_digest="5" * 64, optimizer_digest="6" * 64, rng_digest="7" * 64,
+    )
+    return pipeline, pipeline.candidate_from_checkpoint(
+        manifest, checkpoint, candidate_id="candidate-1", base_model_digest="2" * 64,
+    )
+
+
+def test_mirror_evaluation_and_promotion_evidence_are_independently_verified(native_model):
+    pipeline, candidate = _candidate_fixture(native_model)
+    evaluation = pipeline.mirror_evaluation(
+        candidate, evaluation_id="eval-1", champion_digest="8" * 64,
+        candidate_score_ppm=700000, champion_score_ppm=600000,
+        risk_gate_passed=True, independent_verifier="mirror-verifier",
+        evidence_digest="9" * 64,
+    )
+    evidence = pipeline.promotion_evidence(
+        candidate, evaluation, exact_head_commit="a" * 64, rights_digest="b" * 64,
+        contamination_scan_digest="c" * 64, rollback_digest="d" * 64,
+        independent_verifier="promotion-verifier", rights_passed=True,
+        contamination_clear=True, rollback_ready=True,
+    )
+
+    assert evaluation.candidate_wins is True
+    assert evidence.candidate_digest == candidate.digest
+    assert evidence.evaluation_passed is True
+    assert evidence.qualified is True
+    assert candidate.production_authorized() is False
+
+
+def test_promotion_evidence_rejects_same_verifier(native_model):
+    from skeleton.ai.model_runtime.tokenization import TokenizerContractError
+    pipeline, candidate = _candidate_fixture(native_model)
+    evaluation = pipeline.mirror_evaluation(
+        candidate, evaluation_id="eval-1", champion_digest="8" * 64,
+        candidate_score_ppm=700000, champion_score_ppm=600000,
+        risk_gate_passed=True, independent_verifier="verifier", evidence_digest="9" * 64,
+    )
+    with pytest.raises(TokenizerContractError, match="verifier separation"):
+        pipeline.promotion_evidence(
+            candidate, evaluation, exact_head_commit="a" * 64, rights_digest="b" * 64,
+            contamination_scan_digest="c" * 64, rollback_digest="d" * 64,
+            independent_verifier="verifier", rights_passed=True,
+            contamination_clear=True, rollback_ready=True,
+        )
+
+
+def test_failed_mirror_risk_gate_cannot_qualify_promotion(native_model):
+    pipeline, candidate = _candidate_fixture(native_model)
+    evaluation = pipeline.mirror_evaluation(
+        candidate, evaluation_id="eval-1", champion_digest="8" * 64,
+        candidate_score_ppm=900000, champion_score_ppm=100000,
+        risk_gate_passed=False, independent_verifier="mirror-verifier", evidence_digest="9" * 64,
+    )
+    evidence = pipeline.promotion_evidence(
+        candidate, evaluation, exact_head_commit="a" * 64, rights_digest="b" * 64,
+        contamination_scan_digest="c" * 64, rollback_digest="d" * 64,
+        independent_verifier="promotion-verifier", rights_passed=True,
+        contamination_clear=True, rollback_ready=True,
+    )
+    assert evaluation.candidate_wins is False
+    assert evidence.evaluation_passed is False
+    assert evidence.qualified is False
