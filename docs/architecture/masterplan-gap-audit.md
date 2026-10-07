@@ -1468,3 +1468,18 @@ The remaining cross-store crash window now has an explicit durable recovery prot
 This establishes deterministic resumable intent, but does not yet claim exactly-once external side effects. The canonical ProvenanceLedger currently generates random entry IDs and exposes no idempotency-key record API; therefore a process death after ledger mutation but before outbox completion can still duplicate provenance. Closing that final boundary requires an idempotent operation-key contract in the downstream provenance layer (and equivalent semantics for any non-replacing index implementation), then wiring the crawler outbox executor to it.
 
 SIGNED status remains withheld pending exact-head execution evidence and closure/acceptance of that downstream idempotency boundary.
+
+
+### 2026-10-07 canonical provenance idempotency tranche
+
+The crawler outbox is now connected to an idempotent downstream provenance contract:
+- ProvenanceLedger.record accepts an optional idempotency_key while preserving legacy call behavior;
+- repeated identical operations under the same key replay the original provenance entry and do not increment recorded stats;
+- reusing a key for a different transformation fails closed;
+- crawler retrieval handoff supplies each deterministic outbox operation ID as the provenance idempotency key and records the returned entry ID in outbox completion;
+- dedicated provenance regressions cover replay, conflicting reuse and legacy no-key behavior;
+- the crawler Actions gate now triggers on the canonical provenance module/test and executes that regression explicitly.
+
+Remaining durability boundary: ProvenanceLedger itself is currently in-memory. Its idempotency map therefore does not survive reconstruction unless the ledger state is persisted/restored by a higher layer. The durable crawler outbox preserves operation identity across restart, but a newly empty provenance ledger cannot know that a prior process already emitted the side effect. Full process-crash exactly-once provenance requires persistence of provenance entries/idempotency mappings or a durable provenance backend.
+
+SIGNED status remains withheld pending observable exact-head execution and that persistence decision.

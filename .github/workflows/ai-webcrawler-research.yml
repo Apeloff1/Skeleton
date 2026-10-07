@@ -5,7 +5,11 @@ on:
     branches: [main]
     paths:
       - "skeleton/ai/webcrawler/**"
+      - "skeleton/retrieval/provenance.py"
+      - "skeleton/retrieval/provenance.py"
       - "tests/test_ai_webcrawler_*.py"
+      - "tests/test_retrieval_provenance_idempotency.py"
+      - "tests/test_retrieval_provenance_idempotency.py"
       - "scripts/check_ai_webcrawler.py"
       - ".github/workflows/ai-webcrawler-research.yml"
   pull_request:
@@ -50,3 +54,5 @@ jobs:
         run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
       - name: Run deterministic crawler verification
         run: python scripts/check_ai_webcrawler.py
+      - name: Run provenance idempotency regression
+        run: python -m pytest -q --noconftest tests/test_retrieval_provenance_idempotency.py
