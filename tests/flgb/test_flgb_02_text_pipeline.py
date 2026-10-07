@@ -117,3 +117,41 @@ def test_model_batches_reject_cross_pipeline_prepared_text(native_model):
     prepared = first.prepare("alpha beta gamma")
     with pytest.raises(TokenizerContractError):
         second.model_batches(prepared)
+
+
+def test_causal_training_batch_shifts_targets_and_masks_padding():
+    from skeleton.ai.model_runtime.text_pipeline import materialize_causal_training_batch, materialize_model_batch
+    from skeleton.ai.model_runtime.tokenization import TokenWindow
+
+    source = "b" * 64
+    model_batch = materialize_model_batch((
+        TokenWindow(0, 4, (5, 6, 7, 8), source),
+        TokenWindow(4, 6, (9, 10), source),
+    ), pad_token_id=0)
+    causal = materialize_causal_training_batch(model_batch)
+
+    assert causal.input_ids == ((5, 6, 7), (9, 10, 0))
+    assert causal.labels == ((6, 7, 8), (10, -100, -100))
+    assert causal.loss_mask == ((1, 1, 1), (1, 0, 0))
+    assert causal.source_window_digests == model_batch.source_window_digests
+    assert len(causal.digest) == 64
+
+
+def test_causal_training_rejects_single_token_only_batch():
+    from skeleton.ai.model_runtime.text_pipeline import materialize_causal_training_batch, materialize_model_batch
+    from skeleton.ai.model_runtime.tokenization import TokenizerContractError, TokenWindow
+
+    model_batch = materialize_model_batch((TokenWindow(0, 1, (5,), "c" * 64),), pad_token_id=0)
+    with pytest.raises(TokenizerContractError, match="at least two"):
+        materialize_causal_training_batch(model_batch)
+
+
+def test_causal_training_pipeline_is_deterministic(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextPipelineConfig, TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model), TextPipelineConfig(context_size=4))
+    prepared = pipeline.prepare("alpha beta gamma delta epsilon")
+    left = pipeline.causal_training_batches(prepared)
+    right = pipeline.causal_training_batches(prepared)
+    assert tuple(batch.digest for batch in left) == tuple(batch.digest for batch in right)
