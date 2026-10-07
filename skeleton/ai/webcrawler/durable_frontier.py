@@ -38,4 +38,10 @@ class DurableFrontier:
    cur=self.db.execute("""UPDATE durable_frontier SET ready_at=?,attempts=?,owner=NULL,lease_token=NULL,lease_expires=NULL
     WHERE url=? AND owner=? AND lease_token=?""",(ready_at,attempts,claim.url,claim.owner,claim.token))
   return cur.rowcount==1
+ def renew(self,claim,*,now,ttl):
+  if ttl<=0:raise ValueError("ttl must be positive")
+  with self.db:
+   cur=self.db.execute("""UPDATE durable_frontier SET lease_expires=?
+    WHERE url=? AND owner=? AND lease_token=? AND lease_expires>?""",(now+ttl,claim.url,claim.owner,claim.token,now))
+  return DurableClaim(claim.url,claim.ready_at,claim.priority,claim.depth,claim.parent_url,claim.attempts,claim.owner,claim.token,now+ttl) if cur.rowcount==1 else None
  def size(self):return self.db.execute("SELECT COUNT(*) FROM durable_frontier").fetchone()[0]
