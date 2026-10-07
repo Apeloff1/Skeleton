@@ -56,8 +56,8 @@ def test_independent_vol003_accepts_current_pending_closure(
     assert receipt["volume"] == "VOL-003"
     assert receipt["contract_count"] == 36
     assert receipt["override_count"] == 3
-    assert receipt["executed_vector_count"] == 9
-    assert len(receipt["vector_ids"]) == 9
+    assert receipt["executed_vector_count"] == 14
+    assert len(receipt["vector_ids"]) == 14
     assert set(receipt["source_digests"]) == {
         "catalog",
         "schema_catalog",
@@ -247,3 +247,23 @@ def test_independent_vol003_required_bindings_are_nonempty() -> None:
     assert REQUIRED_VOL003_PATHS
     assert REQUIRED_VOL003_TESTS
     assert REQUIRED_VOL003_EVALUATIONS
+
+
+def test_independent_vol003_rejects_nonportable_numeric_expectation_drift(
+    tmp_path: Path,
+) -> None:
+    root = _copy_fixture(tmp_path)
+    path = root / "machine/contract_conformance.json"
+    payload = _load(path)
+    vector = next(
+        row for row in payload["vectors"]
+        if row["id"] == "JSON-UNSAFE-POSITIVE-INTEGER"
+    )
+    vector["expected"] = "accept"
+    _write(path, payload)
+    receipt = verify_repository(root)
+    assert receipt["valid"] is False
+    assert any(
+        "JSON-UNSAFE-POSITIVE-INTEGER replay mismatch" in error
+        for error in receipt["errors"]
+    )
