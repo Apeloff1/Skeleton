@@ -1713,3 +1713,19 @@ The crawler now has a truthful visual-observability protocol designed around a b
 Current 2026 design signals reviewed for this tranche: active DOM/pixel probing in browser agents, live browser-agent views for trust/control, screenshot/action trace interfaces, vision-grounded browser agents, global-view navigation with adaptive budget allocation, and conventional force-directed crawl topology. The intended UI combines those signals without making the mascot authoritative: the event/provenance stream remains the source of truth.
 
 Next: wire observer hooks into CrawlEngine/CanonicalRetrievalBridge; define a frontend event transport/replay contract; add reduced-motion and non-visual accessibility modes; add multi-dragon workers for concurrent leases; visualize policy/robots/budget boundaries; and render provenance embers flowing into temporal/retrieval knowledge stores.
+
+
+### 2026-10-08 user-companion dragon implementation tranche
+
+The approved Nerdy Dragon Crawler concept is now implemented as a reusable companion in the canonical Jeeves conversation workspace:
+- the dragon permanently lives inside the lower half of his hatched egg and wears a broken eggshell cap;
+- conversation text produces an immediate interest/listening state that can seed future crawler-interest extraction;
+- crawler phases map to launch, visual crawl, acquisition, burn-to-memory, distillation, celebration and snuggle states;
+- burn remains semantically tied to accepted acquisition; rejected material never receives the successful burn-to-memory representation;
+- distillation is visually unique: oversized geek glasses plus a white bandage over the glasses bridge appear only for the distillation state;
+- snuggle/rest states place the dragon under a blanket in his egg; flight states expose wings; burn states expose fire and ember effects;
+- the companion is procedurally rendered in React Native so Android/iOS/web work without an external art asset and the renderer can later be upgraded behind the same state contract;
+- DragonCompanionPanel exposes conversation interest, page, knowledge and quality telemetry slots and is mounted responsively in ChatWorkspace;
+- a frontend contract test enforces the eggshell identity, snuggle treatment, accessibility summary, workspace mounting and distillation-only nerd-glasses invariant.
+
+Remaining integration: connect the frontend panel to live DragonCrawlEvent transport/replay from the crawler backend, promote distilled conversation interests into bounded acquisition queries with explicit user control, add reduced-motion preference detection, and replace/augment procedural primitives with production sprite/vector animation assets while retaining deterministic state semantics.
