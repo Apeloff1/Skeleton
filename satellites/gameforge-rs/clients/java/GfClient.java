@@ -1,0 +1,11 @@
+import java.net.URI;import java.net.http.HttpClient;import java.net.http.HttpRequest;import java.net.http.HttpResponse;import java.time.Duration;
+public final class GfClient{
+ private final String base;private final String seal;private final HttpClient http;
+ public GfClient(String base){this(base,"");}public GfClient(String base,String seal){this.base=base;this.seal=seal==null?"":seal;this.http=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();}
+ private String call(String method,String path,String jsonBody)throws Exception{HttpRequest.Builder b=HttpRequest.newBuilder().uri(URI.create(base+path)).timeout(Duration.ofSeconds(10)).header("Content-Type","application/json");if(!seal.isEmpty())b.header("x-gf-seal",seal);if(jsonBody==null)b.GET();else b.method(method,HttpRequest.BodyPublishers.ofString(jsonBody));HttpResponse<String> r=http.send(b.build(),HttpResponse.BodyHandlers.ofString());if(r.statusCode()>=400)throw new IllegalStateException("gf-server "+method+" "+path+": "+r.statusCode()+": "+r.body());return r.body();}
+ private static String q(String s){return "\""+s.replace("\\","\\\\").replace("\"","\\\"")+"\"";}
+ public String propose(String ledger,String kind,String proposalId,String valueJson)throws Exception{String body="{\"ledger\":"+q(ledger)+",\"kind\":"+q(kind)+",\"proposal_id\":"+q(proposalId)+",\"value\":"+valueJson+"}";return call("POST","/api/fabric/propose",body);}
+ public String decide(String domain,String action,long actorWeight)throws Exception{return call("POST","/api/governance/decide","{\"domain\":"+q(domain)+",\"action\":"+q(action)+",\"actor_weight\":"+actorWeight+"}");}
+ public String submitTask(String id,String capability,String payloadJson,String depsJsonArray)throws Exception{return call("POST","/api/swarm/submit","{\"id\":"+q(id)+",\"capability\":"+q(capability)+",\"payload\":"+payloadJson+",\"deps\":"+depsJsonArray+"}");}
+ public String readyWave()throws Exception{return call("GET","/api/swarm/wave",null);}public String fabricTail(String ledger)throws Exception{return call("GET","/api/fabric/"+ledger+"/tail",null);}public String infra()throws Exception{return call("GET","/api/infra",null);}public boolean healthy(){try{return call("GET","/health",null).contains("\"ok\"");}catch(Exception e){return false;}}
+}

@@ -1,0 +1,104 @@
+{
+  "expansion_phase": "17_to_30",
+  "description": "New category definitions to expand from 30 to 100 total categories. Each will eventually have 100 specialized roles with high-competency coder style cross-references.",
+  "new_categories": [
+    {
+      "category_id": 17,
+      "name": "Physics & Simulation Systems",
+      "description": "Designing believable physics, collision, rigidbody, fluid, and simulation systems for games.",
+      "focus": "Grounded, performant, and fun-to-interact physics that serve gameplay.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 18,
+      "name": "AI & NPC Behavior Systems",
+      "description": "Creating intelligent, believable, and scalable AI behaviors for NPCs, enemies, and companions.",
+      "focus": "Believable decision-making, pathfinding, group behavior, and long-term memory for characters.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 19,
+      "name": "Quest, Mission & Narrative Delivery Systems",
+      "description": "Designing quest structures, mission flow, branching narratives, and player-driven story delivery.",
+      "focus": "Meaningful choices, clear objectives, emotional payoff, and seamless integration with gameplay.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 20,
+      "name": "Economy, Progression & Player Growth Systems",
+      "description": "Building long-term player progression, economy loops, skill trees, and meaningful advancement.",
+      "focus": "Rewarding growth, balanced power curves, and systems that keep players engaged for years.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 21,
+      "name": "Multiplayer Networking & Synchronization",
+      "description": "Designing robust, low-latency multiplayer systems, state sync, prediction, and reconciliation.",
+      "focus": "Fair, responsive, and scalable multiplayer experiences across platforms.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 22,
+      "name": "Audio Design, Implementation & Spatial Systems",
+      "description": "Creating immersive audio systems, spatial audio, dynamic mixing, and procedural sound.",
+      "focus": "Audio that enhances emotion, provides feedback, and feels alive in the game world.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 23,
+      "name": "Visual Effects, Particles & Rendering Systems",
+      "description": "Designing high-quality VFX, particle systems, shaders, and rendering pipelines.",
+      "focus": "Beautiful, performant visuals that support gameplay readability and emotional impact.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 24,
+      "name": "Animation Systems & Character Performance",
+      "description": "Building animation pipelines, blending, IK, procedural animation, and character expressiveness.",
+      "focus": "Characters that move and emote believably while remaining performant.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 25,
+      "name": "Asset Pipeline, Tooling & Production Systems",
+      "description": "Designing efficient asset pipelines, import tools, validation, and artist-friendly workflows.",
+      "focus": "Fast iteration, high quality, and scalable content production for large teams.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 26,
+      "name": "Security, Anti-Cheat & Integrity Systems",
+      "description": "Protecting games from cheating, exploits, and maintaining fair play at scale.",
+      "focus": "Robust detection, prevention, and response systems without harming legitimate players.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 27,
+      "name": "Localization, Internationalization & Cultural Adaptation",
+      "description": "Making games accessible and culturally appropriate across languages and regions.",
+      "focus": "High-quality translation, cultural sensitivity, and seamless multi-language support.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 28,
+      "name": "Telemetry, Analytics & Data-Driven Design",
+      "description": "Building systems to collect, analyze, and act on player behavior data ethically.",
+      "focus": "Actionable insights that improve design while respecting player privacy.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 29,
+      "name": "Live Events, Seasonal Content & Temporary Experiences",
+      "description": "Designing engaging limited-time events, seasons, and special content drops.",
+      "focus": "Fresh, exciting content that brings players back without fragmenting the core experience.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 30,
+      "name": "Monetization Strategy, Ethics & Long-term Health",
+      "description": "Designing fair, sustainable monetization that respects players and supports the game long-term.",
+      "focus": "Ethical systems that align player enjoyment with business sustainability.",
+      "target_roles_per_category": 100
+    }
+  ]
+}

@@ -1,0 +1,390 @@
+{
+  "schema_version": "skeleton.p2.quality_control.v1",
+  "control_version": "0.2.0",
+  "status": "active",
+  "purpose": "Masterplan-bound quality, formal-method, project-metric and final-assembly qualification authority for P2.",
+  "masterplan_bindings": [
+    {
+      "volume_ref": "VOL-070",
+      "title": "Quality Vector",
+      "accountability_id": "ACC-VOL-070",
+      "required_gap_texts": [
+        "bind dimensions to eval suites",
+        "define non-compensable failure rules"
+      ],
+      "risks": [
+        "aggregate score hides failure",
+        "metric correlation bias",
+        "threshold drift"
+      ],
+      "contracts": [
+        "QualityVector",
+        "QualityDimension",
+        "QualityThreshold"
+      ]
+    },
+    {
+      "volume_ref": "VOL-081",
+      "title": "Formal Methods",
+      "accountability_id": "ACC-VOL-081",
+      "required_gap_texts": [
+        "select P0 formal targets",
+        "establish model-to-code traceability"
+      ],
+      "risks": [
+        "spec/code drift",
+        "state explosion",
+        "proof overclaim"
+      ],
+      "contracts": [
+        "FormalSpecification",
+        "ProofObligation",
+        "Counterexample"
+      ]
+    },
+    {
+      "volume_ref": "VOL-117",
+      "title": "Project Metrics",
+      "accountability_id": "ACC-VOL-117",
+      "required_gap_texts": [
+        "define metric registry",
+        "bind progress percentages to traceable state"
+      ],
+      "risks": [
+        "vanity metrics",
+        "Goodhart effects",
+        "stale denominator"
+      ],
+      "contracts": [
+        "ProjectMetric",
+        "MetricObservation",
+        "MetricDefinition"
+      ]
+    },
+    {
+      "volume_ref": "VOL-120",
+      "title": "Final Assembly Test",
+      "accountability_id": "ACC-VOL-120",
+      "required_gap_texts": [
+        "materialize final assembly harness",
+        "bind release promotion to final evidence digest"
+      ],
+      "risks": [
+        "integration-only failure",
+        "environment mismatch",
+        "incomplete release evidence"
+      ],
+      "contracts": [
+        "FinalAssemblyPlan",
+        "FinalAssemblyRun",
+        "FinalAssemblyEvidence"
+      ]
+    }
+  ],
+  "sources": {
+    "engineering_pass": "machine/ai_engineering_pass.json",
+    "master_traceability": "machine/master_traceability.json",
+    "p2_execution_map": "machine/ai_p2_execution_map.json",
+    "p2_task_backlog": "machine/ai_p2_task_backlog.json",
+    "nfr_registry": "machine/nfr_registry.json",
+    "state_machine_catalogue": "machine/state_machine_catalogue.json",
+    "app_manifest": "skeleton/app/manifest.json",
+    "release_evidence_module": "skeleton/release/evidence.py"
+  },
+  "quality_vector": {
+    "aggregation_rule": "No weighted or averaged overall score has completion authority. Every required dimension is non-compensable.",
+    "promotion_rule": "All applicable required dimensions must pass independently with evidence; one failure blocks qualification.",
+    "dimensions": [
+      {
+        "dimension_id": "ENG-AUTH",
+        "non_compensable": true,
+        "evaluation_refs": [
+          "scripts/check_p1_required_gate_authority.py"
+        ]
+      },
+      {
+        "dimension_id": "ENG-CAP",
+        "non_compensable": true,
+        "evaluation_refs": [
+          "scripts/check_traceability_spine.py"
+        ]
+      },
+      {
+        "dimension_id": "ENG-COMPAT",
+        "non_compensable": true,
+        "evaluation_refs": [
+          "scripts/check_architecture_contract_conformance.py"
+        ]
+      },
+      {
+        "dimension_id": "ENG-DEPLOY",
+        "non_compensable": true,
+        "evaluation_refs": [
+          "scripts/check_app_assembly.py"
+        ]
+      },
+      {
+        "dimension_id": "ENG-EVAL",
+        "non_compensable": true,
+        "evaluation_refs": [
+          ".github/workflows/backend-quality.yml"
+        ]
+      },
+      {
+        "dimension_id": "ENG-FAIL",
+        "non_compensable": true,
+        "evaluation_refs": [
+          "scripts/check_ai_full_edge_case_matrix.py"
+        ]
+      },
+      {
+        "dimension_id": "ENG-IFACE",
+        "non_compensable": true,
+        "evaluation_refs": [
+          "scripts/check_capability_interfaces.py"
+        ]
+      },
+      {
+        "dimension_id": "ENG-NFR",
+        "non_compensable": true,
+        "evaluation_refs": [
+          "scripts/check_nfr_registry.py"
+        ]
+      },
+      {
+        "dimension_id": "ENG-OBS",
+        "non_compensable": true,
+        "evaluation_refs": [
+          "tests/test_observability.py"
+        ]
+      },
+      {
+        "dimension_id": "ENG-OWN",
+        "non_compensable": true,
+        "evaluation_refs": [
+          "scripts/check_architecture_ownership.py"
+        ]
+      },
+      {
+        "dimension_id": "ENG-REC",
+        "non_compensable": true,
+        "evaluation_refs": [
+          "scripts/state_recovery_drill.py"
+        ]
+      },
+      {
+        "dimension_id": "ENG-REPRO",
+        "non_compensable": true,
+        "evaluation_refs": [
+          "scripts/check_p1_reproducibility.py"
+        ]
+      },
+      {
+        "dimension_id": "ENG-REQ",
+        "non_compensable": true,
+        "evaluation_refs": [
+          "scripts/check_master_traceability.py"
+        ]
+      },
+      {
+        "dimension_id": "ENG-STATE",
+        "non_compensable": true,
+        "evaluation_refs": [
+          "scripts/check_state_topology.py"
+        ]
+      },
+      {
+        "dimension_id": "ENG-TEST",
+        "non_compensable": true,
+        "evaluation_refs": [
+          ".github/workflows/merge-readiness.yml"
+        ]
+      }
+    ]
+  },
+  "formal_methods": {
+    "policy": {
+      "selection_rule": "Targets are selected for high consequence and explicit finite-state ambiguity, not prestige.",
+      "proof_scope_rule": "A passed finite-state proof applies only to the named model, source symbols, assumptions and source digest.",
+      "counterexample_rule": "Any counterexample blocks the target and is retained as engineering input."
+    },
+    "targets": [
+      {
+        "target_id": "FORMAL-OPERATION-LIFECYCLE",
+        "module": "skeleton.contracts.operation",
+        "source": "skeleton/contracts/operation.py",
+        "enum_symbol": "OperationState",
+        "transition_symbol": "_ALLOWED_TRANSITIONS",
+        "terminal_symbol": "TERMINAL_OPERATION_STATES",
+        "initial_state": "created",
+        "requirement_refs": [
+          "REQ:VOL-081:001",
+          "REQ:VOL-081:002",
+          "REQ:VOL-081:003"
+        ],
+        "test_refs": [
+          "skeleton/testing/test_operation_runtime.py"
+        ],
+        "properties": [
+          "complete_transition_domain",
+          "declared_targets_only",
+          "terminal_absorbing",
+          "terminal_reachable_from_every_state",
+          "all_states_reachable_from_initial"
+        ]
+      },
+      {
+        "target_id": "FORMAL-AI-EXECUTION-LIFECYCLE",
+        "module": "skeleton.contracts.ai_execution",
+        "source": "skeleton/contracts/ai_execution.py",
+        "enum_symbol": "ExecutionState",
+        "transition_symbol": "_ALLOWED_EXECUTION_TRANSITIONS",
+        "terminal_symbol": "TERMINAL_EXECUTION_STATES",
+        "initial_state": "created",
+        "requirement_refs": [
+          "REQ:VOL-081:001",
+          "REQ:VOL-081:002",
+          "REQ:VOL-081:003"
+        ],
+        "test_refs": [
+          "skeleton/testing/test_engine_execution_service.py",
+          "skeleton/testing/test_engine_execution_coordinator.py"
+        ],
+        "properties": [
+          "complete_transition_domain",
+          "declared_targets_only",
+          "terminal_absorbing",
+          "terminal_reachable_from_every_state",
+          "all_states_reachable_from_initial"
+        ]
+      }
+    ]
+  },
+  "project_metrics": {
+    "policy": {
+      "categories": [
+        "activity",
+        "throughput",
+        "quality",
+        "risk",
+        "outcome"
+      ],
+      "derivation_rule": "Metric observations are recomputed from canonical machine sources; stored manual percentages are forbidden.",
+      "completion_rule": "Metrics are diagnostic signals only and have zero completion or maturity authority.",
+      "ratio_rule": "Every percentage/ratio exposes numerator, denominator and source identities; denominator must be positive."
+    },
+    "definitions": [
+      {
+        "metric_id": "PM-P2-SCHEDULED-VOLUMES",
+        "category": "activity",
+        "derivation": "p2_scheduled_volume_count",
+        "sources": [
+          "machine/ai_p2_execution_map.json"
+        ]
+      },
+      {
+        "metric_id": "PM-P2-VERIFIED-TASKS",
+        "category": "throughput",
+        "derivation": "verified_p2_task_count",
+        "sources": [
+          "machine/ai_p2_task_backlog.json"
+        ]
+      },
+      {
+        "metric_id": "PM-TRACE-EVIDENCE-COVERAGE",
+        "category": "quality",
+        "derivation": "trace_evidence_coverage_ratio",
+        "sources": [
+          "machine/master_traceability.json"
+        ]
+      },
+      {
+        "metric_id": "PM-TRACE-EVIDENCE-DEBT",
+        "category": "risk",
+        "derivation": "trace_requirements_without_evidence",
+        "sources": [
+          "machine/master_traceability.json"
+        ]
+      },
+      {
+        "metric_id": "PM-P2-VERIFIED-COMPLETION",
+        "category": "outcome",
+        "derivation": "verified_p2_task_ratio",
+        "sources": [
+          "machine/ai_p2_task_backlog.json"
+        ]
+      }
+    ]
+  },
+  "final_assembly": {
+    "schema_version": "skeleton.p2.final_assembly_plan.v1",
+    "source_binding": "exact_git_head",
+    "environment": {
+      "os": "ubuntu-24.04",
+      "python": "3.11.16",
+      "architecture": "x86_64"
+    },
+    "gates": [
+      {
+        "gate_id": "FA-QUALITY",
+        "argv": [
+          "python",
+          "scripts/check_p2_quality_control.py",
+          "--json"
+        ]
+      },
+      {
+        "gate_id": "FA-FORMAL",
+        "argv": [
+          "python",
+          "scripts/check_p2_formal_targets.py",
+          "--json"
+        ]
+      },
+      {
+        "gate_id": "FA-METRICS",
+        "argv": [
+          "python",
+          "scripts/check_p2_project_metrics.py",
+          "--json"
+        ]
+      },
+      {
+        "gate_id": "FA-TRACE",
+        "argv": [
+          "python",
+          "scripts/check_traceability_spine.py",
+          "--json"
+        ]
+      },
+      {
+        "gate_id": "FA-ASSEMBLY",
+        "argv": [
+          "python",
+          "scripts/check_app_assembly.py"
+        ]
+      },
+      {
+        "gate_id": "FA-RELEASE-EVIDENCE",
+        "argv": [
+          "python",
+          "-m",
+          "pytest",
+          "-q",
+          "skeleton/testing/test_release_evidence.py"
+        ]
+      }
+    ],
+    "promotion_binding": {
+      "digest_algorithm": "sha256",
+      "rule": "Release promotion requires the presented final-assembly evidence digest to exactly match the independently verified exact-head final-assembly evidence bundle.",
+      "unresolved_risk_rule": "Unresolved risks must be explicitly disposed as closed, accepted with authority, or blocking; unknown disposition blocks promotion.",
+      "independent_verification_required": true
+    },
+    "dependency_inputs": [
+      "pyproject.toml",
+      "requirements-dev.txt",
+      "requirements-build.txt"
+    ]
+  }
+}

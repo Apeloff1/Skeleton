@@ -1,0 +1,382 @@
+{
+  "schema_version": "skeleton.architecture.rule_registry.v1",
+  "registry_version": "0.4.0",
+  "status": "active",
+  "purpose": "Canonical inventory for architecture fitness checks, ownership, ADR change control, and time-bounded waivers.",
+  "authority": {
+    "architecture_map": "machine/architecture.json",
+    "master_plan": "machine/ai_master_plan.json",
+    "p2_execution_map": "machine/ai_p2_execution_map.json",
+    "validator": "scripts/check_architecture_rule_registry.py"
+  },
+  "masterplan_bindings": [
+    {
+      "volume_ref": "VOL-055",
+      "title": "Architecture Linter",
+      "required_gap_texts": [
+        "define rule registry",
+        "add waiver expiry enforcement"
+      ]
+    },
+    {
+      "volume_ref": "VOL-116",
+      "title": "Architecture Fitness Functions",
+      "required_gap_texts": [
+        "unify architecture check registry",
+        "bind rules to ADR/ownership"
+      ]
+    }
+  ],
+  "registry_policy": {
+    "discovery_rule": "Every scripts/check_architecture*.py validator plus the AI file-tree and scope-freeze architecture guards must have exactly one registry rule.",
+    "owner_rule": "Every rule must bind to one or more canonical root IDs from machine/architecture.json.",
+    "change_control_rule": "Every rule declares change_requires_adr=true. A waiver additionally requires an existing ADR document and bounded evidence.",
+    "waiver_rule": "Waivers are optional per rule, never permanent, never wildcard, and fail closed at or after expires_at_utc.",
+    "execution_rule": "When invoked with --execute, the registry runs every registered validator except itself in deterministic rule-id order; any non-zero result fails the aggregate gate without converting success into maturity evidence.",
+    "execution_order": "sorted rule id; registry self-check excluded to prevent recursion"
+  },
+  "rules": [
+    {
+      "id": "ARCH-ADR-INDEX",
+      "title": "Canonical ADR index and cross-cutting path coverage",
+      "validator_path": "scripts/check_architecture_adr_index.py",
+      "command": [
+        "python",
+        "scripts/check_architecture_adr_index.py"
+      ],
+      "severity": "blocking",
+      "owner_root_ids": [
+        "documentation",
+        "machine-control",
+        "operator-tooling"
+      ],
+      "affected_zone_ids": [
+        "knowledge",
+        "machine",
+        "tooling"
+      ],
+      "change_requires_adr": true,
+      "waiver_policy": {
+        "allowed": false,
+        "max_ttl_days": null,
+        "require_adr": true
+      }
+    },
+    {
+      "id": "ARCH-AI-TREE-PARITY",
+      "title": "AI file-tree ownership and parity",
+      "validator_path": "scripts/check_ai_file_tree.py",
+      "command": [
+        "python",
+        "scripts/check_ai_file_tree.py"
+      ],
+      "severity": "blocking",
+      "owner_root_ids": [
+        "engine-runtime",
+        "machine-control",
+        "operator-tooling"
+      ],
+      "affected_zone_ids": [
+        "engine",
+        "machine",
+        "tooling"
+      ],
+      "change_requires_adr": true,
+      "waiver_policy": {
+        "allowed": true,
+        "max_ttl_days": 7,
+        "require_adr": true
+      }
+    },
+    {
+      "id": "ARCH-BOUNDARY-IMPORTS",
+      "title": "High-risk package and import boundaries",
+      "validator_path": "scripts/check_architecture_boundaries.py",
+      "command": [
+        "python",
+        "scripts/check_architecture_boundaries.py"
+      ],
+      "severity": "blocking",
+      "owner_root_ids": [
+        "engine-runtime",
+        "application-api",
+        "operator-tooling"
+      ],
+      "affected_zone_ids": [
+        "application",
+        "engine",
+        "tooling"
+      ],
+      "change_requires_adr": true,
+      "waiver_policy": {
+        "allowed": true,
+        "max_ttl_days": 14,
+        "require_adr": true
+      }
+    },
+    {
+      "id": "ARCH-CONTRACT-CONFORMANCE",
+      "title": "Canonical contract producer-consumer and serialization conformance",
+      "validator_path": "scripts/check_architecture_contract_conformance.py",
+      "command": [
+        "python",
+        "scripts/check_architecture_contract_conformance.py"
+      ],
+      "severity": "blocking",
+      "owner_root_ids": [
+        "engine-runtime",
+        "machine-control",
+        "operator-tooling"
+      ],
+      "affected_zone_ids": [
+        "engine",
+        "machine",
+        "tooling"
+      ],
+      "change_requires_adr": true,
+      "waiver_policy": {
+        "allowed": false,
+        "max_ttl_days": null,
+        "require_adr": true
+      }
+    },
+    {
+      "id": "ARCH-DOC-AUTHORITY",
+      "title": "Architecture documentation contradiction inventory",
+      "validator_path": "scripts/check_architecture_doc_contradictions.py",
+      "command": [
+        "python",
+        "scripts/check_architecture_doc_contradictions.py"
+      ],
+      "severity": "blocking",
+      "owner_root_ids": [
+        "documentation",
+        "machine-control",
+        "operator-tooling"
+      ],
+      "affected_zone_ids": [
+        "knowledge",
+        "machine",
+        "tooling"
+      ],
+      "change_requires_adr": true,
+      "waiver_policy": {
+        "allowed": true,
+        "max_ttl_days": 30,
+        "require_adr": true
+      }
+    },
+    {
+      "id": "ARCH-MANIFEST-REFERENCES",
+      "title": "Machine manifest references and document digest bindings",
+      "validator_path": "scripts/check_architecture_manifest_references.py",
+      "command": [
+        "python",
+        "scripts/check_architecture_manifest_references.py"
+      ],
+      "severity": "blocking",
+      "owner_root_ids": [
+        "machine-control",
+        "documentation",
+        "operator-tooling"
+      ],
+      "affected_zone_ids": [
+        "machine",
+        "knowledge",
+        "tooling"
+      ],
+      "change_requires_adr": true,
+      "waiver_policy": {
+        "allowed": false,
+        "max_ttl_days": null,
+        "require_adr": true
+      }
+    },
+    {
+      "id": "ARCH-MAP-CONSISTENCY",
+      "title": "Canonical architecture map consistency",
+      "validator_path": "scripts/check_architecture_map.py",
+      "command": [
+        "python",
+        "scripts/check_architecture_map.py"
+      ],
+      "severity": "blocking",
+      "owner_root_ids": [
+        "machine-control",
+        "operator-tooling"
+      ],
+      "affected_zone_ids": [
+        "product",
+        "application",
+        "engine",
+        "acceleration",
+        "data",
+        "machine",
+        "tooling",
+        "knowledge"
+      ],
+      "change_requires_adr": true,
+      "waiver_policy": {
+        "allowed": false,
+        "max_ttl_days": null,
+        "require_adr": true
+      }
+    },
+    {
+      "id": "ARCH-OWNERSHIP",
+      "title": "Canonical repository owner and zone resolution",
+      "validator_path": "scripts/check_architecture_ownership.py",
+      "command": [
+        "python",
+        "scripts/check_architecture_ownership.py"
+      ],
+      "severity": "blocking",
+      "owner_root_ids": [
+        "engine-runtime",
+        "machine-control",
+        "operator-tooling"
+      ],
+      "affected_zone_ids": [
+        "engine",
+        "machine",
+        "tooling"
+      ],
+      "change_requires_adr": true,
+      "waiver_policy": {
+        "allowed": false,
+        "max_ttl_days": null,
+        "require_adr": true
+      }
+    },
+    {
+      "id": "ARCH-PACKAGED-WHEEL",
+      "title": "Isolated packaged-wheel import architecture",
+      "validator_path": "scripts/check_architecture_packaged_wheel.py",
+      "command": [
+        "python",
+        "scripts/check_architecture_packaged_wheel.py"
+      ],
+      "severity": "blocking",
+      "owner_root_ids": [
+        "engine-runtime",
+        "operator-tooling"
+      ],
+      "affected_zone_ids": [
+        "engine",
+        "tooling"
+      ],
+      "change_requires_adr": true,
+      "waiver_policy": {
+        "allowed": false,
+        "max_ttl_days": null,
+        "require_adr": true
+      }
+    },
+    {
+      "id": "ARCH-PYTHON-LAYERS",
+      "title": "Python package layering and import graph fitness",
+      "validator_path": "scripts/check_architecture_package_layers.py",
+      "command": [
+        "python",
+        "scripts/check_architecture_package_layers.py"
+      ],
+      "severity": "blocking",
+      "owner_root_ids": [
+        "engine-runtime",
+        "machine-control",
+        "operator-tooling"
+      ],
+      "affected_zone_ids": [
+        "engine",
+        "machine",
+        "tooling"
+      ],
+      "change_requires_adr": true,
+      "waiver_policy": {
+        "allowed": true,
+        "max_ttl_days": 7,
+        "require_adr": true
+      }
+    },
+    {
+      "id": "ARCH-RULE-REGISTRY",
+      "title": "Architecture rule registry integrity",
+      "validator_path": "scripts/check_architecture_rule_registry.py",
+      "command": [
+        "python",
+        "scripts/check_architecture_rule_registry.py"
+      ],
+      "severity": "blocking",
+      "owner_root_ids": [
+        "machine-control",
+        "operator-tooling"
+      ],
+      "affected_zone_ids": [
+        "machine",
+        "tooling",
+        "knowledge"
+      ],
+      "change_requires_adr": true,
+      "waiver_policy": {
+        "allowed": false,
+        "max_ttl_days": null,
+        "require_adr": true
+      }
+    },
+    {
+      "id": "ARCH-RUNTIME-SUPERVISION",
+      "title": "Backend and engine runtime supervision semantics",
+      "validator_path": "scripts/check_architecture_runtime_supervision.py",
+      "command": [
+        "python",
+        "scripts/check_architecture_runtime_supervision.py"
+      ],
+      "severity": "blocking",
+      "owner_root_ids": [
+        "application-api",
+        "engine-runtime",
+        "machine-control",
+        "operator-tooling"
+      ],
+      "affected_zone_ids": [
+        "application",
+        "engine",
+        "machine",
+        "tooling"
+      ],
+      "change_requires_adr": true,
+      "waiver_policy": {
+        "allowed": false,
+        "max_ttl_days": null,
+        "require_adr": true
+      }
+    },
+    {
+      "id": "ARCH-SCOPE-FREEZE",
+      "title": "Masterplan breadth freeze and ADR exception authority",
+      "validator_path": "scripts/check_ai_scope_freeze.py",
+      "command": [
+        "python",
+        "scripts/check_ai_scope_freeze.py"
+      ],
+      "severity": "blocking",
+      "owner_root_ids": [
+        "machine-control",
+        "documentation",
+        "operator-tooling"
+      ],
+      "affected_zone_ids": [
+        "machine",
+        "knowledge",
+        "tooling"
+      ],
+      "change_requires_adr": true,
+      "waiver_policy": {
+        "allowed": false,
+        "max_ttl_days": null,
+        "require_adr": true
+      }
+    }
+  ],
+  "waivers": []
+}

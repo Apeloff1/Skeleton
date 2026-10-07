@@ -1,0 +1,649 @@
+[repository]
+schema_version = 1
+name = "Skeleton"
+machine_root = ".machine"
+default_owner = "automation-supervisor"
+max_files = 50000
+max_file_bytes = 2000000
+max_context_bytes = 30000
+
+[policy]
+require_tests_for_code = true
+require_readme_for_top_level_code = true
+detect_dependency_cycles = true
+detect_oversized_modules = true
+oversized_python_lines = 1400
+oversized_javascript_lines = 1800
+oversized_generic_lines = 2400
+
+# Zone order is semantic: first match wins. Keep narrow/specific surfaces before
+# broader families. Audience describes the primary navigation consumer, not an
+# access-control boundary. Lifecycle is organizational state, not maturity.
+
+[[zone]]
+name = "repository-machine"
+prefixes = [".machine/", "machine/", "skeleton/repo_machine/", "skeleton/main_guard/"]
+owner = "repository-control-plane"
+criticality = "high"
+purpose = "Canonical repository taxonomy, machine-readable maps, topology, ownership and bounded stewardship."
+audience = "machine"
+lifecycle = "canonical"
+
+[[zone]]
+name = "github"
+prefixes = [".github/"]
+owner = "repository-control-plane"
+criticality = "critical"
+purpose = "GitHub Actions, repository policy, merge gates and hosted automation configuration."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "core-compat"
+prefixes = ["core/"]
+owner = "repository-control-plane"
+criticality = "low"
+purpose = "Compatibility-only top-level core namespace; canonical implementations live under skeleton/security and skeleton/automation."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "ecs-script-runtime"
+prefixes = ["skeleton/ecs/"]
+owner = "simulation-runtime"
+criticality = "high"
+purpose = "Blueprint-to-ECS adapter and policy-instrumented game-logic scripting layered on the canonical deterministic simulation ECS."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "execution-sandbox"
+prefixes = ["skeleton/sandbox/"]
+owner = "security-plane"
+criticality = "critical"
+purpose = "Process and filesystem containment, sanitization, and injection enforcement for untrusted tools, generated code and model input."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "security"
+prefixes = ["skeleton/security/", "skeleton/vault/"]
+owner = "security-plane"
+criticality = "critical"
+purpose = "Security policy/runtime primitives, authorization, vaulting and trust-boundary enforcement."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "swarm-compat"
+prefixes = ["skeleton/swarm/"]
+owner = "automation-control-plane"
+criticality = "low"
+purpose = "Compatibility-only Swarm namespace; canonical runtime lives under skeleton/automation/swarm/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "hive-compat"
+prefixes = ["skeleton/hive/"]
+owner = "automation-control-plane"
+criticality = "low"
+purpose = "Compatibility-only Hive namespace; canonical runtime lives under skeleton/automation/hive/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "overseer-compat"
+prefixes = ["skeleton/overseer/"]
+owner = "automation-control-plane"
+criticality = "low"
+purpose = "Compatibility-only Overseer namespace; canonical runtime lives under skeleton/automation/overseer/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "agents-compat"
+prefixes = ["skeleton/agents/"]
+owner = "automation-control-plane"
+criticality = "low"
+purpose = "Compatibility-only agent runtime namespace; canonical agent/swarm execution lives under skeleton/automation/agents/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "automation"
+prefixes = ["skeleton/automation/", ".emergent/"]
+owner = "automation-control-plane"
+criticality = "critical"
+purpose = "Supervisor/Secretary/Worker orchestration, autonomous builders, queues, agents and controlled repository execution."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "jeeves"
+prefixes = ["skeleton/jeeves/", "jeeves/", "core/jeeves/"]
+owner = "jeeves-runtime"
+criticality = "high"
+purpose = "Jeeves reasoning, assurance, evidence, memory and orchestration planes."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "ai"
+prefixes = ["skeleton/ai/", "skeleton/cognition/", "skeleton/cortex/", "skeleton/intelligence/", "skeleton/learning/", "skeleton/context/"]
+owner = "ai-runtime"
+criticality = "high"
+purpose = "Canonical AI runtime, cognition, context, learning, model/provider adaptation and research-facing execution."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "context-compat"
+prefixes = ["skeleton/contexts/"]
+owner = "ai-runtime"
+criticality = "low"
+purpose = "Compatibility-only plural context namespace; canonical implementations live under skeleton/context/domains/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "shell-runtime"
+prefixes = ["skeleton/shells/"]
+owner = "shell-runtime"
+criticality = "critical"
+purpose = "Policy-bound shell execution, toolchain contracts, workspace transactions and runtime trust."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "graphs-compat"
+prefixes = ["skeleton/graphs/"]
+owner = "knowledge-runtime"
+criticality = "low"
+purpose = "Compatibility-only graph namespace; canonical graph, spectral, motif and GAT primitives live under skeleton/knowledge/graphs/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "chronicle-compat"
+prefixes = ["skeleton/chronicle/"]
+owner = "provenance-runtime"
+criticality = "low"
+purpose = "Compatibility-only Chronicle namespace; canonical append-only provenance and tamper-evident event history live under skeleton/provenance/chronicle/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "provenance"
+prefixes = ["skeleton/provenance/"]
+owner = "provenance-runtime"
+criticality = "high"
+purpose = "Canonical append-only event evidence, Merkle history, tamper detection and independent provenance verification."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "knowledge"
+prefixes = ["skeleton/memory/", "skeleton/retrieval/", "skeleton/knowledge/"]
+owner = "knowledge-runtime"
+criticality = "high"
+purpose = "Runtime memory, retrieval, reusable knowledge/reasoning substrate, indexing and graph services."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "application-compat"
+prefixes = ["skeleton/application/"]
+owner = "application-runtime"
+criticality = "low"
+purpose = "Compatibility-only application namespace; canonical implementation lives under skeleton/app/runtime/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "creator-compat"
+prefixes = ["skeleton/creator/"]
+owner = "delivery-plane"
+criticality = "low"
+purpose = "Compatibility-only creator namespace; canonical intent compilation and reversible design-edit ownership lives under skeleton/forge/creator/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "content-compat"
+prefixes = ["skeleton/content/"]
+owner = "simulation-runtime"
+criticality = "low"
+purpose = "Compatibility-only domain-knowledge namespace; canonical content knowledge lives under skeleton/simulation/content/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "jeeves-app"
+prefixes = ["apps/jeeves/"]
+owner = "jeeves-runtime"
+criticality = "high"
+purpose = "Operator-facing Jeeves application facade, CLI and app-local plane layout. This surface composes governed implementations and must not fork source-of-truth runtime code."
+audience = "both"
+lifecycle = "support"
+
+[[zone]]
+name = "application-workspaces"
+prefixes = ["apps/"]
+owner = "application-runtime"
+criticality = "medium"
+purpose = "Top-level deployable/operator-facing application workspaces and composition facades. Runtime authority remains with the explicitly governed source domains."
+audience = "both"
+lifecycle = "support"
+
+[[zone]]
+name = "application"
+prefixes = ["skeleton/app/", "skeleton/api/", "skeleton/assets/", "skeleton/support/"]
+owner = "application-runtime"
+criticality = "high"
+purpose = "Whole-application assembly, operator surface, APIs and user/product-facing runtime composition."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "backend"
+prefixes = ["backend/"]
+owner = "backend-runtime"
+criticality = "high"
+purpose = "Backend application API, product control plane and service-side integration."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "frontend"
+prefixes = ["frontend/"]
+owner = "frontend-runtime"
+criticality = "medium"
+purpose = "Canonical browser/mobile product shell and human-facing application interface."
+audience = "human"
+lifecycle = "canonical"
+
+[[zone]]
+name = "architecture-history-compat"
+prefixes = ["skeleton/architecture_index.py", "skeleton/architecture_round"]
+owner = "core-runtime"
+criticality = "low"
+purpose = "Compatibility-only architecture index and numbered round modules; canonical history lives under skeleton/foundation/architecture/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "genesis-compat"
+prefixes = ["skeleton/genesis.py"]
+owner = "core-runtime"
+criticality = "low"
+purpose = "Compatibility-only Genesis entrypoint; canonical engine bootstrap lives under skeleton/bootstrap/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "bootstrap"
+prefixes = ["skeleton/bootstrap/"]
+owner = "core-runtime"
+criticality = "critical"
+purpose = "Canonical engine bootstrap, boot ordering and subsystem wiring."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "foundation"
+prefixes = ["skeleton/kernel/", "skeleton/core/", "skeleton/foundation/", "skeleton/primitives/", "skeleton/contracts/", "skeleton/config/", "skeleton/__init__.py", "skeleton/__main__.py", "skeleton/README.py", "skeleton/architecture.py", "skeleton/manifest.py", "skeleton/quickstart.py", "skeleton/requirements.py", "skeleton/setup_config.py"]
+owner = "core-runtime"
+criticality = "critical"
+purpose = "Foundational contracts, kernel primitives, configuration and package-level boot architecture."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "persist-compat"
+prefixes = ["skeleton/persist/"]
+owner = "platform-runtime"
+criticality = "low"
+purpose = "Compatibility-only persistence namespace; canonical primitives live under skeleton/persistence/core/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "jvm-registry-compat"
+prefixes = ["skeleton/jvm_accelerators.py"]
+owner = "platform-runtime"
+criticality = "low"
+purpose = "Compatibility-only JVM accelerator registry entrypoint; canonical registry lives at skeleton/native/jvm_registry.py."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "kv-cache-compat"
+prefixes = ["skeleton/kv_cache.py"]
+owner = "platform-runtime"
+criticality = "low"
+purpose = "Compatibility-only KV-cache facade; canonical public surface lives in the skeleton/kv package."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "platform"
+prefixes = ["skeleton/native/", "skeleton/data/", "skeleton/kv/", "skeleton/state/", "skeleton/persistence/", "skeleton/observability/", "skeleton/telemetry/", "skeleton/reliability/", "skeleton/resilience/"]
+owner = "platform-runtime"
+criticality = "high"
+purpose = "State, storage, networking, native execution, observability and resilience substrate."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "deployment-compat"
+prefixes = ["skeleton/deployment/"]
+owner = "delivery-plane"
+criticality = "low"
+purpose = "Compatibility-only deployment namespace; canonical strategy implementations live under skeleton/deploy/strategies/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "pipelines-compat"
+prefixes = ["skeleton/pipelines/"]
+owner = "delivery-plane"
+criticality = "low"
+purpose = "Compatibility-only generation-pipeline namespace; canonical pipeline ownership lives under skeleton/forge/pipelines/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "build-delivery"
+prefixes = ["skeleton/build/", "skeleton/forge/", "skeleton/deploy/", "skeleton/release/", "skeleton/developer/", "skeleton/ubuntu/", "packaging/", "java-accelerators/", "deploy.py"]
+owner = "delivery-plane"
+criticality = "high"
+purpose = "Build graph, packaging, installers, release, deployment and developer delivery tooling."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "frontier-runtime"
+prefixes = ["skeleton/frontier/"]
+owner = "frontier-runtime"
+criticality = "high"
+purpose = "Frontier domain runtime fully decomposed into runtime/, progression/, ecology/, economy/, characters/, and game/ canonical subdomains; flat historical module paths remain compatibility-only."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "platform-compat"
+prefixes = ["skeleton/platform/"]
+owner = "simulation-runtime"
+criticality = "low"
+purpose = "Compatibility-only engine-adapter namespace; canonical Godot adapter ownership lives under skeleton/simulation/platform/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "economy-compat"
+prefixes = ["skeleton/economy/"]
+owner = "simulation-runtime"
+criticality = "low"
+purpose = "Compatibility-only simulation economy namespace; canonical treasury/economy ownership lives under skeleton/simulation/economy/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "world-compat"
+prefixes = ["skeleton/world/"]
+owner = "simulation-runtime"
+criticality = "low"
+purpose = "Compatibility-only world-state namespace; canonical scene/world ownership lives under skeleton/simulation/world/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "game-compat"
+prefixes = ["skeleton/game/"]
+owner = "simulation-runtime"
+criticality = "low"
+purpose = "Compatibility-only game-runtime namespace; canonical mechanics and deterministic replay live under skeleton/simulation/game/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "era-compat"
+prefixes = ["skeleton/era/"]
+owner = "simulation-runtime"
+criticality = "low"
+purpose = "Compatibility-only era binding namespace; canonical era binding and cited Forge references live under skeleton/simulation/era/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "social-compat"
+prefixes = ["skeleton/social/"]
+owner = "research-evidence"
+criticality = "low"
+purpose = "Compatibility-only social/research evidence namespace; canonical source ingestion, graph and coverage logic lives under skeleton/research/social/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "research"
+prefixes = ["skeleton/research/"]
+owner = "research-evidence"
+criticality = "medium"
+purpose = "Untrusted evidence intake, provenance-preserving discovery, source coverage and research support surfaces."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "galaxy-compat"
+prefixes = ["skeleton/galaxy/"]
+owner = "distributed-runtime"
+criticality = "low"
+purpose = "Compatibility-only Galaxy namespace; canonical federation, transport, consensus and fleet coordination live under skeleton/distributed/galaxy/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "network-compat"
+prefixes = ["skeleton/network/"]
+owner = "distributed-runtime"
+criticality = "low"
+purpose = "Compatibility-only Network namespace; canonical replication, remote execution and model placement live under skeleton/distributed/network/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "mesh-compat"
+prefixes = ["skeleton/mesh/"]
+owner = "distributed-runtime"
+criticality = "low"
+purpose = "Compatibility-only Mesh namespace; canonical service discovery, hedging, deduplication, capacity and traffic control live under skeleton/distributed/mesh/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "distributed"
+prefixes = ["skeleton/distributed/"]
+owner = "distributed-runtime"
+criticality = "critical"
+purpose = "Canonical distributed runtime infrastructure for federation, transport, election, consensus, synchronization and fleet coordination."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "organism-runtime"
+prefixes = ["skeleton/organism/"]
+owner = "core-runtime"
+criticality = "high"
+purpose = "Owner-sensitive engine-organism control plane: runtime DAG, health, policy, quality, recovery and operator control; security-owned secrets remain gated until explicit cutover."
+audience = "internal"
+lifecycle = "support"
+
+[[zone]]
+name = "simulation"
+prefixes = ["skeleton/simulation/", "godot.pointer"]
+owner = "simulation-runtime"
+criticality = "medium"
+purpose = "Deterministic simulation, game/world systems, scene state and engine-adapter execution."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "quality"
+prefixes = ["skeleton/eval/", "eval/", "skeleton/quality/", "skeleton/gate_plane/", "skeleton/artifact_plane/"]
+owner = "quality-plane"
+criticality = "high"
+purpose = "Evaluation, quality analysis, artifact assurance and reusable gate-plane implementation."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "tests"
+prefixes = ["tests/", "skeleton/testing/"]
+owner = "quality-plane"
+criticality = "high"
+purpose = "Regression, contract, integration, reliability and repository-control validation."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "repository-automation"
+prefixes = ["skeleton/pr_automation/", "skeleton/repo_intelligence/", "skeleton/inventory/"]
+owner = "repository-control-plane"
+criticality = "high"
+purpose = "PR automation, repository intelligence, merge control and repository inventory logic."
+audience = "machine"
+lifecycle = "canonical"
+
+[[zone]]
+name = "provider-contract-compat"
+prefixes = ["skeleton/provider_contract.py"]
+owner = "integration-runtime"
+criticality = "low"
+purpose = "Compatibility-only provider-contract entrypoint; canonical provider-neutral contracts live under skeleton/providers/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "providers"
+prefixes = ["skeleton/providers/"]
+owner = "integration-runtime"
+criticality = "high"
+purpose = "Canonical provider-neutral contracts and provider-boundary interfaces; credential-bearing runtime ownership is governed separately."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "integrations-compat"
+prefixes = ["skeleton/integrations/"]
+owner = "tool-runtime"
+criticality = "low"
+purpose = "Compatibility-only integrations namespace; canonical connector and webhook tool edges live under skeleton/tools/integrations/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "tools"
+prefixes = ["skeleton/tools/"]
+owner = "tool-runtime"
+criticality = "high"
+purpose = "Canonical governed tool execution edges, connector adapters and authenticated webhook integrations."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "integrations"
+prefixes = ["skeleton/skills/", "skeleton/provider_runtime.py"]
+owner = "integration-runtime"
+criticality = "medium"
+purpose = "Provider, skill and service integration boundaries that remain outside the canonical tool-edge package."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "school-compat"
+prefixes = ["skeleton/school/"]
+owner = "ai-runtime"
+criticality = "low"
+purpose = "Compatibility-only School namespace; canonical curriculum, learner-state, assessment, tutoring and learning-control runtime lives under skeleton/learning/school/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "research-lineage"
+prefixes = ["skeleton/circulation/", "skeleton/hoag/", "skeleton/motive/", "skeleton/sheaf/", "skeleton/spine/", "skeleton/viscera/"]
+owner = "ai-runtime"
+criticality = "low"
+purpose = "Historical and research-quarantine facades retained for provenance and characterization; these paths carry no production authority."
+audience = "internal"
+lifecycle = "historical"
+
+[[zone]]
+name = "specialized-runtime"
+prefixes = ["skeleton/cue/", "skeleton/genos/", "skeleton/parse/", "skeleton/turn/"]
+owner = "core-runtime"
+criticality = "medium"
+purpose = "Unresolved specialized runtime subsystems that remain explicit until a concrete canonical owner and cutover contract are approved."
+audience = "internal"
+lifecycle = "support"
+
+[[zone]]
+name = "external-sources"
+prefixes = ["complete/", "satellites/", "skeleton/acquired/"]
+owner = "repository-control-plane"
+criticality = "medium"
+purpose = "Imported, mirrored, staged or satellite source material; never becomes canonical implicitly."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "project-memory"
+prefixes = ["memory/"]
+owner = "documentation-plane"
+criticality = "medium"
+purpose = "Historical project/session memory and recovery records; informative but not runtime authority."
+audience = "human"
+lifecycle = "support"
+
+[[zone]]
+name = "docs"
+prefixes = ["docs/", "README", "BACKLOG", "CHANGELOG", "AGENTS", "CLAUDE", "GEMINI", "SECURITY", "LICENSE", "design_guidelines.json"]
+owner = "documentation-plane"
+criticality = "medium"
+purpose = "Human-facing architecture, plans, runbooks, status, policy and project documentation."
+audience = "human"
+lifecycle = "canonical"
+
+[[zone]]
+name = "tooling"
+prefixes = ["scripts/", ".cursor/", ".dockerignore", ".env.example", ".gitattributes", ".gitignore", ".gitleaks.toml", ".pre-commit-config.yaml", "Dockerfile", "Makefile", "docker-compose", "pyproject.toml", "requirements", "setup.cfg", "tools/", "package.json"]
+owner = "developer-tooling"
+criticality = "medium"
+purpose = "Local/CI tooling, repository scripts, environment configuration and developer entrypoints."
+audience = "both"
+lifecycle = "canonical"
+
+[ignore]
+prefixes = [
+  ".git/",
+  # Generated machine artifacts are outputs of the indexer, not inventory inputs.
+  ".machine/",
+  # Local runtime state, never source inventory. Canonical provenance remains indexed.
+  ".skeleton/",
+  "chronicle/",
+  ".venv/",
+  "venv/",
+  "node_modules/",
+  "frontend/node_modules/",
+  "frontend/dist/",
+  "frontend/.expo/",
+  "skeleton.egg-info/",
+  "dist/",
+  "build/",
+  "coverage/",
+  ".pytest_cache/",
+  ".mypy_cache/",
+  ".ruff_cache/",
+  "__pycache__/",
+]
+suffixes = [".pyc", ".pyo", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".zip", ".tar", ".gz"]

@@ -1,0 +1,315 @@
+name: P1 Backup Restore Qualification Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "machine/ai_p1_task_backlog.json"
+      - "skeleton/release/restore.py"
+      - "skeleton/release/migration.py"
+      - "skeleton/release/lifecycle.py"
+      - "skeleton/release/__init__.py"
+      - "skeleton/persistence/snapshots.py"
+      - "skeleton/persistence/operation_store.py"
+      - "skeleton/testing/test_backup_restore_qualification.py"
+      - "skeleton/testing/test_backup_restore_integration.py"
+      - "skeleton/testing/test_migration_rollback_compatibility.py"
+      - ".github/workflows/p1-backup-restore-qualification.yml"
+  pull_request:
+    branches:
+      - main
+      - p1/learn-lane-materialize-20260928
+      - p1/rel-03-migration-rollback-compatibility-20260928
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_p1_task_backlog.json"
+      - "skeleton/release/restore.py"
+      - "skeleton/release/migration.py"
+      - "skeleton/release/lifecycle.py"
+      - "skeleton/release/__init__.py"
+      - "skeleton/persistence/snapshots.py"
+      - "skeleton/persistence/operation_store.py"
+      - "skeleton/testing/test_backup_restore_qualification.py"
+      - "skeleton/testing/test_backup_restore_integration.py"
+      - "skeleton/testing/test_migration_rollback_compatibility.py"
+      - ".github/workflows/p1-backup-restore-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-backup-restore-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate backup restore and derived rebuild
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e .
+          "pytest>=8,<9"
+
+      - name: Compile REL-03 and REL-04 contracts
+        run: >-
+          python -m compileall -q
+          skeleton/release/migration.py
+          skeleton/release/restore.py
+          skeleton/persistence/snapshots.py
+          skeleton/persistence/operation_store.py
+
+      - name: Run migration and restore regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_migration_rollback_compatibility.py
+          skeleton/testing/test_backup_restore_qualification.py
+          skeleton/testing/test_backup_restore_integration.py
+
+      - name: Build accepted exact-head REL-04 restore evidence
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-rel-04
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          from skeleton.contracts.canonical import EvidenceRef
+          from skeleton.release.migration import MigrationCompatibilityDecision
+          from skeleton.release.restore import (
+              BackupComponent,
+              BackupComponentRole,
+              BackupManifest,
+              RestoreComponentReceipt,
+              qualify_backup_restore,
+          )
+
+          def sha(data: bytes) -> str:
+              return hashlib.sha256(data).hexdigest()
+
+          commit = os.environ["EXPECTED_SHA"]
+          migration = MigrationCompatibilityDecision(
+              accepted=True,
+              reasons=(),
+              source_commit=commit,
+              lifecycle_qualification_digest=sha(b"rel-02-lifecycle"),
+              plan_digest=sha(b"rel-03-plan"),
+              rollback_window_digest=sha(b"rel-03-window"),
+              from_version="15.0.0",
+              to_version="16.0.0",
+              receipt_digests=(sha(b"rel-03-receipts"),),
+          )
+
+          operations = BackupComponent(
+              component_id="operations",
+              role=BackupComponentRole.AUTHORITATIVE,
+              source_state_digest=sha(b"operations-state"),
+              restore_order=1,
+              backup_artifact_digest=sha(b"operations-backup"),
+          )
+          conversations = BackupComponent(
+              component_id="conversations",
+              role=BackupComponentRole.AUTHORITATIVE,
+              source_state_digest=sha(b"conversations-state"),
+              restore_order=2,
+              dependencies=("operations",),
+              backup_artifact_digest=sha(b"conversations-backup"),
+          )
+          index = BackupComponent(
+              component_id="operation-search-index",
+              role=BackupComponentRole.DERIVED,
+              source_state_digest=sha(b"derived-index-state"),
+              restore_order=3,
+              dependencies=("operations", "conversations"),
+              rebuild_recipe_digest=sha(b"derived-index-rebuild-v1"),
+          )
+          manifest = BackupManifest(
+              backup_id="rel-04-exact-head",
+              source_commit=commit,
+              migration_compatibility_digest=migration.decision_digest,
+              components=(operations, conversations, index),
+              backup_environment_digest=sha(
+                  b"ubuntu-24.04|python-3.11.16|rel-04-backup"
+              ),
+          )
+
+          def authoritative_receipt(component):
+              return RestoreComponentReceipt(
+                  component_id=component.component_id,
+                  component_digest=component.digest,
+                  source_commit=commit,
+                  manifest_digest=manifest.manifest_digest,
+                  restore_order=component.restore_order,
+                  completed_dependencies=component.dependencies,
+                  observed_backup_artifact_digest=(
+                      component.backup_artifact_digest
+                  ),
+                  restored_state_digest=component.source_state_digest,
+                  verifier_id=f"github-actions:{component.component_id}",
+                  verifier_digest=sha(
+                      f"{component.component_id}:verifier".encode()
+                  ),
+                  test_manifest_digest=sha(
+                      f"{component.component_id}:tests".encode()
+                  ),
+                  evidence_refs=(
+                      EvidenceRef(
+                          source=f"ci://rel-04/{component.component_id}",
+                          digest=sha(
+                              f"{component.component_id}:restore".encode()
+                          ),
+                          category="restore_drill",
+                      ),
+                  ),
+                  restored=True,
+                  rebuilt=False,
+                  independent=True,
+                  production_mutation_count=0,
+              )
+
+          derived_receipt = RestoreComponentReceipt(
+              component_id=index.component_id,
+              component_digest=index.digest,
+              source_commit=commit,
+              manifest_digest=manifest.manifest_digest,
+              restore_order=index.restore_order,
+              completed_dependencies=index.dependencies,
+              rebuild_recipe_digest=index.rebuild_recipe_digest,
+              rebuild_input_digest=manifest.authoritative_state_digest,
+              rebuilt_state_digest=index.source_state_digest,
+              verifier_id="github-actions:derived-rebuild",
+              verifier_digest=sha(b"derived-rebuild-verifier"),
+              test_manifest_digest=sha(b"derived-rebuild-tests"),
+              evidence_refs=(
+                  EvidenceRef(
+                      source="ci://rel-04/derived-rebuild",
+                      digest=sha(b"derived-rebuild-evidence"),
+                      category="restore_drill",
+                  ),
+              ),
+              restored=False,
+              rebuilt=True,
+              independent=True,
+              production_mutation_count=0,
+          )
+
+          decision = qualify_backup_restore(
+              migration_compatibility=migration,
+              manifest=manifest,
+              receipts=(
+                  authoritative_receipt(operations),
+                  authoritative_receipt(conversations),
+                  derived_receipt,
+              ),
+          )
+          if not decision.accepted:
+              raise SystemExit(
+                  f"REL-04 restore qualification rejected: {decision.reasons}"
+              )
+          evidence = decision.accepted_evidence_ref()
+          Path(".p1-rel-04/decision.json").write_text(
+              json.dumps(decision.payload(), indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          Path(".p1-rel-04/refs.json").write_text(
+              json.dumps(
+                  [{
+                      "source": evidence.source,
+                      "digest": evidence.digest,
+                      "category": evidence.category,
+                  }],
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          Path(".p1-rel-04/config.digest").write_text(
+              sha(b"p1-rel-04-backup-restore-v1"),
+              encoding="utf-8",
+          )
+          Path(".p1-rel-04/environment.digest").write_text(
+              sha(b"ubuntu-24.04|python-3.11.16|rel-04"),
+              encoding="utf-8",
+          )
+          Path(".p1-rel-04/verifier.digest").write_text(
+              sha(
+                  Path("skeleton/release/restore.py").read_bytes()
+                  + Path(".github/workflows/p1-backup-restore-qualification.yml").read_bytes()
+              ),
+              encoding="utf-8",
+          )
+          Path(".p1-rel-04/tests.digest").write_text(
+              sha(
+                  Path("skeleton/testing/test_backup_restore_qualification.py").read_bytes()
+                  + Path("skeleton/testing/test_backup_restore_integration.py").read_bytes()
+              ),
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Emit exact-head REL-04 evidence receipt
+        run: |
+          set -euo pipefail
+          python scripts/emit_p1_promotion_evidence.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --expected-head "$EXPECTED_SHA" \
+            --task-id P1-REL-04 \
+            --accountability-id ACC-P1-REL-04 \
+            --configuration-digest "$(cat .p1-rel-04/config.digest)" \
+            --environment-digest "$(cat .p1-rel-04/environment.digest)" \
+            --verifier-id github-actions:p1-backup-restore \
+            --verifier-digest "$(cat .p1-rel-04/verifier.digest)" \
+            --test-manifest-digest "$(cat .p1-rel-04/tests.digest)" \
+            --run-id "$RUN_IDENTITY" \
+            --run-attempt "$RUN_ATTEMPT" \
+            --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --evidence-file .p1-rel-04/refs.json \
+            --out .p1-rel-04/receipt.json \
+            > .p1-rel-04/stdout.json
+
+      - name: Assert exact-head REL-04 receipt
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-rel-04/receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("REL-04 receipt head mismatch")
+          if receipt["task_id"] != "P1-REL-04":
+              raise SystemExit("REL-04 task identity mismatch")
+          if receipt["accountability_id"] != "ACC-P1-REL-04":
+              raise SystemExit("REL-04 accountability identity mismatch")
+          for field in ("subject_digest", "evidence_digest", "receipt_digest"):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print("REL-04 exact-head receipt OK", receipt["receipt_digest"])
+          PY

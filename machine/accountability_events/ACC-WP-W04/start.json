@@ -1,0 +1,15 @@
+{
+  "accountability_id": "ACC-WP-W04",
+  "event_type": "start_marker",
+  "actor_id": "chatgpt:gpt-5.6-sol",
+  "actor_type": "agent",
+  "role": "implementation-agent",
+  "signature_method": "github_identity",
+  "note": "Agent attestation through the user-authorized GitHub connector; not a human signature.",
+  "baseline_git_sha": "cda68ce4c473da403c4bdad383117245c776d236",
+  "timestamp_source": "GitHub commit created_at for this start-marker commit",
+  "from_status": "planned",
+  "intended_to_status": "in_progress",
+  "title": "WP-W04 Events & Streaming Ledger",
+  "statement": "Begin WP-W04 Events & Streaming Ledger for durable event/state reconciliation work."
+}

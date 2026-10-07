@@ -1,0 +1,8 @@
+{
+  "per_room_toolbox_assignment": {
+    "description": "Every room now has its own assigned Toolbox. The Toolbox acts as the coordinator that gathers the room team to fix issues.",
+    "role_of_toolbox": "When an issue is detected in a room (security breach, corruption, damage, performance problem), the room's Toolbox gathers the most qualified agents present in or near that room to form a temporary repair team.",
+    "integration": "Toolbox works with Jeeves delegation, the Agentic Queue, and the Nav Map to efficiently assemble and manage repair teams.",
+    "quality_level": "Mishima Zaibatsu operational standard"
+  }
+}

@@ -1,0 +1,655 @@
+name: App Assembly
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]
+    paths:
+      - "skeleton/app/**"
+      - "skeleton/ai/**"
+      - "skeleton/__main__.py"
+      - "skeleton/testing/test_app_assembly.py"
+      - "skeleton/testing/test_app_plan.py"
+      - "skeleton/testing/test_app_compose_parity.py"
+      - "skeleton/testing/test_app_bootstrap.py"
+      - "skeleton/testing/test_app_runtime_contract.py"
+      - "skeleton/testing/test_app_installer.py"
+      - "skeleton/testing/test_windows_installer.py"
+      - "packaging/windows/**"
+      - "scripts/windows/**"
+      - "skeleton/testing/test_architecture_map.py"
+      - "skeleton/testing/test_ai_app_construction.py"
+      - "skeleton/testing/test_ai_master_plan.py"
+      - "skeleton/testing/test_ai_edge_case_catalog.py"
+      - "skeleton/testing/test_ai_p0_edge_case_matrix.py"
+      - "skeleton/testing/test_ai_full_edge_case_matrix.py"
+      - "skeleton/testing/test_ai_master_build_sequence.py"
+      - "skeleton/testing/test_ai_file_tree.py"
+      - "skeleton/testing/test_ai_engineering_pass.py"
+      - "skeleton/testing/test_ai_engineering_task_matrix.py"
+      - "skeleton/testing/test_ai_adversarial_closure.py"
+      - "skeleton/testing/test_ai_build_accountability.py"
+      - "skeleton/testing/test_ai_execution_frontier.py"
+      - "skeleton/testing/test_ai_accountability_cli.py"
+      - "skeleton/testing/test_capability_interfaces.py"
+      - "skeleton/testing/test_state_topology.py"
+      - "skeleton/testing/test_state_recovery_drill.py"
+      - "skeleton/testing/test_provider_contract.py"
+      - "skeleton/testing/test_provider_runtime_schema_parity.py"
+      - "machine/ai_runtime_schemas.json"
+      - "skeleton/testing/test_provider_surface_inventory.py"
+      - "scripts/check_context_execution_boundary.py"
+      - "tests/test_context_execution_boundary.py"
+      - "scripts/check_instruction_policy_boundary.py"
+      - "tests/test_instruction_policy_boundary.py"
+      - "skeleton/provider_contract.py"
+      - "skeleton/provider_runtime.py"
+      - "skeleton/testing/test_operation_stream.py"
+      - "skeleton/testing/test_operation_contract.py"
+      - "skeleton/frontier/operation_stream.py"
+      - "skeleton/testing/test_operation_stream_store.py"
+      - "skeleton/frontier/operation_stream_store.py"
+      - "skeleton/contracts/operation.py"
+      - "skeleton/contracts/conversation.py"
+      - "skeleton/contracts/context.py"
+      - "skeleton/contracts/memory_record.py"
+      - "skeleton/contracts/ai_execution.py"
+      - "skeleton/context/compiler.py"
+      - "skeleton/context/compaction.py"
+      - "skeleton/context/policy.py"
+      - "skeleton/context/sources/**"
+      - "skeleton/testing/test_context_compiler.py"
+      - "skeleton/skills/tool_contract.py"
+      - "skeleton/skills/tool_runtime.py"
+      - "skeleton/skills/tool_receipt_store.py"
+      - "skeleton/skills/tool_adapters/**"
+      - "skeleton/testing/test_tool_runtime.py"
+      - "skeleton/testing/test_tool_receipt_store.py"
+      - "skeleton/testing/test_tool_adapters.py"
+      - "backend/tests/test_tool_registry_scoped_adapters.py"
+      - "backend/tests/test_tool_registry_canonical_delegate.py"
+      - "skeleton/persistence/operation_store.py"
+      - "skeleton/persistence/operation_runtime.py"
+      - "skeleton/persistence/conversation_repository.py"
+      - "skeleton/persistence/memory_repository.py"
+      - "skeleton/persistence/execution_repository.py"
+      - "skeleton/intelligence/execution_runtime.py"
+      - "skeleton/api/engine_authority.py"
+      - "skeleton/api/engine_service.py"
+      - "skeleton/api/engine_runtime.py"
+      - "skeleton/api/engine_routes.py"
+      - "skeleton/memory/policy.py"
+      - "skeleton/memory/writeback.py"
+      - "skeleton/memory/projection.py"
+      - "skeleton/memory/core.py"
+      - "skeleton/memory/vector.py"
+      - "skeleton/testing/test_operation_store.py"
+      - "skeleton/testing/test_operation_runtime.py"
+      - "skeleton/testing/test_operation_server_binding.py"
+      - "skeleton/testing/test_conversation_repository.py"
+      - "skeleton/testing/test_memory_repository.py"
+      - "skeleton/testing/test_mongo_memory_repository.py"
+      - "skeleton/testing/test_memory_writeback.py"
+      - "skeleton/testing/test_memory_projection.py"
+      - "skeleton/testing/test_execution_repository.py"
+      - "skeleton/testing/test_execution_runtime.py"
+      - "skeleton/testing/test_engine_execution_service.py"
+      - "skeleton/testing/test_engine_execution_coordinator.py"
+      - "skeleton/testing/test_ai_golden_journeys.py"
+      - "skeleton/testing/test_engine_routes.py"
+      - "skeleton/testing/test_engine_media_routes.py"
+      - "skeleton/testing/test_engine_process_isolation.py"
+      - "backend/core/operation_stream_transport.py"
+      - "backend/routes/operation_stream.py"
+      - "backend/routes/ai_debugger.py"
+      - "backend/routes/ai_pipeline.py"
+      - "backend/routes/ai_toolkit_enhanced.py"
+      - "backend/tests/test_operation_stream_transport.py"
+      - "backend/tests/test_operation_stream_route.py"
+      - "backend/tests/test_operation_stream_multiworker.py"
+      - "backend/core/engine_client.py"
+      - "backend/routes/image_generation.py"
+      - "backend/core/expressive_tts.py"
+      - "backend/core/engine_text.py"
+      - "backend/core/ai_provider_compat.py"
+      - "backend/services/ai_assistant_svc.py"
+      - "backend/services/game_llm_service.py"
+      - "backend/tests/test_engine_client.py"
+      - "backend/tests/test_engine_http_boundary.py"
+      - "backend/tests/test_engine_live_process_boundary.py"
+      - "backend/tests/test_engine_cross_service_closure.py"
+      - "backend/tests/test_engine_cross_service_boundary.py"
+      - "backend/tests/test_engine_media_client.py"
+      - "backend/tests/test_engine_media_cutover.py"
+      - "backend/tests/test_engine_text_route_cutovers.py"
+      - "backend/tests/test_ai_chat_engine_cutover.py"
+      - "backend/tests/test_ai_chat_conversation_authority.py"
+      - "backend/tests/test_conversation_regeneration.py"
+      - "backend/tests/test_conversation_governance.py"
+      - "skeleton/vault/data_governance.py"
+      - "skeleton/vault/data_lifecycle.py"
+      - "skeleton/vault/governance_registry.py"
+      - "skeleton/vault/governance_audit.py"
+      - "skeleton/vault/lifecycle_adapters.py"
+      - "skeleton/intelligence/admission.py"
+      - "skeleton/intelligence/admission_runtime.py"
+      - "skeleton/intelligence/shared_pressure.py"
+      - "skeleton/intelligence/capacity_planner.py"
+      - "skeleton/agents/swarm_load_shed.py"
+      - "skeleton/testing/test_shared_pressure.py"
+      - "skeleton/intelligence/quota.py"
+      - "skeleton/intelligence/quota_sqlite.py"
+      - "skeleton/testing/test_admission_runtime.py"
+      - "skeleton/testing/test_tenant_quota.py"
+      - "skeleton/testing/test_tenant_quota_sqlite.py"
+      - "skeleton/testing/test_data_governance.py"
+      - "skeleton/testing/test_data_lifecycle.py"
+      - "skeleton/testing/test_governance_registry.py"
+      - "skeleton/testing/test_governance_audit.py"
+      - "skeleton/testing/test_governance_runtime_binding.py"
+      - "skeleton/testing/test_lifecycle_adapters.py"
+      - "skeleton/testing/test_cost_admission.py"
+      - "docker-compose.yml"
+      - "docker-compose.hot.yml"
+      - "frontend/**"
+      - "backend/**"
+      - "backend/tests/test_rag_state_authority.py"
+      - "backend/tests/test_rag_state_repository.py"
+      - "backend/services/rag_state_repository.py"
+      - "backend/services/rag_service.py"
+      - "backend/tests/test_ai_provider_media.py"
+      - "pyproject.toml"
+      - ".env.example"
+      - "scripts/check_app_assembly.py"
+      - "scripts/check_app_compose_parity.py"
+      - "scripts/check_architecture_map.py"
+      - "scripts/check_ai_app_construction.py"
+      - "scripts/check_ai_master_plan.py"
+      - "scripts/check_ai_edge_case_catalog.py"
+      - "scripts/check_ai_exotic_systems_catalog.py"
+      - "scripts/check_ai_p0_edge_case_matrix.py"
+      - "scripts/check_ai_full_edge_case_matrix.py"
+      - "scripts/check_ai_master_build_sequence.py"
+      - "scripts/check_ai_file_tree.py"
+      - "scripts/check_ai_engineering_pass.py"
+      - "scripts/check_ai_engineering_task_matrix.py"
+      - "scripts/check_ai_adversarial_closure.py"
+      - "scripts/check_ai_build_accountability.py"
+      - "scripts/check_ai_execution_frontier.py"
+      - "scripts/check_ai_assistant_control_plane.py"
+      - "scripts/ai_accountability.py"
+      - "scripts/check_capability_interfaces.py"
+      - "scripts/check_state_topology.py"
+      - "scripts/state_recovery_drill.py"
+      - "scripts/check_provider_bootstrap.py"
+      - "machine/manifest.json"
+      - "machine/architecture.json"
+      - "machine/ai_app_construction.json"
+      - "machine/ai_build_queue.json"
+      - "machine/ai_master_plan.json"
+      - "machine/ai_edge_case_catalog.json"
+      - "machine/ai_exotic_systems_catalog.json"
+      - "machine/ai_p0_edge_case_matrix.json"
+      - "machine/ai_full_edge_case_matrix.json"
+      - "machine/ai_master_build_sequence.json"
+      - "machine/ai_file_tree.json"
+      - "machine/ai_engineering_pass.json"
+      - "machine/ai_engineering_task_matrix.json"
+      - "machine/ai_adversarial_closure.json"
+      - "machine/ai_edge_case_priority_queue.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_execution_frontier_20260924.json"
+      - "machine/capability_interfaces.json"
+      - "machine/state_topology.json"
+      - "docs/ARCHITECTURE_MAP.md"
+      - "docs/AI_APP_CONSTRUCTION_MANUAL.md"
+      - "docs/plan/**"
+      - "AGENTS.md"
+      - "CLAUDE.md"
+      - "GEMINI.md"
+      - ".github/copilot-instructions.md"
+      - ".cursor/rules/architecture.mdc"
+      - ".github/workflows/app-assembly.yml"
+      - ".github/workflows/state-recovery-drill.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-assembly-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11.16"
+  NODE_VERSION: "24.20.0"
+
+jobs:
+  assembly-contract:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
+    name: Assembly Contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+
+      - name: Classify assembly scope
+        id: scope
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$BASE_REF"
+          current_base="$(git rev-parse FETCH_HEAD)"
+          mapfile -t changed < <(git diff --name-only "$current_base" "$HEAD_SHA")
+
+          full=false
+          frontend=false
+          for path in "${changed[@]}"; do
+            case "$path" in
+              frontend/*|skeleton/frontier/operation_stream.py|skeleton/frontier/operation_stream_store.py|backend/core/operation_stream_transport.py|backend/routes/operation_stream.py|.github/workflows/app-assembly.yml)
+                frontend=true
+                ;;
+            esac
+
+            case "$path" in
+              docs/plan/*|machine/ai_master_plan.json|machine/ai_edge_case_catalog.json|machine/ai_exotic_systems_catalog.json|machine/ai_p0_edge_case_matrix.json|machine/ai_full_edge_case_matrix.json|machine/ai_master_build_sequence.json|machine/ai_engineering_pass.json|machine/ai_engineering_task_matrix.json|machine/ai_adversarial_closure.json|machine/ai_edge_case_priority_queue.json|machine/ai_build_accountability.json|scripts/check_ai_*.py|scripts/ai_accountability.py|skeleton/testing/test_ai_*.py)
+                ;;
+              *)
+                full=true
+                ;;
+            esac
+          done
+
+          if [ "${#changed[@]}" -eq 0 ]; then
+            full=true
+            frontend=true
+          fi
+
+          echo "full=$full" >> "$GITHUB_OUTPUT"
+          echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
+          printf 'assembly scope: full=%s frontend=%s changed=%s\n' "$full" "$frontend" "${#changed[@]}"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "${{ env.PYTHON_VERSION }}"
+
+      - name: Validate architecture contract
+        run: python scripts/check_architecture_map.py
+
+      - name: Validate AI construction contract
+        run: python scripts/check_ai_app_construction.py
+
+      - name: Validate AI master plan
+        run: python scripts/check_ai_master_plan.py
+
+      - name: Validate AI edge/historical catalogue
+        run: python scripts/check_ai_edge_case_catalog.py
+
+      - name: Validate AI exotic systems catalogue
+        run: python scripts/check_ai_exotic_systems_catalog.py
+
+      - name: Validate P0 edge-case construction matrix
+        run: python scripts/check_ai_p0_edge_case_matrix.py
+
+      - name: Validate full edge-case construction matrix
+        run: python scripts/check_ai_full_edge_case_matrix.py
+
+      - name: Validate master build sequence
+        run: python scripts/check_ai_master_build_sequence.py
+
+      - name: Validate canonical AI file tree
+        run: python scripts/check_ai_file_tree.py
+
+      - name: Validate masterplan engineering pass
+        run: python scripts/check_ai_engineering_pass.py
+
+      - name: Validate AIQ engineering propagation
+        run: python scripts/check_ai_engineering_task_matrix.py
+
+      - name: Validate masterplan adversarial closure
+        run: python scripts/check_ai_adversarial_closure.py
+
+      - name: Validate signed build accountability
+        run: python scripts/check_ai_build_accountability.py
+
+      - name: Validate current execution frontier
+        run: python scripts/check_ai_execution_frontier.py
+
+      - name: Validate assistant control-plane authority
+        run: python scripts/check_ai_assistant_control_plane.py
+
+      - name: Validate capability interface registry
+        run: python scripts/check_capability_interfaces.py
+
+      - name: Validate state authority topology
+        run: python scripts/check_state_topology.py
+
+      - name: Validate mandatory provider bootstrap
+        env:
+          PROVIDER_SURFACE_EVIDENCE: ${{ runner.temp }}/provider-surface-evidence.json
+        run: |
+          python scripts/check_provider_bootstrap.py --evidence-out "$PROVIDER_SURFACE_EVIDENCE"
+          cat "$PROVIDER_SURFACE_EVIDENCE"
+          {
+            echo "### Provider surface evidence"
+            echo
+            echo "Commit: $GITHUB_SHA"
+            echo
+            echo "~~~json"
+            cat "$PROVIDER_SURFACE_EVIDENCE"
+            echo "~~~"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Validate context execution boundary
+        run: python scripts/check_context_execution_boundary.py
+
+      - name: Validate instruction policy boundary
+        run: python scripts/check_instruction_policy_boundary.py
+
+      - name: Install full assembly test runtime
+        if: steps.scope.outputs.full == 'true'
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pytest-asyncio>=0.24,<2"
+          "pydantic==2.13.5"
+          "pydantic-settings==2.15.0"
+          "fastapi==0.141.1"
+          "uvicorn[standard]==0.52.4"
+          "motor==3.7.1"
+          "pymongo==4.18.1"
+          "python-dotenv==1.2.3"
+          "httpx==0.28.1"
+          "matplotlib==3.10.6"
+          "networkx==3.5"
+          "bcrypt==4.3.0"
+          "PyJWT==2.14.0"
+          "email-validator==2.3.0"
+          "loguru==0.7.3"
+
+      - name: Install plan-only test runtime
+        if: steps.scope.outputs.full != 'true'
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pydantic==2.13.5"
+          "pydantic-settings==2.15.0"
+
+      - name: Set up Node
+        if: steps.scope.outputs.frontend == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "${{ env.NODE_VERSION }}"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Install frontend dependencies without third-party lifecycle scripts
+        if: steps.scope.outputs.frontend == 'true'
+        working-directory: frontend
+        run: yarn install --ignore-scripts
+
+      - name: Apply reviewed local node_modules patches
+        if: steps.scope.outputs.frontend == 'true'
+        working-directory: frontend
+        run: node ./scripts/patch-node-modules.js
+
+      - name: Validate assembled frontend
+        if: steps.scope.outputs.frontend == 'true'
+        working-directory: frontend
+        env:
+          EXPO_PUBLIC_BACKEND_URL: http://localhost:8001
+          EXPO_PUBLIC_SKELETON_URL: http://localhost:8010
+        run: |
+          yarn typecheck
+          yarn test:operation-stream
+          yarn test:conversation
+          yarn export:web
+
+      - name: Compile assembly surface
+        if: steps.scope.outputs.full == 'true'
+        run: >-
+          python -m compileall -q
+          skeleton/app skeleton/ai/assistant skeleton/__main__.py skeleton/provider_contract.py
+          skeleton/provider_runtime.py skeleton/contracts/operation.py
+          skeleton/contracts/conversation.py skeleton/contracts/context.py skeleton/contracts/memory_record.py skeleton/contracts/ai_execution.py
+          skeleton/context/compiler.py skeleton/context/compaction.py skeleton/context/policy.py skeleton/context/sources
+          skeleton/skills/tool_contract.py skeleton/skills/tool_runtime.py skeleton/skills/tool_receipt_store.py skeleton/skills/tool_adapters
+          backend/services/tool_registry.py
+          skeleton/persistence/operation_store.py skeleton/persistence/conversation_repository.py skeleton/persistence/memory_repository.py skeleton/persistence/execution_repository.py
+          skeleton/intelligence/execution_runtime.py
+          skeleton/api/engine_authority.py skeleton/api/engine_service.py skeleton/api/engine_runtime.py skeleton/api/engine_routes.py
+          skeleton/memory/policy.py skeleton/memory/writeback.py skeleton/memory/projection.py skeleton/memory/core.py skeleton/memory/vector.py
+          skeleton/persistence/operation_runtime.py skeleton/config/settings.py skeleton/api/server.py
+          skeleton/frontier/operation_stream.py skeleton/frontier/operation_stream_store.py
+          backend/core/operation_stream_transport.py backend/routes/operation_stream.py backend/routes/app_runtime.py
+          backend/core/conversations.py backend/routes/conversations.py
+          backend/gameforge/jeeves/chat_contract.py backend/routes/jeeves_compose.py
+          skeleton/automation/free_model.py
+          skeleton/jeeves/providers.py
+          skeleton/vault/data_governance.py skeleton/vault/data_lifecycle.py
+          skeleton/vault/governance_registry.py skeleton/vault/governance_audit.py skeleton/vault/lifecycle_adapters.py skeleton/intelligence/admission.py
+          skeleton/intelligence/admission_runtime.py skeleton/intelligence/quota.py skeleton/intelligence/quota_sqlite.py
+          backend/core/ai_provider.py backend/core/ai_provider_compat.py backend/core/provider_architecture.py
+          backend/core/engine_client.py backend/core/engine_text.py
+          backend/routes/image_generation.py backend/core/expressive_tts.py
+          backend/routes/ai.py backend/routes/lafs.py backend/routes/llm_router.py
+          backend/services/ai_assistant_svc.py backend/services/ai_hub_svc.py
+          backend/services/rag_state_repository.py backend/services/rag_service.py
+          backend/services/game_llm_service.py backend/routes/llm_router.py
+          scripts/check_ai_app_construction.py scripts/check_ai_master_plan.py scripts/check_ai_edge_case_catalog.py scripts/check_ai_exotic_systems_catalog.py scripts/check_ai_p0_edge_case_matrix.py scripts/check_ai_full_edge_case_matrix.py scripts/check_ai_engineering_pass.py scripts/check_ai_engineering_task_matrix.py scripts/check_ai_adversarial_closure.py scripts/check_ai_build_accountability.py scripts/check_ai_execution_frontier.py scripts/check_ai_assistant_control_plane.py scripts/ai_accountability.py scripts/state_recovery_drill.py scripts/check_capability_interfaces.py
+          scripts/check_state_topology.py scripts/check_provider_bootstrap.py scripts/check_context_execution_boundary.py scripts/check_instruction_policy_boundary.py
+
+      - name: Audit repository-wide assembly contracts
+        if: steps.scope.outputs.full == 'true'
+        run: python scripts/check_app_assembly.py
+
+      - name: Run plan-only contract tests
+        if: steps.scope.outputs.full != 'true'
+        env:
+          PYTHONPATH: "."
+        run: >-
+          python -m pytest -q
+          skeleton/testing/test_architecture_map.py
+          skeleton/testing/test_ai_app_construction.py
+          skeleton/testing/test_ai_master_plan.py
+          skeleton/testing/test_ai_edge_case_catalog.py
+          skeleton/testing/test_ai_exotic_systems_catalog.py
+          skeleton/testing/test_ai_p0_edge_case_matrix.py
+          skeleton/testing/test_ai_full_edge_case_matrix.py
+          skeleton/testing/test_ai_master_build_sequence.py
+          skeleton/testing/test_ai_engineering_pass.py
+          skeleton/testing/test_ai_engineering_task_matrix.py
+          skeleton/testing/test_ai_adversarial_closure.py
+          skeleton/testing/test_ai_build_accountability.py
+          skeleton/testing/test_ai_execution_frontier.py
+          skeleton/testing/test_ai_accountability_cli.py
+
+      - name: Run engine assembly contract tests
+        if: steps.scope.outputs.full == 'true'
+        env:
+          PYTHONPATH: ".:backend"
+        run: >-
+          python -m pytest -q
+          skeleton/testing/test_architecture_map.py
+          skeleton/testing/test_ai_app_construction.py
+          skeleton/testing/test_ai_master_plan.py
+          skeleton/testing/test_ai_edge_case_catalog.py
+          skeleton/testing/test_ai_exotic_systems_catalog.py
+          skeleton/testing/test_ai_p0_edge_case_matrix.py
+          skeleton/testing/test_ai_full_edge_case_matrix.py
+          skeleton/testing/test_ai_engineering_pass.py
+          skeleton/testing/test_ai_engineering_task_matrix.py
+          skeleton/testing/test_ai_adversarial_closure.py
+          skeleton/testing/test_ai_build_accountability.py
+          skeleton/testing/test_ai_execution_frontier.py
+          skeleton/testing/test_ai_accountability_cli.py
+          skeleton/testing/test_ai_assistant_routing.py
+          skeleton/testing/test_ai_assistant_context.py
+          skeleton/testing/test_ai_assistant_tooling.py
+          skeleton/testing/test_ai_assistant_runtime.py
+          skeleton/testing/test_ai_assistant_manifest.py
+          skeleton/testing/test_capability_interfaces.py
+          skeleton/testing/test_state_topology.py
+          skeleton/testing/test_state_recovery_drill.py
+          skeleton/testing/test_provider_contract.py
+          skeleton/testing/test_provider_runtime_schema_parity.py
+          skeleton/testing/test_provider_surface_inventory.py
+          skeleton/testing/test_data_governance.py
+          skeleton/testing/test_data_lifecycle.py
+          skeleton/testing/test_governance_registry.py
+          skeleton/testing/test_governance_audit.py
+          skeleton/testing/test_governance_runtime_binding.py
+          skeleton/testing/test_lifecycle_adapters.py
+          skeleton/testing/test_cost_admission.py
+          skeleton/testing/test_admission_runtime.py
+          skeleton/testing/test_tenant_quota.py
+          skeleton/testing/test_tenant_quota_sqlite.py
+          skeleton/testing/test_actual_usage_metering.py
+          skeleton/testing/test_shared_pressure.py
+          skeleton/testing/test_operation_contract.py
+          skeleton/testing/test_operation_store.py
+          skeleton/testing/test_operation_runtime.py
+          skeleton/testing/test_operation_server_binding.py
+          skeleton/testing/test_conversation_repository.py
+          skeleton/testing/test_memory_repository.py
+          skeleton/testing/test_mongo_memory_repository.py
+          skeleton/testing/test_memory_writeback.py
+          skeleton/testing/test_memory_projection.py
+          skeleton/testing/test_execution_repository.py
+          skeleton/testing/test_execution_runtime.py
+          skeleton/testing/test_engine_execution_service.py
+          skeleton/testing/test_engine_execution_coordinator.py
+          skeleton/testing/test_ai_golden_journeys.py
+          skeleton/testing/test_engine_routes.py
+          skeleton/testing/test_engine_media_routes.py
+          skeleton/testing/test_engine_process_isolation.py
+          skeleton/testing/test_context_compiler.py
+          skeleton/testing/test_tool_runtime.py
+          skeleton/testing/test_tool_receipt_store.py
+          skeleton/testing/test_tool_adapters.py
+          skeleton/testing/test_operation_stream.py
+          skeleton/testing/test_operation_stream_store.py
+          skeleton/testing/test_app_assembly.py
+          skeleton/testing/test_app_plan.py
+          skeleton/testing/test_app_compose_parity.py
+          skeleton/testing/test_app_bootstrap.py
+          skeleton/testing/test_app_runtime_contract.py
+          skeleton/testing/test_app_installer.py
+          skeleton/testing/test_windows_installer.py
+          tests/test_provider_runtime_boundary.py
+          tests/test_context_execution_boundary.py
+          tests/test_instruction_policy_boundary.py
+          tests/test_jeeves_local_provider_policy.py
+          tests/test_jeeves_chat_workspace.py
+
+      - name: Run isolated backend provider contract tests
+        if: steps.scope.outputs.full == 'true'
+        env:
+          PYTHONPATH: ".:backend"
+        run: >-
+          python -m pytest --noconftest -q
+          backend/tests/test_provider_architecture.py
+          backend/tests/test_ai_provider_adapter.py
+          backend/tests/test_ai_provider_media.py
+          backend/tests/test_ai_provider_request_validation.py
+          backend/tests/test_operation_stream_transport.py
+          backend/tests/test_operation_stream_route.py
+          backend/tests/test_operation_stream_multiworker.py
+          backend/tests/test_conversations_api.py
+          backend/tests/test_tool_registry_scoped_adapters.py
+          backend/tests/test_tool_registry_canonical_delegate.py
+          backend/tests/test_engine_client.py
+          backend/tests/test_engine_http_boundary.py
+          backend/tests/test_engine_live_process_boundary.py
+          backend/tests/test_engine_cross_service_closure.py
+          backend/tests/test_engine_cross_service_boundary.py
+          backend/tests/test_engine_media_client.py
+          backend/tests/test_engine_media_cutover.py
+          backend/tests/test_engine_text.py
+          backend/tests/test_ai_provider_compat.py
+          backend/tests/test_game_llm_engine_cutover.py
+          backend/tests/test_llm_router_engine_cutover.py
+          backend/tests/test_engine_text_route_cutovers.py
+          backend/tests/test_ai_chat_engine_cutover.py
+          backend/tests/test_ai_assist_engine_cutover.py
+          backend/tests/test_ai_chat_conversation_authority.py
+          backend/tests/test_ai_chat_conversation_finalization.py
+          backend/tests/test_conversation_regeneration.py
+          backend/tests/test_conversation_regeneration_route.py
+          backend/tests/test_conversation_storage_admission.py
+          backend/tests/test_conversation_governance.py
+          backend/tests/test_model_router.py
+          backend/tests/test_ai_service_provider_convergence.py
+
+      - name: Validate structural assembly
+        if: steps.scope.outputs.full == 'true'
+        env:
+          PYTHONPATH: "."
+        run: |
+          python -m skeleton app check
+          python -m skeleton app plan --json > /tmp/skeleton-app-plan.json
+          python -m json.tool /tmp/skeleton-app-plan.json >/dev/null
+          python -m skeleton app status --json > /tmp/skeleton-app-status.json
+          python -m json.tool /tmp/skeleton-app-status.json >/dev/null
+
+      - name: Validate Compose topology
+        if: steps.scope.outputs.full == 'true'
+        env:
+          MONGO_URL: mongodb://admin:dummy@mongo:27017/tutolage?authSource=admin
+          SKL_MONGO_URI: mongodb://admin:dummy@mongo:27017/skeleton?authSource=admin
+          MONGO_INITDB_ROOT_PASSWORD: dummy
+          JWT_SECRET: not-a-real-jwt-secret
+          SKL_ENGINE_SERVICE_TOKEN: ci-engine-service-token-00000000000000000001
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.yml config --quiet
+          docker compose -f docker-compose.yml --profile "*" config --format json > /tmp/skeleton-compose.json
+          python scripts/check_app_compose_parity.py /tmp/skeleton-compose.json
+          docker compose -f docker-compose.yml -f docker-compose.hot.yml config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.hot.yml --profile "*" config --format json > /tmp/skeleton-compose-hot.json
+          python scripts/check_app_compose_parity.py /tmp/skeleton-compose-hot.json
+          BUILD_TARGET=production \
+          FRONTEND_BUILD_TARGET=production \
+          FRONTEND_CONTAINER_PORT=8080 \
+          ENVIRONMENT=production \
+          NODE_ENV=production \
+          docker compose -f docker-compose.yml config --quiet
+
+      - name: Verify wheel contains assembly manifest
+        if: steps.scope.outputs.full == 'true'
+        run: |
+          python -m pip wheel --no-deps . -w /tmp/wheelhouse
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          wheels = sorted(Path("/tmp/wheelhouse").glob("skeleton-*.whl"))
+          if len(wheels) != 1:
+              raise SystemExit(f"expected one Skeleton wheel, found {len(wheels)}")
+          with ZipFile(wheels[0]) as archive:
+              names = set(archive.namelist())
+          required = {
+              "skeleton/app/__init__.py",
+              "skeleton/app/assembly.py",
+              "skeleton/app/bootstrap.py",
+              "skeleton/app/cli.py",
+              "skeleton/app/health.py",
+              "skeleton/app/installer.py",
+              "skeleton/app/preloader.py",
+              "skeleton/app/setup_runtime.py",
+              "skeleton/app/windows_launcher.py",
+              "skeleton/app/manifest.json",
+              "skeleton/app/plan.py",
+          }
+          missing = sorted(required - names)
+          if missing:
+              raise SystemExit(f"wheel missing assembly payload: {missing}")
+          print(f"verified {wheels[0].name}")
+          PY

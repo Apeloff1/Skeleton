@@ -1,0 +1,137 @@
+{
+  "schema_version": "skeleton.trace.protocol_registry.v1",
+  "registry_version": "0.1.0",
+  "status": "active",
+  "purpose": "Canonical internal protocol-envelope authority and migration inventory for existing internal message protocols.",
+  "masterplan_binding": {
+    "volume_ref": "VOL-131",
+    "title": "Internal Protocols",
+    "required_gap_texts": [
+      "unify protocol envelopes",
+      "bind protocols to tracing"
+    ]
+  },
+  "canonical_envelope": {
+    "source": "skeleton/contracts/protocol.py",
+    "mirror": "skeleton/ai/runtime/contracts/protocol.py",
+    "class": "ProtocolEnvelope",
+    "version_constant": "PROTOCOL_ENVELOPE_VERSION",
+    "required_fields": [
+      "protocol",
+      "protocol_version",
+      "message_id",
+      "kind",
+      "sender",
+      "recipient",
+      "operation_id",
+      "correlation_id",
+      "causation_id",
+      "trace_id",
+      "span_id",
+      "deadline_utc",
+      "idempotency_key",
+      "attempt",
+      "retry_class",
+      "unknown_outcome_policy",
+      "payload"
+    ],
+    "trace_binding": {
+      "source": "skeleton/kernel/trace.py",
+      "fields": [
+        "trace_id",
+        "span_id",
+        "correlation_id",
+        "causation_id",
+        "operation_id"
+      ]
+    }
+  },
+  "policy": {
+    "canonical_rule": "New internal cross-boundary protocols use ProtocolEnvelope or explicitly declare an adapter into it.",
+    "deadline_rule": "Deadline metadata is preserved end-to-end and never widened by a downstream hop.",
+    "retry_rule": "Retry class, idempotency key, and unknown-outcome policy are explicit per message.",
+    "tracing_rule": "Operation, trace, correlation, and causation identity survive serialization and transport adapters."
+  },
+  "protocols": [
+    {
+      "protocol_id": "PROTO-CANONICAL",
+      "source": "skeleton/contracts/protocol.py",
+      "status": "canonical",
+      "adapter_required": false,
+      "native_fields": [
+        "operation_id",
+        "correlation_id",
+        "causation_id",
+        "trace_id",
+        "span_id",
+        "deadline_utc",
+        "idempotency_key"
+      ]
+    },
+    {
+      "protocol_id": "PROTO-WORKER-CONTROL",
+      "source": "skeleton/shells/worker_protocol.py",
+      "status": "existing-adapter",
+      "adapter_required": true,
+      "native_fields": [
+        "message_id",
+        "protocol_version",
+        "correlation_id",
+        "sequence"
+      ],
+      "missing_canonical_fields": [
+        "operation_id",
+        "causation_id",
+        "trace_id",
+        "span_id",
+        "deadline_utc",
+        "idempotency_key",
+        "retry_class",
+        "unknown_outcome_policy"
+      ]
+    },
+    {
+      "protocol_id": "PROTO-SHELL-AI-MODEL",
+      "source": "skeleton/shells/ai/protocol.py",
+      "status": "existing-adapter",
+      "adapter_required": true,
+      "native_fields": [
+        "request_id",
+        "protocol_version"
+      ],
+      "missing_canonical_fields": [
+        "operation_id",
+        "correlation_id",
+        "causation_id",
+        "trace_id",
+        "span_id",
+        "deadline_utc",
+        "idempotency_key",
+        "retry_class",
+        "unknown_outcome_policy"
+      ]
+    },
+    {
+      "protocol_id": "PROTO-REPLICATION",
+      "source": "skeleton/distributed/network/_replication_protocol.py",
+      "status": "existing-adapter",
+      "adapter_required": true,
+      "native_fields": [
+        "schema_version",
+        "sequence",
+        "checksum"
+      ],
+      "missing_canonical_fields": [
+        "operation_id",
+        "correlation_id",
+        "causation_id",
+        "trace_id",
+        "span_id",
+        "deadline_utc",
+        "idempotency_key",
+        "retry_class",
+        "unknown_outcome_policy"
+      ]
+    }
+  ]
+}

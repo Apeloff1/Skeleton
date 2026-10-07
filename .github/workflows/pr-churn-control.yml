@@ -1,0 +1,50 @@
+name: PR Churn Control
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/pr-churn-control.yml'
+      - 'backend/scripts/pr_churn_control.py'
+      - 'backend/tests/test_pr_churn_control.py'
+      - 'scripts/quality-gates.sh'
+  schedule:
+    - cron: '*/5 * * * *'
+
+permissions: {}
+
+# One trusted default-branch sweep at a time. Churn is coalesced rather than
+# amplified by killing a live controller whenever another merge lands.
+concurrency:
+  group: pr-churn-control-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  retire-explicit-supersedence:
+    # Churn recovery must use the broad hosted pool rather than depending on the
+    # scarcer ARM lane it may need to recover when repository fanout is saturated.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      TRUSTED_AUTHOR: ${{ github.repository_owner }}
+      MAX_MUTATIONS: '100'
+    steps:
+      - name: Check out trusted default-branch control plane
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Retire only explicitly superseded owner PRs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python backend/scripts/pr_churn_control.py

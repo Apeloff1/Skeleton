@@ -1,0 +1,113 @@
+name: P1 Scope Freeze Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_p1_terminal_closure.json"
+      - "machine/ai_scope_freeze_adrs.json"
+      - "scripts/check_ai_master_plan.py"
+      - "scripts/check_ai_scope_freeze.py"
+      - "skeleton/testing/test_ai_master_plan.py"
+      - "skeleton/testing/test_architecture_scope_freeze.py"
+      - "docs/plan/MASTER_PLAN.md"
+      - ".github/workflows/p1-scope-freeze.yml"
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_p1_terminal_closure.json"
+      - "machine/ai_scope_freeze_adrs.json"
+      - "scripts/check_ai_master_plan.py"
+      - "scripts/check_ai_scope_freeze.py"
+      - "skeleton/testing/test_ai_master_plan.py"
+      - "skeleton/testing/test_architecture_scope_freeze.py"
+      - "docs/plan/MASTER_PLAN.md"
+      - ".github/workflows/p1-scope-freeze.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Evidence-critical: exact-head signing verification must survive unrelated main churn.
+  group: p1-scope-freeze-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  validate:
+    name: Validate P1 architecture scope freeze
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused validation runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pydantic[email]>=2.13.5"
+          "pydantic-settings>=2.15.0"
+
+      - name: Validate canonical masterplan
+        run: python scripts/check_ai_master_plan.py
+
+      - name: Validate scope-freeze ADR authority
+        run: >-
+          python scripts/check_ai_scope_freeze.py
+          --print-summary
+          --out .p1-scope-freeze.json
+
+      - name: Run scope-freeze mutation regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_ai_master_plan.py
+          skeleton/testing/test_architecture_scope_freeze.py
+
+      - name: Assert zero applied P1 scope exceptions
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(
+              Path(".p1-scope-freeze.json").read_text(encoding="utf-8")
+          )
+          if report["valid"] is not True:
+              raise SystemExit("scope-freeze report is not valid")
+          if report["frozen_last_top_level_volume"] != 420:
+              raise SystemExit("P1 breadth boundary drifted")
+          if report["frozen_volume_count"] != 421:
+              raise SystemExit("P1 volume count drifted")
+          if report["applied_count"] != 0:
+              raise SystemExit("P1 cannot carry applied top-level scope exceptions")
+          for field in ("master_plan_digest", "adr_register_digest"):
+              if len(report.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print(
+              "P1 scope freeze OK:",
+              report["master_plan_digest"],
+              report["adr_register_digest"],
+          )
+          PY

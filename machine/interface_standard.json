@@ -1,0 +1,1778 @@
+{
+  "schema_version": "skeleton.trace.interface_standard.v1",
+  "standard_version": "0.1.0",
+  "status": "active",
+  "purpose": "Machine-readable interface design rules bound to the canonical capability interface ledger and schema registry.",
+  "masterplan_binding": {
+    "volume_ref": "VOL-128",
+    "title": "Interface Design Standard",
+    "required_gap_texts": [
+      "codify interface lint rules",
+      "bind public contracts to schema registry"
+    ]
+  },
+  "sources": {
+    "interfaces": "machine/capability_interfaces.json",
+    "schemas": "machine/ai_runtime_schemas.json",
+    "contract_conformance": "machine/contract_conformance.json"
+  },
+  "rules": [
+    {
+      "rule_id": "IFACE-OWNER",
+      "description": "source_owner/target_owner and source_zone/target_zone are explicit",
+      "severity": "blocking"
+    },
+    {
+      "rule_id": "IFACE-CONTRACT-SURFACE",
+      "description": "target_contract_surface is non-empty",
+      "severity": "blocking"
+    },
+    {
+      "rule_id": "IFACE-FAILURE",
+      "description": "target_failure_contract is non-empty and explicit",
+      "severity": "blocking"
+    },
+    {
+      "rule_id": "IFACE-COMPAT",
+      "description": "cross-boundary interfaces are versioned through schema/compatibility registry before incompatible change",
+      "severity": "blocking"
+    },
+    {
+      "rule_id": "IFACE-ADAPTER",
+      "description": "provider/framework implementation types do not become canonical contract identities",
+      "severity": "blocking"
+    },
+    {
+      "rule_id": "IFACE-CANCEL",
+      "description": "cancellation/unknown outcomes are explicit where operation semantics admit side effects",
+      "severity": "blocking"
+    }
+  ],
+  "interface_bindings": [
+    {
+      "interface_id": "acceptance_target:deployment-release->application-api",
+      "relation": "acceptance_target",
+      "source_plane": "deployment-release",
+      "target_plane": "application-api",
+      "contract_surface": [
+        "versioned API",
+        "request bounds",
+        "idempotency",
+        "problem details",
+        "health/readiness",
+        "ConversationThread",
+        "ConversationMessage",
+        "conversation append/read/branch/delete/export"
+      ],
+      "failure_contract": "typed 4xx/5xx without secret leakage",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "acceptance_target:deployment-release->engine-api",
+      "relation": "acceptance_target",
+      "source_plane": "deployment-release",
+      "target_plane": "engine-api",
+      "contract_surface": [
+        "/api/v1 versioning",
+        "health/live",
+        "health/ready",
+        "engine operation contracts",
+        "AI execution submit",
+        "AI execution status/result",
+        "AI execution cancel",
+        "delegated authority envelope",
+        "idempotent service command",
+        "operation event replay",
+        "capability readiness endpoint/projection"
+      ],
+      "failure_contract": "typed unavailable/denied/conflict response with no local backend provider fallback",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "acceptance_target:deployment-release->product-experience",
+      "relation": "acceptance_target",
+      "source_plane": "deployment-release",
+      "target_plane": "product-experience",
+      "contract_surface": [
+        "canonical endpoint resolver",
+        "stream/event reducer",
+        "optimistic state policy",
+        "accessible error state",
+        "canonical conversation client",
+        "operation event reducer",
+        "replay cursor",
+        "approval interaction",
+        "cancel interaction",
+        "golden journey observability",
+        "safe response renderer",
+        "qualified/degraded rendering",
+        "interactive steering controls",
+        "capability readiness projection"
+      ],
+      "failure_contract": "recoverable user-facing degraded state",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:application-api->artifact-files",
+      "relation": "runtime_dependency",
+      "source_plane": "application-api",
+      "target_plane": "artifact-files",
+      "contract_surface": [
+        "artifact id",
+        "content hash",
+        "metadata",
+        "scan state",
+        "retention",
+        "ArtifactRecord",
+        "artifact lifecycle",
+        "scan/quarantine receipt",
+        "bounded extraction",
+        "authorized artifact reference"
+      ],
+      "failure_contract": "quarantine/reject unsafe artifacts and preserve canonical lifecycle metadata",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:application-api->identity",
+      "relation": "runtime_dependency",
+      "source_plane": "application-api",
+      "target_plane": "identity",
+      "contract_surface": [
+        "principal",
+        "tenant",
+        "scope/capability",
+        "token/session lifecycle",
+        "AuthorityContext",
+        "delegated authority subset",
+        "auth strength",
+        "tool/action scope"
+      ],
+      "failure_contract": "deny protected operations",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:application-api->memory",
+      "relation": "runtime_dependency",
+      "source_plane": "application-api",
+      "target_plane": "memory",
+      "contract_surface": [
+        "memory record",
+        "namespace",
+        "retention class",
+        "write/read/delete",
+        "provenance",
+        "MemoryRecord",
+        "MemoryWriteProposal",
+        "MemoryWriteReceipt",
+        "MemoryContract",
+        "RetrieverContract",
+        "memory namespace policy",
+        "memory retention/version contract"
+      ],
+      "failure_contract": "memory miss/degraded continuity without cross-tenant fallback or promotion of volatile state",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:application-api->model-provider",
+      "relation": "runtime_dependency",
+      "source_plane": "application-api",
+      "target_plane": "model-provider",
+      "contract_surface": [
+        "ProviderRequest",
+        "ProviderResponse",
+        "ProviderAdapter",
+        "provider architecture receipt",
+        "governance decision receipt",
+        "admission decision receipt",
+        "single credential-bearing runtime owner",
+        "sync/async transport parity",
+        "compatibility surfaces contain no provider credentials",
+        "ProviderImageRequest",
+        "ProviderImageResponse",
+        "ProviderSpeechRequest",
+        "ProviderSpeechResponse",
+        "governed media operations share provider credentials and policy receipts with text generation",
+        "ProviderToolDefinition",
+        "ProviderToolCall",
+        "ProviderStructuredOutputSpec",
+        "ProviderUsage",
+        "ProviderFinishReason",
+        "ProviderStreamDelta",
+        "provider cancellation/deadline propagation"
+      ],
+      "failure_contract": "provider unavailable/invalid/policy-denied with normalized receipt; malformed structured/tool output never reaches orchestration",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:application-api->orchestration",
+      "relation": "runtime_dependency",
+      "source_plane": "application-api",
+      "target_plane": "orchestration",
+      "contract_surface": [
+        "task",
+        "plan",
+        "step",
+        "checkpoint",
+        "result",
+        "cancellation",
+        "AIExecutionRequest",
+        "AgentTurn",
+        "ExecutionCheckpoint",
+        "AIExecutionResult",
+        "StopPolicy",
+        "ResumeToken",
+        "ChildExecutionRequest",
+        "child join policy",
+        "interactive steering command"
+      ],
+      "failure_contract": "checkpoint and stop safely",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:application-api->retrieval",
+      "relation": "runtime_dependency",
+      "source_plane": "application-api",
+      "target_plane": "retrieval",
+      "contract_surface": [
+        "document",
+        "chunk",
+        "index",
+        "query",
+        "ranked evidence",
+        "citation",
+        "RetrievalQueryRequest",
+        "EvidenceReference",
+        "authorized source scope",
+        "source/version provenance",
+        "citation metadata"
+      ],
+      "failure_contract": "degrade to authorized fallback or explicit insufficient evidence; never widen ACL or invent citations",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:artifact-files->data-persistence",
+      "relation": "runtime_dependency",
+      "source_plane": "artifact-files",
+      "target_plane": "data-persistence",
+      "contract_surface": [
+        "transaction",
+        "repository",
+        "migration",
+        "backup/restore",
+        "health"
+      ],
+      "failure_contract": "read-only/degraded mode where safe",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:artifact-files->governance",
+      "relation": "runtime_dependency",
+      "source_plane": "artifact-files",
+      "target_plane": "governance",
+      "contract_surface": [
+        "data class",
+        "retention rule",
+        "deletion request",
+        "export request",
+        "provider privacy policy",
+        "ProviderTransferRequest",
+        "ProviderTransferDecision",
+        "provider transfer receipt"
+      ],
+      "failure_contract": "block transfer when classification/policy unknown",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:artifact-files->identity",
+      "relation": "runtime_dependency",
+      "source_plane": "artifact-files",
+      "target_plane": "identity",
+      "contract_surface": [
+        "principal",
+        "tenant",
+        "scope/capability",
+        "token/session lifecycle",
+        "AuthorityContext",
+        "delegated authority subset",
+        "auth strength",
+        "tool/action scope"
+      ],
+      "failure_contract": "deny protected operations",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:artifact-files->security-safety",
+      "relation": "runtime_dependency",
+      "source_plane": "artifact-files",
+      "target_plane": "security-safety",
+      "contract_surface": [
+        "policy decision",
+        "risk class",
+        "quarantine/deny",
+        "security receipt",
+        "SafetyDecisionReceipt",
+        "content quarantine",
+        "output safety gate"
+      ],
+      "failure_contract": "deny/quarantine with sanitized audit",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:configuration-secrets->foundation",
+      "relation": "runtime_dependency",
+      "source_plane": "configuration-secrets",
+      "target_plane": "foundation",
+      "contract_surface": [
+        "stable error types",
+        "event/capability identity",
+        "deterministic serialization",
+        "CapabilityManifest identity/version"
+      ],
+      "failure_contract": "engine does not boot",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:cost-capacity->jobs-durability",
+      "relation": "runtime_dependency",
+      "source_plane": "cost-capacity",
+      "target_plane": "jobs-durability",
+      "contract_surface": [
+        "job",
+        "lease",
+        "checkpoint",
+        "retry policy",
+        "dead-letter/recovery",
+        "fair queue class",
+        "tenant concurrency",
+        "recovery reserve",
+        "queue age policy",
+        "child execution lease",
+        "parent/child cancellation propagation"
+      ],
+      "failure_contract": "defer/shed bounded new work while preserving committed recovery/finalization",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:cost-capacity->model-routing",
+      "relation": "runtime_dependency",
+      "source_plane": "cost-capacity",
+      "target_plane": "model-routing",
+      "contract_surface": [
+        "ModelEndpoint",
+        "RouteRequest",
+        "RouteDecision",
+        "endpoint telemetry",
+        "RouteDecisionReceipt",
+        "capability/privacy/budget/deadline filter",
+        "fallback ceiling",
+        "no-route result"
+      ],
+      "failure_contract": "return typed no-route/degraded decision; never silently weaken required semantics",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:cost-capacity->observability",
+      "relation": "runtime_dependency",
+      "source_plane": "cost-capacity",
+      "target_plane": "observability",
+      "contract_surface": [
+        "trace id",
+        "request id",
+        "tenant-safe log fields",
+        "metric",
+        "span",
+        "SLO",
+        "cross-plane trace correlation",
+        "operation timeline",
+        "redaction policy",
+        "unsampled critical receipts",
+        "AI usage/quality metrics"
+      ],
+      "failure_contract": "telemetry may degrade but must not leak secrets or make canonical state depend on telemetry availability",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:data-persistence->configuration-secrets",
+      "relation": "runtime_dependency",
+      "source_plane": "data-persistence",
+      "target_plane": "configuration-secrets",
+      "contract_surface": [
+        "typed settings",
+        "secret reference",
+        "configuration snapshot"
+      ],
+      "failure_contract": "fail startup or disable optional capability",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:data-persistence->foundation",
+      "relation": "runtime_dependency",
+      "source_plane": "data-persistence",
+      "target_plane": "foundation",
+      "contract_surface": [
+        "stable error types",
+        "event/capability identity",
+        "deterministic serialization",
+        "CapabilityManifest identity/version"
+      ],
+      "failure_contract": "engine does not boot",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:deployment-release->engine-api",
+      "relation": "runtime_dependency",
+      "source_plane": "deployment-release",
+      "target_plane": "engine-api",
+      "contract_surface": [
+        "/api/v1 versioning",
+        "health/live",
+        "health/ready",
+        "engine operation contracts",
+        "AI execution submit",
+        "AI execution status/result",
+        "AI execution cancel",
+        "delegated authority envelope",
+        "idempotent service command",
+        "operation event replay",
+        "capability readiness endpoint/projection"
+      ],
+      "failure_contract": "typed unavailable/denied/conflict response with no local backend provider fallback",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:deployment-release->evaluation",
+      "relation": "runtime_dependency",
+      "source_plane": "deployment-release",
+      "target_plane": "evaluation",
+      "contract_surface": [
+        "eval case",
+        "dataset version",
+        "metric",
+        "threshold",
+        "promotion verdict",
+        "capability baseline",
+        "scenario harness",
+        "golden journey evidence",
+        "regression budget",
+        "flakiness record"
+      ],
+      "failure_contract": "block promotion when required regression/evidence gates fail",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:deployment-release->observability",
+      "relation": "runtime_dependency",
+      "source_plane": "deployment-release",
+      "target_plane": "observability",
+      "contract_surface": [
+        "trace id",
+        "request id",
+        "tenant-safe log fields",
+        "metric",
+        "span",
+        "SLO",
+        "cross-plane trace correlation",
+        "operation timeline",
+        "redaction policy",
+        "unsampled critical receipts",
+        "AI usage/quality metrics"
+      ],
+      "failure_contract": "telemetry may degrade but must not leak secrets or make canonical state depend on telemetry availability",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:deployment-release->resilience",
+      "relation": "runtime_dependency",
+      "source_plane": "deployment-release",
+      "target_plane": "resilience",
+      "contract_surface": [
+        "retry policy",
+        "circuit state",
+        "degradation mode",
+        "recovery plan"
+      ],
+      "failure_contract": "bounded degradation",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:deployment-release->security-safety",
+      "relation": "runtime_dependency",
+      "source_plane": "deployment-release",
+      "target_plane": "security-safety",
+      "contract_surface": [
+        "policy decision",
+        "risk class",
+        "quarantine/deny",
+        "security receipt",
+        "SafetyDecisionReceipt",
+        "content quarantine",
+        "output safety gate"
+      ],
+      "failure_contract": "deny/quarantine with sanitized audit",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:engine-api->identity",
+      "relation": "runtime_dependency",
+      "source_plane": "engine-api",
+      "target_plane": "identity",
+      "contract_surface": [
+        "principal",
+        "tenant",
+        "scope/capability",
+        "token/session lifecycle",
+        "AuthorityContext",
+        "delegated authority subset",
+        "auth strength",
+        "tool/action scope"
+      ],
+      "failure_contract": "deny protected operations",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:engine-api->memory",
+      "relation": "runtime_dependency",
+      "source_plane": "engine-api",
+      "target_plane": "memory",
+      "contract_surface": [
+        "memory record",
+        "namespace",
+        "retention class",
+        "write/read/delete",
+        "provenance",
+        "MemoryRecord",
+        "MemoryWriteProposal",
+        "MemoryWriteReceipt",
+        "MemoryContract",
+        "RetrieverContract",
+        "memory namespace policy",
+        "memory retention/version contract"
+      ],
+      "failure_contract": "memory miss/degraded continuity without cross-tenant fallback or promotion of volatile state",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:engine-api->observability",
+      "relation": "runtime_dependency",
+      "source_plane": "engine-api",
+      "target_plane": "observability",
+      "contract_surface": [
+        "trace id",
+        "request id",
+        "tenant-safe log fields",
+        "metric",
+        "span",
+        "SLO",
+        "cross-plane trace correlation",
+        "operation timeline",
+        "redaction policy",
+        "unsampled critical receipts",
+        "AI usage/quality metrics"
+      ],
+      "failure_contract": "telemetry may degrade but must not leak secrets or make canonical state depend on telemetry availability",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:engine-api->orchestration",
+      "relation": "runtime_dependency",
+      "source_plane": "engine-api",
+      "target_plane": "orchestration",
+      "contract_surface": [
+        "task",
+        "plan",
+        "step",
+        "checkpoint",
+        "result",
+        "cancellation",
+        "AIExecutionRequest",
+        "AgentTurn",
+        "ExecutionCheckpoint",
+        "AIExecutionResult",
+        "StopPolicy",
+        "ResumeToken",
+        "ChildExecutionRequest",
+        "child join policy",
+        "interactive steering command"
+      ],
+      "failure_contract": "checkpoint and stop safely",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:engine-api->retrieval",
+      "relation": "runtime_dependency",
+      "source_plane": "engine-api",
+      "target_plane": "retrieval",
+      "contract_surface": [
+        "document",
+        "chunk",
+        "index",
+        "query",
+        "ranked evidence",
+        "citation",
+        "RetrievalQueryRequest",
+        "EvidenceReference",
+        "authorized source scope",
+        "source/version provenance",
+        "citation metadata"
+      ],
+      "failure_contract": "degrade to authorized fallback or explicit insufficient evidence; never widen ACL or invent citations",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:evaluation->observability",
+      "relation": "runtime_dependency",
+      "source_plane": "evaluation",
+      "target_plane": "observability",
+      "contract_surface": [
+        "trace id",
+        "request id",
+        "tenant-safe log fields",
+        "metric",
+        "span",
+        "SLO",
+        "cross-plane trace correlation",
+        "operation timeline",
+        "redaction policy",
+        "unsampled critical receipts",
+        "AI usage/quality metrics"
+      ],
+      "failure_contract": "telemetry may degrade but must not leak secrets or make canonical state depend on telemetry availability",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:evaluation->reasoning-verification",
+      "relation": "runtime_dependency",
+      "source_plane": "evaluation",
+      "target_plane": "reasoning-verification",
+      "contract_surface": [
+        "verdict",
+        "confidence",
+        "evidence",
+        "repair instruction",
+        "VerificationRequest",
+        "VerificationReceipt",
+        "ClaimRecord",
+        "EvidenceReference",
+        "PostconditionCheck",
+        "verification policy",
+        "repair directive"
+      ],
+      "failure_contract": "qualify/abstain/repair/block according to risk policy; never silently promote unsupported high-impact output",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:feedback-learning->evaluation",
+      "relation": "runtime_dependency",
+      "source_plane": "feedback-learning",
+      "target_plane": "evaluation",
+      "contract_surface": [
+        "eval case",
+        "dataset version",
+        "metric",
+        "threshold",
+        "promotion verdict",
+        "capability baseline",
+        "scenario harness",
+        "golden journey evidence",
+        "regression budget",
+        "flakiness record"
+      ],
+      "failure_contract": "block promotion when required regression/evidence gates fail",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:feedback-learning->governance",
+      "relation": "runtime_dependency",
+      "source_plane": "feedback-learning",
+      "target_plane": "governance",
+      "contract_surface": [
+        "data class",
+        "retention rule",
+        "deletion request",
+        "export request",
+        "provider privacy policy",
+        "ProviderTransferRequest",
+        "ProviderTransferDecision",
+        "provider transfer receipt"
+      ],
+      "failure_contract": "block transfer when classification/policy unknown",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:feedback-learning->observability",
+      "relation": "runtime_dependency",
+      "source_plane": "feedback-learning",
+      "target_plane": "observability",
+      "contract_surface": [
+        "trace id",
+        "request id",
+        "tenant-safe log fields",
+        "metric",
+        "span",
+        "SLO",
+        "cross-plane trace correlation",
+        "operation timeline",
+        "redaction policy",
+        "unsampled critical receipts",
+        "AI usage/quality metrics"
+      ],
+      "failure_contract": "telemetry may degrade but must not leak secrets or make canonical state depend on telemetry availability",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:governance->configuration-secrets",
+      "relation": "runtime_dependency",
+      "source_plane": "governance",
+      "target_plane": "configuration-secrets",
+      "contract_surface": [
+        "typed settings",
+        "secret reference",
+        "configuration snapshot"
+      ],
+      "failure_contract": "fail startup or disable optional capability",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:governance->identity",
+      "relation": "runtime_dependency",
+      "source_plane": "governance",
+      "target_plane": "identity",
+      "contract_surface": [
+        "principal",
+        "tenant",
+        "scope/capability",
+        "token/session lifecycle",
+        "AuthorityContext",
+        "delegated authority subset",
+        "auth strength",
+        "tool/action scope"
+      ],
+      "failure_contract": "deny protected operations",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:identity->foundation",
+      "relation": "runtime_dependency",
+      "source_plane": "identity",
+      "target_plane": "foundation",
+      "contract_surface": [
+        "stable error types",
+        "event/capability identity",
+        "deterministic serialization",
+        "CapabilityManifest identity/version"
+      ],
+      "failure_contract": "engine does not boot",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:jobs-durability->data-persistence",
+      "relation": "runtime_dependency",
+      "source_plane": "jobs-durability",
+      "target_plane": "data-persistence",
+      "contract_surface": [
+        "transaction",
+        "repository",
+        "migration",
+        "backup/restore",
+        "health"
+      ],
+      "failure_contract": "read-only/degraded mode where safe",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:jobs-durability->identity",
+      "relation": "runtime_dependency",
+      "source_plane": "jobs-durability",
+      "target_plane": "identity",
+      "contract_surface": [
+        "principal",
+        "tenant",
+        "scope/capability",
+        "token/session lifecycle",
+        "AuthorityContext",
+        "delegated authority subset",
+        "auth strength",
+        "tool/action scope"
+      ],
+      "failure_contract": "deny protected operations",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:jobs-durability->observability",
+      "relation": "runtime_dependency",
+      "source_plane": "jobs-durability",
+      "target_plane": "observability",
+      "contract_surface": [
+        "trace id",
+        "request id",
+        "tenant-safe log fields",
+        "metric",
+        "span",
+        "SLO",
+        "cross-plane trace correlation",
+        "operation timeline",
+        "redaction policy",
+        "unsampled critical receipts",
+        "AI usage/quality metrics"
+      ],
+      "failure_contract": "telemetry may degrade but must not leak secrets or make canonical state depend on telemetry availability",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:memory->data-persistence",
+      "relation": "runtime_dependency",
+      "source_plane": "memory",
+      "target_plane": "data-persistence",
+      "contract_surface": [
+        "transaction",
+        "repository",
+        "migration",
+        "backup/restore",
+        "health"
+      ],
+      "failure_contract": "read-only/degraded mode where safe",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:memory->foundation",
+      "relation": "runtime_dependency",
+      "source_plane": "memory",
+      "target_plane": "foundation",
+      "contract_surface": [
+        "stable error types",
+        "event/capability identity",
+        "deterministic serialization",
+        "CapabilityManifest identity/version"
+      ],
+      "failure_contract": "engine does not boot",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:memory->governance",
+      "relation": "runtime_dependency",
+      "source_plane": "memory",
+      "target_plane": "governance",
+      "contract_surface": [
+        "data class",
+        "retention rule",
+        "deletion request",
+        "export request",
+        "provider privacy policy",
+        "ProviderTransferRequest",
+        "ProviderTransferDecision",
+        "provider transfer receipt"
+      ],
+      "failure_contract": "block transfer when classification/policy unknown",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:memory->identity",
+      "relation": "runtime_dependency",
+      "source_plane": "memory",
+      "target_plane": "identity",
+      "contract_surface": [
+        "principal",
+        "tenant",
+        "scope/capability",
+        "token/session lifecycle",
+        "AuthorityContext",
+        "delegated authority subset",
+        "auth strength",
+        "tool/action scope"
+      ],
+      "failure_contract": "deny protected operations",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:model-provider->configuration-secrets",
+      "relation": "runtime_dependency",
+      "source_plane": "model-provider",
+      "target_plane": "configuration-secrets",
+      "contract_surface": [
+        "typed settings",
+        "secret reference",
+        "configuration snapshot"
+      ],
+      "failure_contract": "fail startup or disable optional capability",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:model-provider->foundation",
+      "relation": "runtime_dependency",
+      "source_plane": "model-provider",
+      "target_plane": "foundation",
+      "contract_surface": [
+        "stable error types",
+        "event/capability identity",
+        "deterministic serialization",
+        "CapabilityManifest identity/version"
+      ],
+      "failure_contract": "engine does not boot",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:model-routing->model-provider",
+      "relation": "runtime_dependency",
+      "source_plane": "model-routing",
+      "target_plane": "model-provider",
+      "contract_surface": [
+        "ProviderRequest",
+        "ProviderResponse",
+        "ProviderAdapter",
+        "provider architecture receipt",
+        "governance decision receipt",
+        "admission decision receipt",
+        "single credential-bearing runtime owner",
+        "sync/async transport parity",
+        "compatibility surfaces contain no provider credentials",
+        "ProviderImageRequest",
+        "ProviderImageResponse",
+        "ProviderSpeechRequest",
+        "ProviderSpeechResponse",
+        "governed media operations share provider credentials and policy receipts with text generation",
+        "ProviderToolDefinition",
+        "ProviderToolCall",
+        "ProviderStructuredOutputSpec",
+        "ProviderUsage",
+        "ProviderFinishReason",
+        "ProviderStreamDelta",
+        "provider cancellation/deadline propagation"
+      ],
+      "failure_contract": "provider unavailable/invalid/policy-denied with normalized receipt; malformed structured/tool output never reaches orchestration",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:model-routing->observability",
+      "relation": "runtime_dependency",
+      "source_plane": "model-routing",
+      "target_plane": "observability",
+      "contract_surface": [
+        "trace id",
+        "request id",
+        "tenant-safe log fields",
+        "metric",
+        "span",
+        "SLO",
+        "cross-plane trace correlation",
+        "operation timeline",
+        "redaction policy",
+        "unsampled critical receipts",
+        "AI usage/quality metrics"
+      ],
+      "failure_contract": "telemetry may degrade but must not leak secrets or make canonical state depend on telemetry availability",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:observability->foundation",
+      "relation": "runtime_dependency",
+      "source_plane": "observability",
+      "target_plane": "foundation",
+      "contract_surface": [
+        "stable error types",
+        "event/capability identity",
+        "deterministic serialization",
+        "CapabilityManifest identity/version"
+      ],
+      "failure_contract": "engine does not boot",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:operator-control->application-api",
+      "relation": "runtime_dependency",
+      "source_plane": "operator-control",
+      "target_plane": "application-api",
+      "contract_surface": [
+        "versioned API",
+        "request bounds",
+        "idempotency",
+        "problem details",
+        "health/readiness",
+        "ConversationThread",
+        "ConversationMessage",
+        "conversation append/read/branch/delete/export"
+      ],
+      "failure_contract": "typed 4xx/5xx without secret leakage",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:operator-control->deployment-release",
+      "relation": "runtime_dependency",
+      "source_plane": "operator-control",
+      "target_plane": "deployment-release",
+      "contract_surface": [
+        "build artifact",
+        "release manifest",
+        "preflight",
+        "health/readiness",
+        "rollback",
+        "release evidence bundle",
+        "provider smoke",
+        "canary gate",
+        "rollback plan",
+        "contract compatibility evidence"
+      ],
+      "failure_contract": "hold/rollback release while preserving canonical user and operation state",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:operator-control->observability",
+      "relation": "runtime_dependency",
+      "source_plane": "operator-control",
+      "target_plane": "observability",
+      "contract_surface": [
+        "trace id",
+        "request id",
+        "tenant-safe log fields",
+        "metric",
+        "span",
+        "SLO",
+        "cross-plane trace correlation",
+        "operation timeline",
+        "redaction policy",
+        "unsampled critical receipts",
+        "AI usage/quality metrics"
+      ],
+      "failure_contract": "telemetry may degrade but must not leak secrets or make canonical state depend on telemetry availability",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:operator-control->security-safety",
+      "relation": "runtime_dependency",
+      "source_plane": "operator-control",
+      "target_plane": "security-safety",
+      "contract_surface": [
+        "policy decision",
+        "risk class",
+        "quarantine/deny",
+        "security receipt",
+        "SafetyDecisionReceipt",
+        "content quarantine",
+        "output safety gate"
+      ],
+      "failure_contract": "deny/quarantine with sanitized audit",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:orchestration->foundation",
+      "relation": "runtime_dependency",
+      "source_plane": "orchestration",
+      "target_plane": "foundation",
+      "contract_surface": [
+        "stable error types",
+        "event/capability identity",
+        "deterministic serialization",
+        "CapabilityManifest identity/version"
+      ],
+      "failure_contract": "engine does not boot",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:orchestration->memory",
+      "relation": "runtime_dependency",
+      "source_plane": "orchestration",
+      "target_plane": "memory",
+      "contract_surface": [
+        "memory record",
+        "namespace",
+        "retention class",
+        "write/read/delete",
+        "provenance",
+        "MemoryRecord",
+        "MemoryWriteProposal",
+        "MemoryWriteReceipt",
+        "MemoryContract",
+        "RetrieverContract",
+        "memory namespace policy",
+        "memory retention/version contract"
+      ],
+      "failure_contract": "memory miss/degraded continuity without cross-tenant fallback or promotion of volatile state",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:orchestration->model-routing",
+      "relation": "runtime_dependency",
+      "source_plane": "orchestration",
+      "target_plane": "model-routing",
+      "contract_surface": [
+        "ModelEndpoint",
+        "RouteRequest",
+        "RouteDecision",
+        "endpoint telemetry",
+        "RouteDecisionReceipt",
+        "capability/privacy/budget/deadline filter",
+        "fallback ceiling",
+        "no-route result"
+      ],
+      "failure_contract": "return typed no-route/degraded decision; never silently weaken required semantics",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:orchestration->prompt-context",
+      "relation": "runtime_dependency",
+      "source_plane": "orchestration",
+      "target_plane": "prompt-context",
+      "contract_surface": [
+        "context envelope",
+        "instruction hierarchy",
+        "token/character budget",
+        "source provenance",
+        "ContextEnvelope",
+        "ContextSegment",
+        "ContextBudget",
+        "ContextSnapshot",
+        "ContextCompiler",
+        "context source adapter",
+        "provider projection",
+        "InstructionPolicyRef",
+        "instruction policy version/digest"
+      ],
+      "failure_contract": "drop/deny unauthorized or unbounded segments; produce explicit insufficient-context result rather than silently bypassing policy",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:orchestration->tool-runtime",
+      "relation": "runtime_dependency",
+      "source_plane": "orchestration",
+      "target_plane": "tool-runtime",
+      "contract_surface": [
+        "tool manifest",
+        "input schema",
+        "authority",
+        "execution receipt",
+        "result/error",
+        "ToolManifest",
+        "ToolExecutionRequest",
+        "ToolExecutionReceipt",
+        "ToolResult",
+        "tool schema projection",
+        "approval policy",
+        "idempotency reservation",
+        "compensation contract"
+      ],
+      "failure_contract": "tool unavailable/denied/failed with bounded durable receipt; never bypass authority or provider ownership",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:product-experience->application-api",
+      "relation": "runtime_dependency",
+      "source_plane": "product-experience",
+      "target_plane": "application-api",
+      "contract_surface": [
+        "versioned API",
+        "request bounds",
+        "idempotency",
+        "problem details",
+        "health/readiness",
+        "ConversationThread",
+        "ConversationMessage",
+        "conversation append/read/branch/delete/export"
+      ],
+      "failure_contract": "typed 4xx/5xx without secret leakage",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:product-experience->engine-api",
+      "relation": "runtime_dependency",
+      "source_plane": "product-experience",
+      "target_plane": "engine-api",
+      "contract_surface": [
+        "/api/v1 versioning",
+        "health/live",
+        "health/ready",
+        "engine operation contracts",
+        "AI execution submit",
+        "AI execution status/result",
+        "AI execution cancel",
+        "delegated authority envelope",
+        "idempotent service command",
+        "operation event replay",
+        "capability readiness endpoint/projection"
+      ],
+      "failure_contract": "typed unavailable/denied/conflict response with no local backend provider fallback",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:product-experience->identity",
+      "relation": "runtime_dependency",
+      "source_plane": "product-experience",
+      "target_plane": "identity",
+      "contract_surface": [
+        "principal",
+        "tenant",
+        "scope/capability",
+        "token/session lifecycle",
+        "AuthorityContext",
+        "delegated authority subset",
+        "auth strength",
+        "tool/action scope"
+      ],
+      "failure_contract": "deny protected operations",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:product-experience->observability",
+      "relation": "runtime_dependency",
+      "source_plane": "product-experience",
+      "target_plane": "observability",
+      "contract_surface": [
+        "trace id",
+        "request id",
+        "tenant-safe log fields",
+        "metric",
+        "span",
+        "SLO",
+        "cross-plane trace correlation",
+        "operation timeline",
+        "redaction policy",
+        "unsampled critical receipts",
+        "AI usage/quality metrics"
+      ],
+      "failure_contract": "telemetry may degrade but must not leak secrets or make canonical state depend on telemetry availability",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:prompt-context->foundation",
+      "relation": "runtime_dependency",
+      "source_plane": "prompt-context",
+      "target_plane": "foundation",
+      "contract_surface": [
+        "stable error types",
+        "event/capability identity",
+        "deterministic serialization",
+        "CapabilityManifest identity/version"
+      ],
+      "failure_contract": "engine does not boot",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:prompt-context->identity",
+      "relation": "runtime_dependency",
+      "source_plane": "prompt-context",
+      "target_plane": "identity",
+      "contract_surface": [
+        "principal",
+        "tenant",
+        "scope/capability",
+        "token/session lifecycle",
+        "AuthorityContext",
+        "delegated authority subset",
+        "auth strength",
+        "tool/action scope"
+      ],
+      "failure_contract": "deny protected operations",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:prompt-context->retrieval",
+      "relation": "runtime_dependency",
+      "source_plane": "prompt-context",
+      "target_plane": "retrieval",
+      "contract_surface": [
+        "document",
+        "chunk",
+        "index",
+        "query",
+        "ranked evidence",
+        "citation",
+        "RetrievalQueryRequest",
+        "EvidenceReference",
+        "authorized source scope",
+        "source/version provenance",
+        "citation metadata"
+      ],
+      "failure_contract": "degrade to authorized fallback or explicit insufficient evidence; never widen ACL or invent citations",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:reasoning-verification->model-routing",
+      "relation": "runtime_dependency",
+      "source_plane": "reasoning-verification",
+      "target_plane": "model-routing",
+      "contract_surface": [
+        "ModelEndpoint",
+        "RouteRequest",
+        "RouteDecision",
+        "endpoint telemetry",
+        "RouteDecisionReceipt",
+        "capability/privacy/budget/deadline filter",
+        "fallback ceiling",
+        "no-route result"
+      ],
+      "failure_contract": "return typed no-route/degraded decision; never silently weaken required semantics",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:reasoning-verification->orchestration",
+      "relation": "runtime_dependency",
+      "source_plane": "reasoning-verification",
+      "target_plane": "orchestration",
+      "contract_surface": [
+        "task",
+        "plan",
+        "step",
+        "checkpoint",
+        "result",
+        "cancellation",
+        "AIExecutionRequest",
+        "AgentTurn",
+        "ExecutionCheckpoint",
+        "AIExecutionResult",
+        "StopPolicy",
+        "ResumeToken",
+        "ChildExecutionRequest",
+        "child join policy",
+        "interactive steering command"
+      ],
+      "failure_contract": "checkpoint and stop safely",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:resilience->data-persistence",
+      "relation": "runtime_dependency",
+      "source_plane": "resilience",
+      "target_plane": "data-persistence",
+      "contract_surface": [
+        "transaction",
+        "repository",
+        "migration",
+        "backup/restore",
+        "health"
+      ],
+      "failure_contract": "read-only/degraded mode where safe",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:resilience->jobs-durability",
+      "relation": "runtime_dependency",
+      "source_plane": "resilience",
+      "target_plane": "jobs-durability",
+      "contract_surface": [
+        "job",
+        "lease",
+        "checkpoint",
+        "retry policy",
+        "dead-letter/recovery",
+        "fair queue class",
+        "tenant concurrency",
+        "recovery reserve",
+        "queue age policy",
+        "child execution lease",
+        "parent/child cancellation propagation"
+      ],
+      "failure_contract": "defer/shed bounded new work while preserving committed recovery/finalization",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:resilience->model-routing",
+      "relation": "runtime_dependency",
+      "source_plane": "resilience",
+      "target_plane": "model-routing",
+      "contract_surface": [
+        "ModelEndpoint",
+        "RouteRequest",
+        "RouteDecision",
+        "endpoint telemetry",
+        "RouteDecisionReceipt",
+        "capability/privacy/budget/deadline filter",
+        "fallback ceiling",
+        "no-route result"
+      ],
+      "failure_contract": "return typed no-route/degraded decision; never silently weaken required semantics",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:resilience->observability",
+      "relation": "runtime_dependency",
+      "source_plane": "resilience",
+      "target_plane": "observability",
+      "contract_surface": [
+        "trace id",
+        "request id",
+        "tenant-safe log fields",
+        "metric",
+        "span",
+        "SLO",
+        "cross-plane trace correlation",
+        "operation timeline",
+        "redaction policy",
+        "unsampled critical receipts",
+        "AI usage/quality metrics"
+      ],
+      "failure_contract": "telemetry may degrade but must not leak secrets or make canonical state depend on telemetry availability",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:retrieval->data-persistence",
+      "relation": "runtime_dependency",
+      "source_plane": "retrieval",
+      "target_plane": "data-persistence",
+      "contract_surface": [
+        "transaction",
+        "repository",
+        "migration",
+        "backup/restore",
+        "health"
+      ],
+      "failure_contract": "read-only/degraded mode where safe",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:retrieval->governance",
+      "relation": "runtime_dependency",
+      "source_plane": "retrieval",
+      "target_plane": "governance",
+      "contract_surface": [
+        "data class",
+        "retention rule",
+        "deletion request",
+        "export request",
+        "provider privacy policy",
+        "ProviderTransferRequest",
+        "ProviderTransferDecision",
+        "provider transfer receipt"
+      ],
+      "failure_contract": "block transfer when classification/policy unknown",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:retrieval->memory",
+      "relation": "runtime_dependency",
+      "source_plane": "retrieval",
+      "target_plane": "memory",
+      "contract_surface": [
+        "memory record",
+        "namespace",
+        "retention class",
+        "write/read/delete",
+        "provenance",
+        "MemoryRecord",
+        "MemoryWriteProposal",
+        "MemoryWriteReceipt",
+        "MemoryContract",
+        "RetrieverContract",
+        "memory namespace policy",
+        "memory retention/version contract"
+      ],
+      "failure_contract": "memory miss/degraded continuity without cross-tenant fallback or promotion of volatile state",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:retrieval->model-provider",
+      "relation": "runtime_dependency",
+      "source_plane": "retrieval",
+      "target_plane": "model-provider",
+      "contract_surface": [
+        "ProviderRequest",
+        "ProviderResponse",
+        "ProviderAdapter",
+        "provider architecture receipt",
+        "governance decision receipt",
+        "admission decision receipt",
+        "single credential-bearing runtime owner",
+        "sync/async transport parity",
+        "compatibility surfaces contain no provider credentials",
+        "ProviderImageRequest",
+        "ProviderImageResponse",
+        "ProviderSpeechRequest",
+        "ProviderSpeechResponse",
+        "governed media operations share provider credentials and policy receipts with text generation",
+        "ProviderToolDefinition",
+        "ProviderToolCall",
+        "ProviderStructuredOutputSpec",
+        "ProviderUsage",
+        "ProviderFinishReason",
+        "ProviderStreamDelta",
+        "provider cancellation/deadline propagation"
+      ],
+      "failure_contract": "provider unavailable/invalid/policy-denied with normalized receipt; malformed structured/tool output never reaches orchestration",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:security-safety->configuration-secrets",
+      "relation": "runtime_dependency",
+      "source_plane": "security-safety",
+      "target_plane": "configuration-secrets",
+      "contract_surface": [
+        "typed settings",
+        "secret reference",
+        "configuration snapshot"
+      ],
+      "failure_contract": "fail startup or disable optional capability",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:security-safety->identity",
+      "relation": "runtime_dependency",
+      "source_plane": "security-safety",
+      "target_plane": "identity",
+      "contract_surface": [
+        "principal",
+        "tenant",
+        "scope/capability",
+        "token/session lifecycle",
+        "AuthorityContext",
+        "delegated authority subset",
+        "auth strength",
+        "tool/action scope"
+      ],
+      "failure_contract": "deny protected operations",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:security-safety->tool-runtime",
+      "relation": "runtime_dependency",
+      "source_plane": "security-safety",
+      "target_plane": "tool-runtime",
+      "contract_surface": [
+        "tool manifest",
+        "input schema",
+        "authority",
+        "execution receipt",
+        "result/error",
+        "ToolManifest",
+        "ToolExecutionRequest",
+        "ToolExecutionReceipt",
+        "ToolResult",
+        "tool schema projection",
+        "approval policy",
+        "idempotency reservation",
+        "compensation contract"
+      ],
+      "failure_contract": "tool unavailable/denied/failed with bounded durable receipt; never bypass authority or provider ownership",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:streaming-realtime->application-api",
+      "relation": "runtime_dependency",
+      "source_plane": "streaming-realtime",
+      "target_plane": "application-api",
+      "contract_surface": [
+        "versioned API",
+        "request bounds",
+        "idempotency",
+        "problem details",
+        "health/readiness",
+        "ConversationThread",
+        "ConversationMessage",
+        "conversation append/read/branch/delete/export"
+      ],
+      "failure_contract": "typed 4xx/5xx without secret leakage",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:streaming-realtime->engine-api",
+      "relation": "runtime_dependency",
+      "source_plane": "streaming-realtime",
+      "target_plane": "engine-api",
+      "contract_surface": [
+        "/api/v1 versioning",
+        "health/live",
+        "health/ready",
+        "engine operation contracts",
+        "AI execution submit",
+        "AI execution status/result",
+        "AI execution cancel",
+        "delegated authority envelope",
+        "idempotent service command",
+        "operation event replay",
+        "capability readiness endpoint/projection"
+      ],
+      "failure_contract": "typed unavailable/denied/conflict response with no local backend provider fallback",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:streaming-realtime->jobs-durability",
+      "relation": "runtime_dependency",
+      "source_plane": "streaming-realtime",
+      "target_plane": "jobs-durability",
+      "contract_surface": [
+        "job",
+        "lease",
+        "checkpoint",
+        "retry policy",
+        "dead-letter/recovery",
+        "fair queue class",
+        "tenant concurrency",
+        "recovery reserve",
+        "queue age policy",
+        "child execution lease",
+        "parent/child cancellation propagation"
+      ],
+      "failure_contract": "defer/shed bounded new work while preserving committed recovery/finalization",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:streaming-realtime->observability",
+      "relation": "runtime_dependency",
+      "source_plane": "streaming-realtime",
+      "target_plane": "observability",
+      "contract_surface": [
+        "trace id",
+        "request id",
+        "tenant-safe log fields",
+        "metric",
+        "span",
+        "SLO",
+        "cross-plane trace correlation",
+        "operation timeline",
+        "redaction policy",
+        "unsampled critical receipts",
+        "AI usage/quality metrics"
+      ],
+      "failure_contract": "telemetry may degrade but must not leak secrets or make canonical state depend on telemetry availability",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:tool-runtime->configuration-secrets",
+      "relation": "runtime_dependency",
+      "source_plane": "tool-runtime",
+      "target_plane": "configuration-secrets",
+      "contract_surface": [
+        "typed settings",
+        "secret reference",
+        "configuration snapshot"
+      ],
+      "failure_contract": "fail startup or disable optional capability",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:tool-runtime->foundation",
+      "relation": "runtime_dependency",
+      "source_plane": "tool-runtime",
+      "target_plane": "foundation",
+      "contract_surface": [
+        "stable error types",
+        "event/capability identity",
+        "deterministic serialization",
+        "CapabilityManifest identity/version"
+      ],
+      "failure_contract": "engine does not boot",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:tool-runtime->identity",
+      "relation": "runtime_dependency",
+      "source_plane": "tool-runtime",
+      "target_plane": "identity",
+      "contract_surface": [
+        "principal",
+        "tenant",
+        "scope/capability",
+        "token/session lifecycle",
+        "AuthorityContext",
+        "delegated authority subset",
+        "auth strength",
+        "tool/action scope"
+      ],
+      "failure_contract": "deny protected operations",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    },
+    {
+      "interface_id": "runtime_dependency:tool-runtime->observability",
+      "relation": "runtime_dependency",
+      "source_plane": "tool-runtime",
+      "target_plane": "observability",
+      "contract_surface": [
+        "trace id",
+        "request id",
+        "tenant-safe log fields",
+        "metric",
+        "span",
+        "SLO",
+        "cross-plane trace correlation",
+        "operation timeline",
+        "redaction policy",
+        "unsampled critical receipts",
+        "AI usage/quality metrics"
+      ],
+      "failure_contract": "telemetry may degrade but must not leak secrets or make canonical state depend on telemetry availability",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "status": "present"
+    }
+  ]
+}

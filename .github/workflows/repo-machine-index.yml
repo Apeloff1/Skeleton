@@ -1,0 +1,185 @@
+name: Repository machine index
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - ".machine/**"
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repo-machine-index-main
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Build machine index
+        run: |
+          python -m pip install .
+          mkdir -p .machine
+          skeleton-repo-machine --root . --output .machine/repository-machine.json --build-code-search .machine/code-search-index.json
+          python - <<'PY'
+          from skeleton.repo_machine.code_search import load_code_search_index
+          from skeleton.repo_machine.manifest import load_manifest, validate_manifest
+          manifest = load_manifest(".machine/repository-machine.json")
+          validate_manifest(manifest)
+          code_index = load_code_search_index(
+              ".machine/code-search-index.json",
+              expected_fingerprint=manifest["fingerprint"],
+          )
+          files = manifest["state"]["files"]
+          summary = code_index.summary()
+          print(f"Machine index contains {len(files)} files.")
+          print(
+              f"Code search contains {summary['documents']} documents, "
+              f"{summary['terms']} terms, {summary['postings']} postings."
+          )
+          PY
+
+      - name: Publish changed indexes atomically
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          manifest_path=".machine/repository-machine.json"
+          code_index_path=".machine/code-search-index.json"
+
+          # git diff does not report untracked files. Use status so a first-time
+          # materialization cannot be mistaken for an already-current index.
+          if [[ -z "$(git status --porcelain -- "$manifest_path" "$code_index_path")" ]]; then
+            echo "Machine indexes are current."
+            exit 0
+          fi
+
+          base_sha="$(git rev-parse HEAD)"
+          remote_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha')"
+          if [[ "$remote_sha" != "$base_sha" ]]; then
+            echo "::notice::main advanced from $base_sha to $remote_sha; skipping stale index publication."
+            exit 0
+          fi
+
+          base_tree="$(gh api "repos/${GITHUB_REPOSITORY}/git/commits/${base_sha}" --jq '.tree.sha')"
+
+          create_blob() {
+            local source_path="$1"
+            local payload_path="$RUNNER_TEMP/repo-machine-blob.json"
+            python - "$source_path" "$payload_path" <<'PY'
+          import base64
+          import json
+          from pathlib import Path
+          import sys
+
+          source = Path(sys.argv[1])
+          payload = Path(sys.argv[2])
+          payload.write_text(
+              json.dumps(
+                  {
+                      "content": base64.b64encode(source.read_bytes()).decode("ascii"),
+                      "encoding": "base64",
+                  },
+                  sort_keys=True,
+                  separators=(",", ":"),
+              ),
+              encoding="utf-8",
+          )
+          PY
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/blobs" \
+              --input "$payload_path" --jq '.sha'
+          }
+
+          manifest_blob="$(create_blob "$manifest_path")"
+          code_index_blob="$(create_blob "$code_index_path")"
+
+          export BASE_TREE="$base_tree"
+          export MANIFEST_BLOB="$manifest_blob"
+          export CODE_INDEX_BLOB="$code_index_blob"
+          tree_payload="$RUNNER_TEMP/repo-machine-tree.json"
+          python - "$tree_payload" <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import sys
+
+          payload = {
+              "base_tree": os.environ["BASE_TREE"],
+              "tree": [
+                  {
+                      "path": ".machine/repository-machine.json",
+                      "mode": "100644",
+                      "type": "blob",
+                      "sha": os.environ["MANIFEST_BLOB"],
+                  },
+                  {
+                      "path": ".machine/code-search-index.json",
+                      "mode": "100644",
+                      "type": "blob",
+                      "sha": os.environ["CODE_INDEX_BLOB"],
+                  },
+              ],
+          }
+          Path(sys.argv[1]).write_text(
+              json.dumps(payload, sort_keys=True, separators=(",", ":")),
+              encoding="utf-8",
+          )
+          PY
+          tree_sha="$(gh api --method POST "repos/${GITHUB_REPOSITORY}/git/trees" \
+            --input "$tree_payload" --jq '.sha')"
+
+          export BASE_SHA="$base_sha"
+          export TREE_SHA="$tree_sha"
+          commit_payload="$RUNNER_TEMP/repo-machine-commit.json"
+          python - "$commit_payload" <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import sys
+
+          payload = {
+              "message": "chore(machine): refresh repository and code-search indexes",
+              "tree": os.environ["TREE_SHA"],
+              "parents": [os.environ["BASE_SHA"]],
+          }
+          Path(sys.argv[1]).write_text(
+              json.dumps(payload, sort_keys=True, separators=(",", ":")),
+              encoding="utf-8",
+          )
+          PY
+          commit_sha="$(gh api --method POST "repos/${GITHUB_REPOSITORY}/git/commits" \
+            --input "$commit_payload" --jq '.sha')"
+
+          # Re-check the lease immediately before moving main. GitHub also
+          # rejects a non-fast-forward update because force remains false.
+          remote_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha')"
+          if [[ "$remote_sha" != "$base_sha" ]]; then
+            echo "::notice::main advanced during index publication; leaving the generated commit unreachable."
+            exit 0
+          fi
+
+          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/git/refs/heads/main" \
+            -f sha="$commit_sha" -F force=false >/dev/null
+          echo "Published repository-machine indexes at $commit_sha."

@@ -1,0 +1,1206 @@
+from __future__ import annotations
+
+from copy import deepcopy
+from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
+from uuid import uuid4
+
+import pytest
+
+from skeleton.contracts.memory_record import (
+    MemoryKind,
+    MemoryState,
+    MemoryWriteProposal,
+)
+from skeleton.intelligence.admission import (
+    AdmissionRequest,
+    ResourceBudget,
+    UsageEstimate,
+)
+from skeleton.intelligence.admission_runtime import AdmissionRuntime
+from skeleton.intelligence.quota import TenantQuota, TenantQuotaLedger
+from skeleton.memory.writeback import (
+    AsyncGovernedMemoryWriter,
+    MemoryWritebackError,
+)
+from skeleton.memory.projection import (
+    AsyncMemoryProjectionCoordinator,
+    LegacyMemoryStoreProjection,
+)
+from skeleton.memory.store import MemoryStore
+from skeleton.memory.types import MemoryChunk, MemoryQueryResult
+from skeleton.persistence.memory_repository import (
+    MemoryConflict,
+    MemoryNotFound,
+    MongoMemoryRepository,
+)
+from skeleton.vault.governance_registry import GovernanceRegistry
+from skeleton.vault.lifecycle_adapters import (
+    LifecycleAdapterRegistry,
+    LifecycleExecutor,
+    MongoMemoryLifecycleAdapter,
+)
+
+
+def _matches(doc: dict, query: dict) -> bool:
+    return all(doc.get(key) == value for key, value in query.items())
+
+
+class FakeCursor:
+    def __init__(self, docs):
+        self.docs = [deepcopy(doc) for doc in docs]
+
+    def sort(self, fields):
+        for key, direction in reversed(fields):
+            self.docs.sort(key=lambda item: item.get(key), reverse=direction < 0)
+        return self
+
+    async def to_list(self, length=None):
+        if length is None:
+            return [deepcopy(doc) for doc in self.docs]
+        return [deepcopy(doc) for doc in self.docs[:length]]
+
+
+class FakeCollection:
+    def __init__(self):
+        self.docs: list[dict] = []
+        self.indexes: list[tuple] = []
+
+    async def create_index(self, fields, **kwargs):
+        self.indexes.append((tuple(fields), dict(kwargs)))
+        return kwargs.get("name")
+
+    async def find_one(self, query):
+        for doc in self.docs:
+            if _matches(doc, query):
+                return deepcopy(doc)
+        return None
+
+    async def find_one_and_update(
+        self,
+        query,
+        update,
+        *,
+        upsert=False,
+        return_document=None,
+    ):
+        for index, doc in enumerate(self.docs):
+            if _matches(doc, query):
+                updated = deepcopy(doc)
+                updated.update(deepcopy(update.get("$set", {})))
+                self.docs[index] = updated
+                return deepcopy(updated)
+        if not upsert:
+            return None
+        created = {
+            key: deepcopy(value)
+            for key, value in query.items()
+            if not isinstance(value, dict)
+        }
+        created.update(deepcopy(update.get("$setOnInsert", {})))
+        created.update(deepcopy(update.get("$set", {})))
+        self.docs.append(created)
+        return deepcopy(created)
+
+    async def update_one(self, query, update, *, upsert=False):
+        for index, doc in enumerate(self.docs):
+            if _matches(doc, query):
+                updated = deepcopy(doc)
+                updated.update(deepcopy(update.get("$set", {})))
+                self.docs[index] = updated
+                return SimpleNamespace(matched_count=1, modified_count=1)
+        if upsert:
+            created = {
+                key: deepcopy(value)
+                for key, value in query.items()
+                if not isinstance(value, dict)
+            }
+            created.update(deepcopy(update.get("$setOnInsert", {})))
+            created.update(deepcopy(update.get("$set", {})))
+            self.docs.append(created)
+            return SimpleNamespace(
+                matched_count=0,
+                modified_count=0,
+                upserted_id=created.get("event_id") or created.get("memory_id"),
+            )
+        return SimpleNamespace(matched_count=0, modified_count=0)
+
+    async def insert_one(self, doc):
+        identity = (
+            doc.get("repository_namespace"),
+            doc.get("memory_id"),
+        )
+        for existing in self.docs:
+            if (
+                existing.get("repository_namespace"),
+                existing.get("memory_id"),
+            ) == identity:
+                raise RuntimeError("duplicate memory identity")
+        self.docs.append(deepcopy(doc))
+        return SimpleNamespace(inserted_id=doc.get("memory_id"))
+
+    async def delete_one(self, query):
+        for index, doc in enumerate(self.docs):
+            if _matches(doc, query):
+                self.docs.pop(index)
+                return SimpleNamespace(deleted_count=1)
+        return SimpleNamespace(deleted_count=0)
+
+    def find(self, query):
+        return FakeCursor(doc for doc in self.docs if _matches(doc, query))
+
+
+
+class FakeProjectionStore(MemoryStore):
+    def __init__(self):
+        self.items: dict[str, MemoryChunk] = {}
+
+    def add(self, chunk: MemoryChunk) -> None:
+        self.items[chunk.id] = chunk
+
+    def query(self, query_text, *, top_k=5, metadata_filter=None, min_score=0.0):
+        return [
+            MemoryQueryResult(chunk=item, score=1.0, rank=index + 1)
+            for index, item in enumerate(self.items.values())
+        ][:top_k]
+
+    def delete(self, chunk_id: str) -> bool:
+        return self.items.pop(chunk_id, None) is not None
+
+    def health(self):
+        return {"ok": True}
+
+
+class FakeDatabase:
+    def __init__(self):
+        self.collections: dict[str, FakeCollection] = {}
+
+    def __getitem__(self, name: str) -> FakeCollection:
+        return self.collections.setdefault(name, FakeCollection())
+
+
+def _now():
+    return datetime(2026, 9, 23, 18, 0, tzinfo=timezone.utc)
+
+
+def _proposal(
+    *,
+    key: str,
+    content: str = "remember",
+    tenant: str = "tenant-a",
+    namespace: str = "assistant",
+    target: str | None = None,
+    version: int | None = None,
+    expires_at: datetime | None = None,
+):
+    return MemoryWriteProposal(
+        proposal_id=str(uuid4()),
+        tenant_id=tenant,
+        namespace=namespace,
+        subject_id="user-a",
+        kind=MemoryKind.SEMANTIC,
+        idempotency_key=key,
+        proposed_at=_now(),
+        content=content,
+        provenance_refs=("conversation:1",),
+        source_operation_id=str(uuid4()),
+        target_memory_id=target,
+        expected_version=version,
+        expires_at=expires_at,
+    )
+
+
+@pytest.mark.asyncio
+async def test_mongo_repository_creates_required_unique_indexes() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+
+    await repo.ensure_indexes()
+
+    record_indexes = db["canonical_memory_records"].indexes
+    idempotency_indexes = db["canonical_memory_idempotency"].indexes
+    assert any(meta.get("unique") for _, meta in record_indexes)
+    assert any(
+        meta.get("name") == "canonical_memory_idempotency"
+        and meta.get("unique") is True
+        for _, meta in idempotency_indexes
+    )
+
+
+@pytest.mark.asyncio
+async def test_mongo_repository_survives_reinstantiation_and_isolates_scope() -> None:
+    db = FakeDatabase()
+    first = MongoMemoryRepository(db)
+    proposal = _proposal(key="create")
+    stored = await first.commit(proposal, now=_now())
+
+    reopened = MongoMemoryRepository(db)
+    loaded = await reopened.get(
+        stored.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+    )
+
+    assert loaded == stored
+    with pytest.raises(MemoryNotFound):
+        await reopened.get(
+            stored.memory_id,
+            tenant_id="tenant-b",
+            namespace="assistant",
+        )
+    with pytest.raises(MemoryNotFound):
+        await reopened.get(
+            stored.memory_id,
+            tenant_id="tenant-a",
+            namespace="other",
+        )
+
+
+@pytest.mark.asyncio
+async def test_mongo_old_idempotency_receipt_survives_later_update() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    create = _proposal(key="create", content="v1")
+    created = await repo.commit(create, now=_now())
+    await repo.commit(
+        _proposal(
+            key="update",
+            content="v2",
+            target=created.memory_id,
+            version=1,
+        ),
+        now=_now() + timedelta(seconds=1),
+    )
+
+    replay = await MongoMemoryRepository(db).commit(
+        create,
+        now=_now() + timedelta(seconds=30),
+    )
+    current = await repo.get(
+        created.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+    )
+
+    assert replay.version == 1
+    assert replay.content == "v1"
+    assert current.version == 2
+    assert current.content == "v2"
+
+
+@pytest.mark.asyncio
+async def test_mongo_update_uses_optimistic_version_fence() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    created = await repo.commit(_proposal(key="create"), now=_now())
+    await repo.commit(
+        _proposal(
+            key="update-1",
+            content="v2",
+            target=created.memory_id,
+            version=1,
+        ),
+        now=_now() + timedelta(seconds=1),
+    )
+
+    with pytest.raises(MemoryConflict, match="version conflict"):
+        await repo.commit(
+            _proposal(
+                key="update-stale",
+                content="stale",
+                target=created.memory_id,
+                version=1,
+            ),
+            now=_now() + timedelta(seconds=2),
+        )
+
+
+@pytest.mark.asyncio
+async def test_mongo_tombstone_preserves_exportable_authority() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    created = await repo.commit(_proposal(key="create"), now=_now())
+
+    tombstoned = await repo.tombstone(
+        created.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+        expected_version=1,
+        now=_now() + timedelta(seconds=1),
+    )
+
+    assert tombstoned.state.value == "tombstoned"
+    assert tombstoned.version == 2
+    with pytest.raises(MemoryNotFound):
+        await repo.get(
+            created.memory_id,
+            tenant_id="tenant-a",
+            namespace="assistant",
+        )
+    visible = await repo.list_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        include_tombstoned=True,
+    )
+    assert visible == (tombstoned,)
+
+
+@pytest.mark.asyncio
+async def test_mongo_idempotency_key_reuse_with_different_intent_conflicts() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    original = _proposal(key="stable", content="one")
+    await repo.commit(original, now=_now())
+
+    conflicting = _proposal(key="stable", content="two")
+    with pytest.raises(MemoryConflict, match="different memory write intent"):
+        await repo.commit(conflicting, now=_now())
+
+
+@pytest.mark.asyncio
+async def test_mongo_expire_due_tombstones_only_elapsed_records() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    due = await repo.commit(
+        _proposal(
+            key="due",
+            content="old",
+            expires_at=_now() + timedelta(seconds=5),
+        ),
+        now=_now(),
+    )
+    future = await repo.commit(
+        _proposal(
+            key="future",
+            content="new",
+            expires_at=_now() + timedelta(seconds=50),
+        ),
+        now=_now(),
+    )
+
+    expired = await repo.expire_due(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        now=_now() + timedelta(seconds=10),
+    )
+
+    assert [item.memory_id for item in expired] == [due.memory_id]
+    assert expired[0].version == 2
+    with pytest.raises(MemoryNotFound):
+        await repo.get(
+            due.memory_id,
+            tenant_id="tenant-a",
+            namespace="assistant",
+        )
+    assert (
+        await repo.get(
+            future.memory_id,
+            tenant_id="tenant-a",
+            namespace="assistant",
+        )
+    ).version == 1
+
+@pytest.mark.asyncio
+async def test_mongo_authority_rebuilds_derived_projection() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    first = await repo.commit(_proposal(key="one", content="alpha"), now=_now())
+    second = await repo.commit(_proposal(key="two", content="beta"), now=_now())
+    store = FakeProjectionStore()
+    coordinator = AsyncMemoryProjectionCoordinator(repo)
+
+    report = await coordinator.rebuild_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        projections=(LegacyMemoryStoreProjection("rag", store),),
+        known_projection_ids=("stale-id",),
+    )
+
+    assert report.degraded is False
+    assert set(store.items) == {first.memory_id, second.memory_id}
+    assert store.items[first.memory_id].metadata["canonical_version"] == 1
+    assert store.items[first.memory_id].source_tier == "derived:rag"
+
+
+@pytest.mark.asyncio
+async def test_mongo_expiry_removes_projection_but_keeps_export_lineage() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    due = await repo.commit(
+        _proposal(
+            key="due-projection",
+            content="temporary",
+            expires_at=_now() + timedelta(seconds=5),
+        ),
+        now=_now(),
+    )
+    store = FakeProjectionStore()
+    projection = LegacyMemoryStoreProjection("mag", store)
+    coordinator = AsyncMemoryProjectionCoordinator(repo)
+    await coordinator.sync_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        projections=(projection,),
+    )
+    assert due.memory_id in store.items
+
+    report = await coordinator.expire_and_sync_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        projections=(projection,),
+        now=_now() + timedelta(seconds=10),
+    )
+    exported = await coordinator.export_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        include_tombstoned=True,
+    )
+
+    assert due.memory_id not in store.items
+    assert report.tombstones == 1
+    assert report.active_records == 0
+    assert exported[0]["memory_id"] == due.memory_id
+    assert exported[0]["state"] == "tombstoned"
+
+
+@pytest.mark.asyncio
+async def test_mongo_indexes_cover_revision_and_projection_outbox() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+
+    await repo.ensure_indexes()
+
+    revision_indexes = db["canonical_memory_revisions"].indexes
+    projection_indexes = db["canonical_memory_projection_outbox"].indexes
+    assert any(
+        meta.get("name") == "canonical_memory_revision_identity"
+        and meta.get("unique") is True
+        for _, meta in revision_indexes
+    )
+    assert any(
+        meta.get("name") == "canonical_memory_projection_event_identity"
+        and meta.get("unique") is True
+        for _, meta in projection_indexes
+    )
+
+
+@pytest.mark.asyncio
+async def test_mongo_revision_history_and_projection_outbox_follow_versions() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    created = await repo.commit(_proposal(key="rev-create", content="v1"), now=_now())
+    updated = await repo.commit(
+        _proposal(
+            key="rev-update",
+            content="v2",
+            target=created.memory_id,
+            version=created.version,
+        ),
+        now=_now() + timedelta(seconds=1),
+    )
+    tombstoned = await repo.tombstone(
+        created.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+        expected_version=updated.version,
+        now=_now() + timedelta(seconds=2),
+    )
+
+    history = await repo.history(
+        created.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+    )
+    events = await repo.pending_projection_events()
+
+    assert [row.version for row in history] == [1, 2, 3]
+    assert [row.predecessor_version for row in history] == [None, 1, 2]
+    assert [row.mutation for row in history] == ["create", "update", "tombstone"]
+    assert history[-1].record == tombstoned
+    assert [(row.memory_version, row.action) for row in events] == [
+        (1, "upsert"),
+        (2, "upsert"),
+        (3, "delete"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_mongo_projection_ack_is_idempotent_and_filters_pending() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    await repo.commit(_proposal(key="projection-ack"), now=_now())
+    event = (await repo.pending_projection_events())[0]
+
+    first = await repo.mark_projection_published(
+        event.event_id,
+        now=_now() + timedelta(seconds=1),
+    )
+    second = await repo.mark_projection_published(
+        event.event_id,
+        now=_now() + timedelta(seconds=5),
+    )
+
+    assert first.published_at == _now() + timedelta(seconds=1)
+    assert second.published_at == first.published_at
+    assert await repo.pending_projection_events() == ()
+
+
+@pytest.mark.asyncio
+async def test_mongo_idempotent_replay_does_not_duplicate_revision_or_outbox() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    proposal = _proposal(key="replay-no-duplicate", content="v1")
+
+    created = await repo.commit(proposal, now=_now())
+    replay = await repo.commit(proposal, now=_now() + timedelta(seconds=10))
+
+    assert replay == created
+    history = await repo.history(
+        created.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+    )
+    events = await repo.pending_projection_events()
+    assert [row.version for row in history] == [1]
+    assert [(row.memory_version, row.action) for row in events] == [(1, "upsert")]
+
+
+@pytest.mark.asyncio
+async def test_mongo_tombstone_retry_with_original_version_heals_idempotently() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    created = await repo.commit(_proposal(key="delete-retry"), now=_now())
+
+    first = await repo.tombstone(
+        created.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+        expected_version=created.version,
+        now=_now() + timedelta(seconds=1),
+    )
+    retry = await repo.tombstone(
+        created.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+        expected_version=created.version,
+        now=_now() + timedelta(seconds=10),
+    )
+
+    assert retry == first
+    history = await repo.history(
+        created.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+    )
+    events = await repo.pending_projection_events()
+    assert [row.version for row in history] == [1, 2]
+    assert [(row.memory_version, row.action) for row in events] == [
+        (1, "upsert"),
+        (2, "delete"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_mongo_revision_and_outbox_survive_repository_reinstantiation() -> None:
+    db = FakeDatabase()
+    first = MongoMemoryRepository(db)
+    created = await first.commit(_proposal(key="restart-history", content="v1"), now=_now())
+    await first.commit(
+        _proposal(
+            key="restart-update",
+            content="v2",
+            target=created.memory_id,
+            version=1,
+        ),
+        now=_now() + timedelta(seconds=1),
+    )
+    first_event = (await first.pending_projection_events())[0]
+    await first.mark_projection_published(
+        first_event.event_id,
+        now=_now() + timedelta(seconds=2),
+    )
+
+    reopened = MongoMemoryRepository(db)
+    history = await reopened.history(
+        created.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+    )
+    pending = await reopened.pending_projection_events()
+
+    assert [row.record.content for row in history] == ["v1", "v2"]
+    assert [(row.memory_version, row.action) for row in pending] == [(2, "upsert")]
+
+
+@pytest.mark.asyncio
+async def test_mongo_outbox_dispatch_applies_versions_and_acks() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    first = await repo.commit(
+        _proposal(key="async-dispatch-create", content="v1"),
+        now=_now(),
+    )
+    await repo.commit(
+        _proposal(
+            key="async-dispatch-update",
+            content="v2",
+            target=first.memory_id,
+            version=1,
+        ),
+        now=_now() + timedelta(seconds=1),
+    )
+    store = FakeProjectionStore()
+    coordinator = AsyncMemoryProjectionCoordinator(repo)
+
+    report = await coordinator.dispatch_pending(
+        projections=(LegacyMemoryStoreProjection("rag", store),),
+        limit=10,
+        now=_now() + timedelta(seconds=2),
+    )
+
+    assert report.degraded is False
+    assert report.published_events == 2
+    assert [attempt.memory_version for attempt in report.attempts] == [1, 2]
+    assert store.items[first.memory_id].text == "v2"
+    assert await repo.pending_projection_events() == ()
+
+
+@pytest.mark.asyncio
+async def test_mongo_outbox_failure_blocks_later_versions_and_recovers() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    first = await repo.commit(
+        _proposal(key="async-block-create", content="v1"),
+        now=_now(),
+    )
+    await repo.commit(
+        _proposal(
+            key="async-block-update",
+            content="v2",
+            target=first.memory_id,
+            version=1,
+        ),
+        now=_now() + timedelta(seconds=1),
+    )
+    healthy = FakeProjectionStore()
+    failing = FakeProjectionStore()
+    original_add = failing.add
+
+    def broken_add(chunk):
+        raise RuntimeError("projection down")
+
+    failing.add = broken_add
+    coordinator = AsyncMemoryProjectionCoordinator(repo)
+    projections = (
+        LegacyMemoryStoreProjection("healthy", healthy),
+        LegacyMemoryStoreProjection("failing", failing),
+    )
+
+    blocked = await coordinator.dispatch_pending(
+        projections=projections,
+        limit=10,
+        now=_now() + timedelta(seconds=2),
+    )
+
+    assert blocked.degraded is True
+    assert blocked.attempted_events == 2
+    assert blocked.published_events == 1
+    assert blocked.attempts[0].superseded is True
+    assert blocked.attempts[0].published is True
+    assert blocked.attempts[1].memory_version == 2
+    assert blocked.attempts[1].published is False
+    assert len(await repo.pending_projection_events()) == 1
+    assert healthy.items[first.memory_id].text == "v2"
+
+    failing.add = original_add
+    recovered = await coordinator.dispatch_pending(
+        projections=projections,
+        limit=10,
+        now=_now() + timedelta(seconds=3),
+    )
+
+    assert recovered.degraded is False
+    assert recovered.published_events == 1
+    assert healthy.items[first.memory_id].text == "v2"
+    assert failing.items[first.memory_id].text == "v2"
+    assert await repo.pending_projection_events() == ()
+
+
+@pytest.mark.asyncio
+async def test_mongo_expiry_revision_is_expire_not_generic_tombstone() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    due = await repo.commit(
+        _proposal(
+            key="expire-revision-kind",
+            content="old",
+            expires_at=_now() + timedelta(seconds=5),
+        ),
+        now=_now(),
+    )
+
+    await repo.expire_due(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        now=_now() + timedelta(seconds=10),
+    )
+    history = await repo.history(
+        due.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+    )
+
+    assert [row.mutation for row in history] == ["create", "expire"]
+    assert [(row.memory_version, row.action) for row in await repo.pending_projection_events()] == [
+        (1, "upsert"),
+        (2, "delete"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_mongo_stale_pending_event_cannot_regress_rebuilt_projection() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    first = await repo.commit(
+        _proposal(key="mongo-stale-create", content="v1"),
+        now=_now(),
+    )
+    await repo.commit(
+        _proposal(
+            key="mongo-stale-update",
+            content="v2",
+            target=first.memory_id,
+            version=1,
+        ),
+        now=_now() + timedelta(seconds=1),
+    )
+    store = FakeProjectionStore()
+    projection = LegacyMemoryStoreProjection("rag", store)
+    coordinator = AsyncMemoryProjectionCoordinator(repo)
+
+    rebuilt = await coordinator.rebuild_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        projections=(projection,),
+    )
+    assert rebuilt.degraded is False
+    assert store.items[first.memory_id].text == "v2"
+
+    bounded = await coordinator.dispatch_pending(
+        projections=(projection,),
+        limit=1,
+        now=_now() + timedelta(seconds=2),
+    )
+
+    assert bounded.published_events == 1
+    assert bounded.attempts[0].memory_version == 1
+    assert bounded.attempts[0].superseded is True
+    assert store.items[first.memory_id].text == "v2"
+    assert [(event.memory_version, event.action) for event in await repo.pending_projection_events()] == [
+        (2, "upsert"),
+    ]
+
+def _memory_admission_for(proposal: MemoryWriteProposal):
+    ledger = TenantQuotaLedger()
+    ledger.configure(
+        proposal.tenant_id,
+        TenantQuota(
+            window_id="mongo-memory-window",
+            max_operations=10,
+            max_input_tokens=10_000,
+            max_output_tokens=10_000,
+            max_cost_usd=100.0,
+            max_tool_calls=100,
+            max_artifact_bytes=1_000_000,
+            max_storage_bytes=1_000_000,
+            max_concurrent_operations=4,
+        ),
+    )
+    runtime = AdmissionRuntime(quota_ledger=ledger)
+    runtime.admit(
+        AdmissionRequest(
+            operation_id=proposal.source_operation_id,
+            tenant_id=proposal.tenant_id,
+            capability="memory-write",
+            budget=ResourceBudget(max_storage_bytes=1_000_000),
+            estimate=UsageEstimate(),
+        ),
+        now_wall=_now().timestamp(),
+    )
+    return runtime, ledger
+
+
+@pytest.mark.asyncio
+async def test_async_governed_writer_meters_mongo_memory_before_commit() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    governance = GovernanceRegistry()
+    proposal = _proposal(key="governed-create")
+    runtime, ledger = _memory_admission_for(proposal)
+    writer = AsyncGovernedMemoryWriter(
+        repo,
+        governance=governance,
+        admission_runtime=runtime,
+    )
+    writer.stage(proposal)
+
+    record = await writer.commit(proposal.proposal_id, now=_now())
+    storage = ledger.snapshot("tenant-a")["metered_by_category"]["storage"]
+    governed = governance.lifecycle.get(record.memory_id)
+
+    assert record.state is MemoryState.ACTIVE
+    assert storage["storage_bytes"] > 0
+    assert storage["artifact_bytes"] == 0
+    assert governed["owner_plane"] == "memory"
+    assert governed["tenant_id"] == "tenant-a"
+
+
+@pytest.mark.asyncio
+async def test_async_governed_writer_requires_active_memory_admission() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    governance = GovernanceRegistry()
+    proposal = _proposal(key="missing-admission")
+    ledger = TenantQuotaLedger()
+    ledger.configure(
+        proposal.tenant_id,
+        TenantQuota(
+            window_id="mongo-memory-window",
+            max_storage_bytes=1_000_000,
+        ),
+    )
+    runtime = AdmissionRuntime(quota_ledger=ledger)
+    writer = AsyncGovernedMemoryWriter(
+        repo,
+        governance=governance,
+        admission_runtime=runtime,
+    )
+    writer.stage(proposal)
+
+    with pytest.raises(
+        MemoryWritebackError,
+        match="memory write denied by resource admission",
+    ):
+        await writer.commit(proposal.proposal_id, now=_now())
+
+    assert db["canonical_memory_records"].docs == []
+
+
+@pytest.mark.asyncio
+async def test_async_governed_writer_replay_does_not_double_charge() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    governance = GovernanceRegistry()
+    proposal = _proposal(key="governed-replay")
+    runtime, ledger = _memory_admission_for(proposal)
+    writer = AsyncGovernedMemoryWriter(
+        repo,
+        governance=governance,
+        admission_runtime=runtime,
+    )
+    writer.stage(proposal)
+
+    first = await writer.commit(proposal.proposal_id, now=_now())
+    first_snapshot = ledger.snapshot("tenant-a")
+    writer.stage(proposal)
+    replay = await writer.commit(
+        proposal.proposal_id,
+        now=_now() + timedelta(seconds=2),
+    )
+    replay_snapshot = ledger.snapshot("tenant-a")
+
+    assert replay == first
+    assert first_snapshot["usage_events"] == 1
+    assert replay_snapshot["usage_events"] == 1
+    assert (
+        replay_snapshot["metered_by_category"]["storage"]["storage_bytes"]
+        == first_snapshot["metered_by_category"]["storage"]["storage_bytes"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_async_governed_writer_tombstones_on_governance_failure(
+    monkeypatch,
+) -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    governance = GovernanceRegistry()
+    proposal = _proposal(key="governance-failure")
+    runtime, _ledger = _memory_admission_for(proposal)
+    writer = AsyncGovernedMemoryWriter(
+        repo,
+        governance=governance,
+        admission_runtime=runtime,
+    )
+    writer.stage(proposal)
+
+    def fail(*_args, **_kwargs):
+        raise RuntimeError("governance unavailable")
+
+    monkeypatch.setattr(governance, "reconcile_canonical_write", fail)
+
+    with pytest.raises(
+        MemoryWritebackError,
+        match="governance registration failed; memory was tombstoned",
+    ):
+        await writer.commit(proposal.proposal_id, now=_now())
+
+    rows = await repo.list_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        include_tombstoned=True,
+    )
+    assert len(rows) == 1
+    assert rows[0].state is MemoryState.TOMBSTONED
+
+@pytest.mark.asyncio
+async def test_async_governed_writer_supports_remote_engine_boundaries() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    proposal = _proposal(key="remote-governed")
+    admissions = []
+    governance = []
+
+    async def admit(**kwargs):
+        admissions.append(dict(kwargs))
+        return {
+            "receipt_id": "storage-admission:remote-memory",
+            "storage_bytes": kwargs["storage_bytes"],
+        }
+
+    async def reconcile(**kwargs):
+        governance.append(dict(kwargs))
+        return {
+            "mode": "reconcile",
+            "record": {
+                "record_id": kwargs["record_id"],
+                "tenant_id": kwargs["tenant_id"],
+                "owner_plane": "memory",
+                "state": "active",
+            },
+        }
+
+    writer = AsyncGovernedMemoryWriter(
+        repo,
+        storage_admitter=admit,
+        governance_reconciler=reconcile,
+    )
+    writer.stage(proposal)
+
+    record = await writer.commit(proposal.proposal_id, now=_now())
+
+    assert record.state is MemoryState.ACTIVE
+    assert len(admissions) == 1
+    assert admissions[0]["capability"] == "memory-persistence"
+    assert admissions[0]["resource_id"] == "memory:tenant-a:assistant"
+    assert admissions[0]["write_id"] == proposal.proposal_id
+    assert admissions[0]["storage_bytes"] > 0
+
+    assert len(governance) == 1
+    governed = governance[0]
+    assert governed["mode"] == "reconcile"
+    assert governed["plane"] == "memory"
+    assert governed["record_id"] == record.memory_id
+    assert governed["tenant_id"] == record.tenant_id
+    assert governed["source_ref"] == (
+        f"memory://{record.namespace}/{record.memory_id}"
+    )
+    assert governed["purposes"] == (
+        "model-inference",
+        "retrieval-synthesis",
+    )
+
+
+@pytest.mark.asyncio
+async def test_async_remote_memory_admission_failure_prevents_mongo_write() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    proposal = _proposal(key="remote-admission-denied")
+
+    async def deny(**_kwargs):
+        raise RuntimeError("engine unavailable")
+
+    async def govern(**kwargs):
+        return {
+            "mode": "reconcile",
+            "record": {
+                "record_id": kwargs["record_id"],
+                "tenant_id": kwargs["tenant_id"],
+                "owner_plane": "memory",
+                "state": "active",
+            },
+        }
+
+    writer = AsyncGovernedMemoryWriter(
+        repo,
+        storage_admitter=deny,
+        governance_reconciler=govern,
+    )
+    writer.stage(proposal)
+
+    with pytest.raises(
+        MemoryWritebackError,
+        match="remote resource admission",
+    ):
+        await writer.commit(proposal.proposal_id, now=_now())
+
+    assert db["canonical_memory_records"].docs == []
+
+
+@pytest.mark.asyncio
+async def test_async_remote_governance_failure_tombstones_mongo_memory() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    proposal = _proposal(key="remote-governance-denied")
+
+    async def admit(**kwargs):
+        return {
+            "receipt_id": "storage-admission:remote-memory",
+            "storage_bytes": kwargs["storage_bytes"],
+        }
+
+    async def deny_governance(**_kwargs):
+        raise RuntimeError("engine governance unavailable")
+
+    writer = AsyncGovernedMemoryWriter(
+        repo,
+        storage_admitter=admit,
+        governance_reconciler=deny_governance,
+    )
+    writer.stage(proposal)
+
+    with pytest.raises(
+        MemoryWritebackError,
+        match="memory was tombstoned",
+    ):
+        await writer.commit(proposal.proposal_id, now=_now())
+
+    rows = await repo.list_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        include_tombstoned=True,
+    )
+    assert len(rows) == 1
+    assert rows[0].state is MemoryState.TOMBSTONED
+
+
+def test_async_governed_writer_rejects_double_local_remote_owners() -> None:
+    repo = MongoMemoryRepository(FakeDatabase())
+    governance = GovernanceRegistry()
+
+    async def admit(**_kwargs):
+        return {}
+
+    async def reconcile(**_kwargs):
+        return {}
+
+    with pytest.raises(ValueError, match="governance owners"):
+        AsyncGovernedMemoryWriter(
+            repo,
+            governance=governance,
+            governance_reconciler=reconcile,
+        )
+
+    with pytest.raises(ValueError, match="admission owners"):
+        AsyncGovernedMemoryWriter(
+            repo,
+            governance=governance,
+            admission_runtime=AdmissionRuntime(),
+            storage_admitter=admit,
+        )
+
+
+@pytest.mark.asyncio
+async def test_mongo_memory_lifecycle_export_and_delete_use_canonical_authority(
+) -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    await repo.ensure_indexes()
+    record = await repo.commit(
+        _proposal(key="lifecycle-memory", content="governed memory"),
+        now=_now(),
+    )
+
+    governance = GovernanceRegistry()
+    source_ref = MongoMemoryLifecycleAdapter.source_ref(
+        record.namespace,
+        record.memory_id,
+    )
+    governance.reconcile_canonical_write(
+        "memory",
+        record_id=record.memory_id,
+        tenant_id=record.tenant_id,
+        source_ref=source_ref,
+        data_class=record.data_class,
+        purposes=("model-inference", "retrieval-synthesis"),
+        deletion_targets=("memory",),
+        created_at=record.created_at.timestamp(),
+        exportable=True,
+    )
+    adapters = LifecycleAdapterRegistry()
+    lifecycle = MongoMemoryLifecycleAdapter(repo)
+    adapters.register_deletion("memory", lifecycle)
+    adapters.register_export("memory", lifecycle)
+    executor = LifecycleExecutor(governance.lifecycle, adapters)
+
+    exported = await executor.export_tenant(record.tenant_id)
+
+    assert exported.tenant_id == record.tenant_id
+    assert len(exported.records) == 1
+    assert exported.records[0]["payload"]["memory_id"] == record.memory_id
+    assert exported.records[0]["payload"]["content"] == "governed memory"
+
+    plan = governance.request_deletion(
+        record.tenant_id,
+        record_ids=(record.memory_id,),
+        reason="memory-lifecycle-test",
+    )
+    deleted = await executor.execute_deletion_plan(plan)
+
+    assert len(deleted.receipts) == 1
+    assert deleted.receipts[0].target == "memory"
+    tombstoned = await repo.get(
+        record.memory_id,
+        tenant_id=record.tenant_id,
+        namespace=record.namespace,
+        include_tombstoned=True,
+    )
+    assert tombstoned.state is MemoryState.TOMBSTONED
+    assert tombstoned.version == record.version + 1
+    with pytest.raises(MemoryNotFound):
+        await repo.get(
+            record.memory_id,
+            tenant_id=record.tenant_id,
+            namespace=record.namespace,
+        )
+
+
+@pytest.mark.asyncio
+async def test_server_registers_mongo_memory_lifecycle_adapters() -> None:
+    from skeleton.api.server import ServerState
+
+    state = ServerState()
+    state.engine_execution_admission_runtime = AdmissionRuntime()
+    db = FakeDatabase()
+
+    writer = await state.bind_canonical_memory_writer(database=db)
+
+    assert writer is state.canonical_memory_writer
+    assert isinstance(
+        state.governance_lifecycle_adapters.deletion("memory"),
+        MongoMemoryLifecycleAdapter,
+    )
+    assert (
+        state.governance_lifecycle_adapters.exporter("memory")
+        is state.governance_lifecycle_adapters.deletion("memory")
+    )
+    await state.close_canonical_memory_writer()
+    state.close_governance_registry()

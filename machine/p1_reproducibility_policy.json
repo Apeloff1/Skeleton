@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "policy_id": "skeleton.p1.reproducibility",
+  "policy_version": "1.0.0",
+  "task_id": "P1-EVID-05",
+  "accountability_ref": "ACC-P1-EVID-05",
+  "non_authoritative": true,
+  "exact_head_required": true,
+  "source_date_epoch_required": true,
+  "runners": [
+    {
+      "id": "promotion-evidence-emitter",
+      "path": "scripts/emit_p1_promotion_evidence.py",
+      "purpose": "Construct canonical exact-head promotion evidence receipts from explicit evidence refs."
+    },
+    {
+      "id": "provenance-pytest-manifest",
+      "path": "scripts/run_provenance_evidence.py",
+      "purpose": "Execute declared canonical provenance test evidence through pytest."
+    },
+    {
+      "id": "p1-reproducibility-verifier",
+      "path": "scripts/check_p1_reproducibility.py",
+      "purpose": "Validate bundle policy bindings and compare independent replay evidence."
+    }
+  ],
+  "budgets": [
+    {
+      "id": "focused-ci",
+      "wall_seconds": 900,
+      "cpu_units": 1,
+      "memory_mb": 4096,
+      "retries": 0,
+      "network_policy": "repository-declared"
+    },
+    {
+      "id": "independent-replay",
+      "wall_seconds": 1200,
+      "cpu_units": 2,
+      "memory_mb": 8192,
+      "retries": 0,
+      "network_policy": "repository-declared"
+    }
+  ],
+  "comparison": {
+    "require_same_repository": true,
+    "require_same_commit_sha": true,
+    "require_same_task_id": true,
+    "require_same_accountability_id": true,
+    "require_same_configuration_digest": true,
+    "require_same_environment_digest": true,
+    "require_same_verifier_id": true,
+    "require_same_verifier_digest": true,
+    "require_same_test_manifest_digest": true,
+    "require_same_runner_id_and_digest": true,
+    "require_same_budget_id_and_digest": true,
+    "require_same_source_date_epoch": true,
+    "require_same_subject_digest": true,
+    "require_same_evidence_digest": true,
+    "run_id_may_differ": true,
+    "run_attempt_may_differ": true,
+    "observed_at_may_differ": true
+  },
+  "terminal_policy": {
+    "reproduced_required_for_qualifying_evidence": true,
+    "deterministic_incompatibility_is_not_success": true,
+    "failed_replay_is_not_success": true,
+    "bundle_cannot_self_promote": true
+  }
+}

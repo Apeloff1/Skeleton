@@ -1,0 +1,23 @@
+{
+  "schema_version": "skeleton.ai.observability_integrity_contract.v1",
+  "status": "active",
+  "gap_id": "G023",
+  "title": "Observability integrity",
+  "canonical_runtime": "skeleton/observability/integrity.py",
+  "ai_mirror": "skeleton/ai/runtime/observability/integrity.py",
+  "existing_resilience_runtime": "skeleton/observability/resilient_telemetry.py",
+  "invariants": [
+    "missing or stale monitor heartbeats are unknown rather than healthy",
+    "emitted delivered and lost telemetry are accounted separately",
+    "receipt sequence gaps are explicit loss evidence",
+    "receipt identity replay mutation fails closed",
+    "cardinality budgets produce visible degradation",
+    "critical sources without evidence are unknown",
+    "required trace stages have deadlines and incomplete traces degrade integrity",
+    "resilient telemetry sink failures are importable into integrity accounting",
+    "observability failure never becomes canonical application state",
+    "implementation state cannot self-grant verification or completion"
+  ],
+  "exact_head_workflow": ".github/workflows/observability-integrity.yml",
+  "completion_authority": false
+}

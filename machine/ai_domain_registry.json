@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "volume": "VOL-071",
+  "status": "implementation_contract",
+  "policy": {
+    "routing_rule": "A specialist is eligible only when its declared domain, sources, tools, assumptions, confidence, and independently owned evaluation satisfy the active domain profile.",
+    "fallback_rule": "Unknown, stale, under-evaluated, out-of-domain, or policy-incompatible specialization falls back to general capability.",
+    "evaluation_rule": "Specialists cannot self-own promotion evidence; evaluation owner and suite identity are part of the domain contract."
+  },
+  "profiles": [
+    {
+      "domain_id": "software-engineering",
+      "description": "Repository-grounded software construction and repair requiring code and test evidence.",
+      "required_source_types": ["repository-state", "test-evidence"],
+      "required_tools": ["repository-read", "test-runner"],
+      "allowed_tools": ["repository-read", "repository-write", "test-runner"],
+      "forbidden_assumptions": ["tests-pass-without-evidence", "unread-code-is-correct"],
+      "evaluation": {
+        "owner_id": "eval-software-quality",
+        "suite_id": "software-specialist-v1",
+        "min_quality_score": 0.82,
+        "min_calibration_score": 0.78,
+        "min_specialist_confidence": 0.72,
+        "max_age_seconds": 604800,
+        "max_future_skew_seconds": 5
+      }
+    },
+    {
+      "domain_id": "simulation-intelligence",
+      "description": "Bounded simulation reasoning with explicit state, model contracts, and simulated-to-real separation.",
+      "required_source_types": ["model-contract", "simulation-state"],
+      "required_tools": ["bounded-rollout", "simulation-read"],
+      "allowed_tools": ["bounded-rollout", "simulation-read"],
+      "forbidden_assumptions": ["simulation-equals-reality", "unbounded-rollout-is-safe"],
+      "evaluation": {
+        "owner_id": "eval-simulation-quality",
+        "suite_id": "simulation-specialist-v1",
+        "min_quality_score": 0.84,
+        "min_calibration_score": 0.8,
+        "min_specialist_confidence": 0.74,
+        "max_age_seconds": 259200,
+        "max_future_skew_seconds": 5
+      }
+    },
+    {
+      "domain_id": "research-synthesis",
+      "description": "Evidence-grounded research synthesis with provenance and explicit source-quality constraints.",
+      "required_source_types": ["primary-source", "provenance-record"],
+      "required_tools": ["source-read"],
+      "allowed_tools": ["source-read", "source-search"],
+      "forbidden_assumptions": ["citation-implies-truth", "secondary-source-is-primary"],
+      "evaluation": {
+        "owner_id": "eval-research-quality",
+        "suite_id": "research-specialist-v1",
+        "min_quality_score": 0.86,
+        "min_calibration_score": 0.82,
+        "min_specialist_confidence": 0.76,
+        "max_age_seconds": 604800,
+        "max_future_skew_seconds": 5
+      }
+    }
+  ],
+  "implementation": {
+    "registry": "skeleton/ai/specialization/domain_registry.py",
+    "tests": "tests/test_vol071_specialized_intelligence.py",
+    "verifier": "scripts/check_vol071_specialized_intelligence.py"
+  }
+}

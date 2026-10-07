@@ -1,0 +1,14 @@
+{
+  "accountability_id": "ACC-WP-W30",
+  "event_type": "start_marker",
+  "actor_id": "chatgpt:gpt-5.6-sol",
+  "actor_type": "agent",
+  "role": "implementation-agent",
+  "signature_method": "github_identity",
+  "note": "Agent attestation through the user-authorized GitHub connector; not a human signature.",
+  "baseline_git_sha": "f135bd3bfdd029dc7c83bd038d62d6569004fbcf",
+  "timestamp_source": "GitHub commit created_at for this start-marker commit",
+  "from_status": "planned",
+  "intended_to_status": "in_progress",
+  "statement": "Begin WP-W30 Production Hardening to remove packaging/release blockers discovered during signed construction."
+}

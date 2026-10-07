@@ -1,0 +1,190 @@
+name: P1 Adversarial AC-11 Evidence Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+      - p1/adversarial-ac20-evidence-20260930
+      - p1/closure-rollup-490-23-20260930
+      - p1/adversarial-wave2-bindings-20260930
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_p1_execution_map.json"
+      - "machine/ai_adversarial_closure.json"
+      - "machine/p1_risk_evidence_policy.json"
+      - "machine/p1_risk_evidence_bindings.json"
+      - "machine/architecture.json"
+      - "machine/state_topology.json"
+      - "machine/capability_interfaces.json"
+      - "scripts/check_ai_master_plan.py"
+      - "scripts/check_ai_adversarial_closure.py"
+      - "scripts/check_architecture_map.py"
+      - "scripts/check_state_topology.py"
+      - "scripts/check_capability_interfaces.py"
+      - "scripts/build_p1_adversarial_ac11_evidence.py"
+      - "tests/test_p1_adversarial_ac11_evidence.py"
+      - "tests/test_p1_adversarial_wave2_bindings.py"
+      - ".github/workflows/p1-adversarial-ac11-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-adversarial-ac11-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify AC-11 semantic drift evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ env.EXPECTED_SHA }}
+
+      - name: Assert exact head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pydantic[email]>=2.13.5"
+          "pydantic-settings>=2.15.0"
+
+      - name: Run live semantic canaries and contract probes
+        run: |
+          set -euo pipefail
+          python scripts/check_ai_master_plan.py
+          python scripts/check_ai_adversarial_closure.py
+          python scripts/check_architecture_map.py
+          python scripts/check_state_topology.py
+          python scripts/check_capability_interfaces.py
+
+      - name: Run AC-11 mutation regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_ai_adversarial_closure.py
+          tests/test_p1_adversarial_ac11_evidence.py
+          tests/test_p1_adversarial_ac11_binding.py
+          tests/test_p1_adversarial_wave2_bindings.py
+          tests/test_p1_adversarial_ac20_binding.py
+          tests/test_p1_bulk_volume_obligation_bindings.py
+          tests/test_p1_risk_evidence_reconciliation.py
+
+      - name: Compile exact-head AC-11 evidence twice
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-ac11
+          python scripts/build_p1_adversarial_ac11_evidence.py             --expected-head "$EXPECTED_SHA"             --out .p1-ac11/report.json             --print-summary
+          python scripts/build_p1_adversarial_ac11_evidence.py             --expected-head "$EXPECTED_SHA"             --out .p1-ac11/replay.json
+          cmp .p1-ac11/report.json .p1-ac11/replay.json
+
+      - name: Prove AC-11 candidate authority boundary
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(
+              Path(".p1-ac11/report.json").read_text(encoding="utf-8")
+          )
+          candidate = report["candidate"]
+          expected_modes = {
+              "semantic_canary",
+              "contract_probe",
+              "drift_eval",
+              "evidence_invalidation",
+          }
+          if report["axis_id"] != "AC-11":
+              raise SystemExit("wrong adversarial axis")
+          if report["candidate_count"] != 1:
+              raise SystemExit("AC-11 candidate count drift")
+          if report["already_bound_count"] != 1:
+              raise SystemExit("AC-11 governed binding not detected")
+          if report["candidate_binding_count"] != 0:
+              raise SystemExit("AC-11 unexpectedly remains a binding candidate")
+          if candidate["binding_present"] is not True:
+              raise SystemExit("AC-11 candidate does not detect governed binding")
+          if set(candidate["required_evidence_modes"]) != expected_modes:
+              raise SystemExit("AC-11 required evidence modes drift")
+          if {row["category"] for row in candidate["evidence"]} != expected_modes:
+              raise SystemExit("AC-11 evidence categories incomplete")
+          if candidate["expected_head"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("AC-11 candidate is not exact-head bound")
+          if candidate["recommended_severity"] != "high":
+              raise SystemExit("AC-11 severity must remain high")
+          if candidate["recommended_disposition"] != "evidence":
+              raise SystemExit("AC-11 disposition must remain evidence")
+          invalidation = candidate["proofs"]["evidence_invalidation"]
+          if invalidation["schema_version_before"] != invalidation["schema_version_after"]:
+              raise SystemExit("AC-11 mutation changed schema version")
+          if invalidation["digest_changed"] is not True:
+              raise SystemExit("AC-11 semantic mutation failed to invalidate digest")
+          for field in (
+              "creates_binding",
+              "accepts_risk",
+              "lowers_severity",
+              "promotes_maturity",
+          ):
+              if candidate[field] is not False:
+                  raise SystemExit(f"AC-11 authority boundary drift: {field}")
+          print(
+              "P1_AC11_BINDING_SEED "
+              + json.dumps(
+                  {
+                      "obligation_id": candidate["obligation_id"],
+                      "obligation_digest": candidate["obligation_digest"],
+                      "owner_id": candidate["owner_id"],
+                      "severity": candidate["recommended_severity"],
+                      "disposition": candidate["recommended_disposition"],
+                      "evidence": candidate["evidence"],
+                  },
+                  sort_keys=True,
+                  separators=(",", ":"),
+              )
+          )
+          PY
+
+      - name: Confirm governed frontier remains 513 resolved and 0 blocking
+        run: |
+          set -euo pipefail
+          python scripts/reconcile_p1_risk_evidence.py             --evaluated-at "2026-10-01T12:00:00+00:00"             --out .p1-ac11/reconciliation.json             --print-summary
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(
+              Path(".p1-ac11/reconciliation.json").read_text(encoding="utf-8")
+          )
+          if report["binding_count"] != 513:
+              raise SystemExit("AC-11 verifier mutated binding count")
+          if report["resolved_count"] != 513:
+              raise SystemExit("AC-11 verifier mutated resolved count")
+          if report["unresolved_blocking_count"] != 0:
+              raise SystemExit("AC-11 verifier mutated blocking count")
+          if report["unclassified_count"] != 0:
+              raise SystemExit("AC-11 verifier reintroduced unclassified risks")
+          if report["disposition_counts"] != {
+              "evidence": 513,
+
+          }:
+              raise SystemExit("AC-11 verifier mutated disposition counts")
+          PY

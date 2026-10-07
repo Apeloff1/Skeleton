@@ -1,0 +1,191 @@
+# Evidence refresh trigger: VOL-016 current-main delegation verification.
+name: P1 Agent Delegation Qualification Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+      - p1/auto-01-privileged-tool-transaction-20260928
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/agents/delegation_qualification.py"
+      - "skeleton/agents/agent_runtime.py"
+      - "skeleton/automation/agents/agent_runtime.py"
+      - "machine/ai_p1_task_backlog.json"
+      - "skeleton/ai/agents/core/delegation_qualification.py"
+      - "skeleton/ai/agents/core/agent_runtime.py"
+      - "skeleton/agents/__init__.py"
+      - "skeleton/automation/agents/__init__.py"
+      - "skeleton/ai/agents/core/__init__.py"
+      - "skeleton/testing/test_agent_delegation_qualification.py"
+      - "skeleton/testing/test_agent_runtime_durable.py"
+      - ".github/workflows/p1-agent-delegation-qualification.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/agents/delegation_qualification.py"
+      - "skeleton/agents/agent_runtime.py"
+      - "skeleton/automation/agents/agent_runtime.py"
+      - "machine/ai_p1_task_backlog.json"
+      - "skeleton/ai/agents/core/delegation_qualification.py"
+      - "skeleton/ai/agents/core/agent_runtime.py"
+      - "skeleton/agents/__init__.py"
+      - "skeleton/automation/agents/__init__.py"
+      - "skeleton/ai/agents/core/__init__.py"
+      - "skeleton/testing/test_agent_delegation_qualification.py"
+      - "skeleton/testing/test_agent_runtime_durable.py"
+      - ".github/workflows/p1-agent-delegation-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-agent-delegation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate bounded agent delegation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "fastapi>=0.110,<1"
+          "pydantic[email]>=2.13.5"
+          "pydantic-settings>=2.15.0"
+
+      - name: Compile delegation qualification
+        run: >-
+          python -m compileall -q
+          skeleton/agents/delegation_qualification.py
+          skeleton/automation/agents/agent_runtime.py
+          skeleton/ai/agents/core/delegation_qualification.py
+          skeleton/ai/agents/core/agent_runtime.py
+
+      - name: Run delegation and lease regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_agent_delegation_qualification.py
+          skeleton/testing/test_agent_runtime_durable.py
+          skeleton/testing/test_swarm_exact_lease_atomicity.py
+          skeleton/testing/test_swarm_fencing.py
+          skeleton/testing/test_swarm_fencing_concurrency.py
+
+      - name: Validate canonical AI file tree parity
+        run: python scripts/check_ai_file_tree.py
+
+      - name: Emit exact-head AUTO-02 evidence receipt
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-auto02
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          evidence_files = [
+              "skeleton/agents/delegation_qualification.py",
+              "skeleton/automation/agents/agent_runtime.py",
+              "skeleton/ai/agents/core/delegation_qualification.py",
+              "skeleton/ai/agents/core/agent_runtime.py",
+              "skeleton/testing/test_agent_delegation_qualification.py",
+              "skeleton/testing/test_agent_runtime_durable.py",
+          ]
+          refs = []
+          for name in evidence_files:
+              refs.append(
+                  {
+                      "source": name,
+                      "digest": hashlib.sha256(Path(name).read_bytes()).hexdigest(),
+                      "category": "repository_state",
+                  }
+              )
+          Path(".p1-auto02/refs.json").write_text(
+              json.dumps(refs, sort_keys=True),
+              encoding="utf-8",
+          )
+
+          def digest(names):
+              h = hashlib.sha256()
+              for name in names:
+                  h.update(name.encode())
+                  h.update(b"\0")
+                  h.update(Path(name).read_bytes())
+                  h.update(b"\0")
+              return h.hexdigest()
+
+          Path(".p1-auto02/config.digest").write_text(
+              digest(["machine/ai_p1_task_backlog.json"]),
+              encoding="utf-8",
+          )
+          Path(".p1-auto02/environment.digest").write_text(
+              hashlib.sha256(b"ubuntu-24.04|python-3.11.16").hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-auto02/verifier.digest").write_text(
+              digest(
+                  [
+                      "skeleton/agents/delegation_qualification.py",
+                      "skeleton/automation/agents/agent_runtime.py",
+                      "skeleton/ai/agents/core/agent_runtime.py",
+                      ".github/workflows/p1-agent-delegation-qualification.yml",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          Path(".p1-auto02/tests.digest").write_text(
+              digest(
+                  [
+                      "skeleton/testing/test_agent_delegation_qualification.py",
+                      "skeleton/testing/test_agent_runtime_durable.py",
+                      "skeleton/testing/test_swarm_exact_lease_atomicity.py",
+                      "skeleton/testing/test_swarm_fencing.py",
+                      "skeleton/testing/test_swarm_fencing_concurrency.py",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          PY
+          python scripts/emit_p1_promotion_evidence.py             --repository Apeloff1/Skeleton             --commit-sha "$EXPECTED_SHA"             --expected-head "$EXPECTED_SHA"             --task-id P1-AUTO-02             --accountability-id ACC-P1-AUTO-02             --configuration-digest "$(cat .p1-auto02/config.digest)"             --environment-digest "$(cat .p1-auto02/environment.digest)"             --verifier-id github-actions:p1-agent-delegation             --verifier-digest "$(cat .p1-auto02/verifier.digest)"             --test-manifest-digest "$(cat .p1-auto02/tests.digest)"             --run-id "$RUN_IDENTITY"             --run-attempt "$RUN_ATTEMPT"             --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"             --evidence-file .p1-auto02/refs.json             --out .p1-auto02/receipt.json             > .p1-auto02/stdout.json
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-auto02/receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("AUTO-02 receipt head mismatch")
+          if receipt["task_id"] != "P1-AUTO-02":
+              raise SystemExit("AUTO-02 receipt task mismatch")
+          if receipt["accountability_id"] != "ACC-P1-AUTO-02":
+              raise SystemExit("AUTO-02 accountability mismatch")
+          for field in ("subject_digest", "evidence_digest", "receipt_digest"):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print("AUTO-02 exact-head receipt OK", receipt["receipt_digest"])
+          PY

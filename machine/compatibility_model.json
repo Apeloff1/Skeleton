@@ -1,0 +1,1251 @@
+{
+  "schema_version": "skeleton.trace.compatibility_model.v1",
+  "model_version": "0.1.0",
+  "status": "active",
+  "purpose": "Producer/consumer compatibility and mixed-version policy for canonical schemas and interfaces.",
+  "masterplan_binding": {
+    "volume_ref": "VOL-130",
+    "title": "Compatibility Model",
+    "required_gap_texts": [
+      "bind schema/API versions to matrix",
+      "define support window policy"
+    ]
+  },
+  "sources": {
+    "schemas": "machine/schema_registry.json",
+    "interfaces": "machine/capability_interfaces.json",
+    "guard": "skeleton/data/schema_evolution.py"
+  },
+  "support_window_policy": {
+    "default_supported_versions": 2,
+    "rule": "Current plus immediately preceding compatible version are supported unless a narrower explicit security policy applies.",
+    "breaking_change_rule": "Breaking changes require version increment, migration order, rollback path, mixed-version behavior and deprecation window before landing.",
+    "rollback_rule": "Writer changes may not remove the ability to roll back within the declared support window."
+  },
+  "schema_matrix": [
+    {
+      "schema_id": "SCHEMA-OperationEnvelope",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "orchestration",
+      "consumer_planes": [
+        "application-api",
+        "engine-api",
+        "reasoning-verification"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-ResourceBudget",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "cost-capacity",
+      "consumer_planes": [
+        "orchestration",
+        "model-routing",
+        "tool-runtime",
+        "prompt-context"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-ConversationThread",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "application-api",
+      "consumer_planes": [
+        "deployment-release",
+        "operator-control",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-ConversationMessage",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "application-api",
+      "consumer_planes": [
+        "deployment-release",
+        "operator-control",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-ContextSegment",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "prompt-context",
+      "consumer_planes": [
+        "orchestration"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-ContextEnvelope",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "prompt-context",
+      "consumer_planes": [
+        "orchestration"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-AIExecutionRequest",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "orchestration",
+      "consumer_planes": [
+        "application-api",
+        "engine-api",
+        "reasoning-verification"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-AgentTurn",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "orchestration",
+      "consumer_planes": [
+        "application-api",
+        "engine-api",
+        "reasoning-verification"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-ProviderToolDefinition",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "model-provider",
+      "consumer_planes": [
+        "application-api",
+        "model-routing",
+        "retrieval"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-ProviderToolCall",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "model-provider",
+      "consumer_planes": [
+        "application-api",
+        "model-routing",
+        "retrieval"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-ProviderUsage",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "model-provider",
+      "consumer_planes": [
+        "application-api",
+        "model-routing",
+        "retrieval"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-ProviderResponse",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "model-provider",
+      "consumer_planes": [
+        "application-api",
+        "model-routing",
+        "retrieval"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-ToolExecutionRequest",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "tool-runtime",
+      "consumer_planes": [
+        "orchestration",
+        "security-safety"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-ToolExecutionReceipt",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "tool-runtime",
+      "consumer_planes": [
+        "orchestration",
+        "security-safety"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-MemoryRecord",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "memory",
+      "consumer_planes": [
+        "application-api",
+        "engine-api",
+        "orchestration",
+        "retrieval"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-VerificationReceipt",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "reasoning-verification",
+      "consumer_planes": [
+        "evaluation"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-AIExecutionResult",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "orchestration",
+      "consumer_planes": [
+        "application-api",
+        "engine-api",
+        "reasoning-verification"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-DelegatedAuthority",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "engine-api",
+      "consumer_planes": [
+        "deployment-release",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-EngineExecutionCommand",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "engine-api",
+      "consumer_planes": [
+        "deployment-release",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-StreamEvent",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "streaming-realtime",
+      "consumer_planes": [
+        "application-api",
+        "product-experience"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-AIError",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "application-api",
+      "consumer_planes": [
+        "deployment-release",
+        "operator-control",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-ProviderRequest",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "model-provider",
+      "consumer_planes": [
+        "application-api",
+        "model-routing",
+        "retrieval"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-RouteDecision",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "model-routing",
+      "consumer_planes": [
+        "cost-capacity",
+        "orchestration",
+        "reasoning-verification",
+        "resilience"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-EvidenceReference",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "retrieval",
+      "consumer_planes": [
+        "application-api",
+        "engine-api",
+        "prompt-context"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-ToolCallProposal",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "tool-runtime",
+      "consumer_planes": [
+        "orchestration",
+        "security-safety"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-ArtifactRecord",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "artifact-files",
+      "consumer_planes": [
+        "application-api"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-ReleaseEvidence",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "deployment-release",
+      "consumer_planes": [
+        "operator-control"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-AdmissionDecision",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "cost-capacity",
+      "consumer_planes": [
+        "orchestration",
+        "model-routing"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-ProviderTransferDecision",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "governance",
+      "consumer_planes": [
+        "artifact-files",
+        "feedback-learning",
+        "memory",
+        "retrieval"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-VerificationRequest",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "reasoning-verification",
+      "consumer_planes": [
+        "evaluation"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-EngineExecutionAck",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "engine-api",
+      "consumer_planes": [
+        "deployment-release",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-EngineExecutionStatus",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "engine-api",
+      "consumer_planes": [
+        "deployment-release",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-EngineCancelCommand",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "engine-api",
+      "consumer_planes": [
+        "deployment-release",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-CapabilityManifest",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "foundation",
+      "consumer_planes": [
+        "configuration-secrets",
+        "data-persistence",
+        "identity",
+        "memory",
+        "model-provider",
+        "observability",
+        "orchestration",
+        "prompt-context",
+        "tool-runtime"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-InstructionPolicyRef",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "prompt-context",
+      "consumer_planes": [
+        "orchestration"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-ProviderDelta",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "model-provider",
+      "consumer_planes": [
+        "application-api",
+        "model-routing",
+        "retrieval"
+      ],
+      "migration_required_for_breaking_change": true
+    }
+  ],
+  "interface_matrix": [
+    {
+      "interface_id": "acceptance_target:deployment-release->application-api",
+      "status": "present",
+      "producer": "deployment-release",
+      "consumer": "application-api",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "acceptance_target:deployment-release->engine-api",
+      "status": "present",
+      "producer": "deployment-release",
+      "consumer": "engine-api",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "acceptance_target:deployment-release->product-experience",
+      "status": "present",
+      "producer": "deployment-release",
+      "consumer": "product-experience",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:application-api->artifact-files",
+      "status": "present",
+      "producer": "application-api",
+      "consumer": "artifact-files",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:application-api->identity",
+      "status": "present",
+      "producer": "application-api",
+      "consumer": "identity",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:application-api->memory",
+      "status": "present",
+      "producer": "application-api",
+      "consumer": "memory",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:application-api->model-provider",
+      "status": "present",
+      "producer": "application-api",
+      "consumer": "model-provider",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:application-api->orchestration",
+      "status": "present",
+      "producer": "application-api",
+      "consumer": "orchestration",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:application-api->retrieval",
+      "status": "present",
+      "producer": "application-api",
+      "consumer": "retrieval",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:artifact-files->data-persistence",
+      "status": "present",
+      "producer": "artifact-files",
+      "consumer": "data-persistence",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:artifact-files->governance",
+      "status": "present",
+      "producer": "artifact-files",
+      "consumer": "governance",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:artifact-files->identity",
+      "status": "present",
+      "producer": "artifact-files",
+      "consumer": "identity",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:artifact-files->security-safety",
+      "status": "present",
+      "producer": "artifact-files",
+      "consumer": "security-safety",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:configuration-secrets->foundation",
+      "status": "present",
+      "producer": "configuration-secrets",
+      "consumer": "foundation",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:cost-capacity->jobs-durability",
+      "status": "present",
+      "producer": "cost-capacity",
+      "consumer": "jobs-durability",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:cost-capacity->model-routing",
+      "status": "present",
+      "producer": "cost-capacity",
+      "consumer": "model-routing",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:cost-capacity->observability",
+      "status": "present",
+      "producer": "cost-capacity",
+      "consumer": "observability",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:data-persistence->configuration-secrets",
+      "status": "present",
+      "producer": "data-persistence",
+      "consumer": "configuration-secrets",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:data-persistence->foundation",
+      "status": "present",
+      "producer": "data-persistence",
+      "consumer": "foundation",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:deployment-release->engine-api",
+      "status": "present",
+      "producer": "deployment-release",
+      "consumer": "engine-api",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:deployment-release->evaluation",
+      "status": "present",
+      "producer": "deployment-release",
+      "consumer": "evaluation",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:deployment-release->observability",
+      "status": "present",
+      "producer": "deployment-release",
+      "consumer": "observability",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:deployment-release->resilience",
+      "status": "present",
+      "producer": "deployment-release",
+      "consumer": "resilience",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:deployment-release->security-safety",
+      "status": "present",
+      "producer": "deployment-release",
+      "consumer": "security-safety",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:engine-api->identity",
+      "status": "present",
+      "producer": "engine-api",
+      "consumer": "identity",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:engine-api->memory",
+      "status": "present",
+      "producer": "engine-api",
+      "consumer": "memory",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:engine-api->observability",
+      "status": "present",
+      "producer": "engine-api",
+      "consumer": "observability",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:engine-api->orchestration",
+      "status": "present",
+      "producer": "engine-api",
+      "consumer": "orchestration",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:engine-api->retrieval",
+      "status": "present",
+      "producer": "engine-api",
+      "consumer": "retrieval",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:evaluation->observability",
+      "status": "present",
+      "producer": "evaluation",
+      "consumer": "observability",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:evaluation->reasoning-verification",
+      "status": "present",
+      "producer": "evaluation",
+      "consumer": "reasoning-verification",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:feedback-learning->evaluation",
+      "status": "present",
+      "producer": "feedback-learning",
+      "consumer": "evaluation",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:feedback-learning->governance",
+      "status": "present",
+      "producer": "feedback-learning",
+      "consumer": "governance",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:feedback-learning->observability",
+      "status": "present",
+      "producer": "feedback-learning",
+      "consumer": "observability",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:governance->configuration-secrets",
+      "status": "present",
+      "producer": "governance",
+      "consumer": "configuration-secrets",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:governance->identity",
+      "status": "present",
+      "producer": "governance",
+      "consumer": "identity",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:identity->foundation",
+      "status": "present",
+      "producer": "identity",
+      "consumer": "foundation",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:jobs-durability->data-persistence",
+      "status": "present",
+      "producer": "jobs-durability",
+      "consumer": "data-persistence",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:jobs-durability->identity",
+      "status": "present",
+      "producer": "jobs-durability",
+      "consumer": "identity",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:jobs-durability->observability",
+      "status": "present",
+      "producer": "jobs-durability",
+      "consumer": "observability",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:memory->data-persistence",
+      "status": "present",
+      "producer": "memory",
+      "consumer": "data-persistence",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:memory->foundation",
+      "status": "present",
+      "producer": "memory",
+      "consumer": "foundation",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:memory->governance",
+      "status": "present",
+      "producer": "memory",
+      "consumer": "governance",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:memory->identity",
+      "status": "present",
+      "producer": "memory",
+      "consumer": "identity",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:model-provider->configuration-secrets",
+      "status": "present",
+      "producer": "model-provider",
+      "consumer": "configuration-secrets",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:model-provider->foundation",
+      "status": "present",
+      "producer": "model-provider",
+      "consumer": "foundation",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:model-routing->model-provider",
+      "status": "present",
+      "producer": "model-routing",
+      "consumer": "model-provider",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:model-routing->observability",
+      "status": "present",
+      "producer": "model-routing",
+      "consumer": "observability",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:observability->foundation",
+      "status": "present",
+      "producer": "observability",
+      "consumer": "foundation",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:operator-control->application-api",
+      "status": "present",
+      "producer": "operator-control",
+      "consumer": "application-api",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:operator-control->deployment-release",
+      "status": "present",
+      "producer": "operator-control",
+      "consumer": "deployment-release",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:operator-control->observability",
+      "status": "present",
+      "producer": "operator-control",
+      "consumer": "observability",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:operator-control->security-safety",
+      "status": "present",
+      "producer": "operator-control",
+      "consumer": "security-safety",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:orchestration->foundation",
+      "status": "present",
+      "producer": "orchestration",
+      "consumer": "foundation",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:orchestration->memory",
+      "status": "present",
+      "producer": "orchestration",
+      "consumer": "memory",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:orchestration->model-routing",
+      "status": "present",
+      "producer": "orchestration",
+      "consumer": "model-routing",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:orchestration->prompt-context",
+      "status": "present",
+      "producer": "orchestration",
+      "consumer": "prompt-context",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:orchestration->tool-runtime",
+      "status": "present",
+      "producer": "orchestration",
+      "consumer": "tool-runtime",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:product-experience->application-api",
+      "status": "present",
+      "producer": "product-experience",
+      "consumer": "application-api",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:product-experience->engine-api",
+      "status": "present",
+      "producer": "product-experience",
+      "consumer": "engine-api",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:product-experience->identity",
+      "status": "present",
+      "producer": "product-experience",
+      "consumer": "identity",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:product-experience->observability",
+      "status": "present",
+      "producer": "product-experience",
+      "consumer": "observability",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:prompt-context->foundation",
+      "status": "present",
+      "producer": "prompt-context",
+      "consumer": "foundation",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:prompt-context->identity",
+      "status": "present",
+      "producer": "prompt-context",
+      "consumer": "identity",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:prompt-context->retrieval",
+      "status": "present",
+      "producer": "prompt-context",
+      "consumer": "retrieval",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:reasoning-verification->model-routing",
+      "status": "present",
+      "producer": "reasoning-verification",
+      "consumer": "model-routing",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:reasoning-verification->orchestration",
+      "status": "present",
+      "producer": "reasoning-verification",
+      "consumer": "orchestration",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:resilience->data-persistence",
+      "status": "present",
+      "producer": "resilience",
+      "consumer": "data-persistence",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:resilience->jobs-durability",
+      "status": "present",
+      "producer": "resilience",
+      "consumer": "jobs-durability",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:resilience->model-routing",
+      "status": "present",
+      "producer": "resilience",
+      "consumer": "model-routing",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:resilience->observability",
+      "status": "present",
+      "producer": "resilience",
+      "consumer": "observability",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:retrieval->data-persistence",
+      "status": "present",
+      "producer": "retrieval",
+      "consumer": "data-persistence",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:retrieval->governance",
+      "status": "present",
+      "producer": "retrieval",
+      "consumer": "governance",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:retrieval->memory",
+      "status": "present",
+      "producer": "retrieval",
+      "consumer": "memory",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:retrieval->model-provider",
+      "status": "present",
+      "producer": "retrieval",
+      "consumer": "model-provider",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:security-safety->configuration-secrets",
+      "status": "present",
+      "producer": "security-safety",
+      "consumer": "configuration-secrets",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:security-safety->identity",
+      "status": "present",
+      "producer": "security-safety",
+      "consumer": "identity",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:security-safety->tool-runtime",
+      "status": "present",
+      "producer": "security-safety",
+      "consumer": "tool-runtime",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:streaming-realtime->application-api",
+      "status": "present",
+      "producer": "streaming-realtime",
+      "consumer": "application-api",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:streaming-realtime->engine-api",
+      "status": "present",
+      "producer": "streaming-realtime",
+      "consumer": "engine-api",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:streaming-realtime->jobs-durability",
+      "status": "present",
+      "producer": "streaming-realtime",
+      "consumer": "jobs-durability",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:streaming-realtime->observability",
+      "status": "present",
+      "producer": "streaming-realtime",
+      "consumer": "observability",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:tool-runtime->configuration-secrets",
+      "status": "present",
+      "producer": "tool-runtime",
+      "consumer": "configuration-secrets",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:tool-runtime->foundation",
+      "status": "present",
+      "producer": "tool-runtime",
+      "consumer": "foundation",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:tool-runtime->identity",
+      "status": "present",
+      "producer": "tool-runtime",
+      "consumer": "identity",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    },
+    {
+      "interface_id": "runtime_dependency:tool-runtime->observability",
+      "status": "present",
+      "producer": "tool-runtime",
+      "consumer": "observability",
+      "compatibility_semantics": "contract-surface additive unless schema registry marks versioned breaking change",
+      "rollback_required": true
+    }
+  ]
+}

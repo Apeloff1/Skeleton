@@ -1,0 +1,7 @@
+{
+  "github_skill_unlock": {
+    "description": "Skills can be unlocked by contributing to or analyzing GitHub repos. Parsed and added to skill bank.",
+    "parser": "github_repo_analyzer",
+    "integration": "Room skill trees + Jeeves permanent skill bank"
+  }
+}
