@@ -1246,3 +1246,40 @@ def test_temporal_evolution_resolution_fails_on_gap_or_overlap(native_model):
     d = TemporalEvidence("d", "claim:overlap", sha256(b"d").hexdigest(), pipeline.temporal_signal(source_year=2000, observed_year=2000, knowledge_cutoff_year=2026, valid_from_year=2000), 900_000, True)
     with pytest.raises(TokenizerContractError, match="ambiguous temporal versions"):
         resolve_temporal_evolution_at(build_temporal_evolution_chain((c, d)), 2001)
+
+
+def test_walk_forward_snapshot_excludes_future_observations(native_model):
+    from hashlib import sha256
+    from skeleton.ai.model_runtime.text_pipeline import TemporalEvidence, TemporalSourceEvidence, TextTokenPipeline, walk_forward_snapshot
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    old = TemporalSourceEvidence(TemporalEvidence("old", "claim:x", sha256(b"a").hexdigest(), pipeline.temporal_signal(source_year=2010, observed_year=2010, knowledge_cutoff_year=2026), 800_000, True), "source-a", "group-a")
+    future = TemporalSourceEvidence(TemporalEvidence("future", "claim:x", sha256(b"b").hexdigest(), pipeline.temporal_signal(source_year=2020, observed_year=2020, knowledge_cutoff_year=2026), 900_000, True), "source-b", "group-b")
+    snapshot = walk_forward_snapshot((future, old), cutoff_year=2015)
+    assert snapshot.evidence_digests == (old.digest,)
+    assert snapshot.excluded_future_digests == (future.digest,)
+    assert snapshot.independent_groups == ("group-a",)
+
+
+def test_independent_confidence_counts_mirrors_once(native_model):
+    from hashlib import sha256
+    from skeleton.ai.model_runtime.text_pipeline import TemporalEvidence, TemporalSourceEvidence, TextTokenPipeline, independent_confidence_ppm
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    signal = pipeline.temporal_signal(source_year=2026, observed_year=2026, knowledge_cutoff_year=2026)
+    value = sha256(b"same").hexdigest()
+    a = TemporalSourceEvidence(TemporalEvidence("a", "claim:x", value, signal, 800_000, True), "mirror-a", "wire-1")
+    b = TemporalSourceEvidence(TemporalEvidence("b", "claim:x", value, signal, 700_000, True), "mirror-b", "wire-1")
+    assert independent_confidence_ppm((a, b)) == 800_000
+
+
+def test_independent_confidence_fuses_distinct_groups(native_model):
+    from hashlib import sha256
+    from skeleton.ai.model_runtime.text_pipeline import TemporalEvidence, TemporalSourceEvidence, TextTokenPipeline, independent_confidence_ppm
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    signal = pipeline.temporal_signal(source_year=2026, observed_year=2026, knowledge_cutoff_year=2026)
+    value = sha256(b"same").hexdigest()
+    a = TemporalSourceEvidence(TemporalEvidence("a", "claim:x", value, signal, 800_000, True), "source-a", "group-a")
+    b = TemporalSourceEvidence(TemporalEvidence("b", "claim:x", value, signal, 500_000, True), "source-b", "group-b")
+    assert independent_confidence_ppm((a, b)) == 900_000
