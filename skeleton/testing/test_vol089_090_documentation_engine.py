@@ -146,8 +146,12 @@ def test_manifest_changes_when_source_changes():
 
 def test_reference_validation_rejects_malformed_reference_syntax():
     checks = validate_references("See [[ref:../escape]] and [[ref:VOL-089]].", {"VOL-089"})
-    assert [check.status for check in checks] == [CheckStatus.PASS, CheckStatus.FAIL]
-    assert any(check.check_id.startswith("reference-invalid:") for check in checks)
+    resolved = next(check for check in checks if check.check_id == "reference:VOL-089")
+    invalid = next(
+        check for check in checks if check.check_id.startswith("reference-invalid:")
+    )
+    assert resolved.status is CheckStatus.PASS
+    assert invalid.status is CheckStatus.FAIL
 
 
 def test_markdown_link_validation_covers_local_external_and_unsafe_paths():
