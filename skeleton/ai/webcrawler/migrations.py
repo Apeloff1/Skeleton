@@ -1,6 +1,6 @@
 """Explicit durable crawler schema migrations."""
 from __future__ import annotations
-SCHEMA_VERSION=6
+SCHEMA_VERSION=7
 MIGRATIONS={
  1:(),
  2:(
@@ -25,6 +25,10 @@ MIGRATIONS={
   "CREATE TABLE IF NOT EXISTS temporal_fragments(fragment_id TEXT PRIMARY KEY, payload TEXT NOT NULL)",
   "CREATE TABLE IF NOT EXISTS evidence_revisions(revision_id TEXT PRIMARY KEY, payload TEXT NOT NULL)",
   "CREATE TABLE IF NOT EXISTS source_quality(source TEXT PRIMARY KEY, alpha REAL NOT NULL, beta REAL NOT NULL)",
+ ),
+ 7:(
+  "CREATE TABLE IF NOT EXISTS action_economics(action_type TEXT PRIMARY KEY, attempts INTEGER NOT NULL, successes INTEGER NOT NULL, mean_cost REAL NOT NULL, mean_latency REAL NOT NULL)",
+  "CREATE TABLE IF NOT EXISTS calibration_outcomes(outcome_id TEXT PRIMARY KEY, predicted REAL NOT NULL, actual INTEGER NOT NULL, resolved_at REAL NOT NULL, metadata TEXT NOT NULL)",
  ),
 }
 def migrate(db):
