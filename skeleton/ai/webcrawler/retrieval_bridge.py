@@ -10,11 +10,15 @@ class RetrievalBridgeReceipt:
 
 class CanonicalRetrievalBridge:
  def __init__(self,index,ledger,chunker):
-  self.index=index;self.ledger=ledger;self.chunker=chunker
+  self.index=index;self.ledger=ledger;self.chunker=chunker;self._receipts={}
+ def _key(self,doc,decision):return f"{doc.content_hash}:{decision.decision_id}"
  def ingest(self,doc:CrawlDocument,decision:PromotionDecision)->RetrievalBridgeReceipt:
   if decision.action!="promote" or decision.content_hash!=doc.content_hash:
    raise ValueError("retrieval admission requires matching promotion")
-  chunks=self.chunker.chunk(doc.content_hash,doc.text)
+  key=self._key(doc,decision)
+  if key in self._receipts:return self._receipts[key]
+  chunks=tuple(self.chunker.chunk(doc.content_hash,doc.text))
+  if len({x.chunk_id for x in chunks})!=len(chunks):raise ValueError("duplicate chunk ids")
   ids=[]
   for chunk in chunks:
    self.index.add(chunk.chunk_id,chunk.text)
@@ -25,4 +29,6 @@ class CanonicalRetrievalBridge:
               "start":chunk.start,"end":chunk.end,
               "promotion_decision_id":decision.decision_id})
    ids.append(entry.entry_id)
-  return RetrievalBridgeReceipt(doc.content_hash,len(chunks),self.index.revision,tuple(ids))
+  receipt=RetrievalBridgeReceipt(doc.content_hash,len(chunks),self.index.revision,tuple(ids))
+  self._receipts[key]=receipt
+  return receipt
