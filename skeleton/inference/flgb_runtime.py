@@ -516,6 +516,8 @@ class UsageLedger:
                 raise FLGBInferenceError("usage ledger sequence drift")
 
     def append(self, input_tokens: int, output_tokens: int, cost_micro_units: int = 0) -> "UsageLedger":
+        if len(self.entries) >= 8:
+            raise FLGBInferenceError("usage attempt budget exceeded")
         entry = UsageEntry(len(self.entries), input_tokens, output_tokens, cost_micro_units)
         total_input = self.input_tokens + input_tokens
         total_output = self.output_tokens + output_tokens
@@ -695,9 +697,12 @@ class ProviderFailoverPlan:
                 return None
             if attempt.outcome not in self.RETRYABLE:
                 return None
+        allowed = {(item.provider, item.model) for item in self.candidates}
         counts: dict[tuple[str, str], int] = {}
         for attempt in attempts:
             key = (attempt.provider, attempt.model)
+            if key not in allowed:
+                raise FLGBInferenceError("attempt references unknown provider candidate")
             counts[key] = counts.get(key, 0) + 1
         for candidate in self.candidates:
             key = (candidate.provider, candidate.model)
