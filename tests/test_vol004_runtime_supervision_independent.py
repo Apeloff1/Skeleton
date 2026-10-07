@@ -256,7 +256,13 @@ def release_work(): pass
             {
                 "key": "VOL-004",
                 "title": "Kernel & Execution Foundation",
+                "scope": "canonical-plan",
                 "implementation_status": "implemented",
+                "requirements": [
+                    "Bootstrap services in deterministic dependency order with explicit readiness and shutdown semantics.",
+                    "Propagate cancellation, deadline, budget and operation identity through all runtime layers.",
+                    "Prevent orphan work and unbounded background execution after terminal operation state.",
+                ],
                 "implementation_paths": sorted(REQUIRED_VOL004_PATHS),
                 "tests": sorted(REQUIRED_VOL004_TESTS),
                 "evaluations": sorted(REQUIRED_VOL004_EVALUATIONS),
@@ -437,3 +443,38 @@ def test_independent_verifier_rejects_signed_pending_machine_state(
         "implementation_state/masterplan drift" in error
         for error in receipt["errors"]
     )
+
+
+def test_independent_verifier_rejects_requirement_drift(tmp_path: Path) -> None:
+    root = _valid_repo(tmp_path)
+    path = root / "machine/ai_master_plan.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    volume = next(v for v in payload["volumes"] if v["key"] == "VOL-004")
+    volume["requirements"] = [
+        value
+        for value in volume["requirements"]
+        if "Prevent orphan work" not in value
+    ]
+    _write_json(path, payload)
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "VOL-004 requirement invariant lost" in error
+        for error in receipt["errors"]
+    )
+
+
+def test_independent_verifier_rejects_scope_drift(tmp_path: Path) -> None:
+    root = _valid_repo(tmp_path)
+    path = root / "machine/ai_master_plan.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    volume = next(v for v in payload["volumes"] if v["key"] == "VOL-004")
+    volume["scope"] = "shadow-plan"
+    _write_json(path, payload)
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert "VOL-004 scope drifted" in receipt["errors"]
