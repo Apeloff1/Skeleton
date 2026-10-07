@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
+import importlib
 import json
 
 from skeleton.learning.school.decision_ledger import (
@@ -20,6 +21,52 @@ from skeleton.learning.school.runtime_replay import (
 from skeleton.learning.school.session_audit import (
     audit_session,
 )
+
+
+def _trusted_twin_instance(
+    value: object,
+    canonical_type: type[object],
+    *,
+    twin_module: str,
+    twin_name: str,
+) -> bool:
+    """Accept only a canonical runtime type or its governed AI-tree twin."""
+
+    if isinstance(value, canonical_type):
+        return True
+    try:
+        module = importlib.import_module(twin_module)
+        twin_type = getattr(module, twin_name)
+    except (ImportError, AttributeError):
+        return False
+    return isinstance(twin_type, type) and isinstance(value, twin_type)
+
+
+def _is_decision_ledger(value: object) -> bool:
+    return _trusted_twin_instance(
+        value,
+        DecisionLedger,
+        twin_module="skeleton.ai.learning.school.decision_ledger",
+        twin_name="DecisionLedger",
+    )
+
+
+def _is_runtime_snapshot(value: object) -> bool:
+    return _trusted_twin_instance(
+        value,
+        RuntimeReplaySnapshot,
+        twin_module="skeleton.ai.learning.school.runtime_replay",
+        twin_name="RuntimeReplaySnapshot",
+    )
+
+
+def _is_runtime_attestation(value: object) -> bool:
+    return _trusted_twin_instance(
+        value,
+        RuntimeAttestation,
+        twin_module="skeleton.ai.learning.school.runtime_attestation",
+        twin_name="RuntimeAttestation",
+    )
 
 
 def _digest(payload: object) -> str:
@@ -65,12 +112,12 @@ class RuntimeAttestation:
         snapshot: RuntimeReplaySnapshot,
         ledger: DecisionLedger,
     ) -> "RuntimeAttestation":
-        if not isinstance(snapshot, RuntimeReplaySnapshot):
+        if not _is_runtime_snapshot(snapshot):
             raise TypeError(
-                "snapshot must be RuntimeReplaySnapshot"
+                "snapshot must be trusted RuntimeReplaySnapshot"
             )
-        if not isinstance(ledger, DecisionLedger):
-            raise TypeError("ledger must be DecisionLedger")
+        if not _is_decision_ledger(ledger):
+            raise TypeError("ledger must be trusted DecisionLedger")
 
         runtime_audit = audit_runtime(snapshot, ledger)
         session_audit = audit_session(
@@ -114,13 +161,13 @@ class RuntimeAttestation:
             record.decision_id
             for record in records
             if record.disposition
-            is DecisionDisposition.ACCEPTED
+            == DecisionDisposition.ACCEPTED
         )
         rejected = tuple(
             record.decision_id
             for record in records
             if record.disposition
-            is DecisionDisposition.REJECTED
+            == DecisionDisposition.REJECTED
         )
         record_hashes = tuple(
             record.record_hash
@@ -142,7 +189,7 @@ class RuntimeAttestation:
             if (
                 selected_record is None
                 or selected_record.disposition
-                is not DecisionDisposition.ACCEPTED
+                != DecisionDisposition.ACCEPTED
             ):
                 raise ValueError(
                     "selected policy decision is not an accepted session record"
@@ -226,16 +273,16 @@ def verify_attestation(
     ledger: DecisionLedger,
 ) -> tuple[str, ...]:
     """Return deterministic integrity violations for an attestation."""
-    if not isinstance(attestation, RuntimeAttestation):
+    if not _is_runtime_attestation(attestation):
         raise TypeError(
-            "attestation must be RuntimeAttestation"
+            "attestation must be trusted RuntimeAttestation"
         )
-    if not isinstance(snapshot, RuntimeReplaySnapshot):
+    if not _is_runtime_snapshot(snapshot):
         raise TypeError(
-            "snapshot must be RuntimeReplaySnapshot"
+            "snapshot must be trusted RuntimeReplaySnapshot"
         )
-    if not isinstance(ledger, DecisionLedger):
-        raise TypeError("ledger must be DecisionLedger")
+    if not _is_decision_ledger(ledger):
+        raise TypeError("ledger must be trusted DecisionLedger")
 
     failures: list[str] = []
     runtime = audit_runtime(snapshot, ledger)
