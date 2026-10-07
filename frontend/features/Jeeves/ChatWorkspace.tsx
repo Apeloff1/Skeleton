@@ -262,7 +262,7 @@ export default function ChatWorkspace() {
       <View style={[s.companionDock, width < 760 && s.companionDockCompact]}>
         <DragonCompanionPanel draft={conversation.draft} lastUserText={[...conversation.messages].reverse().find(message => message.role === 'user')?.text} />
       </View>
-      <ScrollView ref={scroll} style={s.flex} contentContainerStyle={s.transcript} keyboardShouldPersistTaps="handled" testID="jeeves-transcript">
+      <ScrollView ref={scroll} style={s.flex} contentContainerStyle={[s.transcript, width < 760 && s.transcriptCompact]} keyboardShouldPersistTaps="handled" testID="jeeves-transcript">
         {!conversation.messages.length && <View style={s.welcome}>
           <View style={s.crest}><Ionicons name="sparkles-outline" size={34} color={C.purple} /></View>
           <Text style={s.welcomeTitle}>What shall we work on?</Text>
@@ -316,7 +316,7 @@ const s = StyleSheet.create({
   chatTitle: { color: C.text, fontSize: 15, fontWeight: '700', lineHeight: 21 },
   notice: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#26223c', padding: 12 },
   companionDock: { position: 'absolute', right: 16, top: 112, width: 310, zIndex: 8 }, companionDockCompact: { position: 'relative', right: undefined, top: undefined, width: '100%', maxWidth: 420, alignSelf: 'center', paddingHorizontal: 14, paddingTop: 10 },
-  transcript: { padding: 18, paddingBottom: 30, paddingRight: 340, width: '100%', maxWidth: 1280, alignSelf: 'center', flexGrow: 1 },
+  transcript: { padding: 18, paddingBottom: 30, paddingRight: 340, width: '100%', maxWidth: 1280, alignSelf: 'center', flexGrow: 1 }, transcriptCompact: { paddingRight: 18, maxWidth: 960 },
   welcome: { alignItems: 'center', justifyContent: 'center', paddingVertical: 30, gap: 16 },
   crest: { padding: 20, backgroundColor: '#241c38', borderRadius: 24, borderWidth: 1, borderColor: '#463362' },
   welcomeTitle: { fontSize: 28, fontWeight: '700', color: C.text, textAlign: 'center' },
