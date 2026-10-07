@@ -19,3 +19,10 @@ def test_retry_atomically_releases_claim_with_new_schedule():
   a=q.claim("a",now=0,ttl=10);assert q.retry(a,ready_at=20,attempts=1)
   assert q.claim("b",now=19,ttl=10) is None
   b=q.claim("b",now=20,ttl=10);assert b and b.attempts==1
+
+def test_renew_is_fenced_and_cannot_revive_expired_claim():
+ with tempfile.TemporaryDirectory() as d:
+  s=SqliteCrawlStore(d+"/c.db");q=DurableFrontier(s.db);q.enqueue("https://a.example/x")
+  a=q.claim("a",now=0,ttl=2);renewed=q.renew(a,now=1,ttl=5)
+  assert renewed and renewed.expires_at==6
+  assert q.renew(a,now=7,ttl=5) is None
