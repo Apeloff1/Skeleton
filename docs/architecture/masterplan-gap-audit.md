@@ -1319,3 +1319,38 @@ Closed a critical policy gap and repaired a discovered regression:
 This closes the previously documented redirect-target robots authorization blocker.
 
 Remaining UNSIGNED blockers are verification-oriented rather than known crawler-policy holes: exact-head CI/status evidence is still absent, plus load/concurrency characterization and previously rejected content-credential/extraction test mutations.
+
+
+### 2026-10-07 crawler verification and stress tranche
+
+Verification infrastructure now exists specifically for this plane:
+- dedicated `AI Webcrawler Research Plane` workflow;
+- push/PR path filters cover `skeleton/ai/webcrawler/**` and `tests/test_ai_webcrawler_*.py`;
+- exact-head checkout assertion;
+- Python 3.11 crawler compile gate;
+- focused crawler regression corpus execution;
+- manual workflow_dispatch support.
+
+Additional stress invariants landed:
+- 100 repeated deliveries of identical content remain one durable document;
+- 250 distinct documents survive SQLite close/reopen with identity preserved;
+- 100 lease-expiry/successor cycles reject stale completion every time.
+
+CI root-cause finding: prior zero-run observations were expected because existing AI exact-head workflows did not include crawler paths. A crawler-specific gate now closes that configuration gap. GitHub's workflow-run endpoint has not yet surfaced a run for the new gate's triggering commits, so execution success is not claimed.
+
+Status remains IMPLEMENTED / UNSIGNED pending an observed exact-head workflow result.
+
+
+### 2026-10-07 adversarial crawler verification tranche
+
+Additional proof-oriented coverage and repairs:
+- explicit request-budget conservation across robots bootstrap, retry responses and normal document fetches;
+- zero-budget state prevents even autonomous robots network access;
+- checkpoint/restart preserves frontier priority and consumed budget;
+- restore now fails closed on duplicate frontier URLs and frontier/queued-set disagreement;
+- unknown checkpoint schema remains rejected;
+- stress corpus already covers repeated-delivery idempotency, durable reopen and stale-lease fencing.
+
+During verification, an initially drafted replay test assumed a nonexistent class-level restore API. Repository inspection caught the mismatch before treating it as evidence; the test was corrected to the actual keyed instance restore contract, and restore validation was strengthened in production code.
+
+CI observation: the GitHub connector's commit-workflow helper only reports pull-request-triggered runs, so it cannot establish whether push-triggered main runs exist. The repository workflow configuration is now correct for crawler paths, but SIGNED status still requires observable execution evidence rather than inference.
