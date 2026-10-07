@@ -195,9 +195,10 @@
         "FLGB-07-T11",
         "FLGB-07-T12"
       ],
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
-      "independent_verification_signed": false
+      "independent_verification_signed": false,
+      "implementation_note": "T01-T12 governed dataset/training/candidate-weight targets, schemas, and focused regressions are present; the existing VOL-149 post-training owner is reused; exact-head dependency closure and independent verification remain required."
     },
     {
       "id": "FLGB-08",
@@ -5276,7 +5277,7 @@
       "implementation_target": "skeleton/ai/training/dataset_rights.py",
       "contract_target": "skeleton/ai/training/contracts/dataset_rights.schema.json",
       "test_target": "tests/flgb/test_flgb_07_dataset_rights.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -5342,7 +5343,7 @@
       "implementation_target": "skeleton/ai/training/dataset_lineage.py",
       "contract_target": "skeleton/ai/training/contracts/dataset_lineage.schema.json",
       "test_target": "tests/flgb/test_flgb_07_dataset_lineage.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -5408,7 +5409,7 @@
       "implementation_target": "skeleton/ai/training/deduplication.py",
       "contract_target": "skeleton/ai/training/contracts/deduplication.schema.json",
       "test_target": "tests/flgb/test_flgb_07_deduplication.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -5474,7 +5475,7 @@
       "implementation_target": "skeleton/ai/training/contamination_scan.py",
       "contract_target": "skeleton/ai/training/contracts/contamination_scan.schema.json",
       "test_target": "tests/flgb/test_flgb_07_contamination_scan.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -5540,7 +5541,7 @@
       "implementation_target": "skeleton/ai/training/training_manifest.py",
       "contract_target": "skeleton/ai/training/contracts/training_manifest.schema.json",
       "test_target": "tests/flgb/test_flgb_07_training_manifest.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -5606,7 +5607,7 @@
       "implementation_target": "skeleton/ai/training/checkpoint_lineage.py",
       "contract_target": "skeleton/ai/training/contracts/checkpoint_lineage.schema.json",
       "test_target": "tests/flgb/test_flgb_07_checkpoint_lineage.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -5672,7 +5673,7 @@
       "implementation_target": "skeleton/ai/training/post_training.py",
       "contract_target": "skeleton/ai/training/contracts/post_training.schema.json",
       "test_target": "tests/flgb/test_flgb_07_post_training.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -5738,7 +5739,7 @@
       "implementation_target": "skeleton/ai/training/distillation.py",
       "contract_target": "skeleton/ai/training/contracts/distillation.schema.json",
       "test_target": "tests/flgb/test_flgb_07_distillation.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -5804,7 +5805,7 @@
       "implementation_target": "skeleton/ai/training/adapter_training.py",
       "contract_target": "skeleton/ai/training/contracts/adapter_training.schema.json",
       "test_target": "tests/flgb/test_flgb_07_adapter_training.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -5870,7 +5871,7 @@
       "implementation_target": "skeleton/ai/training/candidate_weights.py",
       "contract_target": "skeleton/ai/training/contracts/candidate_weights.schema.json",
       "test_target": "tests/flgb/test_flgb_07_candidate_weights.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -5936,7 +5937,7 @@
       "implementation_target": "skeleton/ai/training/mirror_room_evaluation.py",
       "contract_target": "skeleton/ai/training/contracts/mirror_room_evaluation.schema.json",
       "test_target": "tests/flgb/test_flgb_07_mirror_room_evaluation.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -6002,7 +6003,7 @@
       "implementation_target": "skeleton/ai/training/promotion_gate.py",
       "contract_target": "skeleton/ai/training/contracts/promotion_gate.schema.json",
       "test_target": "tests/flgb/test_flgb_07_promotion_gate.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
