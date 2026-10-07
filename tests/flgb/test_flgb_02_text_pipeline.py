@@ -1394,3 +1394,35 @@ def test_provenance_derived_evidence_prevents_mirror_confidence_inflation(native
     b = source_evidence_from_provenance(TemporalEvidence("b", "claim:x", value, signal, 700_000, True), source_id="mirror-b", graph=graph)
     assert a.independence_group == b.independence_group
     assert independent_confidence_ppm((a, b)) == 800_000
+
+
+def test_temporal_instant_supports_year_month_day_and_leap_day():
+    from skeleton.ai.model_runtime.text_pipeline import TemporalInstant
+    assert TemporalInstant(2026).granularity == "year"
+    assert TemporalInstant(2026, 10, 1, "month").month == 10
+    assert TemporalInstant(2024, 2, 29, "day").day == 29
+    assert TemporalInstant(2024, 2, 29, "day") < TemporalInstant(2024, 3, 1, "day")
+
+
+def test_temporal_instant_rejects_noncanonical_or_impossible_dates():
+    import pytest
+    from skeleton.ai.model_runtime.text_pipeline import TemporalInstant
+    from skeleton.ai.model_runtime.tokenization import TokenizerContractError
+    with pytest.raises(TokenizerContractError):
+        TemporalInstant(2025, 2, 29, "day")
+    with pytest.raises(TokenizerContractError, match="canonical January 1"):
+        TemporalInstant(2026, 2, 1, "year")
+    with pytest.raises(TokenizerContractError, match="canonical first day"):
+        TemporalInstant(2026, 10, 7, "month")
+
+
+def test_temporal_interval_contains_boundaries_and_rejects_reverse():
+    import pytest
+    from skeleton.ai.model_runtime.text_pipeline import TemporalInstant, TemporalInterval
+    from skeleton.ai.model_runtime.tokenization import TokenizerContractError
+    interval = TemporalInterval(TemporalInstant(2024, 2, 29, "day"), TemporalInstant(2024, 3, 2, "day"))
+    assert interval.contains(TemporalInstant(2024, 2, 29, "day"))
+    assert interval.contains(TemporalInstant(2024, 3, 2, "day"))
+    assert not interval.contains(TemporalInstant(2024, 3, 3, "day"))
+    with pytest.raises(TokenizerContractError, match="runs backward"):
+        TemporalInterval(TemporalInstant(2025), TemporalInstant(2024))
