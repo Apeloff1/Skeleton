@@ -26,3 +26,14 @@ from .dns_binding import ResolvedTarget,resolve_target,peer_is_planned
 from .durable_frontier import DurableClaim,DurableFrontier
 from .bound_http import SocketBoundFetcher,BoundConnectionError
 __all__=[name for name in globals() if not name.startswith("_")]
+
+from .temporal_semantics import TemporalSemantics,infer_temporal_semantics
+from .uncertainty import Interval,deterministic_bootstrap,polarity_uncertainty
+from .lag_signals import LagSignal,lag_scan
+from .active_research import AcquisitionTarget,plan_acquisition
+
+from .bitemporal import BitemporalFact
+from .source_dependence import DependenceEdge,source_dependence,independent_host_count
+from .temporal_scope import TemporalScope,filter_temporal
+from .acquisition_queries import AcquisitionQuery,synthesize_acquisition_queries
+from .regime_assurance import ChangePointDecision,gate_change_points

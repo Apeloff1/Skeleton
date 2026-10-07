@@ -95,6 +95,16 @@ class EvidenceSet:
     def qualified(self) -> list[EvidenceObservation]:
         return [o for o in self.observations.values() if o.relevance >= self.query.min_relevance and o.source_score >= self.query.min_source_score]
 
+    def source_dependence(self):
+        from .source_dependence import source_dependence
+        return source_dependence(self.qualified())
+
+    @property
+    def independent_evidence_clusters(self) -> int:
+        from .source_dependence import independent_host_count
+        vals=self.qualified()
+        return independent_host_count(vals,source_dependence(vals)) if vals else 0
+
     @property
     def distinct_hosts(self) -> int:
         return len({x.host for x in self.qualified()})
@@ -197,9 +207,10 @@ class EvidenceSet:
             "query":self.query.text,
             "score":score,
             "distinct_hosts":self.distinct_hosts,
+            "independent_evidence_clusters":self.independent_evidence_clusters,
             "required_sources":self.query.required_sources,
             "contradictions":len(contradictions),
-            "sufficient":self.distinct_hosts >= self.query.required_sources and score >= .45,
+            "sufficient":self.independent_evidence_clusters >= self.query.required_sources and score >= .45,
         }
 
 def frontier_priority(query: str, candidate_url: str, anchor_text: str="", *, same_host: bool=False, target_years: Iterable[int]=(), target_decades: Iterable[int]=()) -> float:

@@ -1611,3 +1611,34 @@ Temporal research now extends substantially beyond fixed calendar decades:
 - focused regressions cover structural splits, gap segmentation, reversal classification and high-risk historical evidence.
 
 This transforms decade signals from descriptive calendar summaries into a regime-aware historical reasoning plane. Advanced next work: richer event/publication/valid-time extraction, statistically calibrated change-point thresholds, bootstrap uncertainty around regime boundaries, and active acquisition policies that prioritize high-bias or persistently contested historical regimes.
+
+
+### 2026-10-07 deep temporal research and active acquisition tranche
+
+The historical signal plane now includes deeper temporal semantics and research feedback:
+- TemporalSemantics separates observation time from inferred publication time and explicit event-year span, retaining confidence and extraction basis instead of collapsing all dates into one timestamp;
+- deterministic bootstrap intervals provide reproducible uncertainty estimates for evidence-derived signal statistics;
+- lag_scan compares annual signal series across bounded positive/negative offsets and reports correlation/overlap as precursor-lag evidence without asserting causality;
+- active acquisition planning combines learned-regime sparsity, historical/archive bias, persistent contradiction and uncertainty into bounded, explainable historical research priorities;
+- these acquisition targets can be translated into existing year/decade-directed frontier and federated-provider searches, closing analysis-to-acquisition feedback;
+- regressions cover multi-time separation, deterministic uncertainty, shifted annual signals and biased/contested regime acquisition priority.
+
+Research grounding reviewed during this tranche includes recent temporal GraphRAG, temporal-validity/decay, entity-event temporal-causal RAG, dynamic temporal GraphRAG, and agentic event-forecasting work. The implementation deliberately keeps deterministic evidence/provenance contracts and does not equate lag correlation with causation.
+
+Advanced next work: attach TemporalSemantics to EvidenceObservation directly; calibrate event/publication extraction using structured page metadata; propagate uncertainty into regime boundary acceptance; generate acquisition queries from AcquisitionTarget; and add temporal retrieval filters over the canonical knowledge/retrieval bridge.
+
+
+### 2026-10-07 deep research methodology tranche
+
+Temporal research now includes methodology-level controls beyond calendar/regime aggregation:
+- BitemporalFact separates valid/event time from knowledge/transaction time, supporting questions of both "when was this true?" and "what was known as of this point?";
+- TemporalScope provides explicit event-range and as-of filtering for evidence selection;
+- source-dependence analysis clusters identical-content, same-host and high-overlap evidence so mirrors/syndication cannot inflate corroboration merely by appearing on distinct hosts;
+- EvidenceSet assurance now exposes and requires dependence-adjusted independent evidence clusters for source sufficiency;
+- regime change points can be assurance-gated using independent-host support and uncertainty, preventing high-variance historical shifts from becoming accepted boundaries solely on point estimates;
+- active historical acquisition targets can be compiled into bounded deterministic search queries with explicit year spans and reasons;
+- regression coverage exercises bitemporal visibility, temporal scope, mirror collapse, bounded query synthesis and uncertainty-aware regime rejection.
+
+Research grounding for this tranche reviewed current work on temporal GraphRAG/time-consistent retrieval, temporal knowledge-store planning, evidence-retroactive RAG, and change-point inference. The implementation retains explicit deterministic contracts and avoids interpreting lag/correlation as causal evidence.
+
+Next research depth: provenance lineage beyond textual similarity (citation/reference relationships), structured date metadata extraction into EvidenceObservation, temporal scope propagation through canonical retrieval indexes, counterfactual evidence tests, calibration metrics (Brier/ECE) for historical confidence, and evidence-revision receipts so retroactive research changes are auditable.
