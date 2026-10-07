@@ -9,6 +9,8 @@ from .slo_planner import ResourcePlan, RuntimeEstimate, SLOResourcePlanner, SLOT
 from .serving_telemetry import RequestTelemetry, ServingTelemetryWindow
 from .runtime_feedback import DeterministicRuntimeEstimator, FeedbackLimits, FeedbackReceipt
 from .closed_loop_serving import ClosedLoopServingController, ControlDecision
+from .iteration_scheduler import InferencePhase, IterationPlan, IterationScheduler, IterationSlice, IterationWork
+from .execution_telemetry import ExecutionTiming
 from .flgb_model_runtime import (
     ALLOWED_TRANSITIONS,
     BatchRequest,
@@ -91,11 +93,17 @@ __all__ = [
     "DevicePolicy",
     "DeviceReceipt",
     "EpochStatus",
+    "ExecutionTiming",
     "FeedbackLimits",
     "FeedbackReceipt",
     "GenerationConfig",
     "GenerationResult",
     "GenerationStream",
+    "InferencePhase",
+    "IterationPlan",
+    "IterationScheduler",
+    "IterationSlice",
+    "IterationWork",
     "KVCacheEntry",
     "LocalModelReceipt",
     "LocalModelRequest",
