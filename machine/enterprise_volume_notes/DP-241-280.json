@@ -1598,16 +1598,7 @@
         "evaluations": [
           ".github/workflows/p1-reasoning-search-stop-policy.yml"
         ],
-        "existing_evidence": [
-          ".github/workflows/p1-reasoning-search-stop-policy.yml",
-          "git-head:31d7ea22706a83a4c46e9aa95e5700a68a69f902",
-          "git-head:ff7d3e764d81c7f80bbc698516b03bd872c04961",
-          "github-actions-job:108726229944",
-          "github-actions-job:111334676216",
-          "github-actions-job:111334676231",
-          "github-actions-job:111334676388",
-          "github-actions-job:111334677962"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -2277,13 +2268,7 @@
         "evaluations": [
           ".github/workflows/p1-reasoning-search-stop-policy.yml"
         ],
-        "existing_evidence": [
-          "git-head:ff7d3e764d81c7f80bbc698516b03bd872c04961",
-          "github-actions-job:108726229944",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896",
-          "https://github.com/Apeloff1/Skeleton/commit/ff7d3e764d81c7f80bbc698516b03bd872c04961",
-          "https://github.com/Apeloff1/Skeleton/commit/209a2fc39b00dc00789e274772dc5724051db2c5"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -2511,13 +2496,7 @@
         "evaluations": [
           ".github/workflows/p1-reasoning-search-stop-policy.yml"
         ],
-        "existing_evidence": [
-          "git-head:ff7d3e764d81c7f80bbc698516b03bd872c04961",
-          "github-actions-job:108726229944",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896",
-          "https://github.com/Apeloff1/Skeleton/commit/ff7d3e764d81c7f80bbc698516b03bd872c04961",
-          "https://github.com/Apeloff1/Skeleton/commit/209a2fc39b00dc00789e274772dc5724051db2c5"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -2740,16 +2719,7 @@
         "evaluations": [
           ".github/workflows/p1-reasoning-search-stop-policy.yml"
         ],
-        "existing_evidence": [
-          "skeleton/intelligence/strategy_registry.py",
-          "skeleton/testing/test_reasoning_strategy_registry.py",
-          ".github/workflows/p1-reasoning-search-stop-policy.yml",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896",
-          "https://github.com/Apeloff1/Skeleton/commit/ff7d3e764d81c7f80bbc698516b03bd872c04961",
-          "https://github.com/Apeloff1/Skeleton/commit/209a2fc39b00dc00789e274772dc5724051db2c5",
-          "git-head:ff7d3e764d81c7f80bbc698516b03bd872c04961",
-          "github-actions-job:108726229944"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -2974,16 +2944,7 @@
           ".github/workflows/p1-answer-artifact-quality.yml",
           ".github/workflows/p1-core-intelligence-bundle.yml"
         ],
-        "existing_evidence": [
-          "skeleton/intelligence/output_quality.py",
-          "skeleton/ai/runtime/intelligence/output_quality.py",
-          "skeleton/testing/test_answer_artifact_quality.py",
-          ".github/workflows/p1-answer-artifact-quality.yml",
-          ".github/workflows/p1-core-intelligence-bundle.yml",
-          "git-head:0338bd4519e33e574ced4705b414f4b7345b4a7b",
-          "github-actions-job:109014996463",
-          "github-actions-job:109014994255"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -3208,16 +3169,7 @@
           ".github/workflows/p1-answer-artifact-quality.yml",
           ".github/workflows/p1-core-intelligence-bundle.yml"
         ],
-        "existing_evidence": [
-          "skeleton/intelligence/output_quality.py",
-          "skeleton/ai/runtime/intelligence/output_quality.py",
-          "skeleton/testing/test_answer_artifact_quality.py",
-          ".github/workflows/p1-answer-artifact-quality.yml",
-          ".github/workflows/p1-core-intelligence-bundle.yml",
-          "git-head:0338bd4519e33e574ced4705b414f4b7345b4a7b",
-          "github-actions-job:109014996463",
-          "github-actions-job:109014994255"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -3446,12 +3398,7 @@
         "evaluations": [
           ".github/workflows/p1-human-control.yml"
         ],
-        "existing_evidence": [
-          "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
-          "github-actions-job:109064006960",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36462413272",
-          "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -3681,12 +3628,7 @@
         "evaluations": [
           ".github/workflows/p1-blast-radius-alignment.yml"
         ],
-        "existing_evidence": [
-          "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
-          "github-actions-job:109064006200",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36462412966",
-          "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -3916,12 +3858,7 @@
         "evaluations": [
           ".github/workflows/p1-blast-radius-alignment.yml"
         ],
-        "existing_evidence": [
-          "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
-          "github-actions-job:109064006200",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36462412966",
-          "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
@@ -4151,12 +4088,7 @@
         "evaluations": [
           ".github/workflows/p1-blast-radius-alignment.yml"
         ],
-        "existing_evidence": [
-          "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
-          "github-actions-job:109064006200",
-          "https://github.com/Apeloff1/Skeleton/actions/runs/36462412966",
-          "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
-        ]
+        "existing_evidence": []
       },
       "implementation_levels": [
         {
