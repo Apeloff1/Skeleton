@@ -172,6 +172,13 @@ class VisionResult:
         if not isinstance(region, ImageRegion) or not isinstance(asset, ImageAsset):
             raise VisionError("typed region and asset required")
         region.validate(asset)
+        if (
+            isinstance(confidence, bool)
+            or not isinstance(confidence, (int, float))
+            or not math.isfinite(confidence)
+            or not 0 <= confidence <= 1
+        ):
+            raise VisionError("invalid confidence")
         body = {
             "asset_id": region.asset_id,
             "source_digest": asset.source_digest,

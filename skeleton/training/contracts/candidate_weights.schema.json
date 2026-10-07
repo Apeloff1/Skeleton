@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-07:candidate_weights:v1",
+  "title": "FLGB-07 candidate weights",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "candidate_id",
+    "weights_digest",
+    "training_lineage_digest",
+    "base_model_digest",
+    "status"
+  ],
+  "properties": {
+    "candidate_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "weights_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "training_lineage_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "base_model_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "status": {
+      "enum": [
+        "candidate",
+        "quarantined",
+        "rejected",
+        "promoted"
+      ]
+    }
+  }
+}
