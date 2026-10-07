@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-02:native-llm-runtime:v2",
+  "title": "FLGB-02 native LLM generation result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "model_digest",
+    "tokenizer_digest",
+    "architecture_digest",
+    "request_digest",
+    "output_digest",
+    "config_digest",
+    "device_digest",
+    "prompt_token_ids",
+    "generated_token_ids",
+    "finish_reason",
+    "usage",
+    "checkpoint_digest"
+  ],
+  "properties": {
+    "model_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "tokenizer_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "architecture_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "request_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "output_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "config_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "device_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "prompt_token_ids": {
+      "type": "array",
+      "maxItems": 1000000,
+      "items": {"type": "integer", "minimum": 0, "maximum": 2147483647}
+    },
+    "generated_token_ids": {
+      "type": "array",
+      "maxItems": 1000000,
+      "items": {"type": "integer", "minimum": 0, "maximum": 2147483647}
+    },
+    "finish_reason": {"enum": ["completed", "length", "stop_token"]},
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prompt_tokens",
+        "generated_tokens",
+        "total_tokens",
+        "model_bytes",
+        "kv_peak_bytes",
+        "cache_resets"
+      ],
+      "properties": {
+        "prompt_tokens": {"type": "integer", "minimum": 0},
+        "generated_tokens": {"type": "integer", "minimum": 0},
+        "total_tokens": {"type": "integer", "minimum": 0},
+        "model_bytes": {"type": "integer", "minimum": 1},
+        "kv_peak_bytes": {"type": "integer", "minimum": 0},
+        "cache_resets": {"type": "integer", "minimum": 0}
+      }
+    },
+    "checkpoint_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

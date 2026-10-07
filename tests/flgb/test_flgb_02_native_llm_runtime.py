@@ -1,0 +1,327 @@
+import copy
+import unittest
+
+from skeleton.cortex.bpe import BytePairEncoder
+from skeleton.cortex.transformer import TinyTransformer
+from skeleton.ai.model_runtime import (
+    BatchGenerationRequest,
+    DevicePolicy,
+    GenerationConfig,
+    NativeLLMRuntime,
+    ReplayMismatch,
+    RuntimeContractError,
+    RuntimeLimits,
+)
+
+
+class TestNativeLLMRuntime(unittest.TestCase):
+    def model(self, *, ctx=8, seed=11):
+        return TinyTransformer(
+            vocab=("hello", "world", "again", "small", "runtime", "token"),
+            dim=8,
+            ctx=ctx,
+            seed=seed,
+            n_heads=2,
+            n_layers=2,
+            d_ff=16,
+        )
+
+    def runtime(self, *, ctx=8):
+        return NativeLLMRuntime(
+            self.model(ctx=ctx),
+            device_policy=DevicePolicy("cpu"),
+        )
+
+    def test_architecture_is_real_transformer_shape(self):
+        runtime = self.runtime()
+        architecture = runtime.architecture
+        self.assertEqual(architecture.dim, 8)
+        self.assertEqual(architecture.context, 8)
+        self.assertEqual(architecture.heads, 2)
+        self.assertEqual(architecture.layers, 2)
+        self.assertEqual(architecture.feed_forward, 16)
+        self.assertIn("rope", architecture.positional)
+        health = runtime.health_snapshot()
+        self.assertEqual(health["model_digest"], runtime.model_digest)
+        self.assertEqual(
+            health["tokenizer_digest"],
+            runtime.tokenizer.digest,
+        )
+        self.assertGreater(health["model_bytes"], 0)
+        self.assertGreater(health["kv_bytes_per_token"], 0)
+
+    def test_generation_returns_only_new_tokens(self):
+        runtime = self.runtime()
+        prompt = runtime.encode("hello world")
+        result = runtime.generate(
+            "hello world",
+            GenerationConfig(
+                max_new_tokens=3,
+                seed=3,
+                temperature=0.0,
+            ),
+        )
+        self.assertEqual(result.prompt_sequence, prompt)
+        self.assertEqual(len(result.generated_ids), 3)
+        self.assertEqual(len(result.generated_tokens), 3)
+        self.assertEqual(
+            result.usage.total_tokens,
+            len(prompt.token_ids) + 3,
+        )
+        self.assertEqual(result.finish_reason, "length")
+        record = result.to_record()
+        self.assertEqual(
+            record["generated_token_ids"],
+            list(result.generated_ids),
+        )
+        self.assertEqual(record["output_digest"], result.output_digest)
+
+    def test_stream_has_admission_prompt_tokens_completion(self):
+        runtime = self.runtime()
+        stream = runtime.stream(
+            "hello world",
+            GenerationConfig(
+                max_new_tokens=2,
+                seed=2,
+                temperature=0.0,
+            ),
+        )
+        events = list(stream)
+        self.assertIsNotNone(stream.result)
+        self.assertEqual(
+            [event.kind for event in events[:2]],
+            ["admitted", "prompt"],
+        )
+        self.assertEqual(events[-1].kind, "completed")
+        self.assertEqual(
+            tuple(
+                event.token_id
+                for event in events
+                if event.kind == "token"
+            ),
+            stream.result.generated_ids,
+        )
+
+    def test_cached_and_uncached_greedy_decode_match(self):
+        left = self.runtime(ctx=6)
+        right = NativeLLMRuntime(
+            TinyTransformer.from_snapshot(left.model.snapshot())
+        )
+        cached = left.generate(
+            "hello world again",
+            GenerationConfig(
+                max_new_tokens=6,
+                temperature=0.0,
+                use_cache=True,
+            ),
+        )
+        uncached = right.generate(
+            "hello world again",
+            GenerationConfig(
+                max_new_tokens=6,
+                temperature=0.0,
+                use_cache=False,
+            ),
+        )
+        self.assertEqual(cached.generated_ids, uncached.generated_ids)
+        self.assertEqual(cached.text, uncached.text)
+        self.assertGreater(cached.usage.kv_peak_bytes, 0)
+        self.assertEqual(uncached.usage.kv_peak_bytes, 0)
+        self.assertGreaterEqual(cached.usage.cache_resets, 1)
+
+    def test_seeded_sampling_replays(self):
+        runtime = self.runtime()
+        config = GenerationConfig(
+            max_new_tokens=5,
+            seed=991,
+            temperature=0.9,
+            top_k=4,
+            top_p=0.8,
+        )
+        first = runtime.generate("hello world", config)
+        replay = runtime.replay(
+            first.replay_receipt,
+            "hello world",
+            config,
+        )
+        self.assertEqual(replay.generated_ids, first.generated_ids)
+        self.assertEqual(replay.output_digest, first.output_digest)
+        with self.assertRaises(ReplayMismatch):
+            runtime.replay(
+                first.replay_receipt,
+                "hello world",
+                GenerationConfig(
+                    max_new_tokens=5,
+                    seed=992,
+                    temperature=0.9,
+                    top_k=4,
+                    top_p=0.8,
+                ),
+            )
+
+    def test_stop_token_terminates_decode(self):
+        runtime = self.runtime()
+        first = runtime.generate(
+            "hello world",
+            GenerationConfig(
+                max_new_tokens=1,
+                temperature=0.0,
+            ),
+        )
+        stop_id = first.generated_ids[0]
+        stopped = runtime.generate(
+            "hello world",
+            GenerationConfig(
+                max_new_tokens=6,
+                temperature=0.0,
+                stop_token_ids=(stop_id,),
+            ),
+        )
+        self.assertEqual(stopped.finish_reason, "stop_token")
+        self.assertEqual(stopped.generated_ids, (stop_id,))
+        self.assertIn(
+            "stopped",
+            [event.kind for event in stopped.events],
+        )
+
+    def test_checkpoint_round_trip_and_tamper_rejection(self):
+        runtime = self.runtime()
+        config = GenerationConfig(
+            max_new_tokens=4,
+            seed=42,
+            temperature=0.0,
+        )
+        before = runtime.generate("hello world", config)
+        checkpoint = runtime.checkpoint()
+        restored = NativeLLMRuntime.restore(
+            checkpoint,
+            device_policy=DevicePolicy("cpu"),
+        )
+        after = restored.generate("hello world", config)
+        self.assertEqual(restored.model_digest, runtime.model_digest)
+        self.assertEqual(
+            restored.tokenizer.digest,
+            runtime.tokenizer.digest,
+        )
+        self.assertEqual(after.generated_ids, before.generated_ids)
+        self.assertEqual(after.output_digest, before.output_digest)
+        from_json = NativeLLMRuntime.restore_json(
+            runtime.checkpoint_json(),
+            device_policy=DevicePolicy("cpu"),
+        )
+        self.assertEqual(from_json.model_digest, runtime.model_digest)
+
+        tampered = copy.deepcopy(checkpoint)
+        tampered["model"]["E"][0][0] += 1.0
+        with self.assertRaises(RuntimeContractError):
+            NativeLLMRuntime.restore(tampered)
+
+    def test_model_and_bpe_mutation_require_readmission(self):
+        model = self.model()
+        bpe = BytePairEncoder(merges=8)
+        bpe.fit(("hello world", "hello again", "small runtime"))
+        model.bpe = bpe
+        runtime = NativeLLMRuntime(model)
+        old = runtime.model_digest
+
+        runtime.model.bout[0] += 0.25
+        with self.assertRaises(RuntimeContractError):
+            runtime.generate(
+                "hello",
+                GenerationConfig(max_new_tokens=1),
+            )
+        self.assertNotEqual(old, runtime.refresh_model_identity())
+
+        runtime.model.bpe.merges.append(("x", "y", "xy"))
+        with self.assertRaises(RuntimeContractError):
+            runtime.generate(
+                "hello",
+                GenerationConfig(max_new_tokens=1),
+            )
+
+    def test_context_total_model_and_kv_budgets_fail_closed(self):
+        runtime = NativeLLMRuntime(
+            self.model(ctx=4),
+            limits=RuntimeLimits(
+                max_context=4,
+                max_new_tokens=3,
+                max_total_tokens=5,
+                max_model_bytes=2**30,
+                max_kv_bytes=2**30,
+                max_batch_size=4,
+                max_batch_tokens=20,
+                max_checkpoint_bytes=20_000_000,
+            ),
+        )
+        with self.assertRaises(RuntimeContractError):
+            runtime.generate(
+                "hello world again small runtime",
+                GenerationConfig(max_new_tokens=1),
+            )
+        with self.assertRaises(RuntimeContractError):
+            runtime.generate(
+                "hello world again",
+                GenerationConfig(max_new_tokens=3),
+            )
+        with self.assertRaises(RuntimeContractError):
+            runtime.generate(
+                "hello",
+                GenerationConfig(max_new_tokens=4),
+            )
+
+        with self.assertRaises(RuntimeContractError):
+            NativeLLMRuntime(
+                self.model(ctx=4),
+                limits=RuntimeLimits(
+                    max_context=4,
+                    max_new_tokens=2,
+                    max_total_tokens=6,
+                    max_model_bytes=2**30,
+                    max_kv_bytes=1,
+                    max_batch_size=4,
+                    max_batch_tokens=20,
+                    max_checkpoint_bytes=20_000_000,
+                ),
+            )
+
+    def test_batch_and_sampling_contracts(self):
+        runtime = self.runtime()
+        config = GenerationConfig(
+            max_new_tokens=2,
+            seed=1,
+            temperature=0.0,
+        )
+        results = runtime.generate_batch(
+            (
+                BatchGenerationRequest("a", "hello", config),
+                BatchGenerationRequest("b", "world", config),
+            )
+        )
+        self.assertEqual(
+            [item.request_id for item in results],
+            ["a", "b"],
+        )
+        with self.assertRaises(RuntimeContractError):
+            runtime.generate_batch(
+                (
+                    BatchGenerationRequest("same", "hello", config),
+                    BatchGenerationRequest("same", "world", config),
+                )
+            )
+        with self.assertRaises(RuntimeContractError):
+            runtime.generate(
+                "hello",
+                GenerationConfig(max_new_tokens=1, top_p=0.0),
+            )
+        with self.assertRaises(RuntimeContractError):
+            runtime.generate(
+                "hello",
+                GenerationConfig(
+                    max_new_tokens=1,
+                    top_k=runtime.tokenizer.vocab_size + 1,
+                ),
+            )
+
+
+if __name__ == "__main__":
+    unittest.main()
