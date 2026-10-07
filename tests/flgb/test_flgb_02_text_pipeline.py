@@ -1426,3 +1426,33 @@ def test_temporal_interval_contains_boundaries_and_rejects_reverse():
     assert not interval.contains(TemporalInstant(2024, 3, 3, "day"))
     with pytest.raises(TokenizerContractError, match="runs backward"):
         TemporalInterval(TemporalInstant(2025), TemporalInstant(2024))
+
+
+def test_round_trip_receipt_binds_lossless_decode(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    receipt = pipeline.round_trip_receipt("alpha beta")
+    assert receipt.sequence_digest == pipeline.encode("alpha beta").digest
+    assert len(receipt.source_text_digest) == 64
+    assert len(receipt.decoded_text_digest) == 64
+    assert isinstance(receipt.lossless, bool)
+    assert receipt.digest == pipeline.round_trip_receipt("alpha beta").digest
+
+
+def test_round_trip_receipt_can_fail_closed_on_loss(native_model, monkeypatch):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    monkeypatch.setattr(pipeline.tokenizer, "decode_ids", lambda token_ids: "different")
+    with pytest.raises(TokenizerContractError, match="round trip is lossy"):
+        pipeline.round_trip_receipt("alpha beta", require_lossless=True)
+
+
+def test_verify_round_trip_preserves_legacy_default(native_model, monkeypatch):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    monkeypatch.setattr(pipeline.tokenizer, "decode_ids", lambda token_ids: "different")
+    sequence = pipeline.verify_round_trip("alpha beta")
+    assert sequence.source_text_digest == pipeline.encode("alpha beta").source_text_digest
