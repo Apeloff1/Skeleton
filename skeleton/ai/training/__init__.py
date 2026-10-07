@@ -15,3 +15,8 @@ __all__=[
     "TrainingManifest","deduplicate","scan_contamination","PostTrainingCandidate",
     "PostTrainingError","PostTrainingRun","PreferenceDataset",
 ]
+
+from .project_learning import LearningApproval, ProjectLearningError, ProjectOutcome, ProjectTrainingAdmission, admit_project_outcome
+from .project_learning_run import ProjectLearningRun, build_project_learning_manifest
+from .lifecycle_proof import LifecycleProof, LifecycleProofError, LifecycleStage, prove_project_learning
+__all__ += ["LearningApproval","ProjectLearningError","ProjectOutcome","ProjectTrainingAdmission","admit_project_outcome","ProjectLearningRun","build_project_learning_manifest","LifecycleProof","LifecycleProofError","LifecycleStage","prove_project_learning"]
