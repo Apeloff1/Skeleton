@@ -280,13 +280,12 @@ def violations(path: Path) -> list[str]:
         with path.open("r", encoding="utf-8", newline="") as handle:
             number = 1
             carry = ""
+            line_bytes = 0
+            overlong_line = False
             while True:
                 fragment = handle.readline(SCAN_FRAGMENT_CHARS)
                 if not fragment:
                     break
-
-                combined = carry + fragment
-                findings.extend(_scan_secret_fragment(combined, label, number))
 
                 continued = (
                     len(fragment) >= SCAN_FRAGMENT_CHARS
@@ -294,9 +293,37 @@ def violations(path: Path) -> list[str]:
                     and not fragment.endswith("\r")
                 )
                 if continued:
-                    carry = combined[-SCAN_OVERLAP_CHARS:]
+                    payload_fragment = fragment
+                elif fragment.endswith("\r\n"):
+                    payload_fragment = fragment[:-2]
+                elif fragment.endswith("\n") or fragment.endswith("\r"):
+                    payload_fragment = fragment[:-1]
                 else:
+                    payload_fragment = fragment
+
+                line_bytes += len(payload_fragment.encode("utf-8"))
+                if not overlong_line and line_bytes > MAX_FILE_BYTES:
+                    findings.append(
+                        f"{label}:{number}: scan failure: exceeds "
+                        f"{MAX_FILE_BYTES}-byte secret-scan line limit"
+                    )
+                    overlong_line = True
                     carry = ""
+
+                if not overlong_line:
+                    combined = carry + fragment
+                    findings.extend(
+                        _scan_secret_fragment(combined, label, number)
+                    )
+                    if continued:
+                        carry = combined[-SCAN_OVERLAP_CHARS:]
+                    else:
+                        carry = ""
+
+                if not continued:
+                    carry = ""
+                    line_bytes = 0
+                    overlong_line = False
                     number += 1
     except UnicodeError as exc:
         return [f"{label}: read failure: {type(exc).__name__}"]
