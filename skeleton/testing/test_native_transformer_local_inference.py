@@ -3,7 +3,7 @@ import threading
 import unittest
 
 from skeleton.cortex.transformer import TinyTransformer
-from skeleton.ai.model_runtime import DevicePolicy, NativeLLMRuntime
+from skeleton.ai.model_runtime import DevicePolicy, NativeLLMRuntime, RuntimeContractError
 from skeleton.ai.runtime.inference import (
     LocalInferenceCancelled,
     LocalInferenceEngine,
@@ -78,8 +78,24 @@ class TestNativeTransformerLocalBackend(unittest.TestCase):
     def test_model_mutation_is_rejected_after_backend_binding(self):
         backend = self.backend()
         backend.runtime.model.bout[0] += 0.5
+        with self.assertRaises(RuntimeContractError):
+            backend.infer(LocalInferenceRequest(prompt="hello"), threading.Event())
+
+    def test_runtime_identity_is_stable_and_sha256(self):
+        backend = self.backend()
+        self.assertEqual(len(backend.runtime_digest), 64)
+        self.assertTrue(all(ch in "0123456789abcdef" for ch in backend.runtime_digest))
+        self.assertEqual(backend.runtime_digest, backend._compute_runtime_digest())
+
+    def test_tokenizer_mutation_is_rejected_after_backend_binding(self):
+        backend = self.backend()
+        backend.runtime.model.itos[0] = "mutated-token"
         with self.assertRaises(Exception):
             backend.infer(LocalInferenceRequest(prompt="hello"), threading.Event())
+
+    def test_model_id_is_normalized_once_at_binding(self):
+        backend = NativeTransformerModel(self.backend().runtime, model_id="  owned-native  ")
+        self.assertEqual(backend.model_id, "owned-native")
 
 
 if __name__ == "__main__":
