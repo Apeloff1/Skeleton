@@ -243,6 +243,45 @@ class TestNativeRuntimeLocalArtifact(unittest.TestCase):
         ):
             backend._parse_output(undeclared, request)
 
+        boolean_version = raw.replace(
+            '"skeleton_local_response":1',
+            '"skeleton_local_response":true',
+        )
+        with self.assertRaisesRegex(
+            NativeRuntimeBackendError,
+            "unsupported native local response protocol version",
+        ):
+            backend._parse_output(boolean_version, request)
+
+        duplicate_key = (
+            '{"skeleton_local_response":1,'
+            '"skeleton_local_response":1,'
+            '"text":"alpha"}'
+        )
+        with self.assertRaisesRegex(
+            NativeRuntimeBackendError,
+            "duplicate JSON key",
+        ):
+            backend._parse_output(duplicate_key, request)
+
+        unknown_field = (
+            '{"skeleton_local_response":1,"text":"alpha","extra":true}'
+        )
+        with self.assertRaisesRegex(
+            NativeRuntimeBackendError,
+            "unsupported fields",
+        ):
+            backend._parse_output(unknown_field, request)
+
+        empty_text = (
+            '{"skeleton_local_response":1,"text":"   "}'
+        )
+        with self.assertRaisesRegex(
+            NativeRuntimeBackendError,
+            "text must be non-empty",
+        ):
+            backend._parse_output(empty_text, request)
+
     def test_tool_prompt_projects_only_declared_contract(self):
         backend = _backend()
         request = LocalInferenceRequest(
