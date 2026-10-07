@@ -135,6 +135,63 @@ def materialize_model_batch(windows: Sequence[TokenWindow], *, pad_token_id: int
     return ModelInputBatch(tuple(rows), tuple(masks), tuple(digests), pad_token_id)
 
 
+@dataclass(frozen=True)
+class CausalTrainingBatch:
+    """Next-token training tensors derived only from unmasked source tokens."""
+    input_ids: tuple[tuple[int, ...], ...]
+    labels: tuple[tuple[int, ...], ...]
+    loss_mask: tuple[tuple[int, ...], ...]
+    source_window_digests: tuple[str, ...]
+    pad_token_id: int
+    ignore_index: int = -100
+
+    def __post_init__(self) -> None:
+        if not self.input_ids:
+            raise TokenizerContractError("empty causal training batch")
+        width = len(self.input_ids[0])
+        if width <= 0 or any(len(row) != width for row in self.input_ids):
+            raise TokenizerContractError("ragged causal inputs")
+        if len(self.labels) != len(self.input_ids) or any(len(row) != width for row in self.labels):
+            raise TokenizerContractError("causal label shape mismatch")
+        if len(self.loss_mask) != len(self.input_ids) or any(len(row) != width for row in self.loss_mask):
+            raise TokenizerContractError("causal loss-mask shape mismatch")
+        if len(self.source_window_digests) != len(self.input_ids):
+            raise TokenizerContractError("causal provenance mismatch")
+        if any(bit not in (0, 1) for row in self.loss_mask for bit in row):
+            raise TokenizerContractError("invalid causal loss mask")
+        for labels, mask in zip(self.labels, self.loss_mask):
+            if any((bit == 0) != (label == self.ignore_index) for label, bit in zip(labels, mask)):
+                raise TokenizerContractError("ignored labels/loss mask mismatch")
+
+    @property
+    def digest(self) -> str:
+        return digest_json({"input_ids": [list(row) for row in self.input_ids], "labels": [list(row) for row in self.labels], "loss_mask": [list(row) for row in self.loss_mask], "source_window_digests": list(self.source_window_digests), "pad_token_id": self.pad_token_id, "ignore_index": self.ignore_index})
+
+
+def materialize_causal_training_batch(batch: ModelInputBatch, *, ignore_index: int = -100) -> CausalTrainingBatch:
+    if not isinstance(batch, ModelInputBatch):
+        raise TokenizerContractError("ModelInputBatch required")
+    if isinstance(ignore_index, bool) or not isinstance(ignore_index, int):
+        raise TokenizerContractError("invalid ignore_index")
+    inputs, labels, masks = [], [], []
+    for row, attention in zip(batch.input_ids, batch.attention_mask):
+        active = sum(attention)
+        if active < 2:
+            continue
+        width = len(row) - 1
+        source = tuple(row[:-1])
+        target = tuple(row[1:])
+        loss = tuple(1 if index < active - 1 else 0 for index in range(width))
+        target = tuple(token if bit else ignore_index for token, bit in zip(target, loss))
+        inputs.append(source)
+        labels.append(target)
+        masks.append(loss)
+    if not inputs:
+        raise TokenizerContractError("causal batch requires at least two source tokens")
+    digests = tuple(d for d, row in zip(batch.source_window_digests, batch.attention_mask) if sum(row) >= 2)
+    return CausalTrainingBatch(tuple(inputs), tuple(labels), tuple(masks), digests, batch.pad_token_id, ignore_index)
+
+
 class TextTokenPipeline:
     """One admitted, immutable text-to-model-input pipeline."""
 
@@ -198,6 +255,17 @@ class TextTokenPipeline:
             raise TokenizerContractError("padding token outside vocabulary")
         return tuple(materialize_model_batch(batch.windows, pad_token_id=pad) for batch in prepared.batches)
 
+    def causal_training_batches(self, prepared: PreparedText, *, pad_token_id: int | None = None, ignore_index: int = -100) -> tuple[CausalTrainingBatch, ...]:
+        batches = self.model_batches(prepared, pad_token_id=pad_token_id)
+        output = []
+        for batch in batches:
+            try:
+                output.append(materialize_causal_training_batch(batch, ignore_index=ignore_index))
+            except TokenizerContractError as exc:
+                if str(exc) != "causal batch requires at least two source tokens":
+                    raise
+        return tuple(output)
+
     def decode(self, sequence: TokenSequence, *, require_identity: bool = True) -> str:
         if not isinstance(sequence, TokenSequence):
             raise TokenizerContractError("TokenSequence required")
@@ -236,4 +304,4 @@ class TextTokenPipeline:
         return prepared
 
 
-__all__ = ["ModelInputBatch", "PreparedText", "TextPipelineConfig", "TextTokenPipeline", "materialize_model_batch"]
+__all__ = ["CausalTrainingBatch", "ModelInputBatch", "PreparedText", "TextPipelineConfig", "TextTokenPipeline", "materialize_causal_training_batch", "materialize_model_batch"]
