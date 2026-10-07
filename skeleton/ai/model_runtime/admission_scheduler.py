@@ -249,7 +249,7 @@ class RuntimeAdmissionScheduler:
         self._sequence += 1
 
     def snapshot(self) -> dict[str, object]:
-        return {
+        body: dict[str, object] = {
             "schema": "skeleton.ai.runtime-admission-scheduler.v1",
             "limits": {
                 "max_active_requests": self.limits.max_active_requests,
@@ -289,6 +289,8 @@ class RuntimeAdmissionScheduler:
                     "enqueue_sequence": item.enqueue_sequence,
                     "pinned_kv": item.pinned_kv,
                 }
+        body["digest"] = _digest(body)
+        return body
                 for item in sorted(self._active.values(), key=lambda x: x.request.request_id)
             ],
             "kv": [
