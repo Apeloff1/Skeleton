@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-11:material_graph:v1",
+  "title": "FLGB-11 material graph",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "node_id",
+    "operation",
+    "inputs",
+    "output_type"
+  ],
+  "properties": {
+    "node_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "operation": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "inputs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "output_type": {
+      "enum": [
+        "scalar",
+        "vec2",
+        "vec3",
+        "vec4",
+        "color",
+        "texture",
+        "normal"
+      ]
+    }
+  }
+}
