@@ -1073,3 +1073,37 @@ def test_temporal_contradiction_cannot_use_recency_for_same_year(native_model):
         pipeline.temporal_contradiction(left, right, resolution="newer-wins")
     coexist = pipeline.temporal_contradiction(left, right, resolution="coexists-by-validity")
     assert coexist.resolution == "coexists-by-validity"
+
+
+def test_temporal_evaluation_slice_enforces_historical_cutoff(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    safe = pipeline.temporal_signal(source_year=1998, observed_year=1999, knowledge_cutoff_year=2000)
+    slice_ = pipeline.temporal_evaluation_slice("y2000", (safe,), ("a" * 64,), cutoff_year=2000)
+    assert slice_.cutoff_year == 2000
+    assert slice_.source_years == (1998,)
+    future = pipeline.temporal_signal(source_year=2001, observed_year=2001, knowledge_cutoff_year=2026)
+    with pytest.raises(TokenizerContractError, match="historical cutoff"):
+        pipeline.temporal_evaluation_slice("y2000", (future,), ("b" * 64,), cutoff_year=2000)
+
+
+def test_temporal_evaluation_gate_requires_every_slice_to_pass(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TemporalEvaluationResult, TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    strong = TemporalEvaluationResult("a" * 64, correct=90, incorrect=5, abstained=3, inconsistent=2)
+    weak = TemporalEvaluationResult("b" * 64, correct=70, incorrect=10, abstained=5, inconsistent=15)
+    assert pipeline.temporal_evaluation_gate((strong,), minimum_accuracy_ppm=800_000, maximum_inconsistency_ppm=50_000).passed
+    gate = pipeline.temporal_evaluation_gate((strong, weak), minimum_accuracy_ppm=700_000, maximum_inconsistency_ppm=100_000)
+    assert gate.passed is False
+    assert gate.result_digests == (strong.digest, weak.digest)
+
+
+def test_temporal_evaluation_metrics_are_integer_deterministic():
+    from skeleton.ai.model_runtime.text_pipeline import TemporalEvaluationResult
+    result = TemporalEvaluationResult("a" * 64, correct=2, incorrect=1, abstained=0, inconsistent=0)
+    assert result.total == 3
+    assert result.accuracy_ppm == 666_666
+    assert result.inconsistency_ppm == 0
+    assert result.digest == TemporalEvaluationResult("a" * 64, 2, 1, 0, 0).digest
