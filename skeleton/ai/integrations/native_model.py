@@ -1,5 +1,6 @@
 """Identity-preserving bridge from native transformer to local inference."""
 from __future__ import annotations
+import hashlib
 import threading
 from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
 from skeleton.ai.model_runtime.runtime_contracts import GenerationConfig, RuntimeContractError
@@ -57,6 +58,11 @@ class NativeRuntimeBackend:
         if cancel.is_set():
             raise LocalInferenceCancelled("native generation cancelled")
         self._assert_identity()
+        receipt_material = result.replay_receipt.digest
+        if request.context_digest is not None:
+            receipt_material = hashlib.sha256(
+                ("context:" + request.context_digest + ":runtime:" + receipt_material).encode("utf-8")
+            ).hexdigest()
         return LocalInferenceResult(
             text=result.text,
             model_id=self.model_id,
@@ -64,7 +70,7 @@ class NativeRuntimeBackend:
             input_tokens=result.usage.prompt_tokens,
             output_tokens=result.usage.generated_tokens,
             finish_reason="length" if result.finish_reason == "length" else "completed",
-            response_id="native:" + result.replay_receipt.digest[:32],
+            response_id="native:" + receipt_material[:32],
         )
 
 __all__ = ["NativeRuntimeBackend"]
