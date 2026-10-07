@@ -237,7 +237,35 @@ def _load_backend_ai_route(monkeypatch):
         auth.require_role = lambda _role: (lambda: {"email": OWNER, "tenant_id": TENANT})
         monkeypatch.setitem(sys.modules, "routes.gameforge_auth", auth)
 
-    return importlib.import_module("routes.ai")
+    route = importlib.import_module("routes.ai")
+
+    # Product chat now journals every turn through a durable authority. These
+    # tests deliberately replace production Mongo conversation storage with
+    # SQLite, so isolate the turn journal as well; otherwise the module-global
+    # Motor authority can retain an event loop from a previous pytest case.
+    from core.chat_turn_lifecycle import ChatTurnLifecycle
+    from skeleton.persistence.chat_turn_repository import SQLiteChatTurnRepository
+
+    class _AsyncChatTurnAuthority:
+        def __init__(self, repository):
+            self.repository = repository
+
+        def __getattr__(self, name):
+            target = getattr(self.repository, name)
+
+            async def invoke(*args, **kwargs):
+                return target(*args, **kwargs)
+
+            return invoke
+
+    monkeypatch.setattr(
+        route,
+        "chat_turn_lifecycle",
+        ChatTurnLifecycle(
+            _AsyncChatTurnAuthority(SQLiteChatTurnRepository())
+        ),
+    )
+    return route
 
 
 def _local_registry() -> tuple[ProviderRegistry, list[LocalInferenceRequest]]:

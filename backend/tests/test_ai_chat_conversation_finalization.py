@@ -204,6 +204,7 @@ async def test_chat_never_commits_assistant_when_engine_is_unavailable(
     async def execute(_command):
         raise EngineUnavailableError("engine unavailable")
 
+    fake_client.wait_for_terminal = wait_for_terminal
     fake_client.execute = execute
 
     monkeypatch.setattr(route, "conversation_authority", fake_authority)

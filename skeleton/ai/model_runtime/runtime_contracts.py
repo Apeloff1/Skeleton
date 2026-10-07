@@ -43,6 +43,23 @@ def nonnegative_int(value: Any, name: str, upper: int) -> int:
     return int(value)
 
 
+def runtime_id(value: Any, name: str) -> str:
+    try:
+        return require_id(value, name)
+    except ValueError as exc:
+        raise RuntimeContractError(f"invalid {name}") from exc
+
+
+def runtime_digest(value: Any, name: str) -> str:
+    if (
+        not isinstance(value, str)
+        or len(value) != 64
+        or any(ch not in "0123456789abcdef" for ch in value)
+    ):
+        raise RuntimeContractError(f"invalid {name}")
+    return value
+
+
 @dataclass(frozen=True)
 class RuntimeLimits:
     max_context: int
@@ -137,6 +154,21 @@ class RuntimeArchitecture:
     ffn_kind: str
     positional: str = "learned-position-embedding+rope-attention"
 
+    def __post_init__(self) -> None:
+        positive_int(self.vocab_size, "vocab_size", 2**31 - 1)
+        positive_int(self.dim, "dim", 1_000_000)
+        positive_int(self.context, "context", MAX_CONTEXT)
+        positive_int(self.heads, "heads", self.dim)
+        positive_int(self.layers, "layers", 65_536)
+        nonnegative_int(self.feed_forward, "feed_forward", 16_000_000)
+        if self.dim % self.heads:
+            raise RuntimeContractError("runtime dimension must be divisible by heads")
+        if self.norm not in {"ln", "rms"}:
+            raise RuntimeContractError("unsupported runtime norm")
+        if self.ffn_kind not in {"gelu", "swiglu"}:
+            raise RuntimeContractError("unsupported runtime FFN")
+        runtime_id(self.positional, "positional")
+
     @property
     def digest(self) -> str:
         return digest_json(self.to_dict())
@@ -215,6 +247,16 @@ class RuntimeUsage:
     kv_peak_bytes: int
     cache_resets: int
 
+    def __post_init__(self) -> None:
+        nonnegative_int(self.prompt_tokens, "prompt_tokens", MAX_TOTAL_TOKENS)
+        nonnegative_int(self.generated_tokens, "generated_tokens", MAX_NEW_TOKENS)
+        nonnegative_int(self.total_tokens, "total_tokens", MAX_TOTAL_TOKENS)
+        positive_int(self.model_bytes, "model_bytes", MAX_MODEL_BYTES)
+        nonnegative_int(self.kv_peak_bytes, "kv_peak_bytes", MAX_KV_BYTES)
+        nonnegative_int(self.cache_resets, "cache_resets", MAX_TOTAL_TOKENS)
+        if self.total_tokens != self.prompt_tokens + self.generated_tokens:
+            raise RuntimeContractError("runtime usage token accounting mismatch")
+
     def to_dict(self) -> dict[str, int]:
         return {
             "prompt_tokens": self.prompt_tokens,
@@ -269,6 +311,22 @@ class ReplayReceipt:
     seed: int
     schema: str = REPLAY_SCHEMA
 
+    def __post_init__(self) -> None:
+        for name in (
+            "model_digest",
+            "tokenizer_digest",
+            "architecture_digest",
+            "request_digest",
+            "output_digest",
+            "config_digest",
+            "device_digest",
+        ):
+            runtime_digest(getattr(self, name), name)
+        if not is_int(self.seed):
+            raise RuntimeContractError("replay seed must be an integer")
+        if self.schema != REPLAY_SCHEMA:
+            raise RuntimeContractError("unsupported replay receipt schema")
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "schema": self.schema,
@@ -294,7 +352,7 @@ class BatchGenerationRequest:
     config: GenerationConfig = GenerationConfig()
 
     def __post_init__(self) -> None:
-        require_id(self.request_id, "request_id")
+        runtime_id(self.request_id, "request_id")
         if not isinstance(self.prompt, str):
             raise RuntimeContractError("batch prompt must be a string")
         if not isinstance(self.config, GenerationConfig):
@@ -319,4 +377,6 @@ __all__ = [
     "is_int",
     "nonnegative_int",
     "positive_int",
+    "runtime_digest",
+    "runtime_id",
 ]
