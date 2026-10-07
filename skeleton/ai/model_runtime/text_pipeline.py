@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from hashlib import sha256
-from typing import Iterable, Iterator
+from typing import Iterable, Iterator, Sequence
 
 from .flgb_model_runtime import TokenSequence, digest_json
 from .text_normalization import normalize_text
@@ -82,6 +82,59 @@ class PreparedText:
             raise TokenizerContractError("batch/window accounting mismatch")
 
 
+@dataclass(frozen=True)
+class ModelInputBatch:
+    """Rectangular model-ready token ids with explicit attention semantics."""
+    input_ids: tuple[tuple[int, ...], ...]
+    attention_mask: tuple[tuple[int, ...], ...]
+    source_window_digests: tuple[str, ...]
+    pad_token_id: int
+
+    def __post_init__(self) -> None:
+        if not self.input_ids:
+            raise TokenizerContractError("empty model input batch")
+        width = len(self.input_ids[0])
+        if width <= 0 or any(len(row) != width for row in self.input_ids):
+            raise TokenizerContractError("ragged model input ids")
+        if len(self.attention_mask) != len(self.input_ids) or any(len(row) != width for row in self.attention_mask):
+            raise TokenizerContractError("attention mask shape mismatch")
+        if len(self.source_window_digests) != len(self.input_ids):
+            raise TokenizerContractError("model batch provenance mismatch")
+        if any(bit not in (0, 1) for row in self.attention_mask for bit in row):
+            raise TokenizerContractError("invalid attention mask")
+        for ids, mask in zip(self.input_ids, self.attention_mask):
+            seen_padding = False
+            for token_id, bit in zip(ids, mask):
+                if bit == 0:
+                    seen_padding = True
+                    if token_id != self.pad_token_id:
+                        raise TokenizerContractError("masked token is not padding")
+                elif seen_padding:
+                    raise TokenizerContractError("non-padding token after padding")
+
+    @property
+    def digest(self) -> str:
+        return digest_json({"input_ids": [list(row) for row in self.input_ids], "attention_mask": [list(row) for row in self.attention_mask], "source_window_digests": list(self.source_window_digests), "pad_token_id": self.pad_token_id})
+
+
+def materialize_model_batch(windows: Sequence[TokenWindow], *, pad_token_id: int) -> ModelInputBatch:
+    items = tuple(windows)
+    if not items:
+        raise TokenizerContractError("empty model input windows")
+    if isinstance(pad_token_id, bool) or not isinstance(pad_token_id, int) or pad_token_id < 0:
+        raise TokenizerContractError("invalid pad_token_id")
+    if any(not isinstance(window, TokenWindow) for window in items):
+        raise TokenizerContractError("TokenWindow required")
+    width = max(len(window.token_ids) for window in items)
+    rows, masks, digests = [], [], []
+    for window in items:
+        padding = width - len(window.token_ids)
+        rows.append(tuple(window.token_ids) + (pad_token_id,) * padding)
+        masks.append((1,) * len(window.token_ids) + (0,) * padding)
+        digests.append(window.digest)
+    return ModelInputBatch(tuple(rows), tuple(masks), tuple(digests), pad_token_id)
+
+
 class TextTokenPipeline:
     """One admitted, immutable text-to-model-input pipeline."""
 
@@ -137,6 +190,14 @@ class TextTokenPipeline:
             sha256(normalized.encode("utf-8")).hexdigest(),
         )
 
+    def model_batches(self, prepared: PreparedText, *, pad_token_id: int | None = None) -> tuple[ModelInputBatch, ...]:
+        if not isinstance(prepared, PreparedText) or prepared.pipeline_digest != self.digest:
+            raise TokenizerContractError("prepared text belongs to another pipeline")
+        pad = self.tokenizer.vocabulary_manifest.special_tokens["unk"] if pad_token_id is None else pad_token_id
+        if isinstance(pad, bool) or not isinstance(pad, int) or not 0 <= pad < self.tokenizer.vocab_size:
+            raise TokenizerContractError("padding token outside vocabulary")
+        return tuple(materialize_model_batch(batch.windows, pad_token_id=pad) for batch in prepared.batches)
+
     def decode(self, sequence: TokenSequence, *, require_identity: bool = True) -> str:
         if not isinstance(sequence, TokenSequence):
             raise TokenizerContractError("TokenSequence required")
@@ -175,4 +236,4 @@ class TextTokenPipeline:
         return prepared
 
 
-__all__ = ["PreparedText", "TextPipelineConfig", "TextTokenPipeline"]
+__all__ = ["ModelInputBatch", "PreparedText", "TextPipelineConfig", "TextTokenPipeline", "materialize_model_batch"]
