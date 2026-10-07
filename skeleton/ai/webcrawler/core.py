@@ -317,16 +317,32 @@ class RobotsCache:
     def __init__(self, user_agent: str) -> None:
         self.user_agent = user_agent
         self._parsers: dict[str, RobotFileParser] = {}
+        self._meta: dict[str, dict[str, object]] = {}
 
-    def install(self, origin: str, robots_text: str) -> None:
+    def install(self, origin: str, robots_text: str, *, fetched_at: float = 0.0, etag: str | None = None, last_modified: str | None = None) -> None:
         parser = RobotFileParser()
         parser.set_url(origin.rstrip("/") + "/robots.txt")
         parser.parse(robots_text.splitlines())
         self._parsers[origin] = parser
+        self._meta[origin] = {"fetched_at": fetched_at, "etag": etag, "last_modified": last_modified}
 
     def known(self, url: str) -> bool:
         p = urlsplit(url)
         return f"{p.scheme}://{p.netloc}" in self._parsers
+
+    def fresh(self, url: str, *, now: float, ttl: float) -> bool:
+        p=urlsplit(url);meta=self._meta.get(f"{p.scheme}://{p.netloc}")
+        return bool(meta and now-float(meta["fetched_at"]) < ttl)
+
+    def validators(self, url: str) -> dict[str, str]:
+        p=urlsplit(url);meta=self._meta.get(f"{p.scheme}://{p.netloc}") or {};out={}
+        if meta.get("etag"):out["If-None-Match"]=str(meta["etag"])
+        if meta.get("last_modified"):out["If-Modified-Since"]=str(meta["last_modified"])
+        return out
+
+    def touch(self,url: str, *, fetched_at: float) -> None:
+        p=urlsplit(url);origin=f"{p.scheme}://{p.netloc}"
+        if origin in self._meta:self._meta[origin]["fetched_at"]=fetched_at
 
     def allowed(self, url: str) -> bool:
         p = urlsplit(url)
