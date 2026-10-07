@@ -26,6 +26,7 @@ CLAIM_ID = "33333333-3333-4333-8333-333333333333"
 OTHER_CLAIM_ID = "44444444-4444-4444-8444-444444444444"
 EVIDENCE_ID = "55555555-5555-4555-8555-555555555555"
 POSTCONDITION_ID = "66666666-6666-4666-8666-666666666666"
+CHECK_ID = "99999999-9999-4999-8999-999999999999"
 
 
 def verification_receipt(
@@ -54,6 +55,7 @@ def verification_receipt(
         policy_satisfied=policy_satisfied,
         verifier_id="canonical-verifier",
         verified_at=verified_at,
+        check_id=CHECK_ID if policy_satisfied else None,
         operation_id=operation_id,
         execution_id=execution_id,
         supporting_evidence_ids=supporting,
@@ -139,7 +141,7 @@ def test_high_assurance_requires_independent_receipt() -> None:
     decision = evaluate(
         CHAT_VERIFICATION_PROFILES["high_assurance"],
         verification_receipt(
-            level=VerificationLevel.INDEPENDENT,
+            level=VerificationLevel.EVIDENCE,
             modes=("structural", "evidence", "independent"),
             supporting=(EVIDENCE_ID,),
             independent=False,
@@ -169,6 +171,7 @@ def test_contested_receipt_quarantines_instead_of_publishing() -> None:
         verification_receipt(
             outcome=VerificationOutcome.CONTESTED,
             level=VerificationLevel.EVIDENCE,
+            policy_satisfied=False,
             modes=("structural", "evidence"),
             supporting=(EVIDENCE_ID,),
         ),
@@ -192,7 +195,7 @@ def test_postcondition_profile_requires_observation() -> None:
     decision = evaluate(
         CHAT_VERIFICATION_PROFILES["action_postcondition"],
         verification_receipt(
-            level=VerificationLevel.POSTCONDITION,
+            level=VerificationLevel.INDEPENDENT,
             modes=(
                 "structural",
                 "evidence",
