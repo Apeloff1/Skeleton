@@ -1285,3 +1285,20 @@ Remaining before SIGNED COMPLETE:
 - exact-head CI evidence and performance/load characterization.
 
 Status: IMPLEMENTED / UNSIGNED.
+
+
+### 2026-10-07 crawler correctness closeout tranche
+
+Landed on main:
+- host-fair frontier selection removes cross-host head-of-line blocking;
+- retryable HTTP status policy for 408/425/429/500/502/503/504;
+- bounded Retry-After handling with deterministic exponential fallback;
+- hard discovered-link admission limit per document;
+- fenced frontier claiming over durable SQLite leases;
+- stale-worker renewal/completion is rejected after lease succession;
+- canonical retrieval bridge chunks promoted documents into the existing InvertedIndex and records per-chunk ProvenanceLedger lineage;
+- structured bounded extraction for JSON, JSON-LD, Markdown, CSV and plain text.
+
+Regression coverage now explicitly exercises host fairness, 429 Retry-After timing, retry caps, link fanout limits, competing workers, lease expiry/fencing, retrieval searchability and provenance tracing.
+
+Still UNSIGNED: exact-head CI remains absent; redirect-target robots authorization before following redirects is still a required correctness control; content-credential observation and some extraction regression mutations were rejected by repository write safety and remain open.

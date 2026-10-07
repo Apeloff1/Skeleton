@@ -313,6 +313,10 @@ class RobotsCache:
         parser.parse(robots_text.splitlines())
         self._parsers[origin] = parser
 
+    def known(self, url: str) -> bool:
+        p = urlsplit(url)
+        return f"{p.scheme}://{p.netloc}" in self._parsers
+
     def allowed(self, url: str) -> bool:
         p = urlsplit(url)
         origin = f"{p.scheme}://{p.netloc}"
@@ -410,6 +414,36 @@ class CrawlEngine:
         except (ValueError, TypeError):
             return None
 
+    def load_robots(self, url: str) -> bool:
+        """Load an origin's robots policy once, charging the crawl budget."""
+        p = urlsplit(url)
+        origin = f"{p.scheme}://{p.netloc}"
+        if self.robots.known(url):
+            return True
+        if not self.budget.can_request():
+            return False
+        robots_url = origin + "/robots.txt"
+        try:
+            response = self.fetcher.fetch(
+                robots_url, user_agent=self.policy.user_agent,
+                max_bytes=min(self.policy.max_response_bytes, 512_000),
+            )
+        except Exception:
+            self.budget.requests += 1
+            return False
+        body = response.body[:512_000]
+        self.budget.charge_response(len(body), accepted=False)
+        if response.status in {404, 410}:
+            self.robots.install(origin, "")
+            return True
+        if response.status != 200:
+            return False
+        ctype = response.headers.get("content-type", "text/plain").split(";", 1)[0].lower()
+        if ctype not in {"text/plain", "text/html"}:
+            return False
+        self.robots.install(origin, body.decode("utf-8", errors="replace"))
+        return True
+
     def step(self, *, now: float | None = None) -> CrawlDocument | None:
         now = time.time() if now is None else now
         if self.budget.exhausted or not self.budget.can_request():
@@ -420,6 +454,8 @@ class CrawlEngine:
         if item.url in self._seen:
             return None
         self._seen.add(item.url)
+        if not self.robots.known(item.url) and not self.load_robots(item.url):
+            return None
         if not self.robots.allowed(item.url):
             return None
         host = urlsplit(item.url).hostname or ""
