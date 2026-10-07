@@ -828,6 +828,46 @@ def temporal_retention_gate(results: Sequence[TemporalRetentionResult], *, maxim
 
 
 @dataclass(frozen=True)
+class TemporalRetentionTrajectory:
+    """Sequential-edit retention history with deterministic worst-case accounting."""
+    cohort: str
+    stage_result_digests: tuple[str, ...]
+    stage_scores_ppm: tuple[int, ...]
+
+    def __post_init__(self) -> None:
+        if self.cohort not in {"historical", "current", "stable", "unrelated"}:
+            raise TokenizerContractError("invalid retention trajectory cohort")
+        if not self.stage_scores_ppm or len(self.stage_result_digests) != len(self.stage_scores_ppm):
+            raise TokenizerContractError("invalid retention trajectory accounting")
+        if any(isinstance(v, bool) or not isinstance(v, int) or not 0 <= v <= 1_000_000 for v in self.stage_scores_ppm):
+            raise TokenizerContractError("invalid retention trajectory score")
+        if any(not isinstance(d, str) or len(d) != 64 for d in self.stage_result_digests):
+            raise TokenizerContractError("invalid retention trajectory digest")
+
+    @property
+    def worst_regression_ppm(self) -> int:
+        baseline = self.stage_scores_ppm[0]
+        return max(baseline - score for score in self.stage_scores_ppm)
+
+    @property
+    def final_delta_ppm(self) -> int:
+        return self.stage_scores_ppm[-1] - self.stage_scores_ppm[0]
+
+    @property
+    def digest(self) -> str:
+        return digest_json({"cohort": self.cohort, "stage_result_digests": list(self.stage_result_digests), "stage_scores_ppm": list(self.stage_scores_ppm)})
+
+
+def build_temporal_retention_trajectory(results: Sequence[TemporalRetentionResult], *, cohort: str) -> TemporalRetentionTrajectory:
+    items = tuple(result for result in results if result.cohort == cohort)
+    if not items:
+        raise TokenizerContractError("retention trajectory cohort has no results")
+    scores = (items[0].before_ppm,) + tuple(item.after_ppm for item in items)
+    digests = (items[0].digest,) + tuple(item.digest for item in items)
+    return TemporalRetentionTrajectory(cohort, digests, scores)
+
+
+@dataclass(frozen=True)
 class SupervisedTextExample:
     """One prompt/response example with a deterministic normalized boundary."""
     example_id: str
