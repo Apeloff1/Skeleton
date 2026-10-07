@@ -3,6 +3,8 @@ from __future__ import annotations
 from urllib.parse import urljoin,urlsplit
 from .core import canonicalize_url
 class RedirectPolicyError(ValueError):pass
+class RedirectFetchError(RuntimeError):
+    def __init__(self,message,*,request_started=False):super().__init__(message);self.request_started=request_started
 def fetch_with_policy(engine,url,*,now):
     current=canonicalize_url(url);seen=set()
     for hop in range(engine.policy.max_redirects+1):
@@ -23,7 +25,8 @@ def fetch_with_policy(engine,url,*,now):
             if hop:raise RedirectPolicyError("fetcher cannot expose redirect hops")
             response=engine.fetcher.fetch(current,user_agent=engine.policy.user_agent,max_bytes=engine.policy.max_response_bytes)
         else:
-            response=fetch_once(current,user_agent=engine.policy.user_agent,max_bytes=engine.policy.max_response_bytes)
+            try:response=fetch_once(current,user_agent=engine.policy.user_agent,max_bytes=engine.policy.max_response_bytes)
+            except Exception as exc:raise RedirectFetchError("redirect hop fetch failed",request_started=True) from exc
         body=response.body[:engine.policy.max_response_bytes]
         engine.budget.charge_response(len(body),accepted=False)
         if response.status not in {301,302,303,307,308}:return response
