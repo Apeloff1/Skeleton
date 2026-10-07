@@ -816,6 +816,12 @@ def walk_forward_snapshot(items: Sequence[TemporalSourceEvidence], *, cutoff_yea
     return WalkForwardSnapshot(cutoff_year, included, excluded, groups)
 
 
+def source_evidence_from_provenance(evidence: TemporalEvidence, *, source_id: str, graph: SourceProvenanceGraph) -> TemporalSourceEvidence:
+    if not isinstance(evidence, TemporalEvidence):
+        raise TokenizerContractError("TemporalEvidence required")
+    return TemporalSourceEvidence(evidence, source_id, provenance_independence_group(graph, source_id))
+
+
 def independent_confidence_ppm(items: Sequence[TemporalSourceEvidence]) -> int:
     """Fuse corroboration by independent group, counting mirrors only once."""
     sources = tuple(items)
