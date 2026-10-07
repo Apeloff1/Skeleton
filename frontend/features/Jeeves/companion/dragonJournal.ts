@@ -16,6 +16,7 @@ export function reduceDragonJournal(j:CompanionJournal,e:WireDragonEvent):Compan
  if(e.kind==='burn_complete'&&e.payload.persisted!==true)return warning('Completion rejected: durable indexing receipt missing');
  if(e.kind==='burn_complete'){if(!burning.has(e.url))return warning('Completion rejected: no active burn');burning.delete(e.url);accepted.delete(e.url)}
  if(e.kind==='policy_rejected'){accepted.delete(e.url);burning.delete(e.url)}
+ if(e.kind==='crawl_complete'&&burning.size)return warning('Crawl completion rejected: unfinished burns');
  return {lastSequence:e.sequence,seenIds:[...j.seenIds.slice(-511),e.event_id],accepted:[...accepted],burning:[...burning],state:companionFromCrawler(e.kind,e.payload),rejected:j.rejected+Number(e.kind==='policy_rejected'),indexed:j.indexed+Number(e.kind==='burn_complete'),warnings:j.warnings};
 }
 export function replayDragonJournal(events:readonly WireDragonEvent[]):CompanionJournal{return events.reduce(reduceDragonJournal,EMPTY_COMPANION_JOURNAL)}
