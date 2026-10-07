@@ -94,9 +94,11 @@ class PlatformExport:
 @dataclass(frozen=True)
 class PerformanceBudget:
     metric_id:str; maximum:int; unit:str
-    def __post_init__(self): req_id(self.metric_id,"metric_id"); req_id(self.unit,"unit");
+    def __post_init__(self):
+        req_id(self.metric_id,"metric_id"); req_id(self.unit,"unit")
+        if not _int(self.maximum) or self.maximum<0: raise BuildContractError("invalid performance maximum")
     def allows(self,value:int)->bool:
-        if not _int(value) or value<0 or not _int(self.maximum) or self.maximum<0: raise BuildContractError("invalid performance value")
+        if not _int(value) or value<0: raise BuildContractError("invalid performance value")
         return value<=self.maximum
 @dataclass(frozen=True)
 class MemoryBudget:
@@ -110,7 +112,9 @@ class MemoryBudget:
 @dataclass(frozen=True)
 class PlaytestResult:
     scenario_id:str; seed_digest:str; terminal_state_digest:str; passed:bool; assertion_digest:str
-    def __post_init__(self): req_id(self.scenario_id,"scenario_id"); req_digest(self.seed_digest,"seed_digest"); req_digest(self.terminal_state_digest,"terminal_state_digest"); req_digest(self.assertion_digest,"assertion_digest");
+    def __post_init__(self):
+        req_id(self.scenario_id,"scenario_id"); req_digest(self.seed_digest,"seed_digest"); req_digest(self.terminal_state_digest,"terminal_state_digest"); req_digest(self.assertion_digest,"assertion_digest")
+        if not isinstance(self.passed,bool): raise BuildContractError("passed must be boolean")
 @dataclass(frozen=True)
 class ReleaseArtifact:
     artifact_digest:str; provenance_digest:str; signature_digest:str|None; sbom_digest:str; test_evidence_digest:str
