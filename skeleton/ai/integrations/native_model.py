@@ -1,0 +1,1 @@
+"""Native model integration boundary."""
