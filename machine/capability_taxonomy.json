@@ -8,8 +8,8 @@
       "volume_ref": "VOL-113",
       "title": "Capability Map",
       "required_gap_texts": [
-        "unify capability descriptors",
-        "bind runtime discovery to registry"
+        "repository-wide capability descriptor/evidence population remains separate",
+        "independent capability maturity verification remains pending"
       ]
     },
     {
