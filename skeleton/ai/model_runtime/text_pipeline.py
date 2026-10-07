@@ -351,6 +351,19 @@ class TextTokenPipeline:
             raise TokenizerContractError("dataset transform does not match pipeline")
         return GovernedTrainingInput(receipt.digest, dataset_revision.digest, dataset_revision.transform_digest, dataset_revision.rights_digest)
 
+    def training_manifest(self, prepared: PreparedText, dataset_revision, *, run_id: str, base_model_digest: str, code_digest: str, seed_manifest_digest: str, max_steps: int, pad_token_id: int | None = None, ignore_index: int = -100):
+        from skeleton.ai.training.flgb_training_runtime import TrainingManifest
+        governed = self.governed_training_input(prepared, dataset_revision, pad_token_id=pad_token_id, ignore_index=ignore_index)
+        return TrainingManifest(
+            run_id=run_id,
+            base_model_digest=base_model_digest,
+            dataset_revision_digests=(governed.dataset_revision_digest,),
+            code_digest=code_digest,
+            config_digest=digest_json({"pipeline_digest": self.digest, "training_input_digest": governed.digest}),
+            seed_manifest_digest=seed_manifest_digest,
+            max_steps=max_steps,
+        )
+
     def decode(self, sequence: TokenSequence, *, require_identity: bool = True) -> str:
         if not isinstance(sequence, TokenSequence):
             raise TokenizerContractError("TokenSequence required")
