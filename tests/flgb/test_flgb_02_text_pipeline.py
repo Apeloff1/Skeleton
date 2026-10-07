@@ -117,7 +117,7 @@ def test_model_batches_reject_cross_pipeline_prepared_text(native_model):
     second = TextTokenPipeline(tokenizer, TextPipelineConfig(context_size=3))
     prepared = first.prepare("alpha beta gamma")
     with pytest.raises(TokenizerContractError):
-        second.model_batches(prepared)
+        second.model_batches(prepared, pad_token_id=native_model.unk)
 
 
 def test_causal_training_batch_shifts_targets_and_masks_padding():
@@ -153,8 +153,8 @@ def test_causal_training_pipeline_is_deterministic(native_model):
 
     pipeline = TextTokenPipeline(NativeTokenizer(native_model), TextPipelineConfig(context_size=4))
     prepared = pipeline.prepare("alpha beta gamma delta epsilon")
-    left = pipeline.causal_training_batches(prepared)
-    right = pipeline.causal_training_batches(prepared)
+    left = pipeline.causal_training_batches(prepared, pad_token_id=native_model.unk)
+    right = pipeline.causal_training_batches(prepared, pad_token_id=native_model.unk)
     assert tuple(batch.digest for batch in left) == tuple(batch.digest for batch in right)
 
 
@@ -164,7 +164,7 @@ def test_training_receipt_binds_replayable_training_payload(native_model):
 
     pipeline = TextTokenPipeline(NativeTokenizer(native_model), TextPipelineConfig(context_size=4))
     prepared = pipeline.prepare("alpha beta gamma delta epsilon")
-    receipt = pipeline.training_receipt(prepared)
+    receipt = pipeline.training_receipt(prepared, pad_token_id=native_model.unk)
 
     assert receipt.pipeline_digest == pipeline.digest
     assert receipt.tokenizer_digest == pipeline.tokenizer.digest
@@ -182,7 +182,7 @@ def test_training_receipt_rejects_tampered_payload(native_model):
 
     pipeline = TextTokenPipeline(NativeTokenizer(native_model), TextPipelineConfig(context_size=4))
     prepared = pipeline.prepare("alpha beta gamma delta epsilon")
-    receipt = pipeline.training_receipt(prepared)
+    receipt = pipeline.training_receipt(prepared, pad_token_id=native_model.unk)
     tampered = replace(receipt, supervised_token_count=receipt.supervised_token_count + 1)
 
     with pytest.raises(TokenizerContractError, match="receipt mismatch"):
@@ -196,7 +196,7 @@ def test_training_receipt_fails_closed_without_trainable_examples(native_model):
     pipeline = TextTokenPipeline(NativeTokenizer(native_model), TextPipelineConfig(context_size=1))
     prepared = pipeline.prepare("alpha")
     with pytest.raises(TokenizerContractError, match="no trainable"):
-        pipeline.training_receipt(prepared)
+        pipeline.training_receipt(prepared, pad_token_id=native_model.unk)
 
 
 def test_governed_training_input_binds_dataset_lineage(native_model):
@@ -209,13 +209,13 @@ def test_governed_training_input_binds_dataset_lineage(native_model):
     rights = DatasetRights("dataset", "source", "allowed", "license", ("training",), "9" * 64)
     rights_digest = rights.digest
     revision = DatasetRevision("dataset", 0, prepared.raw_text_digest, rights_digest, pipeline.digest)
-    governed = pipeline.governed_training_input(prepared, revision, rights)
+    governed = pipeline.governed_training_input(prepared, revision, rights, pad_token_id=native_model.unk)
 
     assert governed.dataset_revision_digest == revision.digest
     assert governed.transform_digest == pipeline.digest
     assert governed.rights_digest == rights_digest
     assert governed.authorized_scope == "training"
-    assert governed.receipt_digest == pipeline.training_receipt(prepared).digest
+    assert governed.receipt_digest == pipeline.training_receipt(prepared, pad_token_id=native_model.unk).digest
     assert len(governed.digest) == 64
 
 
@@ -229,7 +229,7 @@ def test_governed_training_input_rejects_wrong_content(native_model):
     rights = DatasetRights("dataset", "source", "allowed", "license", ("training",), "9" * 64)
     revision = DatasetRevision("dataset", 0, "0" * 64, rights.digest, pipeline.digest)
     with pytest.raises(TokenizerContractError, match="content"):
-        pipeline.governed_training_input(prepared, revision, rights)
+        pipeline.governed_training_input(prepared, revision, rights, pad_token_id=native_model.unk)
 
 
 def test_governed_training_input_rejects_wrong_transform(native_model):
@@ -242,7 +242,7 @@ def test_governed_training_input_rejects_wrong_transform(native_model):
     rights = DatasetRights("dataset", "source", "allowed", "license", ("training",), "9" * 64)
     revision = DatasetRevision("dataset", 0, prepared.raw_text_digest, rights.digest, "2" * 64)
     with pytest.raises(TokenizerContractError, match="transform"):
-        pipeline.governed_training_input(prepared, revision, rights)
+        pipeline.governed_training_input(prepared, revision, rights, pad_token_id=native_model.unk)
 
 
 def test_training_manifest_binds_pipeline_and_dataset(native_model):
@@ -255,10 +255,10 @@ def test_training_manifest_binds_pipeline_and_dataset(native_model):
     prepared = pipeline.prepare("alpha beta gamma")
     rights = DatasetRights("dataset", "source", "allowed", "license", ("training",), "9" * 64)
     revision = DatasetRevision("dataset", 0, prepared.raw_text_digest, rights.digest, pipeline.digest)
-    governed = pipeline.governed_training_input(prepared, revision, rights)
+    governed = pipeline.governed_training_input(prepared, revision, rights, pad_token_id=native_model.unk)
     manifest = pipeline.training_manifest(
         prepared, revision, rights, run_id="run-1", base_model_digest="2" * 64,
-        code_digest="3" * 64, seed_manifest_digest="4" * 64, max_steps=10,
+        code_digest="3" * 64, seed_manifest_digest="4" * 64, max_steps=10, pad_token_id=native_model.unk,
     )
 
     assert manifest.dataset_revision_digests == (revision.digest,)
@@ -276,7 +276,7 @@ def _training_lineage_fixture(native_model):
     revision = DatasetRevision("dataset", 0, prepared.raw_text_digest, rights.digest, pipeline.digest)
     manifest = pipeline.training_manifest(
         prepared, revision, rights, run_id="run-1", base_model_digest="2" * 64,
-        code_digest="3" * 64, seed_manifest_digest="4" * 64, max_steps=10,
+        code_digest="3" * 64, seed_manifest_digest="4" * 64, max_steps=10, pad_token_id=native_model.unk,
     )
     return pipeline, manifest
 
@@ -610,7 +610,7 @@ def test_causal_pipeline_skips_untrainable_windows_without_exception_matching(na
         TextPipelineConfig(context_size=1, max_batch_size=8),
     )
     prepared = pipeline.prepare("alpha beta gamma")
-    assert pipeline.causal_training_batches(prepared) == ()
+    assert pipeline.causal_training_batches(prepared, pad_token_id=native_model.unk) == ()
 
 
 def test_governed_training_rejects_rights_without_training_scope(native_model):
@@ -622,7 +622,7 @@ def test_governed_training_rejects_rights_without_training_scope(native_model):
     rights = DatasetRights("dataset", "source", "allowed", "license", ("evaluation",), "9" * 64)
     revision = DatasetRevision("dataset", 0, prepared.raw_text_digest, rights.digest, pipeline.digest)
     with pytest.raises(TokenizerContractError, match="rights do not permit"):
-        pipeline.governed_training_input(prepared, revision, rights)
+        pipeline.governed_training_input(prepared, revision, rights, pad_token_id=native_model.unk)
 
 
 def test_governed_training_rejects_mismatched_rights_identity(native_model):
@@ -634,7 +634,7 @@ def test_governed_training_rejects_mismatched_rights_identity(native_model):
     rights = DatasetRights("other", "source", "allowed", "license", ("training",), "9" * 64)
     revision = DatasetRevision("dataset", 0, prepared.raw_text_digest, rights.digest, pipeline.digest)
     with pytest.raises(TokenizerContractError, match="rights identity mismatch"):
-        pipeline.governed_training_input(prepared, revision, rights)
+        pipeline.governed_training_input(prepared, revision, rights, pad_token_id=native_model.unk)
 
 
 def test_governed_training_scope_changes_durable_identity(native_model):
@@ -645,8 +645,8 @@ def test_governed_training_scope_changes_durable_identity(native_model):
     prepared = pipeline.prepare("alpha beta gamma")
     rights = DatasetRights("dataset", "source", "allowed", "license", ("training", "continued-training"), "9" * 64)
     revision = DatasetRevision("dataset", 0, prepared.raw_text_digest, rights.digest, pipeline.digest)
-    training = pipeline.governed_training_input(prepared, revision, rights, scope="training")
-    continued = pipeline.governed_training_input(prepared, revision, rights, scope="continued-training")
+    training = pipeline.governed_training_input(prepared, revision, rights, scope="training", pad_token_id=native_model.unk)
+    continued = pipeline.governed_training_input(prepared, revision, rights, scope="continued-training", pad_token_id=native_model.unk)
     assert training.authorized_scope == "training"
     assert continued.authorized_scope == "continued-training"
     assert training.digest != continued.digest
@@ -662,3 +662,14 @@ def test_model_batch_rejects_position_ids_in_padding():
     ), pad_token_id=0)
     with pytest.raises(TokenizerContractError, match="position ids"):
         replace(batch, position_ids=((0, 1), (0, 1)))
+
+
+def test_model_batches_require_declared_or_explicit_padding(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    prepared = pipeline.prepare("alpha beta gamma")
+    with pytest.raises(TokenizerContractError, match="does not declare pad token"):
+        pipeline.model_batches(prepared)
+    batches = pipeline.model_batches(prepared, pad_token_id=native_model.unk)
+    assert batches
