@@ -1371,3 +1371,22 @@ Closed additional evidence and trust-boundary gaps:
 Focused regressions landed for false corroboration, provider failure isolation/canonical dedupe/identity spoofing, strict decoding bounds and content-credential trust semantics.
 
 Known implementation gaps are now dominated by deeper transport/runtime concerns: DNS validation still has a resolution-to-connect TOCTOU window because urllib resolves independently after validation; frontier claiming exists but is not yet atomically coupled to the engine's heap dequeue in a shared distributed frontier. These remain explicit blockers to a fully SIGNED production-grade distributed crawler.
+
+
+### 2026-10-07 transport and distributed-frontier closeout tranche
+
+Major distributed-runtime blocker substantially closed:
+- repaired literal escaped-newline corruption in durable crawler storage that would have prevented Python compilation;
+- durable schema advanced to v3;
+- shared SQLite frontier stores scheduling, depth, retry and lease ownership state;
+- worker selection plus lease assignment occurs under one IMMEDIATE transaction;
+- completion and retry are opaque-token fenced;
+- expired claims can be reassigned without allowing stale completion;
+- focused regressions cover exclusive claim, expiry/reclaim and atomic retry rescheduling.
+
+DNS hardening advanced from a loose preflight check to an explicit resolution/peer-binding contract:
+- a ResolvedTarget captures the exact prevalidated public address set;
+- peer verification accepts only an address from that validated set;
+- malformed/unplanned peers fail closed.
+
+Important remaining transport blocker: SafeHttpFetcher still uses urllib and therefore does not yet expose the connected socket peer to enforce ResolvedTarget at connection time. The binding contract and tests now exist, but production transport must switch to or wrap a connection primitive that exposes peername while preserving HTTPS SNI/hostname certificate verification. This is not marked complete until that enforcement is wired into the actual socket.
