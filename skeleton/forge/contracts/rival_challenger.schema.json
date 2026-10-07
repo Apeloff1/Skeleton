@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-17:rival_challenger:v1",
+  "title": "FLGB-17 rival challenger",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "challenge_id",
+    "proposal_digest",
+    "defect_digests",
+    "severity_ppm",
+    "independent_agent_id"
+  ],
+  "properties": {
+    "challenge_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "proposal_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "defect_digests": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    },
+    "severity_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "independent_agent_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    }
+  }
+}
