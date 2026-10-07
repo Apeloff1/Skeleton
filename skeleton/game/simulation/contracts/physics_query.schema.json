@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-10:physics_query:v1",
+  "title": "FLGB-10 physics query",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "query_id",
+    "origin",
+    "direction",
+    "max_distance"
+  ],
+  "properties": {
+    "query_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "origin": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "integer"
+      }
+    },
+    "direction": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "integer"
+      }
+    },
+    "max_distance": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}
