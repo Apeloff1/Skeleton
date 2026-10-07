@@ -3,7 +3,7 @@ import unittest
 from skeleton.cortex.transformer import TinyTransformer
 from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
 from skeleton.ai.model_runtime.runtime_checkpoint import portable_model_snapshot,snapshot_digest
-from skeleton.ai.model_runtime.training_admission import admit_candidate_model
+from skeleton.ai.model_runtime.training_admission import admit_candidate_model,execute_rollback
 from skeleton.ai.training.flgb_training_runtime import CandidateWeights,MirrorEvaluation,PromotionEvidence,digest_json
 from skeleton.ai.training.project_learning import ProjectOutcome,LearningApproval,admit_project_outcome
 from skeleton.ai.training.project_learning_run import build_project_learning_manifest
@@ -24,5 +24,4 @@ class TestFullCycle(unittest.TestCase):
   prom=PromotionEvidence(cand.digest,"d"*64,ad.rights.digest,a.contamination_scan_digest,digest_json(ev.__dict__),cp["digest"],"mirror-verifier",True,True,True,True)
   def apply(m): m.E[0][0]+=0.25
   rt,adm,rb=admit_candidate_model(rt,cand,prom,apply,admission_authority="runtime-custodian")
-  final=extend_with_promotion(proof,cand,ev,prom,adm,rb)
-  self.assertEqual(rt.model_digest,cand.weights_digest); self.assertEqual(final.stages[-1].subject_digest,old); self.assertEqual(len(final.stages),9)
+  ready=extend_with_promotion(proof,cand,ev,prom,adm,rb)\n  self.assertEqual(rt.model_digest,cand.weights_digest); self.assertEqual(ready.stages[-1].stage,"rollback-ready")\n  executed=execute_rollback(rt,adm,rb,cp)\n  final=extend_with_promotion(proof,cand,ev,prom,adm,executed)\n  self.assertEqual(rt.model_digest,old); self.assertEqual(rt._current_model_digest(),old)\n  self.assertEqual(final.stages[-1].stage,"rollback-executed"); self.assertEqual(final.stages[-1].subject_digest,old); self.assertEqual(len(final.stages),9)
