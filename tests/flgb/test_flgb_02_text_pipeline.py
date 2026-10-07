@@ -258,3 +258,61 @@ def test_training_manifest_binds_pipeline_and_dataset(native_model):
     assert manifest.dataset_revision_digests == (revision.digest,)
     assert manifest.config_digest == digest_json({"pipeline_digest": pipeline.digest, "training_input_digest": governed.digest})
     assert manifest.output_kind == "candidate-only"
+
+
+def _training_lineage_fixture(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    from skeleton.ai.training.flgb_training_runtime import DatasetRevision
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    prepared = pipeline.prepare("alpha beta gamma delta")
+    revision = DatasetRevision("dataset", 0, prepared.raw_text_digest, "1" * 64, pipeline.digest)
+    manifest = pipeline.training_manifest(
+        prepared, revision, run_id="run-1", base_model_digest="2" * 64,
+        code_digest="3" * 64, seed_manifest_digest="4" * 64, max_steps=10,
+    )
+    return pipeline, manifest
+
+
+def test_training_checkpoint_and_candidate_preserve_lineage(native_model):
+    pipeline, manifest = _training_lineage_fixture(native_model)
+    checkpoint = pipeline.initial_training_checkpoint(
+        manifest, weights_digest="5" * 64, optimizer_digest="6" * 64, rng_digest="7" * 64,
+    )
+    candidate = pipeline.candidate_from_checkpoint(
+        manifest, checkpoint, candidate_id="candidate-1", base_model_digest="2" * 64,
+    )
+
+    assert checkpoint.run_manifest_digest == manifest.digest
+    assert candidate.weights_digest == checkpoint.weights_digest
+    assert candidate.training_lineage_digest == checkpoint.digest
+    assert candidate.status == "candidate"
+    assert candidate.production_authorized() is False
+
+
+def test_candidate_rejects_checkpoint_from_other_manifest(native_model):
+    from dataclasses import replace
+    from skeleton.ai.model_runtime.tokenization import TokenizerContractError
+
+    pipeline, manifest = _training_lineage_fixture(native_model)
+    checkpoint = pipeline.initial_training_checkpoint(
+        manifest, weights_digest="5" * 64, optimizer_digest="6" * 64, rng_digest="7" * 64,
+    )
+    foreign = replace(checkpoint, run_manifest_digest="8" * 64)
+    with pytest.raises(TokenizerContractError, match="does not belong"):
+        pipeline.candidate_from_checkpoint(
+            manifest, foreign, candidate_id="candidate-1", base_model_digest="2" * 64,
+        )
+
+
+def test_candidate_rejects_base_model_mismatch(native_model):
+    from skeleton.ai.model_runtime.tokenization import TokenizerContractError
+
+    pipeline, manifest = _training_lineage_fixture(native_model)
+    checkpoint = pipeline.initial_training_checkpoint(
+        manifest, weights_digest="5" * 64, optimizer_digest="6" * 64, rng_digest="7" * 64,
+    )
+    with pytest.raises(TokenizerContractError, match="base model"):
+        pipeline.candidate_from_checkpoint(
+            manifest, checkpoint, candidate_id="candidate-1", base_model_digest="9" * 64,
+        )
