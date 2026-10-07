@@ -227,6 +227,25 @@ class TrainingInputReceipt:
         return digest_json({"pipeline_digest": self.pipeline_digest, "tokenizer_digest": self.tokenizer_digest, "sequence_digest": self.sequence_digest, "batch_digests": list(self.batch_digests), "example_count": self.example_count, "supervised_token_count": self.supervised_token_count})
 
 
+@dataclass(frozen=True)
+class GovernedTrainingInput:
+    """Binds a replayable token payload to an admitted FLGB-07 dataset revision."""
+    receipt_digest: str
+    dataset_revision_digest: str
+    transform_digest: str
+    rights_digest: str
+
+    def __post_init__(self) -> None:
+        for name in ("receipt_digest", "dataset_revision_digest", "transform_digest", "rights_digest"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value):
+                raise TokenizerContractError(f"invalid {name}")
+
+    @property
+    def digest(self) -> str:
+        return digest_json(self.__dict__)
+
+
 class TextTokenPipeline:
     """One admitted, immutable text-to-model-input pipeline."""
 
@@ -321,6 +340,17 @@ class TextTokenPipeline:
         if expected.digest != receipt.digest:
             raise TokenizerContractError("training input receipt mismatch")
 
+    def governed_training_input(self, prepared: PreparedText, dataset_revision, *, pad_token_id: int | None = None, ignore_index: int = -100) -> GovernedTrainingInput:
+        from skeleton.ai.training.flgb_training_runtime import DatasetRevision
+        if not isinstance(dataset_revision, DatasetRevision):
+            raise TokenizerContractError("DatasetRevision required")
+        receipt = self.training_receipt(prepared, pad_token_id=pad_token_id, ignore_index=ignore_index)
+        if dataset_revision.content_digest != prepared.raw_text_digest:
+            raise TokenizerContractError("dataset content does not match prepared source")
+        if dataset_revision.transform_digest != self.digest:
+            raise TokenizerContractError("dataset transform does not match pipeline")
+        return GovernedTrainingInput(receipt.digest, dataset_revision.digest, dataset_revision.transform_digest, dataset_revision.rights_digest)
+
     def decode(self, sequence: TokenSequence, *, require_identity: bool = True) -> str:
         if not isinstance(sequence, TokenSequence):
             raise TokenizerContractError("TokenSequence required")
@@ -359,4 +389,4 @@ class TextTokenPipeline:
         return prepared
 
 
-__all__ = ["CausalTrainingBatch", "ModelInputBatch", "PreparedText", "TextPipelineConfig", "TextTokenPipeline", "TrainingInputReceipt", "materialize_causal_training_batch", "materialize_model_batch"]
+__all__ = ["CausalTrainingBatch", "GovernedTrainingInput", "ModelInputBatch", "PreparedText", "TextPipelineConfig", "TextTokenPipeline", "TrainingInputReceipt", "materialize_causal_training_batch", "materialize_model_batch"]
