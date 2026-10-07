@@ -33,8 +33,8 @@ Completion requires implementation sign-off plus independent verification sign-o
 ## Volumes 000–420
 
 - [x] `ACC-VOL-000` — VOL-000 Plan Constitution — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:P1 Evidence Identity Gate** — completed_at_utc: `2026-10-04T04:35:02Z`
-- [ ] `ACC-VOL-001` — VOL-001 Scientific & Historical Foundation — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-002` — VOL-002 System Architecture — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-001` — VOL-001 Scientific & Historical Foundation — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:AI Research Lineage Closure** — completed_at_utc: `2026-10-07T02:45:00Z`
+- [x] `ACC-VOL-002` — VOL-002 System Architecture — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:VOL-002 Architecture Fitness and Ownership Gate** — completed_at_utc: `2026-10-07T02:45:00Z`
 - [ ] `ACC-VOL-003` — VOL-003 Canonical Contract System — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-004` — VOL-004 Kernel & Execution Foundation — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-005` — VOL-005 Data & Persistence — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
