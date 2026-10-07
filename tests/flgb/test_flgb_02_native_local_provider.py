@@ -205,6 +205,19 @@ class TestNativeRuntimeLocalArtifact(unittest.TestCase):
         ):
             backend._parse_output("not-json", request)
 
+        non_object = LocalInferenceRequest(
+            prompt="alpha",
+            structured_output_schema={
+                "type": "array",
+                "items": {"type": "string"},
+            },
+        )
+        with self.assertRaisesRegex(
+            NativeRuntimeBackendError,
+            "must describe an object",
+        ):
+            backend._render_prompt(non_object)
+
     def test_tool_protocol_accepts_declared_and_rejects_undeclared_ids(self):
         backend = _backend()
         request = LocalInferenceRequest(
