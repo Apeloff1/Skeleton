@@ -10,6 +10,7 @@ from .research import EvidenceSet
 class PromotionDecision:
     decision_id:str; content_hash:str; action:str; reasons:tuple[str,...]; decided_at:float
     assurance_score:float; provenance_schema:str|None
+    qualified_sources:int=0; required_sources:int=0
     def receipt(self)->dict[str,object]:
         return {"schema":"skeleton.ai.crawl.promotion.v1",**asdict(self)}
 
@@ -26,7 +27,7 @@ class PromotionGate:
         if not schema:reasons.append("missing_provenance")
         action="promote" if not reasons else "quarantine"
         did=hashlib.sha256(f"{doc.content_hash}:{action}:{','.join(reasons)}".encode()).hexdigest()
-        return PromotionDecision(did,doc.content_hash,action,tuple(reasons),now,float(assurance["score"]),schema)
+        return PromotionDecision(did,doc.content_hash,action,tuple(reasons),now,float(assurance["score"]),schema,int(assurance["distinct_hosts"]),int(assurance["required_sources"]))
 
 @dataclass
 class HostHealth:
