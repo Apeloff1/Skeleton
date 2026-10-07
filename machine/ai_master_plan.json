@@ -858,7 +858,9 @@
         "ModelRequest",
         "ModelResult",
         "ModelStreamEvent",
-        "InferenceUsage"
+        "InferenceUsage",
+        "BatchPlan",
+        "SpeculationDecision"
       ],
       "implementation_paths": [
         "skeleton/provider_runtime.py",
@@ -868,7 +870,11 @@
         "skeleton/inference/session.py",
         "skeleton/inference/provider_bridge.py",
         "skeleton/inference/replay.py",
-        "skeleton/inference/async_runtime.py"
+        "skeleton/inference/async_runtime.py",
+        "skeleton/inference/batching.py",
+        "skeleton/inference/speculation.py",
+        "scripts/verify_vol007_inference.py",
+        ".github/workflows/vol007-inference.yml"
       ],
       "tests": [
         "tests/test_model_runtime.py",
@@ -877,14 +883,26 @@
         "skeleton/testing/test_vol007_inference_session.py",
         "skeleton/testing/test_vol007_provider_bridge.py",
         "skeleton/testing/test_vol007_inference_replay.py",
-        "skeleton/testing/test_vol007_async_runtime.py"
+        "skeleton/testing/test_vol007_async_runtime.py",
+        "skeleton/testing/test_vol007_batching.py",
+        "skeleton/testing/test_vol007_speculation.py",
+        "tests/test_vol007_inference_independent.py"
       ],
       "evaluations": [
         "planned:stream/cancel/failover matrix",
-        "planned:latency-cost-quality characterization"
+        "planned:latency-cost-quality characterization",
+        ".github/workflows/vol007-inference.yml",
+        "scripts/verify_vol007_inference.py"
       ],
       "evidence": [
-        "implementation-head:a6bacd6b09b83c09ff1f397a05bb48a8cfcdd2f9"
+        "implementation-head:a6bacd6b09b83c09ff1f397a05bb48a8cfcdd2f9",
+        "skeleton/inference/batching.py",
+        "skeleton/inference/speculation.py",
+        "skeleton/testing/test_vol007_batching.py",
+        "skeleton/testing/test_vol007_speculation.py",
+        "scripts/verify_vol007_inference.py",
+        "tests/test_vol007_inference_independent.py",
+        ".github/workflows/vol007-inference.yml"
       ],
       "risks": [
         "duplicate provider effects during retry",
@@ -892,8 +910,7 @@
         "uncancelled expensive work"
       ],
       "gaps": [
-        "continuous batching and local serving optimization remain future performance work",
-        "speculative decoding requires measured correctness gates"
+        "independent exact-head VOL-007 Inference Engine Closure qualification remains pending"
       ],
       "accountability_id": "ACC-VOL-007",
       "completion_checkbox": false,
