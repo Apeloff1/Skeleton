@@ -51,3 +51,9 @@ from .value_of_information import ResearchAction,ActionValue,rank_actions
 from .sequential_evidence import SequentialDecision,sequential_bernoulli
 from .source_quality import SourcePosterior,update_source_quality,conservative_quality
 from .research_state import ResearchStateStore
+
+from .information_gain import InformationGain,binary_entropy,expected_binary_information_gain
+from .dependence_trust import ClusterTrust,dependence_adjusted_trust
+from .action_learning import ActionEconomics,update_action_economics
+from .research_learning import ResearchLearningStore
+from .research_controller import ControllerCandidate,ControllerChoice,choose_next_action
