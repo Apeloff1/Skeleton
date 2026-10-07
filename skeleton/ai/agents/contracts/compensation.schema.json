@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-04:compensation:v1",
+  "title": "FLGB-04 compensation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "action_id",
+    "original_receipt_digest",
+    "compensation_input_digest"
+  ],
+  "properties": {
+    "action_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "original_receipt_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "compensation_input_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

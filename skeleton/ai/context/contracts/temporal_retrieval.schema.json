@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-03:temporal_retrieval:v1",
+  "title": "FLGB-03 temporal retrieval",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "record_id",
+    "content_digest",
+    "provenance_digest",
+    "valid_from",
+    "valid_to"
+  ],
+  "properties": {
+    "record_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "content_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "provenance_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "valid_from": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "valid_to": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    }
+  }
+}

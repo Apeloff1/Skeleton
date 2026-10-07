@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-02:device_placement:v1",
+  "title": "FLGB-02 device placement",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "shard_index",
+    "device_id",
+    "bytes"
+  ],
+  "properties": {
+    "shard_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "device_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "bytes": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}

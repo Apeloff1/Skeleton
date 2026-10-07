@@ -33,6 +33,18 @@ def main() -> int:
     if backlog.get("plane_count") != 18 or backlog.get("task_count") != 216:
         fail("declared counts are stale")
 
+    state_model = backlog.get("state_model")
+    if not isinstance(state_model, dict):
+        fail("state model missing")
+    for required_state in (
+        "planned",
+        "implemented-pending-verification",
+        "in-progress",
+        "verified",
+    ):
+        if not isinstance(state_model.get(required_state), str) or not state_model[required_state].strip():
+            fail(f"state model missing {required_state}")
+
     manifest_shards = manifest.get("shards", [])
     shard_by_id = {item["id"]: item for item in manifest_shards}
     if set(shard_by_id) != {f"FLGB-{i:02d}" for i in range(1, 19)}:
@@ -128,12 +140,49 @@ def main() -> int:
         gates = task.get("acceptance_gates")
         if not isinstance(gates, list) or len(gates) < 12:
             fail(f"{task_id} acceptance gate set incomplete")
-        if task.get("state") != "planned":
-            fail(f"{task_id} may not be pre-completed")
-        if task.get("implementation_signed") is not False:
-            fail(f"{task_id} implementation signoff must remain false")
-        if task.get("independent_verification_signed") is not False:
-            fail(f"{task_id} verification signoff must remain false")
+        state = task.get("state")
+        allowed_task_states = {
+            "planned",
+            "implemented-pending-verification",
+            "verified",
+        }
+        if state not in allowed_task_states:
+            fail(f"{task_id} invalid task state {state!r}")
+
+        if state in {"implemented-pending-verification", "verified"}:
+            for label, target in (
+                ("implementation", implementation_target),
+                ("contract", contract_target),
+                ("test", test_target),
+            ):
+                target_path = ROOT / target
+                if not target_path.is_file():
+                    fail(f"{task_id} missing {label} target {target}")
+                if target_path.stat().st_size <= 0:
+                    fail(f"{task_id} empty {label} target {target}")
+            try:
+                contract_data = json.loads((ROOT / contract_target).read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                fail(f"{task_id} contract target is not valid JSON: {exc}")
+            if not isinstance(contract_data, dict) or contract_data.get("type") != "object":
+                fail(f"{task_id} contract target is not an object schema")
+
+        if state == "verified":
+            if task.get("implementation_signed") is not True:
+                fail(f"{task_id} verified state requires implementation signoff")
+            if task.get("independent_verification_signed") is not True:
+                fail(f"{task_id} verified state requires independent verification")
+            evidence = task.get("verification_evidence")
+            if not isinstance(evidence, dict):
+                fail(f"{task_id} verified state requires evidence")
+            for key in ("commit_sha", "workflow_run_id", "verified_at", "verifier"):
+                if not isinstance(evidence.get(key), str) or not evidence[key].strip():
+                    fail(f"{task_id} verified evidence missing {key}")
+        else:
+            if task.get("implementation_signed") is not False:
+                fail(f"{task_id} unsigned state cannot claim implementation signoff")
+            if task.get("independent_verification_signed") is not False:
+                fail(f"{task_id} unsigned state cannot claim verification signoff")
 
     expected_pairs = {
         (shard["id"], subsystem)
@@ -153,12 +202,38 @@ def main() -> int:
             fail(f"{plane_id} task index stale")
         if len(expected_task_ids) != 12:
             fail(f"{plane_id} must contain 12 build units")
-        if plane.get("state") != "planned":
-            fail(f"{plane_id} may not be pre-completed")
-        if plane.get("implementation_signed") is not False:
-            fail(f"{plane_id} implementation signoff must remain false")
-        if plane.get("independent_verification_signed") is not False:
-            fail(f"{plane_id} verification signoff must remain false")
+        task_states = {
+            task["state"] for task in tasks if task.get("plane_id") == plane_id
+        }
+        if task_states == {"planned"}:
+            expected_plane_state = "planned"
+        elif task_states == {"verified"}:
+            expected_plane_state = "verified"
+        elif task_states.issubset({"implemented-pending-verification", "verified"}) and (
+            "implemented-pending-verification" in task_states
+        ):
+            expected_plane_state = "implemented-pending-verification"
+        else:
+            expected_plane_state = "in-progress"
+
+        if plane.get("state") != expected_plane_state:
+            fail(
+                f"{plane_id} state drift: {plane.get('state')!r} != "
+                f"{expected_plane_state!r}"
+            )
+        if expected_plane_state == "verified":
+            if plane.get("implementation_signed") is not True:
+                fail(f"{plane_id} verified state requires implementation signoff")
+            if plane.get("independent_verification_signed") is not True:
+                fail(f"{plane_id} verified state requires independent verification")
+            for dependency in plane.get("depends_on", []):
+                if plane_by_id[dependency].get("state") != "verified":
+                    fail(f"{plane_id} verified before dependency {dependency}")
+        else:
+            if plane.get("implementation_signed") is not False:
+                fail(f"{plane_id} unsigned state cannot claim implementation signoff")
+            if plane.get("independent_verification_signed") is not False:
+                fail(f"{plane_id} unsigned state cannot claim verification signoff")
 
     frontier_gate = backlog.get("frontier_competition_gate")
     if not isinstance(frontier_gate, dict):

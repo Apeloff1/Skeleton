@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-02:distributed_serving:v1",
+  "title": "FLGB-02 distributed serving",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "replica_id",
+    "model_identity_digest",
+    "endpoint_digest",
+    "healthy",
+    "inflight"
+  ],
+  "properties": {
+    "replica_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "model_identity_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "endpoint_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "healthy": {
+      "type": "boolean"
+    },
+    "inflight": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

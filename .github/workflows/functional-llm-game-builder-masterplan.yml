@@ -33,7 +33,7 @@ jobs:
         with:
           python-version: "3.11.16"
       - name: Compile validator
-        run: python -m py_compile scripts/check_functional_llm_game_builder_10mb.py scripts/check_functional_llm_game_builder_execution_backlog.py tests/test_functional_llm_game_builder_masterplan.py tests/test_functional_llm_game_builder_execution_backlog.py
+        run: python -m py_compile scripts/check_functional_llm_game_builder_10mb.py scripts/check_functional_llm_game_builder_execution_backlog.py skeleton/__init__.py skeleton/inference/__init__.py skeleton/inference/flgb_runtime.py skeleton/ai/model_runtime/flgb_model_runtime.py skeleton/ai/model_runtime/__init__.py skeleton/ai/context/flgb_context_runtime.py skeleton/ai/context/__init__.py skeleton/ai/agents/flgb_agent_runtime.py skeleton/ai/agents/__init__.py skeleton/security/activation_security.py tests/flgb/test_flgb_activation_security_timeout.py tests/test_functional_llm_game_builder_masterplan.py tests/test_functional_llm_game_builder_execution_backlog.py tests/flgb/test_flgb_01_*.py
       - name: Validate atlas
         run: python scripts/check_functional_llm_game_builder_10mb.py
       - name: Validate execution backlog
@@ -42,5 +42,15 @@ jobs:
         run: |
           python tests/test_functional_llm_game_builder_masterplan.py -q
           python tests/test_functional_llm_game_builder_execution_backlog.py -q
+      - name: Run FLGB-01 inference-plane regressions
+        run: python -m unittest discover -s tests/flgb -p 'test_flgb_01_*.py' -v
+      - name: Run FLGB-02 model-runtime regressions
+        run: python -m unittest discover -s tests/flgb -p 'test_flgb_02_*.py' -v
+      - name: Run FLGB-03 context-plane regressions
+        run: python -m unittest discover -s tests/flgb -p 'test_flgb_03_*.py' -v
+      - name: Run FLGB-04 agent-plane regressions
+        run: python -m unittest discover -s tests/flgb -p 'test_flgb_04_*.py' -v
+      - name: Run FLGB support regressions
+        run: python -m unittest discover -s tests/flgb -p 'test_flgb_activation_security_timeout.py' -v
       - name: Confirm exact head
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
