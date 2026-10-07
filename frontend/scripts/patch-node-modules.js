@@ -190,19 +190,56 @@ braces.parse = (input, options = {}) =>
   );
 }
 
-function patchHttpCacheSemanticsMaxStale() {
+function patchHttpCacheSemanticsSecurity() {
   const pkgPath = path.join(ROOT, 'node_modules/http-cache-semantics/package.json');
   if (!fs.existsSync(pkgPath)) return;
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
-  if (version !== '4.2.0') {
+  const reviewedVersions = new Set(['4.2.0', '4.3.0']);
+  if (!reviewedVersions.has(version)) {
     throw new Error(`[patch-node-modules] http-cache-semantics ${version} requires security patch review`);
   }
 
+  // CVE-2026-93750: 4.2.0 only rejects a byte-for-byte "Vary: *" value.
+  // Normalize the comma-separated fields first and reject a wildcard wherever
+  // it occurs. 4.3.0 already ships this shape; patchSecurityFile treats that
+  // as already hardened and still fails closed on any unknown source layout.
+  patchSecurityFile(
+    'node_modules/http-cache-semantics/index.js',
+    /\/\/ A Vary header field-value of "\*" always fails to match\s+if \(this\._resHeaders\.vary === '\*'\) \{\s+return false;\s+\}\s+\s*const fields = this\._resHeaders\.vary\s+\.trim\(\)\s+\.toLowerCase\(\)\s+\.split\(\/\\s\*,\\s\*\/\);\s+for \(const name of fields\) \{\s+if \(req\.headers\[name\] !== this\._reqHeaders\[name\]\) return false;\s+\}/,
+    `const fields = this._resHeaders.vary
+            .trim()
+            .toLowerCase()
+            .split(/\\s*,\\s*/);
+
+        for (const name of fields) {
+            // A Vary header field-value of "*" always fails to match.
+            if (name === '*') {
+                return false;
+            }
+
+            const newReq = Object.prototype.hasOwnProperty.call(
+                req.headers,
+                name
+            ) && req.headers[name];
+
+            const cachedReq = Object.prototype.hasOwnProperty.call(
+                this._reqHeaders,
+                name
+            ) && this._reqHeaders[name];
+
+            if (newReq !== cachedReq) {
+                return false;
+            }
+        }`,
+    /for \(const name of fields\) \{\s+\/\/ A Vary header field-value of "\*" always fails to match\.?\s+if \(name === '\*'\) \{/,
+  );
+
   // CVE-2026-93748 / GHSA-ch52-4w7c-c8xp: security-zeroed shared
   // responses (for example Set-Cookie responses) must never be resurrected
-  // by a client max-stale directive. Conservatively disallow max-stale when
-  // maxAge() is zero.
+  // by a client max-stale directive. The newly published 4.3.0 release still
+  // has the vulnerable branch, so keep the local hardening until upstream
+  // ships and this fail-closed review gate explicitly admits a fixed version.
   patchSecurityFile(
     'node_modules/http-cache-semantics/index.js',
     /if \(allowsStaleWithoutRevalidation\) \{/,
@@ -342,7 +379,7 @@ function patchReactNativeRnGetPolyfillsExport() {
 
 patchImageSizeDoS();
 patchBracesDepthDoS();
-patchHttpCacheSemanticsMaxStale();
+patchHttpCacheSemanticsSecurity();
 patchNodeForgeNestedDigestAlgorithm();
 patchWorkletsStaticRendering();
 patchReactNativeRnGetPolyfillsExport();
