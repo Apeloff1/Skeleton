@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-10:rigid_body:v1",
+  "title": "FLGB-10 rigid body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "entity_id",
+    "mass_mg",
+    "pos_x",
+    "pos_y",
+    "pos_z",
+    "vel_x",
+    "vel_y",
+    "vel_z",
+    "dynamic"
+  ],
+  "properties": {
+    "entity_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "mass_mg": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "pos_x": {
+      "type": "integer"
+    },
+    "pos_y": {
+      "type": "integer"
+    },
+    "pos_z": {
+      "type": "integer"
+    },
+    "vel_x": {
+      "type": "integer"
+    },
+    "vel_y": {
+      "type": "integer"
+    },
+    "vel_z": {
+      "type": "integer"
+    },
+    "dynamic": {
+      "type": "boolean"
+    }
+  }
+}
