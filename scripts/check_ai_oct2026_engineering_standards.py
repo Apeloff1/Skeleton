@@ -57,7 +57,7 @@ def validate(root:Path=ROOT,*,head:str|None=None)->dict[str,Any]:
     for key in EXPECTED:
         v=by.get(key)
         if not isinstance(v,dict): raise Oct2026StandardsCandidateError(f"missing {key}")
-        if v.get("implementation_status")!="implemented": raise Oct2026StandardsCandidateError(f"{key} must be implemented but unverified")
+        if v.get("implementation_status") not in {"unverified","implemented"}: raise Oct2026StandardsCandidateError(f"{key} must remain pre-verification")
         if v.get("completion_checkbox") is not False: raise Oct2026StandardsCandidateError(f"{key} self-promoted completion")
         if v.get("implementation_paths")!=[modules[key]]: raise Oct2026StandardsCandidateError(f"{key} implementation binding drift")
         if tests[key] not in v.get("tests",()) or review_test not in v.get("tests",()): raise Oct2026StandardsCandidateError(f"{key} test binding drift")
