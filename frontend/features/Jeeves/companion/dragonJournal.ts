@@ -13,6 +13,7 @@ export function reduceDragonJournal(j:CompanionJournal,e:WireDragonEvent):Compan
  if(e.kind==='acquisition_accepted')accepted.add(e.url);
  if(e.kind==='burn_started'){if(!accepted.has(e.url))return warning('Burn rejected: no accepted acquisition');burning.add(e.url)}
  if(e.kind==='burn_chunk'&&!burning.has(e.url))return warning('Chunk rejected: no active burn');
+ if(e.kind==='burn_complete'&&e.payload.persisted!==true)return warning('Completion rejected: durable indexing receipt missing');
  if(e.kind==='burn_complete'){if(!burning.has(e.url))return warning('Completion rejected: no active burn');burning.delete(e.url);accepted.delete(e.url)}
  if(e.kind==='policy_rejected'){accepted.delete(e.url);burning.delete(e.url)}
  return {lastSequence:e.sequence,seenIds:[...j.seenIds.slice(-511),e.event_id],accepted:[...accepted],burning:[...burning],state:companionFromCrawler(e.kind,e.payload),rejected:j.rejected+Number(e.kind==='policy_rejected'),indexed:j.indexed+Number(e.kind==='burn_complete'),warnings:j.warnings};
