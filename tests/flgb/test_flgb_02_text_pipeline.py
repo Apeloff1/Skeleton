@@ -727,3 +727,43 @@ def test_native_tokenizer_wraps_native_encode_failure(native_model, monkeypatch)
     monkeypatch.setattr(native_model, "_ids", fail)
     with pytest.raises(TokenizerContractError, match="encode failed"):
         tokenizer.encode_ids("alpha")
+
+
+def test_corpus_training_receipt_binds_ordered_document_boundaries(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    corpus = pipeline.prepare_corpus((
+        ("doc-a", "alpha beta gamma"),
+        ("doc-b", "delta epsilon zeta"),
+    ))
+    receipt = pipeline.corpus_training_receipt(corpus, pad_token_id=native_model.unk)
+    per_document = pipeline.corpus_training_receipts(corpus, pad_token_id=native_model.unk)
+    assert receipt.document_ids == ("doc-a", "doc-b")
+    assert receipt.document_receipt_digests == tuple(item.digest for item in per_document)
+    assert receipt.example_count == sum(item.example_count for item in per_document)
+    assert receipt.supervised_token_count == sum(item.supervised_token_count for item in per_document)
+    assert pipeline.verify_corpus_training_receipt(corpus, receipt, pad_token_id=native_model.unk)
+
+
+def test_corpus_training_receipt_is_order_sensitive(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    left = pipeline.prepare_corpus((("a", "alpha beta"), ("b", "gamma delta")))
+    right = pipeline.prepare_corpus((("b", "gamma delta"), ("a", "alpha beta")))
+    left_receipt = pipeline.corpus_training_receipt(left, pad_token_id=native_model.unk)
+    right_receipt = pipeline.corpus_training_receipt(right, pad_token_id=native_model.unk)
+    assert left_receipt.digest != right_receipt.digest
+
+
+def test_corpus_training_receipt_rejects_foreign_corpus(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextPipelineConfig, TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    tokenizer = NativeTokenizer(native_model)
+    first = TextTokenPipeline(tokenizer, TextPipelineConfig(context_size=2))
+    second = TextTokenPipeline(tokenizer, TextPipelineConfig(context_size=3))
+    corpus = first.prepare_corpus((("a", "alpha beta gamma"),))
+    receipt = first.corpus_training_receipt(corpus, pad_token_id=native_model.unk)
+    with pytest.raises(TokenizerContractError):
+        second.verify_corpus_training_receipt(corpus, receipt, pad_token_id=native_model.unk)
