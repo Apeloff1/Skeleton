@@ -1354,3 +1354,20 @@ Additional proof-oriented coverage and repairs:
 During verification, an initially drafted replay test assumed a nonexistent class-level restore API. Repository inspection caught the mismatch before treating it as evidence; the test was corrected to the actual keyed instance restore contract, and restore validation was strengthened in production code.
 
 CI observation: the GitHub connector's commit-workflow helper only reports pull-request-triggered runs, so it cannot establish whether push-triggered main runs exist. The repository workflow configuration is now correct for crawler paths, but SIGNED status still requires observable execution evidence rather than inference.
+
+
+### 2026-10-07 final crawler implementation-hardening tranche
+
+Closed additional evidence and trust-boundary gaps:
+- research sufficiency counts only evidence meeting explicit relevance and source-quality thresholds;
+- irrelevant and low-quality independent hosts can no longer manufacture corroboration;
+- configured diversity and contradiction weights now participate in assurance scoring;
+- federated discovery canonicalizes URLs before dedupe, isolates provider failures and pins provider identity to the trusted adapter;
+- malformed provider URLs are discarded without aborting healthy providers;
+- MIME extraction is byte-bounded before decoding, charset-aware over a deliberately constrained set and strict on malformed encodings;
+- external content-credential observations now distinguish verified/invalid/absent/unknown;
+- absent or unknown credentials contribute no authenticity uplift, invalid credentials are negative, and verified credentials are only a small bounded signal.
+
+Focused regressions landed for false corroboration, provider failure isolation/canonical dedupe/identity spoofing, strict decoding bounds and content-credential trust semantics.
+
+Known implementation gaps are now dominated by deeper transport/runtime concerns: DNS validation still has a resolution-to-connect TOCTOU window because urllib resolves independently after validation; frontier claiming exists but is not yet atomically coupled to the engine's heap dequeue in a shared distributed frontier. These remain explicit blockers to a fully SIGNED production-grade distributed crawler.
