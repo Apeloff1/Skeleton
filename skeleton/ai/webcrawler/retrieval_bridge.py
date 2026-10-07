@@ -4,12 +4,13 @@ from dataclasses import asdict,dataclass
 from .core import CrawlDocument
 from .governance import PromotionDecision
 from .ingestion_registry import DurableIngestionRegistry,IngestionLease
+from .outbox import IngestionOutbox
 @dataclass(frozen=True)
 class RetrievalBridgeReceipt:
  content_hash:str;chunks:int;index_revision:int;provenance_entry_ids:tuple[str,...]
 class CanonicalRetrievalBridge:
- def __init__(self,index,ledger,chunker,*,registry:DurableIngestionRegistry|None=None,owner="retrieval",lease_ttl=60.0):
-  self.index=index;self.ledger=ledger;self.chunker=chunker;self.registry=registry;self.owner=owner;self.lease_ttl=lease_ttl;self._receipts={}
+ def __init__(self,index,ledger,chunker,*,registry:DurableIngestionRegistry|None=None,outbox:IngestionOutbox|None=None,owner="retrieval",lease_ttl=60.0):
+  self.index=index;self.ledger=ledger;self.chunker=chunker;self.registry=registry;self.outbox=outbox;self.owner=owner;self.lease_ttl=lease_ttl;self._receipts={}
  def _key(self,doc,decision):return f"{doc.content_hash}:{decision.decision_id}"
  @staticmethod
  def _receipt(raw):return RetrievalBridgeReceipt(raw["content_hash"],raw["chunks"],raw["index_revision"],tuple(raw["provenance_entry_ids"]))
@@ -26,13 +27,17 @@ class CanonicalRetrievalBridge:
   try:
    chunks=tuple(self.chunker.chunk(doc.content_hash,doc.text))
    if len({x.chunk_id for x in chunks})!=len(chunks):raise ValueError("duplicate chunk ids")
+   payloads=[{"chunk_id":x.chunk_id,"text":x.text,"start":x.start,"end":x.end} for x in chunks]
+   operations=self.outbox.plan(key,payloads) if self.outbox else ()
    ids=[]
-   for chunk in chunks:
+   for ordinal,chunk in enumerate(chunks):
     self.index.add(chunk.chunk_id,chunk.text)
     entry=self.ledger.record(source=doc.canonical_url,operation="crawler.promoted_chunk",
      input_data=doc.content_hash,output_data=chunk.text,
-     metadata={"content_hash":doc.content_hash,"chunk_id":chunk.chunk_id,"start":chunk.start,"end":chunk.end,"promotion_decision_id":decision.decision_id})
+     metadata={"content_hash":doc.content_hash,"chunk_id":chunk.chunk_id,"start":chunk.start,"end":chunk.end,"promotion_decision_id":decision.decision_id},
+     idempotency_key=operations[ordinal].operation_id if operations else None)
     ids.append(entry.entry_id)
+    if operations:self.outbox.complete(operations[ordinal].operation_id,{"entry_id":entry.entry_id})
    receipt=RetrievalBridgeReceipt(doc.content_hash,len(chunks),self.index.revision,tuple(ids))
    if lease and not self.registry.complete(lease,asdict(receipt)):raise RuntimeError("lost retrieval ingestion lease")
    self._receipts[key]=receipt;return receipt
