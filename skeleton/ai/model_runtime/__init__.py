@@ -49,7 +49,7 @@ from .runtime_contracts import (
     RuntimeLimits,
     RuntimeUsage,
 )
-from .text_pipeline import CausalTrainingBatch, GovernedTrainingInput, ModelInputBatch, PipelineReplayCheckpoint, PreparedCorpus, PreparedText, PromotionAuthorizationRequest, TextPipelineConfig, TextTokenPipeline, TrainingInputReceipt, materialize_causal_training_batch, materialize_model_batch
+from .text_pipeline import CausalTrainingBatch, GovernedTrainingInput, ModelInputBatch, PipelineReplayCheckpoint, PreparedCorpus, PreparedText, PromotionAuthorizationRequest, TextPipelineConfig, TextTokenPipeline, TrainingInputReceipt, deserialize_causal_training_batch, deserialize_model_input_batch, materialize_causal_training_batch, materialize_model_batch, serialize_causal_training_batch, serialize_model_input_batch
 from .tokenization import (
     NativeTokenizer,
     StreamingTextFeed,
@@ -117,6 +117,8 @@ __all__ = [
     "WeightLoadPlan",
     "WeightShard",
     "batch_token_windows",
+    "deserialize_causal_training_batch",
+    "deserialize_model_input_batch",
     "deserialize_token_sequence",
     "iter_context_windows",
     "materialize_causal_training_batch",
@@ -125,6 +127,8 @@ __all__ = [
     "plan_device_placement",
     "plan_kv_admission",
     "route_request",
+    "serialize_causal_training_batch",
+    "serialize_model_input_batch",
     "serialize_token_sequence",
     "validate_model_snapshot",
 ]
