@@ -231,16 +231,40 @@ class EffortSignal:
     blast_radius: float
     novelty: float
     marginal_gain: float
+    evaluator_provenance: EvaluatorProvenance
+    evidence_digest: str
 
     def __post_init__(self) -> None:
         for label in ("risk", "uncertainty", "blast_radius", "novelty", "marginal_gain"):
             object.__setattr__(self, label, _unit(getattr(self, label), label))
+        if not isinstance(self.evaluator_provenance, EvaluatorProvenance):
+            raise TypeError("effort evaluator_provenance must be EvaluatorProvenance")
+        _stable(self.evidence_digest, "evidence_digest")
+        if self.evidence_digest not in self.evaluator_provenance.output_evidence_refs:
+            raise FrontierAssuranceError(
+                "effort evidence must be referenced by evaluator authority"
+            )
+
+    @property
+    def binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "blast_radius": self.blast_radius,
+                "evaluator_provenance_digest": self.evaluator_provenance.digest,
+                "evidence_digest": self.evidence_digest,
+                "marginal_gain": self.marginal_gain,
+                "novelty": self.novelty,
+                "risk": self.risk,
+                "uncertainty": self.uncertainty,
+            }
+        )
 
 
 @dataclass(frozen=True, slots=True)
 class EffortDecision:
     mode: EffortMode
     score: float
+    signal_binding_digest: str
     reason_digest: str
 
 
@@ -269,20 +293,16 @@ class EffortPortfolioScheduler:
             mode = EffortMode.FORGE_1000
         else:
             mode = EffortMode.FORGE_100
+        signal_binding_digest = signal.binding_digest
         return EffortDecision(
             mode=mode,
             score=score,
+            signal_binding_digest=signal_binding_digest,
             reason_digest=canonical_digest(
                 {
                     "mode": int(mode),
                     "score": score,
-                    "signal": {
-                        "blast_radius": signal.blast_radius,
-                        "marginal_gain": signal.marginal_gain,
-                        "novelty": signal.novelty,
-                        "risk": signal.risk,
-                        "uncertainty": signal.uncertainty,
-                    },
+                    "signal_binding_digest": signal_binding_digest,
                 }
             ),
         )
@@ -422,14 +442,37 @@ class RegretObservation:
     policy_id: str
     champion_score: float
     alternative_score: float
+    evaluator_provenance: EvaluatorProvenance
+    evidence_digest: str
     weight: float = 1.0
 
     def __post_init__(self) -> None:
         _stable(self.policy_id, "policy_id")
         object.__setattr__(self, "champion_score", _unit(self.champion_score, "champion_score"))
         object.__setattr__(self, "alternative_score", _unit(self.alternative_score, "alternative_score"))
+        if not isinstance(self.evaluator_provenance, EvaluatorProvenance):
+            raise TypeError("regret evaluator_provenance must be EvaluatorProvenance")
+        _stable(self.evidence_digest, "evidence_digest")
+        if self.evidence_digest not in self.evaluator_provenance.output_evidence_refs:
+            raise FrontierAssuranceError(
+                "regret evidence must be referenced by evaluator authority"
+            )
         if isinstance(self.weight, bool) or not isinstance(self.weight, (int, float)) or self.weight <= 0:
             raise FrontierAssuranceError("weight must be positive")
+        object.__setattr__(self, "weight", float(self.weight))
+
+    @property
+    def binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "alternative_score": self.alternative_score,
+                "champion_score": self.champion_score,
+                "evaluator_provenance_digest": self.evaluator_provenance.digest,
+                "evidence_digest": self.evidence_digest,
+                "policy_id": self.policy_id,
+                "weight": self.weight,
+            }
+        )
 
 
 class RegretLedger:
@@ -453,6 +496,19 @@ class RegretLedger:
             max(0.0, row.alternative_score - row.champion_score) * float(row.weight)
             for row in self._rows.values()
         ) / total_weight
+
+    @property
+    def digest(self) -> str:
+        return canonical_digest(
+            {
+                "maximum_weighted_regret": self.maximum_weighted_regret,
+                "observations": [
+                    self._rows[key].binding_digest
+                    for key in sorted(self._rows)
+                ],
+                "weighted_regret": self.weighted_regret,
+            }
+        )
 
     def promotion_allowed(self) -> bool:
         return bool(self._rows) and self.weighted_regret <= self.maximum_weighted_regret
