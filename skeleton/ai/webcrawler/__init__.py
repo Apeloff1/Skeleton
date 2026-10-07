@@ -6,6 +6,7 @@ from .storage import SqliteCrawlStore
 from .governance import HostBudgetController,PromotionDecision,PromotionGate
 from .ingestion import GovernedIngestor,IngestionReceipt
 from .ingestion_registry import DurableIngestionRegistry,IngestionLease
+from .outbox import IngestionOutbox,OutboxOperation
 from .session import ResearchSession,SessionLimits
 from .recrawl import RecrawlItem,RecrawlScheduler
 from .knowledge_bridge import CanonicalKnowledgeBridge,KnowledgeBridgeReceipt
