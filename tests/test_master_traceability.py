@@ -23,11 +23,11 @@ class MasterTraceabilityTests(unittest.TestCase):
         result = MODULE.validate(ROOT)
         self.assertEqual(result["status"], "valid")
         self.assertEqual(result["volume_count"], 421)
-        self.assertEqual(result["node_count"], 9115)
-        self.assertEqual(result["edge_count"], 25119)
+        self.assertEqual(result["node_count"], 10011)
+        self.assertEqual(result["edge_count"], 30365)
         self.assertEqual(result["requirement_count"], 963)
         self.assertEqual(result["requirements_without_tests"], [])
-        self.assertEqual(result["requirements_without_evidence_count"], 688)
+        self.assertEqual(result["requirements_without_evidence_count"], 432)
 
     def test_change_impact_resolves_runtime_path(self) -> None:
         result = MODULE.impact(ROOT, ["skeleton/api/server.py"])
