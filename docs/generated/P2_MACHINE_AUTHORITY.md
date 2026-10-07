@@ -10,8 +10,8 @@ This document is a deterministic projection of machine authority. It has no comp
 
 | Source | Git blob SHA-1 |
 | --- | --- |
-| `machine/ai_master_plan.json` | `0dbf90c2cb94ead905eb74e7558b09ffc06bcf19` |
-| `machine/ai_p2_execution_map.json` | `0bf612a989023e6fc8e69d8a1d4084d04aa72698` |
+| `machine/ai_master_plan.json` | `e1855e1f231ad2af7fe49ef5cd415ecd8b451fec` |
+| `machine/ai_p2_execution_map.json` | `7b552eead507b38ace326af50fb200bc50bf42ce` |
 | `machine/ai_p2_task_backlog.json` | `a21f8528c5d644ac65ad97138c8504c79b9bf889` |
 
 ## P2 execution boundary
@@ -42,18 +42,18 @@ This document is a deterministic projection of machine authority. It has no comp
 
 | Volume | Title | Implementation status |
 | --- | --- | --- |
-| `VOL-002` | System Architecture | `unverified` |
-| `VOL-003` | Canonical Contract System | `unverified` |
-| `VOL-004` | Kernel & Execution Foundation | `unverified` |
+| `VOL-002` | System Architecture | `verified` |
+| `VOL-003` | Canonical Contract System | `implemented` |
+| `VOL-004` | Kernel & Execution Foundation | `implemented` |
 | `VOL-051` | Repository Architecture | `unverified` |
 | `VOL-052` | Internal Python Architecture | `unverified` |
 | `VOL-053` | Import Architecture | `unverified` |
-| `VOL-054` | Machine Architecture Manifests | `unverified` |
+| `VOL-054` | Machine Architecture Manifests | `implemented` |
 | `VOL-055` | Architecture Linter | `unverified` |
 | `VOL-058` | ADR Program | `unverified` |
-| `VOL-116` | Architecture Fitness Functions | `unverified` |
-| `VOL-112` | Master Traceability Matrix | `unverified` |
-| `VOL-113` | Capability Map | `unverified` |
+| `VOL-116` | Architecture Fitness Functions | `implemented` |
+| `VOL-112` | Master Traceability Matrix | `implemented` |
+| `VOL-113` | Capability Map | `implemented` |
 | `VOL-122` | Requirements Engineering | `unverified` |
 | `VOL-123` | Non-Functional Requirements | `unverified` |
 | `VOL-124` | Capability Taxonomy | `unverified` |
@@ -64,35 +64,35 @@ This document is a deterministic projection of machine authority. It has no comp
 | `VOL-129` | Schema Registry | `unverified` |
 | `VOL-130` | Compatibility Model | `unverified` |
 | `VOL-131` | Internal Protocols | `unverified` |
-| `VOL-021` | Code Intelligence | `unverified` |
-| `VOL-022` | Autonomous Repository Engineering | `unverified` |
-| `VOL-092` | Repository Maintenance | `unverified` |
-| `VOL-093` | Backlog Control | `unverified` |
-| `VOL-094` | Priority Engine | `unverified` |
-| `VOL-095` | Build Work Packages | `unverified` |
-| `VOL-108` | Anti-Patterns | `unverified` |
-| `VOL-109` | Build Order | `unverified` |
-| `VOL-110` | Definition of Done | `unverified` |
-| `VOL-115` | Technical Debt Ledger | `unverified` |
-| `VOL-118` | Roadmap Control | `unverified` |
-| `VOL-119` | Completion Model | `unverified` |
-| `VOL-070` | Quality Vector | `unverified` |
-| `VOL-081` | Formal Methods | `unverified` |
-| `VOL-117` | Project Metrics | `unverified` |
-| `VOL-120` | Final Assembly Test | `unverified` |
-| `VOL-089` | Documentation Engine | `unverified` |
-| `VOL-090` | Generated Documentation | `unverified` |
-| `VOL-032` | High-Performance Native Core | `unverified` |
+| `VOL-021` | Code Intelligence | `implemented` |
+| `VOL-022` | Autonomous Repository Engineering | `implemented` |
+| `VOL-092` | Repository Maintenance | `implemented` |
+| `VOL-093` | Backlog Control | `implemented` |
+| `VOL-094` | Priority Engine | `implemented` |
+| `VOL-095` | Build Work Packages | `implemented` |
+| `VOL-108` | Anti-Patterns | `implemented` |
+| `VOL-109` | Build Order | `implemented` |
+| `VOL-110` | Definition of Done | `implemented` |
+| `VOL-115` | Technical Debt Ledger | `implemented` |
+| `VOL-118` | Roadmap Control | `implemented` |
+| `VOL-119` | Completion Model | `implemented` |
+| `VOL-070` | Quality Vector | `implemented` |
+| `VOL-081` | Formal Methods | `implemented` |
+| `VOL-117` | Project Metrics | `implemented` |
+| `VOL-120` | Final Assembly Test | `implemented` |
+| `VOL-089` | Documentation Engine | `implemented` |
+| `VOL-090` | Generated Documentation | `implemented` |
+| `VOL-032` | High-Performance Native Core | `implemented` |
 | `VOL-033` | Java / JVM Plane | `unverified` |
-| `VOL-005` | Data & Persistence | `unverified` |
+| `VOL-005` | Data & Persistence | `implemented` |
 | `VOL-007` | Inference Engine | `implemented` |
-| `VOL-026` | Cybersecurity | `unverified` |
-| `VOL-027` | Privacy & Data Protection | `unverified` |
-| `VOL-039` | Event Architecture | `unverified` |
-| `VOL-091` | Operations Manual | `unverified` |
-| `VOL-096` | VS-000 Foundation Recovery Slice | `unverified` |
-| `VOL-097` | VS-001 Functional AI | `unverified` |
-| `VOL-104` | Acceptance: Functional AI | `unverified` |
+| `VOL-026` | Cybersecurity | `implemented` |
+| `VOL-027` | Privacy & Data Protection | `implemented` |
+| `VOL-039` | Event Architecture | `implemented` |
+| `VOL-091` | Operations Manual | `implemented` |
+| `VOL-096` | VS-000 Foundation Recovery Slice | `implemented` |
+| `VOL-097` | VS-001 Functional AI | `implemented` |
+| `VOL-104` | Acceptance: Functional AI | `implemented` |
 | `VOL-132` | Consistency Model | `unverified` |
 | `VOL-134` | Outbox / Inbox Patterns | `unverified` |
 | `VOL-167` | Threat Model | `unverified` |
