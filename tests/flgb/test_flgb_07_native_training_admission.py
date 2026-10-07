@@ -67,6 +67,14 @@ class TestNativeTrainingAdmission(unittest.TestCase):
   other=NativeLLMRuntime(TinyTransformer(["a","b"],dim=4,ctx=4,seed=2)).checkpoint()
   with self.assertRaisesRegex(RuntimePromotionError,"checkpoint identity mismatch"):
    execute_rollback(admitted,a,rb,other)
+ def test_stale_base_candidate_rejected_before_mutation(self):
+  rt,cp,prior,c,p,apply=setup(); touched=[]
+  c=CandidateWeights(c.candidate_id,c.weights_digest,c.training_lineage_digest,"f"*64,c.status)
+  p=PromotionEvidence(c.digest,p.exact_head_commit,p.rights_digest,p.contamination_scan_digest,p.evaluation_digest,p.rollback_digest,p.independent_verifier,True,True,True,True)
+  def tracked(m): touched.append(True); apply(m)
+  with self.assertRaisesRegex(RuntimePromotionError,"base model"):
+   admit_candidate_model(rt,c,p,tracked,admission_authority="runtime")
+  self.assertEqual(touched,[]); self.assertEqual(rt.model_digest,prior); self.assertEqual(rt._current_model_digest(),prior)
  def test_declared_digest_cannot_lie_about_observed_weights(self):
   rt,cp,prior,c,p,apply=setup()
   c=CandidateWeights("candidate","f"*64,c.training_lineage_digest,prior)
