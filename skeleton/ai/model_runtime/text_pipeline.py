@@ -390,6 +390,46 @@ class PreparedCorpus:
 
 
 @dataclass(frozen=True)
+class CorpusTrainingReceipt:
+    """Ordered training identity that preserves every document boundary."""
+    pipeline_digest: str
+    corpus_digest: str
+    document_ids: tuple[str, ...]
+    document_receipt_digests: tuple[str, ...]
+    example_count: int
+    supervised_token_count: int
+
+    def __post_init__(self) -> None:
+        for name in ("pipeline_digest", "corpus_digest"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value):
+                raise TokenizerContractError(f"invalid {name}")
+        if not self.document_ids or len(self.document_ids) != len(self.document_receipt_digests):
+            raise TokenizerContractError("invalid corpus training documents")
+        if len(set(self.document_ids)) != len(self.document_ids):
+            raise TokenizerContractError("duplicate corpus training document id")
+        if any(not isinstance(value, str) or not value or value != value.strip() for value in self.document_ids):
+            raise TokenizerContractError("invalid corpus training document id")
+        if any(not isinstance(value, str) or len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value) for value in self.document_receipt_digests):
+            raise TokenizerContractError("invalid document training receipt digest")
+        if isinstance(self.example_count, bool) or not isinstance(self.example_count, int) or self.example_count <= 0:
+            raise TokenizerContractError("invalid corpus example count")
+        if isinstance(self.supervised_token_count, bool) or not isinstance(self.supervised_token_count, int) or self.supervised_token_count <= 0:
+            raise TokenizerContractError("invalid corpus supervised token count")
+
+    @property
+    def digest(self) -> str:
+        return digest_json({
+            "pipeline_digest": self.pipeline_digest,
+            "corpus_digest": self.corpus_digest,
+            "document_ids": list(self.document_ids),
+            "document_receipt_digests": list(self.document_receipt_digests),
+            "example_count": self.example_count,
+            "supervised_token_count": self.supervised_token_count,
+        })
+
+
+@dataclass(frozen=True)
 class PipelineReplayCheckpoint:
     """Durable identity checkpoint for deterministic text/corpus replay."""
     pipeline_digest: str
@@ -478,6 +518,25 @@ class TextTokenPipeline:
         if not isinstance(corpus, PreparedCorpus) or corpus.pipeline_digest != self.digest:
             raise TokenizerContractError("corpus belongs to another pipeline")
         return tuple(self.training_receipt(document, pad_token_id=pad_token_id, ignore_index=ignore_index) for document in corpus.documents)
+
+    def corpus_training_receipt(self, corpus: PreparedCorpus, *, pad_token_id: int | None = None, ignore_index: int = -100) -> CorpusTrainingReceipt:
+        receipts = self.corpus_training_receipts(corpus, pad_token_id=pad_token_id, ignore_index=ignore_index)
+        return CorpusTrainingReceipt(
+            self.digest,
+            corpus.digest,
+            corpus.document_ids,
+            tuple(receipt.digest for receipt in receipts),
+            sum(receipt.example_count for receipt in receipts),
+            sum(receipt.supervised_token_count for receipt in receipts),
+        )
+
+    def verify_corpus_training_receipt(self, corpus: PreparedCorpus, receipt: CorpusTrainingReceipt, *, pad_token_id: int | None = None, ignore_index: int = -100) -> bool:
+        if not isinstance(receipt, CorpusTrainingReceipt):
+            raise TokenizerContractError("CorpusTrainingReceipt required")
+        expected = self.corpus_training_receipt(corpus, pad_token_id=pad_token_id, ignore_index=ignore_index)
+        if expected.digest != receipt.digest:
+            raise TokenizerContractError("corpus training receipt mismatch")
+        return True
 
     def replay_checkpoint(self, payload: PreparedText | PreparedCorpus) -> PipelineReplayCheckpoint:
         if isinstance(payload, PreparedText):
