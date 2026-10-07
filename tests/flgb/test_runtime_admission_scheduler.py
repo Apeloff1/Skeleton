@@ -2,6 +2,7 @@ import unittest
 
 from skeleton.ai.model_runtime.admission_scheduler import AdmissionLimits, RuntimeAdmissionScheduler
 from skeleton.ai.model_runtime.flgb_model_runtime import BatchRequest, ModelRuntimeError
+from skeleton.ai.model_runtime.runtime_policy import RuntimePolicyCompiler
 
 
 class TestRuntimeAdmissionScheduler(unittest.TestCase):
@@ -132,6 +133,23 @@ class TestRuntimeAdmissionScheduler(unittest.TestCase):
         self.assertEqual(cap["queued_tokens"], 6)
         self.assertEqual(cap["kv_used_bytes"], 25)
         self.assertEqual(cap["kv_free_bytes"], 75)
+
+    def test_snapshot_binds_temporal_policy_receipt(self):
+        policy = RuntimePolicyCompiler().compile(2024)
+        s = RuntimeAdmissionScheduler(
+            AdmissionLimits(
+                max_active_requests=2, max_queued_requests=4, max_batch_size=1,
+                max_tokens_per_batch=20, kv_capacity_bytes=100, max_age_boost=10,
+            ),
+            policy=policy,
+        )
+        s.submit(BatchRequest("a", 1, 1), kv_bytes=10)
+        decision = s.admit()
+        snapshot = s.snapshot()
+        self.assertEqual(snapshot["policy"]["through_year"], 2024)
+        self.assertEqual(snapshot["policy"]["digest"], policy.digest)
+        self.assertIn("prefix_affinity", snapshot["policy"]["capabilities"])
+        self.assertEqual(len(decision.snapshot_digest), 64)
 
 if __name__ == "__main__":
     unittest.main()
