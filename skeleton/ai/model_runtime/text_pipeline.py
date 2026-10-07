@@ -420,8 +420,12 @@ class TextTokenPipeline:
         from skeleton.ai.training.flgb_training_runtime import CandidateWeights, MirrorEvaluation, PromotionEvidence
         if not isinstance(candidate, CandidateWeights) or not isinstance(evaluation, MirrorEvaluation):
             raise TokenizerContractError("candidate/evaluation required")
+        if candidate.status != "candidate":
+            raise TokenizerContractError("only candidate weights may produce promotion evidence")
         if evaluation.candidate_digest != candidate.digest:
             raise TokenizerContractError("evaluation does not belong to candidate")
+        if not isinstance(rights_passed, bool) or not isinstance(contamination_clear, bool) or not isinstance(rollback_ready, bool):
+            raise TokenizerContractError("promotion gate flags must be boolean")
         if evaluation.independent_verifier == independent_verifier:
             raise TokenizerContractError("promotion requires verifier separation")
         return PromotionEvidence(
