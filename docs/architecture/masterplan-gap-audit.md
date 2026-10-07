@@ -1302,3 +1302,20 @@ Landed on main:
 Regression coverage now explicitly exercises host fairness, 429 Retry-After timing, retry caps, link fanout limits, competing workers, lease expiry/fencing, retrieval searchability and provenance tracing.
 
 Still UNSIGNED: exact-head CI remains absent; redirect-target robots authorization before following redirects is still a required correctness control; content-credential observation and some extraction regression mutations were rejected by repository write safety and remain open.
+
+
+### 2026-10-07 redirect-policy and robots correctness closeout
+
+Closed a critical policy gap and repaired a discovered regression:
+- restored autonomous, budget-accounted robots.txt bootstrap for previously unseen origins;
+- robots fetch remains fail-closed on transport/server errors, with explicit 404/410 absence handling;
+- HTTP transport now exposes a validated single-hop fetch primitive;
+- redirect traversal moved under crawler control;
+- every redirect hop is canonicalized, destination-policy checked, robots-loaded and robots-authorized before the redirected resource is fetched;
+- redirect loops and malformed/over-limit chains fail closed;
+- cross-origin robots-denial and redirect-loop regression coverage landed;
+- CrawlEngine production fetch path now routes through the redirect policy controller.
+
+This closes the previously documented redirect-target robots authorization blocker.
+
+Remaining UNSIGNED blockers are verification-oriented rather than known crawler-policy holes: exact-head CI/status evidence is still absent, plus load/concurrency characterization and previously rejected content-credential/extraction test mutations.
