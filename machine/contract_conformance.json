@@ -1,6 +1,6 @@
 {
   "schema_version": "skeleton.architecture.contract_conformance.v1",
-  "catalog_version": "0.1.0",
+  "catalog_version": "0.2.0",
   "status": "active",
   "purpose": "Complete producer/consumer plane inventory for canonical runtime records plus shared fail-closed JSON/schema conformance vectors.",
   "masterplan_binding": {
@@ -442,6 +442,71 @@
       "consumer_planes": [
         "application-api",
         "model-routing",
+        "retrieval"
+      ],
+      "consumer_derivation": "capability_interface_incoming_edges",
+      "override_rationale": null
+    },
+    {
+      "contract": "ProtocolEnvelope",
+      "schema_version": 1,
+      "producer_plane": "foundation",
+      "consumer_planes": [
+        "configuration-secrets",
+        "data-persistence",
+        "identity",
+        "memory",
+        "model-provider",
+        "observability",
+        "orchestration",
+        "prompt-context",
+        "tool-runtime"
+      ],
+      "consumer_derivation": "capability_interface_incoming_edges",
+      "override_rationale": null
+    },
+    {
+      "contract": "ProtocolExecutionEnvelope",
+      "schema_version": 2,
+      "producer_plane": "orchestration",
+      "consumer_planes": [
+        "application-api",
+        "engine-api",
+        "reasoning-verification"
+      ],
+      "consumer_derivation": "capability_interface_incoming_edges",
+      "override_rationale": null
+    },
+    {
+      "contract": "ProtocolReceipt",
+      "schema_version": 1,
+      "producer_plane": "observability",
+      "consumer_planes": [
+        "cost-capacity",
+        "deployment-release",
+        "engine-api",
+        "evaluation",
+        "feedback-learning",
+        "jobs-durability",
+        "model-routing",
+        "operator-control",
+        "product-experience",
+        "resilience",
+        "streaming-realtime",
+        "tool-runtime"
+      ],
+      "consumer_derivation": "capability_interface_incoming_edges",
+      "override_rationale": null
+    },
+    {
+      "contract": "ConsistencyProfile",
+      "schema_version": 1,
+      "producer_plane": "data-persistence",
+      "consumer_planes": [
+        "artifact-files",
+        "jobs-durability",
+        "memory",
+        "resilience",
         "retrieval"
       ],
       "consumer_derivation": "capability_interface_incoming_edges",
