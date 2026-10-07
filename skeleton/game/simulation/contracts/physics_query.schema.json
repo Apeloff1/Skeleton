@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-10:physics_query:v1",
+  "title": "FLGB-10 physics query",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "collider_id",
+    "distance_units"
+  ],
+  "properties": {
+    "collider_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "distance_units": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}
