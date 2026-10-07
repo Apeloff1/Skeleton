@@ -57,6 +57,10 @@ REQUIRED_INVARIANTS = (
     "engine-backed live chat requires an accepted verification identity and at least one canonical provider receipt before transcript commit",
     "synchronous and deferred engine results must pass the same canonical response-acceptance policy before transcript commit",
     "live response acceptance binds both engine operation identity and execution identity before transcript promotion",
+    "complete provider receipt sets are bound into durable chat events by a content-minimized aggregate reference",
+    "tool restart handling cannot convert consequential ambiguity into reexecution before canonical reconciliation evidence",
+    "governed attachment bindings contain content-addressed and artifact references but never raw attachment payload bytes",
+    "structured claim evidence is bound to exact operation and context identity before the live acceptance gate can require it",
 )
 
 
@@ -127,6 +131,12 @@ def validate() -> list[str]:
         "ownership_repository_tests",
         "response_acceptance",
         "response_acceptance_tests",
+        "tool_recovery",
+        "tool_recovery_tests",
+        "attachments",
+        "attachment_tests",
+        "live_evidence",
+        "live_evidence_tests",
     }
     if set(files) != expected_roles:
         errors.append("AI chat runtime contract file roles drifted")
@@ -265,14 +275,19 @@ def validate() -> list[str]:
             )
         else:
             required_response_acceptance = (
+                "LiveClaimEvidenceBinding",
                 "LiveResponseAcceptancePolicy",
                 "LiveResponseAcceptanceReceipt",
+                "bind_live_claim_evidence",
                 "evaluate_live_response_acceptance",
                 "operation_identity_mismatch",
                 "execution_identity_mismatch",
                 "provider_receipt_missing",
                 "verification_not_accepted",
                 "output_size_exceeded",
+                "claim_evidence_missing",
+                "claim_evidence_operation_mismatch",
+                "claim_evidence_context_mismatch",
                 "response-acceptance-sha256:",
                 "production_authority: bool = False",
             )
@@ -286,6 +301,69 @@ def validate() -> list[str]:
                     "AI chat response acceptance lost fail-closed markers: "
                     + ", ".join(missing_response_acceptance)
                 )
+
+
+    cross_plane_checks = {
+        "tool_recovery": (
+            "ToolRestartResolution",
+            "resolve_tool_restart",
+            "RecoveryAction.RECONCILE_TOOL",
+            "canonical-tool-reconciliation:",
+            "only read-only tool work may be reexecuted without reconciliation",
+            "production_authority: bool = False",
+        ),
+        "attachments": (
+            "AttachmentReference",
+            "content_ref",
+            "attachment-sha256:",
+            "ready_for_context",
+            "UNTRUSTED_EVIDENCE",
+        ),
+        "live_evidence": (
+            "ProviderReceiptSetBinding",
+            "GovernedAttachmentBinding",
+            "LiveTurnEvidenceEnvelope",
+            "bind_provider_receipt_set",
+            "bind_governed_attachment",
+            "build_live_turn_evidence",
+            "provider-set-sha256:",
+            "chat-attachment-binding-sha256:",
+            "production_authority: bool = False",
+        ),
+    }
+    for role, markers in cross_plane_checks.items():
+        raw_path = files.get(role)
+        if not isinstance(raw_path, str):
+            errors.append(f"AI chat cross-plane role missing: {role}")
+            continue
+        path = ROOT / raw_path
+        if not path.is_file():
+            continue
+        try:
+            cross_plane_source = path.read_text(encoding="utf-8")
+            ast.parse(cross_plane_source)
+        except (OSError, UnicodeDecodeError, SyntaxError) as exc:
+            errors.append(
+                f"AI chat cross-plane module is invalid: {role}: {exc}"
+            )
+            continue
+        forbidden_hits = [
+            marker for marker in FORBIDDEN_MARKERS
+            if marker in cross_plane_source
+        ]
+        if forbidden_hits:
+            errors.append(
+                f"AI chat cross-plane module crossed provider boundary: {role}: "
+                + ", ".join(forbidden_hits)
+            )
+        missing_cross_plane = [
+            marker for marker in markers if marker not in cross_plane_source
+        ]
+        if missing_cross_plane:
+            errors.append(
+                f"AI chat cross-plane module lost fail-closed markers: {role}: "
+                + ", ".join(missing_cross_plane)
+            )
 
     streaming_path = files.get("streaming")
     if isinstance(streaming_path, str) and (ROOT / streaming_path).is_file():
@@ -335,6 +413,8 @@ def validate() -> list[str]:
             "evaluate_live_response_acceptance",
             "response_acceptance_rejected",
             "response_acceptance.artifact_ref",
+            "bind_provider_receipt_set",
+            "provider_binding.reference",
         ),
     }
     for role, markers in live_checks.items():
