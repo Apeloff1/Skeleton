@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-18:build_to_chat_evidence:v1",
+  "title": "FLGB-18 build to chat evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "transaction_digest",
+    "exact_head_commit",
+    "build_digest",
+    "test_digest",
+    "artifact_digest",
+    "status"
+  ],
+  "properties": {
+    "transaction_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "exact_head_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "build_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "test_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "artifact_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "status": {
+      "enum": [
+        "passed",
+        "failed"
+      ]
+    }
+  }
+}

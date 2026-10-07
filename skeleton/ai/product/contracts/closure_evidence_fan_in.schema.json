@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-18:closure_evidence_fan_in:v1",
+  "title": "FLGB-18 closure evidence fan in",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "exact_head_commit",
+    "plane_ids",
+    "acceptance_digest",
+    "evidence_digest"
+  ],
+  "properties": {
+    "exact_head_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "plane_ids": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "acceptance_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "evidence_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
