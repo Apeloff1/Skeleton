@@ -16,6 +16,8 @@ import json
 import math
 from typing import Iterable, Mapping, Sequence
 
+from .contracts import EvaluatorProvenance, canonical_digest
+
 
 class DeepAssuranceError(RuntimeError):
     """Fail-closed error raised by fourth-generation assurance controls."""
@@ -113,22 +115,41 @@ class RequirementProof:
     requirement_id: str
     artifact_digest: str
     evidence_digests: tuple[str, ...]
+    evaluator_provenance: EvaluatorProvenance
     critical: bool = False
     passed: bool = True
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "requirement_id", _text(self.requirement_id, "requirement_id"))
         object.__setattr__(self, "artifact_digest", _digest(self.artifact_digest, "artifact_digest"))
+        if not isinstance(self.evaluator_provenance, EvaluatorProvenance):
+            raise TypeError("requirement proof evaluator_provenance must be EvaluatorProvenance")
         if not isinstance(self.critical, bool):
             raise TypeError("requirement proof critical state must be boolean")
         if not isinstance(self.passed, bool):
             raise TypeError("requirement proof passed state must be boolean")
         if not self.evidence_digests:
             raise DeepAssuranceError("requirement proof needs evidence")
-        object.__setattr__(
-            self,
-            "evidence_digests",
-            tuple(_digest(x, "evidence_digest") for x in self.evidence_digests),
+        evidence = tuple(_digest(x, "evidence_digest") for x in self.evidence_digests)
+        if len(evidence) != len(set(evidence)):
+            raise DeepAssuranceError("requirement proof evidence digests must be unique")
+        if set(evidence) - set(self.evaluator_provenance.output_evidence_refs):
+            raise DeepAssuranceError(
+                "requirement proof evidence must be referenced by evaluator authority"
+            )
+        object.__setattr__(self, "evidence_digests", evidence)
+
+    @property
+    def evidence_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "artifact_digest": self.artifact_digest,
+                "critical": self.critical,
+                "evaluator_provenance_digest": self.evaluator_provenance.digest,
+                "evidence_digests": list(self.evidence_digests),
+                "passed": self.passed,
+                "requirement_id": self.requirement_id,
+            }
         )
 
 
@@ -169,6 +190,8 @@ class RequirementClosureLedger:
                     "evidence": proof.evidence_digests,
                     "critical": proof.critical,
                     "passed": proof.passed,
+                    "evidence_binding_digest": proof.evidence_binding_digest,
+                    "evaluator_provenance_digest": proof.evaluator_provenance.digest,
                 }
                 for key, proof in sorted(self._proofs.items())
             },
@@ -180,17 +203,37 @@ class ConstraintResult:
     constraint_id: str
     passed: bool
     evidence_digest: str
+    evaluator_provenance: EvaluatorProvenance
     critical: bool = True
     conflict_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "constraint_id", _text(self.constraint_id, "constraint_id"))
         object.__setattr__(self, "evidence_digest", _digest(self.evidence_digest, "evidence_digest"))
+        if not isinstance(self.evaluator_provenance, EvaluatorProvenance):
+            raise TypeError("constraint evaluator_provenance must be EvaluatorProvenance")
+        if self.evidence_digest not in self.evaluator_provenance.output_evidence_refs:
+            raise DeepAssuranceError(
+                "constraint evidence must be referenced by evaluator authority"
+            )
         if not isinstance(self.passed, bool):
             raise TypeError("constraint passed state must be boolean")
         if not isinstance(self.critical, bool):
             raise TypeError("constraint critical state must be boolean")
         object.__setattr__(self, "conflict_ids", tuple(_text(x, "conflict_id") for x in self.conflict_ids))
+
+    @property
+    def evidence_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "conflict_ids": list(self.conflict_ids),
+                "constraint_id": self.constraint_id,
+                "critical": self.critical,
+                "evaluator_provenance_digest": self.evaluator_provenance.digest,
+                "evidence_digest": self.evidence_digest,
+                "passed": self.passed,
+            }
+        )
 
 
 class ConstraintProofSet:
@@ -219,6 +262,19 @@ class ConstraintProofSet:
     @property
     def promotable(self) -> bool:
         return bool(self._rows) and not self.blocking
+
+    @property
+    def evidence_root(self) -> str:
+        if not self._rows:
+            return canonical_digest({"constraints": []})
+        return canonical_digest(
+            {
+                "constraints": [
+                    self._rows[key].evidence_binding_digest
+                    for key in sorted(self._rows)
+                ]
+            }
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -563,13 +619,31 @@ class ProjectResurrectionRegistry:
 
 
 class EvidenceMerkleLedger:
-    """OP79: append-only tamper-evident evidence root."""
+    """OP79: append-only evidence root over authority-bound evidence leaves."""
 
     def __init__(self) -> None:
         self._leaves: list[str] = []
 
-    def append(self, evidence_digest: str) -> str:
-        self._leaves.append(_digest(evidence_digest, "evidence_digest"))
+    def append(
+        self,
+        evidence_digest: str,
+        *,
+        evaluator_provenance: EvaluatorProvenance,
+    ) -> str:
+        evidence = _digest(evidence_digest, "evidence_digest")
+        if not isinstance(evaluator_provenance, EvaluatorProvenance):
+            raise TypeError("evidence ledger evaluator_provenance must be EvaluatorProvenance")
+        if evidence not in evaluator_provenance.output_evidence_refs:
+            raise DeepAssuranceError(
+                "evidence ledger leaf must be referenced by evaluator authority"
+            )
+        binding = canonical_digest(
+            {
+                "evaluator_provenance_digest": evaluator_provenance.digest,
+                "evidence_digest": evidence,
+            }
+        )
+        self._leaves.append(binding)
         return self.root
 
     @property
@@ -599,17 +673,43 @@ class ClosureCertificate:
     evidence_root: str
     family_ids: tuple[str, ...]
     critical_plane_ids: tuple[str, ...]
+    verifier_provenance: EvaluatorProvenance
+    verification_evidence_digest: str
     unresolved_critical_gaps: tuple[str, ...] = ()
     independently_verified: bool = False
 
     def __post_init__(self) -> None:
         for name in ("artifact_digest", "canon_digest", "provenance_digest", "evidence_root"):
             object.__setattr__(self, name, _digest(getattr(self, name), name))
+        if not isinstance(self.verifier_provenance, EvaluatorProvenance):
+            raise TypeError("closure verifier_provenance must be EvaluatorProvenance")
+        object.__setattr__(
+            self,
+            "verification_evidence_digest",
+            _digest(self.verification_evidence_digest, "verification_evidence_digest"),
+        )
+        if self.verification_evidence_digest not in self.verifier_provenance.output_evidence_refs:
+            raise DeepAssuranceError(
+                "closure verification evidence must be referenced by verifier authority"
+            )
         if not isinstance(self.independently_verified, bool):
             raise TypeError("closure independent verification state must be boolean")
         object.__setattr__(self, "family_ids", tuple(_text(x, "family_id") for x in self.family_ids))
         object.__setattr__(self, "critical_plane_ids", tuple(_text(x, "critical_plane_id") for x in self.critical_plane_ids))
         object.__setattr__(self, "unresolved_critical_gaps", tuple(_text(x, "gap") for x in self.unresolved_critical_gaps))
+
+    @property
+    def verification_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "artifact_digest": self.artifact_digest,
+                "canon_digest": self.canon_digest,
+                "evidence_root": self.evidence_root,
+                "provenance_digest": self.provenance_digest,
+                "verification_evidence_digest": self.verification_evidence_digest,
+                "verifier_provenance_digest": self.verifier_provenance.digest,
+            }
+        )
 
     def validate(self, *, required_critical_planes: Sequence[str]) -> None:
         expected_families = tuple(f"GB{i:02d}" for i in range(1, 51))
@@ -634,4 +734,6 @@ class ClosureCertificate:
             "critical_planes": self.critical_plane_ids,
             "gaps": self.unresolved_critical_gaps,
             "independent": self.independently_verified,
+            "verification_binding_digest": self.verification_binding_digest,
+            "verifier_provenance_digest": self.verifier_provenance.digest,
         })

@@ -285,7 +285,7 @@ def test_shift_supervisor_model_gateway_is_declared_automation_provider_surface(
     surfaces = {
         item["owner"]: item for item in contract["provider_surfaces"]
     }
-    entry = surfaces["skeleton/automation/shift_supervisor/model_gateway.py"]
+    entry = surfaces["skeleton/ai/build/shift_supervisor/model_gateway.py"]
 
     assert entry["family"] == "automation_model"
     assert entry["surface_class"] == "automation_provider_explicitly_separate_and_receipt-gated"
@@ -295,7 +295,7 @@ def test_shift_supervisor_model_gateway_is_declared_automation_provider_surface(
     assert set(entry["discovery_edge_classes"]) == {"credential", "network_transport"}
 
     discovered = discover_provider_surfaces(ROOT)
-    assert set(discovered["skeleton/automation/shift_supervisor/model_gateway.py"]["edge_classes"]) == {
+    assert set(discovered["skeleton/ai/build/shift_supervisor/model_gateway.py"]["edge_classes"]) == {
         "credential",
         "network_transport",
     }

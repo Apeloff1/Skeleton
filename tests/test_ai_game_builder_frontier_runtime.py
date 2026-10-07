@@ -159,22 +159,28 @@ def test_genealogy_requires_known_parents_and_recovers_ancestry() -> None:
 
 def test_evaluator_independence_detects_correlated_quorum() -> None:
     graph = EvaluatorIndependenceGraph()
-    graph.register("judge-a", ("provider-x", "method-sim"))
-    graph.register("judge-b", ("provider-x", "method-human"))
-    graph.register("judge-c", ("provider-y", "method-formal"))
-    graph.register("judge-d", ("provider-z", "method-behavioral"))
-    assert not graph.quorum_is_independent(("judge-a", "judge-b", "judge-c"), minimum_groups=3)
-    assert graph.quorum_is_independent(("judge-a", "judge-c", "judge-d"), minimum_groups=3)
+    graph.register("judge-alpha", ("provider-x", "method-sim"))
+    graph.register("judge-beta", ("provider-x", "method-human"))
+    graph.register("judge-charlie", ("provider-y", "method-formal"))
+    graph.register("judge-delta", ("provider-z", "method-behavioral"))
+    assert not graph.quorum_is_independent(
+        ("judge-alpha", "judge-beta", "judge-charlie"),
+        minimum_groups=3,
+    )
+    assert graph.quorum_is_independent(
+        ("judge-alpha", "judge-charlie", "judge-delta"),
+        minimum_groups=3,
+    )
 
 
 def test_regret_ledger_blocks_champion_that_hurts_alternate_player_policy() -> None:
     ledger = RegretLedger(maximum_weighted_regret=0.05)
-    ledger.record(RegretObservation("novice", champion_score=0.75, alternative_score=0.78, weight=2))
-    ledger.record(RegretObservation("expert", champion_score=0.8, alternative_score=0.81, weight=1))
+    ledger.record(RegretObservation("novice-policy", champion_score=0.75, alternative_score=0.78, weight=2))
+    ledger.record(RegretObservation("expert-policy", champion_score=0.8, alternative_score=0.81, weight=1))
     assert ledger.promotion_allowed()
 
     bad = RegretLedger(maximum_weighted_regret=0.05)
-    bad.record(RegretObservation("novice", champion_score=0.5, alternative_score=0.9, weight=1))
+    bad.record(RegretObservation("novice-policy", champion_score=0.5, alternative_score=0.9, weight=1))
     assert bad.weighted_regret > 0.05
     assert not bad.promotion_allowed()
 
