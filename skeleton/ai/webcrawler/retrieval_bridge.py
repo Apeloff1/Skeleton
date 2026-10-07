@@ -1,6 +1,7 @@
 """Canonical crawler handoff into Skeleton retrieval index and provenance ledger."""
 from __future__ import annotations
 from dataclasses import asdict,dataclass
+import time
 from .core import CrawlDocument
 from .governance import PromotionDecision
 from .ingestion_registry import DurableIngestionRegistry,IngestionLease
@@ -9,12 +10,13 @@ from .outbox import IngestionOutbox
 class RetrievalBridgeReceipt:
  content_hash:str;chunks:int;index_revision:int;provenance_entry_ids:tuple[str,...]
 class CanonicalRetrievalBridge:
- def __init__(self,index,ledger,chunker,*,registry:DurableIngestionRegistry|None=None,outbox:IngestionOutbox|None=None,owner="retrieval",lease_ttl=60.0):
-  self.index=index;self.ledger=ledger;self.chunker=chunker;self.registry=registry;self.outbox=outbox;self.owner=owner;self.lease_ttl=lease_ttl;self._receipts={}
+ def __init__(self,index,ledger,chunker,*,registry:DurableIngestionRegistry|None=None,outbox:IngestionOutbox|None=None,temporal_catalog=None,owner="retrieval",lease_ttl=60.0):
+  self.index=index;self.ledger=ledger;self.chunker=chunker;self.registry=registry;self.outbox=outbox;self.temporal_catalog=temporal_catalog;self.owner=owner;self.lease_ttl=lease_ttl;self._receipts={}
  def _key(self,doc,decision):return f"{doc.content_hash}:{decision.decision_id}"
  @staticmethod
  def _receipt(raw):return RetrievalBridgeReceipt(raw["content_hash"],raw["chunks"],raw["index_revision"],tuple(raw["provenance_entry_ids"]))
- def ingest(self,doc:CrawlDocument,decision:PromotionDecision,*,now:float=0.0)->RetrievalBridgeReceipt:
+ def ingest(self,doc:CrawlDocument,decision:PromotionDecision,*,now:float|None=None)->RetrievalBridgeReceipt:
+  now=time.time() if now is None else now
   if decision.action!="promote" or decision.content_hash!=doc.content_hash:raise ValueError("retrieval admission requires matching promotion")
   key=self._key(doc,decision)
   if key in self._receipts:return self._receipts[key]
@@ -32,6 +34,11 @@ class CanonicalRetrievalBridge:
    ids=[]
    for ordinal,chunk in enumerate(chunks):
     self.index.add(chunk.chunk_id,chunk.text)
+    if self.temporal_catalog:
+     from .temporal_retrieval import TemporalFragment
+     from .research import EvidenceObservation
+     obs=EvidenceObservation.from_document(doc,"temporal-metadata")
+     self.temporal_catalog.put(TemporalFragment(chunk.chunk_id,doc.canonical_url,doc.fetched_at,obs.signal_years,doc.content_hash))
     entry=self.ledger.record(source=doc.canonical_url,operation="crawler.promoted_chunk",
      input_data=doc.content_hash,output_data=chunk.text,
      metadata={"content_hash":doc.content_hash,"chunk_id":chunk.chunk_id,"start":chunk.start,"end":chunk.end,"promotion_decision_id":decision.decision_id},

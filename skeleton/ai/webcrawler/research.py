@@ -96,14 +96,16 @@ class EvidenceSet:
         return [o for o in self.observations.values() if o.relevance >= self.query.min_relevance and o.source_score >= self.query.min_source_score]
 
     def source_dependence(self):
-        from .source_dependence import source_dependence
-        return source_dependence(self.qualified())
+        from .source_dependence import source_dependence,merge_citation_dependence
+        from .citation_lineage import extract_citation_edges,citation_dependence
+        vals=self.qualified();edges=source_dependence(vals);citations=extract_citation_edges(vals)
+        return merge_citation_dependence(vals,edges,citation_dependence(vals,citations))
 
     @property
     def independent_evidence_clusters(self) -> int:
         from .source_dependence import independent_host_count
         vals=self.qualified()
-        return independent_host_count(vals,source_dependence(vals)) if vals else 0
+        return independent_host_count(vals,self.source_dependence()) if vals else 0
 
     @property
     def distinct_hosts(self) -> int:
@@ -191,6 +193,15 @@ class EvidenceSet:
         from .contradiction_history import contradiction_persistence,persistent_contestation
         rows=contradiction_persistence(self.qualified(),self.learned_regimes(threshold=threshold))
         return {"regimes":rows,**persistent_contestation(rows)}
+
+    def counterfactual_influence(self,*,now:float):
+        from .counterfactual import leave_one_out_influence
+        return leave_one_out_influence(self,now=now)
+
+    def citation_lineage(self):
+        from .citation_lineage import extract_citation_edges,citation_dependence
+        vals=self.qualified();edges=extract_citation_edges(vals)
+        return {"edges":edges,"known_dependencies":citation_dependence(vals,edges)}
 
     def assurance(self, *, now: float) -> Mapping[str, object]:
         ranked=self.ranked(now=now)

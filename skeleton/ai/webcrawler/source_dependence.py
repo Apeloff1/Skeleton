@@ -19,6 +19,13 @@ def source_dependence(observations,*,threshold=.72):
    if j>=.6:reasons.append("high-text-overlap")
    if score>=threshold:out.append(DependenceEdge(a.observation_id,b.observation_id,min(1,score),tuple(reasons)))
  return tuple(out)
+def merge_citation_dependence(observations,edges,citation_pairs):
+ by={x.observation_id:x for x in observations};merged=list(edges);known={tuple(sorted((e.left_id,e.right_id))) for e in edges}
+ for a,b in citation_pairs:
+  pair=tuple(sorted((a,b)))
+  if pair not in known and a in by and b in by:merged.append(DependenceEdge(a,b,1.0,("direct-citation",)))
+ return tuple(sorted(merged,key=lambda e:(e.left_id,e.right_id,e.reasons)))
+
 def independent_host_count(observations,edges):
  parent={x.observation_id:x.observation_id for x in observations}
  def root(x):

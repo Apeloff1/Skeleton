@@ -1642,3 +1642,33 @@ Temporal research now includes methodology-level controls beyond calendar/regime
 Research grounding for this tranche reviewed current work on temporal GraphRAG/time-consistent retrieval, temporal knowledge-store planning, evidence-retroactive RAG, and change-point inference. The implementation retains explicit deterministic contracts and avoids interpreting lag/correlation as causal evidence.
 
 Next research depth: provenance lineage beyond textual similarity (citation/reference relationships), structured date metadata extraction into EvidenceObservation, temporal scope propagation through canonical retrieval indexes, counterfactual evidence tests, calibration metrics (Brier/ECE) for historical confidence, and evidence-revision receipts so retroactive research changes are auditable.
+
+
+### 2026-10-07 evidence integrity and research calibration tranche
+
+The research plane now evaluates evidence integrity, confidence quality and revision sensitivity:
+- explicit URL citations in evidence excerpts produce deterministic CitationEdge lineage; known cited observations are surfaced as direct dependencies rather than independent corroborators;
+- counterfactual leave-one-out analysis recomputes assurance without each observation and ranks evidence by absolute conclusion influence, exposing single-source brittleness;
+- calibration_report computes Brier score and expected calibration error over evaluated probabilistic research outputs;
+- RevisionReceipt records deterministic before/after evidence-set digests, exact additions/removals, reason and timestamp so retroactive evidence revision is auditable;
+- EvidenceSet exposes citation lineage and counterfactual influence directly;
+- regression coverage validates known citation dependency detection, zero-error perfect calibration, deterministic revision receipts and state-safe counterfactual evaluation.
+
+Research grounding for this tranche includes evidence-retroactive RAG, temporal consistency/retrieval, calibration methodology, and provenance-aware retrieval. The implementation uses these as design signals while retaining Skeleton's deterministic evidence/provenance contracts.
+
+Next depth: fold citation lineage into independence clustering (not just diagnostics), propagate temporal scope into the canonical retrieval bridge/index metadata, persist revision receipts in the provenance ledger/outbox, add source-level Shapley approximations for multi-source interactions, and build calibration datasets from resolved historical claims.
+
+
+### 2026-10-07 SOTA research assurance tranche
+
+Research assurance now closes several gaps between descriptive evidence analysis and robust autonomous research:
+- explicit citation dependencies are merged into the same dependence graph used by assurance, preventing cross-domain direct citations from masquerading as independent corroboration;
+- durable retrieval ingestion no longer defaults lease time to epoch zero when no explicit deterministic clock is supplied;
+- canonical provenance snapshot restore now reconstructs parent-before-child lineage and rejects unreachable/cyclic state instead of relying on opaque entry-ID order;
+- deterministic Shapley-style permutation sampling estimates marginal evidence contribution across multi-source interactions rather than only leave-one-out sensitivity;
+- ResearchStopDecision requires assurance score, dependence-adjusted evidence clusters, bounded uncertainty and bounded maximum single-source influence before autonomous research may stop;
+- TemporalRetrievalCatalog binds canonical fragment IDs to source URL, observation time, event years and content hash, allowing event-range/as-of filtering without contaminating BM25 lexical scoring;
+- CanonicalRetrievalBridge can populate this temporal sidecar during promoted chunk ingestion;
+- focused regressions cover citation-collapse of cross-host independence, robust stop/continue decisions and temporal fragment filtering.
+
+This moves the plane toward research assurance rather than feature accumulation: acquisition, stopping, retrieval and confidence are all conditioned on evidence independence and temporal validity. Remaining SOTA work includes durable persistence for temporal metadata/revision receipts, calibrated empirical outcome datasets, structured metadata extraction for publication/event dates, interaction-aware acquisition value, and exact-head executable validation.

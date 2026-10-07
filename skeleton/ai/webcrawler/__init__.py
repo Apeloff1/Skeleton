@@ -37,3 +37,12 @@ from .source_dependence import DependenceEdge,source_dependence,independent_host
 from .temporal_scope import TemporalScope,filter_temporal
 from .acquisition_queries import AcquisitionQuery,synthesize_acquisition_queries
 from .regime_assurance import ChangePointDecision,gate_change_points
+
+from .citation_lineage import CitationEdge,extract_citation_edges,citation_dependence
+from .calibration import CalibrationReport,calibration_report
+from .counterfactual import EvidenceInfluence,leave_one_out_influence
+from .evidence_revision import RevisionReceipt,revision_receipt
+
+from .shapley import SourceAttribution,approximate_shapley
+from .stopping import ResearchStopDecision,decide_research_stop
+from .temporal_retrieval import TemporalFragment,TemporalRetrievalCatalog
