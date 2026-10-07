@@ -59,14 +59,15 @@
       "source_disposition": "canonical_provider_contract_with_governed_ai_facade",
       "note": "Provider-neutral class ownership remains at skeleton/providers/contract.py; the governed AI destination is a non-owning compatibility facade until explicit import/ownership cutover.",
       "parity_mode": "compatibility_facade",
-      "facade_required_import": "from skeleton.providers.contract import"
+      "facade_required_import": "from skeleton.providers.contract import",
+      "volume_refs": []
     },
     {
       "id": "AIFT-PROVIDER-RUNTIME",
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/providers/runtime.py",
       "kind": "file",
-      "source_git_object_sha": "cc15bd41c0f4b945afa5d59ed5473135db04f140",
+      "source_git_object_sha": "6af63338b94878b89635ef799d1dd1acc157e64b",
       "role": "credential-bearing provider runtime",
       "work_package_refs": [
         "WP-W05",
@@ -98,7 +99,7 @@
       "source": "skeleton/contracts",
       "destination": "skeleton/ai/runtime/contracts",
       "kind": "tree",
-      "source_git_object_sha": "10e8bb62caeac7744c8250c92ecf415f1de7b436",
+      "source_git_object_sha": "af65bbc56e8d32a7c7b1f80bbd27d339b7baa599",
       "role": "canonical operation/conversation/context/formal/localization/compliance/Definition-of-Done contracts with governed AI runtime mirrors, deterministic identity, and fail-closed evidence/maturity boundaries",
       "work_package_refs": [
         "WP-W00",
@@ -178,7 +179,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "39b560ccd2c95a9cf068a65384458026b13dfcf5",
+      "source_git_object_sha": "0dedf8a467e5a57229496ba220c9ddb066953ce6",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -212,7 +213,9 @@
         "VOL-075",
         "VOL-076",
         "VOL-096",
-        "VOL-177",
+        "VOL-247",
+        "VOL-260",
+        "VOL-295",
         "VOL-361",
         "VOL-364",
         "VOL-365",
@@ -224,7 +227,7 @@
       "source": "skeleton/context",
       "destination": "skeleton/ai/runtime/context",
       "kind": "tree",
-      "source_git_object_sha": "4a7e68dc28aabfa9e7ba170c0ce076f37ad600ea",
+      "source_git_object_sha": "360d0366a20f1a8fff5b7db28f0e4cfe17799417",
       "role": "context compilation",
       "work_package_refs": [
         "WP-W10"
@@ -257,7 +260,7 @@
       "source": "skeleton/retrieval",
       "destination": "skeleton/ai/runtime/retrieval",
       "kind": "tree",
-      "source_git_object_sha": "83acf1c234e482be5e47389e0e55fad6e7186f65",
+      "source_git_object_sha": "8e34efff7987f6e32d148588c6c36ae3aeb79be1",
       "role": "retrieval and grounding",
       "work_package_refs": [
         "WP-W08",
@@ -289,7 +292,7 @@
       "source": "skeleton/memory",
       "destination": "skeleton/ai/runtime/memory",
       "kind": "tree",
-      "source_git_object_sha": "9715bc1e66e9ef7fdbd548f16cbb87dff2997d3e",
+      "source_git_object_sha": "724cf1b68a897adddcb90a2045059c93a469b751",
       "role": "memory authority and recall",
       "work_package_refs": [
         "WP-W07"
@@ -320,7 +323,7 @@
       "source": "skeleton/intelligence",
       "destination": "skeleton/ai/runtime/intelligence",
       "kind": "tree",
-      "source_git_object_sha": "8fd118c100b8a2cb411bdfe707694de28999f323",
+      "source_git_object_sha": "8fd79c909ddf726cfecf886039881ba1d6ca105f",
       "role": "admission verification and execution",
       "work_package_refs": [
         "WP-W06",
@@ -368,7 +371,7 @@
       "source": "skeleton/frontier",
       "destination": "skeleton/ai/runtime/frontier",
       "kind": "tree",
-      "source_git_object_sha": "76aa77aa53ff8a559b5710f1af7f19b0ea4ecffc",
+      "source_git_object_sha": "e032c4d2050c7e90121acc43eda0d54b45b85648",
       "role": "Frontier domain runtime with canonical runtime/control-plane primitives under runtime/, progression/meta systems under progression/, ecology/lifecycle systems under ecology/, commerce/cooking/crafting/energy/equipment systems under economy/, NPC/character systems under characters/, and gameplay/voyage/world systems under game/, mirrored exactly into skeleton/ai/runtime/frontier.",
       "work_package_refs": [
         "WP-W04",
@@ -394,7 +397,9 @@
         "VOL-040",
         "VOL-042",
         "VOL-044",
-        "VOL-045"
+        "VOL-045",
+        "VOL-288",
+        "VOL-295"
       ]
     },
     {
@@ -402,7 +407,7 @@
       "source": "skeleton/skills",
       "destination": "skeleton/ai/runtime/skills",
       "kind": "tree",
-      "source_git_object_sha": "bd0c81106081917156f01115ebc02402af287543",
+      "source_git_object_sha": "7af90642faa16e3bc068c458d6974fcf99ba1485",
       "role": "tool and skill runtime",
       "work_package_refs": [
         "WP-W13",
@@ -464,7 +469,7 @@
       "source": "skeleton/automation/shift_supervisor",
       "destination": "skeleton/ai/build/shift_supervisor",
       "kind": "tree",
-      "source_git_object_sha": "296d738eeff4bb5e08859dc333ba2a5eba44c895",
+      "source_git_object_sha": "6ba121661d20dd83ace629b18a09514593f84140",
       "role": "canonical shift-supervisor planning, scheduling, and build-control harness",
       "work_package_refs": [
         "WP-W11",
@@ -497,7 +502,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "854a772974c5d5559b9b7ea5920ba1bcd7072fae",
+      "source_git_object_sha": "e96926ee2a28ed4ab6861c037b4cbb759f99d062",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -535,7 +540,7 @@
       "source": "skeleton/vault",
       "destination": "skeleton/ai/runtime/vault",
       "kind": "tree",
-      "source_git_object_sha": "64635758baba1e322aaed82dda43632c18e45350",
+      "source_git_object_sha": "99a854e2cf4fbe1d5cd290388bd6ee7e90ca7b5d",
       "role": "data governance lifecycle and audit authority",
       "work_package_refs": [
         "WP-W00",
@@ -567,8 +572,7 @@
       "volume_refs": [
         "VOL-010",
         "VOL-027",
-        "VOL-028",
-        "VOL-174"
+        "VOL-028"
       ]
     },
     {
@@ -576,7 +580,7 @@
       "source": "skeleton/automation/agents",
       "destination": "skeleton/ai/agents/core",
       "kind": "tree",
-      "source_git_object_sha": "c21ad1fe0d0dca814aa81987cd6b0ea9c220427b",
+      "source_git_object_sha": "1d0cb0396d28dc471f32439a93be4c7eef1c047e",
       "role": "canonical agent/swarm execution runtime under automation ownership",
       "work_package_refs": [
         "WP-W00",
@@ -635,7 +639,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "719d3f40841100f547293b22e14c8904425c77a3",
+      "source_git_object_sha": "ad851b41e9a0f787e4ea3188d294f6e41e853124",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -720,6 +724,7 @@
         "swarm"
       ],
       "volume_refs": [
+        "VOL-004",
         "VOL-015",
         "VOL-016",
         "VOL-017",
@@ -736,7 +741,9 @@
         "VOL-116",
         "VOL-118",
         "VOL-119",
-        "VOL-121"
+        "VOL-121",
+        "VOL-290",
+        "VOL-294"
       ]
     },
     {
@@ -771,14 +778,15 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-OBSERVABILITY",
       "source": "skeleton/observability",
       "destination": "skeleton/ai/runtime/observability",
       "kind": "tree",
-      "source_git_object_sha": "56d1f3e52a4c65a5674b0c26f0f75ec05009bb7e",
+      "source_git_object_sha": "597cb92672fc0a75183fe517c9871af9a81dfd6e",
       "role": "AI runtime observability, telemetry, audit, provenance-bound explainability, and executable operations runbook plane",
       "work_package_refs": [
         "WP-W00",
@@ -813,16 +821,13 @@
         "VOL-085",
         "VOL-091",
         "VOL-117",
-        "VOL-180",
-        "VOL-181",
-        "VOL-182",
-        "VOL-183",
-        "VOL-184",
-        "VOL-185",
-        "VOL-186",
-        "VOL-187",
         "VOL-191",
         "VOL-204",
+        "VOL-235",
+        "VOL-236",
+        "VOL-279",
+        "VOL-280",
+        "VOL-282",
         "VOL-325",
         "VOL-390",
         "VOL-403",
@@ -861,14 +866,15 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "canonical_context_domains_with_legacy_plural_shims"
+      "source_disposition": "canonical_context_domains_with_legacy_plural_shims",
+      "volume_refs": []
     },
     {
       "id": "AIFT-SECURITY",
       "source": "skeleton/security",
       "destination": "skeleton/ai/runtime/security",
       "kind": "tree",
-      "source_git_object_sha": "44cecc1c1f9b291e053b8c3d1cf48af7f27be628",
+      "source_git_object_sha": "290023631f726023820f6fa1c7d895d95962d09a",
       "role": "AI runtime security and activation controls",
       "work_package_refs": [
         "WP-W00",
@@ -915,22 +921,16 @@
         "VOL-084",
         "VOL-164",
         "VOL-165",
-        "VOL-166",
-        "VOL-167",
         "VOL-168",
-        "VOL-169",
         "VOL-170",
-        "VOL-172",
-        "VOL-173",
-        "VOL-174",
-        "VOL-175",
-        "VOL-176",
-        "VOL-177",
         "VOL-205",
         "VOL-230",
         "VOL-233",
         "VOL-256",
         "VOL-257",
+        "VOL-276",
+        "VOL-277",
+        "VOL-283",
         "VOL-318",
         "VOL-320",
         "VOL-321",
@@ -942,7 +942,7 @@
       "source": "skeleton/eval",
       "destination": "skeleton/ai/evaluation",
       "kind": "tree",
-      "source_git_object_sha": "d9dff0b5bb6a90450d2feaff27289961967aa63c",
+      "source_git_object_sha": "f3910ffc50539370ff4c8097de3b824c2856764a",
       "role": "evaluation and evidence support",
       "work_package_refs": [
         "WP-W00",
@@ -990,8 +990,10 @@
         "VOL-206",
         "VOL-207",
         "VOL-208",
+        "VOL-242",
         "VOL-248",
         "VOL-252",
+        "VOL-296",
         "VOL-323",
         "VOL-324",
         "VOL-362",
@@ -1011,7 +1013,7 @@
       "source": "skeleton/kernel",
       "destination": "skeleton/ai/runtime/kernel",
       "kind": "tree",
-      "source_git_object_sha": "75c2b95ba4cdf5a27aa6ab2460bbb43a1cf7a685",
+      "source_git_object_sha": "b081e84057c8ecc3ab59537c1aeb9538afdd287a",
       "role": "engine kernel and governance primitives",
       "work_package_refs": [
         "WP-W00",
@@ -1046,7 +1048,7 @@
       "source": "skeleton/reliability",
       "destination": "skeleton/ai/runtime/reliability",
       "kind": "tree",
-      "source_git_object_sha": "a1d7859f7685e6d8344c3dbe8b5a6dc3f0fff7f2",
+      "source_git_object_sha": "228a1d345df9bb526f500230cc89f97140e05065",
       "role": "runtime reliability controls",
       "work_package_refs": [
         "WP-W00",
@@ -1078,7 +1080,14 @@
       "volume_refs": [
         "VOL-029",
         "VOL-102",
-        "VOL-188"
+        "VOL-188",
+        "VOL-288",
+        "VOL-289",
+        "VOL-290",
+        "VOL-291",
+        "VOL-292",
+        "VOL-293",
+        "VOL-294"
       ]
     },
     {
@@ -1086,7 +1095,7 @@
       "source": "skeleton/learning",
       "destination": "skeleton/ai/learning",
       "kind": "tree",
-      "source_git_object_sha": "4c6cdadff67847d2a1fdbd42f346fbd735124eec",
+      "source_git_object_sha": "5f8ffbd04a916279dc260e9617ec8d2e0748cfef",
       "role": "controlled learning support with evidence-grounded learner-state inference, objective planning, and outcome evaluation",
       "work_package_refs": [
         "WP-W00",
@@ -1186,7 +1195,8 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-PRIMITIVES",
@@ -1218,14 +1228,15 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-REPO-INTELLIGENCE",
       "source": "skeleton/repo_intelligence",
       "destination": "skeleton/ai/build/repo_intelligence",
       "kind": "tree",
-      "source_git_object_sha": "ff374e8c0ced7394c92873847ab670c1a5fbfae2",
+      "source_git_object_sha": "46ddfd2b547b2e283bdb7729212c08ec5b166966",
       "role": "repository intelligence for build/control workflows",
       "work_package_refs": [
         "WP-W00",
@@ -1261,7 +1272,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "3c3fdaceb4ded0a4a7394ac56d588dab4956ddb6",
+      "source_git_object_sha": "c1da6c899962ca62dea134ff08788fab69390f73",
       "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -1273,7 +1284,8 @@
       "volume_refs": [
         "VOL-019",
         "VOL-073",
-        "VOL-197"
+        "VOL-197",
+        "VOL-284"
       ],
       "move_tags": [
         "ai-tree:mapped",
@@ -1297,7 +1309,6 @@
         "AIQ-S7-E2E-01"
       ],
       "volume_refs": [
-        "VOL-023",
         "VOL-101"
       ],
       "move_tags": [
@@ -1313,7 +1324,7 @@
       "source": "skeleton/native",
       "destination": "skeleton/ai/runtime/native",
       "kind": "tree",
-      "source_git_object_sha": "8c6a214853800c1be14884becffd7a13bab17803",
+      "source_git_object_sha": "93846bd098a957ef1e54a5138aef7b7871204e14",
       "role": "high-performance native capability registry, ABI boundary and accelerated kernels",
       "volume_refs": [
         "VOL-032"
@@ -1374,7 +1385,8 @@
         "cutover:owner-sensitive"
       ],
       "move_batch": "B3-owner-sensitive",
-      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
+      "source_disposition": "retain_until_explicit_owner_and_import_cutover",
+      "volume_refs": []
     },
     {
       "id": "AIFT-ORGANISM",
@@ -1405,7 +1417,8 @@
         "cutover:owner-sensitive"
       ],
       "move_batch": "B3-owner-sensitive",
-      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
+      "source_disposition": "retain_until_explicit_owner_and_import_cutover",
+      "volume_refs": []
     },
     {
       "id": "AIFT-APPLICATION",
@@ -1425,11 +1438,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-004",
-        "VOL-041",
-        "VOL-128"
-      ],
+      "volume_refs": [],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
         "preserve backend versus engine ownership boundary",
@@ -1458,11 +1467,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-067",
-        "VOL-079",
-        "VOL-095"
-      ],
+      "volume_refs": [],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
         "keep repository input as data",
@@ -1493,11 +1498,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-038",
-        "VOL-039",
-        "VOL-139"
-      ],
+      "volume_refs": [],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
         "preserve append-only and tamper-detection semantics",
@@ -1528,11 +1529,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-004",
-        "VOL-029",
-        "VOL-286"
-      ],
+      "volume_refs": [],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
         "preserve cancellation and graceful-shutdown semantics",
@@ -1566,8 +1563,6 @@
         "AIQ-S7-E2E-01"
       ],
       "volume_refs": [
-        "VOL-005",
-        "VOL-039",
         "VOL-137",
         "VOL-138",
         "VOL-139",
@@ -1603,10 +1598,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-194",
-        "VOL-281"
-      ],
+      "volume_refs": [],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
         "keep operator tooling outside model authority",
@@ -1626,7 +1618,7 @@
       "source": "skeleton/foundation",
       "destination": "skeleton/ai/runtime/foundation",
       "kind": "tree",
-      "source_git_object_sha": "31cf0ac9bd4311fcab850cf02aa27b6208ed2b07",
+      "source_git_object_sha": "c5b0c68e9c7fb7137d92d14458c67a734f24a269",
       "role": "Merkle lineage, event journal/replay, capability security, and temporal invariants are cross-cutting AI runtime primitives.",
       "work_package_refs": [
         "WP-W01",
@@ -1640,10 +1632,9 @@
         "AIQ-S7-E2E-01"
       ],
       "volume_refs": [
-        "VOL-003",
-        "VOL-005",
-        "VOL-028",
-        "VOL-038"
+        "VOL-297",
+        "VOL-298",
+        "VOL-299"
       ],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
@@ -1681,10 +1672,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-017",
-        "VOL-030"
-      ],
+      "volume_refs": [],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
         "preserve bounded consensus/election behavior",
@@ -1714,11 +1702,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-025",
-        "VOL-028",
-        "VOL-029"
-      ],
+      "volume_refs": [],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
         "keep policy deterministic",
@@ -1748,10 +1732,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-004",
-        "VOL-120"
-      ],
+      "volume_refs": [],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
         "do not create a second application bootstrap owner",
@@ -1771,7 +1752,7 @@
       "source": "skeleton/kv",
       "destination": "skeleton/ai/runtime/inference/kv",
       "kind": "tree",
-      "source_git_object_sha": "41fc253161afa293f75c72a0f3e4833b91c81958",
+      "source_git_object_sha": "2c27721018d578803f08dd14b9aba6ca0d7765f8",
       "role": "Paged/tiered KV management is an inference/runtime optimization with integrity and resource implications.",
       "work_package_refs": [
         "WP-W05",
@@ -1782,11 +1763,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-007",
-        "VOL-029",
-        "VOL-031"
-      ],
+      "volume_refs": [],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
         "prove cache reuse cannot change semantics",
@@ -1817,11 +1794,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-007",
-        "VOL-029",
-        "VOL-387"
-      ],
+      "volume_refs": [],
       "migration_action": "converge_facade_then_cutover",
       "cutover_preconditions": [
         "prove cache reuse is semantics-preserving",
@@ -1853,10 +1826,8 @@
       ],
       "volume_refs": [
         "VOL-029",
-        "VOL-030",
         "VOL-067",
         "VOL-068",
-        "VOL-171",
         "VOL-386",
         "VOL-390",
         "VOL-391"
@@ -1880,7 +1851,7 @@
       "source": "skeleton/distributed/network",
       "destination": "skeleton/ai/runtime/distributed/network",
       "kind": "tree",
-      "source_git_object_sha": "e0cf7a9f7dc0169aab0fa9fd39fb7fbf4cbba231",
+      "source_git_object_sha": "ca0fed429a1be5395e8626d11ec7cb80089638db",
       "role": "Replication, reconciliation, rollback, ordering, and delivery outcomes directly implement reliability/distributed-runtime obligations.",
       "work_package_refs": [
         "WP-W19",
@@ -1890,7 +1861,6 @@
         "AIQ-S7-E2E-01"
       ],
       "volume_refs": [
-        "VOL-029",
         "VOL-030",
         "VOL-031",
         "VOL-381",
@@ -1931,12 +1901,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-029",
-        "VOL-030",
-        "VOL-284",
-        "VOL-286"
-      ],
+      "volume_refs": [],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
         "preserve human override and safe-degradation controls",
@@ -1966,11 +1931,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-022",
-        "VOL-059",
-        "VOL-098"
-      ],
+      "volume_refs": [],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
         "preserve protected-base and merge-gate fail-closed behavior",
@@ -1999,11 +1960,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-035",
-        "VOL-036",
-        "VOL-079"
-      ],
+      "volume_refs": [],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
         "keep evidence read-mostly",
@@ -2023,7 +1980,7 @@
       "source": "skeleton/repo_machine",
       "destination": "skeleton/ai/build/repo_machine",
       "kind": "tree",
-      "source_git_object_sha": "1520a1f5ce0a59af8d75ac757eacaff27eca3c54",
+      "source_git_object_sha": "5cd35c1f6d23792129c34c09463e0f86a5867ede",
       "role": "Repository model, impact, workgraph, governance, stewardship, ownership-aware maintenance, and bounded cleanup authority for autonomous repository engineering.",
       "work_package_refs": [
         "WP-W11",
@@ -2036,16 +1993,7 @@
         "AIQ-S7-E2E-01"
       ],
       "volume_refs": [
-        "VOL-021",
-        "VOL-022",
         "VOL-092",
-        "VOL-093",
-        "VOL-094",
-        "VOL-095",
-        "VOL-098",
-        "VOL-108",
-        "VOL-109",
-        "VOL-110",
         "VOL-115",
         "VOL-118",
         "VOL-119"
@@ -2079,10 +2027,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-004",
-        "VOL-005"
-      ],
+      "volume_refs": [],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
         "preserve schema/migration semantics",
@@ -2116,7 +2061,6 @@
         "AIQ-S7-E2E-01"
       ],
       "volume_refs": [
-        "VOL-016",
         "VOL-017"
       ],
       "migration_action": "mirror_then_cutover",
@@ -2150,9 +2094,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-012"
-      ],
+      "volume_refs": [],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
         "keep export/render helpers side-effect free",
@@ -2183,8 +2125,7 @@
         "AIQ-S7-E2E-01"
       ],
       "volume_refs": [
-        "VOL-015",
-        "VOL-026"
+        "VOL-015"
       ],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
@@ -2216,10 +2157,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-113",
-        "VOL-124"
-      ],
+      "volume_refs": [],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
         "preserve fail-closed classification",
@@ -2255,11 +2193,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-210",
-        "VOL-211"
-      ],
+      "volume_refs": [],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
         "treat external material as untrusted evidence",
@@ -2290,11 +2224,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-009",
-        "VOL-011",
-        "VOL-029"
-      ],
+      "volume_refs": [],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
         "preserve retrieval trust labeling",
@@ -2322,10 +2252,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-024",
-        "VOL-074"
-      ],
+      "volume_refs": [],
       "migration_action": "split_then_mirror",
       "cutover_preconditions": [
         "retain provenance that code was acquired",
@@ -2356,11 +2283,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-005",
-        "VOL-029",
-        "VOL-135"
-      ],
+      "volume_refs": [],
       "migration_action": "split_then_mirror",
       "cutover_preconditions": [
         "cache remains derived/non-authoritative",
@@ -2392,10 +2315,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-025",
-        "VOL-029"
-      ],
+      "volume_refs": [],
       "migration_action": "split_then_mirror",
       "cutover_preconditions": [
         "fail closed on unknown policy",
@@ -2426,10 +2346,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-019",
-        "VOL-073"
-      ],
+      "volume_refs": [],
       "migration_action": "merge_into_existing_owner",
       "cutover_preconditions": [
         "retain source lineage",
@@ -2458,10 +2375,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-014",
-        "VOL-023"
-      ],
+      "volume_refs": [],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
         "retain provenance links",
@@ -2490,10 +2404,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-019",
-        "VOL-073"
-      ],
+      "volume_refs": [],
       "migration_action": "merge_into_existing_owner",
       "cutover_preconditions": [
         "preserve double-entry invariants",
@@ -2522,10 +2433,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-019",
-        "VOL-073"
-      ],
+      "volume_refs": [],
       "migration_action": "merge_into_existing_owner",
       "cutover_preconditions": [
         "preserve deterministic replay",
@@ -2554,9 +2462,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-017"
-      ],
+      "volume_refs": [],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
         "compare overlap with skeleton/swarm before cutover",
@@ -2576,7 +2482,7 @@
       "source": "skeleton/native/jvm_registry.py",
       "destination": "skeleton/ai/runtime/native/jvm_registry.py",
       "kind": "file",
-      "source_git_object_sha": "fc62b6b66d45c6d0d9c9a2ecaf2e260ce3833764",
+      "source_git_object_sha": "441f270edb325919bb0d6c15354be4b6164b7c40",
       "role": "Canonical optional JVM accelerator registry beside native runtime ownership; java-accelerators remains the separate accelerator implementation root.",
       "work_package_refs": [
         "WP-W29",
@@ -2585,10 +2491,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-032",
-        "VOL-033"
-      ],
+      "volume_refs": [],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
         "keep JVM helpers optional and fallback-safe",
@@ -2617,11 +2520,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-019",
-        "VOL-023",
-        "VOL-073"
-      ],
+      "volume_refs": [],
       "migration_action": "merge_into_existing_owner",
       "cutover_preconditions": [
         "preserve engine-neutral schemas",
@@ -2641,7 +2540,7 @@
       "source": "skeleton/learning/school",
       "destination": "skeleton/ai/learning/school",
       "kind": "tree",
-      "source_git_object_sha": "4f14ed170585eec28d6ae8fcad300690275e09a5",
+      "source_git_object_sha": "14b8ba6ccc11fa587726a256e1fb04bbb385539d",
       "role": "Curriculum, assessment, tutoring, code-intelligence, and learning-control modules deepen the existing controlled-learning owner.",
       "work_package_refs": [
         "WP-W28"
@@ -2650,7 +2549,6 @@
         "AIQ-S7-E2E-01"
       ],
       "volume_refs": [
-        "VOL-024",
         "VOL-074"
       ],
       "migration_action": "merge_into_existing_owner",
@@ -2681,10 +2579,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-019",
-        "VOL-073"
-      ],
+      "volume_refs": [],
       "migration_action": "merge_into_existing_owner",
       "cutover_preconditions": [
         "preserve world/scene schema identity",
@@ -2712,10 +2607,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "retain original acceptance evidence",
@@ -2746,10 +2638,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "retain original acceptance evidence",
@@ -2781,10 +2670,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "retain existing algebraic invariant tests",
@@ -2816,10 +2702,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-005",
-        "VOL-039"
-      ],
+      "volume_refs": [],
       "migration_action": "merge_into_existing_owner",
       "cutover_preconditions": [
         "compare against skeleton/persistence",
@@ -2847,10 +2730,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-023",
-        "VOL-073"
-      ],
+      "volume_refs": [],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
         "preserve domain scoping",
@@ -2879,11 +2759,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-012",
-        "VOL-419"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "retain mathematical invariant tests",
@@ -2915,11 +2791,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-019",
-        "VOL-419"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "retain invariant/acceptance evidence",
@@ -2952,11 +2824,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-006",
-        "VOL-007",
-        "VOL-077"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "benchmark each primitive against a named baseline",
@@ -3045,7 +2913,8 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-TURN-COMPAT",
@@ -3079,7 +2948,8 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_characterized_merged_and_callers_inverted"
+      "source_disposition": "retain_until_characterized_merged_and_callers_inverted",
+      "volume_refs": []
     },
     {
       "id": "AIFT-TELEMETRY-COMPAT",
@@ -3110,7 +2980,8 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_characterized_merged_and_callers_inverted"
+      "source_disposition": "retain_until_characterized_merged_and_callers_inverted",
+      "volume_refs": []
     },
     {
       "id": "AIFT-ARCHITECTURE-LEGACY",
@@ -3126,10 +2997,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "machine/architecture.json remains the only current architecture authority",
@@ -3161,10 +3029,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "machine/architecture.json remains the only current architecture authority",
@@ -3196,10 +3061,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "machine/architecture.json remains the only current architecture authority",
@@ -3231,10 +3093,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "machine/architecture.json remains the only current architecture authority",
@@ -3266,10 +3125,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "machine/architecture.json remains the only current architecture authority",
@@ -3301,10 +3157,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "machine/architecture.json remains the only current architecture authority",
@@ -3336,10 +3189,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "machine/architecture.json remains the only current architecture authority",
@@ -3371,10 +3221,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "machine/architecture.json remains the only current architecture authority",
@@ -3406,10 +3253,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "machine/architecture.json remains the only current architecture authority",
@@ -3441,10 +3285,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "machine/architecture.json remains the only current architecture authority",
@@ -3476,10 +3317,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "machine/architecture.json remains the only current architecture authority",
@@ -3511,10 +3349,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "machine/architecture.json remains the only current architecture authority",
@@ -3546,10 +3381,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "machine/architecture.json remains the only current architecture authority",
@@ -3581,10 +3413,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "machine/architecture.json remains the only current architecture authority",
@@ -3616,10 +3445,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "machine/architecture.json remains the only current architecture authority",
@@ -3651,10 +3477,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "machine/architecture.json remains the only current architecture authority",
@@ -3686,10 +3509,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "machine/architecture.json remains the only current architecture authority",
@@ -3721,10 +3541,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "machine/architecture.json remains the only current architecture authority",
@@ -3756,10 +3573,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "machine/architecture.json remains the only current architecture authority",
@@ -3791,10 +3605,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "machine/architecture.json remains the only current architecture authority",
@@ -3826,10 +3637,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "machine/architecture.json remains the only current architecture authority",
@@ -3861,10 +3669,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
+      "volume_refs": [],
       "migration_action": "quarantine_then_characterize",
       "cutover_preconditions": [
         "machine/architecture.json remains the only current architecture authority",
@@ -3902,7 +3707,8 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2-GAMEFORGE-EXOCORTEX-ZAIBATSU",
@@ -3924,7 +3730,8 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2-GAMEFORGE-REASONING",
@@ -3946,7 +3753,8 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2-GAMEFORGE-RAG",
@@ -3968,7 +3776,8 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2-GAMEFORGE-MATH-EXOCORTEX",
@@ -3990,7 +3799,8 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2-GAMEFORGE-NEURO",
@@ -4012,7 +3822,8 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2-BACKEND-CORE-JEEVES-CAPABILITIES",
@@ -4034,7 +3845,8 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2-BACKEND-CORE-JEEVES-CONTROL-PLANE",
@@ -4056,7 +3868,8 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2-BACKEND-CORE-JEEVES-EXECUTION-KERNEL",
@@ -4078,7 +3891,8 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2-BACKEND-CORE-JEEVES-MEMORY",
@@ -4099,7 +3913,8 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2-BACKEND-CORE-KNOWLEDGE-AUGMENTED-JEEVES",
@@ -4121,14 +3936,15 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2-BACKEND-CORE-MODEL-ROUTER",
       "source": "backend/core/model_router.py",
       "destination": "skeleton/ai/compat/backend_core/model_router.py",
       "kind": "file",
-      "source_git_object_sha": "32b9f561cf7ab0aa44c01642191edb0e7ce78cc6",
+      "source_git_object_sha": "324cf94f8ab438d26212d686be9f12ae16e28de3",
       "role": "Legacy backend model router staged for convergence; provider authority remains unchanged.",
       "work_package_refs": [
         "WP-W05",
@@ -4143,7 +3959,8 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2-BACKEND-CORE-KNOWLEDGE-FABRIC",
@@ -4165,7 +3982,8 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2-BACKEND-CORE-GAME-KNOWLEDGE-VAULT",
@@ -4187,7 +4005,8 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2-BACKEND-CORE-SKILL-GRAPH",
@@ -4208,7 +4027,8 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2-BACKEND-CORE-SWARM-AGENTS",
@@ -4230,7 +4050,8 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2-BACKEND-CORE-SWARM-PLANNER",
@@ -4252,7 +4073,8 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2-BACKEND-CORE-SWARM-SCHEDULER",
@@ -4274,7 +4096,8 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2-BACKEND-CORE-WORLD-AGENTS",
@@ -4296,7 +4119,8 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2-BACKEND-CORE-WORLD-GRAPH",
@@ -4317,7 +4141,8 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2-BACKEND-CORE-WORLD-GRAPH-PROJECTION",
@@ -4338,7 +4163,8 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2-BACKEND-CORE-WORLD-RUNTIME",
@@ -4360,7 +4186,8 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2-BACKEND-CORE-WORLD-SYSTEM-COMPOSER",
@@ -4382,7 +4209,8 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2-BACKEND-CORE-RELATIONSHIP-MEMORY",
@@ -4403,7 +4231,8 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2-BACKEND-CORE-PROGRESSION-INTELLIGENCE",
@@ -4425,7 +4254,8 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2-BACKEND-CORE-SYSTEMS-KNOWLEDGE",
@@ -4447,7 +4277,8 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-ACQUIRED-GAMING",
@@ -4461,10 +4292,7 @@
         "WP-W18"
       ],
       "aiq_refs": [],
-      "volume_refs": [
-        "VOL-073",
-        "VOL-078"
-      ],
+      "volume_refs": [],
       "move_tags": [
         "ai-tree:mapped",
         "migration:staged-mirror",
@@ -4485,10 +4313,7 @@
         "WP-W20"
       ],
       "aiq_refs": [],
-      "volume_refs": [
-        "VOL-008",
-        "VOL-026"
-      ],
+      "volume_refs": [],
       "move_tags": [
         "ai-tree:mapped",
         "migration:staged-mirror",
@@ -4509,10 +4334,7 @@
         "WP-W28"
       ],
       "aiq_refs": [],
-      "volume_refs": [
-        "VOL-024",
-        "VOL-035"
-      ],
+      "volume_refs": [],
       "move_tags": [
         "ai-tree:mapped",
         "migration:staged-mirror",
@@ -4533,10 +4355,7 @@
         "WP-W26"
       ],
       "aiq_refs": [],
-      "volume_refs": [
-        "VOL-075",
-        "VOL-077"
-      ],
+      "volume_refs": [],
       "move_tags": [
         "ai-tree:mapped",
         "migration:staged-mirror",
@@ -4565,7 +4384,8 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2B-GAMEFORGE-JEEVES",
@@ -4588,7 +4408,8 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2B-GAMEFORGE-WORKFLOW",
@@ -4610,7 +4431,8 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2B-GAMEFORGE-RUNTIME",
@@ -4632,7 +4454,8 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2B-GAMEFORGE-OMEGA",
@@ -4654,7 +4477,8 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2B-GAMEFORGE-PERSONAL-DIARIES",
@@ -4676,7 +4500,8 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2B-GAMEFORGE-PERSONAL-LOGS",
@@ -4698,7 +4523,8 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2B-GAMEFORGE-FORGES",
@@ -4720,7 +4546,8 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2B-GAMEFORGE-KNOWLEDGE",
@@ -4742,7 +4569,8 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2B-GAMEFORGE-SKILLS",
@@ -4764,7 +4592,8 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2B-GAMEFORGE-NAVIGATION",
@@ -4786,7 +4615,8 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2B-GAMEFORGE-BOOTSTRAP",
@@ -4808,7 +4638,8 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2B-GAMEFORGE-ORCHESTRATOR",
@@ -4830,7 +4661,8 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2B-GAMEFORGE-INDEXING",
@@ -4852,7 +4684,8 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2B-BACKEND-CORE-AGENT-LEDGER",
@@ -4874,7 +4707,8 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2B-BACKEND-CORE-AGENT-MESH",
@@ -4896,7 +4730,8 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2B-BACKEND-CORE-COLLECTION-AGENTS",
@@ -4917,7 +4752,8 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2B-BACKEND-CORE-DEPLOYMENT-PLANNER",
@@ -4938,7 +4774,8 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2B-BACKEND-CORE-DIRECTOR-AGENT",
@@ -4960,7 +4797,8 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-V2B-BACKEND-CORE-PLAYABLE-SIMULATION",
@@ -4982,7 +4820,8 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates",
+      "volume_refs": []
     },
     {
       "id": "AIFT-PROVENANCE",
@@ -5000,11 +4839,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-038",
-        "VOL-039",
-        "VOL-139"
-      ],
+      "volume_refs": [],
       "overlay_children": [
         "chronicle"
       ],
@@ -5024,7 +4859,7 @@
       "source": "skeleton/knowledge",
       "destination": "skeleton/ai/runtime/knowledge",
       "kind": "tree",
-      "source_git_object_sha": "b3d713a209d0afb4616b86393f01202dfb31b608",
+      "source_git_object_sha": "c523b4a5d8815b756d9fac62f3f42c6d69bb4675",
       "role": "Canonical reusable knowledge and reasoning substrate parent with independently governed graph primitives.",
       "work_package_refs": [
         "WP-W09",
@@ -5033,9 +4868,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-012"
-      ],
+      "volume_refs": [],
       "overlay_children": [
         "graphs"
       ],
@@ -5065,10 +4898,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-015",
-        "VOL-026"
-      ],
+      "volume_refs": [],
       "overlay_children": [
         "integrations"
       ],
@@ -5097,9 +4927,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-019"
-      ],
+      "volume_refs": [],
       "migration_action": "merge_into_existing_owner",
       "cutover_preconditions": [
         "preserve citation-required Forge behavior",
@@ -5119,7 +4947,7 @@
       "source": "skeleton/distributed",
       "destination": "skeleton/ai/runtime/distributed",
       "kind": "tree",
-      "source_git_object_sha": "f6ac62091cb6c9bf4018ae4e7927cbf93f51c3d0",
+      "source_git_object_sha": "4de6d1fbb58bc08220ba187112894c9591465c38",
       "role": "Distributed coordination packages; subdomains retain their declared owners.",
       "work_package_refs": [
         "WP-W15"
@@ -5145,23 +4973,7 @@
         "mesh",
         "network"
       ],
-      "volume_refs": [
-        "VOL-029",
-        "VOL-030",
-        "VOL-031",
-        "VOL-067",
-        "VOL-068",
-        "VOL-381",
-        "VOL-382",
-        "VOL-385",
-        "VOL-386",
-        "VOL-390",
-        "VOL-391",
-        "VOL-392",
-        "VOL-397",
-        "VOL-398",
-        "VOL-399"
-      ]
+      "volume_refs": []
     },
     {
       "id": "AIFT-RESEARCH",
@@ -5224,9 +5036,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-019"
-      ],
+      "volume_refs": [],
       "move_tags": [
         "ai-tree:mapped",
         "migration:staged-mirror",
@@ -5249,9 +5059,7 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "volume_refs": [
-        "VOL-007"
-      ],
+      "volume_refs": [],
       "move_tags": [
         "ai-tree:mapped",
         "migration:staged-mirror",
@@ -5336,7 +5144,6 @@
         "AIQ-S7-E2E-01"
       ],
       "volume_refs": [
-        "VOL-006",
         "VOL-143",
         "VOL-144",
         "VOL-145",
@@ -5401,7 +5208,7 @@
       "source": "skeleton/artifacts",
       "destination": "skeleton/ai/runtime/extensions/artifacts",
       "kind": "tree",
-      "source_git_object_sha": "eaaf487f9aae5300ac1e30e51016f8e8eff15a0c",
+      "source_git_object_sha": "9d33a45d9382948d9728ae2cab14d4a2296e320a",
       "role": "Governed artifact and multimodal-ingestion contracts that admit bounded content before decode and preserve content-addressed transformation lineage.",
       "work_package_refs": [
         "WP-W28",
@@ -5433,7 +5240,7 @@
       "source": "skeleton/vision",
       "destination": "skeleton/ai/runtime/extensions/vision",
       "kind": "tree",
-      "source_git_object_sha": "c43edb466e54e474bdecfc5ca679f131e04bfcf0",
+      "source_git_object_sha": "d131a1583929c659a1331801e5ab3f23b8b57451",
       "role": "Resource-bounded image asset, region, result, and model-provenance contracts.",
       "work_package_refs": [
         "WP-W28",
@@ -5637,8 +5444,7 @@
         "AIQ-S7-E2E-01"
       ],
       "volume_refs": [
-        "VOL-162",
-        "VOL-163"
+        "VOL-162"
       ],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
@@ -5670,7 +5476,6 @@
         "AIQ-S7-E2E-01"
       ],
       "volume_refs": [
-        "VOL-178",
         "VOL-179"
       ],
       "migration_action": "mirror_then_cutover",
@@ -5693,7 +5498,7 @@
       "source": "skeleton/multimodal",
       "destination": "skeleton/ai/runtime/multimodal",
       "kind": "tree",
-      "source_git_object_sha": "749fcccb8e312baf5b50b7bb006984e806bb3e04",
+      "source_git_object_sha": "2dab24895ad17378d6bd6498ea01932eb2f9cdf0",
       "role": "Typed multimodal ingestion, provenance, sanitization, and cross-modal artifact contracts for completed VOL-020 runtime behavior.",
       "work_package_refs": [
         "WP-W28",
@@ -5725,7 +5530,7 @@
       "source": "skeleton/inference",
       "destination": "skeleton/ai/runtime/inference/core",
       "kind": "tree",
-      "source_git_object_sha": "f96b863b26eb4e7ca3e7ddc57eaa859a3cdf1eca",
+      "source_git_object_sha": "440e860e0e90900281362a66c5dcc4a37871a1cc",
       "role": "Core inference session, provider-bridge, replay, and async-runtime compatibility plane staged beneath the canonical inference runtime without colliding with native local/neural/KV engines.",
       "work_package_refs": [
         "WP-W05",
@@ -6090,7 +5895,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "178_mapping_plus_23_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "178_mapping_plus_24_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -6896,7 +6701,7 @@
       "BASE-FRONTEND-SSR-RAF-01"
     ],
     "invariant": "Preparation metadata and move tags authorize staging only; the reconciled mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion.",
-    "native_ai_owner_count": 23
+    "native_ai_owner_count": 24
   },
   "validation_request": {
     "requested_at_utc": "2026-09-22T15:47:00Z",
@@ -7439,7 +7244,11 @@
       "volume_refs": [
         "VOL-098",
         "VOL-100",
-        "VOL-259"
+        "VOL-259",
+        "VOL-263",
+        "VOL-264",
+        "VOL-265",
+        "VOL-266"
       ]
     },
     {
@@ -7468,7 +7277,8 @@
         "VOL-204",
         "VOL-205",
         "VOL-206",
-        "VOL-207"
+        "VOL-207",
+        "VOL-237"
       ]
     },
     {
@@ -7533,9 +7343,7 @@
       "ownership_mode": "canonical_native",
       "residual_only": false,
       "role": "Canonical documentation for the governed AI assembly tree and its ownership rules.",
-      "volume_refs": [
-        "VOL-000"
-      ]
+      "volume_refs": []
     },
     {
       "id": "AIFT-NATIVE-ASSISTANT-ROOT",
@@ -7544,9 +7352,7 @@
       "ownership_mode": "canonical_native",
       "residual_only": false,
       "role": "Canonical AI-native assistant control-plane, context, tooling, routing, provenance, memory, automation, and handoff surfaces.",
-      "volume_refs": [
-        "VOL-097"
-      ]
+      "volume_refs": []
     },
     {
       "id": "AIFT-NATIVE-COMPAT-ROOT",
@@ -7556,8 +7362,6 @@
       "residual_only": true,
       "role": "Residual compatibility package surfaces not claimed by more-specific convergence mappings; compatibility never creates independent production authority.",
       "volume_refs": [
-        "VOL-003",
-        "VOL-060",
         "VOL-261"
       ]
     },
@@ -7568,11 +7372,7 @@
       "ownership_mode": "canonical_native",
       "residual_only": false,
       "role": "Canonical AI-native bounded integration adapters and open-source interoperability surfaces.",
-      "volume_refs": [
-        "VOL-007",
-        "VOL-162",
-        "VOL-343"
-      ]
+      "volume_refs": []
     },
     {
       "id": "AIFT-NATIVE-PLANNING-ROOT",
@@ -7581,10 +7381,7 @@
       "ownership_mode": "canonical_native",
       "residual_only": false,
       "role": "Canonical AI-native construction/planning authority support distinct from mirrored runtime planning implementations.",
-      "volume_refs": [
-        "VOL-014",
-        "VOL-095"
-      ]
+      "volume_refs": []
     },
     {
       "id": "AIFT-NATIVE-PROVIDERS-ROOT",
@@ -7594,10 +7391,9 @@
       "residual_only": true,
       "role": "Residual provider package/export surfaces around more-specific governed provider contract and runtime mappings.",
       "volume_refs": [
-        "VOL-007",
-        "VOL-227",
-        "VOL-228",
-        "VOL-229"
+        "VOL-229",
+        "VOL-239",
+        "VOL-240"
       ]
     },
     {
@@ -7607,12 +7403,7 @@
       "ownership_mode": "canonical_native",
       "residual_only": true,
       "role": "Residual AI-native research and quarantined external reference material not claimed by more-specific historical/acquired/legacy mappings.",
-      "volume_refs": [
-        "VOL-001",
-        "VOL-099",
-        "VOL-106",
-        "VOL-409"
-      ]
+      "volume_refs": []
     },
     {
       "id": "AIFT-NATIVE-RUNTIME-ROOT",
@@ -7622,13 +7413,6 @@
       "residual_only": true,
       "role": "Residual canonical AI-native runtime surfaces—including autonomous engineering, effects, local inference, learning foundation, training, functional AI, provider runtime, and system completion—not claimed by more-specific mappings or native owners.",
       "volume_refs": [
-        "VOL-006",
-        "VOL-007",
-        "VOL-015",
-        "VOL-022",
-        "VOL-097",
-        "VOL-119",
-        "VOL-143",
         "VOL-231",
         "VOL-232"
       ]
@@ -7641,12 +7425,6 @@
       "residual_only": false,
       "role": "Canonical AI-native October 2026 governance cards, health, administration, and engineering-standards evidence surfaces.",
       "volume_refs": [
-        "VOL-221",
-        "VOL-222",
-        "VOL-223",
-        "VOL-224",
-        "VOL-225",
-        "VOL-226",
         "VOL-234"
       ]
     },
@@ -7657,11 +7435,7 @@
       "ownership_mode": "canonical_native",
       "residual_only": false,
       "role": "Canonical AI-native dual-rival game-builder control, canon, rights, evaluation, resilience, assurance, resource, debt, and release runtime surfaces.",
-      "volume_refs": [
-        "VOL-073",
-        "VOL-101",
-        "VOL-197"
-      ]
+      "volume_refs": []
     },
     {
       "id": "AIFT-NATIVE-AI-ROOT-RESIDUAL",
@@ -7673,49 +7447,27 @@
       "volume_refs": [
         "VOL-084",
         "VOL-097",
-        "VOL-098",
-        "VOL-099",
-        "VOL-100",
-        "VOL-101",
         "VOL-102",
-        "VOL-113",
         "VOL-164",
         "VOL-197",
-        "VOL-201",
-        "VOL-202",
-        "VOL-203",
-        "VOL-204",
-        "VOL-205",
-        "VOL-206",
-        "VOL-207",
         "VOL-209",
-        "VOL-210",
-        "VOL-217",
-        "VOL-218",
-        "VOL-237",
-        "VOL-239",
-        "VOL-240",
-        "VOL-243",
+        "VOL-238",
+        "VOL-241",
+        "VOL-247",
         "VOL-248",
+        "VOL-249",
+        "VOL-250",
         "VOL-251",
         "VOL-252",
         "VOL-258",
-        "VOL-259",
-        "VOL-261",
-        "VOL-263",
-        "VOL-264",
-        "VOL-265",
-        "VOL-266",
+        "VOL-285",
+        "VOL-286",
+        "VOL-287",
         "VOL-320",
         "VOL-321",
         "VOL-322",
         "VOL-323",
         "VOL-325",
-        "VOL-336",
-        "VOL-337",
-        "VOL-338",
-        "VOL-339",
-        "VOL-343",
         "VOL-361",
         "VOL-362",
         "VOL-363",
@@ -7726,10 +7478,6 @@
         "VOL-385",
         "VOL-386",
         "VOL-398",
-        "VOL-400",
-        "VOL-411",
-        "VOL-412",
-        "VOL-413",
         "VOL-414"
       ]
     },
@@ -7739,13 +7487,7 @@
       "kind": "file",
       "ownership_mode": "canonical_native",
       "residual_only": false,
-      "volume_refs": [
-        "VOL-084",
-        "VOL-097",
-        "VOL-131",
-        "VOL-164",
-        "VOL-300"
-      ]
+      "volume_refs": []
     },
     {
       "id": "AIFT-NATIVE-EXECUTION-AUTHORITY-CORE",
@@ -7753,13 +7495,7 @@
       "kind": "file",
       "ownership_mode": "canonical_native",
       "residual_only": false,
-      "volume_refs": [
-        "VOL-084",
-        "VOL-097",
-        "VOL-131",
-        "VOL-164",
-        "VOL-300"
-      ]
+      "volume_refs": []
     },
     {
       "id": "AIFT-NATIVE-MATHEMATICS-ROOT",
@@ -7768,9 +7504,7 @@
       "ownership_mode": "canonical_native",
       "residual_only": false,
       "role": "Canonical AI-native deterministic mathematical reference substrate for stable numerics, linear algebra, probability, optimization, and runtime parity evidence; no independent knowledge, model, promotion, or execution authority.",
-      "volume_refs": [
-        "VOL-012"
-      ]
+      "volume_refs": []
     }
   ]
 }
