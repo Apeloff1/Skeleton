@@ -1,6 +1,6 @@
 """Explicit durable crawler schema migrations."""
 from __future__ import annotations
-SCHEMA_VERSION=4
+SCHEMA_VERSION=5
 MIGRATIONS={
  1:(),
  2:(
@@ -15,6 +15,11 @@ MIGRATIONS={
  4:(
   "CREATE TABLE IF NOT EXISTS ingestion_receipts(ingestion_key TEXT PRIMARY KEY, state TEXT NOT NULL, owner TEXT, token TEXT, lease_expires REAL, receipt TEXT)",
   "CREATE INDEX IF NOT EXISTS idx_ingestion_lease ON ingestion_receipts(state,lease_expires)",
+ ),
+ 5:(
+  "CREATE TABLE IF NOT EXISTS ingestion_outbox(operation_id TEXT PRIMARY KEY, ingestion_key TEXT NOT NULL, ordinal INTEGER NOT NULL, payload TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'pending', result TEXT)",
+  "CREATE UNIQUE INDEX IF NOT EXISTS idx_outbox_ingestion_ordinal ON ingestion_outbox(ingestion_key,ordinal)",
+  "CREATE INDEX IF NOT EXISTS idx_outbox_pending ON ingestion_outbox(ingestion_key,state,ordinal)",
  ),
 }
 def migrate(db):
