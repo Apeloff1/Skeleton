@@ -118,7 +118,7 @@ class MaterialGraph:
             state[node_id]=1
             for dep in self._nodes[node_id].input_nodes: visit(dep)
             state[node_id]=2
-        visit(self.output_node)
+        for node_id in sorted(self._nodes): visit(node_id)
 
     @property
     def digest(self)->str: return digest_json({"output_node":self.output_node,"nodes":[{"node_id":n.node_id,"op":n.op,"input_nodes":list(n.input_nodes),"parameter_digest":n.parameter_digest} for n in sorted(self._nodes.values(),key=lambda n:n.node_id)]})
