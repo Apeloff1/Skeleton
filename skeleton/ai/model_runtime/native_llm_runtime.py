@@ -71,6 +71,33 @@ class GenerationResult:
 
 
 @dataclass(frozen=True)
+class InferenceResult:
+    """Deterministic next-token graph output before sampling."""
+
+    prompt_sequence: TokenSequence
+    logits: tuple[float, ...]
+    cache_tokens: int
+    model_digest: str
+    architecture_digest: str
+
+    @property
+    def argmax_token_id(self) -> int:
+        if not self.logits:
+            raise RuntimeContractError("inference result has no logits")
+        return max(range(len(self.logits)), key=self.logits.__getitem__)
+
+    @property
+    def digest(self) -> str:
+        return digest_json({
+            "prompt_sequence_digest": self.prompt_sequence.digest,
+            "logits": list(self.logits),
+            "cache_tokens": self.cache_tokens,
+            "model_digest": self.model_digest,
+            "architecture_digest": self.architecture_digest,
+        })
+
+
+@dataclass(frozen=True)
 class BatchGenerationResult:
     request_id: str
     result: GenerationResult
@@ -249,6 +276,51 @@ class NativeLLMRuntime:
 
     def decode_ids(self, token_ids: Sequence[int]) -> str:
         return self.tokenizer.decode_ids(token_ids)
+
+    def infer_sequence(
+        self,
+        sequence: TokenSequence,
+        *,
+        use_cache: bool = True,
+    ) -> InferenceResult:
+        """Run embeddings → position/RoPE → transformer blocks → LM head.
+
+        This exposes the executable inference graph independently of decoding so
+        loaders, portability checks, and samplers can validate identical model
+        state against a canonical pre-tokenized input.
+        """
+        if not isinstance(sequence, TokenSequence):
+            raise RuntimeContractError("TokenSequence required")
+        if not isinstance(use_cache, bool):
+            raise RuntimeContractError("use_cache must be boolean")
+        if not hmac.compare_digest(sequence.tokenizer_digest, self.tokenizer.digest):
+            raise RuntimeContractError("token sequence tokenizer identity mismatch")
+        if not sequence.token_ids:
+            raise RuntimeContractError("token sequence must not be empty")
+        if len(sequence.token_ids) > self.limits.max_context:
+            raise RuntimeContractError("prompt exceeds context budget")
+        if any(token_id >= self.tokenizer.vocab_size for token_id in sequence.token_ids):
+            raise RuntimeContractError("token sequence contains id outside vocabulary")
+        self.assert_model_unchanged()
+        self.tokenizer.assert_unchanged()
+        window = sequence.token_ids[-self.limits.max_context:]
+        cache = KVCache(self.model.n_layers, self.limits.max_context) if use_cache else None
+        logits = tuple(float(value) for value in self.model._logits_window(window, cache))
+        if len(logits) != self.tokenizer.vocab_size:
+            raise RuntimeContractError("inference graph emitted invalid logits shape")
+        if any(value != value or value in (float("inf"), float("-inf")) for value in logits):
+            raise RuntimeContractError("inference graph emitted non-finite logits")
+        return InferenceResult(
+            prompt_sequence=sequence,
+            logits=logits,
+            cache_tokens=len(cache.tokens) if cache is not None else 0,
+            model_digest=self.model_digest,
+            architecture_digest=self.architecture.digest,
+        )
+
+    def infer_text(self, text: str, *, use_cache: bool = True) -> InferenceResult:
+        """Tokenize text and execute one next-token inference graph pass."""
+        return self.infer_sequence(self.encode(text), use_cache=use_cache)
 
     def _config_digest(self, config: GenerationConfig) -> str:
         return digest_json(config.to_dict())
@@ -675,5 +747,6 @@ __all__ = [
     "BatchGenerationResult",
     "GenerationResult",
     "GenerationStream",
+    "InferenceResult",
     "NativeLLMRuntime",
 ]
