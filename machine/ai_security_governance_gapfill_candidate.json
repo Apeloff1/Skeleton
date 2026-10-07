@@ -5,7 +5,7 @@
   "source_frontier": "machine/ai_masterplan_continuation_frontier.json",
   "master_plan": "machine/ai_master_plan.json",
   "ai_file_tree": "machine/ai_file_tree.json",
-  "source_queue_state": "queued_unmodified",
+  "source_queue_state": "frontier_preserved",
   "volume_refs": [
     "VOL-166",
     "VOL-167",
@@ -50,20 +50,59 @@
     "skeleton/testing/test_privacy_deletion_authority.py"
   ],
   "mirror_pairs": [
-    ["skeleton/security/policy_simulation.py", "skeleton/ai/runtime/security/policy_simulation.py"],
-    ["skeleton/security/threat_model.py", "skeleton/ai/runtime/security/threat_model.py"],
-    ["skeleton/security/boundaries.py", "skeleton/ai/runtime/security/boundaries.py"],
-    ["skeleton/security/egress_control.py", "skeleton/ai/runtime/security/egress_control.py"],
-    ["skeleton/security/secret_handles.py", "skeleton/ai/runtime/security/secret_handles.py"],
-    ["skeleton/security/secret_lifecycle.py", "skeleton/ai/runtime/security/secret_lifecycle.py"],
-    ["skeleton/security/key_management.py", "skeleton/ai/runtime/security/key_management.py"],
-    ["skeleton/security/tenant_isolation.py", "skeleton/ai/runtime/security/tenant_isolation.py"],
-    ["skeleton/security/privacy_engine.py", "skeleton/ai/runtime/security/privacy_engine.py"],
-    ["skeleton/security/data_deletion.py", "skeleton/ai/runtime/security/data_deletion.py"],
-    ["skeleton/security/deletion_propagation.py", "skeleton/ai/runtime/security/deletion_propagation.py"],
-    ["skeleton/supply_chain/sbom.py", "skeleton/ai/runtime/extensions/supply_chain/sbom.py"]
+    [
+      "skeleton/security/policy_simulation.py",
+      "skeleton/ai/runtime/security/policy_simulation.py"
+    ],
+    [
+      "skeleton/security/threat_model.py",
+      "skeleton/ai/runtime/security/threat_model.py"
+    ],
+    [
+      "skeleton/security/boundaries.py",
+      "skeleton/ai/runtime/security/boundaries.py"
+    ],
+    [
+      "skeleton/security/egress_control.py",
+      "skeleton/ai/runtime/security/egress_control.py"
+    ],
+    [
+      "skeleton/security/secret_handles.py",
+      "skeleton/ai/runtime/security/secret_handles.py"
+    ],
+    [
+      "skeleton/security/secret_lifecycle.py",
+      "skeleton/ai/runtime/security/secret_lifecycle.py"
+    ],
+    [
+      "skeleton/security/key_management.py",
+      "skeleton/ai/runtime/security/key_management.py"
+    ],
+    [
+      "skeleton/security/tenant_isolation.py",
+      "skeleton/ai/runtime/security/tenant_isolation.py"
+    ],
+    [
+      "skeleton/security/privacy_engine.py",
+      "skeleton/ai/runtime/security/privacy_engine.py"
+    ],
+    [
+      "skeleton/security/data_deletion.py",
+      "skeleton/ai/runtime/security/data_deletion.py"
+    ],
+    [
+      "skeleton/security/deletion_propagation.py",
+      "skeleton/ai/runtime/security/deletion_propagation.py"
+    ],
+    [
+      "skeleton/supply_chain/sbom.py",
+      "skeleton/ai/runtime/extensions/supply_chain/sbom.py"
+    ]
   ],
-  "mapping_ids": ["AIFT-SECURITY", "AIFT-SUPPLY-CHAIN"],
+  "mapping_ids": [
+    "AIFT-SECURITY",
+    "AIFT-SUPPLY-CHAIN"
+  ],
   "evidence_policy": {
     "exact_head_ci_required": true,
     "independent_closure_required": true,
@@ -77,5 +116,9 @@
     "verification_signed": false,
     "may_self_close": false,
     "production_authority": false
+  },
+  "frontier_membership_policy": {
+    "rule": "Candidate validation preserves the canonical continuation frontier: refs present in continuation_source remain queued unless separately scheduled; refs absent from continuation_source are not reintroduced.",
+    "scheduled_refs_must_remain_empty": true
   }
 }
