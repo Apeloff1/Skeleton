@@ -1216,3 +1216,28 @@ scope=G001..G200 + Track AB
 open_P0_blocks_production_readiness=true
 fault_model=single-axis + pairwise + selected-three-axis
 signoff_required_for_closure=true
+
+
+## 2026-10-07 — Self-directed information-gathering / webcrawler plane
+
+Implementation landed directly under `skeleton/ai/webcrawler/`.
+
+Implemented and regression-covered:
+- deterministic canonical URL identity and tracking-parameter removal;
+- bounded priority frontier, depth limits, URL/content deduplication and anti-loop seen/queued sets;
+- fail-closed robots admission with autonomous robots.txt bootstrap and explicit 404/410 handling;
+- per-host crawl-delay/rate scheduling and bounded exponential retries;
+- request/byte/document crawl budgets;
+- bounded HTML/text extraction, link discovery and content hashing;
+- provenance envelopes, deterministic source scoring and retrieval-record handoff;
+- resumable checkpoint/restore state;
+- public-destination policy checks, host allowlists, redirect-hop validation and bounded HTTP responses.
+
+Still open before this plane can be signed complete:
+- durable production storage adapter (reference in-memory contract exists);
+- direct adapter into the canonical knowledge/training index rather than the neutral retrieval-record boundary;
+- redirect/DNS-rebinding integration fixtures and live-network contract tests;
+- richer document formats and extraction quality scoring;
+- CI evidence from the repository gates for the landed commits.
+
+Status: IMPLEMENTED / UNSIGNED pending CI and downstream adapter evidence.
