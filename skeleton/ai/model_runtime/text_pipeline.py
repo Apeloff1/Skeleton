@@ -139,6 +139,55 @@ class TemporalTrainingSignal:
 
 
 @dataclass(frozen=True)
+class TemporalSupersession:
+    """Deterministic relationship between older and newer temporal evidence."""
+    older_signal_digest: str
+    newer_signal_digest: str
+    older_source_year: int
+    newer_source_year: int
+    cutoff_year: int
+    relation: str
+
+    def __post_init__(self) -> None:
+        for name in ("older_signal_digest", "newer_signal_digest"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value):
+                raise TokenizerContractError(f"invalid {name}")
+        if self.relation not in {"supersedes", "coexists"}:
+            raise TokenizerContractError("invalid temporal relation")
+        if self.newer_source_year < self.older_source_year:
+            raise TokenizerContractError("temporal supersession runs backward")
+        if self.newer_source_year > self.cutoff_year:
+            raise TokenizerContractError("superseding evidence exceeds knowledge cutoff")
+        if self.relation == "supersedes" and self.newer_source_year == self.older_source_year:
+            raise TokenizerContractError("same-year evidence cannot supersede by year alone")
+
+    @property
+    def year_distance(self) -> int:
+        return self.newer_source_year - self.older_source_year
+
+    @property
+    def digest(self) -> str:
+        return digest_json(self.__dict__)
+
+
+def temporal_weight_ppm(signal: TemporalTrainingSignal) -> int:
+    """Deterministic recency prior in parts-per-million; never erases history."""
+    if not isinstance(signal, TemporalTrainingSignal):
+        raise TokenizerContractError("TemporalTrainingSignal required")
+    age = signal.age_years
+    if age == 0:
+        return 1_000_000
+    if age <= 2:
+        return 850_000
+    if age <= 5:
+        return 650_000
+    if age <= 10:
+        return 400_000
+    return 200_000
+
+
+@dataclass(frozen=True)
 class SupervisedTextExample:
     """One prompt/response example with a deterministic normalized boundary."""
     example_id: str
@@ -625,6 +674,16 @@ class TextTokenPipeline:
 
     def temporal_signal(self, *, source_year: int, observed_year: int, knowledge_cutoff_year: int, valid_from_year: int | None = None, valid_to_year: int | None = None) -> TemporalTrainingSignal:
         return TemporalTrainingSignal(source_year, observed_year, knowledge_cutoff_year, valid_from_year, valid_to_year)
+
+    def temporal_supersession(self, older: TemporalTrainingSignal, newer: TemporalTrainingSignal, *, supersedes: bool) -> TemporalSupersession:
+        if not isinstance(older, TemporalTrainingSignal) or not isinstance(newer, TemporalTrainingSignal):
+            raise TokenizerContractError("temporal signals required")
+        if older.knowledge_cutoff_year != newer.knowledge_cutoff_year:
+            raise TokenizerContractError("temporal signals use different knowledge cutoffs")
+        return TemporalSupersession(
+            older.digest, newer.digest, older.source_year, newer.source_year,
+            older.knowledge_cutoff_year, "supersedes" if supersedes else "coexists",
+        )
 
     def prepare_supervised_example(self, example_id: str, prompt: str, response: str, *, temporal_signal: TemporalTrainingSignal | None = None) -> SupervisedTextExample:
         if not isinstance(prompt, str) or not isinstance(response, str) or not prompt or not response:
