@@ -280,9 +280,10 @@
         "FLGB-10-T11",
         "FLGB-10-T12"
       ],
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
-      "independent_verification_signed": false
+      "independent_verification_signed": false,
+      "implementation_note": "T01-T12 deterministic simulation/physics-control targets, schemas, and focused regressions are present; integer fixed-point state, replay chains, snapshot lineage, and rollback bounds are explicit; exact-head dependency closure and independent verification remain required."
     },
     {
       "id": "FLGB-11",
@@ -7655,7 +7656,7 @@
       "implementation_target": "skeleton/game/simulation/entity_component_storage.py",
       "contract_target": "skeleton/game/simulation/contracts/entity_component_storage.schema.json",
       "test_target": "tests/flgb/test_flgb_10_entity_component_storage.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -7721,7 +7722,7 @@
       "implementation_target": "skeleton/game/simulation/transform_hierarchy.py",
       "contract_target": "skeleton/game/simulation/contracts/transform_hierarchy.schema.json",
       "test_target": "tests/flgb/test_flgb_10_transform_hierarchy.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -7787,7 +7788,7 @@
       "implementation_target": "skeleton/game/simulation/fixed_timestep.py",
       "contract_target": "skeleton/game/simulation/contracts/fixed_timestep.schema.json",
       "test_target": "tests/flgb/test_flgb_10_fixed_timestep.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -7853,7 +7854,7 @@
       "implementation_target": "skeleton/game/simulation/collision_broadphase.py",
       "contract_target": "skeleton/game/simulation/contracts/collision_broadphase.schema.json",
       "test_target": "tests/flgb/test_flgb_10_collision_broadphase.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -7919,7 +7920,7 @@
       "implementation_target": "skeleton/game/simulation/collision_narrowphase.py",
       "contract_target": "skeleton/game/simulation/contracts/collision_narrowphase.schema.json",
       "test_target": "tests/flgb/test_flgb_10_collision_narrowphase.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -7985,7 +7986,7 @@
       "implementation_target": "skeleton/game/simulation/rigid_body.py",
       "contract_target": "skeleton/game/simulation/contracts/rigid_body.schema.json",
       "test_target": "tests/flgb/test_flgb_10_rigid_body.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -8051,7 +8052,7 @@
       "implementation_target": "skeleton/game/simulation/character_controller.py",
       "contract_target": "skeleton/game/simulation/contracts/character_controller.schema.json",
       "test_target": "tests/flgb/test_flgb_10_character_controller.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -8117,7 +8118,7 @@
       "implementation_target": "skeleton/game/simulation/constraints.py",
       "contract_target": "skeleton/game/simulation/contracts/constraints.schema.json",
       "test_target": "tests/flgb/test_flgb_10_constraints.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -8183,7 +8184,7 @@
       "implementation_target": "skeleton/game/simulation/deterministic_simulation.py",
       "contract_target": "skeleton/game/simulation/contracts/deterministic_simulation.schema.json",
       "test_target": "tests/flgb/test_flgb_10_deterministic_simulation.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -8249,7 +8250,7 @@
       "implementation_target": "skeleton/game/simulation/physics_query.py",
       "contract_target": "skeleton/game/simulation/contracts/physics_query.schema.json",
       "test_target": "tests/flgb/test_flgb_10_physics_query.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -8315,7 +8316,7 @@
       "implementation_target": "skeleton/game/simulation/simulation_snapshot.py",
       "contract_target": "skeleton/game/simulation/contracts/simulation_snapshot.schema.json",
       "test_target": "tests/flgb/test_flgb_10_simulation_snapshot.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -8381,7 +8382,7 @@
       "implementation_target": "skeleton/game/simulation/rollback_simulation.py",
       "contract_target": "skeleton/game/simulation/contracts/rollback_simulation.schema.json",
       "test_target": "tests/flgb/test_flgb_10_rollback_simulation.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
