@@ -97,6 +97,54 @@ class TestNativeTransformerLocalBackend(unittest.TestCase):
         backend = NativeTransformerModel(self.backend().runtime, model_id="  owned-native  ")
         self.assertEqual(backend.model_id, "owned-native")
 
+    def test_string_stop_projects_usage_and_identity_to_published_text(self):
+        backend = self.backend()
+        baseline = backend.infer(
+            LocalInferenceRequest(prompt="hello", max_output_tokens=6, seed=4),
+            threading.Event(),
+        )
+        words = baseline.text.split()
+        if not words:
+            self.skipTest("deterministic fixture produced empty text")
+        marker = words[0]
+        stopped = backend.infer(
+            LocalInferenceRequest(
+                prompt="hello",
+                max_output_tokens=6,
+                seed=4,
+                stop=(marker,),
+            ),
+            threading.Event(),
+        )
+        self.assertEqual(stopped.text, "")
+        self.assertEqual(stopped.output_tokens, 0)
+        self.assertEqual(stopped.finish_reason, "completed")
+        self.assertNotEqual(stopped.response_id, baseline.response_id)
+
+    def test_string_stop_after_prefix_recounts_published_tokens(self):
+        backend = self.backend()
+        baseline = backend.infer(
+            LocalInferenceRequest(prompt="hello world", max_output_tokens=8, seed=12),
+            threading.Event(),
+        )
+        words = baseline.text.split()
+        if len(words) < 2:
+            self.skipTest("deterministic fixture did not produce a stop-able suffix")
+        marker = words[1]
+        stopped = backend.infer(
+            LocalInferenceRequest(
+                prompt="hello world",
+                max_output_tokens=8,
+                seed=12,
+                stop=(marker,),
+            ),
+            threading.Event(),
+        )
+        self.assertEqual(stopped.text, baseline.text[:baseline.text.find(marker)])
+        expected = 0 if not stopped.text else len(backend.runtime.tokenizer.encode_ids(stopped.text))
+        self.assertEqual(stopped.output_tokens, expected)
+        self.assertLessEqual(stopped.output_tokens, baseline.output_tokens)
+
 
 if __name__ == "__main__":
     unittest.main()
