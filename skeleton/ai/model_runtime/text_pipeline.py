@@ -218,6 +218,80 @@ def decade_weight_ppm(signal: DecadeTrainingSignal) -> int:
 
 
 @dataclass(frozen=True)
+class DecadeCorpusBucket:
+    """Immutable accounting for one source decade in a prepared corpus."""
+    decade: int
+    document_ids: tuple[str, ...]
+    token_count: int
+    chronology_digests: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if isinstance(self.decade, bool) or not isinstance(self.decade, int) or self.decade % 10 or not 1000 <= self.decade <= 9990:
+            raise TokenizerContractError("invalid corpus decade")
+        if not self.document_ids or len(self.document_ids) != len(self.chronology_digests):
+            raise TokenizerContractError("invalid decade bucket membership")
+        if len(set(self.document_ids)) != len(self.document_ids):
+            raise TokenizerContractError("duplicate decade bucket document")
+        if isinstance(self.token_count, bool) or not isinstance(self.token_count, int) or self.token_count <= 0:
+            raise TokenizerContractError("invalid decade bucket token count")
+        if any(not isinstance(v, str) or len(v) != 64 or any(ch not in "0123456789abcdef" for ch in v) for v in self.chronology_digests):
+            raise TokenizerContractError("invalid decade bucket chronology digest")
+
+    @property
+    def digest(self) -> str:
+        return digest_json({"decade": self.decade, "document_ids": list(self.document_ids), "token_count": self.token_count, "chronology_digests": list(self.chronology_digests)})
+
+
+@dataclass(frozen=True)
+class DecadeCoverageReceipt:
+    """Deterministic temporal coverage evidence for a corpus."""
+    pipeline_digest: str
+    cutoff_year: int
+    buckets: tuple[DecadeCorpusBucket, ...]
+    document_count: int
+    token_count: int
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.pipeline_digest, str) or len(self.pipeline_digest) != 64:
+            raise TokenizerContractError("invalid decade coverage pipeline digest")
+        if isinstance(self.cutoff_year, bool) or not isinstance(self.cutoff_year, int) or not 1000 <= self.cutoff_year <= 9999:
+            raise TokenizerContractError("invalid decade coverage cutoff")
+        if not self.buckets:
+            raise TokenizerContractError("empty decade coverage")
+        decades = tuple(bucket.decade for bucket in self.buckets)
+        if decades != tuple(sorted(decades)) or len(set(decades)) != len(decades):
+            raise TokenizerContractError("decade coverage buckets must be unique and ordered")
+        if self.document_count != sum(len(bucket.document_ids) for bucket in self.buckets):
+            raise TokenizerContractError("decade coverage document accounting mismatch")
+        if self.token_count != sum(bucket.token_count for bucket in self.buckets):
+            raise TokenizerContractError("decade coverage token accounting mismatch")
+
+    @property
+    def digest(self) -> str:
+        return digest_json({"pipeline_digest": self.pipeline_digest, "cutoff_year": self.cutoff_year, "bucket_digests": [b.digest for b in self.buckets], "document_count": self.document_count, "token_count": self.token_count})
+
+
+@dataclass(frozen=True)
+class DecadeSamplingPlan:
+    """Deterministic round-robin plan preventing a large decade from hiding others."""
+    coverage_digest: str
+    ordered_document_ids: tuple[str, ...]
+    max_documents_per_decade: int
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.coverage_digest, str) or len(self.coverage_digest) != 64:
+            raise TokenizerContractError("invalid sampling coverage digest")
+        if not self.ordered_document_ids or len(set(self.ordered_document_ids)) != len(self.ordered_document_ids):
+            raise TokenizerContractError("invalid decade sampling document order")
+        if isinstance(self.max_documents_per_decade, bool) or not isinstance(self.max_documents_per_decade, int) or self.max_documents_per_decade <= 0:
+            raise TokenizerContractError("invalid decade sampling cap")
+
+    @property
+    def digest(self) -> str:
+        return digest_json({"coverage_digest": self.coverage_digest, "ordered_document_ids": list(self.ordered_document_ids), "max_documents_per_decade": self.max_documents_per_decade})
+
+
+@dataclass(frozen=True)
 class TemporalSupersession:
     """Deterministic relationship between older and newer temporal evidence."""
     older_signal_digest: str
@@ -775,6 +849,45 @@ class TextTokenPipeline:
             recency_ppm=decade_weight_ppm(decade),
             chronology_digest=signal.digest,
         )
+
+    def decade_coverage(self, corpus: PreparedCorpus, signals: Sequence[TemporalTrainingSignal]) -> DecadeCoverageReceipt:
+        if not isinstance(corpus, PreparedCorpus) or corpus.pipeline_digest != self.digest:
+            raise TokenizerContractError("corpus belongs to another pipeline")
+        items = tuple(signals)
+        if len(items) != len(corpus.documents) or any(not isinstance(s, TemporalTrainingSignal) for s in items):
+            raise TokenizerContractError("one temporal signal required per corpus document")
+        cutoffs = {s.knowledge_cutoff_year for s in items}
+        if len(cutoffs) != 1:
+            raise TokenizerContractError("corpus temporal signals use different knowledge cutoffs")
+        grouped: dict[int, list[tuple[str, PreparedText, TemporalTrainingSignal]]] = {}
+        for document_id, document, signal in zip(corpus.document_ids, corpus.documents, items):
+            decade = (signal.source_year // 10) * 10
+            grouped.setdefault(decade, []).append((document_id, document, signal))
+        buckets = tuple(
+            DecadeCorpusBucket(
+                decade,
+                tuple(item[0] for item in grouped[decade]),
+                sum(len(item[1].sequence.token_ids) for item in grouped[decade]),
+                tuple(item[2].digest for item in grouped[decade]),
+            )
+            for decade in sorted(grouped)
+        )
+        return DecadeCoverageReceipt(self.digest, next(iter(cutoffs)), buckets, len(corpus.documents), sum(len(d.sequence.token_ids) for d in corpus.documents))
+
+    def decade_sampling_plan(self, coverage: DecadeCoverageReceipt, *, max_documents_per_decade: int) -> DecadeSamplingPlan:
+        if not isinstance(coverage, DecadeCoverageReceipt) or coverage.pipeline_digest != self.digest:
+            raise TokenizerContractError("decade coverage belongs to another pipeline")
+        if isinstance(max_documents_per_decade, bool) or not isinstance(max_documents_per_decade, int) or max_documents_per_decade <= 0:
+            raise TokenizerContractError("invalid decade sampling cap")
+        buckets = [bucket.document_ids[:max_documents_per_decade] for bucket in coverage.buckets]
+        ordered = []
+        for index in range(max((len(ids) for ids in buckets), default=0)):
+            for ids in buckets:
+                if index < len(ids):
+                    ordered.append(ids[index])
+        if not ordered:
+            raise TokenizerContractError("decade sampling produced no documents")
+        return DecadeSamplingPlan(coverage.digest, tuple(ordered), max_documents_per_decade)
 
     def temporal_supersession(self, older: TemporalTrainingSignal, newer: TemporalTrainingSignal, *, supersedes: bool) -> TemporalSupersession:
         if not isinstance(older, TemporalTrainingSignal) or not isinstance(newer, TemporalTrainingSignal):
