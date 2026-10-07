@@ -82,3 +82,38 @@ def test_stream_preserves_raw_chunk_boundary_independent_provenance(native_model
     assert one.normalized_text_digest == split.normalized_text_digest
     assert one.sequence.digest == split.sequence.digest
     assert one.pipeline_digest == split.pipeline_digest
+
+
+def test_materialized_batch_is_rectangular_and_masked():
+    from skeleton.ai.model_runtime.text_pipeline import materialize_model_batch
+    from skeleton.ai.model_runtime.tokenization import TokenWindow
+
+    source = "a" * 64
+    first = TokenWindow(0, 3, (1, 2, 3), source)
+    second = TokenWindow(3, 4, (4,), source)
+    batch = materialize_model_batch((first, second), pad_token_id=0)
+
+    assert batch.input_ids == ((1, 2, 3), (4, 0, 0))
+    assert batch.attention_mask == ((1, 1, 1), (1, 0, 0))
+    assert batch.source_window_digests == (first.digest, second.digest)
+    assert len(batch.digest) == 64
+
+
+def test_materialized_batch_rejects_invalid_padding():
+    from skeleton.ai.model_runtime.text_pipeline import materialize_model_batch
+    from skeleton.ai.model_runtime.tokenization import TokenizerContractError, TokenWindow
+
+    with pytest.raises(TokenizerContractError):
+        materialize_model_batch((TokenWindow(0, 1, (1,), "a" * 64),), pad_token_id=True)
+
+
+def test_model_batches_reject_cross_pipeline_prepared_text(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextPipelineConfig, TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+
+    tokenizer = NativeTokenizer(native_model)
+    first = TextTokenPipeline(tokenizer, TextPipelineConfig(context_size=2))
+    second = TextTokenPipeline(tokenizer, TextPipelineConfig(context_size=3))
+    prepared = first.prepare("alpha beta gamma")
+    with pytest.raises(TokenizerContractError):
+        second.model_batches(prepared)
