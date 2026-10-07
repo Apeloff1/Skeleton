@@ -1,6 +1,6 @@
 {
   "schema_version": "skeleton.p2.quality_control.v1",
-  "control_version": "0.2.0",
+  "control_version": "0.2.1",
   "status": "active",
   "purpose": "Masterplan-bound quality, formal-method, project-metric and final-assembly qualification authority for P2.",
   "masterplan_bindings": [
@@ -9,8 +9,7 @@
       "title": "Quality Vector",
       "accountability_id": "ACC-VOL-070",
       "required_gap_texts": [
-        "bind dimensions to eval suites",
-        "define non-compensable failure rules"
+        "independent quality-vector threshold and non-compensable-failure verification remains pending"
       ],
       "risks": [
         "aggregate score hides failure",
@@ -27,10 +26,7 @@
       "volume_ref": "VOL-081",
       "title": "Formal Methods",
       "accountability_id": "ACC-VOL-081",
-      "required_gap_texts": [
-        "select P0 formal targets",
-        "establish model-to-code traceability"
-      ],
+      "required_gap_texts": [],
       "risks": [
         "spec/code drift",
         "state explosion",
@@ -38,8 +34,17 @@
       ],
       "contracts": [
         "FormalSpecification",
+        "FormalAssumption",
+        "ImplementationBinding",
+        "StateVariable",
+        "FormalState",
         "ProofObligation",
-        "Counterexample"
+        "ProofResult",
+        "Counterexample",
+        "FormalRunReport",
+        "FormalSpecificationRegistry",
+        "ModelSemantics",
+        "BoundedModelChecker"
       ]
     },
     {
@@ -47,8 +52,7 @@
       "title": "Project Metrics",
       "accountability_id": "ACC-VOL-117",
       "required_gap_texts": [
-        "define metric registry",
-        "bind progress percentages to traceable state"
+        "independent metric-provenance verification remains pending"
       ],
       "risks": [
         "vanity metrics",
@@ -66,8 +70,8 @@
       "title": "Final Assembly Test",
       "accountability_id": "ACC-VOL-120",
       "required_gap_texts": [
-        "materialize final assembly harness",
-        "bind release promotion to final evidence digest"
+        "independent final-assembly verification remains pending",
+        "P2-QUAL-01 release-qualification dependencies remain external to this bounded implementation"
       ],
       "risks": [
         "integration-only failure",
