@@ -98,24 +98,66 @@ class NativeRuntimeLocalModel:
 
     @staticmethod
     def _stable_json(value: object) -> str:
-        return json.dumps(
-            value,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-            allow_nan=False,
+        try:
+            return json.dumps(
+                value,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
+            )
+        except (TypeError, ValueError) as exc:
+            raise NativeRuntimeBackendError(
+                "native local protocol value is not canonical JSON"
+            ) from exc
+
+    @staticmethod
+    def _strict_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in result:
+                raise NativeRuntimeBackendError(
+                    f"native local protocol duplicate JSON key: {key}"
+                )
+            result[key] = value
+        return result
+
+    @staticmethod
+    def _reject_constant(value: str) -> None:
+        raise NativeRuntimeBackendError(
+            "native local protocol contains non-finite JSON constant: " + value
         )
+
+    def _load_protocol_json(self, text: str) -> Any:
+        try:
+            return json.loads(
+                text,
+                object_pairs_hook=self._strict_object,
+                parse_constant=self._reject_constant,
+            )
+        except NativeRuntimeBackendError:
+            raise
+        except json.JSONDecodeError as exc:
+            raise NativeRuntimeBackendError(
+                "native local protocol output is not valid JSON"
+            ) from exc
 
     def _render_prompt(self, request: LocalInferenceRequest) -> str:
         prompt = request.rendered_input
         if request.tools:
             allowed: list[dict[str, Any]] = []
+            seen_tool_ids: set[str] = set()
             for item in request.tools:
                 tool_id = str(item.get("tool_id", "")).strip()
                 if not tool_id:
                     raise NativeRuntimeBackendError(
                         "native local tool schema missing tool_id"
                     )
+                if tool_id in seen_tool_ids:
+                    raise NativeRuntimeBackendError(
+                        f"duplicate native local tool_id {tool_id!r}"
+                    )
+                seen_tool_ids.add(tool_id)
                 allowed.append(
                     {
                         "tool_id": tool_id,
@@ -164,15 +206,35 @@ class NativeRuntimeLocalModel:
             for item in request.tools
             if str(item.get("tool_id", "")).strip()
         }
+        payload: Any = None
         if text.startswith("{"):
-            try:
-                payload = json.loads(text)
-            except json.JSONDecodeError:
-                payload = None
+            if request.tools or request.structured_output_schema is not None:
+                payload = self._load_protocol_json(text)
+            else:
+                try:
+                    payload = json.loads(text)
+                except json.JSONDecodeError:
+                    payload = None
+            version = (
+                payload.get("skeleton_local_response")
+                if isinstance(payload, dict)
+                else None
+            )
             if (
                 isinstance(payload, dict)
-                and payload.get("skeleton_local_response") == 1
+                and type(version) is int
+                and version == 1
             ):
+                unknown_envelope = set(payload) - {
+                    "skeleton_local_response",
+                    "text",
+                    "structured_output",
+                    "tool_calls",
+                }
+                if unknown_envelope:
+                    raise NativeRuntimeBackendError(
+                        "native local response envelope contains unsupported fields"
+                    )
                 raw_calls = payload.get("tool_calls", [])
                 if not isinstance(raw_calls, list):
                     raise NativeRuntimeBackendError(
@@ -183,6 +245,10 @@ class NativeRuntimeLocalModel:
                     if not isinstance(raw_call, dict):
                         raise NativeRuntimeBackendError(
                             "native local tool call must be an object"
+                        )
+                    if set(raw_call) != {"call_id", "tool_id", "arguments"}:
+                        raise NativeRuntimeBackendError(
+                            "native local tool call has invalid fields"
                         )
                     call_id = str(raw_call.get("call_id", "")).strip()
                     tool_id = str(raw_call.get("tool_id", "")).strip()
@@ -213,6 +279,10 @@ class NativeRuntimeLocalModel:
                 ):
                     raise NativeRuntimeBackendError(
                         "native response text must be text or null"
+                    )
+                if isinstance(payload_text, str) and not payload_text.strip():
+                    raise NativeRuntimeBackendError(
+                        "native response text must be non-empty when present"
                     )
                 structured = payload.get("structured_output")
                 if structured is not None and not isinstance(structured, dict):
@@ -246,8 +316,8 @@ class NativeRuntimeLocalModel:
 
         if request.structured_output_schema is not None:
             try:
-                structured_payload = json.loads(text)
-            except json.JSONDecodeError as exc:
+                structured_payload = self._load_protocol_json(text)
+            except NativeRuntimeBackendError as exc:
                 raise NativeRuntimeBackendError(
                     "native structured output is not valid JSON"
                 ) from exc
