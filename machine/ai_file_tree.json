@@ -66,7 +66,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/providers/runtime.py",
       "kind": "file",
-      "source_git_object_sha": "cc15bd41c0f4b945afa5d59ed5473135db04f140",
+      "source_git_object_sha": "6af63338b94878b89635ef799d1dd1acc157e64b",
       "role": "credential-bearing provider runtime",
       "work_package_refs": [
         "WP-W05",
@@ -213,6 +213,9 @@
         "VOL-076",
         "VOL-096",
         "VOL-177",
+        "VOL-247",
+        "VOL-260",
+        "VOL-295",
         "VOL-361",
         "VOL-364",
         "VOL-365",
@@ -320,7 +323,7 @@
       "source": "skeleton/intelligence",
       "destination": "skeleton/ai/runtime/intelligence",
       "kind": "tree",
-      "source_git_object_sha": "8fd118c100b8a2cb411bdfe707694de28999f323",
+      "source_git_object_sha": "57fff792974439bfd9b1bdf2103307684ceb3235",
       "role": "admission verification and execution",
       "work_package_refs": [
         "WP-W06",
@@ -394,7 +397,9 @@
         "VOL-040",
         "VOL-042",
         "VOL-044",
-        "VOL-045"
+        "VOL-045",
+        "VOL-288",
+        "VOL-295"
       ]
     },
     {
@@ -720,6 +725,7 @@
         "swarm"
       ],
       "volume_refs": [
+        "VOL-004",
         "VOL-015",
         "VOL-016",
         "VOL-017",
@@ -736,7 +742,9 @@
         "VOL-116",
         "VOL-118",
         "VOL-119",
-        "VOL-121"
+        "VOL-121",
+        "VOL-290",
+        "VOL-294"
       ]
     },
     {
@@ -778,7 +786,7 @@
       "source": "skeleton/observability",
       "destination": "skeleton/ai/runtime/observability",
       "kind": "tree",
-      "source_git_object_sha": "56d1f3e52a4c65a5674b0c26f0f75ec05009bb7e",
+      "source_git_object_sha": "d87ad8cee234cdbd68bf47e68042cad83a2b74f9",
       "role": "AI runtime observability, telemetry, audit, provenance-bound explainability, and executable operations runbook plane",
       "work_package_refs": [
         "WP-W00",
@@ -823,6 +831,11 @@
         "VOL-187",
         "VOL-191",
         "VOL-204",
+        "VOL-235",
+        "VOL-236",
+        "VOL-279",
+        "VOL-280",
+        "VOL-282",
         "VOL-325",
         "VOL-390",
         "VOL-403",
@@ -868,7 +881,7 @@
       "source": "skeleton/security",
       "destination": "skeleton/ai/runtime/security",
       "kind": "tree",
-      "source_git_object_sha": "44cecc1c1f9b291e053b8c3d1cf48af7f27be628",
+      "source_git_object_sha": "290023631f726023820f6fa1c7d895d95962d09a",
       "role": "AI runtime security and activation controls",
       "work_package_refs": [
         "WP-W00",
@@ -931,6 +944,9 @@
         "VOL-233",
         "VOL-256",
         "VOL-257",
+        "VOL-276",
+        "VOL-277",
+        "VOL-283",
         "VOL-318",
         "VOL-320",
         "VOL-321",
@@ -990,8 +1006,10 @@
         "VOL-206",
         "VOL-207",
         "VOL-208",
+        "VOL-242",
         "VOL-248",
         "VOL-252",
+        "VOL-296",
         "VOL-323",
         "VOL-324",
         "VOL-362",
@@ -1078,7 +1096,14 @@
       "volume_refs": [
         "VOL-029",
         "VOL-102",
-        "VOL-188"
+        "VOL-188",
+        "VOL-288",
+        "VOL-289",
+        "VOL-290",
+        "VOL-291",
+        "VOL-292",
+        "VOL-293",
+        "VOL-294"
       ]
     },
     {
@@ -1086,7 +1111,7 @@
       "source": "skeleton/learning",
       "destination": "skeleton/ai/learning",
       "kind": "tree",
-      "source_git_object_sha": "4c6cdadff67847d2a1fdbd42f346fbd735124eec",
+      "source_git_object_sha": "71b3d0b5fe6fe81d221cac53e5f7aa8bce71470b",
       "role": "controlled learning support with evidence-grounded learner-state inference, objective planning, and outcome evaluation",
       "work_package_refs": [
         "WP-W00",
@@ -1273,7 +1298,8 @@
       "volume_refs": [
         "VOL-019",
         "VOL-073",
-        "VOL-197"
+        "VOL-197",
+        "VOL-284"
       ],
       "move_tags": [
         "ai-tree:mapped",
@@ -1288,7 +1314,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "d749dc9d71e81911fedb5115b06d7d52a02c04dc",
+      "source_git_object_sha": "6f5faef4896e455526ea8f589ae497617d86d84d",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -1643,7 +1669,10 @@
         "VOL-003",
         "VOL-005",
         "VOL-028",
-        "VOL-038"
+        "VOL-038",
+        "VOL-297",
+        "VOL-298",
+        "VOL-299"
       ],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
@@ -2641,7 +2670,7 @@
       "source": "skeleton/learning/school",
       "destination": "skeleton/ai/learning/school",
       "kind": "tree",
-      "source_git_object_sha": "4f14ed170585eec28d6ae8fcad300690275e09a5",
+      "source_git_object_sha": "14b8ba6ccc11fa587726a256e1fb04bbb385539d",
       "role": "Curriculum, assessment, tutoring, code-intelligence, and learning-control modules deepen the existing controlled-learning owner.",
       "work_package_refs": [
         "WP-W28"
@@ -5326,7 +5355,7 @@
       "source": "skeleton/training",
       "destination": "skeleton/ai/training",
       "kind": "tree",
-      "source_git_object_sha": "3a8e30f9fd6cdd74379e3b0050534db0154f77c0",
+      "source_git_object_sha": "315e43fd52227f0c29db7e6c053ec637c58b2eb8",
       "role": "Governed AI training plane for durable training control, distributed topology, checkpoint/resume, elastic recovery, bounded observability, evaluation gates, post-training experiments, curriculum, RL environment, and verifier-model support.",
       "work_package_refs": [
         "WP-W28",
@@ -5433,7 +5462,7 @@
       "source": "skeleton/vision",
       "destination": "skeleton/ai/runtime/extensions/vision",
       "kind": "tree",
-      "source_git_object_sha": "c43edb466e54e474bdecfc5ca679f131e04bfcf0",
+      "source_git_object_sha": "d131a1583929c659a1331801e5ab3f23b8b57451",
       "role": "Resource-bounded image asset, region, result, and model-provenance contracts.",
       "work_package_refs": [
         "WP-W28",
@@ -5725,7 +5754,7 @@
       "source": "skeleton/inference",
       "destination": "skeleton/ai/runtime/inference/core",
       "kind": "tree",
-      "source_git_object_sha": "f96b863b26eb4e7ca3e7ddc57eaa859a3cdf1eca",
+      "source_git_object_sha": "440e860e0e90900281362a66c5dcc4a37871a1cc",
       "role": "Core inference session, provider-bridge, replay, and async-runtime compatibility plane staged beneath the canonical inference runtime without colliding with native local/neural/KV engines.",
       "work_package_refs": [
         "WP-W05",
@@ -6090,7 +6119,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "178_mapping_plus_23_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "178_mapping_plus_24_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -6896,7 +6925,7 @@
       "BASE-FRONTEND-SSR-RAF-01"
     ],
     "invariant": "Preparation metadata and move tags authorize staging only; the reconciled mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion.",
-    "native_ai_owner_count": 23
+    "native_ai_owner_count": 24
   },
   "validation_request": {
     "requested_at_utc": "2026-09-22T15:47:00Z",
@@ -7439,7 +7468,11 @@
       "volume_refs": [
         "VOL-098",
         "VOL-100",
-        "VOL-259"
+        "VOL-259",
+        "VOL-263",
+        "VOL-264",
+        "VOL-265",
+        "VOL-266"
       ]
     },
     {
@@ -7468,7 +7501,8 @@
         "VOL-204",
         "VOL-205",
         "VOL-206",
-        "VOL-207"
+        "VOL-207",
+        "VOL-237"
       ]
     },
     {
@@ -7597,7 +7631,9 @@
         "VOL-007",
         "VOL-227",
         "VOL-228",
-        "VOL-229"
+        "VOL-229",
+        "VOL-239",
+        "VOL-240"
       ]
     },
     {
@@ -7693,10 +7729,15 @@
         "VOL-217",
         "VOL-218",
         "VOL-237",
+        "VOL-238",
         "VOL-239",
         "VOL-240",
+        "VOL-241",
         "VOL-243",
+        "VOL-247",
         "VOL-248",
+        "VOL-249",
+        "VOL-250",
         "VOL-251",
         "VOL-252",
         "VOL-258",
@@ -7706,6 +7747,9 @@
         "VOL-264",
         "VOL-265",
         "VOL-266",
+        "VOL-285",
+        "VOL-286",
+        "VOL-287",
         "VOL-320",
         "VOL-321",
         "VOL-322",
