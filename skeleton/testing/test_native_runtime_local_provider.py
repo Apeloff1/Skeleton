@@ -249,6 +249,25 @@ def test_native_runtime_tool_protocol_enforces_declared_ids() -> None:
     with pytest.raises(NativeRuntimeBackendError, match="undeclared tool_id"):
         backend._parse_output(raw.replace("repo.read", "repo.write"), request)
 
+    with pytest.raises(
+        NativeRuntimeBackendError,
+        match="unsupported native local response protocol version",
+    ):
+        backend._parse_output(
+            raw.replace(
+                '"skeleton_local_response":1',
+                '"skeleton_local_response":true',
+            ),
+            request,
+        )
+
+    with pytest.raises(NativeRuntimeBackendError, match="duplicate JSON key"):
+        backend._parse_output(
+            '{"skeleton_local_response":1,'
+            '"skeleton_local_response":1,"text":"alpha"}',
+            request,
+        )
+
 
 def test_native_runtime_artifact_tamper_fails_closed(tmp_path) -> None:
     path, _backend, _receipt = _write_native(tmp_path)
