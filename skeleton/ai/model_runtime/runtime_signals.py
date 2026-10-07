@@ -60,6 +60,10 @@ _SIGNALS = (
         SignalMaturity.VALIDATED, "P/D-Serve arXiv:2408.08147", False,
     ),
     RuntimeSignal(
+        "speculative-decoding-serving", 2024, "speculative_decoding",
+        SignalMaturity.VALIDATED, "speculative decoding serving lineage", False,
+    ),
+    RuntimeSignal(
         "heterogeneous-pd-serving", 2025, "heterogeneous_phase_placement",
         SignalMaturity.EMERGING, "arXiv:2509.17542", False,
     ),
