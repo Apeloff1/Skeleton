@@ -706,6 +706,7 @@ class CognitiveControlDecision:
     stopping: StoppingDecision
     candidates_digest: str
     previous_decision_digest: str
+    candidates: tuple[StrategyCandidate, ...] = ()
     selection: StrategySelection | None = None
     reservation: StrategyReservation | None = None
 
@@ -729,6 +730,22 @@ class CognitiveControlDecision:
                 or any(ch not in "0123456789abcdef" for ch in value)
             ):
                 raise ReasoningPolicyError(f"{field} must be lowercase sha256")
+        if not isinstance(self.candidates, tuple):
+            raise ReasoningPolicyError("candidates must be a bounded tuple")
+        if len(self.candidates) > _MAX_STRATEGIES:
+            raise ReasoningPolicyError("candidates exceed bounded manifest limit")
+        if any(not isinstance(row, StrategyCandidate) for row in self.candidates):
+            raise ReasoningPolicyError(
+                "candidates must contain StrategyCandidate values"
+            )
+        if len({row.strategy for row in self.candidates}) != len(self.candidates):
+            raise ReasoningPolicyError("strategy candidates must be unique")
+        canonical_candidates = tuple(
+            sorted(self.candidates, key=lambda row: row.strategy.value)
+        )
+        object.__setattr__(self, "candidates", canonical_candidates)
+        if _candidate_digest(canonical_candidates) != self.candidates_digest:
+            raise ReasoningPolicyError("candidate manifest identity drift")
         continuing = self.stopping.disposition is StopDisposition.CONTINUE
         if continuing:
             if not isinstance(self.selection, StrategySelection):
@@ -751,6 +768,28 @@ class CognitiveControlDecision:
                 raise ReasoningPolicyError("reservation selection identity drift")
             if self.reservation.strategy is not self.selection.strategy:
                 raise ReasoningPolicyError("reservation strategy drift")
+            selected = tuple(
+                row
+                for row in canonical_candidates
+                if row.strategy is self.selection.strategy
+            )
+            if len(selected) != 1:
+                raise ReasoningPolicyError(
+                    "selection missing from candidate manifest"
+                )
+            selected_candidate = selected[0]
+            if self.reservation.expected_tokens != selected_candidate.expected_tokens:
+                raise ReasoningPolicyError("reservation token estimate drift")
+            if (
+                self.reservation.expected_cost_units
+                != selected_candidate.expected_cost_units
+            ):
+                raise ReasoningPolicyError("reservation cost estimate drift")
+            if (
+                self.reservation.expected_wall_time_s
+                != selected_candidate.expected_wall_time_s
+            ):
+                raise ReasoningPolicyError("reservation time estimate drift")
         elif self.selection is not None or self.reservation is not None:
             raise ReasoningPolicyError(
                 "terminal decision cannot reserve another reasoning step"
@@ -763,6 +802,7 @@ class CognitiveControlDecision:
             "stopping": self.stopping.payload(),
             "candidates_digest": self.candidates_digest,
             "previous_decision_digest": self.previous_decision_digest,
+            "candidates": [row.payload() for row in self.candidates],
             "selection": self.selection.payload() if self.selection else None,
             "reservation": self.reservation.payload() if self.reservation else None,
         }
@@ -867,6 +907,7 @@ def evaluate_cognitive_control(
             stopping=stopping,
             candidates_digest=candidates_digest,
             previous_decision_digest=previous_decision_digest,
+            candidates=candidate_rows,
         )
 
     budget = reasoning_budget_snapshot(policy, rows)
@@ -896,6 +937,7 @@ def evaluate_cognitive_control(
             stopping=stopping,
             candidates_digest=candidates_digest,
             previous_decision_digest=previous_decision_digest,
+            candidates=candidate_rows,
         )
 
     selected = next(
@@ -919,6 +961,7 @@ def evaluate_cognitive_control(
         stopping=stopping,
         candidates_digest=candidates_digest,
         previous_decision_digest=previous_decision_digest,
+        candidates=candidate_rows,
         selection=selection,
         reservation=reservation,
     )
