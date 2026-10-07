@@ -1,3 +1,4 @@
+from .content_credentials import CredentialObservation, credential_trust_delta
 from .claiming import ClaimedWork, FrontierClaimer
 from .retrieval_bridge import CanonicalRetrievalBridge, RetrievalBridgeReceipt
 from .mime import ExtractedPayload, MimeExtractor
