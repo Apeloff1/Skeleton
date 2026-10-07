@@ -200,6 +200,21 @@ def parse_checkpoint_json(payload: str | bytes) -> Mapping[str, Any]:
 def validate_checkpoint(checkpoint: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(checkpoint, Mapping) or checkpoint.get("schema") != RUNTIME_SCHEMA:
         raise RuntimeContractError("unsupported runtime checkpoint")
+    expected_keys = {
+        "schema",
+        "model",
+        "model_digest",
+        "tokenizer",
+        "architecture",
+        "limits",
+        "device_policy",
+        "digest",
+    }
+    if set(checkpoint) != expected_keys:
+        raise RuntimeContractError("runtime checkpoint envelope shape mismatch")
+    encoded_checkpoint = canonical_bytes(checkpoint)
+    if len(encoded_checkpoint) > MAX_CHECKPOINT_BYTES:
+        raise RuntimeContractError("runtime checkpoint exceeds global byte budget")
     expected = checkpoint.get("digest")
     if (
         not isinstance(expected, str)
@@ -264,6 +279,8 @@ def restore_components(
     if set(limits_raw) != required_limit_keys:
         raise RuntimeContractError("runtime checkpoint limits shape mismatch")
     limits = RuntimeLimits(**dict(limits_raw))
+    if len(canonical_bytes(checkpoint)) > limits.max_checkpoint_bytes:
+        raise RuntimeContractError("runtime checkpoint exceeds configured byte budget")
 
     if device_policy is None:
         policy_raw = body["device_policy"]
