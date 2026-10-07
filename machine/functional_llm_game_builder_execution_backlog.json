@@ -34,9 +34,10 @@
         "FLGB-01-T11",
         "FLGB-01-T12"
       ],
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
-      "independent_verification_signed": false
+      "independent_verification_signed": false,
+      "implementation_note": "T01-T12 runtime code, versioned contract schemas, and focused regressions are present on the implementation branch; exact-head CI and independent verification remain required before signoff."
     },
     {
       "id": "FLGB-02",
@@ -518,7 +519,7 @@
       "implementation_target": "skeleton/inference/operation_envelope.py",
       "contract_target": "skeleton/inference/contracts/operation_envelope.schema.json",
       "test_target": "tests/flgb/test_flgb_01_operation_envelope.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -584,7 +585,7 @@
       "implementation_target": "skeleton/inference/conversation_state.py",
       "contract_target": "skeleton/inference/contracts/conversation_state.schema.json",
       "test_target": "tests/flgb/test_flgb_01_conversation_state.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -650,7 +651,7 @@
       "implementation_target": "skeleton/inference/provider_neutral_request.py",
       "contract_target": "skeleton/inference/contracts/provider_neutral_request.schema.json",
       "test_target": "tests/flgb/test_flgb_01_provider_neutral_request.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -716,7 +717,7 @@
       "implementation_target": "skeleton/inference/stream_decoder.py",
       "contract_target": "skeleton/inference/contracts/stream_decoder.schema.json",
       "test_target": "tests/flgb/test_flgb_01_stream_decoder.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -782,7 +783,7 @@
       "implementation_target": "skeleton/inference/structured_output.py",
       "contract_target": "skeleton/inference/contracts/structured_output.schema.json",
       "test_target": "tests/flgb/test_flgb_01_structured_output.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -848,7 +849,7 @@
       "implementation_target": "skeleton/inference/tool_call_proposal.py",
       "contract_target": "skeleton/inference/contracts/tool_call_proposal.schema.json",
       "test_target": "tests/flgb/test_flgb_01_tool_call_proposal.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -914,7 +915,7 @@
       "implementation_target": "skeleton/inference/cancellation.py",
       "contract_target": "skeleton/inference/contracts/cancellation.schema.json",
       "test_target": "tests/flgb/test_flgb_01_cancellation.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -980,7 +981,7 @@
       "implementation_target": "skeleton/inference/deadline.py",
       "contract_target": "skeleton/inference/contracts/deadline.schema.json",
       "test_target": "tests/flgb/test_flgb_01_deadline.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -1046,7 +1047,7 @@
       "implementation_target": "skeleton/inference/usage_accounting.py",
       "contract_target": "skeleton/inference/contracts/usage_accounting.schema.json",
       "test_target": "tests/flgb/test_flgb_01_usage_accounting.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -1112,7 +1113,7 @@
       "implementation_target": "skeleton/inference/terminal_commit.py",
       "contract_target": "skeleton/inference/contracts/terminal_commit.schema.json",
       "test_target": "tests/flgb/test_flgb_01_terminal_commit.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -1178,7 +1179,7 @@
       "implementation_target": "skeleton/inference/replay_receipt.py",
       "contract_target": "skeleton/inference/contracts/replay_receipt.schema.json",
       "test_target": "tests/flgb/test_flgb_01_replay_receipt.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -1244,7 +1245,7 @@
       "implementation_target": "skeleton/inference/provider_failover.py",
       "contract_target": "skeleton/inference/contracts/provider_failover.schema.json",
       "test_target": "tests/flgb/test_flgb_01_provider_failover.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -14853,5 +14854,11 @@
       "long_horizon_50_and_80_percent_curves": true,
       "evaluator_independence": true
     }
+  },
+  "state_model": {
+    "planned": "No implementation target set is admitted as runtime evidence.",
+    "implemented-pending-verification": "All declared implementation, contract, and regression targets exist; implementation and independent-verification signoffs remain false until exact-head evidence is admitted.",
+    "in-progress": "At least one task has implementation targets present but the plane is not uniformly implementation-complete.",
+    "verified": "All tasks are exact-head implementation-signed and independently verified; dependency closure is satisfied."
   }
 }
