@@ -151,5 +151,22 @@ class TestRuntimeAdmissionScheduler(unittest.TestCase):
         self.assertIn("prefix_affinity", snapshot["policy"]["capabilities"])
         self.assertEqual(len(decision.snapshot_digest), 64)
 
+    def test_active_kv_is_pinned_for_planning_so_inactive_cache_can_be_evicted(self):
+        limits = AdmissionLimits(
+            max_active_requests=2, max_queued_requests=4, max_batch_size=1,
+            max_tokens_per_batch=20, kv_capacity_bytes=100, max_age_boost=10,
+        )
+        s = RuntimeAdmissionScheduler(limits)
+        s.submit(BatchRequest("active", 1, 1), kv_bytes=60)
+        self.assertEqual(s.admit().admitted, ("active",))
+        s.submit(BatchRequest("retained", 1, 1), kv_bytes=30)
+        self.assertEqual(s.admit().admitted, ("retained",))
+        s.complete("retained", retain_kv=True)
+        s.submit(BatchRequest("incoming", 1, 1), kv_bytes=40)
+        decision = s.admit()
+        self.assertEqual(decision.admitted, ("incoming",))
+        self.assertEqual(decision.evicted_kv, ("retained",))
+        self.assertIn("active", s.active_ids)
+
 if __name__ == "__main__":
     unittest.main()
