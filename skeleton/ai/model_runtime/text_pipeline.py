@@ -364,6 +364,33 @@ class TextTokenPipeline:
             max_steps=max_steps,
         )
 
+    def initial_training_checkpoint(self, manifest, *, weights_digest: str, optimizer_digest: str, rng_digest: str):
+        from skeleton.ai.training.flgb_training_runtime import TrainingCheckpoint, TrainingManifest
+        if not isinstance(manifest, TrainingManifest):
+            raise TokenizerContractError("TrainingManifest required")
+        return TrainingCheckpoint(
+            run_manifest_digest=manifest.digest,
+            sequence=0,
+            weights_digest=weights_digest,
+            optimizer_digest=optimizer_digest,
+            rng_digest=rng_digest,
+        )
+
+    def candidate_from_checkpoint(self, manifest, checkpoint, *, candidate_id: str, base_model_digest: str):
+        from skeleton.ai.training.flgb_training_runtime import CandidateWeights, TrainingCheckpoint, TrainingManifest
+        if not isinstance(manifest, TrainingManifest) or not isinstance(checkpoint, TrainingCheckpoint):
+            raise TokenizerContractError("training manifest/checkpoint required")
+        if checkpoint.run_manifest_digest != manifest.digest:
+            raise TokenizerContractError("checkpoint does not belong to training manifest")
+        if manifest.base_model_digest != base_model_digest:
+            raise TokenizerContractError("candidate base model mismatch")
+        return CandidateWeights(
+            candidate_id=candidate_id,
+            weights_digest=checkpoint.weights_digest,
+            training_lineage_digest=checkpoint.digest,
+            base_model_digest=base_model_digest,
+        )
+
     def decode(self, sequence: TokenSequence, *, require_identity: bool = True) -> str:
         if not isinstance(sequence, TokenSequence):
             raise TokenizerContractError("TokenSequence required")
