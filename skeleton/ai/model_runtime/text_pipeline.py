@@ -83,6 +83,58 @@ class PreparedText:
             raise TokenizerContractError("batch/window accounting mismatch")
 
 
+@dataclass(frozen=True, order=True)
+class TemporalInstant:
+    """Canonical proleptic-Gregorian date with explicit granularity."""
+    year: int
+    month: int = 1
+    day: int = 1
+    granularity: str = "year"
+
+    def __post_init__(self) -> None:
+        import calendar
+        if isinstance(self.year, bool) or not isinstance(self.year, int) or not 1000 <= self.year <= 9999:
+            raise TokenizerContractError("invalid temporal instant year")
+        if self.granularity not in {"year", "month", "day"}:
+            raise TokenizerContractError("invalid temporal granularity")
+        if isinstance(self.month, bool) or not isinstance(self.month, int) or not 1 <= self.month <= 12:
+            raise TokenizerContractError("invalid temporal instant month")
+        max_day = calendar.monthrange(self.year, self.month)[1]
+        if isinstance(self.day, bool) or not isinstance(self.day, int) or not 1 <= self.day <= max_day:
+            raise TokenizerContractError("invalid temporal instant day")
+        if self.granularity == "year" and (self.month, self.day) != (1, 1):
+            raise TokenizerContractError("year granularity requires canonical January 1")
+        if self.granularity == "month" and self.day != 1:
+            raise TokenizerContractError("month granularity requires canonical first day")
+
+    @property
+    def digest(self) -> str:
+        return digest_json({"year": self.year, "month": self.month, "day": self.day, "granularity": self.granularity})
+
+
+@dataclass(frozen=True)
+class TemporalInterval:
+    """Closed interval over canonical temporal instants."""
+    start: TemporalInstant
+    end: TemporalInstant
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.start, TemporalInstant) or not isinstance(self.end, TemporalInstant):
+            raise TokenizerContractError("TemporalInstant interval bounds required")
+        if (self.end.year, self.end.month, self.end.day) < (self.start.year, self.start.month, self.start.day):
+            raise TokenizerContractError("temporal interval runs backward")
+
+    def contains(self, instant: TemporalInstant) -> bool:
+        if not isinstance(instant, TemporalInstant):
+            raise TokenizerContractError("TemporalInstant required")
+        key = (instant.year, instant.month, instant.day)
+        return (self.start.year, self.start.month, self.start.day) <= key <= (self.end.year, self.end.month, self.end.day)
+
+    @property
+    def digest(self) -> str:
+        return digest_json({"start": self.start.digest, "end": self.end.digest})
+
+
 @dataclass(frozen=True)
 class TemporalTrainingSignal:
     """Leakage-safe year signal attached to a training source or example."""
