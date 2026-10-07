@@ -946,3 +946,42 @@ def test_decade_signal_digest_distinguishes_exact_years_within_same_decade(nativ
     late = pipeline.decade_signal(pipeline.temporal_signal(source_year=1989, observed_year=1989, knowledge_cutoff_year=2026))
     assert early.source_decade == late.source_decade == 1980
     assert early.digest != late.digest
+
+
+def test_decade_signal_vector_preserves_exact_year_provenance(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    exact = pipeline.temporal_signal(source_year=1987, observed_year=1991, knowledge_cutoff_year=2026)
+    vector = pipeline.decade_signal_vector(exact)
+    assert vector.source_decade == 1980
+    assert vector.cutoff_decade == 2020
+    assert vector.distance_decades == 4
+    assert vector.recency_ppm == 350_000
+    assert vector.chronology_digest == exact.digest
+    assert len(vector.digest) == 64
+
+
+@pytest.mark.parametrize("years", [
+    {"source_year": 2030, "observed_year": 2030, "knowledge_cutoff_year": 2026},
+    {"source_year": 1990, "observed_year": 2027, "knowledge_cutoff_year": 2026},
+])
+def test_decade_signal_path_fails_closed_on_future_chronology(native_model, years):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    with pytest.raises(TokenizerContractError):
+        pipeline.temporal_signal(**years)
+
+
+def test_decade_signal_vector_does_not_change_token_identity(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    before = pipeline.prepare("historical source text")
+    signal = pipeline.temporal_signal(source_year=1968, observed_year=1970, knowledge_cutoff_year=2026)
+    vector = pipeline.decade_signal_vector(signal)
+    after = pipeline.prepare("historical source text")
+    assert before.sequence.digest == after.sequence.digest
+    assert before.sequence.token_ids == after.sequence.token_ids
+    assert vector.chronology_digest == signal.digest
