@@ -1,4 +1,5 @@
 """Provider-neutral FLGB-02 model-runtime and native execution contracts."""
+from .admission_scheduler import AdmissionDecision, AdmissionLimits, RuntimeAdmissionScheduler, ScheduledRequest
 from .flgb_model_runtime import (
     ALLOWED_TRANSITIONS,
     BatchRequest,
@@ -64,6 +65,8 @@ from .tokenization import (
 
 __all__ = [
     "ALLOWED_TRANSITIONS",
+    "AdmissionDecision",
+    "AdmissionLimits",
     "BatchGenerationRequest",
     "BatchGenerationResult",
     "CancellationToken",
@@ -91,11 +94,13 @@ __all__ = [
     "ReplayMismatch",
     "ReplayReceipt",
     "Replica",
+    "RuntimeAdmissionScheduler",
     "RuntimeArchitecture",
     "RuntimeContractError",
     "RuntimeEvent",
     "RuntimeLimits",
     "RuntimeUsage",
+    "ScheduledRequest",
     "SpeculativeReceipt",
     "StreamingTextFeed",
     "TokenBatch",
