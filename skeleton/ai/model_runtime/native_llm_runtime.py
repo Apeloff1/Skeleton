@@ -33,7 +33,7 @@ from .runtime_contracts import (
     RuntimeLimits,
     RuntimeUsage,
 )
-from .tokenization import NativeTokenizer, TokenizerContractError
+from .tokenization import NativeTokenizer, StreamingTextFeed, TokenizerContractError
 
 
 @dataclass(frozen=True)
@@ -457,6 +457,100 @@ class NativeLLMRuntime:
             events=tuple(events),
             checkpoint_digest=checkpoint["digest"],
         )
+
+    def generate_sequence(
+        self,
+        sequence: TokenSequence,
+        config: GenerationConfig | None = None,
+    ) -> GenerationResult:
+        """Execute a pre-tokenized sequence without silently retokenizing it.
+
+        This is the canonical bridge from bounded text/token ingestion into the
+        executable transformer.  The tokenizer identity must match this runtime;
+        source text is intentionally not reconstructed from lossy token pieces.
+        """
+        if not isinstance(sequence, TokenSequence):
+            raise RuntimeContractError("TokenSequence required")
+        if not hmac.compare_digest(sequence.tokenizer_digest, self.tokenizer.digest):
+            raise RuntimeContractError("token sequence tokenizer identity mismatch")
+        if not sequence.token_ids:
+            raise RuntimeContractError("token sequence must not be empty")
+        if any(token_id >= self.tokenizer.vocab_size for token_id in sequence.token_ids):
+            raise RuntimeContractError("token sequence contains id outside vocabulary")
+        # NativeTokenizer's exact source digest cannot be recovered from token IDs.
+        # Execute through the same graph using the supplied IDs and preserve their
+        # identity in the result/receipt rather than fabricating source text.
+        cfg = config or GenerationConfig(max_new_tokens=min(32, self.limits.max_new_tokens))
+        return self._generate_token_sequence(sequence, cfg)
+
+    def generate_feed(
+        self,
+        feed: StreamingTextFeed,
+        config: GenerationConfig | None = None,
+    ) -> GenerationResult:
+        """Finalize a StreamingTextFeed and execute it end-to-end."""
+        if not isinstance(feed, StreamingTextFeed):
+            raise RuntimeContractError("StreamingTextFeed required")
+        return self.generate_sequence(feed.finalize(self.tokenizer), config)
+
+    def _generate_token_sequence(
+        self,
+        prompt_sequence: TokenSequence,
+        config: GenerationConfig,
+    ) -> GenerationResult:
+        config.validate(limits=self.limits, vocab_size=self.tokenizer.vocab_size)
+        self.assert_model_unchanged()
+        self.tokenizer.assert_unchanged()
+        prompt_tokens = len(prompt_sequence.token_ids)
+        if prompt_tokens > self.limits.max_context:
+            raise RuntimeContractError("prompt exceeds context budget")
+        if prompt_tokens + config.max_new_tokens > self.limits.max_total_tokens:
+            raise RuntimeContractError("request exceeds total-token budget")
+        projected = min(self.limits.max_context, prompt_tokens + config.max_new_tokens)
+        if config.use_cache and self.estimate_kv_bytes(projected) > self.limits.max_kv_bytes:
+            raise RuntimeContractError("request exceeds KV memory budget")
+
+        config_digest = self._config_digest(config)
+        request_digest = self._request_digest(prompt_sequence, config)
+        rng = random.Random(int(config.seed) & 0xFFFFFFFF)
+        cache = KVCache(self.model.n_layers, self.limits.max_context) if config.use_cache else None
+        output = list(prompt_sequence.token_ids)
+        generated: list[int] = []
+        events = [RuntimeEvent(0, "admitted", detail_digest=request_digest), RuntimeEvent(1, "prompt", detail_digest=prompt_sequence.digest)]
+        stop_ids = set(config.stop_token_ids)
+        finish_reason = "completed" if config.max_new_tokens == 0 else "length"
+        cache_resets = 0
+        kv_peak = 0
+        sequence_no = 2
+        for _ in range(config.max_new_tokens):
+            window = output[-self.limits.max_context:]
+            before = len(cache.tokens) if cache is not None else 0
+            primed = cache.primed_for(window) if cache is not None else False
+            logits = self.model._logits_window(window, cache)
+            if cache is not None and before and not primed:
+                cache_resets += 1
+            next_id = int(sample_logits(logits, rng, temperature=config.temperature, top_k=config.top_k, top_p=config.top_p))
+            if not 0 <= next_id < self.tokenizer.vocab_size:
+                raise RuntimeContractError("sampler emitted token outside vocabulary")
+            output.append(next_id); generated.append(next_id)
+            token_text = self.tokenizer.token_text(next_id)
+            cache_tokens = len(cache.tokens) if cache is not None else 0
+            if cache is not None:
+                kv_peak = max(kv_peak, self.estimate_kv_bytes(cache_tokens))
+            detail = digest_json({"request_digest": request_digest, "ordinal": len(generated), "token_id": next_id})
+            events.append(RuntimeEvent(sequence_no, "token", token_id=next_id, text_delta=token_text, cache_tokens=cache_tokens, detail_digest=detail)); sequence_no += 1
+            if next_id in stop_ids:
+                finish_reason = "stop_token"
+                events.append(RuntimeEvent(sequence_no, "stopped", token_id=next_id, text_delta=token_text, cache_tokens=cache_tokens, detail_digest=detail)); sequence_no += 1
+                break
+        generated_ids = tuple(generated)
+        generated_tokens = tuple(self.tokenizer.token_text(i) for i in generated_ids)
+        text = self.tokenizer.decode_ids(generated_ids)
+        output_digest = digest_json({"generated_ids": list(generated_ids), "text": text, "finish_reason": finish_reason})
+        usage = RuntimeUsage(prompt_tokens=prompt_tokens, generated_tokens=len(generated_ids), total_tokens=prompt_tokens + len(generated_ids), model_bytes=self.model_bytes, kv_peak_bytes=kv_peak, cache_resets=cache_resets)
+        receipt = ReplayReceipt(model_digest=self.model_digest, tokenizer_digest=self.tokenizer.digest, architecture_digest=self.architecture.digest, request_digest=request_digest, output_digest=output_digest, config_digest=config_digest, device_digest=self.device.digest, seed=config.seed)
+        events.append(RuntimeEvent(sequence_no, "completed", cache_tokens=len(cache.tokens) if cache is not None else 0, detail_digest=receipt.digest))
+        return GenerationResult(prompt_sequence, generated_ids, generated_tokens, text, finish_reason, usage, receipt, tuple(events), self.checkpoint()["digest"])
 
     def generate(
         self,
