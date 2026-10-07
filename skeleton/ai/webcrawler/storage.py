@@ -10,9 +10,10 @@ from .migrations import migrate
 class SqliteCrawlStore:
     def __init__(self,path:str|Path):
         self.path=str(path)
-        self.db=sqlite3.connect(self.path)
+        self.db=sqlite3.connect(self.path, timeout=30.0)
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA foreign_keys=ON")
+        self.db.execute("PRAGMA busy_timeout=30000")
         self.db.executescript("""
         CREATE TABLE IF NOT EXISTS documents(
           content_hash TEXT PRIMARY KEY, canonical_url TEXT NOT NULL, fetched_url TEXT NOT NULL,
