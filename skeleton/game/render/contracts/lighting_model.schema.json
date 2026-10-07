@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-11:lighting_model:v1",
+  "title": "FLGB-11 lighting model",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "light_id",
+    "kind",
+    "intensity_milli",
+    "color_milli",
+    "casts_shadow"
+  ],
+  "properties": {
+    "light_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "kind": {
+      "enum": [
+        "directional",
+        "point",
+        "spot",
+        "area",
+        "environment"
+      ]
+    },
+    "intensity_milli": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "color_milli": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 1000
+      }
+    },
+    "casts_shadow": {
+      "type": "boolean"
+    }
+  }
+}
