@@ -289,6 +289,27 @@ class PreparedCorpus:
         return digest_json({"document_ids": list(self.document_ids), "sequence_digests": [document.sequence.digest for document in self.documents], "raw_text_digests": [document.raw_text_digest for document in self.documents], "pipeline_digest": self.pipeline_digest})
 
 
+@dataclass(frozen=True)
+class PipelineReplayCheckpoint:
+    """Durable identity checkpoint for deterministic text/corpus replay."""
+    pipeline_digest: str
+    tokenizer_digest: str
+    payload_digest: str
+    payload_kind: str
+
+    def __post_init__(self) -> None:
+        for name in ("pipeline_digest", "tokenizer_digest", "payload_digest"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value):
+                raise TokenizerContractError(f"invalid {name}")
+        if self.payload_kind not in {"prepared-text", "prepared-corpus"}:
+            raise TokenizerContractError("invalid replay payload kind")
+
+    @property
+    def digest(self) -> str:
+        return digest_json(self.__dict__)
+
+
 class TextTokenPipeline:
     """One admitted, immutable text-to-model-input pipeline."""
 
@@ -357,6 +378,25 @@ class TextTokenPipeline:
         if not isinstance(corpus, PreparedCorpus) or corpus.pipeline_digest != self.digest:
             raise TokenizerContractError("corpus belongs to another pipeline")
         return tuple(self.training_receipt(document, pad_token_id=pad_token_id, ignore_index=ignore_index) for document in corpus.documents)
+
+    def replay_checkpoint(self, payload: PreparedText | PreparedCorpus) -> PipelineReplayCheckpoint:
+        if isinstance(payload, PreparedText):
+            if payload.pipeline_digest != self.digest:
+                raise TokenizerContractError("prepared text belongs to another pipeline")
+            payload_digest, kind = payload.sequence.digest, "prepared-text"
+        elif isinstance(payload, PreparedCorpus):
+            if payload.pipeline_digest != self.digest:
+                raise TokenizerContractError("corpus belongs to another pipeline")
+            payload_digest, kind = payload.digest, "prepared-corpus"
+        else:
+            raise TokenizerContractError("prepared payload required")
+        return PipelineReplayCheckpoint(self.digest, self.tokenizer.digest, payload_digest, kind)
+
+    def verify_replay_checkpoint(self, payload: PreparedText | PreparedCorpus, checkpoint: PipelineReplayCheckpoint) -> None:
+        if not isinstance(checkpoint, PipelineReplayCheckpoint):
+            raise TokenizerContractError("PipelineReplayCheckpoint required")
+        if self.replay_checkpoint(payload).digest != checkpoint.digest:
+            raise TokenizerContractError("pipeline replay checkpoint mismatch")
 
     def model_batches(self, prepared: PreparedText, *, pad_token_id: int | None = None) -> tuple[ModelInputBatch, ...]:
         if not isinstance(prepared, PreparedText) or prepared.pipeline_digest != self.digest:
@@ -560,4 +600,4 @@ class TextTokenPipeline:
         return prepared
 
 
-__all__ = ["CausalTrainingBatch", "GovernedTrainingInput", "ModelInputBatch", "PreparedCorpus", "PreparedText", "PromotionAuthorizationRequest", "TextPipelineConfig", "TextTokenPipeline", "TrainingInputReceipt", "materialize_causal_training_batch", "materialize_model_batch"]
+__all__ = ["CausalTrainingBatch", "GovernedTrainingInput", "ModelInputBatch", "PipelineReplayCheckpoint", "PreparedCorpus", "PreparedText", "PromotionAuthorizationRequest", "TextPipelineConfig", "TextTokenPipeline", "TrainingInputReceipt", "materialize_causal_training_batch", "materialize_model_batch"]
