@@ -116,3 +116,6 @@ __all__ = [
     "serialize_token_sequence",
     "validate_model_snapshot",
 ]
+
+from .training_admission import RuntimePromotionError, admit_candidate_model
+__all__ += ["RuntimePromotionError","admit_candidate_model"]
