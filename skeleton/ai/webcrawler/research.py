@@ -31,6 +31,14 @@ class ResearchQuery:
     contradiction_weight: float = 0.20
     min_relevance: float = 0.10
     min_source_score: float = 0.25
+    def __post_init__(self):
+        if not isinstance(self.text,str) or not self.text.strip(): raise ValueError("research query text is required")
+        if isinstance(self.required_sources,bool) or not isinstance(self.required_sources,int) or self.required_sources<1: raise ValueError("required_sources must be positive")
+        if not math.isfinite(self.freshness_half_life_seconds) or self.freshness_half_life_seconds<=0: raise ValueError("freshness half-life must be finite and positive")
+        for name in ("diversity_weight","contradiction_weight","min_relevance","min_source_score"):
+            value=getattr(self,name)
+            if not isinstance(value,(int,float)) or isinstance(value,bool) or not math.isfinite(value) or not 0<=value<=1: raise ValueError(f"{name} must be finite and between 0 and 1")
+        if self.diversity_weight+self.contradiction_weight>1: raise ValueError("research weights exceed score budget")
 
 @dataclass(frozen=True)
 class EvidenceObservation:
@@ -90,7 +98,7 @@ class EvidenceSet:
 
     def contradictions(self) -> list[Contradiction]:
         out=[]
-        vals=list(self.observations.values())
+        vals=self.qualified()
         q=tokens(self.query.text)
         for i,a in enumerate(vals):
             for b in vals[i+1:]:
