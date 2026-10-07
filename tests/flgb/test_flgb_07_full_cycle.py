@@ -24,4 +24,9 @@ class TestFullCycle(unittest.TestCase):
   prom=PromotionEvidence(cand.digest,"d"*64,ad.rights.digest,a.contamination_scan_digest,digest_json(ev.__dict__),cp["digest"],"mirror-verifier",True,True,True,True)
   def apply(m): m.E[0][0]+=0.25
   rt,adm,rb=admit_candidate_model(rt,cand,prom,apply,admission_authority="runtime-custodian")
-  ready=extend_with_promotion(proof,cand,ev,prom,adm,rb)\n  self.assertEqual(rt.model_digest,cand.weights_digest); self.assertEqual(ready.stages[-1].stage,"rollback-ready")\n  executed=execute_rollback(rt,adm,rb,cp)\n  final=extend_with_promotion(proof,cand,ev,prom,adm,executed)\n  self.assertEqual(rt.model_digest,old); self.assertEqual(rt._current_model_digest(),old)\n  self.assertEqual(final.stages[-1].stage,"rollback-executed"); self.assertEqual(final.stages[-1].subject_digest,old); self.assertEqual(len(final.stages),9)
+  ready=extend_with_promotion(proof,cand,ev,prom,adm,rb)
+  self.assertEqual(rt.model_digest,cand.weights_digest); self.assertEqual(ready.stages[-1].stage,"rollback-ready")
+  executed=execute_rollback(rt,adm,rb,cp)
+  final=extend_with_promotion(proof,cand,ev,prom,adm,executed)
+  self.assertEqual(rt.model_digest,old); self.assertEqual(rt._current_model_digest(),old)
+  self.assertEqual(final.stages[-1].stage,"rollback-executed"); self.assertEqual(final.stages[-1].subject_digest,old); self.assertEqual(len(final.stages),9)
