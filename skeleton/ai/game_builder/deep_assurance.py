@@ -434,6 +434,8 @@ class KnowledgeSource:
     rights_state: str
     source_class: str
     snapshot_digest: str
+    source_authority: EvaluatorProvenance
+    source_evidence_digest: str
     factual_only: bool = False
 
     def __post_init__(self) -> None:
@@ -442,6 +444,34 @@ class KnowledgeSource:
         object.__setattr__(self, "snapshot_digest", _digest(self.snapshot_digest, "snapshot_digest"))
         object.__setattr__(self, "source_class", _text(self.source_class, "source_class"))
         object.__setattr__(self, "rights_state", _text(self.rights_state, "rights_state"))
+        if not isinstance(self.source_authority, EvaluatorProvenance):
+            raise TypeError("knowledge source_authority must be EvaluatorProvenance")
+        object.__setattr__(
+            self,
+            "source_evidence_digest",
+            _digest(self.source_evidence_digest, "source_evidence_digest"),
+        )
+        if self.source_evidence_digest not in self.source_authority.output_evidence_refs:
+            raise DeepAssuranceError(
+                "knowledge source evidence must be referenced by source authority"
+            )
+        if not isinstance(self.factual_only, bool):
+            raise TypeError("knowledge factual_only state must be boolean")
+
+    @property
+    def authority_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "content_digest": self.content_digest,
+                "factual_only": self.factual_only,
+                "rights_state": self.rights_state,
+                "snapshot_digest": self.snapshot_digest,
+                "source_authority_digest": self.source_authority.digest,
+                "source_class": self.source_class,
+                "source_evidence_digest": self.source_evidence_digest,
+                "source_id": self.source_id,
+            }
+        )
 
 
 class KnowledgeIngestionFirewall:
@@ -473,6 +503,7 @@ class KnowledgeIngestionFirewall:
     def snapshot_digest(self) -> str:
         return _stable({
             key: {
+                "authority_binding_digest": row.authority_binding_digest,
                 "content": row.content_digest,
                 "rights": row.rights_state,
                 "class": row.source_class,
@@ -572,13 +603,51 @@ class RareEventObservation:
     samples: int
     critical_failures: int
     threshold: float
+    evaluator_provenance: EvaluatorProvenance
+    evidence_digest: str
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "scenario_id", _text(self.scenario_id, "scenario_id"))
-        if self.samples <= 0 or self.critical_failures < 0 or self.critical_failures > self.samples:
+        if (
+            isinstance(self.samples, bool)
+            or not isinstance(self.samples, int)
+            or isinstance(self.critical_failures, bool)
+            or not isinstance(self.critical_failures, int)
+            or self.samples <= 0
+            or self.critical_failures < 0
+            or self.critical_failures > self.samples
+        ):
             raise DeepAssuranceError("invalid rare-event sample counts")
-        if not 0.0 <= self.threshold <= 1.0:
+        if isinstance(self.threshold, bool) or not isinstance(self.threshold, (int, float)):
+            raise TypeError("rare-event threshold must be numeric")
+        threshold = float(self.threshold)
+        if not 0.0 <= threshold <= 1.0:
             raise DeepAssuranceError("threshold must be in [0,1]")
+        object.__setattr__(self, "threshold", threshold)
+        if not isinstance(self.evaluator_provenance, EvaluatorProvenance):
+            raise TypeError("rare-event evaluator_provenance must be EvaluatorProvenance")
+        object.__setattr__(
+            self,
+            "evidence_digest",
+            _digest(self.evidence_digest, "evidence_digest"),
+        )
+        if self.evidence_digest not in self.evaluator_provenance.output_evidence_refs:
+            raise DeepAssuranceError(
+                "rare-event evidence must be referenced by evaluator authority"
+            )
+
+    @property
+    def authority_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "critical_failures": self.critical_failures,
+                "evaluator_provenance_digest": self.evaluator_provenance.digest,
+                "evidence_digest": self.evidence_digest,
+                "samples": self.samples,
+                "scenario_id": self.scenario_id,
+                "threshold": self.threshold,
+            }
+        )
 
     @property
     def observed_rate(self) -> float:
