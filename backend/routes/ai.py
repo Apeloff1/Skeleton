@@ -426,7 +426,12 @@ def _chat_error(exc: Exception) -> HTTPException:
     return HTTPException(status_code=500, detail="Conversation operation failed")
 
 
-def _provider_history(messages, *, before_sequence: int | None = None) -> List[Dict[str, str]]:
+def _provider_history(
+    messages,
+    *,
+    before_sequence: int | None = None,
+    exclude_message_id: str | None = None,
+) -> List[Dict[str, str]]:
     # Failed/cancelled turns are closed by a system-derived terminal marker.
     # Their user prompt must not leak forward as an unanswered provider-history
     # turn, otherwise a later model sees work that canonical execution rejected.
@@ -443,6 +448,8 @@ def _provider_history(messages, *, before_sequence: int | None = None) -> List[D
     history: List[Dict[str, str]] = []
     for message in messages:
         if before_sequence is not None and message.sequence >= before_sequence:
+            continue
+        if exclude_message_id is not None and message.message_id == exclude_message_id:
             continue
         if message.message_id in abandoned_user_ids:
             continue
