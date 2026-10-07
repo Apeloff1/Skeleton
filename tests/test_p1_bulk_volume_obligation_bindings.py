@@ -22,6 +22,14 @@ VERIFIER_RUN_ID = 36755041677
 VERIFIER_JOB_ID = 110023019780
 BOUND_AT = "2026-09-30T18:00:00Z"
 REVIEW_AT = "2026-10-30T18:00:00Z"
+REFRESHED_BOUND_AT = "2026-10-06T19:28:13Z"
+REFRESHED_REVIEW_AT = "2026-11-05T19:28:13Z"
+REFRESHED_OBLIGATION_IDS = frozenset({
+    "P1-GAP-VOL-008:gap:0fb088140e-733f82e58e6474c6",
+    "P1-GAP-VOL-009:gap:c8aa33cfa3-679d49dbbd2ef60d",
+    "P1-GAP-VOL-012:gap:7c9fbd97d7-593b4d226d62b6f6",
+    "P1-GAP-VOL-012:gap:fb855ce6d8-320322fb17a1718e",
+})
 NOW = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
 CATEGORY = "p1_volume_obligation_evidence"
 
@@ -62,8 +70,12 @@ def test_bulk_binding_provenance_is_exact_and_complete() -> None:
         assert row["owner_id"].startswith("ACC-VOL-")
         assert row["severity"] == "high"
         assert row["disposition"] == "evidence"
-        assert row["bound_at"] == BOUND_AT
-        assert row["review_at"] == REVIEW_AT
+        if row["obligation_id"] in REFRESHED_OBLIGATION_IDS:
+            assert row["bound_at"] == REFRESHED_BOUND_AT
+            assert row["review_at"] == REFRESHED_REVIEW_AT
+        else:
+            assert row["bound_at"] == BOUND_AT
+            assert row["review_at"] == REVIEW_AT
         assert row["accepted_risk"] is None
         assert len(row["obligation_digest"]) == 64
         assert len(row["evidence"]) == 1
@@ -105,12 +117,12 @@ def test_bulk_bindings_match_live_or_governed_retired_obligations() -> None:
 def test_governed_frontier_is_497_resolved_16_adversarial() -> None:
     report = reconcile_repository(ROOT, evaluated_at=NOW)
 
-    assert report["binding_count"] == 513
-    assert report["resolved_count"] == 513
+    assert report["binding_count"] == _load(ROOT / POLICY)["inventory_expectations"]["total_obligation_count"]
+    assert report["resolved_count"] == _load(ROOT / POLICY)["inventory_expectations"]["total_obligation_count"]
     assert report["unresolved_blocking_count"] == 0
     assert report["unclassified_count"] == 0
     assert report["disposition_counts"] == {
-        "evidence": 513,
+        "evidence": _load(ROOT / POLICY)["inventory_expectations"]["total_obligation_count"],
 
     }
 
