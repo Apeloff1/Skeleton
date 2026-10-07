@@ -798,3 +798,34 @@ def test_prompt_prefix_mask_rejects_invalid_policy(prefix_lengths):
     causal = materialize_causal_training_batch(model)
     with pytest.raises(TokenizerContractError):
         mask_causal_prefix(causal, prefix_lengths)
+
+
+def test_supervised_example_binds_prompt_response_boundary(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    example = pipeline.prepare_supervised_example("example-1", "alpha beta ", "gamma delta")
+    assert example.prompt_token_count > 0
+    assert example.prompt_token_count < len(example.prepared.sequence.token_ids)
+    batches = pipeline.supervised_training_batches(example, pad_token_id=native_model.unk)
+    assert batches
+    assert sum(sum(row) for batch in batches for row in batch.loss_mask) > 0
+    assert example.digest == pipeline.prepare_supervised_example("example-1", "alpha beta ", "gamma delta").digest
+
+
+def test_supervised_example_identity_changes_with_response(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    left = pipeline.prepare_supervised_example("example-1", "alpha beta ", "gamma")
+    right = pipeline.prepare_supervised_example("example-1", "alpha beta ", "delta")
+    assert left.digest != right.digest
+    assert left.response_digest != right.response_digest
+
+
+def test_supervised_example_requires_response_tokens(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    with pytest.raises(TokenizerContractError):
+        pipeline.prepare_supervised_example("example-1", "alpha", "")
