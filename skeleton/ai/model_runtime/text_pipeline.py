@@ -391,6 +391,14 @@ class TextTokenPipeline:
             base_model_digest=base_model_digest,
         )
 
+    def advance_training_checkpoint(self, manifest, checkpoint, *, weights_digest: str, optimizer_digest: str, rng_digest: str):
+        from skeleton.ai.training.flgb_training_runtime import TrainingCheckpoint, TrainingManifest
+        if not isinstance(manifest, TrainingManifest) or not isinstance(checkpoint, TrainingCheckpoint):
+            raise TokenizerContractError("training manifest/checkpoint required")
+        if checkpoint.run_manifest_digest != manifest.digest:
+            raise TokenizerContractError("checkpoint does not belong to training manifest")
+        return checkpoint.next(weights_digest, optimizer_digest, rng_digest)
+
     def decode(self, sequence: TokenSequence, *, require_identity: bool = True) -> str:
         if not isinstance(sequence, TokenSequence):
             raise TokenizerContractError("TokenSequence required")
