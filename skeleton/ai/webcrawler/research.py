@@ -29,6 +29,8 @@ class ResearchQuery:
     freshness_half_life_seconds: float = 7 * 86400.0
     diversity_weight: float = 0.25
     contradiction_weight: float = 0.20
+    min_relevance: float = 0.10
+    min_source_score: float = 0.25
 
 @dataclass(frozen=True)
 class EvidenceObservation:
@@ -79,9 +81,12 @@ class EvidenceSet:
         self.observations[obs.observation_id]=obs
         return obs
 
+    def qualified(self) -> list[EvidenceObservation]:
+        return [o for o in self.observations.values() if o.relevance >= self.query.min_relevance and o.source_score >= self.query.min_source_score]
+
     @property
     def distinct_hosts(self) -> int:
-        return len({x.host for x in self.observations.values()})
+        return len({x.host for x in self.qualified()})
 
     def contradictions(self) -> list[Contradiction]:
         out=[]
@@ -123,13 +128,14 @@ class EvidenceSet:
 
     def assurance(self, *, now: float) -> Mapping[str, object]:
         ranked=self.ranked(now=now)
-        relevant=[o for o in ranked if o.relevance > 0]
+        relevant=[o for o in ranked if o.relevance >= self.query.min_relevance and o.source_score >= self.query.min_source_score]
         contradictions=self.contradictions()
         diversity=min(1.0, self.distinct_hosts/max(1,self.query.required_sources))
         mean_rel=sum(o.relevance for o in relevant)/max(1,len(relevant))
         mean_quality=sum(o.source_score for o in relevant)/max(1,len(relevant))
         contradiction_penalty=min(1.0,sum(c.confidence for c in contradictions)/max(1,len(relevant)))
-        score=max(0.0,min(1.0,.4*mean_rel+.35*mean_quality+.25*diversity-.2*contradiction_penalty))
+        base_weight=max(0.0,1.0-self.query.diversity_weight)
+        score=max(0.0,min(1.0,base_weight*(.55*mean_rel+.45*mean_quality)+self.query.diversity_weight*diversity-self.query.contradiction_weight*contradiction_penalty))
         return {
             "schema":"skeleton.ai.research.assurance.v1",
             "query":self.query.text,
