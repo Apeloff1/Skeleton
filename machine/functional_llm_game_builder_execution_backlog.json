@@ -113,9 +113,10 @@
         "FLGB-04-T11",
         "FLGB-04-T12"
       ],
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
-      "independent_verification_signed": false
+      "independent_verification_signed": false,
+      "implementation_note": "T01-T12 tools/agents/authority/recovery control targets, schemas, and focused regressions are present; FLGB-01/03 dependencies and exact-head independent verification remain required before signoff."
     },
     {
       "id": "FLGB-05",
@@ -2897,7 +2898,7 @@
       "implementation_target": "skeleton/ai/agents/tool_registry.py",
       "contract_target": "skeleton/ai/agents/contracts/tool_registry.schema.json",
       "test_target": "tests/flgb/test_flgb_04_tool_registry.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -2963,7 +2964,7 @@
       "implementation_target": "skeleton/ai/agents/tool_schema.py",
       "contract_target": "skeleton/ai/agents/contracts/tool_schema.schema.json",
       "test_target": "tests/flgb/test_flgb_04_tool_schema.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -3029,7 +3030,7 @@
       "implementation_target": "skeleton/ai/agents/authority_subset.py",
       "contract_target": "skeleton/ai/agents/contracts/authority_subset.schema.json",
       "test_target": "tests/flgb/test_flgb_04_authority_subset.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -3095,7 +3096,7 @@
       "implementation_target": "skeleton/ai/agents/sandbox_execution.py",
       "contract_target": "skeleton/ai/agents/contracts/sandbox_execution.schema.json",
       "test_target": "tests/flgb/test_flgb_04_sandbox_execution.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -3161,7 +3162,7 @@
       "implementation_target": "skeleton/ai/agents/idempotent_writes.py",
       "contract_target": "skeleton/ai/agents/contracts/idempotent_writes.schema.json",
       "test_target": "tests/flgb/test_flgb_04_idempotent_writes.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -3227,7 +3228,7 @@
       "implementation_target": "skeleton/ai/agents/compensation.py",
       "contract_target": "skeleton/ai/agents/contracts/compensation.schema.json",
       "test_target": "tests/flgb/test_flgb_04_compensation.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -3293,7 +3294,7 @@
       "implementation_target": "skeleton/ai/agents/plan_dag.py",
       "contract_target": "skeleton/ai/agents/contracts/plan_dag.schema.json",
       "test_target": "tests/flgb/test_flgb_04_plan_dag.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -3359,7 +3360,7 @@
       "implementation_target": "skeleton/ai/agents/worker_leases.py",
       "contract_target": "skeleton/ai/agents/contracts/worker_leases.schema.json",
       "test_target": "tests/flgb/test_flgb_04_worker_leases.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -3425,7 +3426,7 @@
       "implementation_target": "skeleton/ai/agents/checkpointing.py",
       "contract_target": "skeleton/ai/agents/contracts/checkpointing.schema.json",
       "test_target": "tests/flgb/test_flgb_04_checkpointing.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -3491,7 +3492,7 @@
       "implementation_target": "skeleton/ai/agents/handoff.py",
       "contract_target": "skeleton/ai/agents/contracts/handoff.schema.json",
       "test_target": "tests/flgb/test_flgb_04_handoff.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -3557,7 +3558,7 @@
       "implementation_target": "skeleton/ai/agents/multi_agent_arbitration.py",
       "contract_target": "skeleton/ai/agents/contracts/multi_agent_arbitration.schema.json",
       "test_target": "tests/flgb/test_flgb_04_multi_agent_arbitration.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -3623,7 +3624,7 @@
       "implementation_target": "skeleton/ai/agents/long_run_recovery.py",
       "contract_target": "skeleton/ai/agents/contracts/long_run_recovery.schema.json",
       "test_target": "tests/flgb/test_flgb_04_long_run_recovery.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
