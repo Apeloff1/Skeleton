@@ -100,13 +100,13 @@ def test_ac14_binding_matches_live_adversarial_obligation() -> None:
 def test_ac14_binding_advances_frontier_without_risk_acceptance() -> None:
     report = reconcile_repository(ROOT, evaluated_at=NOW)
 
-    assert report["binding_count"] == 517
-    assert report["resolved_count"] == 517
+    expected_total = report["inventory"]["total_obligation_count"]
+    assert report["binding_count"] == expected_total
+    assert report["resolved_count"] == expected_total
     assert report["unresolved_blocking_count"] == 0
     assert report["unclassified_count"] == 0
     assert report["disposition_counts"] == {
-        "evidence": 517,
-
+        "evidence": expected_total,
     }
 
     registry = _load(ROOT / REGISTRY)
