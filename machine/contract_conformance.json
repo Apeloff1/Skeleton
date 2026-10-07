@@ -515,6 +515,41 @@
       "mutation": "null:deadline",
       "expected": "accept",
       "reason": "declared nullable fields accept explicit null"
+    },
+    {
+      "id": "JSON-SAFE-MAX-INTEGER",
+      "kind": "raw_json",
+      "payload": "{\"a\":9007199254740991}",
+      "expected": "accept",
+      "reason": "largest interoperable IEEE-754 integer must remain exact"
+    },
+    {
+      "id": "JSON-UNSAFE-POSITIVE-INTEGER",
+      "kind": "raw_json",
+      "payload": "{\"a\":9007199254740992}",
+      "expected": "reject",
+      "reason": "integer exceeds interoperable IEEE-754 exact range"
+    },
+    {
+      "id": "JSON-UNSAFE-NEGATIVE-INTEGER",
+      "kind": "raw_json",
+      "payload": "{\"a\":-9007199254740992}",
+      "expected": "reject",
+      "reason": "integer exceeds interoperable IEEE-754 exact range"
+    },
+    {
+      "id": "JSON-POSITIVE-ZERO",
+      "kind": "raw_json",
+      "payload": "{\"a\":0.0}",
+      "expected": "accept",
+      "reason": "positive zero has stable canonical sign"
+    },
+    {
+      "id": "JSON-NEGATIVE-ZERO",
+      "kind": "raw_json",
+      "payload": "{\"a\":-0.0}",
+      "expected": "reject",
+      "reason": "negative zero has divergent cross-runtime canonicalization"
     }
   ]
 }
