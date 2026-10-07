@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from .contracts import ProducerProvenance
+from collections.abc import Iterable, Mapping
+
+from .contracts import ArtifactIdentity, Candidate, ProducerProvenance
 
 
 class ProducerProvenanceBindingError(ValueError):
@@ -74,10 +76,51 @@ def producer_provenance_from_canonical_execution(
         producer_behavior_digest=producer_behavior_digest,
         source_revision=source_revision,
         provider_receipt_refs=tuple(result.provider_receipts),
+        output_artifact_refs=tuple(result.artifact_refs),
+        output_evidence_refs=tuple(result.evidence_refs),
+    )
+
+
+def candidate_from_canonical_execution(
+    *,
+    producer_id: str,
+    project_id: str,
+    run_id: str,
+    request: object,
+    finalization: object,
+    model_manifest: object,
+    producer_behavior_digest: str,
+    source_revision: str,
+    artifact: ArtifactIdentity,
+    quality: Mapping[str, float],
+    evidence_digests: Iterable[str],
+    assumption_digest: str,
+    parent_candidate_digests: Iterable[str] = (),
+) -> Candidate:
+    """Construct a candidate only when its payload is committed by the execution."""
+
+    provenance = producer_provenance_from_canonical_execution(
+        project_id=project_id,
+        run_id=run_id,
+        request=request,
+        finalization=finalization,
+        model_manifest=model_manifest,
+        producer_behavior_digest=producer_behavior_digest,
+        source_revision=source_revision,
+    )
+    return Candidate.create(
+        producer_id=producer_id,
+        producer_provenance=provenance,
+        artifact=artifact,
+        quality=quality,
+        evidence_digests=evidence_digests,
+        assumption_digest=assumption_digest,
+        parent_candidate_digests=parent_candidate_digests,
     )
 
 
 __all__ = [
     "ProducerProvenanceBindingError",
+    "candidate_from_canonical_execution",
     "producer_provenance_from_canonical_execution",
 ]

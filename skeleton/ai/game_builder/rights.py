@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Iterable
 
-from .contracts import canonical_digest
+from .contracts import EvaluatorProvenance, canonical_digest
 
 
 class RightsError(RuntimeError):
@@ -49,6 +49,8 @@ class SourceRecord:
     rights_state: RightsState
     allowed_uses: frozenset[UseKind]
     source_class: str
+    rights_authority: EvaluatorProvenance
+    rights_evidence_digest: str
     license_id: str | None = None
     attribution_text: str | None = None
     attribution_required: bool = False
@@ -56,19 +58,56 @@ class SourceRecord:
     consent_digest: str | None = None
 
     def __post_init__(self) -> None:
-        if not self.source_id.strip() or not self.source_class.strip():
+        if (
+            not isinstance(self.source_id, str)
+            or not self.source_id.strip()
+            or not isinstance(self.source_class, str)
+            or not self.source_class.strip()
+        ):
             raise ValueError("source identity and source_class must be non-empty")
-        if len(self.content_digest) < 16:
+        if not isinstance(self.content_digest, str) or len(self.content_digest) < 16:
             raise ValueError("content_digest must be stable")
+        if not isinstance(self.rights_state, RightsState):
+            raise TypeError("rights_state must be RightsState")
+        if not isinstance(self.allowed_uses, frozenset) or any(
+            not isinstance(item, UseKind) for item in self.allowed_uses
+        ):
+            raise TypeError("allowed_uses must be a frozenset of UseKind")
+        if not isinstance(self.rights_authority, EvaluatorProvenance):
+            raise TypeError("rights_authority must be EvaluatorProvenance")
+        if (
+            not isinstance(self.rights_evidence_digest, str)
+            or len(self.rights_evidence_digest) < 16
+        ):
+            raise ValueError("rights_evidence_digest must be stable")
+        if self.rights_evidence_digest not in self.rights_authority.output_evidence_refs:
+            raise RightsError(
+                "rights evidence must be referenced by rights authority"
+            )
+        if not isinstance(self.attribution_required, bool):
+            raise TypeError("attribution_required must be boolean")
+        if not isinstance(self.consent_required, bool):
+            raise TypeError("consent_required must be boolean")
         if self.attribution_required and not (self.attribution_text or "").strip():
             raise ValueError("required attribution text is missing")
         if self.consent_required and not self.consent_digest:
             raise ValueError("required consent evidence is missing")
-        if self.consent_digest is not None and len(self.consent_digest) < 16:
+        if self.consent_digest is not None and (
+            not isinstance(self.consent_digest, str)
+            or len(self.consent_digest) < 16
+        ):
             raise ValueError("consent_digest must be stable")
+        if self.rights_state is RightsState.LICENSED_REUSE and not (
+            self.license_id or ""
+        ).strip():
+            raise ValueError("licensed reuse requires license identity")
         if self.rights_state in {RightsState.UNKNOWN_QUARANTINE, RightsState.FORBIDDEN}:
             if self.allowed_uses:
                 raise ValueError("quarantined/forbidden sources cannot declare allowed uses")
+
+    @property
+    def rights_binding_digest(self) -> str:
+        return canonical_digest(self.to_payload())
 
     def to_payload(self) -> dict[str, object]:
         return {
@@ -79,6 +118,8 @@ class SourceRecord:
             "consent_required": self.consent_required,
             "content_digest": self.content_digest,
             "license_id": self.license_id,
+            "rights_authority_digest": self.rights_authority.digest,
+            "rights_evidence_digest": self.rights_evidence_digest,
             "rights_state": self.rights_state.value,
             "source_class": self.source_class,
             "source_id": self.source_id,
@@ -93,16 +134,83 @@ class SimilarityFinding:
     modality: str
     risk: SimilarityRisk
     evidence_digest: str
+    evaluator_provenance: EvaluatorProvenance
     resolved: bool = False
     resolution: str | None = None
+    resolution_evidence_digest: str | None = None
+    resolution_authority: EvaluatorProvenance | None = None
 
     def __post_init__(self) -> None:
         if not self.finding_id.strip() or not self.modality.strip():
             raise ValueError("similarity finding identity/modality must be non-empty")
         if len(self.artifact_digest) < 16 or len(self.evidence_digest) < 16:
             raise ValueError("similarity finding digests must be stable")
-        if self.resolved and not (self.resolution or "").strip():
-            raise ValueError("resolved finding requires a resolution")
+        if not isinstance(self.evaluator_provenance, EvaluatorProvenance):
+            raise TypeError("similarity evaluator_provenance must be EvaluatorProvenance")
+        if self.evidence_digest not in self.evaluator_provenance.output_evidence_refs:
+            raise RightsError(
+                "similarity evidence must be referenced by evaluator authority"
+            )
+        if not isinstance(self.resolved, bool):
+            raise TypeError("similarity resolved state must be boolean")
+        if self.resolved:
+            if not (self.resolution or "").strip():
+                raise ValueError("resolved finding requires a resolution")
+            if not isinstance(self.resolution_authority, EvaluatorProvenance):
+                raise TypeError("resolved finding requires resolution authority")
+            if (
+                not isinstance(self.resolution_evidence_digest, str)
+                or len(self.resolution_evidence_digest) < 16
+            ):
+                raise ValueError("resolved finding requires stable resolution evidence")
+            if (
+                self.resolution_evidence_digest
+                not in self.resolution_authority.output_evidence_refs
+            ):
+                raise RightsError(
+                    "similarity resolution evidence must be referenced by resolution authority"
+                )
+            if (
+                self.risk is SimilarityRisk.HIGH
+                and self.resolution_authority.evaluator_id
+                == self.evaluator_provenance.evaluator_id
+            ):
+                raise RightsError(
+                    "high-risk similarity resolution requires independent authority"
+                )
+        elif (
+            self.resolution is not None
+            or self.resolution_evidence_digest is not None
+            or self.resolution_authority is not None
+        ):
+            raise ValueError("unresolved finding cannot carry resolution authority state")
+
+    @property
+    def evidence_binding_digest(self) -> str:
+        return canonical_digest(
+            {
+                "artifact_digest": self.artifact_digest,
+                "evaluator_provenance_digest": self.evaluator_provenance.digest,
+                "evidence_digest": self.evidence_digest,
+                "finding_id": self.finding_id,
+                "modality": self.modality,
+                "risk": self.risk.value,
+                "source_id": self.source_id,
+            }
+        )
+
+    @property
+    def resolution_binding_digest(self) -> str | None:
+        if not self.resolved or self.resolution_authority is None:
+            return None
+        return canonical_digest(
+            {
+                "finding_evidence_binding_digest": self.evidence_binding_digest,
+                "resolution": self.resolution,
+                "resolution_authority_digest": self.resolution_authority.digest,
+                "resolution_evidence_digest": self.resolution_evidence_digest,
+            }
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,6 +222,34 @@ class IncorporationDecision:
     reason: str
     source_record_digest: str
     decision_digest: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.allowed, bool):
+            raise TypeError("incorporation allowed state must be boolean")
+        if not isinstance(self.use_kind, UseKind):
+            raise TypeError("incorporation use_kind must be UseKind")
+        if not self.source_id.strip() or not self.reason.strip():
+            raise ValueError("incorporation identity/reason must be non-empty")
+        for value in (
+            self.artifact_digest,
+            self.source_record_digest,
+            self.decision_digest,
+        ):
+            if not isinstance(value, str) or len(value) < 16:
+                raise ValueError("incorporation decision identities must be stable")
+        expected = canonical_digest(self.decision_payload())
+        if self.decision_digest != expected:
+            raise ValueError("incorporation decision digest mismatch")
+
+    def decision_payload(self) -> dict[str, object]:
+        return {
+            "allowed": self.allowed,
+            "artifact_digest": self.artifact_digest,
+            "reason": self.reason,
+            "source_id": self.source_id,
+            "source_record_digest": self.source_record_digest,
+            "use_kind": self.use_kind.value,
+        }
 
 
 class RightsLedger:
@@ -199,7 +335,14 @@ class RightsLedger:
             raise RightsError("similarity finding identity cannot be rebound")
         self._findings[finding.finding_id] = finding
 
-    def resolve_similarity(self, finding_id: str, *, resolution: str) -> SimilarityFinding:
+    def resolve_similarity(
+        self,
+        finding_id: str,
+        *,
+        resolution: str,
+        resolution_evidence_digest: str,
+        resolution_authority: EvaluatorProvenance,
+    ) -> SimilarityFinding:
         existing = self._findings.get(finding_id)
         if existing is None:
             raise RightsError(f"unknown similarity finding: {finding_id}")
@@ -214,8 +357,11 @@ class RightsLedger:
             modality=existing.modality,
             risk=existing.risk,
             evidence_digest=existing.evidence_digest,
+            evaluator_provenance=existing.evaluator_provenance,
             resolved=True,
             resolution=resolution,
+            resolution_evidence_digest=resolution_evidence_digest,
+            resolution_authority=resolution_authority,
         )
         self._findings[finding_id] = resolved
         return resolved
@@ -273,9 +419,12 @@ class RightsLedger:
                 {
                     "artifact_digest": row.artifact_digest,
                     "evidence_digest": row.evidence_digest,
+                    "evidence_binding_digest": row.evidence_binding_digest,
+                    "evaluator_provenance_digest": row.evaluator_provenance.digest,
                     "finding_id": row.finding_id,
                     "modality": row.modality,
                     "resolution": row.resolution,
+                    "resolution_binding_digest": row.resolution_binding_digest,
                     "resolved": row.resolved,
                     "risk": row.risk.value,
                     "source_id": row.source_id,

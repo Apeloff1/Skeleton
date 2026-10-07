@@ -5,13 +5,14 @@ execution remains outside the authority boundary and must enter through governed
 candidate, canon, rights, atom-lineage, and evidence contracts.
 """
 
-from .atomizer import ArtifactAtom, AtomGraph, AtomGraphError
+from .atomizer import ArtifactAtom, AtomGraph, AtomGraphError, AtomSourceBinding
 from .canon import CanonAssertion, CanonError, CanonLedger, CharacterKnowledge
 from .contracts import (
     ArtifactIdentity,
     Candidate,
     Challenge,
     EffortMode,
+    EvaluatorProvenance,
     GateResult,
     PromotionReceipt,
     ProducerProvenance,
@@ -54,9 +55,11 @@ from .resource_governor import (
 )
 from .resilience import (
     DissentLedger,
+    ImpactCalibrationReceipt,
     ImpactGraph,
     Invariant,
     InvariantRegistry,
+    InvariantRevisionReceipt,
     NoveltyRecord,
     NoveltyReservoir,
     Objection,
@@ -95,13 +98,21 @@ from .deep_assurance import (
     RequirementClosureLedger,
     RequirementProof,
     ResurrectionPoint,
+    ResurrectionVerification,
     TailRiskLab,
     TelemetryAggregate,
     TelemetryFeedbackGate,
     TransformReceipt,
 )
+from .evaluator_provenance import (
+    EvaluatorProvenanceBindingError,
+    evaluator_provenance_from_canonical_execution,
+    gate_result_from_canonical_execution,
+    judge_verdict_from_canonical_execution,
+)
 from .producer_provenance import (
     ProducerProvenanceBindingError,
+    candidate_from_canonical_execution,
     producer_provenance_from_canonical_execution,
 )
 from .rights import (
@@ -120,6 +131,7 @@ __all__ = [
     "ArtifactIdentity",
     "AtomGraph",
     "AtomGraphError",
+    "AtomSourceBinding",
     "Candidate",
     "CanonAssertion",
     "CanonError",
@@ -128,12 +140,18 @@ __all__ = [
     "CharacterKnowledge",
     "DualRivalForge",
     "EffortMode",
+    "EvaluatorProvenance",
+    "EvaluatorProvenanceBindingError",
+    "evaluator_provenance_from_canonical_execution",
+    "gate_result_from_canonical_execution",
+    "judge_verdict_from_canonical_execution",
     "ForgeStateError",
     "GateResult",
     "IncorporationDecision",
     "PromotionReceipt",
     "ProducerProvenance",
     "ProducerProvenanceBindingError",
+    "candidate_from_canonical_execution",
     "producer_provenance_from_canonical_execution",
     "RightsError",
     "RightsLedger",
@@ -172,9 +190,11 @@ __all__ = [
     "ResourceSnapshot",
     "blind_candidate_token",
     "DissentLedger",
+    "ImpactCalibrationReceipt",
     "ImpactGraph",
     "Invariant",
     "InvariantRegistry",
+    "InvariantRevisionReceipt",
     "NoveltyRecord",
     "NoveltyReservoir",
     "Objection",
@@ -209,6 +229,7 @@ __all__ = [
     "RequirementClosureLedger",
     "RequirementProof",
     "ResurrectionPoint",
+    "ResurrectionVerification",
     "TailRiskLab",
     "TelemetryAggregate",
     "TelemetryFeedbackGate",
