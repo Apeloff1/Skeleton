@@ -2,6 +2,8 @@
 from .admission_scheduler import AdmissionDecision, AdmissionLimits, RuntimeAdmissionScheduler, ScheduledRequest
 from .runtime_signals import DEFAULT_RUNTIME_SIGNALS, RuntimeSignal, RuntimeSignalRegistry, SignalMaturity
 from .runtime_policy import DEFAULT_RUNTIME_POLICY_COMPILER, RuntimePolicy, RuntimePolicyCompiler
+from .runtime_epochs import DEFAULT_RUNTIME_EPOCHS, EpochStatus, RuntimeEpoch, RuntimeEpochRegistry
+from .temporal_policy import DEFAULT_TEMPORAL_RUNTIME_POLICY_COMPILER, TemporalRuntimePolicy, TemporalRuntimePolicyCompiler
 from .flgb_model_runtime import (
     ALLOWED_TRANSITIONS,
     BatchRequest,
@@ -73,11 +75,14 @@ __all__ = [
     "BatchGenerationResult",
     "CancellationToken",
     "BatchRequest",
+    "DEFAULT_RUNTIME_EPOCHS",
     "DEFAULT_RUNTIME_POLICY_COMPILER",
+    "DEFAULT_TEMPORAL_RUNTIME_POLICY_COMPILER",
     "DEFAULT_RUNTIME_SIGNALS",
     "DeviceDescriptor",
     "DevicePolicy",
     "DeviceReceipt",
+    "EpochStatus",
     "GenerationConfig",
     "GenerationResult",
     "GenerationStream",
@@ -99,6 +104,8 @@ __all__ = [
     "ReplayReceipt",
     "Replica",
     "RuntimeAdmissionScheduler",
+    "RuntimeEpoch",
+    "RuntimeEpochRegistry",
     "RuntimePolicy",
     "RuntimePolicyCompiler",
     "RuntimeSignal",
@@ -112,6 +119,8 @@ __all__ = [
     "SignalMaturity",
     "SpeculativeReceipt",
     "StreamingTextFeed",
+    "TemporalRuntimePolicy",
+    "TemporalRuntimePolicyCompiler",
     "TokenBatch",
     "TokenSequence",
     "TokenWindow",
