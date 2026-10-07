@@ -495,3 +495,7 @@ def test_control_chain_rejects_policy_drift() -> None:
         previous_decision_digest=first.decision_digest,
     )
     assert not verify_cognitive_control_chain((first, second))
+
+
+def test_empty_control_chain_is_not_valid_evidence() -> None:
+    assert not verify_cognitive_control_chain(())
