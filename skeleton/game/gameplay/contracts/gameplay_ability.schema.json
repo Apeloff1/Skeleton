@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-13:gameplay_ability:v1",
+  "title": "FLGB-13 gameplay ability",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ability_id",
+    "cost_units",
+    "cooldown_ticks",
+    "tags",
+    "requirement_digest"
+  ],
+  "properties": {
+    "ability_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "cost_units": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cooldown_ticks": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tags": {
+      "type": "array",
+      "maxItems": 1024,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "requirement_digest": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}
