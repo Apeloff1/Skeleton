@@ -2285,11 +2285,12 @@ async def get_ai_chat_turn(
                     "response-accepted:"
                     + deferred_response_acceptance.digest
                 ),
-                provider_receipt_ref=(
-                    engine_result.provider_receipts[0]
-                    if len(engine_result.provider_receipts) == 1
-                    else None
-                ),
+                provider_receipt_ref=bind_provider_receipt_set(
+                    operation_id=operation_id,
+                    execution_id=execution_id,
+                    context_digest=binding.context_digest,
+                    provider_receipts=engine_result.provider_receipts,
+                ).reference,
                 lease=poll_lease,
             )
         except Exception as exc:
