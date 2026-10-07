@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-14:lore_graph:v1",
+  "title": "FLGB-14 lore graph",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "fact_id",
+    "subject",
+    "predicate",
+    "object_digest",
+    "source_digest"
+  ],
+  "properties": {
+    "fact_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "subject": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "predicate": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "object_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
