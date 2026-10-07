@@ -49,7 +49,7 @@ from .runtime_contracts import (
     RuntimeLimits,
     RuntimeUsage,
 )
-from .text_pipeline import CausalTrainingBatch, CorpusTrainingReceipt, GovernedTrainingInput, ModelInputBatch, PipelineReplayCheckpoint, PreparedCorpus, PreparedText, PromotionAuthorizationRequest, SupervisedTextExample, TemporalSupersession, TemporalTrainingSignal, TextPipelineConfig, TextTokenPipeline, TrainingInputReceipt, deserialize_causal_training_batch, deserialize_model_input_batch, mask_causal_prefix, materialize_causal_training_batch, materialize_model_batch, serialize_causal_training_batch, serialize_model_input_batch
+from .text_pipeline import CausalTrainingBatch, CorpusTrainingReceipt, DecadeTrainingSignal, GovernedTrainingInput, ModelInputBatch, PipelineReplayCheckpoint, PreparedCorpus, PreparedText, PromotionAuthorizationRequest, SupervisedTextExample, TemporalSupersession, TemporalTrainingSignal, TextPipelineConfig, TextTokenPipeline, TrainingInputReceipt, deserialize_causal_training_batch, decade_weight_ppm, deserialize_model_input_batch, mask_causal_prefix, materialize_causal_training_batch, materialize_model_batch, serialize_causal_training_batch, serialize_model_input_batch
 from .tokenization import (
     NativeTokenizer,
     StreamingTextFeed,
@@ -71,6 +71,7 @@ __all__ = [
     "BatchRequest",
     "CausalTrainingBatch",
     "CorpusTrainingReceipt",
+    "DecadeTrainingSignal",
     "DeviceDescriptor",
     "DevicePolicy",
     "DeviceReceipt",
@@ -121,6 +122,7 @@ __all__ = [
     "WeightLoadPlan",
     "WeightShard",
     "batch_token_windows",
+    "decade_weight_ppm",
     "deserialize_causal_training_batch",
     "deserialize_model_input_batch",
     "deserialize_token_sequence",
