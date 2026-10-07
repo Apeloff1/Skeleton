@@ -155,3 +155,44 @@ def test_causal_training_pipeline_is_deterministic(native_model):
     left = pipeline.causal_training_batches(prepared)
     right = pipeline.causal_training_batches(prepared)
     assert tuple(batch.digest for batch in left) == tuple(batch.digest for batch in right)
+
+
+def test_training_receipt_binds_replayable_training_payload(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextPipelineConfig, TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model), TextPipelineConfig(context_size=4))
+    prepared = pipeline.prepare("alpha beta gamma delta epsilon")
+    receipt = pipeline.training_receipt(prepared)
+
+    assert receipt.pipeline_digest == pipeline.digest
+    assert receipt.tokenizer_digest == pipeline.tokenizer.digest
+    assert receipt.sequence_digest == prepared.sequence.digest
+    assert receipt.example_count > 0
+    assert receipt.supervised_token_count > 0
+    assert len(receipt.digest) == 64
+    pipeline.verify_training_receipt(prepared, receipt)
+
+
+def test_training_receipt_rejects_tampered_payload(native_model):
+    from dataclasses import replace
+    from skeleton.ai.model_runtime.text_pipeline import TextPipelineConfig, TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model), TextPipelineConfig(context_size=4))
+    prepared = pipeline.prepare("alpha beta gamma delta epsilon")
+    receipt = pipeline.training_receipt(prepared)
+    tampered = replace(receipt, supervised_token_count=receipt.supervised_token_count + 1)
+
+    with pytest.raises(TokenizerContractError, match="receipt mismatch"):
+        pipeline.verify_training_receipt(prepared, tampered)
+
+
+def test_training_receipt_fails_closed_without_trainable_examples(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextPipelineConfig, TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model), TextPipelineConfig(context_size=1))
+    prepared = pipeline.prepare("alpha")
+    with pytest.raises(TokenizerContractError, match="no trainable"):
+        pipeline.training_receipt(prepared)
