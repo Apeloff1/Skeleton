@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-13:npc_planner:v1",
+  "title": "FLGB-13 npc planner",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "goal_id",
+    "utility_ppm",
+    "risk_ppm",
+    "action_digest"
+  ],
+  "properties": {
+    "goal_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "utility_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "risk_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "action_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
