@@ -9,6 +9,7 @@ from skeleton.ai.model_runtime import (
     GenerationConfig,
     NativeLLMRuntime,
     ReplayMismatch,
+    ReplayReceipt,
     RuntimeContractError,
     RuntimeLimits,
 )
@@ -283,6 +284,42 @@ class TestNativeLLMRuntime(unittest.TestCase):
                     max_checkpoint_bytes=20_000_000,
                 ),
             )
+
+    def test_replay_receipt_and_checkpoint_envelopes_fail_closed(self):
+        runtime = self.runtime()
+        result = runtime.generate(
+            "hello world",
+            GenerationConfig(max_new_tokens=1, seed=4, temperature=0.0),
+        )
+        receipt = result.replay_receipt
+        with self.assertRaises(RuntimeContractError):
+            ReplayReceipt(
+                model_digest="bad",
+                tokenizer_digest=receipt.tokenizer_digest,
+                architecture_digest=receipt.architecture_digest,
+                request_digest=receipt.request_digest,
+                output_digest=receipt.output_digest,
+                config_digest=receipt.config_digest,
+                device_digest=receipt.device_digest,
+                seed=receipt.seed,
+            )
+        with self.assertRaises(RuntimeContractError):
+            ReplayReceipt(
+                model_digest=receipt.model_digest,
+                tokenizer_digest=receipt.tokenizer_digest,
+                architecture_digest=receipt.architecture_digest,
+                request_digest=receipt.request_digest,
+                output_digest=receipt.output_digest,
+                config_digest=receipt.config_digest,
+                device_digest=receipt.device_digest,
+                seed=receipt.seed,
+                schema="unsupported",
+            )
+
+        checkpoint = copy.deepcopy(runtime.checkpoint())
+        checkpoint["unexpected"] = True
+        with self.assertRaises(RuntimeContractError):
+            NativeLLMRuntime.restore(checkpoint)
 
     def test_batch_and_sampling_contracts(self):
         runtime = self.runtime()
