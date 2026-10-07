@@ -106,6 +106,18 @@ def test_horizon_sentinel_requires_near_mid_and_far_evidence() -> None:
     assert sentinel.qualified("character.arc")
 
 
+def test_horizon_probe_rejects_truthy_non_boolean_pass_state() -> None:
+    with pytest.raises(TypeError, match="horizon probe passed state must be boolean"):
+        HorizonProbe(
+            probe_id="probe-malformed",
+            anchor_id="character.arc",
+            distant_ids=("ending",),
+            minimum_distance=100,
+            evidence_digest="far-" + "c" * 32,
+            passed="false",
+        )
+
+
 def test_effort_scheduler_selects_exact_supported_tiers() -> None:
     scheduler = EffortPortfolioScheduler(medium_threshold=0.4, extreme_threshold=0.7)
     low = scheduler.choose(EffortSignal(0.1, 0.1, 0.1, 0.2, 0.1))
@@ -195,6 +207,17 @@ def test_convergence_monitor_detects_cycle_and_stagnation_without_declaring_succ
     assert monitor.cycling
     assert monitor.stagnant
     assert monitor.requires_hypothesis_injection
+
+
+def test_project_wisdom_rejects_truthy_non_boolean_verification_state() -> None:
+    with pytest.raises(TypeError, match="wisdom independent verification state must be boolean"):
+        WisdomRecord(
+            lesson_id="lesson-malformed",
+            scope_ids=("GB09",),
+            evidence_digests=("evidence-" + "a" * 32,),
+            statement_digest="statement-" + "b" * 32,
+            independently_verified="false",
+        )
 
 
 def test_project_wisdom_requires_independent_verification() -> None:

@@ -122,6 +122,93 @@ def test_stage_order_and_role_rotation_are_fail_closed() -> None:
     assert forge.stage is Stage.CONSTRUCT
 
 
+def test_compensable_only_gate_set_cannot_promote() -> None:
+    incumbent = _candidate("seed", "s", quality=_quality(0.4))
+    forge = DualRivalForge(effort_mode=100, champion=incumbent)
+    built = _candidate(Rival.A.value, "a", quality=_quality(0.5))
+    forge.submit_construct(built)
+    challenge = _challenge(Rival.B, built, "b")
+    forge.submit_attack(challenge)
+
+    receipt = forge.reconcile(
+        submitted=challenge.improved_candidate,
+        evaluator_id="independent-judge",
+        gate_results=(
+            GateResult(
+                "advisory",
+                True,
+                "evidence-advisory-0000000000000000",
+                non_compensable=False,
+            ),
+        ),
+    )
+
+    assert receipt.decision == "retain_incumbent"
+    assert forge.champion.digest == incumbent.digest
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("passed", 1, "passed state must be boolean"),
+        ("passed", "false", "passed state must be boolean"),
+        ("non_compensable", 1, "non_compensable state must be boolean"),
+        ("non_compensable", "false", "non_compensable state must be boolean"),
+    ],
+)
+def test_gate_result_rejects_non_boolean_authority_states(
+    field: str,
+    value: object,
+    message: str,
+) -> None:
+    kwargs = {
+        "gate_id": "rights",
+        "passed": True,
+        "evidence_digest": "evidence-rights-0000000000000000",
+        "non_compensable": True,
+    }
+    kwargs[field] = value
+    with pytest.raises(TypeError, match=message):
+        GateResult(**kwargs)
+
+
+def test_duplicate_gate_ids_are_rejected_before_promotion() -> None:
+    incumbent = _candidate("seed", "s", quality=_quality(0.4))
+    forge = DualRivalForge(effort_mode=100, champion=incumbent)
+    built = _candidate(Rival.A.value, "a", quality=_quality(0.5))
+    forge.submit_construct(built)
+    challenge = _challenge(Rival.B, built, "b")
+    forge.submit_attack(challenge)
+
+    duplicate = GateResult(
+        "rights",
+        True,
+        "evidence-rights-1111111111111111",
+    )
+    with pytest.raises(ValueError, match="unique gate ids"):
+        forge.reconcile(
+            submitted=challenge.improved_candidate,
+            evaluator_id="independent-judge",
+            gate_results=(_gates()[0], duplicate),
+        )
+
+
+def test_malformed_gate_object_is_rejected_before_promotion() -> None:
+    incumbent = _candidate("seed", "s", quality=_quality(0.4))
+    forge = DualRivalForge(effort_mode=100, champion=incumbent)
+    built = _candidate(Rival.A.value, "a", quality=_quality(0.5))
+    forge.submit_construct(built)
+    challenge = _challenge(Rival.B, built, "b")
+    forge.submit_attack(challenge)
+
+    with pytest.raises(TypeError, match="GateResult"):
+        forge.reconcile(
+            submitted=challenge.improved_candidate,
+            evaluator_id="independent-judge",
+            gate_results=(object(),),
+        )
+
+
 def test_non_compensable_gate_failure_retains_incumbent() -> None:
     incumbent = _candidate("seed", "s", quality=_quality(0.4))
     forge = DualRivalForge(effort_mode=100, champion=incumbent)

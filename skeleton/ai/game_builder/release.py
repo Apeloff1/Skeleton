@@ -20,7 +20,9 @@ class FamilyQualification:
     def __post_init__(self) -> None:
         if self.family_id not in {f"GB{i:02d}" for i in range(1, 51)}:
             raise ValueError("family_id must be GB01..GB50")
-        if len(self.evidence_digest) < 16:
+        if not isinstance(self.passed, bool):
+            raise TypeError("family qualification passed state must be boolean")
+        if not isinstance(self.evidence_digest, str) or len(self.evidence_digest) < 16:
             raise ValueError("family evidence digest must be stable")
 
 
@@ -31,9 +33,11 @@ class CriticalGateQualification:
     evidence_digest: str
 
     def __post_init__(self) -> None:
-        if not self.gate_id.strip():
+        if not isinstance(self.gate_id, str) or not self.gate_id.strip():
             raise ValueError("critical gate id must be non-empty")
-        if len(self.evidence_digest) < 16:
+        if not isinstance(self.passed, bool):
+            raise TypeError("critical gate passed state must be boolean")
+        if not isinstance(self.evidence_digest, str) or len(self.evidence_digest) < 16:
             raise ValueError("critical gate evidence digest must be stable")
 
 
@@ -158,10 +162,12 @@ class TribunalVote:
     rationale_digest: str
 
     def __post_init__(self) -> None:
-        if not self.authority_id.strip():
+        if not isinstance(self.authority_id, str) or not self.authority_id.strip():
             raise ValueError("authority_id must be non-empty")
+        if not isinstance(self.accept, bool):
+            raise TypeError("tribunal vote accept state must be boolean")
         for value in (self.bundle_digest, self.evidence_digest, self.rationale_digest):
-            if len(value) < 16:
+            if not isinstance(value, str) or len(value) < 16:
                 raise ValueError("tribunal vote identities must be stable digests")
 
 

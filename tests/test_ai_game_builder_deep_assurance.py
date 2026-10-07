@@ -93,6 +93,54 @@ def test_requirement_closure_is_fail_closed() -> None:
     assert len(ledger.digest) == 64
 
 
+@pytest.mark.parametrize(
+    ("factory", "message"),
+    [
+        (
+            lambda: RequirementProof(
+                "REQ-X",
+                _d("artifact-x"),
+                (_d("evidence-x"),),
+                passed="false",
+            ),
+            "requirement proof passed state must be boolean",
+        ),
+        (
+            lambda: RequirementProof(
+                "REQ-X",
+                _d("artifact-x"),
+                (_d("evidence-x"),),
+                critical="false",
+            ),
+            "requirement proof critical state must be boolean",
+        ),
+        (
+            lambda: ConstraintResult(
+                "C-X",
+                "false",
+                _d("constraint-x"),
+            ),
+            "constraint passed state must be boolean",
+        ),
+        (
+            lambda: ConstraintResult(
+                "C-X",
+                True,
+                _d("constraint-x"),
+                critical="false",
+            ),
+            "constraint critical state must be boolean",
+        ),
+    ],
+)
+def test_deep_assurance_rejects_truthy_non_boolean_authority_states(
+    factory,
+    message: str,
+) -> None:
+    with pytest.raises(TypeError, match=message):
+        factory()
+
+
 def test_constraint_proof_extracts_blocking_conflict_core() -> None:
     proof = ConstraintProofSet()
     proof.add(ConstraintResult("C1", True, _d("e1")))
@@ -223,6 +271,19 @@ def test_evidence_merkle_root_changes_on_append() -> None:
     root2 = ledger.append(_d("two"))
     assert root0 != root1 != root2
     assert len(root2) == 64
+
+
+def test_closure_certificate_rejects_truthy_non_boolean_independent_verification() -> None:
+    with pytest.raises(TypeError, match="closure independent verification state must be boolean"):
+        ClosureCertificate(
+            artifact_digest=_d("artifact"),
+            canon_digest=_d("canon"),
+            provenance_digest=_d("provenance"),
+            evidence_root=_d("evidence"),
+            family_ids=tuple(f"GB{i:02d}" for i in range(1, 51)),
+            critical_plane_ids=("OP01",),
+            independently_verified="false",
+        )
 
 
 def test_closure_certificate_requires_all_families_zero_critical_gaps_and_independent_verification() -> None:
