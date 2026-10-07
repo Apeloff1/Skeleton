@@ -671,6 +671,23 @@ def build_temporal_evolution_chain(items: Sequence[TemporalEvidence]) -> Tempora
     return TemporalEvolutionChain(claim, tuple(nodes))
 
 
+def resolve_temporal_evolution_at(chain: TemporalEvolutionChain, year: int) -> TemporalEvolutionNode:
+    """Resolve exactly one historically valid version or fail closed."""
+    if not isinstance(chain, TemporalEvolutionChain):
+        raise TokenizerContractError("TemporalEvolutionChain required")
+    if isinstance(year, bool) or not isinstance(year, int) or not 1000 <= year <= 9999:
+        raise TokenizerContractError("invalid temporal resolution year")
+    matches = tuple(
+        node for node in chain.nodes
+        if node.valid_from_year <= year and (node.valid_to_year is None or year <= node.valid_to_year)
+    )
+    if not matches:
+        raise TokenizerContractError("no temporal version valid at requested year")
+    if len(matches) != 1:
+        raise TokenizerContractError("ambiguous temporal versions at requested year")
+    return matches[0]
+
+
 @dataclass(frozen=True)
 class SupervisedTextExample:
     """One prompt/response example with a deterministic normalized boundary."""
