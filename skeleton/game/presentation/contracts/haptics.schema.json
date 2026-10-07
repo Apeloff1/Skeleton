@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-12:haptics:v1",
+  "title": "FLGB-12 haptics",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "time_ms",
+    "intensity_ppm"
+  ],
+  "properties": {
+    "time_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 86400000
+    },
+    "intensity_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    }
+  }
+}
