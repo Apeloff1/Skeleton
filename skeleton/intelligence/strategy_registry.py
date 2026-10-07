@@ -930,6 +930,8 @@ def verify_cognitive_control_chain(
     """Verify decision ordering, hash linkage and terminal finality."""
 
     rows = tuple(decisions)
+    if not rows:
+        return False
     previous = "0" * 64
     terminal_seen = False
     policy_digest: str | None = None
