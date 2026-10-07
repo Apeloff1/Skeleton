@@ -9,3 +9,20 @@ __all__ = [
     "CrawlBudget", "CrawlDocument", "CrawlEngine", "CrawlPolicy",
     "FrontierItem", "InMemoryCrawlStore", "canonicalize_url", "extract_document",
 ]
+
+from .retrieval_bridge import CrawlRetrievalBridgeError, CrawlRetrievalRecord, bridge_crawl_document
+from .context_bridge import CrawlContextBundle, compile_crawl_context
+from .generation_bridge import (
+    EvidenceGenerationError, EvidenceGenerationReceipt, EvidenceGenerationResult,
+    generate_from_crawl_context,
+)
+
+__all__ += [
+    "SqliteCrawlStore", "HostBudgetController", "PromotionDecision", "PromotionGate",
+    "GovernedIngestor", "IngestionReceipt", "ResearchSession", "SessionLimits",
+    "RecrawlItem", "RecrawlScheduler", "ChangeEvent", "TemporalCorpus", "TemporalVersion",
+    "EvidenceObservation", "EvidenceSet", "ResearchQuery", "frontier_priority",
+    "CrawlRetrievalBridgeError", "CrawlRetrievalRecord", "bridge_crawl_document",
+    "CrawlContextBundle", "compile_crawl_context", "EvidenceGenerationError",
+    "EvidenceGenerationReceipt", "EvidenceGenerationResult", "generate_from_crawl_context",
+]
