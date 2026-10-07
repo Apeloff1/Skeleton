@@ -60,10 +60,19 @@ class PreparedText:
     windows: tuple[TokenWindow, ...]
     batches: tuple[TokenBatch, ...]
     pipeline_digest: str
+    raw_text_digest: str
+    normalized_text_digest: str
 
     def __post_init__(self) -> None:
         if len(self.pipeline_digest) != 64:
             raise TokenizerContractError("invalid pipeline digest")
+        if len(self.raw_text_digest) != 64 or len(self.normalized_text_digest) != 64:
+            raise TokenizerContractError("invalid text provenance digest")
+        expected_normalized = sha256(self.normalized_text.encode("utf-8")).hexdigest()
+        if self.normalized_text_digest != expected_normalized:
+            raise TokenizerContractError("normalized text digest mismatch")
+        if self.sequence.source_text_digest != self.normalized_text_digest:
+            raise TokenizerContractError("sequence/normalized text provenance mismatch")
         if any(window.source_sequence_digest != self.sequence.digest for window in self.windows):
             raise TokenizerContractError("window provenance mismatch")
         flattened = tuple(window for batch in self.batches for window in batch.windows)
@@ -116,7 +125,15 @@ class TextTokenPipeline:
             max_batch_size=self.config.max_batch_size,
             max_tokens_per_batch=self.config.max_tokens_per_batch,
         ) if windows else ()
-        return PreparedText(normalized, sequence, windows, batches, self.digest)
+        return PreparedText(
+            normalized,
+            sequence,
+            windows,
+            batches,
+            self.digest,
+            sha256(text.encode("utf-8")).hexdigest(),
+            sha256(normalized.encode("utf-8")).hexdigest(),
+        )
 
     def decode(self, sequence: TokenSequence, *, require_identity: bool = True) -> str:
         if not isinstance(sequence, TokenSequence):
