@@ -246,6 +246,27 @@ class GovernedTrainingInput:
         return digest_json(self.__dict__)
 
 
+@dataclass(frozen=True)
+class PromotionAuthorizationRequest:
+    """Non-authorizing handoff for an external production authority."""
+    candidate_digest: str
+    promotion_evidence_digest: str
+    exact_head_commit: str
+    requester: str
+
+    def __post_init__(self) -> None:
+        for name in ("candidate_digest", "promotion_evidence_digest", "exact_head_commit"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value):
+                raise TokenizerContractError(f"invalid {name}")
+        if not isinstance(self.requester, str) or not self.requester or self.requester != self.requester.strip():
+            raise TokenizerContractError("invalid requester")
+
+    @property
+    def digest(self) -> str:
+        return digest_json(self.__dict__)
+
+
 class TextTokenPipeline:
     """One admitted, immutable text-to-model-input pipeline."""
 
@@ -451,6 +472,20 @@ class TextTokenPipeline:
             rollback_ready=rollback_ready,
         )
 
+    def promotion_authorization_request(self, candidate, evidence, *, requester: str) -> PromotionAuthorizationRequest:
+        from skeleton.ai.training.flgb_training_runtime import CandidateWeights, PromotionEvidence
+        if not isinstance(candidate, CandidateWeights) or not isinstance(evidence, PromotionEvidence):
+            raise TokenizerContractError("candidate/promotion evidence required")
+        if candidate.status != "candidate":
+            raise TokenizerContractError("only candidate weights may request authorization")
+        if evidence.candidate_digest != candidate.digest:
+            raise TokenizerContractError("promotion evidence does not belong to candidate")
+        if not evidence.qualified:
+            raise TokenizerContractError("unqualified promotion evidence")
+        if candidate.production_authorized():
+            raise TokenizerContractError("candidate unexpectedly self-authorized")
+        return PromotionAuthorizationRequest(candidate.digest, evidence.digest, evidence.exact_head_commit, requester)
+
     def decode(self, sequence: TokenSequence, *, require_identity: bool = True) -> str:
         if not isinstance(sequence, TokenSequence):
             raise TokenizerContractError("TokenSequence required")
@@ -489,4 +524,4 @@ class TextTokenPipeline:
         return prepared
 
 
-__all__ = ["CausalTrainingBatch", "GovernedTrainingInput", "ModelInputBatch", "PreparedText", "TextPipelineConfig", "TextTokenPipeline", "TrainingInputReceipt", "materialize_causal_training_batch", "materialize_model_batch"]
+__all__ = ["CausalTrainingBatch", "GovernedTrainingInput", "ModelInputBatch", "PreparedText", "PromotionAuthorizationRequest", "TextPipelineConfig", "TextTokenPipeline", "TrainingInputReceipt", "materialize_causal_training_batch", "materialize_model_batch"]
