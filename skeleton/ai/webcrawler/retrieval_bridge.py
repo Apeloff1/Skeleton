@@ -15,6 +15,7 @@ from skeleton.ai.context.flgb_context_runtime import ContextItem, RetrievalCandi
 
 from .core import CrawlDocument
 from .governance import PromotionDecision
+from .ingestion import IngestionReceipt
 
 
 class CrawlRetrievalBridgeError(ValueError):
@@ -93,6 +94,7 @@ def bridge_crawl_document(
     token_cost: int,
     priority: int = 0,
     promotion: PromotionDecision | None = None,
+    ingestion: IngestionReceipt | None = None,
 ) -> CrawlRetrievalRecord:
     """Verify crawler evidence and emit canonical retrieval/context contracts.
 
@@ -109,6 +111,17 @@ def bridge_crawl_document(
             raise CrawlRetrievalBridgeError("crawler evidence is not promoted")
         if promotion.provenance_schema != provenance.get("schema"):
             raise CrawlRetrievalBridgeError("promotion provenance schema mismatch")
+    if ingestion is not None:
+        if not isinstance(ingestion, IngestionReceipt):
+            raise CrawlRetrievalBridgeError("IngestionReceipt required")
+        if not ingestion.accepted or ingestion.reason != "promoted":
+            raise CrawlRetrievalBridgeError("crawler ingestion was not accepted")
+        if ingestion.destination != "retrieval":
+            raise CrawlRetrievalBridgeError("crawler ingestion destination mismatch")
+        if ingestion.content_hash != doc.content_hash:
+            raise CrawlRetrievalBridgeError("ingestion content identity mismatch")
+        if promotion is None:
+            raise CrawlRetrievalBridgeError("accepted ingestion requires promotion evidence")
     if isinstance(token_cost, bool) or not isinstance(token_cost, int) or token_cost < 0:
         raise CrawlRetrievalBridgeError("invalid token_cost")
     if isinstance(priority, bool) or not isinstance(priority, int):
