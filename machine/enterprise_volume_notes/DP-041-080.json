@@ -57,7 +57,12 @@
         "evaluations": [
           ".github/workflows/p1-api-contract-registry.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "git-head:b5c084b467882913f51b96c945e5eccb27a2e8c7",
+          "github-actions-job:109087842649",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36469488333",
+          "https://github.com/Apeloff1/Skeleton/commit/b5c084b467882913f51b96c945e5eccb27a2e8c7"
+        ]
       },
       "implementation_levels": [
         {
@@ -294,7 +299,14 @@
           ".github/workflows/p1-streaming-projection-authority.yml",
           ".github/workflows/p1-product-workspace-projection.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "git-head:b5c084b467882913f51b96c945e5eccb27a2e8c7",
+          "github-actions-job:109087843241",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36469488267",
+          "https://github.com/Apeloff1/Skeleton/commit/b5c084b467882913f51b96c945e5eccb27a2e8c7",
+          "github-actions-job:109087842827",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36469488382"
+        ]
       },
       "implementation_levels": [
         {
@@ -522,7 +534,13 @@
         "evaluations": [
           ".github/workflows/p1-tenant-storage-boundary.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "git-head:b5c084b467882913f51b96c945e5eccb27a2e8c7",
+          "github-actions-job:109087845062",
+          "github-actions-job:109087845157",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36469488639",
+          "https://github.com/Apeloff1/Skeleton/commit/b5c084b467882913f51b96c945e5eccb27a2e8c7"
+        ]
       },
       "implementation_levels": [
         {
@@ -758,7 +776,15 @@
           ".github/workflows/p1-streaming-projection-authority.yml",
           ".github/workflows/p1-tenant-storage-boundary.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "git-head:b5c084b467882913f51b96c945e5eccb27a2e8c7",
+          "github-actions-job:109087843241",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36469488267",
+          "https://github.com/Apeloff1/Skeleton/commit/b5c084b467882913f51b96c945e5eccb27a2e8c7",
+          "github-actions-job:109087845062",
+          "github-actions-job:109087845157",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36469488639"
+        ]
       },
       "implementation_levels": [
         {
@@ -996,7 +1022,15 @@
           ".github/workflows/p1-product-workspace-projection.yml",
           ".github/workflows/p1-operator-control-projection.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "git-head:b5c084b467882913f51b96c945e5eccb27a2e8c7",
+          "github-actions-job:109087842827",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36469488382",
+          "https://github.com/Apeloff1/Skeleton/commit/b5c084b467882913f51b96c945e5eccb27a2e8c7",
+          "github-actions-job:109087843767",
+          "github-actions-job:109087844354",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36469488469"
+        ]
       },
       "implementation_levels": [
         {
@@ -1227,7 +1261,13 @@
         "evaluations": [
           ".github/workflows/p1-tenant-storage-boundary.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "git-head:b5c084b467882913f51b96c945e5eccb27a2e8c7",
+          "github-actions-job:109087845062",
+          "github-actions-job:109087845157",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36469488639",
+          "https://github.com/Apeloff1/Skeleton/commit/b5c084b467882913f51b96c945e5eccb27a2e8c7"
+        ]
       },
       "implementation_levels": [
         {
@@ -1453,7 +1493,12 @@
         "evaluations": [
           ".github/workflows/p1-installer-lifecycle.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+          "github-actions-job:109098309291",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36472597852",
+          "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+        ]
       },
       "implementation_levels": [
         {
@@ -1685,7 +1730,14 @@
           ".github/workflows/p1-installer-lifecycle.yml",
           ".github/workflows/p1-migration-rollback-compatibility.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+          "github-actions-job:109098309291",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36472597852",
+          "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+          "github-actions-job:109098310186",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36472598086"
+        ]
       },
       "implementation_levels": [
         {
@@ -1912,7 +1964,12 @@
         "evaluations": [
           ".github/workflows/p1-installer-lifecycle.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+          "github-actions-job:109098309291",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36472597852",
+          "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+        ]
       },
       "implementation_levels": [
         {
@@ -2137,7 +2194,12 @@
         "evaluations": [
           ".github/workflows/p1-installer-lifecycle.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+          "github-actions-job:109098309291",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36472597852",
+          "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+        ]
       },
       "implementation_levels": [
         {
@@ -3041,7 +3103,9 @@
           "planned:manifest drift injection suite",
           "planned:stale-reference evaluation"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "https://github.com/Apeloff1/Skeleton/commit/d4334086eaf1c7cbbff46890b727fc954fde1677"
+        ]
       },
       "implementation_levels": [
         {
@@ -3500,7 +3564,16 @@
           ".github/workflows/p1-evidence-identity.yml",
           ".github/workflows/p1-risk-evidence-binding.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          ".github/workflows/p1-evidence-identity.yml",
+          ".github/workflows/p1-reproducibility-bundle.yml",
+          ".github/workflows/p1-required-gate-authority.yml",
+          ".github/workflows/p1-risk-evidence-binding.yml",
+          ".github/workflows/p1-scope-freeze.yml",
+          "P1-GAP-VOL-056:gap:97327e13f0-fb312c2b30523b6c",
+          "P1-GAP-VOL-056:gap:b8d1c37349-27b01a16de3b9f60",
+          "git-head:1a66b2212c438cdc8d77ba912160d46682775a94"
+        ]
       },
       "implementation_levels": [
         {
@@ -3727,7 +3800,16 @@
         "evaluations": [
           ".github/workflows/p1-risk-evidence-binding.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          ".github/workflows/p1-evidence-identity.yml",
+          ".github/workflows/p1-reproducibility-bundle.yml",
+          ".github/workflows/p1-required-gate-authority.yml",
+          ".github/workflows/p1-risk-evidence-binding.yml",
+          ".github/workflows/p1-scope-freeze.yml",
+          "P1-GAP-VOL-057:gap:19c223f2c1-5031e0af7967855e",
+          "P1-GAP-VOL-057:gap:a471b17add-04fc6e13a9b6e800",
+          "git-head:1a66b2212c438cdc8d77ba912160d46682775a94"
+        ]
       },
       "implementation_levels": [
         {
@@ -4180,7 +4262,16 @@
         "evaluations": [
           ".github/workflows/p1-required-gate-authority.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          ".github/workflows/p1-evidence-identity.yml",
+          ".github/workflows/p1-reproducibility-bundle.yml",
+          ".github/workflows/p1-required-gate-authority.yml",
+          ".github/workflows/p1-risk-evidence-binding.yml",
+          ".github/workflows/p1-scope-freeze.yml",
+          "P1-GAP-VOL-059:gap:67f06b252b-eba88e26ef6db7f2",
+          "P1-GAP-VOL-059:gap:c8f3cbba24-b73a3187a7f12551",
+          "git-head:1a66b2212c438cdc8d77ba912160d46682775a94"
+        ]
       },
       "implementation_levels": [
         {
@@ -4406,7 +4497,12 @@
         "evaluations": [
           ".github/workflows/p1-release-evidence-bundle.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+          "github-actions-job:109098309453",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36472597938",
+          "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+        ]
       },
       "implementation_levels": [
         {
@@ -4633,7 +4729,12 @@
         "evaluations": [
           ".github/workflows/p1-migration-rollback-compatibility.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+          "github-actions-job:109098310186",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36472598086",
+          "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+        ]
       },
       "implementation_levels": [
         {
@@ -4860,7 +4961,12 @@
         "evaluations": [
           ".github/workflows/p1-migration-rollback-compatibility.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+          "github-actions-job:109098310186",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36472598086",
+          "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+        ]
       },
       "implementation_levels": [
         {
@@ -5087,7 +5193,12 @@
         "evaluations": [
           ".github/workflows/p1-migration-rollback-compatibility.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+          "github-actions-job:109098310186",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36472598086",
+          "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+        ]
       },
       "implementation_levels": [
         {
@@ -5313,7 +5424,12 @@
         "evaluations": [
           ".github/workflows/p1-backup-restore-qualification.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+          "github-actions-job:109098308997",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36472597665",
+          "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+        ]
       },
       "implementation_levels": [
         {
@@ -5542,7 +5658,14 @@
           ".github/workflows/p1-backup-restore-qualification.yml",
           ".github/workflows/p1-disaster-recovery-feedback.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+          "github-actions-job:109098308997",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36472597665",
+          "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+          "github-actions-job:109098310079",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36472598089"
+        ]
       },
       "implementation_levels": [
         {
@@ -5769,7 +5892,12 @@
         "evaluations": [
           ".github/workflows/p1-disaster-recovery-feedback.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+          "github-actions-job:109098310079",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36472598089",
+          "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+        ]
       },
       "implementation_levels": [
         {
@@ -5995,7 +6123,12 @@
         "evaluations": [
           ".github/workflows/p1-capacity-qualification.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+          "github-actions-job:109102424598",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36473820988",
+          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+        ]
       },
       "implementation_levels": [
         {
@@ -6221,7 +6354,12 @@
         "evaluations": [
           ".github/workflows/p1-capacity-qualification.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+          "github-actions-job:109102424598",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36473820988",
+          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+        ]
       },
       "implementation_levels": [
         {
@@ -6447,7 +6585,12 @@
         "evaluations": [
           ".github/workflows/p1-budget-accounting.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+          "github-actions-job:109102424353",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36473820997",
+          "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+        ]
       },
       "implementation_levels": [
         {
@@ -6672,7 +6815,9 @@
           "planned:metric-gaming evaluation",
           "planned:hard-failure masking test"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "https://github.com/Apeloff1/Skeleton/commit/b860520400f0bd6680b3e17c7fbae2515c374b6e"
+        ]
       },
       "implementation_levels": [
         {
@@ -6896,7 +7041,9 @@
           "planned:out-of-domain abstention evaluation",
           "planned:specialist-vs-general baseline"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "https://github.com/Apeloff1/Skeleton/commit/3c1c47e1a223a5d7aead053001c41ac1b7583b2a"
+        ]
       },
       "implementation_levels": [
         {
@@ -7121,7 +7268,9 @@
           "planned:stale-market-data evaluation",
           "planned:legacy/canonical parity test"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "https://github.com/Apeloff1/Skeleton/commit/7eecd808b90c2627104fe4bb32a0bd543dd924ed"
+        ]
       },
       "implementation_levels": [
         {
@@ -7351,7 +7500,13 @@
           "skeleton/testing/test_simulation_authority_boundary.py",
           "skeleton/testing/test_vol073_scenario_runtime.py"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "https://github.com/Apeloff1/Skeleton/pull/2945",
+          "https://github.com/Apeloff1/Skeleton/commit/bf8a3c44fa6bc300b8a54b99cd82a0ccaf4256dd",
+          "skeleton/simulation/scenario_runtime.py",
+          "skeleton/ai/simulation/scenario_runtime.py",
+          "skeleton/testing/test_vol073_scenario_runtime.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -7580,7 +7735,13 @@
         "evaluations": [
           "skeleton/testing/test_vol074_instruction_runtime.py"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "https://github.com/Apeloff1/Skeleton/pull/2965",
+          "https://github.com/Apeloff1/Skeleton/commit/31f7539c3476d12a2a5498264db6c51e6e1ea45e",
+          "skeleton/learning/instruction_runtime.py",
+          "skeleton/ai/learning/instruction_runtime.py",
+          "skeleton/testing/test_vol074_instruction_runtime.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -7805,7 +7966,12 @@
         "evaluations": [
           ".github/workflows/p1-release-evidence-bundle.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+          "github-actions-job:109098309453",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36472597938",
+          "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+        ]
       },
       "implementation_levels": [
         {
@@ -8029,7 +8195,12 @@
         "evaluations": [
           ".github/workflows/p1-release-evidence-bundle.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+          "github-actions-job:109098309453",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36472597938",
+          "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+        ]
       },
       "implementation_levels": [
         {
@@ -8257,7 +8428,12 @@
         "evaluations": [
           ".github/workflows/p1-experiment-registry.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
+          "github-actions-job:109096150349",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36471954405",
+          "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
+        ]
       },
       "implementation_levels": [
         {
@@ -8489,7 +8665,16 @@
           ".github/workflows/p1-evidence-identity.yml",
           ".github/workflows/p1-reproducibility-bundle.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          ".github/workflows/p1-evidence-identity.yml",
+          ".github/workflows/p1-reproducibility-bundle.yml",
+          ".github/workflows/p1-required-gate-authority.yml",
+          ".github/workflows/p1-scope-freeze.yml",
+          "P1-GAP-VOL-078:gap:1f030c0062-4a165a6a9cac222b",
+          "P1-GAP-VOL-078:gap:99ba84e80f-f47580882f19d78c",
+          "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
+          "git-head:52acf3c531af849e8793e8c88ff663c4ddd1bef8"
+        ]
       },
       "implementation_levels": [
         {
@@ -8716,7 +8901,16 @@
         "evaluations": [
           ".github/workflows/p1-reproducibility-bundle.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          ".github/workflows/p1-evidence-identity.yml",
+          ".github/workflows/p1-reproducibility-bundle.yml",
+          ".github/workflows/p1-required-gate-authority.yml",
+          ".github/workflows/p1-scope-freeze.yml",
+          "P1-GAP-VOL-079:gap:695e0e1870-84a5636eda9efa33",
+          "P1-GAP-VOL-079:gap:e306c1eccc-3273792a3ef19be0",
+          "git-head:52acf3c531af849e8793e8c88ff663c4ddd1bef8",
+          "git-head:de1c7870e4c231eaa4d74b25f79b88c09af75fbc"
+        ]
       },
       "implementation_levels": [
         {
@@ -8946,7 +9140,16 @@
           ".github/workflows/p1-maturity-reconciliation.yml",
           ".github/workflows/p1-evidence-identity.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          ".github/workflows/p1-evidence-identity.yml",
+          ".github/workflows/p1-maturity-reconciliation.yml",
+          ".github/workflows/p1-reproducibility-bundle.yml",
+          ".github/workflows/p1-required-gate-authority.yml",
+          ".github/workflows/p1-scope-freeze.yml",
+          "P1-GAP-VOL-080:gap:a4ae9cb1ec-21b0add447e7d20d",
+          "P1-GAP-VOL-080:gap:ced2da019c-c6e4b29b727baf64",
+          "git-head:1a66b2212c438cdc8d77ba912160d46682775a94"
+        ]
       },
       "implementation_levels": [
         {

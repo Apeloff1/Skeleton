@@ -44,7 +44,9 @@
         "evaluations": [
           "planned:rate-limit/auth failure matrix"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "https://github.com/Apeloff1/Skeleton/commit/60d9966515430a9170293b084c767157284bca67"
+        ]
       },
       "implementation_levels": [
         {
@@ -263,7 +265,9 @@
         "evaluations": [
           "planned:plugin compatibility matrix"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "https://github.com/Apeloff1/Skeleton/commit/2a4e496ef58559371fd458d187713e4ae017157f"
+        ]
       },
       "implementation_levels": [
         {
@@ -482,7 +486,10 @@
         "evaluations": [
           "planned:malicious plugin corpus"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "https://github.com/Apeloff1/Skeleton/commit/f0f3159e5b5f990cc6898d924241d2f80d92b7eb",
+          "machine/ai_p3_deferred_batch_01.json"
+        ]
       },
       "implementation_levels": [
         {
@@ -714,7 +721,12 @@
         "evaluations": [
           ".github/workflows/p1-privileged-tool-transaction.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+          "github-actions-job:109064005732",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36462412958",
+          "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+        ]
       },
       "implementation_levels": [
         {
@@ -946,7 +958,12 @@
         "evaluations": [
           ".github/workflows/p1-privileged-tool-transaction.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+          "github-actions-job:109064005732",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36462412958",
+          "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+        ]
       },
       "implementation_levels": [
         {
@@ -1616,7 +1633,12 @@
         "evaluations": [
           ".github/workflows/p1-blast-radius-alignment.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+          "github-actions-job:109064006200",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36462412966",
+          "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+        ]
       },
       "implementation_levels": [
         {
@@ -2066,7 +2088,12 @@
         "evaluations": [
           ".github/workflows/p1-blast-radius-alignment.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+          "github-actions-job:109064006200",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36462412966",
+          "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+        ]
       },
       "implementation_levels": [
         {
@@ -2285,7 +2312,9 @@
         "evaluations": [
           "planned:partition/DNS failure matrix"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "https://github.com/Apeloff1/Skeleton/commit/2e34aa6af5bc981e4c170ac14de1c059e57f8785"
+        ]
       },
       "implementation_levels": [
         {
@@ -4058,7 +4087,9 @@
         "evaluations": [
           "planned:model lineage completeness audit"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "https://github.com/Apeloff1/Skeleton/commit/8202345847d1a99e8adc17ba187f5b85a56aa9d4"
+        ]
       },
       "implementation_levels": [
         {
@@ -6047,7 +6078,11 @@
         "evaluations": [
           "skeleton/testing/test_ai_chaos_recovery_controls.py"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "https://github.com/Apeloff1/Skeleton/commit/a14bfd868d23105e3432aa5288cb78c9f1e58cd0",
+          "skeleton/ai/runtime/deferred/reliability_release.py",
+          "skeleton/testing/test_ai_chaos_recovery_controls.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -6269,7 +6304,11 @@
         "evaluations": [
           "skeleton/testing/test_ai_chaos_recovery_controls.py"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "https://github.com/Apeloff1/Skeleton/commit/a14bfd868d23105e3432aa5288cb78c9f1e58cd0",
+          "skeleton/ai/runtime/deferred/reliability_release.py",
+          "skeleton/testing/test_ai_chaos_recovery_controls.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -6491,7 +6530,11 @@
         "evaluations": [
           "skeleton/testing/test_ai_release_qualification_policy.py"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "https://github.com/Apeloff1/Skeleton/commit/95b0cd9326216705ab2d6d880d1c44601736b385",
+          "skeleton/ai/runtime/deferred/reliability_release.py",
+          "skeleton/testing/test_ai_release_qualification_policy.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -6713,7 +6756,11 @@
         "evaluations": [
           "skeleton/testing/test_ai_deployment_safety.py"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "https://github.com/Apeloff1/Skeleton/commit/a1bff2662d5afe64b85b30cbfa7fa6f8a670a283",
+          "skeleton/ai/runtime/deferred/reliability_release.py",
+          "skeleton/testing/test_ai_deployment_safety.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -6935,7 +6982,11 @@
         "evaluations": [
           "skeleton/testing/test_ai_deployment_safety.py"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "https://github.com/Apeloff1/Skeleton/commit/a1bff2662d5afe64b85b30cbfa7fa6f8a670a283",
+          "skeleton/ai/runtime/deferred/reliability_release.py",
+          "skeleton/testing/test_ai_deployment_safety.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -7157,7 +7208,11 @@
         "evaluations": [
           "skeleton/testing/test_ai_deployment_safety.py"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "https://github.com/Apeloff1/Skeleton/commit/a1bff2662d5afe64b85b30cbfa7fa6f8a670a283",
+          "skeleton/ai/runtime/deferred/reliability_release.py",
+          "skeleton/testing/test_ai_deployment_safety.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -7379,7 +7434,11 @@
         "evaluations": [
           "skeleton/testing/test_vol194_developer_experience.py"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "https://github.com/Apeloff1/Skeleton/commit/eee9492203589ad8e4fd13f0fe63ce62daf6d750",
+          "skeleton/ai/runtime/deferred/developer_experience.py",
+          "skeleton/testing/test_vol194_developer_experience.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -7603,7 +7662,12 @@
         "evaluations": [
           "planned:clean-machine local bootstrap"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "https://github.com/Apeloff1/Skeleton/commit/d04f366813e6cc372ccb6ed3dd62e71c5208d8bb",
+          "https://github.com/Apeloff1/Skeleton/commit/92188eba884054c85e0c1b700b0d838ae69be976",
+          "https://github.com/Apeloff1/Skeleton/commit/0a66b788f8884be10725c3c13635041ad8875524",
+          "https://github.com/Apeloff1/Skeleton/commit/1c1f9394a573df9e6168e8ac9efa27ccb3e5577f"
+        ]
       },
       "implementation_levels": [
         {
@@ -7823,7 +7887,12 @@
         "evaluations": [
           "skeleton/testing/test_vol196_fixture_platform.py"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "https://github.com/Apeloff1/Skeleton/commit/91d5cf9a17b5df8725b05aa5fcb56deeacc21644",
+          "skeleton/ai/runtime/deferred/fixture_platform.py",
+          "skeleton/ai/runtime/deferred/operations_experience.py",
+          "skeleton/testing/test_vol196_fixture_platform.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -8047,7 +8116,13 @@
         "evaluations": [
           "skeleton/testing/test_vol197_simulation_mode.py"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "https://github.com/Apeloff1/Skeleton/commit/cace4b16170d8c4321be10d5e39fa716e25d48ef",
+          "skeleton/ai/runtime/deferred/simulation_mode.py",
+          "skeleton/ai/runtime/deferred/catalog.py",
+          "skeleton/ai/runtime/deferred/__init__.py",
+          "skeleton/testing/test_vol197_simulation_mode.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -8271,7 +8346,13 @@
         "evaluations": [
           "skeleton/testing/test_vol198_contract_fuzzing.py"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "https://github.com/Apeloff1/Skeleton/commit/f0bc9c5e1c08074556cd7b86f051b560aaf93c1f",
+          "skeleton/ai/runtime/deferred/contract_fuzzing.py",
+          "skeleton/ai/runtime/deferred/catalog.py",
+          "skeleton/ai/runtime/deferred/__init__.py",
+          "skeleton/testing/test_vol198_contract_fuzzing.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -8493,7 +8574,11 @@
         "evaluations": [
           "skeleton/testing/test_property_invariants.py"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "https://github.com/Apeloff1/Skeleton/commit/f5d41e10e229e8ae9a0a9b8bb80a005b1f42a2d4",
+          "skeleton/testing/property_invariants.py",
+          "skeleton/testing/test_property_invariants.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -8719,7 +8804,16 @@
         "evaluations": [
           "skeleton/testing/test_vol200_formal_candidates.py"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "https://github.com/Apeloff1/Skeleton/commit/63967f841f83aa7a8a51146cc9fb0d774ea03c82",
+          "https://github.com/Apeloff1/Skeleton/commit/174897cf919274c91560a4ff11db1f729dbb268f",
+          "https://github.com/Apeloff1/Skeleton/commit/7be00889e195075ab5a08714776c55a2c574e13c",
+          "https://github.com/Apeloff1/Skeleton/commit/1d04b69fe892c4e19e7d97be2320ff0aa3290898",
+          "https://github.com/Apeloff1/Skeleton/commit/9388fb1001100a55eeed6d235d3f33c5762aa053",
+          "skeleton/contracts/formal_candidates.py",
+          "skeleton/ai/runtime/contracts/formal_candidates.py",
+          "skeleton/testing/test_vol200_formal_candidates.py"
+        ]
       },
       "implementation_levels": [
         {
