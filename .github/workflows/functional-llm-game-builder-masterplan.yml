@@ -68,6 +68,8 @@ jobs:
         run: python -m unittest discover -s tests/flgb -p 'test_flgb_12_*.py' -v
       - name: Run FLGB-13 gameplay regressions
         run: python -m unittest discover -s tests/flgb -p 'test_flgb_13_*.py' -v
+      - name: Run FLGB-14 generation-continuity regressions
+        run: python -m unittest discover -s tests/flgb -p 'test_flgb_14_*.py' -v
       - name: Run FLGB support regressions
         run: python -m unittest discover -s tests/flgb -p 'test_flgb_activation_security_timeout.py' -v
       - name: Confirm exact head
