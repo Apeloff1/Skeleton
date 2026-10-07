@@ -43,7 +43,7 @@ def _bulk_records() -> list[dict]:
     return [
         row
         for row in registry["records"]
-        if row["evidence"][0]["category"] == CATEGORY
+        if any(evidence["category"] == CATEGORY for evidence in row["evidence"])
     ]
 
 
@@ -78,10 +78,12 @@ def test_bulk_binding_provenance_is_exact_and_complete() -> None:
             assert row["review_at"] == REVIEW_AT
         assert row["accepted_risk"] is None
         assert len(row["obligation_digest"]) == 64
-        assert len(row["evidence"]) == 1
+        category_evidence = [
+            evidence for evidence in row["evidence"] if evidence["category"] == CATEGORY
+        ]
+        assert len(category_evidence) == 1
 
-        evidence = row["evidence"][0]
-        assert evidence["category"] == CATEGORY
+        evidence = category_evidence[0]
         assert len(evidence["digest"]) == 64
         assert evidence["source"] == (
             "p1:bulk-volume-obligation-evidence:"
