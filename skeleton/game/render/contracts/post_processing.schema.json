@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-11:post_processing:v1",
+  "title": "FLGB-11 post processing",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "pass_id",
+    "effect",
+    "config_digest",
+    "enabled"
+  ],
+  "properties": {
+    "pass_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "effect": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "config_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "enabled": {
+      "type": "boolean"
+    }
+  }
+}
