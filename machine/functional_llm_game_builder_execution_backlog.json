@@ -86,9 +86,10 @@
         "FLGB-03-T11",
         "FLGB-03-T12"
       ],
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
-      "independent_verification_signed": false
+      "independent_verification_signed": false,
+      "implementation_note": "T01-T12 deterministic context/memory/retrieval/evidence targets, schemas, and focused regressions are present; exact-head CI plus independent verification remain required before signoff."
     },
     {
       "id": "FLGB-04",
@@ -2104,7 +2105,7 @@
       "implementation_target": "skeleton/ai/context/context_compiler.py",
       "contract_target": "skeleton/ai/context/contracts/context_compiler.schema.json",
       "test_target": "tests/flgb/test_flgb_03_context_compiler.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -2170,7 +2171,7 @@
       "implementation_target": "skeleton/ai/context/working_memory.py",
       "contract_target": "skeleton/ai/context/contracts/working_memory.schema.json",
       "test_target": "tests/flgb/test_flgb_03_working_memory.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -2236,7 +2237,7 @@
       "implementation_target": "skeleton/ai/context/episodic_memory.py",
       "contract_target": "skeleton/ai/context/contracts/episodic_memory.schema.json",
       "test_target": "tests/flgb/test_flgb_03_episodic_memory.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -2302,7 +2303,7 @@
       "implementation_target": "skeleton/ai/context/semantic_memory.py",
       "contract_target": "skeleton/ai/context/contracts/semantic_memory.schema.json",
       "test_target": "tests/flgb/test_flgb_03_semantic_memory.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -2368,7 +2369,7 @@
       "implementation_target": "skeleton/ai/context/project_memory.py",
       "contract_target": "skeleton/ai/context/contracts/project_memory.schema.json",
       "test_target": "tests/flgb/test_flgb_03_project_memory.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -2434,7 +2435,7 @@
       "implementation_target": "skeleton/ai/context/hybrid_retrieval.py",
       "contract_target": "skeleton/ai/context/contracts/hybrid_retrieval.schema.json",
       "test_target": "tests/flgb/test_flgb_03_hybrid_retrieval.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -2500,7 +2501,7 @@
       "implementation_target": "skeleton/ai/context/code_retrieval.py",
       "contract_target": "skeleton/ai/context/contracts/code_retrieval.schema.json",
       "test_target": "tests/flgb/test_flgb_03_code_retrieval.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -2566,7 +2567,7 @@
       "implementation_target": "skeleton/ai/context/graph_retrieval.py",
       "contract_target": "skeleton/ai/context/contracts/graph_retrieval.schema.json",
       "test_target": "tests/flgb/test_flgb_03_graph_retrieval.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -2632,7 +2633,7 @@
       "implementation_target": "skeleton/ai/context/temporal_retrieval.py",
       "contract_target": "skeleton/ai/context/contracts/temporal_retrieval.schema.json",
       "test_target": "tests/flgb/test_flgb_03_temporal_retrieval.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -2698,7 +2699,7 @@
       "implementation_target": "skeleton/ai/context/claim_evidence_graph.py",
       "contract_target": "skeleton/ai/context/contracts/claim_evidence_graph.schema.json",
       "test_target": "tests/flgb/test_flgb_03_claim_evidence_graph.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -2764,7 +2765,7 @@
       "implementation_target": "skeleton/ai/context/contradiction_handling.py",
       "contract_target": "skeleton/ai/context/contracts/contradiction_handling.schema.json",
       "test_target": "tests/flgb/test_flgb_03_contradiction_handling.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -2830,7 +2831,7 @@
       "implementation_target": "skeleton/ai/context/context_compression.py",
       "contract_target": "skeleton/ai/context/contracts/context_compression.schema.json",
       "test_target": "tests/flgb/test_flgb_03_context_compression.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
