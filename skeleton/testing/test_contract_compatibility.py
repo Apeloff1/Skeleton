@@ -23,7 +23,7 @@ def test_machine_conformance_vectors_are_unique_and_fail_closed():
  vectors=conformance["vectors"]
  ids=[v["id"] for v in vectors]
  assert len(ids)==len(set(ids))
- assert {"JSON-DUPLICATE-KEY","JSON-NAN","JSON-INFINITY","JSON-NEG-INFINITY","JSON-UNICODE-ROUNDTRIP","SCHEMA-ABSENT-REQUIRED","SCHEMA-NULL-NONNULLABLE","SCHEMA-UNKNOWN-ENUM","SCHEMA-NULL-NULLABLE"}<=set(ids)
+ assert {"JSON-DUPLICATE-KEY","JSON-NAN","JSON-INFINITY","JSON-NEG-INFINITY","JSON-UNICODE-ROUNDTRIP","JSON-SAFE-MAX-INTEGER","JSON-UNSAFE-POSITIVE-INTEGER","JSON-UNSAFE-NEGATIVE-INTEGER","JSON-POSITIVE-ZERO","JSON-NEGATIVE-ZERO","SCHEMA-ABSENT-REQUIRED","SCHEMA-NULL-NONNULLABLE","SCHEMA-UNKNOWN-ENUM","SCHEMA-NULL-NULLABLE"}<=set(ids)
  assert all(v["expected"] in {"accept","reject"} for v in vectors)
 
 def test_machine_validator_executes_complete_inventory_and_vectors():
