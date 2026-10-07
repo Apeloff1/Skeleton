@@ -96,6 +96,7 @@ jobs:
           --disable-pip-version-check
           --no-input
           -e .
+          "pytest>=8,<9"
 
       - name: Validate acceleration policy
         run: python scripts/check_p2_acceleration.py --json
