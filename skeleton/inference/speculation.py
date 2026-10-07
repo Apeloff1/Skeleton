@@ -125,8 +125,16 @@ class SpeculationDecision:
                 raise InferenceContractError(f"invalid {field}")
         if not isinstance(self.equivalent, bool):
             raise InferenceContractError("equivalent must be bool")
-        if self.accepted_tokens < 0 or self.draft_tokens < 0:
-            raise InferenceContractError("invalid speculation token accounting")
+        for field in ("accepted_tokens", "draft_tokens"):
+            value = getattr(self, field)
+            if (
+                not isinstance(value, int)
+                or isinstance(value, bool)
+                or value < 0
+            ):
+                raise InferenceContractError(
+                    "invalid speculation token accounting"
+                )
         if self.accepted_tokens > self.draft_tokens:
             raise InferenceContractError("accepted tokens exceed draft tokens")
         if self.authority_scope != "speculation-evidence-only":
