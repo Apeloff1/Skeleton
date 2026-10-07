@@ -22,7 +22,6 @@ from skeleton.learning import (
     empty_calibration,
     make_provenance,
 )
-from skeleton.retrieval.provenance import ProvenanceEntry
 
 NOW = 1_000.0
 SUBJECT = "skill-python"
@@ -460,7 +459,8 @@ def test_provenance_survives_feature_hypothesis_outcome_flow() -> None:
     ]
     assert all(fingerprints)
     assert fingerprints == list(dict.fromkeys(fingerprints))
-    assert all(len(item) == len(ProvenanceEntry.hash_data("x")) for item in fingerprints)
+    assert all(len(item) == 64 for item in fingerprints)
+    assert all(all(ch in "0123456789abcdef" for ch in item) for item in fingerprints)
 
 
 def test_feature_without_parent_provenance_is_rejected() -> None:
