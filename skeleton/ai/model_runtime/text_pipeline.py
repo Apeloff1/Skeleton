@@ -410,11 +410,9 @@ class TextTokenPipeline:
         batches = self.model_batches(prepared, pad_token_id=pad_token_id)
         output = []
         for batch in batches:
-            try:
-                output.append(materialize_causal_training_batch(batch, ignore_index=ignore_index))
-            except TokenizerContractError as exc:
-                if str(exc) != "causal batch requires at least two source tokens":
-                    raise
+            if not any(sum(row) >= 2 for row in batch.attention_mask):
+                continue
+            output.append(materialize_causal_training_batch(batch, ignore_index=ignore_index))
         return tuple(output)
 
     def training_receipt(self, prepared: PreparedText, *, pad_token_id: int | None = None, ignore_index: int = -100) -> TrainingInputReceipt:
