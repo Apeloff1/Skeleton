@@ -3777,8 +3777,8 @@
       "plane": "knowledge",
       "handler": "skeleton.ai.runtime.deferred.knowledge.StrategyRegistry",
       "source_gaps": [
-        "inventory current strategies",
-        "bind selection engine"
+        "bind selection engine",
+        "bind the registry to production selection and benchmark-backed promotion evidence"
       ],
       "source_risks": [
         "strategy sprawl",
@@ -3803,8 +3803,8 @@
       "plane": "knowledge",
       "handler": "skeleton.ai.runtime.deferred.knowledge.StrategyRegistry",
       "source_gaps": [
-        "define baseline selector",
-        "bind performance evidence"
+        "bind performance evidence",
+        "bind selector decisions to runtime routing receipts and comparative performance evidence"
       ],
       "source_risks": [
         "wrong strategy cost explosion",
@@ -3829,8 +3829,8 @@
       "plane": "knowledge",
       "handler": "skeleton.ai.runtime.deferred.knowledge.ReasoningCost",
       "source_gaps": [
-        "define stage IDs",
-        "bind cost governor"
+        "bind cost governor",
+        "bind reasoning-cost attribution to the runtime budget governor and aggregate telemetry"
       ],
       "source_risks": [
         "double counting",
@@ -3855,8 +3855,8 @@
       "plane": "compute",
       "handler": "skeleton.ai.runtime.deferred.compute.GPUMemoryManager",
       "source_gaps": [
-        "define memory accounting",
-        "bind model/KV caches"
+        "bind model/KV caches",
+        "bind GPU reservation accounting to model/KV allocation lifecycle and stress/fault evidence"
       ],
       "source_risks": [
         "GPU OOM",
@@ -3881,8 +3881,8 @@
       "plane": "compute",
       "handler": "skeleton.ai.runtime.deferred.compute.ModelEvictionController",
       "source_gaps": [
-        "define pin/drain semantics",
-        "bind warming"
+        "bind warming",
+        "bind safe eviction decisions to warming/placement state and pressure telemetry"
       ],
       "source_risks": [
         "evict in-flight model",
@@ -3907,8 +3907,8 @@
       "plane": "compute",
       "handler": "skeleton.ai.runtime.deferred.compute.KVCacheKey",
       "source_gaps": [
-        "formalize key identity",
-        "bind GPU memory manager"
+        "bind GPU memory manager",
+        "bind KV allocation identity to GPU reservation receipts and eviction invalidation"
       ],
       "source_risks": [
         "context leak",
@@ -3933,8 +3933,8 @@
       "plane": "compute",
       "handler": "skeleton.ai.runtime.deferred.compute.PrefixCacheKey",
       "source_gaps": [
-        "define key composition",
-        "bind instruction registry"
+        "bind instruction registry",
+        "bind instruction/tokenizer/version digests to canonical registry issuance"
       ],
       "source_risks": [
         "stale prompt prefix",
@@ -4011,8 +4011,8 @@
       "plane": "compute",
       "handler": "skeleton.ai.runtime.deferred.compute.InterconnectGraph",
       "source_gaps": [
-        "model interconnect graph",
-        "bind distributed inference/training"
+        "bind distributed inference/training",
+        "bind measured interconnect discovery, topology refresh and distributed-runtime placement receipts"
       ],
       "source_risks": [
         "slow link bottleneck",
@@ -4037,8 +4037,8 @@
       "plane": "compute",
       "handler": "skeleton.ai.runtime.deferred.compute.StorageTierPlanner",
       "source_gaps": [
-        "define tiers",
-        "bind CAS/model/data registries"
+        "bind CAS/model/data registries",
+        "bind typed storage tiers to CAS/model/data registries, migration receipts and capacity telemetry"
       ],
       "source_risks": [
         "cold tier unexpectedly unavailable",
@@ -4090,7 +4090,7 @@
       "handler": "skeleton.ai.runtime.deferred.compute.WorkFarm",
       "source_gaps": [
         "bind hermetic build profile",
-        "integrate worker attestation"
+        "bind reproducibility consensus and attestation evidence to release provenance and remote-execution identity"
       ],
       "source_risks": [
         "worker contamination",
@@ -4141,8 +4141,8 @@
       "plane": "compute",
       "handler": "skeleton.ai.runtime.deferred.compute.WorkFarm",
       "source_gaps": [
-        "define research classes",
-        "bind quotas/fairness"
+        "bind quotas/fairness",
+        "bind research workload classes to quota/fairness policy and durable allocation receipts"
       ],
       "source_risks": [
         "research starvation",
@@ -4167,8 +4167,8 @@
       "plane": "compute",
       "handler": "skeleton.ai.runtime.deferred.compute.EthicsReview",
       "source_gaps": [
-        "define trigger criteria",
-        "bind research proposals"
+        "bind research proposals",
+        "bind explicit sensitive-research triggers to proposal admission, oversight identity and durable review receipts"
       ],
       "source_risks": [
         "unreviewed sensitive study",
@@ -4193,7 +4193,7 @@
       "plane": "compute",
       "handler": "skeleton.ai.runtime.deferred.compute.SandboxManifest",
       "source_gaps": [
-        "bind feature flags/technology radar"
+        "bind monotonic kill-switch exposure receipts to feature routing, operator controls and technology-radar lifecycle"
       ],
       "source_risks": [
         "experiment leaks authority",
@@ -4219,7 +4219,7 @@
       "handler": "skeleton.ai.runtime.deferred.compute.ResearchBranch",
       "source_gaps": [
         "define branch naming/retention",
-        "bind evidence packages"
+        "bind research promotion receipts/evidence packages to PR/release gates and branch-retention policy"
       ],
       "source_risks": [
         "branch sprawl",
