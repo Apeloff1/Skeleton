@@ -391,9 +391,10 @@
         "FLGB-14-T11",
         "FLGB-14-T12"
       ],
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
-      "independent_verification_signed": false
+      "independent_verification_signed": false,
+      "implementation_note": "T01-T12 deterministic generation/continuity targets, schemas, and focused regressions are present; seeded generation, quest dependency closure, lore/timeline/canon/style constraints, and locked regeneration boundaries are explicit; exact-head dependency closure and independent verification remain required."
     },
     {
       "id": "FLGB-15",
@@ -10827,7 +10828,7 @@
       "implementation_target": "skeleton/game/generation/seed_contract.py",
       "contract_target": "skeleton/game/generation/contracts/seed_contract.schema.json",
       "test_target": "tests/flgb/test_flgb_14_seed_contract.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -10893,7 +10894,7 @@
       "implementation_target": "skeleton/game/generation/terrain_generation.py",
       "contract_target": "skeleton/game/generation/contracts/terrain_generation.schema.json",
       "test_target": "tests/flgb/test_flgb_14_terrain_generation.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -10959,7 +10960,7 @@
       "implementation_target": "skeleton/game/generation/layout_grammar.py",
       "contract_target": "skeleton/game/generation/contracts/layout_grammar.schema.json",
       "test_target": "tests/flgb/test_flgb_14_layout_grammar.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -11025,7 +11026,7 @@
       "implementation_target": "skeleton/game/generation/encounter_generation.py",
       "contract_target": "skeleton/game/generation/contracts/encounter_generation.schema.json",
       "test_target": "tests/flgb/test_flgb_14_encounter_generation.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -11091,7 +11092,7 @@
       "implementation_target": "skeleton/game/generation/quest_generation.py",
       "contract_target": "skeleton/game/generation/contracts/quest_generation.schema.json",
       "test_target": "tests/flgb/test_flgb_14_quest_generation.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -11157,7 +11158,7 @@
       "implementation_target": "skeleton/game/generation/character_generation.py",
       "contract_target": "skeleton/game/generation/contracts/character_generation.schema.json",
       "test_target": "tests/flgb/test_flgb_14_character_generation.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -11223,7 +11224,7 @@
       "implementation_target": "skeleton/game/generation/lore_graph.py",
       "contract_target": "skeleton/game/generation/contracts/lore_graph.schema.json",
       "test_target": "tests/flgb/test_flgb_14_lore_graph.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -11289,7 +11290,7 @@
       "implementation_target": "skeleton/game/generation/timeline_consistency.py",
       "contract_target": "skeleton/game/generation/contracts/timeline_consistency.schema.json",
       "test_target": "tests/flgb/test_flgb_14_timeline_consistency.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -11355,7 +11356,7 @@
       "implementation_target": "skeleton/game/generation/canon_constraints.py",
       "contract_target": "skeleton/game/generation/contracts/canon_constraints.schema.json",
       "test_target": "tests/flgb/test_flgb_14_canon_constraints.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -11421,7 +11422,7 @@
       "implementation_target": "skeleton/game/generation/style_bible.py",
       "contract_target": "skeleton/game/generation/contracts/style_bible.schema.json",
       "test_target": "tests/flgb/test_flgb_14_style_bible.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -11487,7 +11488,7 @@
       "implementation_target": "skeleton/game/generation/continuity_verifier.py",
       "contract_target": "skeleton/game/generation/contracts/continuity_verifier.schema.json",
       "test_target": "tests/flgb/test_flgb_14_continuity_verifier.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -11553,7 +11554,7 @@
       "implementation_target": "skeleton/game/generation/regeneration_diff.py",
       "contract_target": "skeleton/game/generation/contracts/regeneration_diff.schema.json",
       "test_target": "tests/flgb/test_flgb_14_regeneration_diff.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
