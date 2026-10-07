@@ -462,10 +462,8 @@ class CrawlEngine:
         delay = max(self.policy.min_host_delay_seconds, self.robots.crawl_delay(item.url) or 0.0)
         self._host_ready[host] = now + delay
         try:
-            response = self.fetcher.fetch(
-                item.url, user_agent=self.policy.user_agent,
-                max_bytes=self.policy.max_response_bytes,
-            )
+            from .redirects import fetch_with_policy
+            response = fetch_with_policy(self, item.url, now=now)
         except Exception:
             self.budget.requests += 1
             self._retry(item, now=now)
