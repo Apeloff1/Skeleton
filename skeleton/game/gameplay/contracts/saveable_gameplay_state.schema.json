@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-13:saveable_gameplay_state:v1",
+  "title": "FLGB-13 saveable gameplay state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "sequence",
+    "state_digest",
+    "world_digest",
+    "quest_digest",
+    "economy_digest",
+    "prior_snapshot_digest"
+  ],
+  "properties": {
+    "sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "state_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "world_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "quest_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "economy_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "prior_snapshot_digest": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}
