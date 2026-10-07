@@ -1413,11 +1413,7 @@
       ],
       "primary_volume_refs": [
         "VOL-026",
-        "VOL-027",
-        "VOL-167",
-        "VOL-169",
-        "VOL-172",
-        "VOL-175"
+        "VOL-027"
       ],
       "objective": "Bind threat identities, trust-boundary crossings, egress canonicalization, tenant isolation and deletion/privacy semantics to executable controls.",
       "acceptance": [
@@ -1943,8 +1939,8 @@
     "ready_count": 0,
     "blocked_count": 0,
     "landed_unpromoted_count": 12,
-    "scheduled_volume_count": 57,
-    "queued_volume_count": 257,
+    "scheduled_volume_count": 53,
+    "queued_volume_count": 261,
     "source_volume_count": 314
   }
 }
