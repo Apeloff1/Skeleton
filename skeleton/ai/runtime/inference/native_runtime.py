@@ -21,7 +21,11 @@ from skeleton.ai.model_runtime import (
 from skeleton.ai.model_runtime.runtime_contracts import RUNTIME_SCHEMA
 from skeleton.ai.model_runtime.tokenization import TokenizerContractError
 
-from skeleton.skills.tool_contract import ToolContractError, validate_json_value
+from skeleton.skills.tool_contract import (
+    ToolContractError,
+    validate_json_schema,
+    validate_json_value,
+)
 
 from .local import (
     LocalInferenceCancelled,
@@ -142,6 +146,24 @@ class NativeRuntimeLocalModel:
                 "native local protocol output is not valid JSON"
             ) from exc
 
+    def _normalized_structured_output_schema(
+        self,
+        request: LocalInferenceRequest,
+    ) -> dict[str, Any] | None:
+        if request.structured_output_schema is None:
+            return None
+        try:
+            schema = validate_json_schema(request.structured_output_schema)
+        except ToolContractError as exc:
+            raise NativeRuntimeBackendError(
+                f"invalid native structured output schema: {exc}"
+            ) from exc
+        if schema.get("type") not in {None, "object"}:
+            raise NativeRuntimeBackendError(
+                "native structured output schema must describe an object"
+            )
+        return schema
+
     def _render_prompt(self, request: LocalInferenceRequest) -> str:
         prompt = request.rendered_input
         if request.tools:
@@ -165,6 +187,8 @@ class NativeRuntimeLocalModel:
                         "input_schema": item.get("input_schema", {}),
                     }
                 )
+            if request.structured_output_schema is not None:
+                self._normalized_structured_output_schema(request)
             prompt += (
                 "\n\n[Skeleton native local tool protocol]\n"
                 "When a tool is required, output exactly one JSON object and no prose: "
@@ -181,10 +205,11 @@ class NativeRuntimeLocalModel:
                 + self._stable_json(allowed)
             )
         elif request.structured_output_schema is not None:
+            schema = self._normalized_structured_output_schema(request)
             prompt += (
                 "\n\n[Skeleton native structured-output protocol]\n"
                 "Output exactly one JSON object matching this schema and no prose: "
-                + self._stable_json(request.structured_output_schema)
+                + self._stable_json(schema)
             )
         return prompt
 
@@ -303,7 +328,7 @@ class NativeRuntimeLocalModel:
                 ):
                     try:
                         validate_json_value(
-                            request.structured_output_schema,
+                            self._normalized_structured_output_schema(request),
                             structured,
                             path="structured_output",
                         )
@@ -335,7 +360,7 @@ class NativeRuntimeLocalModel:
                 )
             try:
                 validate_json_value(
-                    request.structured_output_schema,
+                    self._normalized_structured_output_schema(request),
                     structured_payload,
                     path="structured_output",
                 )
