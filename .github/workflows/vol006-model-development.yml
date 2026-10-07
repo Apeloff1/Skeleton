@@ -1,0 +1,148 @@
+name: VOL-006 Model Development Closure
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "skeleton/modeling/**"
+      - "skeleton/ai/modeling/**"
+      - "skeleton/testing/test_vol006_model_registry.py"
+      - "skeleton/testing/test_vol006_training_execution.py"
+      - "skeleton/testing/test_vol006_artifact_publication.py"
+      - "skeleton/testing/test_vol006_evaluation_eligibility.py"
+      - "scripts/verify_vol006_model_development.py"
+      - "tests/test_vol006_model_development_independent.py"
+      - ".github/workflows/vol006-model-development.yml"
+  push:
+    branches: [main]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "skeleton/modeling/**"
+      - "skeleton/ai/modeling/**"
+      - "skeleton/testing/test_vol006_model_registry.py"
+      - "skeleton/testing/test_vol006_training_execution.py"
+      - "skeleton/testing/test_vol006_artifact_publication.py"
+      - "skeleton/testing/test_vol006_evaluation_eligibility.py"
+      - "scripts/verify_vol006_model_development.py"
+      - "tests/test_vol006_model_development_independent.py"
+      - ".github/workflows/vol006-model-development.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vol006-model-development-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  model-development:
+    name: Canonical model-development behavior
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: "${{ github.event.pull_request.head.sha || github.sha }}"
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install model-development test runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          .
+          "pytest>=8,<9"
+      - name: Compile model-development surfaces
+        run: >-
+          python -m compileall -q
+          skeleton/modeling
+          skeleton/ai/modeling
+          scripts/verify_vol006_model_development.py
+      - name: Require source and AI mirror parity
+        run: |
+          cmp skeleton/modeling/registry.py skeleton/ai/modeling/registry.py
+          cmp skeleton/modeling/training.py skeleton/ai/modeling/training.py
+          cmp skeleton/modeling/evaluation.py skeleton/ai/modeling/evaluation.py
+          cmp skeleton/modeling/publication.py skeleton/ai/modeling/publication.py
+      - name: Run model-development behavioral regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_vol006_model_registry.py
+          skeleton/testing/test_vol006_training_execution.py
+          skeleton/testing/test_vol006_artifact_publication.py
+          skeleton/testing/test_vol006_evaluation_eligibility.py
+
+  model-development-independent:
+    name: Independent exact-head model-development verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: "${{ github.event.pull_request.head.sha || github.sha }}"
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install independent verifier dependency
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+      - name: Run independent verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_vol006_model_development_independent.py
+      - name: Emit independent exact-head receipt
+        run: >-
+          python scripts/verify_vol006_model_development.py
+          --evidence-out .vol006-model-development-independent.json
+          --print-evidence
+      - name: Assert exact-head receipt identity and coverage
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".vol006-model-development-independent.json")
+              .read_text(encoding="utf-8")
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected:
+              raise SystemExit("VOL-006 receipt does not bind exact head")
+          if receipt.get("verifier") != "independent-vol006-model-development-v1":
+              raise SystemExit("unexpected VOL-006 verifier identity")
+          if receipt.get("volume") != "VOL-006":
+              raise SystemExit("model-development verifier bound wrong volume")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("independent VOL-006 verification failed")
+          if receipt.get("checked_invariant_count", 0) < 40:
+              raise SystemExit("VOL-006 invariant coverage is incomplete")
+          if len(receipt.get("source_digests") or {}) != 4:
+              raise SystemExit("VOL-006 source digest coverage is incomplete")
+          if len(receipt.get("mirror_digests") or {}) != 4:
+              raise SystemExit("VOL-006 mirror digest coverage is incomplete")
+          if len((receipt.get("volume_binding") or {}).get("binding_digest") or "") != 64:
+              raise SystemExit("VOL-006 plan binding digest is missing")
+          if len(receipt.get("receipt_digest") or "") != 64:
+              raise SystemExit("VOL-006 receipt digest is invalid")
+          print("VOL-006 independent exact-head receipt:", expected, receipt["receipt_digest"])
+          PY
