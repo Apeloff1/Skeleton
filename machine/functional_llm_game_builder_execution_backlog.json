@@ -307,9 +307,10 @@
         "FLGB-11-T11",
         "FLGB-11-T12"
       ],
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
-      "independent_verification_signed": false
+      "independent_verification_signed": false,
+      "implementation_note": "T01-T12 rendering/streaming/VFX targets, schemas, and focused regressions are present; render/material graph acyclicity, shader receipts, deterministic budgets, LOD, and recovery are explicit; exact-head dependency closure and independent verification remain required."
     },
     {
       "id": "FLGB-12",
@@ -8448,7 +8449,7 @@
       "implementation_target": "skeleton/game/render/render_graph.py",
       "contract_target": "skeleton/game/render/contracts/render_graph.schema.json",
       "test_target": "tests/flgb/test_flgb_11_render_graph.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -8514,7 +8515,7 @@
       "implementation_target": "skeleton/game/render/material_graph.py",
       "contract_target": "skeleton/game/render/contracts/material_graph.schema.json",
       "test_target": "tests/flgb/test_flgb_11_material_graph.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -8580,7 +8581,7 @@
       "implementation_target": "skeleton/game/render/shader_compilation.py",
       "contract_target": "skeleton/game/render/contracts/shader_compilation.schema.json",
       "test_target": "tests/flgb/test_flgb_11_shader_compilation.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -8646,7 +8647,7 @@
       "implementation_target": "skeleton/game/render/texture_streaming.py",
       "contract_target": "skeleton/game/render/contracts/texture_streaming.schema.json",
       "test_target": "tests/flgb/test_flgb_11_texture_streaming.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -8712,7 +8713,7 @@
       "implementation_target": "skeleton/game/render/mesh_pipeline.py",
       "contract_target": "skeleton/game/render/contracts/mesh_pipeline.schema.json",
       "test_target": "tests/flgb/test_flgb_11_mesh_pipeline.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -8778,7 +8779,7 @@
       "implementation_target": "skeleton/game/render/lighting_model.py",
       "contract_target": "skeleton/game/render/contracts/lighting_model.schema.json",
       "test_target": "tests/flgb/test_flgb_11_lighting_model.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -8844,7 +8845,7 @@
       "implementation_target": "skeleton/game/render/shadow_system.py",
       "contract_target": "skeleton/game/render/contracts/shadow_system.schema.json",
       "test_target": "tests/flgb/test_flgb_11_shadow_system.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -8910,7 +8911,7 @@
       "implementation_target": "skeleton/game/render/camera_rig.py",
       "contract_target": "skeleton/game/render/contracts/camera_rig.schema.json",
       "test_target": "tests/flgb/test_flgb_11_camera_rig.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -8976,7 +8977,7 @@
       "implementation_target": "skeleton/game/render/post_processing.py",
       "contract_target": "skeleton/game/render/contracts/post_processing.schema.json",
       "test_target": "tests/flgb/test_flgb_11_post_processing.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -9042,7 +9043,7 @@
       "implementation_target": "skeleton/game/render/particle_vfx.py",
       "contract_target": "skeleton/game/render/contracts/particle_vfx.schema.json",
       "test_target": "tests/flgb/test_flgb_11_particle_vfx.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -9108,7 +9109,7 @@
       "implementation_target": "skeleton/game/render/lod_system.py",
       "contract_target": "skeleton/game/render/contracts/lod_system.schema.json",
       "test_target": "tests/flgb/test_flgb_11_lod_system.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -9174,7 +9175,7 @@
       "implementation_target": "skeleton/game/render/render_recovery.py",
       "contract_target": "skeleton/game/render/contracts/render_recovery.schema.json",
       "test_target": "tests/flgb/test_flgb_11_render_recovery.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
