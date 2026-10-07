@@ -235,3 +235,13 @@ def test_route_request_digest_binds_budget_metadata_and_tools():
     assert route_request_digest(request) != route_request_digest(
         replace(request, budget=RouteBudget(max_cost=0.005, max_provider_attempts=2))
     )
+
+
+def test_governed_routing_execution_mirror_parity():
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    assert (
+        root / "skeleton/intelligence/routing_execution.py"
+    ).read_bytes() == (
+        root / "skeleton/ai/runtime/intelligence/routing_execution.py"
+    ).read_bytes()
