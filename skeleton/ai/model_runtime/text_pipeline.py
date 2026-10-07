@@ -292,6 +292,84 @@ class DecadeSamplingPlan:
 
 
 @dataclass(frozen=True)
+class TemporalEvaluationSlice:
+    """One cutoff-isolated evaluation slice; no example may exceed its horizon."""
+    slice_id: str
+    cutoff_year: int
+    source_years: tuple[int, ...]
+    example_digests: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.slice_id, str) or not self.slice_id or self.slice_id != self.slice_id.strip():
+            raise TokenizerContractError("invalid temporal evaluation slice id")
+        if isinstance(self.cutoff_year, bool) or not isinstance(self.cutoff_year, int) or not 1000 <= self.cutoff_year <= 9999:
+            raise TokenizerContractError("invalid temporal evaluation cutoff")
+        if not self.source_years or len(self.source_years) != len(self.example_digests):
+            raise TokenizerContractError("invalid temporal evaluation membership")
+        if any(isinstance(y, bool) or not isinstance(y, int) or y > self.cutoff_year for y in self.source_years):
+            raise TokenizerContractError("temporal evaluation leaks beyond cutoff")
+        if any(not isinstance(d, str) or len(d) != 64 or any(ch not in "0123456789abcdef" for ch in d) for d in self.example_digests):
+            raise TokenizerContractError("invalid temporal evaluation digest")
+
+    @property
+    def digest(self) -> str:
+        return digest_json({"slice_id": self.slice_id, "cutoff_year": self.cutoff_year, "source_years": list(self.source_years), "example_digests": list(self.example_digests)})
+
+
+@dataclass(frozen=True)
+class TemporalEvaluationResult:
+    """Integer-only temporal metrics suitable for deterministic promotion gates."""
+    slice_digest: str
+    correct: int
+    incorrect: int
+    abstained: int
+    inconsistent: int
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.slice_digest, str) or len(self.slice_digest) != 64:
+            raise TokenizerContractError("invalid temporal evaluation slice digest")
+        values = (self.correct, self.incorrect, self.abstained, self.inconsistent)
+        if any(isinstance(v, bool) or not isinstance(v, int) or v < 0 for v in values) or sum(values) <= 0:
+            raise TokenizerContractError("invalid temporal evaluation counts")
+
+    @property
+    def total(self) -> int:
+        return self.correct + self.incorrect + self.abstained + self.inconsistent
+
+    @property
+    def accuracy_ppm(self) -> int:
+        return self.correct * 1_000_000 // self.total
+
+    @property
+    def inconsistency_ppm(self) -> int:
+        return self.inconsistent * 1_000_000 // self.total
+
+    @property
+    def digest(self) -> str:
+        return digest_json({"slice_digest": self.slice_digest, "correct": self.correct, "incorrect": self.incorrect, "abstained": self.abstained, "inconsistent": self.inconsistent})
+
+
+@dataclass(frozen=True)
+class TemporalEvaluationGate:
+    """Fail-closed acceptance criteria across independently scored time slices."""
+    result_digests: tuple[str, ...]
+    minimum_accuracy_ppm: int
+    maximum_inconsistency_ppm: int
+    passed: bool
+
+    def __post_init__(self) -> None:
+        if not self.result_digests or any(not isinstance(d, str) or len(d) != 64 for d in self.result_digests):
+            raise TokenizerContractError("invalid temporal gate result digests")
+        for value in (self.minimum_accuracy_ppm, self.maximum_inconsistency_ppm):
+            if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 1_000_000:
+                raise TokenizerContractError("invalid temporal gate threshold")
+
+    @property
+    def digest(self) -> str:
+        return digest_json({"result_digests": list(self.result_digests), "minimum_accuracy_ppm": self.minimum_accuracy_ppm, "maximum_inconsistency_ppm": self.maximum_inconsistency_ppm, "passed": self.passed})
+
+
+@dataclass(frozen=True)
 class TemporalContradiction:
     """Explicit evidence that two time-scoped claims disagree."""
     left_signal_digest: str
@@ -916,6 +994,26 @@ class TextTokenPipeline:
         if not ordered:
             raise TokenizerContractError("decade sampling produced no documents")
         return DecadeSamplingPlan(coverage.digest, tuple(ordered), max_documents_per_decade)
+
+    def temporal_evaluation_slice(self, slice_id: str, signals: Sequence[TemporalTrainingSignal], example_digests: Sequence[str], *, cutoff_year: int) -> TemporalEvaluationSlice:
+        items = tuple(signals)
+        digests = tuple(example_digests)
+        if len(items) != len(digests) or any(not isinstance(s, TemporalTrainingSignal) for s in items):
+            raise TokenizerContractError("one temporal signal required per evaluation example")
+        if any(s.knowledge_cutoff_year > cutoff_year or s.observed_year > cutoff_year or s.source_year > cutoff_year for s in items):
+            raise TokenizerContractError("evaluation signal exceeds historical cutoff")
+        return TemporalEvaluationSlice(slice_id, cutoff_year, tuple(s.source_year for s in items), digests)
+
+    def temporal_evaluation_gate(self, results: Sequence[TemporalEvaluationResult], *, minimum_accuracy_ppm: int, maximum_inconsistency_ppm: int) -> TemporalEvaluationGate:
+        items = tuple(results)
+        if not items or any(not isinstance(r, TemporalEvaluationResult) for r in items):
+            raise TokenizerContractError("temporal evaluation results required")
+        if isinstance(minimum_accuracy_ppm, bool) or not isinstance(minimum_accuracy_ppm, int) or not 0 <= minimum_accuracy_ppm <= 1_000_000:
+            raise TokenizerContractError("invalid minimum temporal accuracy")
+        if isinstance(maximum_inconsistency_ppm, bool) or not isinstance(maximum_inconsistency_ppm, int) or not 0 <= maximum_inconsistency_ppm <= 1_000_000:
+            raise TokenizerContractError("invalid maximum temporal inconsistency")
+        passed = all(r.accuracy_ppm >= minimum_accuracy_ppm and r.inconsistency_ppm <= maximum_inconsistency_ppm for r in items)
+        return TemporalEvaluationGate(tuple(r.digest for r in items), minimum_accuracy_ppm, maximum_inconsistency_ppm, passed)
 
     def temporal_contradiction(self, left: TemporalTrainingSignal, right: TemporalTrainingSignal, *, resolution: str = "unresolved") -> TemporalContradiction:
         if not isinstance(left, TemporalTrainingSignal) or not isinstance(right, TemporalTrainingSignal):
