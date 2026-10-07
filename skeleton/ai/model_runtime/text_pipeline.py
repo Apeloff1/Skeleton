@@ -55,6 +55,28 @@ class TextPipelineConfig:
 
 
 @dataclass(frozen=True)
+class RoundTripReceipt:
+    """Deterministic evidence for encode/decode reversibility."""
+    tokenizer_digest: str
+    source_text_digest: str
+    decoded_text_digest: str
+    sequence_digest: str
+    lossless: bool
+
+    def __post_init__(self) -> None:
+        for name in ("tokenizer_digest", "source_text_digest", "decoded_text_digest", "sequence_digest"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value):
+                raise TokenizerContractError(f"invalid {name}")
+        if not isinstance(self.lossless, bool):
+            raise TokenizerContractError("invalid round-trip lossless flag")
+
+    @property
+    def digest(self) -> str:
+        return digest_json(self.__dict__)
+
+
+@dataclass(frozen=True)
 class PreparedText:
     normalized_text: str
     sequence: TokenSequence
@@ -1871,16 +1893,32 @@ class TextTokenPipeline:
             raise TokenizerContractError("tokenizer identity mismatch")
         return self.tokenizer.decode_ids(sequence.token_ids)
 
-    def verify_round_trip(self, text: str) -> TokenSequence:
+    def round_trip_receipt(self, text: str, *, require_lossless: bool = False) -> RoundTripReceipt:
         normalized = self.normalize(text)
+        self.tokenizer.assert_unchanged()
         sequence = self.tokenizer.encode_sequence(normalized)
         decoded = self.decode(sequence)
-        # Not every admitted legacy vocabulary is lossless. Never pretend it is.
-        # Where decoding is lossless, bind the exact normalized source digest.
-        if decoded == normalized:
-            expected = sha256(normalized.encode("utf-8")).hexdigest()
-            if sequence.source_text_digest != expected:
-                raise TokenizerContractError("source digest mismatch")
+        source_digest = sha256(normalized.encode("utf-8")).hexdigest()
+        decoded_digest = sha256(decoded.encode("utf-8")).hexdigest()
+        if sequence.source_text_digest != source_digest:
+            raise TokenizerContractError("source digest mismatch")
+        lossless = decoded == normalized
+        if require_lossless and not lossless:
+            raise TokenizerContractError("tokenizer round trip is lossy")
+        return RoundTripReceipt(
+            self.tokenizer.digest,
+            source_digest,
+            decoded_digest,
+            sequence.digest,
+            lossless,
+        )
+
+    def verify_round_trip(self, text: str, *, require_lossless: bool = False) -> TokenSequence:
+        normalized = self.normalize(text)
+        sequence = self.tokenizer.encode_sequence(normalized)
+        receipt = self.round_trip_receipt(text, require_lossless=require_lossless)
+        if receipt.sequence_digest != sequence.digest:
+            raise TokenizerContractError("round-trip sequence instability")
         return sequence
 
     def stream(self, chunks: Iterable[str]) -> PreparedText:
