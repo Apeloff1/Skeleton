@@ -29,7 +29,14 @@ from .native_llm_runtime import (
     GenerationStream,
     NativeLLMRuntime,
 )
+from .local_model_bridge import execute_local_request
 from .runtime_checkpoint import validate_model_snapshot
+from .runtime_service import (
+    CancellationToken,
+    NativeModelService,
+    NativeServiceError,
+    NativeServiceResult,
+)
 from .runtime_contracts import (
     BatchGenerationRequest,
     DevicePolicy,
@@ -60,6 +67,10 @@ __all__ = [
     "ALLOWED_TRANSITIONS",
     "BatchGenerationRequest",
     "BatchGenerationResult",
+    "NativeServiceResult",
+    "NativeServiceError",
+    "NativeModelService",
+    "CancellationToken",
     "BatchRequest",
     "DeviceDescriptor",
     "DevicePolicy",
@@ -98,6 +109,7 @@ __all__ = [
     "WeightShard",
     "batch_token_windows",
     "deserialize_token_sequence",
+    "execute_local_request",
     "iter_context_windows",
     "plan_continuous_batches",
     "plan_device_placement",

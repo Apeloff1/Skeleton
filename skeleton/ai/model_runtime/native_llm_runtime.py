@@ -9,7 +9,7 @@ from typing import Any, Iterator, Mapping, Sequence
 from skeleton.cortex.attn import sample_logits
 from skeleton.cortex.transformer import KVCache, TinyTransformer
 
-from .flgb_model_runtime import TokenSequence, digest_json
+from .flgb_model_runtime import ModelIdentity, TokenSequence, digest_json
 from .runtime_checkpoint import (
     checkpoint_json as encode_checkpoint_json,
     logical_bytes,
@@ -153,6 +153,18 @@ class NativeLLMRuntime:
     def model_bytes(self) -> int:
         return self._model_bytes
 
+    @property
+    def model_identity(self) -> ModelIdentity:
+        """Canonical FLGB model identity for the admitted native transformer."""
+        return ModelIdentity(
+            model_id="skeleton-native-transformer",
+            revision=self.model_digest,
+            architecture="skeleton.cortex.TinyTransformer",
+            config_digest=self.architecture.digest,
+            tokenizer_digest=self.tokenizer.digest,
+            weights_digest=self.model_digest,
+        )
+
     def estimate_kv_bytes(self, tokens: int) -> int:
         count = max(0, int(tokens))
         return count * self.model.n_layers * self.model.dim * 2 * 8 + count * 8
@@ -170,8 +182,12 @@ class NativeLLMRuntime:
                 raise RuntimeContractError("device binding failed") from exc
             actual = str(getattr(self.model, "device", "cpu") or "cpu")
             resident = bool(getattr(self.model, "resident", False))
-        desired = "cuda" if requested in {"cuda", "gpu"} else requested
-        degraded = requested not in {"auto", "cpu"} and actual != desired
+        if requested in {"cuda", "gpu"}:
+            degraded = actual != "cuda"
+        elif requested in {"torch", "torch-cpu"}:
+            degraded = not resident
+        else:
+            degraded = False
         if degraded and not policy.allow_fallback:
             raise RuntimeContractError(
                 "requested device unavailable and fallback is disabled"
@@ -212,6 +228,7 @@ class NativeLLMRuntime:
     def health_snapshot(self) -> Mapping[str, Any]:
         return {
             "model_digest": self.model_digest,
+            "model_identity_digest": self.model_identity.identity_digest,
             "tokenizer_digest": self.tokenizer.digest,
             "architecture": self.architecture.to_dict(),
             "architecture_digest": self.architecture.digest,

@@ -65,7 +65,10 @@ class TokenWindow:
             raise TokenizerContractError("invalid token window range")
         if self.stop - self.start != len(self.token_ids):
             raise TokenizerContractError("token window range/content mismatch")
-        if len(self.source_sequence_digest) != 64:
+        if (
+            len(self.source_sequence_digest) != 64
+            or any(ch not in "0123456789abcdef" for ch in self.source_sequence_digest)
+        ):
             raise TokenizerContractError("invalid source sequence digest")
         for token_id in self.token_ids:
             if not _is_int(token_id) or not 0 <= token_id < 2**31:
