@@ -409,8 +409,9 @@ class ContextEnvelope:
         if selected_ids & omitted_ids:
             raise ContextContractError("selected and omitted segment ids must be disjoint")
         snapshot_ids = {item[0] for item in self.source_snapshot}
-        if snapshot_ids != selected_ids | omitted_ids:
-            raise ContextContractError("source_snapshot must exactly cover selected and omitted segments")
+        represented_source_ids = selected_ids | {source_id for segment in selected for source_id in segment.derived_from}
+        if not snapshot_ids <= represented_source_ids | omitted_ids:
+            raise ContextContractError("source_snapshot contains unaccounted source segments")
         if set(dict(self.omission_reasons)) != omitted_ids:
             raise ContextContractError("omission_reasons must exactly cover omitted segments")
         selected_snapshot = tuple(
