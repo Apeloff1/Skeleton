@@ -240,6 +240,7 @@ async def test_live_chat_engine_outage_resumes_same_operation_to_completion(
         if attempts["execute"] == 1:
             raise EngineUnavailableError("down")
         return SimpleNamespace(
+            operation_id=command.operation.operation_id,
             final_output="Recovered.",
             execution_id=command.execution_request.execution_id,
             verification="verified",
