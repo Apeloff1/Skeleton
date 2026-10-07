@@ -1,6 +1,8 @@
 """Adapter from Skeleton's repository-owned transformer to local inference."""
 from __future__ import annotations
 
+import hashlib
+import json
 import threading
 import time
 
@@ -21,10 +23,27 @@ class NativeTransformerModel:
         self.model_id = model_id.strip()
         self._model_digest = runtime.model_digest
         self._tokenizer_digest = runtime.tokenizer.digest
+        self._runtime_digest = self._compute_runtime_digest()
 
     @property
     def model_digest(self) -> str:
         return self._model_digest
+
+    @property
+    def runtime_digest(self) -> str:
+        return self._runtime_digest
+
+    def _compute_runtime_digest(self) -> str:
+        payload = {
+            "schema_version": "skeleton.native_transformer.runtime.v1",
+            "model_digest": self.runtime.model_digest,
+            "tokenizer_digest": self.runtime.tokenizer.digest,
+            "architecture_digest": self.runtime.architecture.digest,
+            "device": self.runtime.device.to_dict(),
+            "limits": self.runtime.limits.to_dict(),
+        }
+        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
     def _assert_identity(self) -> None:
         self.runtime.assert_model_unchanged()
@@ -33,6 +52,8 @@ class NativeTransformerModel:
             raise RuntimeContractError("native transformer model identity drift")
         if self.runtime.tokenizer.digest != self._tokenizer_digest:
             raise RuntimeContractError("native transformer tokenizer identity drift")
+        if self._compute_runtime_digest() != self._runtime_digest:
+            raise RuntimeContractError("native transformer runtime identity drift")
 
     def infer(self, request: LocalInferenceRequest, cancel: threading.Event) -> LocalInferenceResult:
         if not isinstance(request, LocalInferenceRequest):
