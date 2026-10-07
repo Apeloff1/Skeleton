@@ -94,20 +94,20 @@ def test_live_p1_risk_inventory_is_deterministic_and_non_authoritative() -> None
     assert report["inventory"] == {
         "p1_primary_volume_count": 107,
         "volume_risk_count": 281,
-        "volume_gap_count": 212,
+        "volume_gap_count": 208,
         "applicable_adversarial_axis_count": 24,
-        "total_obligation_count": 517,
+        "total_obligation_count": 513,
     }
     assert report["live_inventory"] == {
         "p1_primary_volume_count": 107,
         "volume_risk_count": 281,
-        "volume_gap_count": 174,
+        "volume_gap_count": 170,
         "applicable_adversarial_axis_count": 24,
-        "total_obligation_count": 479,
+        "total_obligation_count": 475,
     }
-    assert report["binding_count"] == 517
-    assert report["live_binding_count"] == 479
-    assert report["historical_binding_count"] == 517
+    assert report["binding_count"] == 513
+    assert report["live_binding_count"] == 475
+    assert report["historical_binding_count"] == 513
     assert report["retired_binding_count"] == 38
     assert report["retired_expected_count"] == 38
     assert len(report["retired_obligation_ids"]) == 38
@@ -115,13 +115,13 @@ def test_live_p1_risk_inventory_is_deterministic_and_non_authoritative() -> None
         item.startswith("P1-GAP-VOL-")
         for item in report["retired_obligation_ids"]
     )
-    assert report["resolved_count"] == 517
-    assert report["live_resolved_count"] == 479
-    assert report["historical_resolved_count"] == 517
+    assert report["resolved_count"] == 513
+    assert report["live_resolved_count"] == 475
+    assert report["historical_resolved_count"] == 513
     assert report["unresolved_blocking_count"] == 0
     assert report["unclassified_count"] == 0
     assert report["disposition_counts"] == {
-        "evidence": 517,
+        "evidence": 513,
 
     }
     assert report["non_authoritative"] is True
@@ -250,7 +250,7 @@ def test_one_real_binding_changes_only_its_own_resolution(tmp_path: Path) -> Non
 
     assert report["binding_count"] == 1
     assert report["resolved_count"] == 1
-    assert report["unresolved_blocking_count"] == 478
+    assert report["unresolved_blocking_count"] == 474
     assert report["unclassified_count"] == 280
 
 
