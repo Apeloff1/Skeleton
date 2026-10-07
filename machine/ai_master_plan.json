@@ -439,7 +439,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "requirements": [
         "Maintain one canonical architecture graph for roots, ownership zones, runtime DAGs and interfaces.",
         "Reject illegal dependencies and undeclared production components before dependency-heavy tests.",
@@ -466,13 +466,15 @@
         "skeleton/testing/test_architecture_map.py",
         "tests/test_architecture_boundaries.py",
         "skeleton/testing/test_architecture_map.py::test_component_fitness_covers_all_runtime_planes_and_ai_mappings",
-        "skeleton/testing/test_architecture_map.py::test_owner_lookup_resolves_future_path_without_materialization"
+        "skeleton/testing/test_architecture_map.py::test_owner_lookup_resolves_future_path_without_materialization",
+        "tests/test_vol002_architecture_independent_verifier.py"
       ],
       "evaluations": [
         ".github/workflows/vol002-architecture-fitness.yml",
         "scripts/check_architecture_map.py --json",
         "skeleton/testing/test_architecture_map.py",
-        "tests/test_architecture_boundaries.py"
+        "tests/test_architecture_boundaries.py",
+        "scripts/verify_vol002_architecture_fitness.py"
       ],
       "evidence": [
         "https://github.com/Apeloff1/Skeleton/commit/d4334086eaf1c7cbbff46890b727fc954fde1677",
@@ -481,19 +483,24 @@
         ".github/workflows/vol002-architecture-fitness.yml",
         "https://github.com/Apeloff1/Skeleton/commit/ce1a19f26c6b811c189d309440ab5b921c1ef7b8",
         "https://github.com/Apeloff1/Skeleton/commit/ce6d1736af9137dd07669ff17423ed1decf2a4c5",
-        "https://github.com/Apeloff1/Skeleton/commit/bae16164548a1cf7250c11ff00c0ce5ea970279f"
+        "https://github.com/Apeloff1/Skeleton/commit/bae16164548a1cf7250c11ff00c0ce5ea970279f",
+        "scripts/verify_vol002_architecture_fitness.py",
+        "tests/test_vol002_architecture_independent_verifier.py",
+        "git-head:8b9e691d8dbbb7a24906fc0e682ace7d76055aef",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/37537159128",
+        "github-actions-job:112520978858",
+        "github-actions-job:112520979326",
+        "architecture-fitness-receipt:4a740545cbf436651c0c55c63b50324d653ee7b2f600396c2ca4202c48662623"
       ],
       "risks": [
         "documentation/runtime split brain",
         "transitional roots becoming accidental owners",
         "cyclic dependency growth"
       ],
-      "gaps": [
-        "independent exact-head VOL-002 Architecture Fitness and Ownership Gate qualification remains pending"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-002",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
       "depth_pass": "DP-000-040",
       "enterprise_grade_state": "designed",
@@ -530,31 +537,40 @@
         "skeleton/contracts/canonical.py",
         "skeleton/ai/runtime/contracts/canonical.py",
         "scripts/check_architecture_contract_conformance.py",
-        "machine/contract_conformance.json"
+        "machine/contract_conformance.json",
+        "scripts/verify_vol003_contract_conformance.py",
+        ".github/workflows/vol003-contract-conformance.yml"
       ],
       "tests": [
         "skeleton/testing/test_contract_serialization_edges.py",
         "skeleton/testing/test_contract_compatibility.py",
         "skeleton/testing/test_contract_unicode_edges.py",
-        "tests/test_architecture_contract_conformance.py"
+        "tests/test_architecture_contract_conformance.py",
+        "tests/test_vol003_contract_conformance_independent.py"
       ],
       "evaluations": [
         "scripts/check_architecture_contract_conformance.py --json",
-        "tests/test_architecture_contract_conformance.py"
+        "tests/test_architecture_contract_conformance.py",
+        ".github/workflows/vol003-contract-conformance.yml",
+        "scripts/verify_vol003_contract_conformance.py"
       ],
       "evidence": [
         "https://github.com/Apeloff1/Skeleton/commit/3118f3d4c5fcbd421c590b7724289abe8c411e11",
         "scripts/check_architecture_contract_conformance.py",
         "machine/contract_conformance.json",
         "skeleton/testing/test_contract_compatibility.py",
-        "tests/test_architecture_contract_conformance.py"
+        "tests/test_architecture_contract_conformance.py",
+        "scripts/verify_vol003_contract_conformance.py",
+        "tests/test_vol003_contract_conformance_independent.py"
       ],
       "risks": [
         "schema drift",
         "privileged defaults from unknown values",
         "cross-language round-trip divergence"
       ],
-      "gaps": [],
+      "gaps": [
+        "independent exact-head VOL-003 Contract Conformance Closure qualification remains pending"
+      ],
       "accountability_id": "ACC-VOL-003",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
@@ -606,7 +622,8 @@
         "skeleton/api/engine_service.py",
         "skeleton/provider_runtime.py",
         "machine/ai_app_construction.json",
-        "docs/architecture/RUNTIME_SUPERVISION.md"
+        "docs/architecture/RUNTIME_SUPERVISION.md",
+        "scripts/verify_vol004_runtime_supervision.py"
       ],
       "tests": [
         "skeleton/testing/test_app_assembly.py",
@@ -617,7 +634,8 @@
         "skeleton/testing/test_kernel_supervisor_cancellation.py",
         "backend/tests/test_engine_cross_service_closure.py::test_cross_service_cancel_fences_late_provider_result",
         "backend/tests/test_engine_cross_service_closure.py::test_stale_task_callback_cannot_release_newer_generation_lease",
-        "backend/tests/test_engine_cross_service_closure.py::test_engine_lifecycle_draining_fences_new_execution_and_drains_lease"
+        "backend/tests/test_engine_cross_service_closure.py::test_engine_lifecycle_draining_fences_new_execution_and_drains_lease",
+        "tests/test_vol004_runtime_supervision_independent.py"
       ],
       "evaluations": [
         "python scripts/check_architecture_runtime_supervision.py --json",
@@ -625,7 +643,8 @@
         "skeleton/testing/test_vol004_runtime_supervision_v2.py",
         "backend/tests/test_engine_cross_service_closure.py::test_cross_service_cancel_fences_late_provider_result",
         "backend/tests/test_engine_cross_service_closure.py::test_stale_task_callback_cannot_release_newer_generation_lease",
-        "backend/tests/test_engine_cross_service_closure.py::test_engine_lifecycle_draining_fences_new_execution_and_drains_lease"
+        "backend/tests/test_engine_cross_service_closure.py::test_engine_lifecycle_draining_fences_new_execution_and_drains_lease",
+        "scripts/verify_vol004_runtime_supervision.py"
       ],
       "evidence": [
         "https://github.com/Apeloff1/Skeleton/commit/be408977891328b78522074c1fe693267b01ce5b",
@@ -654,7 +673,9 @@
         "https://github.com/Apeloff1/Skeleton/commit/c85a925cc16f385bbff92232d8c89be501b1be16",
         "https://github.com/Apeloff1/Skeleton/commit/de2577ba13ab2c5fb936de312c668a754d05b9e6",
         "https://github.com/Apeloff1/Skeleton/commit/fb1b0eda89e3092f23491fa5f1732052aa625f89",
-        "https://github.com/Apeloff1/Skeleton/commit/87177fe5f8c093c124078f1323e3989a6bd91eb6"
+        "https://github.com/Apeloff1/Skeleton/commit/87177fe5f8c093c124078f1323e3989a6bd91eb6",
+        "scripts/verify_vol004_runtime_supervision.py",
+        "tests/test_vol004_runtime_supervision_independent.py"
       ],
       "risks": [
         "orphan tasks",
@@ -701,19 +722,40 @@
         "machine/state_topology.json",
         "skeleton/persistence",
         "backend/services/database.py",
-        "scripts/state_recovery_drill.py"
+        "scripts/state_recovery_drill.py",
+        "machine/state_backup_policy.json",
+        "scripts/state_migration_compatibility.py",
+        "scripts/verify_state_authority_closure.py",
+        ".github/workflows/state-recovery-drill.yml",
+        ".github/workflows/p1-migration-rollback-compatibility.yml"
       ],
       "tests": [
         "skeleton/testing/test_state_recovery_drill.py",
         "skeleton/testing/test_operation_store.py",
-        "backend/tests/test_rag_state_authority.py"
+        "backend/tests/test_rag_state_authority.py",
+        "skeleton/testing/test_state_migration_compatibility.py",
+        "tests/test_state_authority_independent_verifier.py"
       ],
       "evaluations": [
-        "planned:partial-commit fault matrix",
-        "planned:restore consistency evaluation"
+        "scripts/check_state_topology.py --json",
+        "scripts/state_migration_compatibility.py",
+        "scripts/verify_state_authority_closure.py",
+        ".github/workflows/state-recovery-drill.yml",
+        ".github/workflows/p1-migration-rollback-compatibility.yml"
       ],
       "evidence": [
-        "https://github.com/Apeloff1/Skeleton/commit/f9053d8c9a2dfddcff431a4ff37863a5d962eded"
+        "https://github.com/Apeloff1/Skeleton/commit/f9053d8c9a2dfddcff431a4ff37863a5d962eded",
+        "machine/state_topology.json",
+        "machine/state_backup_policy.json",
+        "scripts/state_recovery_drill.py",
+        "scripts/state_migration_compatibility.py",
+        "skeleton/testing/test_state_recovery_drill.py",
+        "skeleton/testing/test_state_migration_compatibility.py",
+        "scripts/verify_state_authority_closure.py",
+        "tests/test_state_authority_independent_verifier.py",
+        ".github/workflows/state-recovery-drill.yml",
+        ".github/workflows/p1-migration-rollback-compatibility.yml",
+        "scripts/check_state_topology.py"
       ],
       "risks": [
         "split-brain ownership",
@@ -722,8 +764,7 @@
         "backup that cannot restore"
       ],
       "gaps": [
-        "converge remaining legacy state owners",
-        "add migration compatibility rehearsal to release qualification"
+        "independent exact-head VOL-005 Data & Persistence Closure qualification remains pending"
       ],
       "accountability_id": "ACC-VOL-005",
       "completion_checkbox": false,

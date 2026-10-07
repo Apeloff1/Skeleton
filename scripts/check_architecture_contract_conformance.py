@@ -134,11 +134,38 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         (v for v in master.get("volumes", []) if isinstance(v, dict) and v.get("key") == "VOL-003"),
         None,
     )
-    if not isinstance(volume, dict) or binding.get("title") != volume.get("title"):
+    if not isinstance(volume, dict):
+        raise ContractConformanceError("masterplan must contain VOL-003")
+    if binding.get("volume_ref") != "VOL-003" or binding.get("title") != volume.get("title"):
         raise ContractConformanceError("contract conformance must remain bound to VOL-003")
-    for gap in binding.get("required_gap_texts", []):
-        if gap not in volume.get("gaps", []):
-            raise ContractConformanceError(f"VOL-003 masterplan gap drift: {gap!r}")
+    qualification_gap = binding.get("qualification_gap")
+    if not isinstance(qualification_gap, str) or not qualification_gap.strip():
+        raise ContractConformanceError("VOL-003 qualification_gap must be non-empty")
+    retired_gaps = binding.get("retired_implementation_gaps")
+    if not isinstance(retired_gaps, list) or not all(
+        isinstance(item, str) and item for item in retired_gaps
+    ):
+        raise ContractConformanceError(
+            "VOL-003 retired_implementation_gaps must be non-empty strings"
+        )
+    live_gaps = list(volume.get("gaps") or [])
+    if live_gaps not in ([qualification_gap], []):
+        raise ContractConformanceError(
+            "VOL-003 gap state must be pending exact-head qualification or signed"
+        )
+    for retired_gap in retired_gaps:
+        if retired_gap in live_gaps:
+            raise ContractConformanceError(
+                f"retired VOL-003 implementation gap reappeared: {retired_gap!r}"
+            )
+    if not live_gaps and volume.get("completion_checkbox") is not True:
+        raise ContractConformanceError(
+            "VOL-003 cannot clear qualification gap before completion signoff"
+        )
+    if live_gaps and volume.get("completion_checkbox") is True:
+        raise ContractConformanceError(
+            "VOL-003 cannot remain signed with a pending qualification gap"
+        )
 
     records = schemas.get("records")
     if not isinstance(records, dict) or not records:

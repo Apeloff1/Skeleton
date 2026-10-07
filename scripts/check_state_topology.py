@@ -168,6 +168,33 @@ def _validate_links(
         if construction_link.get("validator") != "scripts/check_state_topology.py":
             errors.append("construction state_topology.validator path drift")
 
+    migration = topology.get("migration_compatibility")
+    expected_migration = {
+        "tool": "scripts/state_migration_compatibility.py",
+        "test": "skeleton/testing/test_state_migration_compatibility.py",
+        "release_workflow": ".github/workflows/p1-migration-rollback-compatibility.yml",
+        "recovery_workflow": ".github/workflows/state-recovery-drill.yml",
+    }
+    if not isinstance(migration, dict):
+        errors.append("state topology must bind migration_compatibility")
+    else:
+        for key, expected in expected_migration.items():
+            if migration.get(key) != expected:
+                errors.append(
+                    f"state topology migration_compatibility.{key} "
+                    f"must be {expected!r}"
+                )
+            if not (repo_root / expected).is_file():
+                errors.append(
+                    "state topology migration compatibility path is missing: "
+                    + expected
+                )
+        policy = migration.get("policy")
+        if not isinstance(policy, str) or not policy.strip():
+            errors.append(
+                "state topology migration_compatibility.policy must be non-empty"
+            )
+
 
 def _validate_physical_stores(
     topology: dict[str, Any],
@@ -410,6 +437,22 @@ def _validate_state_domains(
             errors.append(
                 f"state domain {domain_id} references unknown gap {gap_id!r}"
             )
+        elif (
+            isinstance(gap_id, str)
+            and gap_id in known_gaps
+            and known_gaps[gap_id].get("status") == "closed"
+        ):
+            errors.append(
+                f"state domain {domain_id} must retire closed gap reference {gap_id!r}"
+            )
+
+        if authority == "authoritative":
+            status = str(item.get("status", "")).lower()
+            if "partial" in status or "transitional" in status:
+                errors.append(
+                    f"authoritative state domain {domain_id} cannot remain "
+                    f"partially bound: {item.get('status')!r}"
+                )
 
         store = stores.get(str(store_id))
         if (

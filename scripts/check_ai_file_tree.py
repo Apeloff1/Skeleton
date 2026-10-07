@@ -675,6 +675,46 @@ def validate() -> list[str]:
         errors.append("native_ai_owners must be a non-empty list")
         native_owners = []
 
+    # Current-state summary fields are part of the machine contract, not
+    # historical prose. Keep them derived from the live governed collections
+    # so automation and human signoff cannot reason about different trees.
+    readiness = data.get("pre_move_readiness")
+    if not isinstance(readiness, dict):
+        errors.append("pre_move_readiness must be an object")
+    else:
+        if readiness.get("governed_mapping_count") != len(mappings):
+            errors.append(
+                "pre_move_readiness governed_mapping_count must equal live mappings"
+            )
+        if readiness.get("native_ai_owner_count") != len(native_owners):
+            errors.append(
+                "pre_move_readiness native_ai_owner_count must equal live native owners"
+            )
+        live_batch_counts: dict[str, int] = {}
+        for mapping in mappings:
+            if isinstance(mapping, dict) and isinstance(mapping.get("move_batch"), str):
+                move_batch = mapping["move_batch"]
+                live_batch_counts[move_batch] = live_batch_counts.get(move_batch, 0) + 1
+        if readiness.get("batch_counts") != live_batch_counts:
+            errors.append(
+                "pre_move_readiness batch_counts must equal live mapping batches"
+            )
+
+    object_audit = data.get("object_audit")
+    if not isinstance(object_audit, dict):
+        errors.append("object_audit must be an object")
+    elif object_audit.get("current_mapping_count") != len(mappings):
+        errors.append("object_audit current_mapping_count must equal live mappings")
+
+    validation_state = data.get("validation_state")
+    expected_state_prefix = f"{len(mappings)}_mapping_plus_{len(native_owners)}_native_owner_"
+    if not isinstance(validation_state, str) or not validation_state.startswith(
+        expected_state_prefix
+    ):
+        errors.append(
+            "validation_state must encode live mapping and native-owner counts"
+        )
+
     known_volume_keys = {
         volume.get("key")
         for volume in master_plan.get("volumes", [])
@@ -1139,6 +1179,19 @@ def validate() -> list[str]:
         errors.append("relocation must not create completion authority")
 
     impl = data.get("implementation_signoff", {})
+    if not isinstance(impl, dict):
+        errors.append("implementation_signoff must be an object")
+        impl = {}
+    elif not impl.get("signed"):
+        pending_statement = impl.get("statement")
+        expected_mapping_label = f"{len(mappings)}-mapping"
+        if (
+            not isinstance(pending_statement, str)
+            or expected_mapping_label not in pending_statement
+        ):
+            errors.append(
+                "pending implementation signoff statement must reference live mapping count"
+            )
     if impl.get("signed"):
         if impl.get("signature_method") not in ALLOWED_SIGNATURE_METHODS:
             errors.append("implementation signoff uses an unbound signature method")
