@@ -127,7 +127,10 @@ class NativeLLMRuntime:
         if self._model_bytes > self.limits.max_model_bytes:
             raise RuntimeContractError("model exceeds runtime memory budget")
 
-        self.tokenizer = NativeTokenizer(model)
+        try:
+            self.tokenizer = NativeTokenizer(model)
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("native tokenizer admission failed") from exc
         self.architecture = self._architecture()
         if self.estimate_kv_bytes(self.limits.max_context) > self.limits.max_kv_bytes:
             raise RuntimeContractError("configured context exceeds KV memory budget")
@@ -197,9 +200,10 @@ class NativeLLMRuntime:
     def bind_device(self, policy: DevicePolicy) -> DeviceReceipt:
         if not isinstance(policy, DevicePolicy):
             raise RuntimeContractError("DevicePolicy required")
+        receipt = self._bind_device(policy)
         self.device_policy = policy
-        self.device = self._bind_device(policy)
-        return self.device
+        self.device = receipt
+        return receipt
 
     def _current_model_digest(self) -> str:
         snapshot = portable_model_snapshot(self.model)
@@ -213,16 +217,25 @@ class NativeLLMRuntime:
             )
 
     def refresh_model_identity(self) -> str:
+        """Atomically re-admit mutable model state after training/weight updates."""
         snapshot = portable_model_snapshot(self.model)
         validate_model_snapshot(snapshot)
         size = logical_bytes(snapshot)
         if size > self.limits.max_model_bytes:
             raise RuntimeContractError("mutated model exceeds runtime memory budget")
+        digest = snapshot_digest(snapshot)
+        try:
+            tokenizer = NativeTokenizer(self.model)
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("native tokenizer re-admission failed") from exc
+        architecture = self._architecture()
+
+        # Commit only after every new identity component has validated.
         self._model_snapshot = snapshot
-        self._model_digest = snapshot_digest(snapshot)
+        self._model_digest = digest
         self._model_bytes = size
-        self.tokenizer = NativeTokenizer(self.model)
-        self.architecture = self._architecture()
+        self.tokenizer = tokenizer
+        self.architecture = architecture
         return self.model_digest
 
     def health_snapshot(self) -> Mapping[str, Any]:
@@ -245,10 +258,16 @@ class NativeLLMRuntime:
         }
 
     def encode(self, text: str) -> TokenSequence:
-        return self.tokenizer.encode_sequence(text)
+        try:
+            return self.tokenizer.encode_sequence(text)
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("native tokenizer encode failed") from exc
 
     def decode_ids(self, token_ids: Sequence[int]) -> str:
-        return self.tokenizer.decode_ids(token_ids)
+        try:
+            return self.tokenizer.decode_ids(token_ids)
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("native tokenizer decode failed") from exc
 
     def _config_digest(self, config: GenerationConfig) -> str:
         return digest_json(config.to_dict())
@@ -531,7 +550,10 @@ class NativeLLMRuntime:
 
     def checkpoint(self) -> Mapping[str, Any]:
         self.assert_model_unchanged()
-        self.tokenizer.assert_unchanged()
+        try:
+            self.tokenizer.assert_unchanged()
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("native tokenizer changed before checkpoint") from exc
         return make_checkpoint(
             model=self.model,
             model_digest=self.model_digest,
