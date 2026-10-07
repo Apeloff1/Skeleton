@@ -1527,3 +1527,18 @@ Adversarial runtime review closed additional non-persistence defects:
 - focused regressions cover contract validation, non-finite discovery scores, duplicate providers, transient robots failure preservation and the one-request robots budget boundary.
 
 These repairs are IMPLEMENTED. Remaining signing blocker is still observable exact-head validation; further runtime audit should examine redirect-hop budget/pacing accounting and Retry-After HTTP-date handling.
+
+
+### 2026-10-07 redirect accounting and pacing tranche
+
+Crawler-controlled redirects now enforce accounting and pacing per actual network hop:
+- each completed redirect/final hop charges request and response-byte budget inside the redirect controller;
+- CrawlEngine avoids double-charging the final response for hop-aware fetchers and charges document admission separately;
+- retryable final responses retain the hop charge without a second response charge;
+- cross-host redirects check the destination host-ready clock before fetching and apply destination robots/minimum delay;
+- policy failures no longer create phantom request charges;
+- transport failures are distinguished from policy failures so a request that actually started can still consume request budget;
+- Retry-After accepts both delta-seconds and HTTP-date forms, with HTTP-date delay computed against response.fetched_at for deterministic replay;
+- regressions cover two-hop accounting, destination pacing and deterministic HTTP-date retry delay.
+
+Further audit note: robots retrieval itself still uses fetcher.fetch rather than crawler-controlled fetch_once traversal, so robots redirect accounting/policy should be reviewed separately before final signing.
