@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-07:post_training:v1",
+  "title": "FLGB-07 post training",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "base_model_digest",
+    "objective_digest",
+    "algorithm_id",
+    "config_digest"
+  ],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "base_model_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "objective_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "algorithm_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "config_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
