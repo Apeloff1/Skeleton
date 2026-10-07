@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-13:dialogue_graph:v1",
+  "title": "FLGB-13 dialogue graph",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "node_id",
+    "line_digest",
+    "choices"
+  ],
+  "properties": {
+    "node_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "line_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "choices": {
+      "type": "array",
+      "maxItems": 4096
+    }
+  }
+}
