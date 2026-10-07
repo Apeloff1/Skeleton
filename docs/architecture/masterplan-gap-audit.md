@@ -1371,3 +1371,40 @@ Closed additional evidence and trust-boundary gaps:
 Focused regressions landed for false corroboration, provider failure isolation/canonical dedupe/identity spoofing, strict decoding bounds and content-credential trust semantics.
 
 Known implementation gaps are now dominated by deeper transport/runtime concerns: DNS validation still has a resolution-to-connect TOCTOU window because urllib resolves independently after validation; frontier claiming exists but is not yet atomically coupled to the engine's heap dequeue in a shared distributed frontier. These remain explicit blockers to a fully SIGNED production-grade distributed crawler.
+
+
+### 2026-10-07 transport and distributed-frontier closeout tranche
+
+Major distributed-runtime blocker substantially closed:
+- repaired literal escaped-newline corruption in durable crawler storage that would have prevented Python compilation;
+- durable schema advanced to v3;
+- shared SQLite frontier stores scheduling, depth, retry and lease ownership state;
+- worker selection plus lease assignment occurs under one IMMEDIATE transaction;
+- completion and retry are opaque-token fenced;
+- expired claims can be reassigned without allowing stale completion;
+- focused regressions cover exclusive claim, expiry/reclaim and atomic retry rescheduling.
+
+DNS hardening advanced from a loose preflight check to an explicit resolution/peer-binding contract:
+- a ResolvedTarget captures the exact prevalidated public address set;
+- peer verification accepts only an address from that validated set;
+- malformed/unplanned peers fail closed.
+
+Important remaining transport blocker: SafeHttpFetcher still uses urllib and therefore does not yet expose the connected socket peer to enforce ResolvedTarget at connection time. The binding contract and tests now exist, but production transport must switch to or wrap a connection primitive that exposes peername while preserving HTTPS SNI/hostname certificate verification. This is not marked complete until that enforcement is wired into the actual socket.
+
+
+### 2026-10-07 socket-bound DNS closeout
+
+The previously explicit DNS resolution-to-connect TOCTOU blocker is now closed in the default production transport:
+- SafeHttpFetcher defaults to SocketBoundFetcher;
+- DNS is resolved once into a validated ResolvedTarget containing only public addresses;
+- the connection is opened directly to a member of that validated address set rather than re-resolving the hostname;
+- the actual connected peer address is checked against the validated set;
+- HTTPS wraps that connected socket with the original hostname as server_hostname, preserving SNI and certificate hostname verification;
+- HTTP Host retains the original hostname rather than the pinned IP;
+- response Content-Length and streamed byte limits remain bounded;
+- redirects remain exposed as single hops for the crawler-level robots/policy controller;
+- focused mocked-socket regressions prove unplanned peers are rejected and exact validated peers are accepted without public-network dependency.
+
+The legacy urllib implementation remains available only behind bind_dns_to_socket=False for compatibility; the safe default is socket-bound.
+
+With atomic durable frontier claiming and socket-bound DNS enforcement both landed, remaining SIGNED blockers are now verification/evidence oriented: observed exact-head CI execution, broader platform/load characterization, and any failures those gates expose.

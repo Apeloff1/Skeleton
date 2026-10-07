@@ -4,7 +4,8 @@ import json, os, sqlite3, tempfile
 from dataclasses import asdict
 from pathlib import Path
 from typing import Mapping
-from .core import CrawlDocument\nfrom .migrations import migrate
+from .core import CrawlDocument
+from .migrations import migrate
 
 class SqliteCrawlStore:
     def __init__(self,path:str|Path):
@@ -22,7 +23,8 @@ class SqliteCrawlStore:
         CREATE TABLE IF NOT EXISTS checkpoints(
           key TEXT PRIMARY KEY, state TEXT NOT NULL);
         """)
-        self.db.commit()\n        migrate(self.db)
+        self.db.commit()
+        migrate(self.db)
     def close(self): self.db.close()
     def has_url(self,url:str)->bool:
         return self.db.execute("SELECT 1 FROM urls WHERE canonical_url=?",(url,)).fetchone() is not None
