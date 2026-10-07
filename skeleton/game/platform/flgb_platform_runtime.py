@@ -78,7 +78,9 @@ class RollbackCorrection:
 @dataclass(frozen=True)
 class SaveField:
     field_id:str;type_id:str;required:bool
-    def __post_init__(self):rid(self.field_id,"field_id");rid(self.type_id,"type_id");
+    def __post_init__(self):
+        rid(self.field_id,"field_id");rid(self.type_id,"type_id")
+        if not isinstance(self.required,bool):raise PlatformContractError("required must be boolean")
 
 @dataclass(frozen=True)
 class SaveSchema:
