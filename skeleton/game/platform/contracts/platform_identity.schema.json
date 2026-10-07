@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-15:platform_identity:v1",
+  "title": "FLGB-15 platform identity",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "platform",
+    "account_id",
+    "subject_digest",
+    "entitlement_digest"
+  ],
+  "properties": {
+    "platform": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "account_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "subject_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "entitlement_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
