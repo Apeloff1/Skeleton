@@ -84,6 +84,61 @@ class PreparedText:
 
 
 @dataclass(frozen=True)
+class TemporalTrainingSignal:
+    """Leakage-safe year signal attached to a training source or example."""
+    source_year: int
+    observed_year: int
+    knowledge_cutoff_year: int
+    valid_from_year: int | None = None
+    valid_to_year: int | None = None
+
+    def __post_init__(self) -> None:
+        years = (self.source_year, self.observed_year, self.knowledge_cutoff_year)
+        if any(isinstance(year, bool) or not isinstance(year, int) or not 1000 <= year <= 9999 for year in years):
+            raise TokenizerContractError("invalid temporal training year")
+        for value in (self.valid_from_year, self.valid_to_year):
+            if value is not None and (isinstance(value, bool) or not isinstance(value, int) or not 1000 <= value <= 9999):
+                raise TokenizerContractError("invalid temporal validity year")
+        if self.source_year > self.observed_year:
+            raise TokenizerContractError("source year cannot be after observation year")
+        if self.observed_year > self.knowledge_cutoff_year:
+            raise TokenizerContractError("future observation exceeds knowledge cutoff")
+        if self.valid_from_year is not None and self.valid_from_year > self.knowledge_cutoff_year:
+            raise TokenizerContractError("future validity exceeds knowledge cutoff")
+        if self.valid_from_year is not None and self.valid_to_year is not None and self.valid_to_year < self.valid_from_year:
+            raise TokenizerContractError("invalid temporal validity interval")
+
+    @property
+    def age_years(self) -> int:
+        return self.knowledge_cutoff_year - self.source_year
+
+    @property
+    def age_bucket(self) -> str:
+        age = self.age_years
+        if age == 0:
+            return "current"
+        if age <= 2:
+            return "recent"
+        if age <= 5:
+            return "medium"
+        if age <= 10:
+            return "historical"
+        return "archive"
+
+    @property
+    def digest(self) -> str:
+        return digest_json({
+            "source_year": self.source_year,
+            "observed_year": self.observed_year,
+            "knowledge_cutoff_year": self.knowledge_cutoff_year,
+            "valid_from_year": self.valid_from_year,
+            "valid_to_year": self.valid_to_year,
+            "age_years": self.age_years,
+            "age_bucket": self.age_bucket,
+        })
+
+
+@dataclass(frozen=True)
 class SupervisedTextExample:
     """One prompt/response example with a deterministic normalized boundary."""
     example_id: str
@@ -563,6 +618,9 @@ class TextTokenPipeline:
             sha256(text.encode("utf-8")).hexdigest(),
             sha256(normalized.encode("utf-8")).hexdigest(),
         )
+
+    def temporal_signal(self, *, source_year: int, observed_year: int, knowledge_cutoff_year: int, valid_from_year: int | None = None, valid_to_year: int | None = None) -> TemporalTrainingSignal:
+        return TemporalTrainingSignal(source_year, observed_year, knowledge_cutoff_year, valid_from_year, valid_to_year)
 
     def prepare_supervised_example(self, example_id: str, prompt: str, response: str) -> SupervisedTextExample:
         if not isinstance(prompt, str) or not isinstance(response, str) or not prompt or not response:
