@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-14:layout_grammar:v1",
+  "title": "FLGB-14 layout grammar",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "symbol",
+    "expansion",
+    "weight"
+  ],
+  "properties": {
+    "symbol": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "expansion": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "weight": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}
