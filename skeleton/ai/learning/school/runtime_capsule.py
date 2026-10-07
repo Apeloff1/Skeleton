@@ -9,22 +9,60 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
+import importlib
 import json
 
-from skeleton.ai.learning.school.decision_ledger import (
+from skeleton.learning.school.decision_ledger import (
     DecisionDisposition,
     DecisionLedger,
 )
-from skeleton.ai.learning.school.runtime_replay import (
+from skeleton.learning.school.runtime_replay import (
     RuntimeAudit,
     RuntimeReplaySnapshot,
     audit_runtime,
     replay_digest,
 )
-from skeleton.ai.learning.school.session_audit import (
+from skeleton.learning.school.session_audit import (
     SessionAudit,
     audit_session,
 )
+
+
+def _trusted_twin_instance(
+    value: object,
+    canonical_type: type[object],
+    *,
+    twin_module: str,
+    twin_name: str,
+) -> bool:
+    """Accept only a canonical runtime type or its governed AI-tree twin."""
+
+    if isinstance(value, canonical_type):
+        return True
+    try:
+        module = importlib.import_module(twin_module)
+        twin_type = getattr(module, twin_name)
+    except (ImportError, AttributeError):
+        return False
+    return isinstance(twin_type, type) and isinstance(value, twin_type)
+
+
+def _is_decision_ledger(value: object) -> bool:
+    return _trusted_twin_instance(
+        value,
+        DecisionLedger,
+        twin_module="skeleton.ai.learning.school.decision_ledger",
+        twin_name="DecisionLedger",
+    )
+
+
+def _is_runtime_snapshot(value: object) -> bool:
+    return _trusted_twin_instance(
+        value,
+        RuntimeReplaySnapshot,
+        twin_module="skeleton.ai.learning.school.runtime_replay",
+        twin_name="RuntimeReplaySnapshot",
+    )
 
 
 def _digest(payload: object) -> str:
@@ -63,12 +101,12 @@ class RuntimeIntegrityCapsule:
         runtime: RuntimeReplaySnapshot,
         ledger: DecisionLedger,
     ) -> "RuntimeIntegrityCapsule":
-        if not isinstance(runtime, RuntimeReplaySnapshot):
+        if not _is_runtime_snapshot(runtime):
             raise TypeError(
-                "runtime must be RuntimeReplaySnapshot"
+                "runtime must be trusted RuntimeReplaySnapshot"
             )
-        if not isinstance(ledger, DecisionLedger):
-            raise TypeError("ledger must be DecisionLedger")
+        if not _is_decision_ledger(ledger):
+            raise TypeError("ledger must be trusted DecisionLedger")
 
         runtime_audit = audit_runtime(runtime, ledger)
         if not runtime_audit.valid:
@@ -105,8 +143,8 @@ class RuntimeIntegrityCapsule:
             )
             if (
                 selected_record is None
-                or selected_record.disposition
-                is not DecisionDisposition.ACCEPTED
+                or selected_record.disposition.value
+                != DecisionDisposition.ACCEPTED.value
             ):
                 raise ValueError(
                     "selected policy decision is not an accepted session record"
@@ -170,8 +208,8 @@ class RuntimeIntegrityCapsule:
         self,
         ledger: DecisionLedger,
     ) -> RuntimeAudit:
-        if not isinstance(ledger, DecisionLedger):
-            raise TypeError("ledger must be DecisionLedger")
+        if not _is_decision_ledger(ledger):
+            raise TypeError("ledger must be trusted DecisionLedger")
         runtime_audit = audit_runtime(self.runtime, ledger)
         session_audit = audit_session(
             ledger,

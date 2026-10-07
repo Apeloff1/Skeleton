@@ -3,23 +3,65 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
+import importlib
 import json
 
-from skeleton.ai.learning.school.decision_ledger import (
+from skeleton.learning.school.decision_ledger import (
     DecisionDisposition,
     DecisionLedger,
 )
-from skeleton.ai.learning.school.runtime_capsule import (
+from skeleton.learning.school.runtime_capsule import (
     RuntimeIntegrityCapsule,
 )
-from skeleton.ai.learning.school.runtime_replay import (
+from skeleton.learning.school.runtime_replay import (
     RuntimeReplaySnapshot,
     audit_runtime,
     replay_digest,
 )
-from skeleton.ai.learning.school.session_audit import (
+from skeleton.learning.school.session_audit import (
     audit_session,
 )
+
+
+def _trusted_named_instance(value: object, type_name: str, *module_names: str) -> bool:
+    """Accept only named types from the canonical or governed mirror modules."""
+
+    for module_name in module_names:
+        try:
+            module = importlib.import_module(module_name)
+            candidate = getattr(module, type_name)
+        except (ImportError, AttributeError):
+            continue
+        if isinstance(candidate, type) and isinstance(value, candidate):
+            return True
+    return False
+
+
+def _is_decision_ledger(value: object) -> bool:
+    return _trusted_named_instance(
+        value,
+        "DecisionLedger",
+        "skeleton.learning.school.decision_ledger",
+        "skeleton.ai.learning.school.decision_ledger",
+    )
+
+
+def _is_runtime_snapshot(value: object) -> bool:
+    return _trusted_named_instance(
+        value,
+        "RuntimeReplaySnapshot",
+        "skeleton.learning.school.runtime_replay",
+        "skeleton.ai.learning.school.runtime_replay",
+    )
+
+
+def _is_runtime_attestation(value: object) -> bool:
+    return _trusted_named_instance(
+        value,
+        "RuntimeAttestation",
+        "skeleton.learning.school.runtime_attestation",
+        "skeleton.ai.learning.school.runtime_attestation",
+    )
 
 
 def _digest(payload: object) -> str:
@@ -65,11 +107,11 @@ class RuntimeAttestation:
         snapshot: RuntimeReplaySnapshot,
         ledger: DecisionLedger,
     ) -> "RuntimeAttestation":
-        if not isinstance(snapshot, RuntimeReplaySnapshot):
+        if not _is_runtime_snapshot(snapshot):
             raise TypeError(
                 "snapshot must be RuntimeReplaySnapshot"
             )
-        if not isinstance(ledger, DecisionLedger):
+        if not _is_decision_ledger(ledger):
             raise TypeError("ledger must be DecisionLedger")
 
         runtime_audit = audit_runtime(snapshot, ledger)
@@ -113,14 +155,14 @@ class RuntimeAttestation:
         accepted = tuple(
             record.decision_id
             for record in records
-            if record.disposition
-            is DecisionDisposition.ACCEPTED
+            if record.disposition.value
+            == DecisionDisposition.ACCEPTED.value
         )
         rejected = tuple(
             record.decision_id
             for record in records
-            if record.disposition
-            is DecisionDisposition.REJECTED
+            if record.disposition.value
+            == DecisionDisposition.REJECTED.value
         )
         record_hashes = tuple(
             record.record_hash
@@ -141,8 +183,8 @@ class RuntimeAttestation:
             )
             if (
                 selected_record is None
-                or selected_record.disposition
-                is not DecisionDisposition.ACCEPTED
+                or selected_record.disposition.value
+                != DecisionDisposition.ACCEPTED.value
             ):
                 raise ValueError(
                     "selected policy decision is not an accepted session record"
@@ -226,7 +268,7 @@ def verify_attestation(
     ledger: DecisionLedger,
 ) -> tuple[str, ...]:
     """Return deterministic integrity violations for an attestation."""
-    if not isinstance(attestation, RuntimeAttestation):
+    if not _is_runtime_attestation(attestation):
         raise TypeError(
             "attestation must be RuntimeAttestation"
         )
@@ -234,7 +276,7 @@ def verify_attestation(
         raise TypeError(
             "snapshot must be RuntimeReplaySnapshot"
         )
-    if not isinstance(ledger, DecisionLedger):
+    if not _is_decision_ledger(ledger):
         raise TypeError("ledger must be DecisionLedger")
 
     failures: list[str] = []

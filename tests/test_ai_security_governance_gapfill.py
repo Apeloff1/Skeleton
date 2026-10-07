@@ -40,9 +40,18 @@ def test_other_exact_head_is_rejected() -> None:
         validate(ROOT,head=other)
 
 
-def test_candidate_volume_set_is_deferred_not_scheduled() -> None:
+def test_candidate_volume_set_preserves_p2_and_p3_frontiers() -> None:
     frontier=json.loads((ROOT/"machine/ai_masterplan_continuation_frontier.json").read_text())
+    p2=json.loads((ROOT/"machine/ai_p2_functional_ai_closure.json").read_text())
     candidate=json.loads((ROOT/"machine/ai_security_governance_gapfill_candidate.json").read_text())
     refs=set(candidate["volume_refs"])
-    assert refs.issubset(set(frontier["next_tranche"]["queued_volume_refs"]))
-    assert refs.isdisjoint(set(frontier["next_tranche"]["scheduled_volume_refs"]))
+    deferred=set(candidate["deferred_queue_refs"])
+    prior_p2=set(candidate["prior_functional_frontier_refs"])
+    queued=set(frontier["next_tranche"]["queued_volume_refs"])
+    scheduled=set(frontier["next_tranche"]["scheduled_volume_refs"])
+    functional=set(p2["functional_frontier_volume_refs"])
+    assert refs == deferred | prior_p2
+    assert deferred.issubset(queued)
+    assert prior_p2.isdisjoint(queued)
+    assert prior_p2.issubset(functional)
+    assert refs.isdisjoint(scheduled)

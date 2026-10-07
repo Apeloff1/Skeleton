@@ -169,7 +169,7 @@ def validate(root=ROOT, head=None):
             str(root),
             "cat-file",
             "-e",
-            f"{implementation_head}^{commit}",
+            f"{implementation_head}^{{commit}}",
         ],
         capture_output=True,
         text=True,

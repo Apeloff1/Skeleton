@@ -15,6 +15,7 @@ ROOT=Path(__file__).resolve().parents[1]
 CANDIDATE=Path("machine/ai_security_governance_gapfill_candidate.json")
 MASTER=Path("machine/ai_master_plan.json")
 FRONTIER=Path("machine/ai_masterplan_continuation_frontier.json")
+P2=Path("machine/ai_p2_functional_ai_closure.json")
 TREE=Path("machine/ai_file_tree.json")
 EXPECTED=(
     "VOL-166","VOL-167","VOL-169","VOL-172","VOL-173",
@@ -22,6 +23,8 @@ EXPECTED=(
 )
 SECURITY_VOLUMES=frozenset(EXPECTED[:-1])
 SUPPLY_VOLUMES=frozenset({"VOL-178"})
+P2_FUNCTIONAL=frozenset({"VOL-167","VOL-169","VOL-172","VOL-175"})
+P3_DEFERRED=frozenset(EXPECTED)-P2_FUNCTIONAL
 
 
 class SecurityGovernanceCandidateError(RuntimeError):
@@ -53,6 +56,7 @@ def validate(root:Path=ROOT, *, head:str|None=None)->dict[str,Any]:
     candidate=_load(root,CANDIDATE)
     master=_load(root,MASTER)
     frontier=_load(root,FRONTIER)
+    p2=_load(root,P2)
     tree=_load(root,TREE)
 
     if candidate.get("schema_version")!="skeleton.ai.security_governance_gapfill_candidate.v1":
@@ -61,8 +65,12 @@ def validate(root:Path=ROOT, *, head:str|None=None)->dict[str,Any]:
         raise SecurityGovernanceCandidateError("candidate status drift")
     if tuple(candidate.get("volume_refs",()))!=EXPECTED:
         raise SecurityGovernanceCandidateError("candidate volume identity drift")
-    if candidate.get("source_queue_state")!="queued_unmodified":
-        raise SecurityGovernanceCandidateError("candidate may not claim scheduling authority")
+    if candidate.get("source_queue_state")!="mixed_p2_closed_and_p3_deferred":
+        raise SecurityGovernanceCandidateError("candidate frontier classification drift")
+    if set(candidate.get("prior_functional_frontier_refs",()))!=P2_FUNCTIONAL:
+        raise SecurityGovernanceCandidateError("candidate P2 functional classification drift")
+    if set(candidate.get("deferred_queue_refs",()))!=P3_DEFERRED:
+        raise SecurityGovernanceCandidateError("candidate P3 deferred classification drift")
 
     promotion=candidate.get("promotion_state",{})
     for key in (
@@ -85,10 +93,15 @@ def validate(root:Path=ROOT, *, head:str|None=None)->dict[str,Any]:
     tranche=frontier.get("next_tranche",{})
     scheduled=set(tranche.get("scheduled_volume_refs",()))
     queued=set(tranche.get("queued_volume_refs",()))
+    functional=set(p2.get("functional_frontier_volume_refs",()))
     if set(EXPECTED)&scheduled:
-        raise SecurityGovernanceCandidateError("deferred gap-fill volumes escaped into scheduled frontier")
-    if not set(EXPECTED).issubset(queued):
-        raise SecurityGovernanceCandidateError("deferred gap-fill volumes must remain explicitly queued")
+        raise SecurityGovernanceCandidateError("security gap-fill volumes escaped into scheduled frontier")
+    if not P3_DEFERRED.issubset(queued):
+        raise SecurityGovernanceCandidateError("P3-deferred security volumes must remain explicitly queued")
+    if P2_FUNCTIONAL & queued:
+        raise SecurityGovernanceCandidateError("P2 functional security volumes re-entered the P3 deferred queue")
+    if not P2_FUNCTIONAL.issubset(functional):
+        raise SecurityGovernanceCandidateError("prior P2 functional security volume identity drift")
 
     modules=candidate.get("primary_implementation_by_volume",{})
     tests=candidate.get("primary_test_by_volume",{})
@@ -182,6 +195,8 @@ def validate(root:Path=ROOT, *, head:str|None=None)->dict[str,Any]:
         "actual_head":actual_head,
         "reported_head":head,
         "queued_frontier_preserved":True,
+        "prior_p2_functional_volume_refs":sorted(P2_FUNCTIONAL),
+        "p3_deferred_volume_refs":sorted(P3_DEFERRED),
         "completion_checkbox":False,
         "production_authority":False,
     }

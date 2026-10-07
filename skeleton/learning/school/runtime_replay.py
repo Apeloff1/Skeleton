@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
+import importlib
 import json
 import math
 from typing import Sequence
@@ -15,6 +16,61 @@ from skeleton.learning.school.session_runtime import (
     SessionEvent,
     SessionPhase,
 )
+
+
+def _trusted_twin_instance(
+    value: object,
+    canonical_type: type[object],
+    *,
+    twin_module: str,
+    twin_name: str,
+) -> bool:
+    """Accept only a canonical runtime type or its governed AI-tree twin."""
+
+    if isinstance(value, canonical_type):
+        return True
+    try:
+        module = importlib.import_module(twin_module)
+        twin_type = getattr(module, twin_name)
+    except (ImportError, AttributeError):
+        return False
+    return isinstance(twin_type, type) and isinstance(value, twin_type)
+
+
+def _is_decision_ledger(value: object) -> bool:
+    return _trusted_twin_instance(
+        value,
+        DecisionLedger,
+        twin_module="skeleton.ai.learning.school.decision_ledger",
+        twin_name="DecisionLedger",
+    )
+
+
+def _is_session_event(value: object) -> bool:
+    return _trusted_twin_instance(
+        value,
+        SessionEvent,
+        twin_module="skeleton.ai.learning.school.session_runtime",
+        twin_name="SessionEvent",
+    )
+
+
+def _is_session_phase(value: object) -> bool:
+    return _trusted_twin_instance(
+        value,
+        SessionPhase,
+        twin_module="skeleton.ai.learning.school.session_runtime",
+        twin_name="SessionPhase",
+    )
+
+
+def _is_runtime_snapshot(value: object) -> bool:
+    return _trusted_twin_instance(
+        value,
+        RuntimeReplaySnapshot,
+        twin_module="skeleton.ai.learning.school.runtime_replay",
+        twin_name="RuntimeReplaySnapshot",
+    )
 
 
 def _text(name: str, value: object, *, maximum: int = 4096) -> str:
@@ -80,16 +136,16 @@ def _sha(name: str, value: object, *, allow_empty: bool = False) -> str:
 def _normalize_event(
     event: SessionEvent,
 ) -> tuple[int, str, str, tuple[tuple[str, str], ...]]:
-    if not isinstance(event, SessionEvent):
-        raise TypeError("events must contain SessionEvent values")
+    if not _is_session_event(event):
+        raise TypeError("events must contain trusted SessionEvent values")
     if (
         isinstance(event.sequence, bool)
         or not isinstance(event.sequence, int)
         or event.sequence <= 0
     ):
         raise ValueError("runtime event sequence must be positive integer")
-    if not isinstance(event.phase, SessionPhase):
-        raise ValueError("runtime event phase must be SessionPhase")
+    if not _is_session_phase(event.phase):
+        raise ValueError("runtime event phase must be trusted SessionPhase")
     name = _text("runtime event", event.event)
     payload: list[tuple[str, str]] = []
     seen: set[str] = set()
@@ -185,10 +241,10 @@ class RuntimeReplaySnapshot:
         pipeline_contract_digest: str = "",
         provenance_digest: str = "",
     ) -> "RuntimeReplaySnapshot":
-        if not isinstance(ledger, DecisionLedger):
-            raise TypeError("ledger must be DecisionLedger")
-        if not isinstance(phase, SessionPhase):
-            raise TypeError("phase must be SessionPhase")
+        if not _is_decision_ledger(ledger):
+            raise TypeError("ledger must be trusted DecisionLedger")
+        if not _is_session_phase(phase):
+            raise TypeError("phase must be trusted SessionPhase")
         normalized_session = _text("session_id", session_id)
         normalized = tuple(_normalize_event(event) for event in events)
         selected = (
@@ -216,8 +272,8 @@ class RuntimeReplaySnapshot:
                 if (
                     selected
                     and record.action == selected
-                    and record.disposition
-                    is DecisionDisposition.ACCEPTED
+                    and record.disposition.value
+                    == DecisionDisposition.ACCEPTED.value
                 )
             )
             selected_id = (
@@ -231,8 +287,8 @@ class RuntimeReplaySnapshot:
             for record in session_records
             if (
                 record.action in rejected
-                and record.disposition
-                is DecisionDisposition.REJECTED
+                and record.disposition.value
+                == DecisionDisposition.REJECTED.value
             )
         )
         rejected_ids = tuple(
@@ -300,7 +356,8 @@ class RuntimeReplaySnapshot:
     ) -> "RuntimeReplaySnapshot":
         snapshot = cls.capture(**kwargs)
         ledger = kwargs.get("ledger")
-        assert isinstance(ledger, DecisionLedger)
+        if not _is_decision_ledger(ledger):
+            raise TypeError("ledger must be trusted DecisionLedger")
         audit = audit_runtime(snapshot, ledger)
         if not audit.valid:
             raise ValueError(
@@ -337,10 +394,10 @@ def audit_runtime(
     snapshot: RuntimeReplaySnapshot,
     ledger: DecisionLedger,
 ) -> RuntimeAudit:
-    if not isinstance(snapshot, RuntimeReplaySnapshot):
-        raise TypeError("snapshot must be RuntimeReplaySnapshot")
-    if not isinstance(ledger, DecisionLedger):
-        raise TypeError("ledger must be DecisionLedger")
+    if not _is_runtime_snapshot(snapshot):
+        raise TypeError("snapshot must be trusted RuntimeReplaySnapshot")
+    if not _is_decision_ledger(ledger):
+        raise TypeError("ledger must be trusted DecisionLedger")
 
     violations: list[str] = []
     try:
@@ -400,12 +457,12 @@ def audit_runtime(
     rejected_records = tuple(
         record
         for record in session_records
-        if record.disposition is DecisionDisposition.REJECTED
+        if record.disposition.value == DecisionDisposition.REJECTED.value
     )
     accepted_records = tuple(
         record
         for record in session_records
-        if record.disposition is DecisionDisposition.ACCEPTED
+        if record.disposition.value == DecisionDisposition.ACCEPTED.value
     )
 
     if snapshot.event_count and not session_records:
@@ -448,8 +505,8 @@ def audit_runtime(
                     "selected policy decision identity does not match selected action"
                 )
             elif (
-                selected_record.disposition
-                is not DecisionDisposition.ACCEPTED
+                selected_record.disposition.value
+                != DecisionDisposition.ACCEPTED.value
             ):
                 violations.append(
                     "selected policy decision identity is not ACCEPTED"
@@ -488,8 +545,8 @@ def audit_runtime(
                 f"rejected policy decision {decision_id!r} crosses session boundary"
             )
         elif (
-            record.disposition
-            is not DecisionDisposition.REJECTED
+            record.disposition.value
+            != DecisionDisposition.REJECTED.value
         ):
             violations.append(
                 f"rejected policy decision {decision_id!r} is not REJECTED"
@@ -607,8 +664,8 @@ def audit_runtime(
 
 
 def replay_digest(snapshot: RuntimeReplaySnapshot) -> str:
-    if not isinstance(snapshot, RuntimeReplaySnapshot):
-        raise TypeError("snapshot must be RuntimeReplaySnapshot")
+    if not _is_runtime_snapshot(snapshot):
+        raise TypeError("snapshot must be trusted RuntimeReplaySnapshot")
     return _digest(
         {
             "schema_version": "skeleton.runtime_replay.v2",

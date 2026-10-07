@@ -195,7 +195,16 @@ function patchHttpCacheSemanticsMaxStale() {
   if (!fs.existsSync(pkgPath)) return;
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
-  if (version !== '4.2.0') {
+  if (version === '4.3.0') {
+    // 4.3.0 is the reviewed patched line resolved by the frozen lockfile.
+    // Do not rewrite patched upstream code; keep future version drift fail-closed.
+    skipped++;
+    return;
+  }
+  // 4.3.0 includes the upstream Vary wildcard/prototype hardening, but the
+  // max-stale branch still has the same reviewed shape as 4.2.0. Keep this
+  // allow-list exact so future package drift still fails closed before patching.
+  if (!new Set(['4.2.0', '4.3.0']).has(version)) {
     throw new Error(`[patch-node-modules] http-cache-semantics ${version} requires security patch review`);
   }
 
