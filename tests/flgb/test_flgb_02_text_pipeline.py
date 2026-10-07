@@ -201,13 +201,14 @@ def test_training_receipt_fails_closed_without_trainable_examples(native_model):
 def test_governed_training_input_binds_dataset_lineage(native_model):
     from skeleton.ai.model_runtime.text_pipeline import TextPipelineConfig, TextTokenPipeline
     from skeleton.ai.model_runtime.tokenization import NativeTokenizer
-    from skeleton.ai.training.flgb_training_runtime import DatasetRevision
+    from skeleton.ai.training.flgb_training_runtime import DatasetRevision, DatasetRights
 
     pipeline = TextTokenPipeline(NativeTokenizer(native_model), TextPipelineConfig(context_size=4))
     prepared = pipeline.prepare("alpha beta gamma delta epsilon")
-    rights_digest = "1" * 64
+    rights = DatasetRights("dataset", "source", "allowed", "license", ("training",), "9" * 64)
+    rights_digest = rights.digest
     revision = DatasetRevision("dataset", 0, prepared.raw_text_digest, rights_digest, pipeline.digest)
-    governed = pipeline.governed_training_input(prepared, revision)
+    governed = pipeline.governed_training_input(prepared, revision, rights)
 
     assert governed.dataset_revision_digest == revision.digest
     assert governed.transform_digest == pipeline.digest
@@ -219,39 +220,42 @@ def test_governed_training_input_binds_dataset_lineage(native_model):
 def test_governed_training_input_rejects_wrong_content(native_model):
     from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
     from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
-    from skeleton.ai.training.flgb_training_runtime import DatasetRevision
+    from skeleton.ai.training.flgb_training_runtime import DatasetRevision, DatasetRights
 
     pipeline = TextTokenPipeline(NativeTokenizer(native_model))
     prepared = pipeline.prepare("alpha beta")
-    revision = DatasetRevision("dataset", 0, "0" * 64, "1" * 64, pipeline.digest)
+    rights = DatasetRights("dataset", "source", "allowed", "license", ("training",), "9" * 64)
+    revision = DatasetRevision("dataset", 0, "0" * 64, rights.digest, pipeline.digest)
     with pytest.raises(TokenizerContractError, match="content"):
-        pipeline.governed_training_input(prepared, revision)
+        pipeline.governed_training_input(prepared, revision, rights)
 
 
 def test_governed_training_input_rejects_wrong_transform(native_model):
     from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
     from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
-    from skeleton.ai.training.flgb_training_runtime import DatasetRevision
+    from skeleton.ai.training.flgb_training_runtime import DatasetRevision, DatasetRights
 
     pipeline = TextTokenPipeline(NativeTokenizer(native_model))
     prepared = pipeline.prepare("alpha beta")
-    revision = DatasetRevision("dataset", 0, prepared.raw_text_digest, "1" * 64, "2" * 64)
+    rights = DatasetRights("dataset", "source", "allowed", "license", ("training",), "9" * 64)
+    revision = DatasetRevision("dataset", 0, prepared.raw_text_digest, rights.digest, "2" * 64)
     with pytest.raises(TokenizerContractError, match="transform"):
-        pipeline.governed_training_input(prepared, revision)
+        pipeline.governed_training_input(prepared, revision, rights)
 
 
 def test_training_manifest_binds_pipeline_and_dataset(native_model):
     from skeleton.ai.model_runtime.flgb_model_runtime import digest_json
     from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
     from skeleton.ai.model_runtime.tokenization import NativeTokenizer
-    from skeleton.ai.training.flgb_training_runtime import DatasetRevision
+    from skeleton.ai.training.flgb_training_runtime import DatasetRevision, DatasetRights
 
     pipeline = TextTokenPipeline(NativeTokenizer(native_model))
     prepared = pipeline.prepare("alpha beta gamma")
-    revision = DatasetRevision("dataset", 0, prepared.raw_text_digest, "1" * 64, pipeline.digest)
-    governed = pipeline.governed_training_input(prepared, revision)
+    rights = DatasetRights("dataset", "source", "allowed", "license", ("training",), "9" * 64)
+    revision = DatasetRevision("dataset", 0, prepared.raw_text_digest, rights.digest, pipeline.digest)
+    governed = pipeline.governed_training_input(prepared, revision, rights)
     manifest = pipeline.training_manifest(
-        prepared, revision, run_id="run-1", base_model_digest="2" * 64,
+        prepared, revision, rights, run_id="run-1", base_model_digest="2" * 64,
         code_digest="3" * 64, seed_manifest_digest="4" * 64, max_steps=10,
     )
 
@@ -263,12 +267,13 @@ def test_training_manifest_binds_pipeline_and_dataset(native_model):
 def _training_lineage_fixture(native_model):
     from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
     from skeleton.ai.model_runtime.tokenization import NativeTokenizer
-    from skeleton.ai.training.flgb_training_runtime import DatasetRevision
+    from skeleton.ai.training.flgb_training_runtime import DatasetRevision, DatasetRights
     pipeline = TextTokenPipeline(NativeTokenizer(native_model))
     prepared = pipeline.prepare("alpha beta gamma delta")
-    revision = DatasetRevision("dataset", 0, prepared.raw_text_digest, "1" * 64, pipeline.digest)
+    rights = DatasetRights("dataset", "source", "allowed", "license", ("training",), "9" * 64)
+    revision = DatasetRevision("dataset", 0, prepared.raw_text_digest, rights.digest, pipeline.digest)
     manifest = pipeline.training_manifest(
-        prepared, revision, run_id="run-1", base_model_digest="2" * 64,
+        prepared, revision, rights, run_id="run-1", base_model_digest="2" * 64,
         code_digest="3" * 64, seed_manifest_digest="4" * 64, max_steps=10,
     )
     return pipeline, manifest
@@ -604,3 +609,27 @@ def test_causal_pipeline_skips_untrainable_windows_without_exception_matching(na
     )
     prepared = pipeline.prepare("alpha beta gamma")
     assert pipeline.causal_training_batches(prepared) == ()
+
+
+def test_governed_training_rejects_rights_without_training_scope(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    from skeleton.ai.training.flgb_training_runtime import DatasetRevision, DatasetRights
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    prepared = pipeline.prepare("alpha beta gamma")
+    rights = DatasetRights("dataset", "source", "allowed", "license", ("evaluation",), "9" * 64)
+    revision = DatasetRevision("dataset", 0, prepared.raw_text_digest, rights.digest, pipeline.digest)
+    with pytest.raises(TokenizerContractError, match="rights do not permit"):
+        pipeline.governed_training_input(prepared, revision, rights)
+
+
+def test_governed_training_rejects_mismatched_rights_identity(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    from skeleton.ai.training.flgb_training_runtime import DatasetRevision, DatasetRights
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    prepared = pipeline.prepare("alpha beta gamma")
+    rights = DatasetRights("other", "source", "allowed", "license", ("training",), "9" * 64)
+    revision = DatasetRevision("dataset", 0, prepared.raw_text_digest, rights.digest, pipeline.digest)
+    with pytest.raises(TokenizerContractError, match="rights identity mismatch"):
+        pipeline.governed_training_input(prepared, revision, rights)
