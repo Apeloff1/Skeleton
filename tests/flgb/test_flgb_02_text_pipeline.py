@@ -36,11 +36,13 @@ def test_normalization_is_provenance_visible_in_sequence_digest(native_model):
     raw = "Cafe\u0301"
     prepared = pipeline.prepare(raw)
 
+    raw_digest = __import__("hashlib").sha256(raw.encode("utf-8")).hexdigest()
+    normalized_digest = __import__("hashlib").sha256(prepared.normalized_text.encode("utf-8")).hexdigest()
     assert prepared.normalized_text == "Caf\u00e9"
-    assert prepared.sequence.source_text_digest != __import__("hashlib").sha256(raw.encode("utf-8")).hexdigest()
-    assert prepared.sequence.source_text_digest == __import__("hashlib").sha256(
-        prepared.normalized_text.encode("utf-8")
-    ).hexdigest()
+    assert prepared.raw_text_digest == raw_digest
+    assert prepared.normalized_text_digest == normalized_digest
+    assert prepared.raw_text_digest != prepared.normalized_text_digest
+    assert prepared.sequence.source_text_digest == prepared.normalized_text_digest
 
 
 def test_pipeline_digest_binds_normalization_policy(native_model):
@@ -52,3 +54,31 @@ def test_pipeline_digest_binds_normalization_policy(native_model):
     none = TextTokenPipeline(tokenizer, TextPipelineConfig(normalization="NONE"))
 
     assert nfc.digest != none.digest
+
+
+def test_prepared_text_rejects_tampered_provenance(native_model):
+    from dataclasses import replace
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+
+    prepared = TextTokenPipeline(NativeTokenizer(native_model)).prepare("alpha")
+    with pytest.raises(TokenizerContractError):
+        replace(prepared, raw_text_digest="0" * 63)
+    with pytest.raises(TokenizerContractError):
+        replace(prepared, normalized_text_digest="0" * 64)
+
+
+def test_stream_preserves_raw_chunk_boundary_independent_provenance(native_model):
+    import hashlib
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    raw = "Cafe\u0301\r\nnext"
+    one = pipeline.stream([raw])
+    split = pipeline.stream(["Ca", "fe\u0301\r", "\nnext"])
+
+    assert one.raw_text_digest == split.raw_text_digest == hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    assert one.normalized_text_digest == split.normalized_text_digest
+    assert one.sequence.digest == split.sequence.digest
+    assert one.pipeline_digest == split.pipeline_digest
