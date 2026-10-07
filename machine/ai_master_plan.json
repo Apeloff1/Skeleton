@@ -722,19 +722,40 @@
         "machine/state_topology.json",
         "skeleton/persistence",
         "backend/services/database.py",
-        "scripts/state_recovery_drill.py"
+        "scripts/state_recovery_drill.py",
+        "machine/state_backup_policy.json",
+        "scripts/state_migration_compatibility.py",
+        "scripts/verify_state_authority_closure.py",
+        ".github/workflows/state-recovery-drill.yml",
+        ".github/workflows/p1-migration-rollback-compatibility.yml"
       ],
       "tests": [
         "skeleton/testing/test_state_recovery_drill.py",
         "skeleton/testing/test_operation_store.py",
-        "backend/tests/test_rag_state_authority.py"
+        "backend/tests/test_rag_state_authority.py",
+        "skeleton/testing/test_state_migration_compatibility.py",
+        "tests/test_state_authority_independent_verifier.py"
       ],
       "evaluations": [
-        "planned:partial-commit fault matrix",
-        "planned:restore consistency evaluation"
+        "scripts/check_state_topology.py --json",
+        "scripts/state_migration_compatibility.py",
+        "scripts/verify_state_authority_closure.py",
+        ".github/workflows/state-recovery-drill.yml",
+        ".github/workflows/p1-migration-rollback-compatibility.yml"
       ],
       "evidence": [
-        "https://github.com/Apeloff1/Skeleton/commit/f9053d8c9a2dfddcff431a4ff37863a5d962eded"
+        "https://github.com/Apeloff1/Skeleton/commit/f9053d8c9a2dfddcff431a4ff37863a5d962eded",
+        "machine/state_topology.json",
+        "machine/state_backup_policy.json",
+        "scripts/state_recovery_drill.py",
+        "scripts/state_migration_compatibility.py",
+        "skeleton/testing/test_state_recovery_drill.py",
+        "skeleton/testing/test_state_migration_compatibility.py",
+        "scripts/verify_state_authority_closure.py",
+        "tests/test_state_authority_independent_verifier.py",
+        ".github/workflows/state-recovery-drill.yml",
+        ".github/workflows/p1-migration-rollback-compatibility.yml",
+        "scripts/check_state_topology.py"
       ],
       "risks": [
         "split-brain ownership",
@@ -743,8 +764,7 @@
         "backup that cannot restore"
       ],
       "gaps": [
-        "converge remaining legacy state owners",
-        "add migration compatibility rehearsal to release qualification"
+        "independent exact-head VOL-005 Data & Persistence Closure qualification remains pending"
       ],
       "accountability_id": "ACC-VOL-005",
       "completion_checkbox": false,
