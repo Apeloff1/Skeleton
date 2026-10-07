@@ -61,8 +61,8 @@ def validate(root:Path=ROOT, *, head:str|None=None)->dict[str,Any]:
         raise SecurityGovernanceCandidateError("candidate status drift")
     if tuple(candidate.get("volume_refs",()))!=EXPECTED:
         raise SecurityGovernanceCandidateError("candidate volume identity drift")
-    if candidate.get("source_queue_state")!="queued_unmodified":
-        raise SecurityGovernanceCandidateError("candidate may not claim scheduling authority")
+    if candidate.get("source_queue_state")!="frontier_preserved":
+        raise SecurityGovernanceCandidateError("candidate frontier-preservation state drift")
 
     promotion=candidate.get("promotion_state",{})
     for key in (
@@ -85,10 +85,16 @@ def validate(root:Path=ROOT, *, head:str|None=None)->dict[str,Any]:
     tranche=frontier.get("next_tranche",{})
     scheduled=set(tranche.get("scheduled_volume_refs",()))
     queued=set(tranche.get("queued_volume_refs",()))
-    if set(EXPECTED)&scheduled:
-        raise SecurityGovernanceCandidateError("deferred gap-fill volumes escaped into scheduled frontier")
-    if not set(EXPECTED).issubset(queued):
-        raise SecurityGovernanceCandidateError("deferred gap-fill volumes must remain explicitly queued")
+    source_refs=set(frontier.get("continuation_source",{}).get("volume_refs",()))
+    expected=set(EXPECTED)
+    source_expected=expected&source_refs
+    external_expected=expected-source_refs
+    if expected&scheduled:
+        raise SecurityGovernanceCandidateError("gap-fill volumes escaped into scheduled frontier")
+    if not source_expected.issubset(queued):
+        raise SecurityGovernanceCandidateError("continuation-source gap-fill volumes must remain queued")
+    if external_expected&queued:
+        raise SecurityGovernanceCandidateError("candidate may not reintroduce non-frontier volumes")
 
     modules=candidate.get("primary_implementation_by_volume",{})
     tests=candidate.get("primary_test_by_volume",{})
@@ -103,8 +109,8 @@ def validate(root:Path=ROOT, *, head:str|None=None)->dict[str,Any]:
         volume=by_key.get(key)
         if not isinstance(volume,dict):
             raise SecurityGovernanceCandidateError(f"masterplan volume missing: {key}")
-        if volume.get("implementation_status")!="implemented":
-            raise SecurityGovernanceCandidateError(f"{key} must be implemented but not verified")
+        if volume.get("implementation_status") not in {"unverified","implemented"}:
+            raise SecurityGovernanceCandidateError(f"{key} must remain pre-verification")
         if volume.get("completion_checkbox") is not False:
             raise SecurityGovernanceCandidateError(f"{key} completion checkbox self-promoted")
         module=modules[key]
