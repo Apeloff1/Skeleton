@@ -1,68 +1,49 @@
-"""Canonical internal protocol envelopes with trace and retry semantics.
+"""Execution semantics for the canonical internal protocol envelope.
 
-VOL-131 Internal Protocols requires stable envelopes carrying correlation,
-causation, deadline, retry/idempotency, and trace identity.  This module is
-transport-neutral: it does not open sockets, persist messages, or execute
-effects.  It provides the deterministic contract that transports and workers
-must preserve.
+The schema and message identity authority lives in skeleton.contracts.protocol.
+This module deliberately does not define another ProtocolEnvelope. It binds the
+canonical contract to bounded delivery attempts, tenant/authority identity,
+causal child creation, trace-safe evidence, and receipts.
 
-The core invariants are fail-closed:
-- every envelope has one stable operation and correlation identity;
-- child messages bind the parent through causation and trace parentage;
-- retries cannot extend the original deadline or mutate payload/authority;
-- retryable delivery requires an idempotency key and bounded attempts;
-- retry attempts form a digest-bound predecessor chain;
-- unknown outcomes carry an explicit recovery policy;
-- trace records expose identity and digests, never raw payload content.
+VOL-131 invariants:
+- one canonical envelope authority;
+- retries preserve payload, operation, correlation, tenant, authority and
+  deadline identity while advancing only message/span/attempt identity;
+- retry attempts are bounded and predecessor-digest chained;
+- children preserve operation/correlation/trace lineage and cannot widen the
+  parent's deadline or authority;
+- trace records expose identifiers and digests, never raw payload;
+- receipts bind both the canonical envelope digest and the execution wrapper.
 """
-
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import datetime, timezone
 from enum import Enum
 import hashlib
 import json
-import math
 import re
 from typing import Any, Iterable, Mapping
 
+from skeleton.contracts.protocol import (
+    ProtocolEnvelope,
+    RetryClass,
+    UnknownOutcomePolicy,
+)
 
-INTERNAL_PROTOCOL_SCHEMA_VERSION = 1
+
+INTERNAL_PROTOCOL_EXECUTION_VERSION = 2
 VOL_131_ID = "VOL-131"
 MAX_ATTRIBUTES = 32
 MAX_ATTRIBUTE_KEY_CHARS = 64
 MAX_ATTRIBUTE_VALUE_CHARS = 256
 MAX_REASON_CHARS = 1024
-MAX_TOKEN_CHARS = 192
-
 _TOKEN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/+#-]{0,191}$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-_TRACE_ID_RE = re.compile(r"^[0-9a-f]{32}$")
-_SPAN_ID_RE = re.compile(r"^[0-9a-f]{16}$")
 
 
-class ProtocolError(ValueError):
-    """Internal protocol data is malformed, ambiguous, or unsafe."""
-
-
-class DeliverySemantics(str, Enum):
-    """Supported delivery contracts.
-
-    AT_MOST_ONCE forbids protocol-level retry.  IDEMPOTENT_RETRY permits
-    bounded retry only when one stable idempotency key is supplied.
-    """
-
-    AT_MOST_ONCE = "at_most_once"
-    IDEMPOTENT_RETRY = "idempotent_retry"
-
-
-class UnknownOutcomePolicy(str, Enum):
-    """Required handling when execution outcome cannot be proven."""
-
-    FAIL_CLOSED = "fail_closed"
-    QUERY_STATUS = "query_status"
-    RECONCILE = "reconcile"
-    COMPENSATE = "compensate"
+class ProtocolExecutionError(ValueError):
+    """Execution metadata is malformed, ambiguous, or unsafe."""
 
 
 class ProtocolOutcome(str, Enum):
@@ -76,88 +57,75 @@ class ProtocolOutcome(str, Enum):
 
 def _text(value: object, field: str, *, maximum: int) -> str:
     if not isinstance(value, str) or not value:
-        raise ProtocolError(f"{field} must be a non-empty string")
+        raise ProtocolExecutionError(f"{field} must be a non-empty string")
     if value != value.strip() or len(value) > maximum:
-        raise ProtocolError(f"{field} must be normalized and bounded")
+        raise ProtocolExecutionError(f"{field} must be normalized and bounded")
     return value
 
 
-def _token(value: object, field: str, *, maximum: int = MAX_TOKEN_CHARS) -> str:
+def _token(value: object, field: str, *, maximum: int = 192) -> str:
     text = _text(value, field, maximum=maximum)
     if not _TOKEN_RE.fullmatch(text):
-        raise ProtocolError(f"{field} must be a canonical token")
+        raise ProtocolExecutionError(f"{field} must be a canonical token")
     return text
 
 
 def _sha256(value: object, field: str) -> str:
     if not isinstance(value, str) or not _SHA256_RE.fullmatch(value):
-        raise ProtocolError(f"{field} must be lowercase sha256")
-    return value
-
-
-def _trace_id(value: object, field: str = "trace_id") -> str:
-    if not isinstance(value, str) or not _TRACE_ID_RE.fullmatch(value):
-        raise ProtocolError(f"{field} must be 32 lowercase hex characters")
-    return value
-
-
-def _span_id(value: object, field: str = "span_id") -> str:
-    if not isinstance(value, str) or not _SPAN_ID_RE.fullmatch(value):
-        raise ProtocolError(f"{field} must be 16 lowercase hex characters")
+        raise ProtocolExecutionError(f"{field} must be lowercase sha256")
     return value
 
 
 def _positive_int(value: object, field: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
-        raise ProtocolError(f"{field} must be a positive integer")
+        raise ProtocolExecutionError(f"{field} must be a positive integer")
     return value
 
 
-def _nonnegative_int(value: object, field: str) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-        raise ProtocolError(f"{field} must be a non-negative integer")
-    return value
+def _timestamp(value: object, field: str) -> str:
+    if not isinstance(value, str) or not value.endswith("Z"):
+        raise ProtocolExecutionError(f"{field} must be RFC3339 UTC ending in Z")
+    try:
+        parsed = datetime.fromisoformat(value[:-1] + "+00:00")
+    except ValueError as exc:
+        raise ProtocolExecutionError(f"{field} is invalid RFC3339 UTC") from exc
+    if parsed.tzinfo is None:
+        raise ProtocolExecutionError(f"{field} must be timezone-aware")
+    return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def _finite_number(value: object, field: str) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise ProtocolError(f"{field} must be finite numeric")
-    result = float(value)
-    if not math.isfinite(result):
-        raise ProtocolError(f"{field} must be finite numeric")
-    return result
+def _timestamp_dt(value: str) -> datetime:
+    return datetime.fromisoformat(value[:-1] + "+00:00")
 
 
 def _pairs(
     values: Mapping[str, str] | Iterable[tuple[str, str]],
-    *,
-    field: str,
-    maximum_items: int = MAX_ATTRIBUTES,
 ) -> tuple[tuple[str, str], ...]:
     items = values.items() if isinstance(values, Mapping) else values
     normalized: dict[str, str] = {}
     for key, value in items:
         normalized_key = _token(
             key,
-            f"{field}.key",
+            "attributes.key",
             maximum=MAX_ATTRIBUTE_KEY_CHARS,
         )
         if normalized_key in normalized:
-            raise ProtocolError(f"{field} contains duplicate key: {normalized_key}")
+            raise ProtocolExecutionError(
+                f"attributes contains duplicate key: {normalized_key}"
+            )
         normalized[normalized_key] = _text(
             value,
-            f"{field}.value",
+            "attributes.value",
             maximum=MAX_ATTRIBUTE_VALUE_CHARS,
         )
-    if len(normalized) > maximum_items:
-        raise ProtocolError(f"{field} exceeds item limit")
+    if len(normalized) > MAX_ATTRIBUTES:
+        raise ProtocolExecutionError("attributes exceeds item limit")
     return tuple(sorted(normalized.items()))
 
 
-def canonical_json_bytes(value: object) -> bytes:
-    """Serialize protocol identity data using deterministic finite JSON."""
+def _canonical_digest(value: object) -> str:
     try:
-        return json.dumps(
+        raw = json.dumps(
             value,
             sort_keys=True,
             separators=(",", ":"),
@@ -165,318 +133,157 @@ def canonical_json_bytes(value: object) -> bytes:
             allow_nan=False,
         ).encode("utf-8")
     except (TypeError, ValueError) as exc:
-        raise ProtocolError("protocol identity must be canonical JSON") from exc
-
-
-def canonical_digest(value: object) -> str:
-    return hashlib.sha256(canonical_json_bytes(value)).hexdigest()
-
-
-@dataclass(frozen=True, slots=True)
-class TraceContext:
-    """Transport-neutral trace identity propagated with each message."""
-
-    trace_id: str
-    span_id: str
-    parent_span_id: str | None = None
-    sampled: bool = True
-    baggage: tuple[tuple[str, str], ...] = ()
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "trace_id", _trace_id(self.trace_id))
-        object.__setattr__(self, "span_id", _span_id(self.span_id))
-        if self.parent_span_id is not None:
-            object.__setattr__(
-                self,
-                "parent_span_id",
-                _span_id(self.parent_span_id, "parent_span_id"),
-            )
-            if self.parent_span_id == self.span_id:
-                raise ProtocolError("trace span cannot parent itself")
-        if not isinstance(self.sampled, bool):
-            raise ProtocolError("sampled must be boolean")
-        object.__setattr__(
-            self,
-            "baggage",
-            _pairs(self.baggage, field="baggage"),
-        )
-
-    def payload(self) -> dict[str, Any]:
-        return {
-            "trace_id": self.trace_id,
-            "span_id": self.span_id,
-            "parent_span_id": self.parent_span_id,
-            "sampled": self.sampled,
-            "baggage": [list(item) for item in self.baggage],
-        }
-
-    @property
-    def digest(self) -> str:
-        return canonical_digest(self.payload())
-
-    def child(self, span_id: str) -> "TraceContext":
-        return TraceContext(
-            trace_id=self.trace_id,
-            span_id=span_id,
-            parent_span_id=self.span_id,
-            sampled=self.sampled,
-            baggage=self.baggage,
-        )
+        raise ProtocolExecutionError(
+            "protocol execution identity must be canonical JSON"
+        ) from exc
+    return hashlib.sha256(raw).hexdigest()
 
 
 @dataclass(frozen=True, slots=True)
-class ProtocolEnvelope:
-    """Canonical message identity for cross-boundary internal operations."""
+class ProtocolExecutionEnvelope:
+    """Bounded execution metadata for one canonical ProtocolEnvelope."""
 
-    message_id: str
-    operation_id: str
-    correlation_id: str
+    envelope: ProtocolEnvelope
     tenant_id: str
-    sender: str
-    recipient: str
-    message_type: str
-    payload_digest: str
     authority_digest: str
-    trace: TraceContext
-    issued_at_ms: int
-    deadline_at_ms: int
-    delivery_semantics: DeliverySemantics = DeliverySemantics.AT_MOST_ONCE
-    unknown_outcome_policy: UnknownOutcomePolicy = UnknownOutcomePolicy.FAIL_CLOSED
-    attempt: int = 1
+    issued_at_utc: str
     max_attempts: int = 1
-    idempotency_key: str | None = None
-    causation_id: str | None = None
-    previous_envelope_digest: str | None = None
+    previous_execution_digest: str | None = None
     attributes: tuple[tuple[str, str], ...] = ()
-    schema_version: int = INTERNAL_PROTOCOL_SCHEMA_VERSION
+    execution_version: int = INTERNAL_PROTOCOL_EXECUTION_VERSION
 
     def __post_init__(self) -> None:
-        for field in (
-            "message_id",
-            "operation_id",
-            "correlation_id",
-            "tenant_id",
-            "sender",
-            "recipient",
-            "message_type",
-        ):
-            object.__setattr__(
-                self,
-                field,
-                _token(getattr(self, field), field),
+        if not isinstance(self.envelope, ProtocolEnvelope):
+            raise ProtocolExecutionError(
+                "envelope must be canonical skeleton.contracts ProtocolEnvelope"
             )
-        object.__setattr__(
-            self,
-            "payload_digest",
-            _sha256(self.payload_digest, "payload_digest"),
-        )
+        object.__setattr__(self, "tenant_id", _token(self.tenant_id, "tenant_id"))
         object.__setattr__(
             self,
             "authority_digest",
             _sha256(self.authority_digest, "authority_digest"),
         )
-        if not isinstance(self.trace, TraceContext):
-            raise ProtocolError("trace must be TraceContext")
-
-        issued = _nonnegative_int(self.issued_at_ms, "issued_at_ms")
-        deadline = _positive_int(self.deadline_at_ms, "deadline_at_ms")
-        if deadline <= issued:
-            raise ProtocolError("deadline_at_ms must exceed issued_at_ms")
-        object.__setattr__(self, "issued_at_ms", issued)
-        object.__setattr__(self, "deadline_at_ms", deadline)
-
-        try:
-            semantics = DeliverySemantics(self.delivery_semantics)
-        except ValueError as exc:
-            raise ProtocolError("unsupported delivery_semantics") from exc
-        object.__setattr__(self, "delivery_semantics", semantics)
-        try:
-            outcome_policy = UnknownOutcomePolicy(self.unknown_outcome_policy)
-        except ValueError as exc:
-            raise ProtocolError("unsupported unknown_outcome_policy") from exc
-        object.__setattr__(self, "unknown_outcome_policy", outcome_policy)
-
-        attempt = _positive_int(self.attempt, "attempt")
+        issued = _timestamp(self.issued_at_utc, "issued_at_utc")
+        object.__setattr__(self, "issued_at_utc", issued)
         max_attempts = _positive_int(self.max_attempts, "max_attempts")
-        if attempt > max_attempts:
-            raise ProtocolError("attempt cannot exceed max_attempts")
-        object.__setattr__(self, "attempt", attempt)
         object.__setattr__(self, "max_attempts", max_attempts)
+        object.__setattr__(self, "attributes", _pairs(self.attributes))
 
-        if self.idempotency_key is not None:
-            object.__setattr__(
-                self,
-                "idempotency_key",
-                _token(self.idempotency_key, "idempotency_key"),
+        if self.execution_version != INTERNAL_PROTOCOL_EXECUTION_VERSION:
+            raise ProtocolExecutionError("unsupported protocol execution version")
+        if self.envelope.attempt > max_attempts:
+            raise ProtocolExecutionError(
+                "canonical attempt cannot exceed execution max_attempts"
             )
-        if self.causation_id is not None:
-            object.__setattr__(
-                self,
-                "causation_id",
-                _token(self.causation_id, "causation_id"),
-            )
-            if self.causation_id == self.message_id:
-                raise ProtocolError("message cannot cause itself")
-        if self.previous_envelope_digest is not None:
-            object.__setattr__(
-                self,
-                "previous_envelope_digest",
-                _sha256(
-                    self.previous_envelope_digest,
-                    "previous_envelope_digest",
-                ),
-            )
-        object.__setattr__(
-            self,
-            "attributes",
-            _pairs(self.attributes, field="attributes"),
-        )
-
-        if semantics is DeliverySemantics.AT_MOST_ONCE:
-            if max_attempts != 1 or attempt != 1:
-                raise ProtocolError(
-                    "at_most_once delivery forbids protocol-level retries"
+        if self.envelope.deadline_utc is not None:
+            if _timestamp_dt(issued) >= _timestamp_dt(self.envelope.deadline_utc):
+                raise ProtocolExecutionError(
+                    "issued_at_utc must precede canonical deadline"
                 )
-            if self.previous_envelope_digest is not None:
-                raise ProtocolError(
-                    "at_most_once envelope cannot bind retry predecessor"
+
+        if self.envelope.retry_class is RetryClass.NEVER:
+            if max_attempts != 1 or self.envelope.attempt != 1:
+                raise ProtocolExecutionError(
+                    "RetryClass.NEVER requires one execution attempt"
+                )
+            if self.previous_execution_digest is not None:
+                raise ProtocolExecutionError(
+                    "non-retryable execution cannot bind predecessor"
                 )
         else:
-            if self.idempotency_key is None:
-                raise ProtocolError(
-                    "idempotent_retry requires idempotency_key"
-                )
             if max_attempts < 2:
-                raise ProtocolError(
-                    "idempotent_retry requires max_attempts >= 2"
+                raise ProtocolExecutionError(
+                    "retryable execution requires max_attempts >= 2"
+                )
+            if self.envelope.deadline_utc is None:
+                raise ProtocolExecutionError(
+                    "retryable execution requires canonical deadline"
                 )
 
-        if attempt == 1 and self.previous_envelope_digest is not None:
-            raise ProtocolError("first attempt cannot bind retry predecessor")
-        if attempt > 1:
-            if self.previous_envelope_digest is None:
-                raise ProtocolError(
-                    "retry attempt must bind previous_envelope_digest"
+        if self.previous_execution_digest is not None:
+            object.__setattr__(
+                self,
+                "previous_execution_digest",
+                _sha256(
+                    self.previous_execution_digest,
+                    "previous_execution_digest",
+                ),
+            )
+        if self.envelope.attempt == 1 and self.previous_execution_digest is not None:
+            raise ProtocolExecutionError(
+                "first execution attempt cannot bind predecessor"
+            )
+        if self.envelope.attempt > 1:
+            if self.previous_execution_digest is None:
+                raise ProtocolExecutionError(
+                    "retry attempt must bind previous_execution_digest"
                 )
-            if self.causation_id is None:
-                raise ProtocolError("retry attempt must bind causation_id")
-
-        if self.schema_version != INTERNAL_PROTOCOL_SCHEMA_VERSION:
-            raise ProtocolError("unsupported internal protocol schema version")
+            if not self.envelope.causation_id:
+                raise ProtocolExecutionError(
+                    "retry attempt must bind canonical causation_id"
+                )
 
     def payload(self) -> dict[str, Any]:
         return {
-            "schema_version": self.schema_version,
+            "execution_version": self.execution_version,
             "volume": VOL_131_ID,
-            "message_id": self.message_id,
-            "operation_id": self.operation_id,
-            "correlation_id": self.correlation_id,
-            "causation_id": self.causation_id,
+            "canonical_envelope_digest": self.envelope.digest,
+            "message_id": self.envelope.message_id,
+            "operation_id": self.envelope.operation_id,
+            "correlation_id": self.envelope.correlation_id,
+            "causation_id": self.envelope.causation_id or None,
+            "trace_id": self.envelope.trace_id,
+            "span_id": self.envelope.span_id or None,
             "tenant_id": self.tenant_id,
-            "sender": self.sender,
-            "recipient": self.recipient,
-            "message_type": self.message_type,
-            "payload_digest": self.payload_digest,
             "authority_digest": self.authority_digest,
-            "trace": self.trace.payload(),
-            "issued_at_ms": self.issued_at_ms,
-            "deadline_at_ms": self.deadline_at_ms,
-            "delivery_semantics": self.delivery_semantics.value,
-            "unknown_outcome_policy": self.unknown_outcome_policy.value,
-            "attempt": self.attempt,
+            "issued_at_utc": self.issued_at_utc,
+            "deadline_utc": self.envelope.deadline_utc,
+            "attempt": self.envelope.attempt,
             "max_attempts": self.max_attempts,
-            "idempotency_key": self.idempotency_key,
-            "previous_envelope_digest": self.previous_envelope_digest,
+            "retry_class": self.envelope.retry_class.value,
+            "unknown_outcome_policy": self.envelope.unknown_outcome_policy.value,
+            "previous_execution_digest": self.previous_execution_digest,
             "attributes": [list(item) for item in self.attributes],
         }
 
     @property
-    def envelope_digest(self) -> str:
-        return canonical_digest(self.payload())
+    def execution_digest(self) -> str:
+        return _canonical_digest(self.payload())
 
-    def remaining_ms(self, now_ms: int) -> int:
-        now = _nonnegative_int(now_ms, "now_ms")
-        return max(0, self.deadline_at_ms - now)
-
-    def expired(self, now_ms: int) -> bool:
-        return self.remaining_ms(now_ms) == 0
-
-    @property
-    def unknown_outcome_action(self) -> str:
-        return self.unknown_outcome_policy.value
-
-    def trace_record(
-        self,
-        *,
-        phase: str,
-        outcome: ProtocolOutcome | None = None,
-    ) -> dict[str, Any]:
-        """Return a bounded trace record with no raw message payload."""
-        phase_token = _token(phase, "phase", maximum=64)
-        result: dict[str, Any] = {
-            "schema_version": self.schema_version,
-            "volume": VOL_131_ID,
-            "phase": phase_token,
-            "message_id": self.message_id,
-            "operation_id": self.operation_id,
-            "correlation_id": self.correlation_id,
-            "causation_id": self.causation_id,
-            "tenant_id": self.tenant_id,
-            "sender": self.sender,
-            "recipient": self.recipient,
-            "message_type": self.message_type,
-            "payload_digest": self.payload_digest,
-            "authority_digest": self.authority_digest,
-            "envelope_digest": self.envelope_digest,
-            "trace_id": self.trace.trace_id,
-            "span_id": self.trace.span_id,
-            "parent_span_id": self.trace.parent_span_id,
-            "attempt": self.attempt,
-            "max_attempts": self.max_attempts,
-            "deadline_at_ms": self.deadline_at_ms,
-        }
-        if outcome is not None:
-            try:
-                result["outcome"] = ProtocolOutcome(outcome).value
-            except ValueError as exc:
-                raise ProtocolError("unsupported protocol outcome") from exc
-        return result
+    def expired(self, *, now: datetime | None = None) -> bool:
+        return self.envelope.deadline_exceeded(now=now)
 
     def retry(
         self,
         *,
         message_id: str,
         span_id: str,
-        now_ms: int,
-    ) -> "ProtocolEnvelope":
-        """Create the next bounded retry without widening authority/deadline."""
-        now = _nonnegative_int(now_ms, "now_ms")
-        if self.delivery_semantics is not DeliverySemantics.IDEMPOTENT_RETRY:
-            raise ProtocolError("envelope is not retryable")
-        if now >= self.deadline_at_ms:
-            raise ProtocolError("cannot retry expired envelope")
-        if self.attempt >= self.max_attempts:
-            raise ProtocolError("retry attempt budget exhausted")
-        return ProtocolEnvelope(
-            message_id=message_id,
-            operation_id=self.operation_id,
-            correlation_id=self.correlation_id,
-            causation_id=self.message_id,
+        issued_at_utc: str,
+    ) -> "ProtocolExecutionEnvelope":
+        if self.envelope.retry_class is RetryClass.NEVER:
+            raise ProtocolExecutionError("canonical envelope is not retryable")
+        if self.envelope.attempt >= self.max_attempts:
+            raise ProtocolExecutionError("retry attempt budget exhausted")
+        issued = _timestamp(issued_at_utc, "issued_at_utc")
+        if self.envelope.deadline_utc is None:
+            raise ProtocolExecutionError("retryable envelope lost deadline")
+        if _timestamp_dt(issued) >= _timestamp_dt(self.envelope.deadline_utc):
+            raise ProtocolExecutionError("cannot retry expired envelope")
+
+        next_envelope = replace(
+            self.envelope,
+            message_id=_token(message_id, "message_id"),
+            causation_id=self.envelope.message_id,
+            span_id=_token(span_id, "span_id"),
+            attempt=self.envelope.attempt + 1,
+        )
+        return ProtocolExecutionEnvelope(
+            envelope=next_envelope,
             tenant_id=self.tenant_id,
-            sender=self.sender,
-            recipient=self.recipient,
-            message_type=self.message_type,
-            payload_digest=self.payload_digest,
             authority_digest=self.authority_digest,
-            trace=self.trace.child(span_id),
-            issued_at_ms=now,
-            deadline_at_ms=self.deadline_at_ms,
-            delivery_semantics=self.delivery_semantics,
-            unknown_outcome_policy=self.unknown_outcome_policy,
-            attempt=self.attempt + 1,
+            issued_at_utc=issued,
             max_attempts=self.max_attempts,
-            idempotency_key=self.idempotency_key,
-            previous_envelope_digest=self.envelope_digest,
+            previous_execution_digest=self.execution_digest,
             attributes=self.attributes,
         )
 
@@ -486,94 +293,135 @@ class ProtocolEnvelope:
         message_id: str,
         span_id: str,
         recipient: str,
-        message_type: str,
-        payload_digest: str,
-        now_ms: int,
-        authority_digest: str | None = None,
-        delivery_semantics: DeliverySemantics = DeliverySemantics.AT_MOST_ONCE,
-        unknown_outcome_policy: UnknownOutcomePolicy = UnknownOutcomePolicy.FAIL_CLOSED,
+        kind: str,
+        payload: Mapping[str, object],
+        issued_at_utc: str,
+        retry_class: RetryClass = RetryClass.NEVER,
+        unknown_outcome_policy: UnknownOutcomePolicy = (
+            UnknownOutcomePolicy.FAIL_CLOSED
+        ),
         idempotency_key: str | None = None,
         max_attempts: int = 1,
         attributes: Mapping[str, str] | Iterable[tuple[str, str]] = (),
-    ) -> "ProtocolEnvelope":
-        """Create a causally linked child inside the parent's deadline."""
-        now = _nonnegative_int(now_ms, "now_ms")
-        if now >= self.deadline_at_ms:
-            raise ProtocolError("cannot spawn child after parent deadline")
-        return ProtocolEnvelope(
-            message_id=message_id,
-            operation_id=self.operation_id,
-            correlation_id=self.correlation_id,
-            causation_id=self.message_id,
-            tenant_id=self.tenant_id,
-            sender=self.recipient,
-            recipient=recipient,
-            message_type=message_type,
-            payload_digest=payload_digest,
-            authority_digest=(
-                self.authority_digest
-                if authority_digest is None
-                else authority_digest
-            ),
-            trace=self.trace.child(span_id),
-            issued_at_ms=now,
-            deadline_at_ms=self.deadline_at_ms,
-            delivery_semantics=delivery_semantics,
-            unknown_outcome_policy=unknown_outcome_policy,
-            attempt=1,
-            max_attempts=max_attempts,
-            idempotency_key=idempotency_key,
-            attributes=_pairs(attributes, field="attributes"),
+    ) -> "ProtocolExecutionEnvelope":
+        issued = _timestamp(issued_at_utc, "issued_at_utc")
+        if self.envelope.deadline_utc is not None:
+            if _timestamp_dt(issued) >= _timestamp_dt(self.envelope.deadline_utc):
+                raise ProtocolExecutionError(
+                    "cannot spawn child after parent deadline"
+                )
+        child_key = (
+            self.envelope.idempotency_key
+            if idempotency_key is None
+            else _token(idempotency_key, "idempotency_key", maximum=256)
         )
+        child = ProtocolEnvelope(
+            protocol=self.envelope.protocol,
+            message_id=_token(message_id, "message_id"),
+            kind=_token(kind, "kind"),
+            sender=self.envelope.recipient,
+            recipient=_token(recipient, "recipient"),
+            operation_id=self.envelope.operation_id,
+            correlation_id=self.envelope.correlation_id,
+            causation_id=self.envelope.message_id,
+            trace_id=self.envelope.trace_id,
+            span_id=_token(span_id, "span_id"),
+            deadline_utc=self.envelope.deadline_utc,
+            idempotency_key=child_key,
+            attempt=1,
+            retry_class=retry_class,
+            unknown_outcome_policy=unknown_outcome_policy,
+            payload=payload,
+        )
+        return ProtocolExecutionEnvelope(
+            envelope=child,
+            tenant_id=self.tenant_id,
+            authority_digest=self.authority_digest,
+            issued_at_utc=issued,
+            max_attempts=max_attempts,
+            attributes=_pairs(attributes),
+        )
+
+    def trace_record(
+        self,
+        *,
+        phase: str,
+        outcome: ProtocolOutcome | None = None,
+    ) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "execution_version": self.execution_version,
+            "volume": VOL_131_ID,
+            "phase": _token(phase, "phase", maximum=64),
+            "canonical_envelope_digest": self.envelope.digest,
+            "execution_digest": self.execution_digest,
+            "message_id": self.envelope.message_id,
+            "operation_id": self.envelope.operation_id,
+            "correlation_id": self.envelope.correlation_id,
+            "causation_id": self.envelope.causation_id or None,
+            "trace_id": self.envelope.trace_id,
+            "span_id": self.envelope.span_id or None,
+            "tenant_id": self.tenant_id,
+            "authority_digest": self.authority_digest,
+            "attempt": self.envelope.attempt,
+            "max_attempts": self.max_attempts,
+            "deadline_utc": self.envelope.deadline_utc,
+        }
+        if outcome is not None:
+            try:
+                result["outcome"] = ProtocolOutcome(outcome).value
+            except ValueError as exc:
+                raise ProtocolExecutionError(
+                    "unsupported protocol outcome"
+                ) from exc
+        return result
 
 
 @dataclass(frozen=True, slots=True)
 class ProtocolReceipt:
-    """Observer evidence for one exact protocol envelope."""
+    """Observer evidence for one exact canonical+execution envelope pair."""
 
-    envelope_digest: str
+    canonical_envelope_digest: str
+    execution_digest: str
     operation_id: str
     correlation_id: str
     trace_id: str
     span_id: str
     observer: str
     outcome: ProtocolOutcome
-    observed_at_ms: int
+    observed_at_utc: str
     reason: str | None = None
     result_digest: str | None = None
-    schema_version: int = INTERNAL_PROTOCOL_SCHEMA_VERSION
+    schema_version: int = 1
 
     def __post_init__(self) -> None:
-        object.__setattr__(
-            self,
-            "envelope_digest",
-            _sha256(self.envelope_digest, "envelope_digest"),
-        )
-        object.__setattr__(
-            self,
+        for field in ("canonical_envelope_digest", "execution_digest"):
+            object.__setattr__(
+                self,
+                field,
+                _sha256(getattr(self, field), field),
+            )
+        for field in (
             "operation_id",
-            _token(self.operation_id, "operation_id"),
-        )
-        object.__setattr__(
-            self,
             "correlation_id",
-            _token(self.correlation_id, "correlation_id"),
-        )
-        object.__setattr__(self, "trace_id", _trace_id(self.trace_id))
-        object.__setattr__(self, "span_id", _span_id(self.span_id))
-        object.__setattr__(
-            self,
+            "trace_id",
+            "span_id",
             "observer",
-            _token(self.observer, "observer"),
-        )
+        ):
+            object.__setattr__(
+                self,
+                field,
+                _token(getattr(self, field), field),
+            )
         try:
             object.__setattr__(self, "outcome", ProtocolOutcome(self.outcome))
         except ValueError as exc:
-            raise ProtocolError("unsupported receipt outcome") from exc
+            raise ProtocolExecutionError(
+                "unsupported protocol receipt outcome"
+            ) from exc
         object.__setattr__(
             self,
-            "observed_at_ms",
-            _nonnegative_int(self.observed_at_ms, "observed_at_ms"),
+            "observed_at_utc",
+            _timestamp(self.observed_at_utc, "observed_at_utc"),
         )
         if self.reason is not None:
             object.__setattr__(
@@ -587,99 +435,104 @@ class ProtocolReceipt:
                 "result_digest",
                 _sha256(self.result_digest, "result_digest"),
             )
-        if self.schema_version != INTERNAL_PROTOCOL_SCHEMA_VERSION:
-            raise ProtocolError("unsupported receipt schema version")
+        if self.schema_version != 1:
+            raise ProtocolExecutionError(
+                "unsupported protocol receipt schema version"
+            )
 
     def payload(self) -> dict[str, Any]:
         return {
             "schema_version": self.schema_version,
-            "volume": VOL_131_ID,
-            "envelope_digest": self.envelope_digest,
+            "canonical_envelope_digest": self.canonical_envelope_digest,
+            "execution_digest": self.execution_digest,
             "operation_id": self.operation_id,
             "correlation_id": self.correlation_id,
             "trace_id": self.trace_id,
             "span_id": self.span_id,
             "observer": self.observer,
             "outcome": self.outcome.value,
-            "observed_at_ms": self.observed_at_ms,
+            "observed_at_utc": self.observed_at_utc,
             "reason": self.reason,
             "result_digest": self.result_digest,
         }
 
     @property
     def receipt_digest(self) -> str:
-        return canonical_digest(self.payload())
+        return _canonical_digest(self.payload())
 
     @classmethod
-    def from_envelope(
+    def from_execution(
         cls,
-        envelope: ProtocolEnvelope,
+        execution: ProtocolExecutionEnvelope,
         *,
         observer: str,
         outcome: ProtocolOutcome,
-        observed_at_ms: int,
+        observed_at_utc: str,
         reason: str | None = None,
         result_digest: str | None = None,
     ) -> "ProtocolReceipt":
-        if not isinstance(envelope, ProtocolEnvelope):
-            raise TypeError("envelope must be ProtocolEnvelope")
-        observed = _nonnegative_int(observed_at_ms, "observed_at_ms")
-        if observed < envelope.issued_at_ms:
-            raise ProtocolError("receipt cannot predate envelope")
+        if not isinstance(execution, ProtocolExecutionEnvelope):
+            raise TypeError("execution must be ProtocolExecutionEnvelope")
+        observed = _timestamp(observed_at_utc, "observed_at_utc")
+        if _timestamp_dt(observed) < _timestamp_dt(execution.issued_at_utc):
+            raise ProtocolExecutionError(
+                "receipt cannot predate execution envelope"
+            )
         return cls(
-            envelope_digest=envelope.envelope_digest,
-            operation_id=envelope.operation_id,
-            correlation_id=envelope.correlation_id,
-            trace_id=envelope.trace.trace_id,
-            span_id=envelope.trace.span_id,
+            canonical_envelope_digest=execution.envelope.digest,
+            execution_digest=execution.execution_digest,
+            operation_id=execution.envelope.operation_id,
+            correlation_id=execution.envelope.correlation_id,
+            trace_id=execution.envelope.trace_id,
+            span_id=execution.envelope.span_id,
             observer=observer,
             outcome=outcome,
-            observed_at_ms=observed,
+            observed_at_utc=observed,
             reason=reason,
             result_digest=result_digest,
         )
 
 
 def validate_receipt(
-    envelope: ProtocolEnvelope,
+    execution: ProtocolExecutionEnvelope,
     receipt: ProtocolReceipt,
 ) -> None:
-    """Fail closed unless receipt binds the exact envelope and trace identity."""
-    if not isinstance(envelope, ProtocolEnvelope):
-        raise TypeError("envelope must be ProtocolEnvelope")
+    if not isinstance(execution, ProtocolExecutionEnvelope):
+        raise TypeError("execution must be ProtocolExecutionEnvelope")
     if not isinstance(receipt, ProtocolReceipt):
         raise TypeError("receipt must be ProtocolReceipt")
-    if receipt.envelope_digest != envelope.envelope_digest:
-        raise ProtocolError("receipt does not bind envelope digest")
-    if receipt.operation_id != envelope.operation_id:
-        raise ProtocolError("receipt operation identity mismatch")
-    if receipt.correlation_id != envelope.correlation_id:
-        raise ProtocolError("receipt correlation identity mismatch")
-    if receipt.trace_id != envelope.trace.trace_id:
-        raise ProtocolError("receipt trace identity mismatch")
-    if receipt.span_id != envelope.trace.span_id:
-        raise ProtocolError("receipt span identity mismatch")
-    if receipt.observed_at_ms < envelope.issued_at_ms:
-        raise ProtocolError("receipt predates envelope")
+    if receipt.canonical_envelope_digest != execution.envelope.digest:
+        raise ProtocolExecutionError(
+            "receipt does not bind canonical envelope digest"
+        )
+    if receipt.execution_digest != execution.execution_digest:
+        raise ProtocolExecutionError("receipt does not bind execution digest")
+    if receipt.operation_id != execution.envelope.operation_id:
+        raise ProtocolExecutionError("receipt operation identity mismatch")
+    if receipt.correlation_id != execution.envelope.correlation_id:
+        raise ProtocolExecutionError("receipt correlation identity mismatch")
+    if receipt.trace_id != execution.envelope.trace_id:
+        raise ProtocolExecutionError("receipt trace identity mismatch")
+    if receipt.span_id != execution.envelope.span_id:
+        raise ProtocolExecutionError("receipt span identity mismatch")
+    if _timestamp_dt(receipt.observed_at_utc) < _timestamp_dt(
+        execution.issued_at_utc
+    ):
+        raise ProtocolExecutionError("receipt predates execution envelope")
 
 
 def canonical_payload_digest(payload: object) -> str:
-    """Digest a JSON-compatible message body without placing it in tracing."""
-    return canonical_digest(payload)
+    """Digest JSON-shaped payload data for callers that store by reference."""
+    return _canonical_digest(payload)
 
 
 __all__ = [
-    "INTERNAL_PROTOCOL_SCHEMA_VERSION",
+    "INTERNAL_PROTOCOL_EXECUTION_VERSION",
     "VOL_131_ID",
-    "DeliverySemantics",
-    "ProtocolEnvelope",
-    "ProtocolError",
+    "ProtocolExecutionEnvelope",
+    "ProtocolExecutionError",
     "ProtocolOutcome",
     "ProtocolReceipt",
-    "TraceContext",
-    "UnknownOutcomePolicy",
-    "canonical_digest",
-    "canonical_json_bytes",
     "canonical_payload_digest",
     "validate_receipt",
 ]
