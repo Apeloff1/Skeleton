@@ -17,3 +17,19 @@ def test_conformance_vector_is_deterministic_and_authority_neutral():
 
 def test_conformance_vector_rejects_untyped_input():
  with pytest.raises(CanonicalContractError,match="CanonicalEnvelope"):canonical_conformance_vector({"payload":{}})
+
+
+def test_canonical_json_rejects_nonportable_integer_range():
+ import pytest
+ from skeleton.contracts.canonical import CanonicalContractError,canonical_json_bytes
+ assert canonical_json_bytes({"n":9007199254740991})
+ for value in (9007199254740992,-9007199254740992):
+  with pytest.raises(CanonicalContractError,match="portable JSON range"):
+   canonical_json_bytes({"n":value})
+
+def test_canonical_json_rejects_negative_zero_but_accepts_positive_zero():
+ import pytest
+ from skeleton.contracts.canonical import CanonicalContractError,canonical_json_bytes
+ assert canonical_json_bytes({"n":0.0})==b'{"n":0.0}'
+ with pytest.raises(CanonicalContractError,match="negative zero"):
+  canonical_json_bytes({"n":-0.0})
