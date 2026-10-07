@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-09:undo_redo:v1",
+  "title": "FLGB-09 undo redo",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "sequence",
+    "transaction_digest",
+    "forward_state_digest",
+    "reverse_state_digest"
+  ],
+  "properties": {
+    "sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "transaction_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "forward_state_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "reverse_state_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
