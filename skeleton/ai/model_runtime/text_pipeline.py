@@ -709,6 +709,78 @@ class TemporalSourceEvidence:
 
 
 @dataclass(frozen=True)
+class SourceProvenanceNode:
+    """One source in a deterministic dependency DAG."""
+    source_id: str
+    parent_source_ids: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.source_id, str) or not self.source_id or self.source_id != self.source_id.strip():
+            raise TokenizerContractError("invalid provenance source id")
+        if any(not isinstance(parent, str) or not parent or parent != parent.strip() for parent in self.parent_source_ids):
+            raise TokenizerContractError("invalid provenance parent")
+        if self.source_id in self.parent_source_ids or len(set(self.parent_source_ids)) != len(self.parent_source_ids):
+            raise TokenizerContractError("invalid provenance parents")
+
+    @property
+    def digest(self) -> str:
+        return digest_json({"source_id": self.source_id, "parent_source_ids": list(self.parent_source_ids)})
+
+
+@dataclass(frozen=True)
+class SourceProvenanceGraph:
+    """Validated source dependency graph used to derive independence roots."""
+    nodes: tuple[SourceProvenanceNode, ...]
+
+    def __post_init__(self) -> None:
+        if not self.nodes:
+            raise TokenizerContractError("empty provenance graph")
+        by_id = {node.source_id: node for node in self.nodes}
+        if len(by_id) != len(self.nodes):
+            raise TokenizerContractError("duplicate provenance source")
+        if any(parent not in by_id for node in self.nodes for parent in node.parent_source_ids):
+            raise TokenizerContractError("unknown provenance parent")
+        visiting: set[str] = set()
+        visited: set[str] = set()
+        def visit(source_id: str) -> None:
+            if source_id in visiting:
+                raise TokenizerContractError("provenance dependency cycle")
+            if source_id in visited:
+                return
+            visiting.add(source_id)
+            for parent in by_id[source_id].parent_source_ids:
+                visit(parent)
+            visiting.remove(source_id)
+            visited.add(source_id)
+        for source_id in sorted(by_id):
+            visit(source_id)
+
+    def roots_for(self, source_id: str) -> tuple[str, ...]:
+        by_id = {node.source_id: node for node in self.nodes}
+        if source_id not in by_id:
+            raise TokenizerContractError("unknown provenance source")
+        def roots(current: str) -> set[str]:
+            parents = by_id[current].parent_source_ids
+            if not parents:
+                return {current}
+            result: set[str] = set()
+            for parent in parents:
+                result.update(roots(parent))
+            return result
+        return tuple(sorted(roots(source_id)))
+
+    @property
+    def digest(self) -> str:
+        return digest_json({"nodes": [node.digest for node in sorted(self.nodes, key=lambda node: node.source_id)]})
+
+
+def provenance_independence_group(graph: SourceProvenanceGraph, source_id: str) -> str:
+    if not isinstance(graph, SourceProvenanceGraph):
+        raise TokenizerContractError("SourceProvenanceGraph required")
+    return digest_json({"roots": list(graph.roots_for(source_id))})
+
+
+@dataclass(frozen=True)
 class WalkForwardSnapshot:
     """Leakage-safe evidence view containing only observations knowable by cutoff."""
     cutoff_year: int
