@@ -49,4 +49,10 @@ class TestPromotionLifecycle(unittest.TestCase):
  def test_evaluator_cannot_also_admit_runtime(self):
   p,c,e,pe,ra,rb=production(); ra=replace(ra,admission_authority=e.independent_verifier); rb=replace(rb,admission_digest=ra.digest)
   with self.assertRaises(LifecycleProofError): extend_with_promotion(p,c,e,pe,ra,rb)
- def test_evaluator_cannot_verify_rollback(self):\n  p,c,e,pe,ra,rb=production(); rb=replace(rb,verifier_id=e.independent_verifier)\n  with self.assertRaisesRegex(LifecycleProofError,"rollback verifier must be independent"): extend_with_promotion(p,c,e,pe,ra,rb)\n def test_admitter_cannot_verify_rollback(self):\n  p,c,e,pe,ra,rb=production(); rb=replace(rb,verifier_id=ra.admission_authority)\n  with self.assertRaisesRegex(LifecycleProofError,"rollback verifier must be independent"): extend_with_promotion(p,c,e,pe,ra,rb)\nif __name__=="__main__": unittest.main()
+ def test_evaluator_cannot_verify_rollback(self):
+  p,c,e,pe,ra,rb=production(); rb=replace(rb,verifier_id=e.independent_verifier)
+  with self.assertRaisesRegex(LifecycleProofError,"rollback verifier must be independent"): extend_with_promotion(p,c,e,pe,ra,rb)
+ def test_admitter_cannot_verify_rollback(self):
+  p,c,e,pe,ra,rb=production(); rb=replace(rb,verifier_id=ra.admission_authority)
+  with self.assertRaisesRegex(LifecycleProofError,"rollback verifier must be independent"): extend_with_promotion(p,c,e,pe,ra,rb)
+if __name__=="__main__": unittest.main()
