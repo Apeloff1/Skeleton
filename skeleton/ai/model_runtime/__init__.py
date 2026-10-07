@@ -11,6 +11,7 @@ from .runtime_feedback import DeterministicRuntimeEstimator, FeedbackLimits, Fee
 from .closed_loop_serving import ClosedLoopServingController, ControlDecision
 from .iteration_scheduler import InferencePhase, IterationPlan, IterationScheduler, IterationSlice, IterationWork
 from .execution_telemetry import ExecutionTiming
+from .admission_checkpoint import restore_admission_scheduler
 from .flgb_model_runtime import (
     ALLOWED_TRANSITIONS,
     BatchRequest,
