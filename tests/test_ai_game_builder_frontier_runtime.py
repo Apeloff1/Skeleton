@@ -279,6 +279,18 @@ def test_effort_scheduler_selects_exact_supported_tiers() -> None:
     assert mid.mode is EffortMode.FORGE_1000
     assert high.mode is EffortMode.FORGE_10000
     assert len(low.reason_digest) == 64
+    assert len(low.signal_binding_digest) == 64
+
+    with pytest.raises(
+        FrontierAssuranceError,
+        match="effort decision reason digest mismatch",
+    ):
+        type(low)(
+            mode=EffortMode.FORGE_10000,
+            score=low.score,
+            signal_binding_digest=low.signal_binding_digest,
+            reason_digest=low.reason_digest,
+        )
 
 
 def test_effort_signal_rejects_unattributed_score_evidence() -> None:
