@@ -435,20 +435,28 @@ class TextTokenPipeline:
         if expected.digest != receipt.digest:
             raise TokenizerContractError("training input receipt mismatch")
 
-    def governed_training_input(self, prepared: PreparedText, dataset_revision, *, pad_token_id: int | None = None, ignore_index: int = -100) -> GovernedTrainingInput:
-        from skeleton.ai.training.flgb_training_runtime import DatasetRevision
+    def governed_training_input(self, prepared: PreparedText, dataset_revision, dataset_rights, *, scope: str = "training", pad_token_id: int | None = None, ignore_index: int = -100) -> GovernedTrainingInput:
+        from skeleton.ai.training.flgb_training_runtime import DatasetRevision, DatasetRights
         if not isinstance(dataset_revision, DatasetRevision):
             raise TokenizerContractError("DatasetRevision required")
+        if not isinstance(dataset_rights, DatasetRights):
+            raise TokenizerContractError("DatasetRights required")
+        if dataset_rights.dataset_id != dataset_revision.dataset_id:
+            raise TokenizerContractError("dataset rights identity mismatch")
+        if dataset_rights.digest != dataset_revision.rights_digest:
+            raise TokenizerContractError("dataset rights digest mismatch")
+        if not dataset_rights.permits(scope):
+            raise TokenizerContractError("dataset rights do not permit requested training scope")
         receipt = self.training_receipt(prepared, pad_token_id=pad_token_id, ignore_index=ignore_index)
         if dataset_revision.content_digest != prepared.raw_text_digest:
             raise TokenizerContractError("dataset content does not match prepared source")
         if dataset_revision.transform_digest != self.digest:
             raise TokenizerContractError("dataset transform does not match pipeline")
-        return GovernedTrainingInput(receipt.digest, dataset_revision.digest, dataset_revision.transform_digest, dataset_revision.rights_digest)
+        return GovernedTrainingInput(receipt.digest, dataset_revision.digest, dataset_revision.transform_digest, dataset_rights.digest)
 
-    def training_manifest(self, prepared: PreparedText, dataset_revision, *, run_id: str, base_model_digest: str, code_digest: str, seed_manifest_digest: str, max_steps: int, pad_token_id: int | None = None, ignore_index: int = -100):
+    def training_manifest(self, prepared: PreparedText, dataset_revision, dataset_rights, *, scope: str = "training", run_id: str, base_model_digest: str, code_digest: str, seed_manifest_digest: str, max_steps: int, pad_token_id: int | None = None, ignore_index: int = -100):
         from skeleton.ai.training.flgb_training_runtime import TrainingManifest
-        governed = self.governed_training_input(prepared, dataset_revision, pad_token_id=pad_token_id, ignore_index=ignore_index)
+        governed = self.governed_training_input(prepared, dataset_revision, dataset_rights, scope=scope, pad_token_id=pad_token_id, ignore_index=ignore_index)
         return TrainingManifest(
             run_id=run_id,
             base_model_digest=base_model_digest,
