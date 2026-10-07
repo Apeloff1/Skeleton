@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-12:accessibility_semantics:v1",
+  "title": "FLGB-12 accessibility semantics",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "node_id",
+    "role",
+    "label",
+    "focus_order",
+    "hidden"
+  ],
+  "properties": {
+    "node_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "role": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "label": {
+      "type": "string"
+    },
+    "focus_order": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "hidden": {
+      "type": "boolean"
+    }
+  }
+}
