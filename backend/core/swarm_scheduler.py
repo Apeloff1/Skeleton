@@ -155,15 +155,82 @@ def execute_schedule(
 
     verification = planner.verify_plan(plan)
 
-    # Lazy import — keeps core.swarm_planner pure and avoids a DB import at module load.
-    from core import platoons as platoons_mod
+    if persist:
+        # Persistent/live execution owns the database-backed platoon runtime.
+        # Keep the import lazy so pure planning and non-persistent execution do
+        # not require Mongo or initialize durable agent side channels.
+        from core import platoons as platoons_mod
 
-    def _executor(phase_id: str, prev_handoff: str | None, rotation_idx: int, _wave: int) -> dict:
-        return platoons_mod.run_platoon(
-            build_id=build_id, phase_id=phase_id, game_ctx=game_ctx,
-            rotation_idx=rotation_idx, prev_handoff=prev_handoff,
-            rounds=rounds, size=platoon_size, persist=persist,
-        )
+        def _executor(
+            phase_id: str,
+            prev_handoff: str | None,
+            rotation_idx: int,
+            _wave: int,
+        ) -> dict:
+            return platoons_mod.run_platoon(
+                build_id=build_id,
+                phase_id=phase_id,
+                game_ctx=game_ctx,
+                rotation_idx=rotation_idx,
+                prev_handoff=prev_handoff,
+                rounds=rounds,
+                size=platoon_size,
+                persist=True,
+            )
+    else:
+        # Ephemeral execution is deliberately DB-free. It executes the
+        # deterministic worker assignments already proven by the plan and
+        # emits bounded synthetic handoffs/transcript rows without durable
+        # ledger, whisper, participation, or schedule writes.
+        planned_workers = {
+            node["phase_id"]: tuple(node.get("workers") or ())
+            for node in plan["nodes"]
+            if node.get("tier") == "platoon"
+        }
+
+        def _executor(
+            phase_id: str,
+            prev_handoff: str | None,
+            rotation_idx: int,
+            wave: int,
+        ) -> dict:
+            workers = planned_workers.get(phase_id, ())
+            members = [
+                {
+                    "code": worker.get("code"),
+                    "agent": worker.get("agent"),
+                    "category": worker.get("category"),
+                }
+                for worker in workers
+            ]
+            codes = ",".join(
+                str(member["code"])
+                for member in members
+                if member.get("code")
+            )
+            inherited = f" <- {prev_handoff}" if prev_handoff else ""
+            handoff = (
+                f"EPHEMERAL[{phase_id}] wave={wave} rotation={rotation_idx} "
+                f"workers={codes}{inherited}"
+            )[:600]
+            transcript = [
+                {
+                    "round": 1,
+                    "phase_id": phase_id,
+                    "speaker_code": member.get("code"),
+                    "text": (
+                        f"[ephemeral:{phase_id}] "
+                        f"{member.get('code') or 'worker'} executes planned assignment"
+                    ),
+                }
+                for member in members
+            ]
+            return {
+                "handoff": handoff,
+                "members": members,
+                "whisper_count": 0,
+                "transcript": transcript,
+            }
 
     execution = run_with_executor(plan, _executor)
 
