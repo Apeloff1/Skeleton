@@ -49,6 +49,7 @@ from .runtime_contracts import (
     RuntimeLimits,
     RuntimeUsage,
 )
+from .training_admission import TrainingAdmissionReceipt, admit_promoted_candidate
 from .tokenization import (
     NativeTokenizer,
     StreamingTextFeed,
@@ -98,6 +99,8 @@ __all__ = [
     "RuntimeUsage",
     "SpeculativeReceipt",
     "StreamingTextFeed",
+    "TrainingAdmissionReceipt",
+    "admit_promoted_candidate",
     "TokenBatch",
     "TokenSequence",
     "TokenWindow",
