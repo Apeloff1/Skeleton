@@ -300,3 +300,34 @@ def test_shift_supervisor_model_gateway_is_declared_automation_provider_surface(
         "network_transport",
     }
     assert validate_provider_bootstrap(ROOT) == []
+
+
+def test_ai_build_provider_paths_are_nonexecuting_canonical_facades() -> None:
+    from skeleton.ai.build.automation.chatgpt_adapter import (
+        ChatGPTReasoner as AiChatGPTReasoner,
+    )
+    from skeleton.ai.build.automation.free_model import (
+        FreeModelClient as AiFreeModelClient,
+    )
+    from skeleton.ai.build.shift_supervisor.model_gateway import (
+        ModelGateway as AiModelGateway,
+    )
+    from skeleton.automation.chatgpt_adapter import (
+        ChatGPTReasoner as CanonicalChatGPTReasoner,
+    )
+    from skeleton.automation.free_model import (
+        FreeModelClient as CanonicalFreeModelClient,
+    )
+    from skeleton.automation.shift_supervisor.model_gateway import (
+        ModelGateway as CanonicalModelGateway,
+    )
+
+    assert AiChatGPTReasoner is CanonicalChatGPTReasoner
+    assert AiFreeModelClient is CanonicalFreeModelClient
+    assert AiModelGateway is CanonicalModelGateway
+
+    discovered = discover_provider_surfaces(ROOT)
+    assert "skeleton/ai/build/automation/chatgpt_adapter.py" not in discovered
+    assert "skeleton/ai/build/automation/free_model.py" not in discovered
+    assert "skeleton/ai/build/shift_supervisor/model_gateway.py" not in discovered
+    assert validate_provider_bootstrap(ROOT) == []
