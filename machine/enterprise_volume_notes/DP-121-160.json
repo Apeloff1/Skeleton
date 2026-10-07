@@ -2,7 +2,7 @@
   "schema_version": "skeleton.enterprise_ai.implementation_notes.v1",
   "standard_version": "2026.10",
   "depth_pass": "DP-121-160",
-  "generated_from_master_plan": "1.7.0",
+  "generated_from_master_plan": "2.6.0",
   "volume_count": 40,
   "dossiers": [
     {
@@ -13,7 +13,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Keep appendices derived from or linked to canonical machine contracts.",
@@ -237,7 +236,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Write requirements as observable obligations with explicit scope and acceptance.",
@@ -459,7 +457,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Every NFR must specify threshold, unit, workload, environment and measurement method.",
@@ -681,7 +678,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Assign stable capability IDs and parent/child relationships.",
@@ -903,7 +899,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Make maturity cumulative and machine-checkable.",
@@ -1125,7 +1120,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Specify normal, degraded and failure behavior independently of implementation structure.",
@@ -1347,7 +1341,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Give each state machine one owner and stable version.",
@@ -1569,7 +1562,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Require explicit error/result and compatibility semantics.",
@@ -1791,7 +1783,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Register every durable/wire schema under stable identity and owner.",
@@ -2013,7 +2004,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Declare producer/consumer compatibility for every cross-boundary version change.",
@@ -2235,7 +2225,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Use stable envelopes with correlation, causation and deadline metadata.",
@@ -2457,7 +2446,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Name authoritative state and consistency requirement for each domain.",
@@ -2679,7 +2667,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Choose atomic transaction, saga or reconciliation model per operation.",
@@ -2696,6 +2683,8 @@
           "CompensationReceipt"
         ],
         "canonical_paths": [
+          "skeleton/storage/cas",
+          "skeleton/ai/runtime/storage/cas",
           "skeleton/storage/cas/__init__.py",
           "skeleton/ai/runtime/storage/cas/__init__.py"
         ],
@@ -2902,7 +2891,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Write outbox records atomically with authoritative state.",
@@ -3124,7 +3112,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Never let cache contents become sole authoritative state.",
@@ -3141,6 +3128,8 @@
           "CacheEntry"
         ],
         "canonical_paths": [
+          "skeleton/storage/cas",
+          "skeleton/ai/runtime/storage/cas",
           "skeleton/storage/cas/__init__.py",
           "skeleton/ai/runtime/storage/cas/__init__.py"
         ],
@@ -3347,7 +3336,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Canonicalize bytes before digest where a format requires it.",
@@ -3364,6 +3352,8 @@
           "DigestPolicy"
         ],
         "canonical_paths": [
+          "skeleton/storage/cas",
+          "skeleton/ai/runtime/storage/cas",
           "skeleton/storage/cas/__init__.py",
           "skeleton/ai/runtime/storage/cas/__init__.py"
         ],
@@ -3570,7 +3560,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Preserve source identity, acquisition time, rights/classification and parser version.",
@@ -3793,7 +3782,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Preserve page/region coordinates and extraction method for every derived claim.",
@@ -4016,7 +4004,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Record transformation identity, inputs, outputs and environment/version.",
@@ -4239,7 +4226,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Define quality checks per dataset/use case and retain raw measurements.",
@@ -4462,7 +4448,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Give every dataset/split immutable identity and provenance.",
@@ -4685,7 +4670,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Label synthetic origin and generator configuration permanently.",
@@ -4908,7 +4892,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Require registered inputs and explicit resource/budget admission.",
@@ -5130,7 +5113,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Define data/model parallel topology and collective timeouts explicitly.",
@@ -5352,7 +5334,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Checkpoint all state required for semantically equivalent resume.",
@@ -5574,7 +5555,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Record consumed data position and optimizer semantics across membership changes.",
@@ -5796,7 +5776,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Capture enough telemetry to diagnose divergence without leaking restricted data.",
@@ -6018,7 +5997,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Evaluate candidates before registry promotion using fixed/versioned suites.",
@@ -6240,7 +6218,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Separate experimental post-training from production model authority.",
@@ -6462,7 +6439,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Keep environment side effects sandboxed and reproducible.",
@@ -6684,7 +6660,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Represent curriculum transitions and prerequisites explicitly.",
@@ -6906,7 +6881,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Keep verifier authority separate from generator confidence.",
@@ -7128,7 +7102,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Preserve source bytes/digests, metadata classification and transformation lineage.",
@@ -7352,7 +7325,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Validate dimensions/format/resources before decode/inference.",
@@ -7574,7 +7546,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Keep OCR text linked to page coordinates and confidence.",
@@ -7796,7 +7767,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Preserve sample rate/channel/time offsets across transformations.",
@@ -8018,7 +7988,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Distinguish provisional transcripts from authoritative final segments.",
@@ -8240,7 +8209,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Bound decode/frame sampling workloads before processing.",
@@ -8462,7 +8430,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Normalize cross-modal evidence into comparable provenance-bearing results.",
@@ -8685,7 +8652,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Require schemas, authority scope, side-effect class, idempotency and timeout metadata.",

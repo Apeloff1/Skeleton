@@ -2,7 +2,7 @@
   "schema_version": "skeleton.enterprise_ai.implementation_notes.v1",
   "standard_version": "2026.10",
   "depth_pass": "DP-000-040",
-  "generated_from_master_plan": "1.7.0",
+  "generated_from_master_plan": "2.6.0",
   "volume_count": 41,
   "dossiers": [
     {
@@ -13,7 +13,6 @@
       "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Define authoritative precedence among runtime truth, construction authority, target plan and evidence.",
@@ -253,10 +252,9 @@
       "title": "Scientific & Historical Foundation",
       "depth_pass": "DP-000-040",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Preserve scientific claims with source, method, result, limitation and correction/retraction lineage.",
@@ -284,21 +282,28 @@
           "source selection bias",
           "retracted/corrected findings surviving as current truth"
         ],
-        "gaps": [
-          "independent exact-head AI Research Lineage Closure qualification for reconciliation receipt remains pending"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_research_lineage.py",
           "skeleton/testing/test_research_system_acceptance.py",
-          "scripts/check_ai_edge_case_catalog.py"
+          "scripts/check_ai_edge_case_catalog.py",
+          "tests/test_research_lineage_independent_verifier.py"
         ],
         "evaluations": [
           "planned:source-quality calibration",
-          "planned:replication-status consistency evaluation"
+          "planned:replication-status consistency evaluation",
+          "scripts/verify_research_lineage_closure.py",
+          ".github/workflows/ai-research-lineage.yml"
         ],
         "existing_evidence": [
           "PR #2721 merged research ingestion/citation lineage implementation",
-          "PR #2950 head 6052b313b9fceacecf06ea4d6f12492c50241325 adds deterministic reconciliation qualification; independent workflow pending"
+          "PR #2950 head 6052b313b9fceacecf06ea4d6f12492c50241325 adds deterministic reconciliation qualification",
+          "scripts/verify_research_lineage_closure.py",
+          "tests/test_research_lineage_independent_verifier.py",
+          ".github/workflows/ai-research-lineage.yml",
+          "git-head:fad73d2f4a2eaf861dbeaf2792dec35ee2456677",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/37531442564",
+          "github-actions-job:112501537878"
         ]
       },
       "implementation_levels": [
@@ -484,10 +489,9 @@
       "title": "System Architecture",
       "depth_pass": "DP-000-040",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Maintain one canonical architecture graph for roots, ownership zones, runtime DAGs and interfaces.",
@@ -516,20 +520,20 @@
           "transitional roots becoming accidental owners",
           "cyclic dependency growth"
         ],
-        "gaps": [
-          "independent exact-head VOL-002 Architecture Fitness and Ownership Gate qualification remains pending"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_architecture_map.py",
           "tests/test_architecture_boundaries.py",
           "skeleton/testing/test_architecture_map.py::test_component_fitness_covers_all_runtime_planes_and_ai_mappings",
-          "skeleton/testing/test_architecture_map.py::test_owner_lookup_resolves_future_path_without_materialization"
+          "skeleton/testing/test_architecture_map.py::test_owner_lookup_resolves_future_path_without_materialization",
+          "tests/test_vol002_architecture_independent_verifier.py"
         ],
         "evaluations": [
           ".github/workflows/vol002-architecture-fitness.yml",
           "scripts/check_architecture_map.py --json",
           "skeleton/testing/test_architecture_map.py",
-          "tests/test_architecture_boundaries.py"
+          "tests/test_architecture_boundaries.py",
+          "scripts/verify_vol002_architecture_fitness.py"
         ],
         "existing_evidence": [
           "https://github.com/Apeloff1/Skeleton/commit/d4334086eaf1c7cbbff46890b727fc954fde1677",
@@ -538,7 +542,8 @@
           ".github/workflows/vol002-architecture-fitness.yml",
           "https://github.com/Apeloff1/Skeleton/commit/ce1a19f26c6b811c189d309440ab5b921c1ef7b8",
           "https://github.com/Apeloff1/Skeleton/commit/ce6d1736af9137dd07669ff17423ed1decf2a4c5",
-          "https://github.com/Apeloff1/Skeleton/commit/bae16164548a1cf7250c11ff00c0ce5ea970279f"
+          "https://github.com/Apeloff1/Skeleton/commit/bae16164548a1cf7250c11ff00c0ce5ea970279f",
+          "scripts/verify_vol002_architecture_fitness.py"
         ]
       },
       "implementation_levels": [
@@ -727,7 +732,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Give every serialized contract stable identity, owner, version, compatibility rule and migration semantics.",
@@ -752,30 +756,38 @@
           "skeleton/contracts/canonical.py",
           "skeleton/ai/runtime/contracts/canonical.py",
           "scripts/check_architecture_contract_conformance.py",
-          "machine/contract_conformance.json"
+          "machine/contract_conformance.json",
+          "scripts/verify_vol003_contract_conformance.py"
         ],
         "risks": [
           "schema drift",
           "privileged defaults from unknown values",
           "cross-language round-trip divergence"
         ],
-        "gaps": [],
+        "gaps": [
+          "independent exact-head VOL-003 Contract Conformance Closure qualification remains pending"
+        ],
         "tests": [
           "skeleton/testing/test_contract_serialization_edges.py",
           "skeleton/testing/test_contract_compatibility.py",
           "skeleton/testing/test_contract_unicode_edges.py",
-          "tests/test_architecture_contract_conformance.py"
+          "tests/test_architecture_contract_conformance.py",
+          "tests/test_vol003_contract_conformance_independent.py"
         ],
         "evaluations": [
           "scripts/check_architecture_contract_conformance.py --json",
-          "tests/test_architecture_contract_conformance.py"
+          "tests/test_architecture_contract_conformance.py",
+          ".github/workflows/vol003-contract-conformance.yml",
+          "scripts/verify_vol003_contract_conformance.py"
         ],
         "existing_evidence": [
           "https://github.com/Apeloff1/Skeleton/commit/3118f3d4c5fcbd421c590b7724289abe8c411e11",
           "scripts/check_architecture_contract_conformance.py",
           "machine/contract_conformance.json",
           "skeleton/testing/test_contract_compatibility.py",
-          "tests/test_architecture_contract_conformance.py"
+          "tests/test_architecture_contract_conformance.py",
+          "scripts/verify_vol003_contract_conformance.py",
+          "tests/test_vol003_contract_conformance_independent.py"
         ]
       },
       "implementation_levels": [
@@ -986,7 +998,11 @@
           "skeleton/app",
           "skeleton/persistence/operation_runtime.py",
           "skeleton/api/server.py",
-          "machine/manifest.json"
+          "machine/manifest.json",
+          "machine/runtime_supervision.json",
+          "scripts/check_architecture_runtime_supervision.py",
+          "skeleton/kernel/runtime_supervision.py",
+          "skeleton/ai/runtime/kernel/runtime_supervision.py"
         ],
         "risks": [
           "orphan tasks",
@@ -994,20 +1010,35 @@
           "shutdown ordering data loss"
         ],
         "gaps": [
-          "unify service supervision semantics across backend and engine",
-          "expand cancellation propagation coverage into all connectors"
+          "independent exact-head VOL-004 Runtime Supervision Closure qualification remains pending"
         ],
         "tests": [
           "skeleton/testing/test_app_assembly.py",
           "skeleton/testing/test_operation_runtime.py",
-          "skeleton/testing/test_operation_server_binding.py"
+          "skeleton/testing/test_operation_server_binding.py",
+          "tests/test_architecture_runtime_supervision.py",
+          "skeleton/testing/test_vol004_runtime_supervision_v2.py",
+          "skeleton/testing/test_kernel_supervisor_cancellation.py",
+          "backend/tests/test_engine_cross_service_closure.py::test_cross_service_cancel_fences_late_provider_result",
+          "backend/tests/test_engine_cross_service_closure.py::test_stale_task_callback_cannot_release_newer_generation_lease"
         ],
         "evaluations": [
-          "planned:crash-at-every-lifecycle-boundary suite",
-          "planned:shutdown/cancellation latency evaluation"
+          "python scripts/check_architecture_runtime_supervision.py --json",
+          ".github/workflows/vol004-runtime-supervision.yml",
+          "skeleton/testing/test_vol004_runtime_supervision_v2.py",
+          "backend/tests/test_engine_cross_service_closure.py::test_cross_service_cancel_fences_late_provider_result",
+          "backend/tests/test_engine_cross_service_closure.py::test_stale_task_callback_cannot_release_newer_generation_lease",
+          "backend/tests/test_engine_cross_service_closure.py::test_engine_lifecycle_draining_fences_new_execution_and_drains_lease"
         ],
         "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/be408977891328b78522074c1fe693267b01ce5b"
+          "https://github.com/Apeloff1/Skeleton/commit/be408977891328b78522074c1fe693267b01ce5b",
+          "machine/runtime_supervision.json",
+          "scripts/check_architecture_runtime_supervision.py",
+          "skeleton/kernel/runtime_supervision.py",
+          "skeleton/ai/runtime/kernel/runtime_supervision.py",
+          "skeleton/testing/test_vol004_runtime_supervision_v2.py",
+          ".github/workflows/vol004-runtime-supervision.yml",
+          "https://github.com/Apeloff1/Skeleton/commit/a9accd0f01bad20f1b3a29e190dd97fb3323cec5"
         ]
       },
       "implementation_levels": [
@@ -1218,7 +1249,11 @@
           "machine/state_topology.json",
           "skeleton/persistence",
           "backend/services/database.py",
-          "scripts/state_recovery_drill.py"
+          "scripts/state_recovery_drill.py",
+          "machine/state_backup_policy.json",
+          "scripts/state_migration_compatibility.py",
+          "scripts/verify_state_authority_closure.py",
+          ".github/workflows/state-recovery-drill.yml"
         ],
         "risks": [
           "split-brain ownership",
@@ -1227,20 +1262,31 @@
           "backup that cannot restore"
         ],
         "gaps": [
-          "converge remaining legacy state owners",
-          "add migration compatibility rehearsal to release qualification"
+          "independent exact-head VOL-005 Data & Persistence Closure qualification remains pending"
         ],
         "tests": [
           "skeleton/testing/test_state_recovery_drill.py",
           "skeleton/testing/test_operation_store.py",
-          "backend/tests/test_rag_state_authority.py"
+          "backend/tests/test_rag_state_authority.py",
+          "skeleton/testing/test_state_migration_compatibility.py",
+          "tests/test_state_authority_independent_verifier.py"
         ],
         "evaluations": [
-          "planned:partial-commit fault matrix",
-          "planned:restore consistency evaluation"
+          "scripts/check_state_topology.py --json",
+          "scripts/state_migration_compatibility.py",
+          "scripts/verify_state_authority_closure.py",
+          ".github/workflows/state-recovery-drill.yml",
+          ".github/workflows/p1-migration-rollback-compatibility.yml"
         ],
         "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/f9053d8c9a2dfddcff431a4ff37863a5d962eded"
+          "https://github.com/Apeloff1/Skeleton/commit/f9053d8c9a2dfddcff431a4ff37863a5d962eded",
+          "machine/state_topology.json",
+          "machine/state_backup_policy.json",
+          "scripts/state_recovery_drill.py",
+          "scripts/state_migration_compatibility.py",
+          "skeleton/testing/test_state_recovery_drill.py",
+          "skeleton/testing/test_state_migration_compatibility.py",
+          "scripts/verify_state_authority_closure.py"
         ]
       },
       "implementation_levels": [
@@ -7868,13 +7914,21 @@
         ],
         "contracts": [
           "JvmCapability",
-          "JvmRequest",
-          "JvmResult",
-          "JvmRuntimeDescriptor"
+          "JvmRuntimeDescriptor",
+          "JvmBenchmarkEvidence",
+          "JvmQualificationPolicy",
+          "JvmQualificationDecision",
+          "JvmRequest"
         ],
         "canonical_paths": [
           "java-accelerators",
-          "planned:jvm"
+          "skeleton/native/jvm_protocol.py",
+          "skeleton/native/jvm_registry.py",
+          "skeleton/memory/jvm_vector_accelerator.py",
+          "skeleton/observability/jvm_accelerator.py",
+          "skeleton/simulation/physics/jvm_broadphase_accelerator.py",
+          "skeleton/ai/runtime/native/jvm_protocol.py",
+          "skeleton/ai/runtime/native/jvm_registry.py"
         ],
         "risks": [
           "classpath drift",
@@ -7883,18 +7937,31 @@
           "duplicate runtime authority"
         ],
         "gaps": [
-          "identify workloads where JVM is actually beneficial",
-          "standardize protocol/version negotiation"
+          "exact-head VOL-033 gate and independent accountability verification pending"
         ],
         "tests": [
-          "planned:java-accelerators/src/test",
-          "planned:skeleton/testing/test_jvm_boundary.py"
+          "skeleton/testing/test_vol033_jvm_protocol.py",
+          "skeleton/testing/test_jvm_accelerator_registry.py",
+          "skeleton/testing/test_jvm_accelerator_runtime_status.py",
+          "skeleton/testing/test_jvm_observability_accelerator.py",
+          "skeleton/testing/test_jvm_vector_accelerator.py",
+          "skeleton/testing/test_jvm_physics_broadphase_accelerator.py",
+          "tests/test_ci_java_accelerator_dependencies.py",
+          "tests/test_jvm_registry_namespace_migration.py"
         ],
         "evaluations": [
-          "planned:JVM-versus-reference benchmark",
-          "planned:GC/backpressure soak test"
+          "scripts/benchmark_java_accelerators.py",
+          ".github/workflows/vol033-jvm-protocol.yml"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "skeleton/native/jvm_protocol.py",
+          "skeleton/native/jvm_registry.py",
+          "skeleton/testing/test_vol033_jvm_protocol.py",
+          "skeleton/testing/test_jvm_accelerator_registry.py",
+          "scripts/benchmark_java_accelerators.py",
+          ".github/workflows/vol033-jvm-protocol.yml",
+          "PR #3324"
+        ]
       },
       "implementation_levels": [
         {

@@ -2,7 +2,7 @@
   "schema_version": "skeleton.enterprise_ai.implementation_notes.v1",
   "standard_version": "2026.10",
   "depth_pass": "DP-161-200",
-  "generated_from_master_plan": "1.7.0",
+  "generated_from_master_plan": "2.6.0",
   "volume_count": 40,
   "dossiers": [
     {
@@ -13,7 +13,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Separate connector discovery/configuration from credential-bearing execution.",
@@ -235,7 +234,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Plugins must declare capabilities, permissions and compatibility before activation.",
@@ -457,7 +455,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Verify provenance/signatures and permission declarations.",
@@ -680,7 +677,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Default deny undeclared capabilities and egress.",
@@ -918,7 +914,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Policy evaluation must be deterministic for identical inputs/version.",
@@ -1153,10 +1148,9 @@
       "title": "Policy Simulation",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Simulation cannot grant real authority or execute external side effects.",
@@ -1374,10 +1368,9 @@
       "title": "Threat Model",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Map threats to concrete components and controls.",
@@ -1598,7 +1591,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Treat untrusted model/context/tool outputs as data, never authority.",
@@ -1831,10 +1823,9 @@
       "title": "Security Boundaries",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Every privileged crossing needs authenticated identity and explicit authorization.",
@@ -2055,7 +2046,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Use workload/service identity and least-privilege grants internally.",
@@ -2291,7 +2281,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Separate public ingress from internal control/data paths.",
@@ -2510,10 +2499,9 @@
       "title": "Egress Control",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Default deny unapproved destinations for privileged sandboxes/tools.",
@@ -2735,10 +2723,9 @@
       "title": "Secret Security",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Secrets are referenced by handles/scopes rather than copied into general state.",
@@ -2959,10 +2946,9 @@
       "title": "Key Management",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Separate key material from metadata/identifiers.",
@@ -3182,10 +3168,9 @@
       "title": "Tenant Isolation",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Attach tenant scope before lookup/ranking/execution.",
@@ -3403,10 +3388,9 @@
       "title": "Privacy Engine",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Propagate privacy labels into derived data and artifacts.",
@@ -3624,10 +3608,9 @@
       "title": "Data Deletion",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Track deletion scope through replicas, indexes, caches, artifacts and backups.",
@@ -3850,10 +3833,9 @@
       "title": "Software Bill of Materials",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Bind SBOM to exact build artifact digest.",
@@ -4074,7 +4056,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Bind MBOM to immutable model artifact/version.",
@@ -4293,10 +4274,9 @@
       "title": "Service Level Objectives",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Specify SLI, target, window and excluded conditions explicitly.",
@@ -4515,10 +4495,9 @@
       "title": "Error Budgets",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Calculate budgets from authoritative SLI data and declared windows.",
@@ -4737,10 +4716,9 @@
       "title": "Observability Cardinality Control",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Declare allowed label sets and high-cardinality exceptions.",
@@ -4959,10 +4937,9 @@
       "title": "Trace Model",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Use stable operation/correlation identity across process boundaries.",
@@ -5181,10 +5158,9 @@
       "title": "Performance Profiling",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Profile before optimization and retain workload/environment identity.",
@@ -5403,10 +5379,9 @@
       "title": "Latency Budgeting",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Set percentile budgets per operation class and environment.",
@@ -5625,10 +5600,9 @@
       "title": "Cost Governor",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Reserve/charge/refund costs using durable accounting semantics.",
@@ -5847,10 +5821,9 @@
       "title": "Energy / Compute Efficiency",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Use hardware/workload-normalized measurements.",
@@ -6072,7 +6045,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Chaos experiments require bounded blast radius and abort controls.",
@@ -6298,7 +6270,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Drills must exercise real procedures/artifacts in representative environments.",
@@ -6525,7 +6496,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Map every release class to mandatory tests/evidence and allowed waivers.",
@@ -6752,7 +6722,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Define canary cohort, duration, success/failure thresholds and abort controls.",
@@ -6979,7 +6948,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Flags must have owner, default, scope, expiry and rollback semantics.",
@@ -7206,7 +7174,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Rollback plans must account for forward-written durable data.",
@@ -7433,7 +7400,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Provide fast local validation aligned with CI.",
@@ -7660,7 +7626,6 @@
       "legacy_implementation_status": "unverified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Local setup must declare required services and seeded data explicitly.",
@@ -7890,7 +7855,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Fixtures must declare scope/ownership and avoid network/clock/randomness leakage by default.",
@@ -8116,7 +8080,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Simulation must never silently invoke production effects.",
@@ -8347,7 +8310,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Fuzz parsers/validators before privileged execution boundaries.",
@@ -8578,7 +8540,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Map properties to named invariants/state machines.",
@@ -8805,7 +8766,6 @@
       "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
-      "enterprise_superiority_profile": null,
       "implementation_summary": {
         "requirements": [
           "Select candidates where concurrency/authority/recovery ambiguity justifies cost.",

@@ -113,9 +113,9 @@
       "move_tags": [
         "ai-tree:mapped",
         "migration:staged-mirror",
-        "cutover:parity-ready"
+        "cutover:owner-sensitive"
       ],
-      "move_batch": "B1-core-runtime",
+      "move_batch": "B3-owner-sensitive",
       "source_disposition": "retain_until_import_inversion_and_regression_gates",
       "volume_refs": [
         "VOL-000",
@@ -165,12 +165,13 @@
       "overlay_children": [
         "execution_authority.py"
       ],
-      "parity_exceptions": {
-        "__init__.py": {
+      "parity_exceptions": [
+        {
+          "path": "__init__.py",
           "mode": "compatibility_facade",
           "facade_required_import": "from .execution_authority import ("
         }
-      }
+      ]
     },
     {
       "id": "AIFT-PERSISTENCE",
@@ -6089,7 +6090,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "178_mapping_plus_21_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "178_mapping_plus_23_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -6884,8 +6885,8 @@
     "pending_assignment_count": 0,
     "retained_outside_ai_tree_count": 86,
     "batch_counts": {
-      "B3-owner-sensitive": 8,
-      "B1-core-runtime": 73,
+      "B3-owner-sensitive": 9,
+      "B1-core-runtime": 72,
       "B2-domain-build": 14,
       "B4-research-quarantine": 55,
       "B3-compat-convergence": 28
@@ -6895,7 +6896,7 @@
       "BASE-FRONTEND-SSR-RAF-01"
     ],
     "invariant": "Preparation metadata and move tags authorize staging only; the reconciled mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion.",
-    "native_ai_owner_count": 21
+    "native_ai_owner_count": 23
   },
   "validation_request": {
     "requested_at_utc": "2026-09-22T15:47:00Z",
@@ -7730,6 +7731,34 @@
         "VOL-412",
         "VOL-413",
         "VOL-414"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-EXECUTION-AUTHORITY-CONTRACTS",
+      "path": "skeleton/ai/runtime/contracts/execution_authority.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "volume_refs": [
+        "VOL-084",
+        "VOL-097",
+        "VOL-131",
+        "VOL-164",
+        "VOL-300"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-EXECUTION-AUTHORITY-CORE",
+      "path": "skeleton/ai/runtime/core/execution_authority.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "volume_refs": [
+        "VOL-084",
+        "VOL-097",
+        "VOL-131",
+        "VOL-164",
+        "VOL-300"
       ]
     }
   ]

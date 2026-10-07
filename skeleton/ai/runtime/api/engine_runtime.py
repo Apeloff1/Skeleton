@@ -13,6 +13,11 @@ from skeleton.api.engine_service import (
 )
 from skeleton.contracts.ai_execution import AIExecutionResult
 from skeleton.intelligence.admission_runtime import AdmissionRuntime
+from skeleton.kernel.runtime_supervision import (
+    RuntimeServiceLifecycle,
+    RuntimeSupervisionError,
+    WorkLease,
+)
 from skeleton.intelligence.execution_runtime import (
     CognitiveExecutionRuntime,
     FinalizationBindingHook,
@@ -65,6 +70,7 @@ class EngineExecutionCoordinator:
         tool_runtime: AsyncToolRuntime | None = None,
         verification_hook: VerificationHook | None = None,
         finalization_binding_hook: FinalizationBindingHook | None = None,
+        lifecycle: RuntimeServiceLifecycle | None = None,
     ) -> None:
         if not isinstance(service, EngineExecutionService):
             raise TypeError("service must be EngineExecutionService")
@@ -73,19 +79,33 @@ class EngineExecutionCoordinator:
         self.tool_runtime = tool_runtime or AsyncToolRuntime()
         self.verification_hook = verification_hook
         self.finalization_binding_hook = finalization_binding_hook
+        if lifecycle is not None and not isinstance(
+            lifecycle,
+            RuntimeServiceLifecycle,
+        ):
+            raise TypeError("lifecycle must be RuntimeServiceLifecycle")
+        self.lifecycle = lifecycle
         self._lock = asyncio.Lock()
         self._tasks: dict[str, asyncio.Task[None]] = {}
+        self._lifecycle_leases: dict[asyncio.Task[None], WorkLease] = {}
+        self._supervision_faults: list[str] = []
         self._closed = False
 
     async def ensure_started(
         self,
         command: EngineExecutionCommand,
+        *,
+        allow_starting: bool = False,
     ) -> None:
         if not isinstance(command, EngineExecutionCommand):
             raise TypeError("command must be EngineExecutionCommand")
         if self._closed:
             raise EngineExecutionCoordinatorError(
                 "engine execution coordinator is closed"
+            )
+        if self._supervision_faults:
+            raise EngineExecutionCoordinatorError(
+                "engine execution coordinator supervision is faulted"
             )
         execution_id = command.execution_request.execution_id
         if self.service.repository.result(execution_id) is not None:
@@ -95,16 +115,67 @@ class EngineExecutionCoordinator:
             existing = self._tasks.get(execution_id)
             if existing is not None and not existing.done():
                 return
-            task = asyncio.create_task(
-                self._drive(command),
-                name="engine-execution:" + execution_id,
-            )
+            if existing is not None and existing.done():
+                self._task_done(execution_id, existing)
+
+            lease = None
+            if self.lifecycle is not None:
+                try:
+                    lease = self.lifecycle.acquire_work(
+                        "engine-execution:" + execution_id,
+                        allow_starting=allow_starting,
+                    )
+                except RuntimeSupervisionError as exc:
+                    raise EngineExecutionCoordinatorError(
+                        "engine lifecycle denied execution admission"
+                    ) from exc
+
+            try:
+                task = asyncio.create_task(
+                    self._drive(command),
+                    name="engine-execution:" + execution_id,
+                )
+            except BaseException:
+                if lease is not None:
+                    self.lifecycle.release_work(lease)
+                raise
+
             self._tasks[execution_id] = task
+            if lease is not None:
+                self._lifecycle_leases[task] = lease
             task.add_done_callback(
                 lambda completed, eid=execution_id: self._task_done(
                     eid,
                     completed,
                 )
+            )
+
+    def _record_supervision_fault(self, message: str) -> None:
+        normalized = str(message).strip()[:1024]
+        if normalized and normalized not in self._supervision_faults:
+            self._supervision_faults.append(normalized)
+
+    def _release_lifecycle_lease(
+        self,
+        task: asyncio.Task[None],
+    ) -> None:
+        lease = self._lifecycle_leases.pop(task, None)
+        if lease is None or self.lifecycle is None:
+            return
+        try:
+            released = self.lifecycle.release_work(lease)
+        except RuntimeSupervisionError as exc:
+            self._record_supervision_fault(
+                "lifecycle lease release failed for "
+                + lease.work_id
+                + ": "
+                + str(exc)
+            )
+            return
+        if not released:
+            self._record_supervision_fault(
+                "lifecycle lease disappeared before task retirement: "
+                + lease.work_id
             )
 
     def _task_done(
@@ -115,6 +186,7 @@ class EngineExecutionCoordinator:
         current = self._tasks.get(execution_id)
         if current is task:
             self._tasks.pop(execution_id, None)
+        self._release_lifecycle_lease(task)
         if task.cancelled():
             return
         # Retrieve the exception so the event loop never reports an unobserved
@@ -123,6 +195,29 @@ class EngineExecutionCoordinator:
             task.exception()
         except asyncio.CancelledError:
             pass
+
+    def supervision_snapshot(self) -> dict[str, object]:
+        """Return identity-safe local supervision state for health/evidence."""
+
+        tasks = tuple(
+            sorted(
+                execution_id
+                for execution_id, task in self._tasks.items()
+                if not task.done()
+            )
+        )
+        lease_ids = tuple(
+            sorted(lease.work_id for lease in self._lifecycle_leases.values())
+        )
+        return {
+            "closed": self._closed,
+            "active_execution_ids": tasks,
+            "active_task_count": len(tasks),
+            "active_lease_ids": lease_ids,
+            "active_lease_count": len(lease_ids),
+            "supervision_faults": tuple(self._supervision_faults),
+            "faulted": bool(self._supervision_faults),
+        }
 
     async def ensure_execution(self, execution_id: str) -> None:
         stored = self.service.submissions.get_by_execution_id(
@@ -194,19 +289,64 @@ class EngineExecutionCoordinator:
                     "submission_command_missing",
                 )
                 continue
-            await self.ensure_started(stored.command)
+            await self.ensure_started(
+                stored.command,
+                allow_starting=True,
+            )
             recovered.append(execution.execution_id)
         return tuple(recovered)
 
     async def shutdown(self) -> None:
         self._closed = True
         async with self._lock:
-            tasks = tuple(self._tasks.values())
-            self._tasks.clear()
-        for task in tasks:
+            task_items = tuple(self._tasks.items())
+
+        for _execution_id, task in task_items:
             task.cancel()
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
+        if task_items:
+            await asyncio.gather(
+                *(task for _execution_id, task in task_items),
+                return_exceptions=True,
+            )
+
+        # Done callbacks normally retire exact task leases. Reconcile
+        # synchronously as well so shutdown correctness never depends on the
+        # event loop scheduling callback delivery before lifecycle STOPPED.
+        for execution_id, task in task_items:
+            self._task_done(execution_id, task)
+
+        async with self._lock:
+            stranded_tasks = tuple(
+                execution_id
+                for execution_id, task in self._tasks.items()
+                if not task.done()
+            )
+            self._tasks = {
+                execution_id: task
+                for execution_id, task in self._tasks.items()
+                if not task.done()
+            }
+
+        if stranded_tasks:
+            self._record_supervision_fault(
+                "shutdown left active tasks: " + ",".join(sorted(stranded_tasks))
+            )
+        if self._lifecycle_leases:
+            leaked = tuple(
+                sorted(
+                    lease.work_id
+                    for lease in self._lifecycle_leases.values()
+                )
+            )
+            self._record_supervision_fault(
+                "shutdown left lifecycle leases: " + ",".join(leaked)
+            )
+
+        if self._supervision_faults:
+            raise EngineExecutionCoordinatorError(
+                "engine execution coordinator shutdown supervision failed: "
+                + "; ".join(self._supervision_faults)
+            )
 
     async def _drive(
         self,

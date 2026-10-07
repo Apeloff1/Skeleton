@@ -649,7 +649,11 @@ class ServerState:
         self.operation_runtime = None
         self.intelligence = self.intelligence_core
 
-    def bind_engine_execution_service(self) -> Any:
+    def bind_engine_execution_service(
+        self,
+        *,
+        runtime_lifecycle: Any | None = None,
+    ) -> Any:
         """Bind durable engine API authority and local execution coordinator."""
 
         if self.engine_execution_service is not None:
@@ -818,6 +822,7 @@ class ServerState:
             finalization_binding_hook=(
                 self.bind_verified_memory_finalization
             ),
+            lifecycle=runtime_lifecycle,
             tool_runtime=build_engine_tool_runtime(
                 admission_runtime=execution_admission_runtime,
                 receipt_store=receipt_store,
@@ -841,16 +846,50 @@ class ServerState:
         return await coordinator.recover()
 
     async def close_engine_execution_service(self) -> None:
+        """Drain execution authority and close durable handles without masking faults."""
+
+        errors: list[BaseException] = []
         coordinator = self.engine_execution_coordinator
         if coordinator is not None:
-            await coordinator.shutdown()
+            try:
+                await coordinator.shutdown()
+            except BaseException as exc:
+                errors.append(exc)
+
         service = self.engine_execution_service
         if service is not None:
-            service.repository.close()
-            service.submissions.close()
+            for closer in (
+                service.repository.close,
+                service.submissions.close,
+            ):
+                try:
+                    closer()
+                except BaseException as exc:
+                    errors.append(exc)
+
         receipt_store = self.engine_tool_receipt_store
         if receipt_store is not None:
-            receipt_store.close()
+            try:
+                receipt_store.close()
+            except BaseException as exc:
+                errors.append(exc)
+
+        quota_ledger = self.engine_quota_ledger
+        close_quota = getattr(quota_ledger, "close", None)
+        if callable(close_quota):
+            try:
+                close_quota()
+            except BaseException as exc:
+                errors.append(exc)
+
+        pressure_ledger = self.engine_pressure_ledger
+        close_pressure = getattr(pressure_ledger, "close", None)
+        if callable(close_pressure):
+            try:
+                close_pressure()
+            except BaseException as exc:
+                errors.append(exc)
+
         self.engine_execution_coordinator = None
         self.engine_execution_service = None
         self.engine_tool_receipt_store = None
@@ -858,6 +897,13 @@ class ServerState:
         self.engine_execution_admission_runtime = None
         self.engine_quota_ledger = None
         self.engine_pressure_ledger = None
+
+        if errors:
+            kinds = ",".join(type(exc).__name__ for exc in errors[:8])
+            raise RuntimeError(
+                "engine runtime shutdown completed with supervision/cleanup "
+                f"errors ({kinds})"
+            ) from errors[0]
 
     def wire_from_genesis(self, genesis: Any) -> None:
         self.genesis = genesis
@@ -967,9 +1013,20 @@ def _gate_body_limits() -> tuple[tuple[str, int], ...]:
 
 
 def create_app() -> Any:
+    from skeleton.kernel.runtime_supervision import RuntimeServiceLifecycle
+
     fastapi = _get_fastapi()
     app = fastapi.FastAPI(title="Skeleton API", version="16.0.0", description="AI game engine / agent orchestration framework")
+    runtime_lifecycle = RuntimeServiceLifecycle("skeleton")
+    app.state.runtime_lifecycle = runtime_lifecycle
     install_error_handlers(app)
+
+    from skeleton.kernel.runtime_supervision import RuntimeAdmissionMiddleware
+    app.add_middleware(
+        RuntimeAdmissionMiddleware,
+        lifecycle=runtime_lifecycle,
+        exempt_prefixes=("/api/v1/health",),
+    )
 
     from skeleton.api.routes import router
     from skeleton.api.command_routes import router as command_router
@@ -1020,18 +1077,23 @@ def create_app() -> Any:
         state.bind_governance_registry()
         state.bind_canonical_artifact_store()
         state.bind_canonical_retrieval_index()
-        state.bind_engine_execution_service()
+        state.bind_engine_execution_service(
+            runtime_lifecycle=runtime_lifecycle,
+        )
         if _canonical_memory_mongo_configured():
             await state.bind_canonical_memory_writer()
         await state.recover_engine_executions()
+        runtime_lifecycle.mark_ready(reason="engine-recovery-complete")
 
     @app.on_event("shutdown")
     async def shutdown():
+        runtime_lifecycle.begin_drain(reason="engine-fastapi-shutdown")
         state = get_state()
         await state.close_canonical_memory_writer()
         await state.close_engine_execution_service()
         state.close_governance_registry()
         state.close_operation_runtime()
+        runtime_lifecycle.mark_stopped(reason="engine-durable-runtimes-drained")
 
     @app.get("/")
     async def root():

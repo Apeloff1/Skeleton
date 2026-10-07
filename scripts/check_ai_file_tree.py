@@ -288,6 +288,40 @@ def _owned_native_ai_path(
     return candidates[0][2]
 
 
+def _native_owner_covers_path(native_owners: list[object], path_value: str) -> bool:
+    """Return whether a validated native-owner declaration covers one AI path."""
+    for raw in native_owners:
+        if not isinstance(raw, dict):
+            continue
+        owned_path = raw.get("path")
+        kind = raw.get("kind")
+        if not isinstance(owned_path, str):
+            continue
+        if kind == "file" and path_value == owned_path:
+            return True
+        if kind == "tree" and _path_within(path_value, owned_path):
+            return True
+    return False
+
+
+def _mapping_declares_overlay(mappings: list[object], path_value: str) -> bool:
+    """Return whether path_value is explicitly carved out as a mapping overlay."""
+    for raw in mappings:
+        if not isinstance(raw, dict):
+            continue
+        destination = raw.get("destination")
+        overlays = raw.get("overlay_children")
+        if not isinstance(destination, str) or not isinstance(overlays, list):
+            continue
+        for overlay in overlays:
+            if not isinstance(overlay, str) or not overlay:
+                continue
+            overlay_path = f"{destination.rstrip('/')}/{overlay}"
+            if path_value == overlay_path or _path_within(path_value, overlay_path):
+                return True
+    return False
+
+
 def _mappings_cover_planned_source(
     mappings: list[object],
     planned_source: str,
@@ -359,6 +393,9 @@ def validate() -> list[str]:
     mappings = data.get("mappings")
     if not isinstance(mappings, list) or len(mappings) < 10:
         return errors + ["mappings must contain the governed consolidation set"]
+    native_owner_declarations = data.get("native_ai_owners", [])
+    if not isinstance(native_owner_declarations, list):
+        native_owner_declarations = []
 
     move_tag_contract = data.get("move_tag_contract")
     if not isinstance(move_tag_contract, dict):
@@ -570,9 +607,14 @@ def validate() -> list[str]:
                             for other in declared_sources
                             if other != src
                         )
+                        native_governed = _native_owner_covers_path(
+                            native_owner_declarations,
+                            full_destination,
+                        )
                         if (
                             full_destination not in declared_destinations
                             and not source_governed
+                            and not native_governed
                         ):
                             errors.append(
                                 f"{mid}: overlay child is not independently governed: "
@@ -717,7 +759,11 @@ def validate() -> list[str]:
             errors.append(f"{owner_id}: native tree missing: {path_value}")
         if kind == "file" and residual_only:
             errors.append(f"{owner_id}: file owner cannot be residual_only")
-        if any(_path_within(path_value, destination) for destination in declared_destinations):
+        overlaps_mapping = any(
+            _path_within(path_value, destination)
+            for destination in declared_destinations
+        )
+        if overlaps_mapping and not _mapping_declares_overlay(mappings, path_value):
             errors.append(f"{owner_id}: native owner overlaps a more-authoritative mapping destination")
         mapped_children = [
             destination
