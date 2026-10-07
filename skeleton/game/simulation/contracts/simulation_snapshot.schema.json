@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-10:simulation_snapshot:v1",
+  "title": "FLGB-10 simulation snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tick",
+    "state_digest",
+    "ecs_digest",
+    "physics_digest",
+    "rng_digest",
+    "prior_snapshot_digest"
+  ],
+  "properties": {
+    "tick": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "state_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "ecs_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "physics_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "rng_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "prior_snapshot_digest": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}
