@@ -30,6 +30,12 @@ from .native_llm_runtime import (
     NativeLLMRuntime,
 )
 from .runtime_checkpoint import validate_model_snapshot
+from .runtime_service import (
+    CancellationToken,
+    NativeModelService,
+    NativeServiceError,
+    NativeServiceResult,
+)
 from .runtime_contracts import (
     BatchGenerationRequest,
     DevicePolicy,
@@ -61,6 +67,7 @@ __all__ = [
     "ALLOWED_TRANSITIONS",
     "BatchGenerationRequest",
     "BatchGenerationResult",
+    "CancellationToken",
     "BatchRequest",
     "DeviceDescriptor",
     "DevicePolicy",
@@ -76,6 +83,9 @@ __all__ = [
     "ModelRegistry",
     "ModelRuntimeError",
     "NativeLLMRuntime",
+    "NativeModelService",
+    "NativeServiceError",
+    "NativeServiceResult",
     "NativeTokenizer",
     "PreparedText",
     "Placement",
