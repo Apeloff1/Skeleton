@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
+import importlib
 import json
 import math
 from typing import Dict, Iterable
@@ -200,9 +201,35 @@ class SLOAssessment:
         })
 
 
+def _trusted_observability_twin(
+    value: object,
+    local_type: type[object],
+    *,
+    twin_name: str,
+) -> bool:
+    """Accept only the local typed contract or its governed byte-parity twin."""
+
+    if isinstance(value, local_type):
+        return True
+    twin_module = (
+        "skeleton.ai.runtime.observability.slo"
+        if __name__ == "skeleton.observability.slo"
+        else "skeleton.observability.slo"
+    )
+    try:
+        module = importlib.import_module(twin_module)
+        twin_type = getattr(module, twin_name)
+    except (ImportError, AttributeError):
+        return False
+    return isinstance(twin_type, type) and isinstance(value, twin_type)
+
+
 def assess_slo(*, slo: SLO, sli: SLI) -> SLOAssessment:
-    if not isinstance(slo, SLO) or not isinstance(sli, SLI):
-        raise TypeError("slo and sli must be typed SLO/SLI contracts")
+    if (
+        not _trusted_observability_twin(slo, SLO, twin_name="SLO")
+        or not _trusted_observability_twin(sli, SLI, twin_name="SLI")
+    ):
+        raise TypeError("slo and sli must be trusted typed SLO/SLI contracts")
     if sli.slo_id != slo.slo_id:
         _fail("SLI belongs to a different SLO")
     if (
