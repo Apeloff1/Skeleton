@@ -1219,3 +1219,30 @@ def test_temporal_evolution_chain_rejects_multiple_claims(native_model):
     b = TemporalEvidence("b", "claim:b", sha256(b"b").hexdigest(), signal, 900_000, True)
     with pytest.raises(TokenizerContractError, match="one claim"):
         build_temporal_evolution_chain((a, b))
+
+
+def test_temporal_evolution_resolves_exact_historical_version(native_model):
+    from hashlib import sha256
+    from skeleton.ai.model_runtime.text_pipeline import TemporalEvidence, TextTokenPipeline, build_temporal_evolution_chain, resolve_temporal_evolution_at
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    old = TemporalEvidence("old", "claim:resolve", sha256(b"v1").hexdigest(), pipeline.temporal_signal(source_year=1980, observed_year=1980, knowledge_cutoff_year=2026, valid_from_year=1980, valid_to_year=1999), 900_000, True)
+    new = TemporalEvidence("new", "claim:resolve", sha256(b"v2").hexdigest(), pipeline.temporal_signal(source_year=2000, observed_year=2000, knowledge_cutoff_year=2026, valid_from_year=2000), 900_000, True)
+    chain = build_temporal_evolution_chain((new, old))
+    assert resolve_temporal_evolution_at(chain, 1987).evidence_digest == old.digest
+    assert resolve_temporal_evolution_at(chain, 2026).evidence_digest == new.digest
+
+
+def test_temporal_evolution_resolution_fails_on_gap_or_overlap(native_model):
+    from hashlib import sha256
+    from skeleton.ai.model_runtime.text_pipeline import TemporalEvidence, TextTokenPipeline, build_temporal_evolution_chain, resolve_temporal_evolution_at
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    a = TemporalEvidence("a", "claim:gap", sha256(b"a").hexdigest(), pipeline.temporal_signal(source_year=1980, observed_year=1980, knowledge_cutoff_year=2026, valid_from_year=1980, valid_to_year=1989), 900_000, True)
+    b = TemporalEvidence("b", "claim:gap", sha256(b"b").hexdigest(), pipeline.temporal_signal(source_year=2000, observed_year=2000, knowledge_cutoff_year=2026, valid_from_year=2000), 900_000, True)
+    with pytest.raises(TokenizerContractError, match="no temporal version"):
+        resolve_temporal_evolution_at(build_temporal_evolution_chain((a, b)), 1995)
+    c = TemporalEvidence("c", "claim:overlap", sha256(b"c").hexdigest(), pipeline.temporal_signal(source_year=1980, observed_year=1980, knowledge_cutoff_year=2026, valid_from_year=1980, valid_to_year=2005), 900_000, True)
+    d = TemporalEvidence("d", "claim:overlap", sha256(b"d").hexdigest(), pipeline.temporal_signal(source_year=2000, observed_year=2000, knowledge_cutoff_year=2026, valid_from_year=2000), 900_000, True)
+    with pytest.raises(TokenizerContractError, match="ambiguous temporal versions"):
+        resolve_temporal_evolution_at(build_temporal_evolution_chain((c, d)), 2001)
