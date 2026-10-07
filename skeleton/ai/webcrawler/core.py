@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import heapq
+from email.utils import parsedate_to_datetime
 import html
 import ipaddress
 import json
@@ -405,14 +406,18 @@ class CrawlEngine:
         self._queued.add(item.url)
 
     @staticmethod
-    def _retry_after(headers: Mapping[str, str]) -> float | None:
+    def _retry_after(headers: Mapping[str, str], *, now: float | None = None) -> float | None:
         raw = headers.get("retry-after")
         if raw is None:
             return None
         try:
             return max(0.0, float(raw.strip()))
         except (ValueError, TypeError):
-            return None
+            try:
+                target=parsedate_to_datetime(raw.strip()).timestamp()
+                return max(0.0,target-(time.time() if now is None else now))
+            except (ValueError,TypeError,OverflowError):
+                return None
 
     def load_robots(self, url: str) -> bool:
         """Load an origin's robots policy once, charging the crawl budget."""
@@ -424,15 +429,11 @@ class CrawlEngine:
             return False
         robots_url = origin + "/robots.txt"
         try:
-            response = self.fetcher.fetch(
-                robots_url, user_agent=self.policy.user_agent,
-                max_bytes=min(self.policy.max_response_bytes, 512_000),
-            )
+            from .redirects import fetch_robots_with_policy
+            response = fetch_robots_with_policy(self, robots_url, now=time.time())
         except Exception:
-            self.budget.requests += 1
             return False
         body = response.body[:512_000]
-        self.budget.charge_response(len(body), accepted=False)
         if response.status in {404, 410}:
             self.robots.install(origin, "")
             return True
@@ -469,15 +470,15 @@ class CrawlEngine:
         try:
             from .redirects import fetch_with_policy
             response = fetch_with_policy(self, item.url, now=now)
-        except Exception:
-            self.budget.requests += 1
+        except Exception as exc:
+            from .redirects import RedirectFetchError
+            if isinstance(exc,RedirectFetchError) and exc.request_started:self.budget.requests += 1
             self._retry(item, now=now)
             return None
 
         body = response.body[: self.policy.max_response_bytes]
         if response.status in self.policy.retry_statuses:
-            self.budget.charge_response(len(body), accepted=False)
-            self._retry(item, now=now, delay=self._retry_after(response.headers))
+            self._retry(item, now=now, delay=self._retry_after(response.headers,now=response.fetched_at))
             return None
         ctype = response.headers.get("content-type", "").split(";", 1)[0].lower()
         accepted_type = ctype in self.policy.allowed_content_types
@@ -487,7 +488,10 @@ class CrawlEngine:
             item.url,
         ) if successful else None
         novel = bool(doc and not self.store.has_content(doc.content_hash))
-        self.budget.charge_response(len(body), accepted=novel)
+        if not hasattr(self.fetcher,"fetch_once"):
+            self.budget.charge_response(len(body), accepted=novel)
+        elif novel:
+            self.budget.documents += 1
         if not doc:
             return None
         self.store.put(doc)
