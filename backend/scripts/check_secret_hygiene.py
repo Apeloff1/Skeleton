@@ -280,10 +280,21 @@ def violations(path: Path) -> list[str]:
         with path.open("r", encoding="utf-8", newline="") as handle:
             number = 1
             carry = ""
+            logical_line_bytes = 0
             while True:
                 fragment = handle.readline(SCAN_FRAGMENT_CHARS)
                 if not fragment:
                     break
+
+                # A tracked machine artifact may contain a very long logical
+                # line. Keep scanning bounded and fail closed instead of
+                # silently exempting material beyond the configured byte cap.
+                logical_line_bytes += len(fragment.encode("utf-8"))
+                if logical_line_bytes > MAX_FILE_BYTES:
+                    return [
+                        f"{label}:{number}: scan failure: exceeds "
+                        f"{MAX_FILE_BYTES}-byte secret-scan line limit"
+                    ]
 
                 combined = carry + fragment
                 findings.extend(_scan_secret_fragment(combined, label, number))
@@ -297,6 +308,7 @@ def violations(path: Path) -> list[str]:
                     carry = combined[-SCAN_OVERLAP_CHARS:]
                 else:
                     carry = ""
+                    logical_line_bytes = 0
                     number += 1
     except UnicodeError as exc:
         return [f"{label}: read failure: {type(exc).__name__}"]
