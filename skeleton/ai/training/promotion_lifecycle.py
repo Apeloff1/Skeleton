@@ -26,10 +26,11 @@ class RollbackProof:
     restored_model_digest:str
     verifier_id:str
     verified:bool
+    executed:bool=False
     def __post_init__(self):
         for n in ("admission_digest","checkpoint_digest","restored_model_digest"): require_digest(getattr(self,n),n)
         require_id(self.verifier_id,"verifier_id")
-        if not isinstance(self.verified,bool): raise LifecycleProofError("verified must be boolean")
+        if not isinstance(self.verified,bool) or not isinstance(self.executed,bool): raise LifecycleProofError("rollback flags must be boolean")
     @property
     def digest(self): return digest_json(self.__dict__)
 
@@ -47,7 +48,7 @@ def extend_with_promotion(
     if admission.admitted_model_digest!=candidate.weights_digest: raise LifecycleProofError("runtime model does not equal candidate weights")
     if promotion.rollback_digest!=admission.checkpoint_digest: raise LifecycleProofError("promotion rollback checkpoint mismatch")
     if rollback.admission_digest!=admission.digest or rollback.checkpoint_digest!=admission.checkpoint_digest: raise LifecycleProofError("rollback/admission mismatch")
-    if not rollback.verified or rollback.restored_model_digest!=admission.prior_model_digest: raise LifecycleProofError("rollback does not restore prior model")
+    if not rollback.verified or rollback.restored_model_digest!=admission.prior_model_digest: raise LifecycleProofError("rollback is not proven ready for prior model")
     if evaluation.independent_verifier==admission.admission_authority: raise LifecycleProofError("evaluation and runtime admission authorities must be separate")
     prev=proof.stages[-1].digest
     extra=(
@@ -55,7 +56,7 @@ def extend_with_promotion(
       LifecycleStage("independent-mirror-evaluation",evaluation.candidate_digest,digest_json(evaluation.__dict__),None),
       LifecycleStage("qualified-promotion",promotion.candidate_digest,promotion.digest,None),
       LifecycleStage("atomic-runtime-admission",admission.admitted_model_digest,admission.digest,None),
-      LifecycleStage("verified-rollback",rollback.restored_model_digest,rollback.digest,None),
+      LifecycleStage("rollback-executed" if rollback.executed else "rollback-ready",rollback.restored_model_digest,rollback.digest,None),
     )
     linked=[]; p=prev
     for s in extra:
