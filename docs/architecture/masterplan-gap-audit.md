@@ -1582,3 +1582,32 @@ Research evidence now models signals by the year the evidence explicitly discuss
 - regressions cover year extraction/bucketing, temporal coverage gaps, year-directed frontier priority, gap-preserving deltas and diversity-first ranking.
 
 Advanced follow-up: separate explicit subject-year extraction from stronger date semantics (published_at/event_at/valid_from), add decade/regime segmentation, and use year-coverage objectives inside federated provider discovery rather than only frontier scoring.
+
+
+### 2026-10-07 decade/regime signal intelligence tranche
+
+The year-signal plane now composes into decade-scale regime intelligence without discarding annual resolution:
+- DecadeSignalSeries aggregates year signals into years-observed coverage density, observation volume, host-year corroboration, observation-weighted relevance/source quality, positive/negative counts and net polarity;
+- decade-over-decade deltas measure coverage, corroboration, volume, relevance, quality and polarity shifts while preserving missing regimes;
+- undercovered_decades exposes absent/sparse historical regimes against a configurable coverage threshold;
+- EvidenceSet exposes decade signals and coverage gaps directly;
+- frontier priority can target missing decades in addition to exact missing years;
+- FederatedDiscovery.discover_temporal promotes candidates whose URL/title/snippet explicitly match target decades, allowing historical coverage objectives to influence source acquisition before crawling;
+- regressions cover decade aggregation, weighted metrics, absent regimes, decade frontier targeting and provider-level temporal prioritization.
+
+Advanced follow-up: infer regime boundaries from change points rather than fixed calendar decades, separate event-year/publication-year semantics, quantify source survival/archive bias by decade, and build cross-decade contradiction persistence so claims can be tracked as stable, reversed or cyclic across historical regimes.
+
+
+### 2026-10-07 learned historical regime intelligence tranche
+
+Temporal research now extends substantially beyond fixed calendar decades:
+- RegimeDetector derives structural change points from adjacent-year shifts in polarity, source quality, relevance and independent-source coverage;
+- missing-year gaps split regimes without fabricating a measured change point;
+- learned regimes preserve their explicit year membership, mean polarity, quality/relevance and internal coverage strength;
+- regime trajectories classify emerging, stable, strengthening, weakening, transitioning, reversed and rediscovered signal behavior;
+- HistoricalBiasAnalyzer scores sparse-year coverage, source concentration and low-quality evidence to expose archive/survivorship-sensitive historical buckets;
+- cross-regime contradiction history measures independent positive/negative host participation, contestation balance and whether disagreement persists across multiple learned regimes;
+- EvidenceSet exposes learned regimes, trajectory, historical bias and contradiction persistence as first-class research outputs;
+- focused regressions cover structural splits, gap segmentation, reversal classification and high-risk historical evidence.
+
+This transforms decade signals from descriptive calendar summaries into a regime-aware historical reasoning plane. Advanced next work: richer event/publication/valid-time extraction, statistically calibrated change-point thresholds, bootstrap uncertainty around regime boundaries, and active acquisition policies that prioritize high-bias or persistently contested historical regimes.
