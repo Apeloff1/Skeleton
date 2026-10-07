@@ -1,0 +1,24 @@
+{
+  "accountability_id": "ACC-AIQ-S0-GOV-01",
+  "event_type": "implementation_superseded",
+  "actor_id": "chatgpt:gpt-5.6-sol",
+  "actor_type": "agent",
+  "role": "implementation-agent",
+  "signed_at_utc": "2026-09-21T17:37:44Z",
+  "git_sha": "2317eebe1e982f953b8956dc47d3ceb781fe91a1",
+  "supersedes_git_sha": "740954febacd5a52a645e19edc9d8401f8c39037",
+  "signature_method": "github_identity",
+  "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/2317eebe1e982f953b8956dc47d3ceb781fe91a1",
+  "statement": "Supersede GOV-01 implementation attestation after adding retry-safe idempotent governance registration and identity-conflict rejection.",
+  "evidence_refs": [
+    "https://github.com/Apeloff1/Skeleton/commit/4ee378fc3473814d0580c95185652f5a18caddf3",
+    "https://github.com/Apeloff1/Skeleton/commit/6253a0436444039b8485f47aa50062116eec3922",
+    "https://github.com/Apeloff1/Skeleton/commit/2317eebe1e982f953b8956dc47d3ceb781fe91a1",
+    "skeleton/vault/data_lifecycle.py",
+    "skeleton/vault/governance_registry.py",
+    "skeleton/testing/test_governance_registry.py"
+  ],
+  "from_status": "evidence_pending",
+  "to_status": "evidence_pending",
+  "human_signature": false
+}

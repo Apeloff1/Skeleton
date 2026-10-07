@@ -1,0 +1,27 @@
+{
+  "schema_version": "ai-chat-attachments/v1",
+  "status": "implemented_candidate",
+  "prepared_at_utc": "2026-10-06T01:35:00Z",
+  "prepared_by": "chatgpt:gpt-5.6-sol",
+  "scope": "governed AI-chat attachment admission, quarantine, content addressing, and untrusted evidence projection",
+  "invariants": [
+    "raw attachment bytes terminate at the attachment admission boundary",
+    "byte signatures rather than filename or claimed MIME determine supported format",
+    "claimed MIME or filename extension disagreement fails closed",
+    "file and batch budgets are enforced before extraction or model exposure",
+    "admitted attachments are content addressed by sha256",
+    "quarantined attachments cannot enter context",
+    "attachment extracted text is always projected as untrusted evidence",
+    "multimodal ingestion requires matching digest size media type and format",
+    "attachment admission grants no tool or execution authority"
+  ],
+  "files": {
+    "module": "skeleton/ai/assistant/attachments.py",
+    "tests": "skeleton/testing/test_ai_chat_attachments.py",
+    "validator": "scripts/check_ai_chat_attachments.py",
+    "independent_verifier": "scripts/verify_ai_chat_attachments.py",
+    "workflow": ".github/workflows/ai-chat-attachments-closure.yml",
+    "plan": "docs/plan/AI_CHAT_MASTERPLAN_2026-10-06.md"
+  },
+  "promotion_rule": "implemented candidate only; exact-head regression and independent verification must pass before qualification"
+}

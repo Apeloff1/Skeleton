@@ -1,0 +1,108 @@
+name: P1 AC-01 AC-08 Binding Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+      - p1/closure-ac19-ac23-509-4-20260930
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/p1_risk_evidence_bindings.json"
+      - "tests/test_p1_adversarial_ac01_ac08_binding.py"
+      - "tests/test_p1_adversarial_ac19_ac23_binding.py"
+      - "tests/test_p1_adversarial_ac16_binding.py"
+      - "tests/test_p1_adversarial_ac17_binding.py"
+      - "tests/test_p1_adversarial_wave2_bindings.py"
+      - "tests/test_p1_adversarial_wave3_bindings.py"
+      - "tests/test_p1_risk_evidence_reconciliation.py"
+      - ".github/workflows/p1-ac01-ac08-binding.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-ac01-ac08-binding-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify governed AC-01 and AC-08 bindings
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ env.EXPECTED_SHA }}
+
+      - name: Assert exact head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e .
+          "pytest>=8,<9"
+
+      - name: Run governed binding regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_p1_adversarial_ac01_ac08_binding.py
+          tests/test_p1_adversarial_ac19_ac23_binding.py
+          tests/test_p1_adversarial_ac16_binding.py
+          tests/test_p1_adversarial_ac17_binding.py
+          tests/test_p1_adversarial_wave2_bindings.py
+          tests/test_p1_adversarial_wave3_bindings.py
+          tests/test_p1_risk_evidence_reconciliation.py
+
+      - name: Reconcile exact 513 resolved 0 blocking frontier
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-ac01-ac08-binding
+          python scripts/reconcile_p1_risk_evidence.py             --evaluated-at "2026-10-01T12:00:00+00:00"             --out .p1-ac01-ac08-binding/reconciliation.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(
+              Path(".p1-ac01-ac08-binding/reconciliation.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          expected = {
+              "binding_count": 513,
+              "resolved_count": 513,
+              "unresolved_blocking_count": 0,
+              "unclassified_count": 0,
+          }
+          for field, value in expected.items():
+              if report[field] != value:
+                  raise SystemExit(
+                      f"AC-01/AC-08 frontier drift: {field}={report[field]!r}"
+                  )
+          if report["disposition_counts"] != {"evidence": 513}:
+              raise SystemExit("AC-01/AC-08 disposition frontier drift")
+
+          residual = {
+              row["obligation"]["source_ref"]
+              for row in report["records"]
+              if not row["evaluation"]["resolved"]
+              and row["obligation"]["kind"] == "adversarial"
+          }
+          if residual:
+              raise SystemExit(
+                  f"AC-01/AC-08 residual axis drift: {sorted(residual)!r}"
+              )
+          PY

@@ -1,0 +1,132 @@
+name: P2 Profile-Gated Acceleration
+
+on:
+  pull_request:
+    branches:
+      - main
+      - feat/p2-quality-final-assembly
+      - fix/p2-reconcile-landed-lanes
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/acceleration_policy.json"
+      - "machine/ai_master_plan.json"
+      - "skeleton/native/**"
+      - "machine/ai_file_tree.json"
+      - "java-accelerators/**"
+      - "skeleton/ai/simulation/physics/jvm_broadphase_accelerator.py"
+      - "skeleton/simulation/physics/jvm_broadphase_accelerator.py"
+      - "skeleton/ai/runtime/observability/jvm_accelerator.py"
+      - "skeleton/observability/jvm_accelerator.py"
+      - "skeleton/ai/runtime/memory/jvm_vector_accelerator.py"
+      - "skeleton/memory/jvm_vector_accelerator.py"
+      - "skeleton/ai/runtime/native/**"
+      - "scripts/check_p2_acceleration.py"
+      - "scripts/profile_p2_acceleration.py"
+      - "scripts/record_p2_acceleration_profile.py"
+      - "tests/test_p2_acceleration_control.py"
+      - "tests/test_p2_acceleration_selection.py"
+      - "tests/test_p2_acceleration_protocol.py"
+      - "tests/test_p2_acceleration_profiling.py"
+      - "tests/test_p2_acceleration_benchmarks.py"
+      - "tests/test_p2_acceleration_receipts.py"
+      - "tests/test_p2_acceleration_isolation.py"
+      - "skeleton/testing/test_native_abi.py"
+      - "skeleton/testing/test_native_fallback.py"
+      - "docs/architecture/P2_PROFILE_GATED_ACCELERATION.md"
+      - ".github/workflows/p2-profile-gated-acceleration.yml"
+  push:
+    branches:
+      - main
+      - feat/p2-profile-gated-acceleration
+    paths:
+      - "machine/acceleration_policy.json"
+      - "machine/ai_master_plan.json"
+      - "skeleton/native/**"
+      - "machine/ai_file_tree.json"
+      - "java-accelerators/**"
+      - "skeleton/ai/simulation/physics/jvm_broadphase_accelerator.py"
+      - "skeleton/simulation/physics/jvm_broadphase_accelerator.py"
+      - "skeleton/ai/runtime/observability/jvm_accelerator.py"
+      - "skeleton/observability/jvm_accelerator.py"
+      - "skeleton/ai/runtime/memory/jvm_vector_accelerator.py"
+      - "skeleton/memory/jvm_vector_accelerator.py"
+      - "skeleton/ai/runtime/native/**"
+      - "scripts/check_p2_acceleration.py"
+      - "scripts/profile_p2_acceleration.py"
+      - "tests/test_p2_acceleration_control.py"
+      - "tests/test_p2_acceleration_selection.py"
+      - "tests/test_p2_acceleration_protocol.py"
+      - "tests/test_p2_acceleration_profiling.py"
+      - "tests/test_p2_acceleration_benchmarks.py"
+      - "tests/test_p2_acceleration_isolation.py"
+      - "docs/architecture/P2_PROFILE_GATED_ACCELERATION.md"
+      - ".github/workflows/p2-profile-gated-acceleration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p2-profile-gated-acceleration-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-acceleration-control:
+    name: Validate profile-gated acceleration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: "."
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install repository runtime
+        run: >-
+          python -m pip install
+          --disable-pip-version-check
+          --no-input
+          -e .
+
+      - name: Validate acceleration policy
+        run: python scripts/check_p2_acceleration.py --json
+
+      - name: Run selection, isolation and protocol regressions
+        run: >-
+          python -m unittest -v
+          tests.test_p2_acceleration_control
+          tests.test_p2_acceleration_selection
+          tests.test_p2_acceleration_protocol
+          tests.test_p2_acceleration_profiling
+          tests.test_p2_acceleration_benchmarks
+          tests.test_p2_acceleration_receipts
+          tests.test_p2_acceleration_isolation
+
+      - name: Run VOL-032 ABI and fallback regressions
+        run: >-
+          python -m pytest -q
+          skeleton/testing/test_native_abi.py
+          skeleton/testing/test_native_fallback.py
+
+      - name: Profile VOL-032 native vector candidate
+        run: >-
+          python scripts/profile_p2_acceleration.py
+          --candidate ACCEL-NATIVE-VECTOR
+          --repeat 5
+          --evidence-id vol032-native-vector-exact-head
+          --output /tmp/vol032-native-vector.json
+
+      - name: Validate measured VOL-032 receipt ingestion without activation
+        run: >-
+          python scripts/record_p2_acceleration_profile.py
+          --receipt /tmp/vol032-native-vector.json
+          --output /tmp/vol032-policy-evaluated.json

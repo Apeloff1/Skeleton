@@ -1,0 +1,22 @@
+{
+  "accountability_id": "ACC-AIQ-S0-GOV-01",
+  "event_type": "implementation_superseded",
+  "actor_id": "chatgpt:gpt-5.6-sol",
+  "actor_type": "agent",
+  "role": "implementation-agent",
+  "signed_at_utc": "2026-09-21T17:35:47Z",
+  "git_sha": "740954febacd5a52a645e19edc9d8401f8c39037",
+  "supersedes_git_sha": "74243c2ac41b40040dce059d9fdb9416dce03ada",
+  "signature_method": "github_identity",
+  "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/740954febacd5a52a645e19edc9d8401f8c39037",
+  "statement": "Supersede the prior GOV-01 implementation attestation after hardening canonical write registration against scalar-string iterable ambiguity.",
+  "evidence_refs": [
+    "https://github.com/Apeloff1/Skeleton/commit/30415b23a06c577d81005f427221b337763d93ea",
+    "https://github.com/Apeloff1/Skeleton/commit/740954febacd5a52a645e19edc9d8401f8c39037",
+    "skeleton/vault/governance_registry.py",
+    "skeleton/testing/test_governance_registry.py"
+  ],
+  "from_status": "evidence_pending",
+  "to_status": "evidence_pending",
+  "human_signature": false
+}

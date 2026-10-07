@@ -1,0 +1,287 @@
+{
+  "schema_version": "xai-grok-oss-assimilation/v1",
+  "status": "research-snapshots-plus-clean-room-adapters",
+  "prepared_at_utc": "2026-09-25T21:00:00Z",
+  "stacked_on": {
+    "pr": 2017,
+    "branch": "build/openai-oss-assimilation-20260925",
+    "head_sha": "b6c764aad4a835e1c8981d0de968321666925409"
+  },
+  "authority_rules": [
+    "all copied upstream source remains non-executable research material",
+    "every copied source is bound to an exact upstream commit and Git blob",
+    "runtime code uses bounded clean-room adapters and optional package imports",
+    "xAI provider objects never become canonical Skeleton durable state",
+    "xAI server-side tools are disabled by default",
+    "remote MCP requires HTTPS and an explicit tool-name allowlist",
+    "provider credentials are ephemeral inputs and never part of persisted provider config",
+    "sensitive xAI SDK telemetry attributes are disabled unless explicitly enabled",
+    "Grok-1 weights are never committed and implicit model download is disabled",
+    "AGPL Grok prompts and custom-license xAI Cookbook source are not copied"
+  ],
+  "sources": {
+    "grok-1": {
+      "repository": "xai-org/grok-1",
+      "commit_sha": "7050ed204b8206bb8645c7b7bbef7252f79561b0",
+      "license_expression": "Apache-2.0",
+      "disposition": "runtime_admitted",
+      "snapshot_root": "skeleton/ai/research/external/xAI/grok-1",
+      "license_evidence_path": "skeleton/ai/research/external/xAI/grok-1/README.md.txt",
+      "package_name": null,
+      "package_version": null,
+      "minimum_python": null,
+      "files": [
+        {
+          "source_path": "README.md",
+          "upstream_blob_sha": "f501a07e03a00d3efff10abf1542a86e94918e59",
+          "destination_path": "skeleton/ai/research/external/xAI/grok-1/README.md.txt"
+        },
+        {
+          "source_path": "model.py",
+          "upstream_blob_sha": "87d700d9b5fde6d86dda2883192861195b7312ae",
+          "destination_path": "skeleton/ai/research/external/xAI/grok-1/model.py.txt"
+        },
+        {
+          "source_path": "runners.py",
+          "upstream_blob_sha": "452c14290f6b7b0be395898748dadce44ffe04c9",
+          "destination_path": "skeleton/ai/research/external/xAI/grok-1/runners.py.txt"
+        },
+        {
+          "source_path": "run.py",
+          "upstream_blob_sha": "f1e157a4a959ed8dddecabec754d11e1c9fdfb8c",
+          "destination_path": "skeleton/ai/research/external/xAI/grok-1/run.py.txt"
+        },
+        {
+          "source_path": "requirements.txt",
+          "upstream_blob_sha": "a61268713c66e7fca49b8b329552931cc7ceff98",
+          "destination_path": "skeleton/ai/research/external/xAI/grok-1/requirements.txt.txt"
+        }
+      ]
+    },
+    "grok-build": {
+      "repository": "xai-org/grok-build",
+      "commit_sha": "f0e3be1100ef5252488e3be8bb0e91cf68d8c305",
+      "license_expression": "Apache-2.0",
+      "disposition": "runtime_admitted",
+      "snapshot_root": "skeleton/ai/research/external/xAI/grok-build",
+      "license_evidence_path": "skeleton/ai/research/external/xAI/grok-build/LICENSE.upstream.txt",
+      "package_name": null,
+      "package_version": null,
+      "minimum_python": null,
+      "files": [
+        {
+          "source_path": "LICENSE",
+          "upstream_blob_sha": "90b1793cf8eb2d6444863591e8405ecc707dc62d",
+          "destination_path": "skeleton/ai/research/external/xAI/grok-build/LICENSE.upstream.txt"
+        },
+        {
+          "source_path": "SOURCE_REV",
+          "upstream_blob_sha": "fd1ae8740fdfdcf3ec3c1375451ed0b7db9d1eec",
+          "destination_path": "skeleton/ai/research/external/xAI/grok-build/SOURCE_REV.txt"
+        },
+        {
+          "source_path": "README.md",
+          "upstream_blob_sha": "4569db83fe4fee02ba656f8eaa52db22e43e8e63",
+          "destination_path": "skeleton/ai/research/external/xAI/grok-build/README.md.txt"
+        },
+        {
+          "source_path": "crates/common/xai-tool-runtime/src/context.rs",
+          "upstream_blob_sha": "3f5a191039d71947a57c23c33a1daf23a8fa7276",
+          "destination_path": "skeleton/ai/research/external/xAI/grok-build/crates/common/xai-tool-runtime/src/context.rs.txt"
+        },
+        {
+          "source_path": "crates/codegen/xai-grok-workspace/src/mcp_claim.rs",
+          "upstream_blob_sha": "e748d1814ecd61f8e9545218beed5adb39a5d7c2",
+          "destination_path": "skeleton/ai/research/external/xAI/grok-build/crates/codegen/xai-grok-workspace/src/mcp_claim.rs.txt"
+        },
+        {
+          "source_path": "crates/codegen/xai-grok-workspace/src/session/checkpoint_store.rs",
+          "upstream_blob_sha": "5980b35fb6654bcb1d534ca9b0dcbe7bd73029a2",
+          "destination_path": "skeleton/ai/research/external/xAI/grok-build/crates/codegen/xai-grok-workspace/src/session/checkpoint_store.rs.txt"
+        },
+        {
+          "source_path": "crates/codegen/xai-grok-workspace/src/permission/hub_gate.rs",
+          "upstream_blob_sha": "647b3be58c59aea3fa1e8f678e07e95535986ea1",
+          "destination_path": "skeleton/ai/research/external/xAI/grok-build/crates/codegen/xai-grok-workspace/src/permission/hub_gate.rs.txt"
+        },
+        {
+          "source_path": "crates/codegen/xai-grok-mcp/src/mcp_http_client.rs",
+          "upstream_blob_sha": "f69aaf15c17d2cd1261bf0ac63f42f2d057c9a43",
+          "destination_path": "skeleton/ai/research/external/xAI/grok-build/crates/codegen/xai-grok-mcp/src/mcp_http_client.rs.txt"
+        }
+      ]
+    },
+    "grok-build-plugin-cc": {
+      "repository": "xai-org/grok-build-plugin-cc",
+      "commit_sha": "92b76a670713335229644e94add15ab40c80e547",
+      "license_expression": "Apache-2.0",
+      "disposition": "runtime_admitted",
+      "snapshot_root": "skeleton/ai/research/external/xAI/grok-build-plugin-cc",
+      "license_evidence_path": "skeleton/ai/research/external/xAI/grok-build-plugin-cc/LICENSE.upstream.txt",
+      "package_name": null,
+      "package_version": null,
+      "minimum_python": null,
+      "files": [
+        {
+          "source_path": "LICENSE",
+          "upstream_blob_sha": "d0be6cdcf06cb8b67f7471b4a687cd9c434a2526",
+          "destination_path": "skeleton/ai/research/external/xAI/grok-build-plugin-cc/LICENSE.upstream.txt"
+        },
+        {
+          "source_path": "package.json",
+          "upstream_blob_sha": "caf0d3e9d282c7f21d3ed9e441d2b642cd6a7859",
+          "destination_path": "skeleton/ai/research/external/xAI/grok-build-plugin-cc/package.json.txt"
+        },
+        {
+          "source_path": "README.md",
+          "upstream_blob_sha": "30ef6360558d21884b22a2c2fa8f9dd2b190a15a",
+          "destination_path": "skeleton/ai/research/external/xAI/grok-build-plugin-cc/README.md.txt"
+        },
+        {
+          "source_path": "plugins/grok-build/scripts/grok-bridge.mjs",
+          "upstream_blob_sha": "8eba2168bfa2fb8a500cd261ba0bf234e7b0ba1f",
+          "destination_path": "skeleton/ai/research/external/xAI/grok-build-plugin-cc/plugins/grok-build/scripts/grok-bridge.mjs.txt"
+        },
+        {
+          "source_path": "plugins/grok-build/scripts/lib/grok.mjs",
+          "upstream_blob_sha": "e7a1ac5698af3711dc4e0143a0b30824e99ed68c",
+          "destination_path": "skeleton/ai/research/external/xAI/grok-build-plugin-cc/plugins/grok-build/scripts/lib/grok.mjs.txt"
+        },
+        {
+          "source_path": "plugins/grok-build/scripts/lib/claude-session-transfer.mjs",
+          "upstream_blob_sha": "799fe9f1ac74de77a8b64caa0edbc8f28c3df6c2",
+          "destination_path": "skeleton/ai/research/external/xAI/grok-build-plugin-cc/plugins/grok-build/scripts/lib/claude-session-transfer.mjs.txt"
+        }
+      ]
+    },
+    "xai-sdk-python": {
+      "repository": "xai-org/xai-sdk-python",
+      "commit_sha": "47125e210ed7e0c5056464b476ce6efce8e6c56d",
+      "license_expression": "Apache-2.0",
+      "disposition": "runtime_admitted",
+      "snapshot_root": "skeleton/ai/research/external/xAI/xai-sdk-python",
+      "license_evidence_path": "skeleton/ai/research/external/xAI/xai-sdk-python/LICENSE.upstream.txt",
+      "package_name": "xai-sdk",
+      "package_version": "1.20.0",
+      "minimum_python": "3.10",
+      "files": [
+        {
+          "source_path": "LICENSE",
+          "upstream_blob_sha": "8e636b988b32d7337f6c683b748d735e9dd12b46",
+          "destination_path": "skeleton/ai/research/external/xAI/xai-sdk-python/LICENSE.upstream.txt"
+        },
+        {
+          "source_path": "pyproject.toml",
+          "upstream_blob_sha": "493c59388195eeeb051a4f2b58862a9d48485604",
+          "destination_path": "skeleton/ai/research/external/xAI/xai-sdk-python/pyproject.toml.txt"
+        },
+        {
+          "source_path": "src/xai_sdk/__about__.py",
+          "upstream_blob_sha": "3de7fccab5046fc7be86ee72cc5e3956f089b20a",
+          "destination_path": "skeleton/ai/research/external/xAI/xai-sdk-python/src/xai_sdk/__about__.py.txt"
+        },
+        {
+          "source_path": "src/xai_sdk/chat.py",
+          "upstream_blob_sha": "c01ee41a284c2ccf8c153213c467db455b2843c8",
+          "destination_path": "skeleton/ai/research/external/xAI/xai-sdk-python/src/xai_sdk/chat.py.txt"
+        },
+        {
+          "source_path": "src/xai_sdk/tools.py",
+          "upstream_blob_sha": "363f9df448f66c79075bad1de7338387989e1f22",
+          "destination_path": "skeleton/ai/research/external/xAI/xai-sdk-python/src/xai_sdk/tools.py.txt"
+        },
+        {
+          "source_path": "src/xai_sdk/sync/client.py",
+          "upstream_blob_sha": "e8f393e265615021b748ca2960274dec01eb982c",
+          "destination_path": "skeleton/ai/research/external/xAI/xai-sdk-python/src/xai_sdk/sync/client.py.txt"
+        },
+        {
+          "source_path": "src/xai_sdk/aio/client.py",
+          "upstream_blob_sha": "a163b528de8f62651ae5bef93a3ce9c6a393995a",
+          "destination_path": "skeleton/ai/research/external/xAI/xai-sdk-python/src/xai_sdk/aio/client.py.txt"
+        },
+        {
+          "source_path": "src/xai_sdk/telemetry/config.py",
+          "upstream_blob_sha": "a8a34f4d864a050c21af06ed515125a366337261",
+          "destination_path": "skeleton/ai/research/external/xAI/xai-sdk-python/src/xai_sdk/telemetry/config.py.txt"
+        }
+      ]
+    },
+    "xai-proto": {
+      "repository": "xai-org/xai-proto",
+      "commit_sha": "c22ad8b1d87375ab8796b224aa56785ed922eb0d",
+      "license_expression": "Apache-2.0",
+      "disposition": "runtime_admitted",
+      "snapshot_root": "skeleton/ai/research/external/xAI/xai-proto",
+      "license_evidence_path": "skeleton/ai/research/external/xAI/xai-proto/LICENSE.upstream.txt",
+      "package_name": null,
+      "package_version": null,
+      "minimum_python": null,
+      "files": [
+        {
+          "source_path": "LICENSE",
+          "upstream_blob_sha": "8e636b988b32d7337f6c683b748d735e9dd12b46",
+          "destination_path": "skeleton/ai/research/external/xAI/xai-proto/LICENSE.upstream.txt"
+        },
+        {
+          "source_path": "proto/xai/api/v1/chat.proto",
+          "upstream_blob_sha": "6cf67dba52fa64871c917c9f0669a5c671a2dd93",
+          "destination_path": "skeleton/ai/research/external/xAI/xai-proto/proto/xai/api/v1/chat.proto.txt"
+        },
+        {
+          "source_path": "proto/xai/api/v1/sample.proto",
+          "upstream_blob_sha": "768808e544e8532095ad8622a23d8d82d642a0e6",
+          "destination_path": "skeleton/ai/research/external/xAI/xai-proto/proto/xai/api/v1/sample.proto.txt"
+        },
+        {
+          "source_path": "proto/xai/api/v1/usage.proto",
+          "upstream_blob_sha": "0599ed1532cc0b2da5aa572945ee7b439dd4a0fc",
+          "destination_path": "skeleton/ai/research/external/xAI/xai-proto/proto/xai/api/v1/usage.proto.txt"
+        },
+        {
+          "source_path": "proto/xai/api/v1/video.proto",
+          "upstream_blob_sha": "81c7fb9a63f76a810022215d5af3d73a54395a9a",
+          "destination_path": "skeleton/ai/research/external/xAI/xai-proto/proto/xai/api/v1/video.proto.txt"
+        },
+        {
+          "source_path": "proto/xai/api/v1/image.proto",
+          "upstream_blob_sha": "09a72b959bb20db59eb9b7fe280eea2c96970435",
+          "destination_path": "skeleton/ai/research/external/xAI/xai-proto/proto/xai/api/v1/image.proto.txt"
+        },
+        {
+          "source_path": "proto/xai/api/v1/files.proto",
+          "upstream_blob_sha": "db8d45edd827b5146e25bfab1efe0e42c5c82af1",
+          "destination_path": "skeleton/ai/research/external/xAI/xai-proto/proto/xai/api/v1/files.proto.txt"
+        }
+      ]
+    }
+  },
+  "excluded_sources": {
+    "grok-prompts": {
+      "repository": "xai-org/grok-prompts",
+      "commit_sha": "a7c186f5ccac95875c0041aed60398f6ecb6d6c7",
+      "license_expression": "AGPL-3.0",
+      "disposition": "metadata_only",
+      "reason": "Copyleft source is not imported into the permissive runtime lane without an explicit repository licensing decision."
+    },
+    "xai-cookbook": {
+      "repository": "xai-org/xai-cookbook",
+      "commit_sha": "01d842179c4c41c326bd8ce8aa65edce9c9c231d",
+      "license_expression": "LicenseRef-xAI-Beta-Testing",
+      "disposition": "metadata_only",
+      "reason": "Custom beta license states the software is intended solely for testing and evaluation; source is not copied."
+    }
+  },
+  "executable_adapters": [
+    "skeleton/ai/integrations/xai_oss/registry.py",
+    "skeleton/ai/integrations/xai_oss/optional.py",
+    "skeleton/ai/integrations/xai_oss/grok1.py",
+    "skeleton/ai/integrations/xai_oss/grok_build.py",
+    "skeleton/ai/integrations/xai_oss/tools.py",
+    "skeleton/ai/integrations/xai_oss/provider.py",
+    "skeleton/ai/integrations/xai_oss/proto.py",
+    "skeleton/ai/integrations/xai_oss/delegation.py",
+    "skeleton/ai/integrations/xai_oss/__init__.py"
+  ],
+  "promotion_rule": "No xAI research snapshot is imported or executed directly. Runtime promotion requires an Apache-2.0 source, a bounded Skeleton adapter, focused tests, exact-head CI, and independent verification."
+}

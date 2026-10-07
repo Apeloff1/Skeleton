@@ -1,0 +1,147 @@
+name: P1 Terminal Closure Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "machine/ai_app_construction.json"
+      - "skeleton/learning/promotion.py"
+      - "skeleton/release/slo_promotion.py"
+      - "skeleton/provider_runtime.py"
+      - "skeleton/ai/runtime/provider_runtime.py"
+      - "scripts/verify_p1_feedback_release_closure.py"
+      - "scripts/verify_provider_redundancy_closure.py"
+      - "scripts/verify_p1_terminal_closure.py"
+      - "tests/test_p1_feedback_release_independent_verifier.py"
+      - "tests/test_provider_redundancy_independent_verifier.py"
+      - "tests/test_p1_terminal_closure_verifier.py"
+      - ".github/workflows/p1-feedback-release-closure.yml"
+      - ".github/workflows/provider-redundancy-closure.yml"
+      - ".github/workflows/p1-terminal-closure.yml"
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_app_construction.json"
+      - "skeleton/learning/promotion.py"
+      - "skeleton/release/slo_promotion.py"
+      - "skeleton/provider_runtime.py"
+      - "skeleton/ai/runtime/provider_runtime.py"
+      - "scripts/verify_p1_feedback_release_closure.py"
+      - "scripts/verify_provider_redundancy_closure.py"
+      - "scripts/verify_p1_terminal_closure.py"
+      - "tests/test_p1_feedback_release_independent_verifier.py"
+      - "tests/test_provider_redundancy_independent_verifier.py"
+      - "tests/test_p1_terminal_closure_verifier.py"
+      - ".github/workflows/p1-feedback-release-closure.yml"
+      - ".github/workflows/provider-redundancy-closure.yml"
+      - ".github/workflows/p1-terminal-closure.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-terminal-closure-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  terminal-p1-assurance:
+    name: Independent terminal P1 assurance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install independent verifier dependency
+        run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+
+      - name: Run P1 verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_p1_feedback_release_independent_verifier.py
+          tests/test_provider_redundancy_independent_verifier.py
+          tests/test_p1_terminal_closure_verifier.py
+
+      - name: Verify feedback and release surfaces
+        env:
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_p1_feedback_release_closure.py
+          --evidence-out .p1-feedback-release.json
+
+      - name: Verify provider redundancy surfaces
+        env:
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_provider_redundancy_closure.py
+          --evidence-out .p1-provider-redundancy.json
+
+      - name: Verify canonical terminal P1 state
+        env:
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_p1_terminal_closure.py
+          --evidence-out .p1-terminal.json
+          --print-evidence
+
+      - name: Assert one exact-head P1 closure
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          expected_sha = os.environ["EXPECTED_SHA"].strip()
+          receipts = {
+              "feedback_release": json.loads(
+                  Path(".p1-feedback-release.json").read_text(encoding="utf-8")
+              ),
+              "provider_redundancy": json.loads(
+                  Path(".p1-provider-redundancy.json").read_text(
+                      encoding="utf-8"
+                  )
+              ),
+              "terminal": json.loads(
+                  Path(".p1-terminal.json").read_text(encoding="utf-8")
+              ),
+          }
+          for name, receipt in receipts.items():
+              if receipt.get("head_sha") != expected_sha:
+                  raise SystemExit(f"{name} receipt head mismatch")
+              if receipt.get("valid") is not True or receipt.get("errors"):
+                  raise SystemExit(f"{name} P1 receipt is invalid")
+
+          expected = {
+              "gap-feedback-promotion": "closed",
+              "gap-provider-redundancy": "closed",
+              "gap-release-slo-loop": "closed",
+          }
+          if receipts["terminal"].get("gap_state") != expected:
+              raise SystemExit("terminal P1 gap state mismatch")
+          if receipts["feedback_release"].get("gap_state") != {
+              "gap-feedback-promotion": "closed",
+              "gap-release-slo-loop": "closed",
+          }:
+              raise SystemExit("feedback/release P1 state mismatch")
+          if receipts["provider_redundancy"].get("gap_status") != "closed":
+              raise SystemExit("provider redundancy P1 state mismatch")
+          print("P1 terminal closure exact-head receipt:", expected_sha)
+          PY

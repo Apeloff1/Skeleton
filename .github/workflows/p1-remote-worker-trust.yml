@@ -1,0 +1,370 @@
+name: P1 Remote Worker Trust Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "machine/ai_p1_task_backlog.json"
+      - "skeleton/network/remote_execution.py"
+      - "skeleton/ai/runtime/distributed/network/remote_execution.py"
+      - "skeleton/network/__init__.py"
+      - "skeleton/ai/runtime/distributed/network/__init__.py"
+      - "skeleton/shells/worker_identity.py"
+      - "skeleton/shells/worker_heartbeat.py"
+      - "skeleton/shells/worker_protocol.py"
+      - "skeleton/shells/leases.py"
+      - "skeleton/testing/test_remote_execution_protocol.py"
+      - ".github/workflows/p1-remote-worker-trust.yml"
+  pull_request:
+    branches:
+      - main
+      - p1/release-lane-materialize-20260928
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_p1_task_backlog.json"
+      - "skeleton/network/remote_execution.py"
+      - "skeleton/ai/runtime/distributed/network/remote_execution.py"
+      - "skeleton/network/__init__.py"
+      - "skeleton/ai/runtime/distributed/network/__init__.py"
+      - "skeleton/shells/worker_identity.py"
+      - "skeleton/shells/worker_heartbeat.py"
+      - "skeleton/shells/worker_protocol.py"
+      - "skeleton/shells/leases.py"
+      - "skeleton/testing/test_remote_execution_protocol.py"
+      - ".github/workflows/p1-remote-worker-trust.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-remote-worker-trust-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate remote worker trust and fencing
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e .
+          "pytest>=8,<9"
+
+      - name: Compile DIST-01 contracts
+        run: >-
+          python -m compileall -q
+          skeleton/network/remote_execution.py
+          skeleton/ai/runtime/distributed/network/remote_execution.py
+
+      - name: Run worker trust and fencing regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_remote_execution_protocol.py
+          skeleton/testing/test_worker_identity_heartbeat.py
+          skeleton/testing/test_shell_leases_queue_rate.py
+          skeleton/testing/test_worker_journal_checkpoint_protocol.py
+
+      - name: Validate canonical AI file tree parity
+        run: python scripts/check_ai_file_tree.py
+
+      - name: Build accepted DIST-01 remote commit
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-dist-01
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          from skeleton.contracts.canonical import EvidenceRef
+          from skeleton.network.remote_execution import (
+              RemoteExecutionRequest,
+              RemoteExecutionResult,
+              RemoteResultStatus,
+              WorkerAttestation,
+              issue_remote_execution_fence,
+              qualify_remote_execution,
+              qualify_remote_execution_commit,
+              worker_identity_digest,
+          )
+          from skeleton.shells.leases import LeaseRegistry
+          from skeleton.shells.worker_heartbeat import (
+              HeartbeatPolicy,
+              HeartbeatRegistry,
+          )
+          from skeleton.shells.worker_identity import (
+              WorkerIdentity,
+              WorkerRegistry,
+              WorkerRole,
+          )
+          from skeleton.shells.worker_protocol import (
+              ProtocolGuard,
+              WorkerMessage,
+              WorkerMessageKind,
+          )
+
+          now = [100.0]
+
+          def clock():
+              return now[0]
+
+          worker = WorkerIdentity(
+              worker_id="ci-worker",
+              generation=1,
+              role=WorkerRole.EXECUTOR,
+              labels={"region": "ci", "trust": "prod"},
+              features=frozenset({"remote-exec", "sandbox-v1"}),
+              protocol_version=1,
+          )
+          workers = WorkerRegistry(clock=clock)
+          registration = workers.register(worker)
+          heartbeats = HeartbeatRegistry(
+              workers=workers,
+              policy=HeartbeatPolicy(
+                  late_after_seconds=5.0,
+                  stale_after_seconds=10.0,
+              ),
+              clock=clock,
+          )
+          heartbeats.beat(worker, sequence=1)
+
+          request = RemoteExecutionRequest(
+              operation_id="ci-operation",
+              execution_id="ci-execution",
+              tenant_id="ci-tenant",
+              request_id="ci-request",
+              coordinator_id="ci-coordinator",
+              action_digest="a" * 64,
+              authority_digest="b" * 64,
+              payload_digest="c" * 64,
+              required_role=WorkerRole.EXECUTOR,
+              required_features=("remote-exec",),
+              required_labels=(("region", "ci"),),
+              protocol_version=1,
+              max_tokens=1000,
+              max_cost_units=10.0,
+              max_wall_time_s=60.0,
+          )
+          leases = LeaseRegistry(clock=clock)
+          lease = leases.acquire(
+              request.lease_key,
+              worker.key,
+              ttl_seconds=30.0,
+          )
+          fence = issue_remote_execution_fence(
+              request=request,
+              worker=worker,
+              lease=lease,
+          )
+          attestation = WorkerAttestation(
+              worker_id=worker.worker_id,
+              generation=worker.generation,
+              identity_digest=worker_identity_digest(worker),
+              runtime_digest="d" * 64,
+              image_digest="e" * 64,
+              policy_digest="f" * 64,
+              verifier_id="github-actions:dist-01-worker-attestation",
+              verifier_digest="1" * 64,
+              evidence_refs=(
+                  EvidenceRef(
+                      source="ci://dist-01-worker-attestation",
+                      digest="2" * 64,
+                      category="worker_attestation",
+                  ),
+              ),
+              observed_at=90.0,
+              expires_at=200.0,
+          )
+          grant = qualify_remote_execution(
+              request=request,
+              worker=worker,
+              registration=registration,
+              liveness=heartbeats.liveness(worker),
+              attestation=attestation,
+              lease=lease,
+              fence=fence,
+              observed_at=clock(),
+          )
+          if not grant.accepted:
+              raise SystemExit(
+                  f"DIST-01 grant rejected: {grant.reasons}"
+              )
+
+          result = RemoteExecutionResult(
+              request_digest=request.request_digest,
+              grant_digest=grant.decision_digest,
+              worker_identity_digest=worker_identity_digest(worker),
+              fence_digest=fence.fence_digest,
+              output_digest="3" * 64,
+              status=RemoteResultStatus.SUCCEEDED,
+              tokens_used=100,
+              cost_units=1.0,
+              wall_time_s=5.0,
+              started_at=101.0,
+              completed_at=106.0,
+          )
+          completion = WorkerMessage(
+              message_id="ci-complete",
+              sequence=1,
+              kind=WorkerMessageKind.COMPLETE,
+              sender=worker,
+              recipient=request.coordinator_id,
+              payload={
+                  "request_digest": request.request_digest,
+                  "grant_digest": grant.decision_digest,
+                  "fence_digest": fence.fence_digest,
+                  "result_digest": result.result_digest,
+              },
+              protocol_version=request.protocol_version,
+              correlation_id=request.request_id,
+          )
+          cursor = ProtocolGuard(
+              protocol_version=request.protocol_version
+          ).accept(completion)
+          commit = qualify_remote_execution_commit(
+              request=request,
+              worker=worker,
+              registration=registration,
+              liveness=heartbeats.liveness(worker),
+              attestation=attestation,
+              lease=lease,
+              current_fence=fence,
+              grant=grant,
+              result=result,
+              completion=completion,
+              protocol_cursor=cursor,
+              observed_at=clock(),
+          )
+          if not commit.accepted:
+              raise SystemExit(
+                  f"DIST-01 commit rejected: {commit.reasons}"
+              )
+          evidence = commit.accepted_evidence_ref()
+          Path(".p1-dist-01/decision.json").write_text(
+              json.dumps(commit.payload(), indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          Path(".p1-dist-01/refs.json").write_text(
+              json.dumps(
+                  [{
+                      "source": evidence.source,
+                      "digest": evidence.digest,
+                      "category": evidence.category,
+                  }],
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Emit exact-head DIST-01 evidence receipt
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          def digest(paths):
+              h = hashlib.sha256()
+              for name in paths:
+                  h.update(name.encode())
+                  h.update(b"\0")
+                  h.update(Path(name).read_bytes())
+                  h.update(b"\0")
+              return h.hexdigest()
+
+          Path(".p1-dist-01/config.digest").write_text(
+              hashlib.sha256(
+                  b"p1-dist-01-remote-worker-trust-v1"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-dist-01/environment.digest").write_text(
+              hashlib.sha256(
+                  b"ubuntu-24.04|python-3.11.16|dist-01"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-dist-01/verifier.digest").write_text(
+              digest([
+                  "skeleton/network/remote_execution.py",
+                  "skeleton/shells/worker_identity.py",
+                  "skeleton/shells/worker_heartbeat.py",
+                  "skeleton/shells/worker_protocol.py",
+                  "skeleton/shells/leases.py",
+                  ".github/workflows/p1-remote-worker-trust.yml",
+              ]),
+              encoding="utf-8",
+          )
+          Path(".p1-dist-01/tests.digest").write_text(
+              digest([
+                  "skeleton/testing/test_remote_execution_protocol.py",
+                  "skeleton/testing/test_worker_identity_heartbeat.py",
+                  "skeleton/testing/test_shell_leases_queue_rate.py",
+                  "skeleton/testing/test_worker_journal_checkpoint_protocol.py",
+              ]),
+              encoding="utf-8",
+          )
+          PY
+
+          python scripts/emit_p1_promotion_evidence.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --expected-head "$EXPECTED_SHA" \
+            --task-id P1-DIST-01 \
+            --accountability-id ACC-P1-DIST-01 \
+            --configuration-digest "$(cat .p1-dist-01/config.digest)" \
+            --environment-digest "$(cat .p1-dist-01/environment.digest)" \
+            --verifier-id github-actions:p1-remote-worker-trust \
+            --verifier-digest "$(cat .p1-dist-01/verifier.digest)" \
+            --test-manifest-digest "$(cat .p1-dist-01/tests.digest)" \
+            --run-id "$RUN_IDENTITY" \
+            --run-attempt "$RUN_ATTEMPT" \
+            --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --evidence-file .p1-dist-01/refs.json \
+            --out .p1-dist-01/receipt.json \
+            > .p1-dist-01/stdout.json
+
+      - name: Assert exact-head DIST-01 receipt
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-dist-01/receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("DIST-01 receipt head mismatch")
+          if receipt["task_id"] != "P1-DIST-01":
+              raise SystemExit("DIST-01 task identity mismatch")
+          if receipt["accountability_id"] != "ACC-P1-DIST-01":
+              raise SystemExit("DIST-01 accountability identity mismatch")
+          for field in ("subject_digest", "evidence_digest", "receipt_digest"):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print("DIST-01 exact-head receipt OK", receipt["receipt_digest"])
+          PY

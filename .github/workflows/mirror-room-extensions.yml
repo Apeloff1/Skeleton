@@ -1,0 +1,81 @@
+name: AI Mirror Room Extensions
+
+on:
+  pull_request:
+    paths:
+      - "skeleton/learning/mirror_room/**"
+      - "skeleton/ai/learning/mirror_room/**"
+      - "skeleton/testing/test_mirror_room_adversarial.py"
+      - "skeleton/testing/test_mirror_room_content_delivery.py"
+      - "skeleton/testing/test_mirror_room_observability.py"
+      - "skeleton/testing/test_mirror_room_learning.py"
+      - "frontend/features/MirrorRoom/**"
+      - "frontend/app/mirror-room.tsx"
+      - "frontend/app/dashboard.tsx"
+      - "frontend/utils/routeRegistry.ts"
+      - "backend/routes/mirror_room.py"
+      - "machine/mirror_room_file_tree.json"
+      - "docs/plan/MIRROR_ROOM_LEARNING.md"
+      - ".github/workflows/mirror-room-extensions.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/learning/mirror_room/**"
+      - "skeleton/ai/learning/mirror_room/**"
+      - "skeleton/testing/test_mirror_room_adversarial.py"
+      - "skeleton/testing/test_mirror_room_content_delivery.py"
+      - "skeleton/testing/test_mirror_room_observability.py"
+      - "frontend/features/MirrorRoom/**"
+      - "frontend/app/mirror-room.tsx"
+      - "frontend/app/dashboard.tsx"
+      - "frontend/utils/routeRegistry.ts"
+      - "backend/routes/mirror_room.py"
+      - "machine/mirror_room_file_tree.json"
+      - "docs/plan/MIRROR_ROOM_LEARNING.md"
+      - ".github/workflows/mirror-room-extensions.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-mirror-room-extensions-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  extensions:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install project test dependencies
+        run: python -m pip install --disable-pip-version-check -e ".[dev]"
+      - name: Verify canonical and AI extension mirrors
+        run: |
+          for name in __init__.py adaptation.py adversarial.py content_quality.py memory.py observability.py replay.py; do
+            cmp "skeleton/learning/mirror_room/$name" "skeleton/ai/learning/mirror_room/$name"
+          done
+      - name: Compile Mirror Room extensions
+        run: >-
+          python -m compileall -q
+          skeleton/learning/mirror_room
+          skeleton/ai/learning/mirror_room
+      - name: Run focused extension acceptance
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_mirror_room_adversarial.py
+          skeleton/testing/test_mirror_room_content_delivery.py
+          skeleton/testing/test_mirror_room_observability.py
+          skeleton/testing/test_mirror_room_learning.py

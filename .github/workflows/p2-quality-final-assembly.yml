@@ -1,0 +1,171 @@
+name: P2 Quality and Final Assembly
+
+on:
+  pull_request:
+    branches:
+      - main
+      - feat/p2-traceability-spine
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/p2_quality_control.json"
+      - "machine/ai_master_plan.json"
+      - "machine/ai_engineering_pass.json"
+      - "machine/master_traceability.json"
+      - "machine/ai_p2_execution_map.json"
+      - "machine/ai_p2_task_backlog.json"
+      - "machine/nfr_registry.json"
+      - "machine/state_machine_catalogue.json"
+      - "skeleton/quality/**"
+      - "skeleton/contracts/operation.py"
+      - "skeleton/contracts/ai_execution.py"
+      - "skeleton/release/evidence.py"
+      - "skeleton/app/manifest.json"
+      - "scripts/check_p2_quality_control.py"
+      - "scripts/check_p2_formal_targets.py"
+      - "scripts/check_p2_project_metrics.py"
+      - "scripts/run_p2_final_assembly.py"
+      - "scripts/check_traceability_spine.py"
+      - "scripts/check_app_assembly.py"
+      - "tests/test_p2_quality_*.py"
+      - "tests/test_p2_formal_targets.py"
+      - "tests/test_p2_project_metrics.py"
+      - "tests/test_p2_final_assembly.py"
+      - ".github/workflows/p2-quality-final-assembly.yml"
+  push:
+    branches:
+      - main
+      - feat/p2-quality-final-assembly
+    paths:
+      - "machine/p2_quality_control.json"
+      - "machine/ai_master_plan.json"
+      - "machine/ai_engineering_pass.json"
+      - "machine/master_traceability.json"
+      - "machine/ai_p2_execution_map.json"
+      - "machine/ai_p2_task_backlog.json"
+      - "machine/nfr_registry.json"
+      - "machine/state_machine_catalogue.json"
+      - "skeleton/quality/**"
+      - "skeleton/contracts/operation.py"
+      - "skeleton/contracts/ai_execution.py"
+      - "skeleton/release/evidence.py"
+      - "skeleton/app/manifest.json"
+      - "scripts/check_p2_quality_control.py"
+      - "scripts/check_p2_formal_targets.py"
+      - "scripts/check_p2_project_metrics.py"
+      - "scripts/run_p2_final_assembly.py"
+      - "scripts/check_traceability_spine.py"
+      - "scripts/check_app_assembly.py"
+      - "tests/test_p2_quality_*.py"
+      - "tests/test_p2_formal_targets.py"
+      - "tests/test_p2_project_metrics.py"
+      - "tests/test_p2_final_assembly.py"
+      - ".github/workflows/p2-quality-final-assembly.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p2-quality-final-assembly-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-quality-authority:
+    name: Validate P2 quality authority
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install repository runtime and test dependencies
+        run: >-
+          python -m pip install
+          --disable-pip-version-check
+          --no-input
+          -e .
+          -r requirements-dev.txt
+
+      - name: Validate quality control
+        run: python scripts/check_p2_quality_control.py --json
+
+      - name: Execute formal targets
+        run: python scripts/check_p2_formal_targets.py --json
+
+      - name: Derive project metrics
+        run: python scripts/check_p2_project_metrics.py --json
+
+      - name: Run focused P2 quality regressions
+        run: >-
+          python -m unittest -v
+          tests.test_p2_quality_vector
+          tests.test_p2_formal_targets
+          tests.test_p2_project_metrics
+          tests.test_p2_final_assembly
+          tests.test_p2_quality_control
+
+  final-assembly-structural:
+    name: Run exact-head P2 final assembly
+    needs: validate-quality-authority
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PYTHONPATH: "."
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install repository runtime and test dependencies
+        run: >-
+          python -m pip install
+          --disable-pip-version-check
+          --no-input
+          -e .
+          -r requirements-dev.txt
+
+      - name: Run structural final assembly
+        run: >-
+          python scripts/run_p2_final_assembly.py
+          --source-sha "$SOURCE_SHA"
+          --builder-id "github-actions-builder"
+          --allow-blocked
+          --output /tmp/p2-final-assembly.json
+
+      - name: Assert gates passed and promotion remains fail-closed
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = json.loads(Path("/tmp/p2-final-assembly.json").read_text(encoding="utf-8"))
+          failed = [x["gate_id"] for x in p["gate_receipts"] if not x["passed"]]
+          if failed:
+              raise SystemExit(f"final assembly gates failed: {failed}")
+          if p["promotion_ready"] is not False:
+              raise SystemExit("unverified/unresolved-risk evidence unexpectedly became promotion-ready")
+          if "independent verification missing" not in p["promotion_blockers"]:
+              raise SystemExit("independent-verification blocker missing")
+          print(json.dumps({
+              "evidence_digest": p["evidence_digest"],
+              "promotion_ready": p["promotion_ready"],
+              "promotion_blockers": p["promotion_blockers"],
+          }, sort_keys=True))
+          PY

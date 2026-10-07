@@ -1,0 +1,179 @@
+{
+  "schema_version": 1,
+  "registry_version": "1.0.0",
+  "task_id": "P1-PROD-01",
+  "accountability_ref": "ACC-P1-PROD-01",
+  "scope": {
+    "kind": "route_module",
+    "route_module": "backend/routes/operation_stream.py",
+    "mount_prefix": "/api",
+    "router_prefix": "/operations",
+    "require_complete_decorator_inventory": true,
+    "route_registry_module": "backend/core/routes_registry.py",
+    "route_import": "routes.operation_stream"
+  },
+  "conventions": {
+    "schema_refs": "Names resolve against machine/ai_runtime_schemas.json records and are hashed as canonical JSON.",
+    "inline_shapes": "Inline request/response shapes are hashed as canonical JSON and remain descriptive, not runtime authority.",
+    "compatibility": "Existing contract removal, operation move, tenant-scope change, idempotency change, or consumer removal is breaking."
+  },
+  "contracts": [
+    {
+      "contract_id": "operation.status",
+      "version": 1,
+      "method": "GET",
+      "path": "/api/operations/{operation_id}",
+      "producer": "backend.routes.operation_stream",
+      "consumers": [
+        "web",
+        "desktop",
+        "native"
+      ],
+      "request_shape": {
+        "path": {
+          "operation_id": "OpaqueId"
+        }
+      },
+      "response_schema_ref": "OperationEnvelope",
+      "tenant_scoped": true,
+      "idempotent": true
+    },
+    {
+      "contract_id": "operation.cancel",
+      "version": 1,
+      "method": "POST",
+      "path": "/api/operations/{operation_id}/cancel",
+      "producer": "backend.routes.operation_stream",
+      "consumers": [
+        "web",
+        "desktop",
+        "native"
+      ],
+      "request_shape": {
+        "path": {
+          "operation_id": "OpaqueId"
+        },
+        "body": null
+      },
+      "response_shape": {
+        "ok": "boolean",
+        "operation_id": "OpaqueId",
+        "state": "OperationState"
+      },
+      "tenant_scoped": true,
+      "idempotent": true
+    },
+    {
+      "contract_id": "operation.events.replay",
+      "version": 1,
+      "method": "GET",
+      "path": "/api/operations/{operation_id}/events/replay",
+      "producer": "backend.routes.operation_stream",
+      "consumers": [
+        "web",
+        "desktop",
+        "native"
+      ],
+      "request_shape": {
+        "path": {
+          "operation_id": "OpaqueId"
+        },
+        "query": {
+          "consumer_id": "string[1,128]",
+          "after_sequence": "NonNegativeInt",
+          "limit": "integer[1,1000]"
+        }
+      },
+      "response_shape": {
+        "ok": "boolean",
+        "events": "array<StreamEvent>",
+        "terminal": "boolean",
+        "replay_floor": "NonNegativeInt"
+      },
+      "tenant_scoped": true,
+      "idempotent": true
+    },
+    {
+      "contract_id": "operation.events.resync",
+      "version": 1,
+      "method": "GET",
+      "path": "/api/operations/{operation_id}/events/resync",
+      "producer": "backend.routes.operation_stream",
+      "consumers": [
+        "web",
+        "desktop",
+        "native"
+      ],
+      "request_shape": {
+        "path": {
+          "operation_id": "OpaqueId"
+        },
+        "query": {
+          "consumer_id": "string[1,128]"
+        }
+      },
+      "response_shape": {
+        "ok": "boolean",
+        "operation": "OperationEnvelope",
+        "replay_floor": "NonNegativeInt",
+        "canonical_result": "nullable object"
+      },
+      "tenant_scoped": true,
+      "idempotent": true
+    },
+    {
+      "contract_id": "operation.events.ack",
+      "version": 1,
+      "method": "POST",
+      "path": "/api/operations/{operation_id}/events/ack",
+      "producer": "backend.routes.operation_stream",
+      "consumers": [
+        "web",
+        "desktop",
+        "native"
+      ],
+      "request_shape": {
+        "path": {
+          "operation_id": "OpaqueId"
+        },
+        "body": {
+          "consumer_id": "string[1,128]",
+          "sequence": "NonNegativeInt"
+        }
+      },
+      "response_shape": {
+        "ok": "boolean",
+        "consumer_id": "string",
+        "sequence": "NonNegativeInt"
+      },
+      "tenant_scoped": true,
+      "idempotent": true
+    },
+    {
+      "contract_id": "operation.events.stream",
+      "version": 1,
+      "method": "GET",
+      "path": "/api/operations/{operation_id}/events",
+      "producer": "backend.routes.operation_stream",
+      "consumers": [
+        "web",
+        "desktop",
+        "native"
+      ],
+      "request_shape": {
+        "path": {
+          "operation_id": "OpaqueId"
+        },
+        "query": {
+          "consumer_id": "string[1,128]",
+          "after_sequence": "nullable NonNegativeInt"
+        }
+      },
+      "response_schema_ref": "StreamEvent",
+      "transport": "text/event-stream",
+      "tenant_scoped": true,
+      "idempotent": true
+    }
+  ],
+  "migrations": []
+}

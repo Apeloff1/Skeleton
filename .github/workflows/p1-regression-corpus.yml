@@ -1,0 +1,284 @@
+name: P1 Regression Corpus Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "machine/ai_p1_task_backlog.json"
+      - "skeleton/eval/regression_corpus.py"
+      - "skeleton/ai/evaluation/regression_corpus.py"
+      - "skeleton/contracts/risk_evidence.py"
+      - "skeleton/eval/__init__.py"
+      - "skeleton/ai/evaluation/__init__.py"
+      - "skeleton/testing/test_regression_corpus.py"
+      - "machine/p1_regression_corpus.json"
+      - "scripts/check_p1_regression_corpus.py"
+      - "tests/test_p1_regression_corpus.py"
+      - ".github/workflows/p1-regression-corpus.yml"
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_p1_task_backlog.json"
+      - "skeleton/eval/regression_corpus.py"
+      - "skeleton/ai/evaluation/regression_corpus.py"
+      - "skeleton/contracts/risk_evidence.py"
+      - "skeleton/eval/__init__.py"
+      - "skeleton/ai/evaluation/__init__.py"
+      - "skeleton/testing/test_regression_corpus.py"
+      - "machine/p1_regression_corpus.json"
+      - "scripts/check_p1_regression_corpus.py"
+      - "tests/test_p1_regression_corpus.py"
+      - ".github/workflows/p1-regression-corpus.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-regression-corpus-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate promotion-blocking regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e .
+          "pytest>=8,<9"
+
+      - name: Compile LEARN-05 contracts
+        run: >-
+          python -m compileall -q
+          skeleton/eval/regression_corpus.py
+          skeleton/ai/evaluation/regression_corpus.py
+          scripts/check_p1_regression_corpus.py
+
+      - name: Validate canonical regression corpus
+        run: >-
+          python scripts/check_p1_regression_corpus.py
+          --print-summary
+
+      - name: Run EVID-04 and LEARN-05 regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_risk_evidence.py
+          skeleton/testing/test_benchmark_registry.py
+          skeleton/testing/test_regression_corpus.py
+          tests/test_p1_regression_corpus.py
+
+      - name: Validate canonical AI file tree parity
+        run: python scripts/check_ai_file_tree.py
+
+      - name: Build accepted LEARN-05 corpus decision
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-learn-05
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          from scripts.check_p1_regression_corpus import load_corpus
+          from skeleton.contracts.canonical import EvidenceRef
+          from skeleton.contracts.risk_evidence import RiskBindingEvaluation
+          from skeleton.eval.benchmark_registry import (
+              BenchmarkQualificationDecision,
+          )
+          from skeleton.eval.regression_corpus import (
+              RegressionObservation,
+              qualify_regression_corpus,
+          )
+
+          _, corpus = load_corpus()
+          candidate_digest = "a" * 64
+          benchmark = BenchmarkQualificationDecision(
+              accepted=True,
+              reasons=(),
+              benchmark_manifest_digest="1" * 64,
+              experiment_manifest_digest="2" * 64,
+              reproducibility_bundle_digest="3" * 64,
+              evaluated_split_ids=("regression",),
+          )
+          observations = []
+          risks = {}
+          for index, case in enumerate(corpus.cases, start=1):
+              observations.append(
+                  RegressionObservation(
+                      case_digest=case.case_digest,
+                      candidate_digest=candidate_digest,
+                      actual_outcome=case.expected_outcome,
+                      evaluator_id=case.evaluator_id,
+                      evaluator_digest=case.evaluator_digest,
+                      output_digest=f"{index:x}" * 64,
+                      evidence_refs=(
+                          EvidenceRef(
+                              source=f"ci://regression/{case.case_id}",
+                              digest="f" * 64,
+                              category="regression",
+                          ),
+                      ),
+                      independent=True,
+                      side_effect_count=0,
+                  )
+              )
+              risks[case.risk_obligation_id] = RiskBindingEvaluation(
+                  obligation_id=case.risk_obligation_id,
+                  obligation_digest=case.risk_obligation_digest,
+                  resolved=True,
+                  blocking=True,
+                  severity="high",
+                  disposition="evidence",
+                  blockers=(),
+              )
+
+          decision = qualify_regression_corpus(
+              corpus=corpus,
+              candidate_digest=candidate_digest,
+              benchmark_qualification=benchmark,
+              expected_benchmark_qualification_digest=(
+                  benchmark.decision_digest
+              ),
+              observations=tuple(observations),
+              risk_evaluations=risks,
+          )
+          if not decision.accepted:
+              raise SystemExit(
+                  f"LEARN-05 fixture rejected: {decision.reasons}"
+              )
+          if len(decision.passed_case_digests) != len(corpus.cases):
+              raise SystemExit("not every regression case passed")
+          if decision.failed_case_digests:
+              raise SystemExit("accepted corpus contains failed cases")
+
+          evidence = decision.accepted_evidence_ref()
+          Path(".p1-learn-05/decision.json").write_text(
+              json.dumps(decision.payload(), indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          Path(".p1-learn-05/refs.json").write_text(
+              json.dumps(
+                  [{
+                      "source": evidence.source,
+                      "digest": evidence.digest,
+                      "category": evidence.category,
+                  }],
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Emit exact-head LEARN-05 evidence receipt
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          def digest(paths):
+              h = hashlib.sha256()
+              for name in paths:
+                  h.update(name.encode())
+                  h.update(b"\0")
+                  h.update(Path(name).read_bytes())
+                  h.update(b"\0")
+              return h.hexdigest()
+
+          Path(".p1-learn-05/config.digest").write_text(
+              hashlib.sha256(
+                  b"p1-learn-05-regression-corpus-v1"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-learn-05/environment.digest").write_text(
+              hashlib.sha256(
+                  b"ubuntu-24.04|python-3.11.16|learn-05"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-learn-05/verifier.digest").write_text(
+              digest([
+                  "skeleton/eval/regression_corpus.py",
+                  "skeleton/eval/benchmark_registry.py",
+                  "skeleton/contracts/risk_evidence.py",
+                  "machine/p1_regression_corpus.json",
+                  "scripts/check_p1_regression_corpus.py",
+                  ".github/workflows/p1-regression-corpus.yml",
+              ]),
+              encoding="utf-8",
+          )
+          Path(".p1-learn-05/tests.digest").write_text(
+              digest([
+                  "skeleton/testing/test_risk_evidence.py",
+                  "skeleton/testing/test_benchmark_registry.py",
+                  "skeleton/testing/test_regression_corpus.py",
+                  "tests/test_p1_regression_corpus.py",
+              ]),
+              encoding="utf-8",
+          )
+          PY
+
+          python scripts/emit_p1_promotion_evidence.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --expected-head "$EXPECTED_SHA" \
+            --task-id P1-LEARN-05 \
+            --accountability-id ACC-P1-LEARN-05 \
+            --configuration-digest "$(cat .p1-learn-05/config.digest)" \
+            --environment-digest "$(cat .p1-learn-05/environment.digest)" \
+            --verifier-id github-actions:p1-regression-corpus \
+            --verifier-digest "$(cat .p1-learn-05/verifier.digest)" \
+            --test-manifest-digest "$(cat .p1-learn-05/tests.digest)" \
+            --run-id "$RUN_IDENTITY" \
+            --run-attempt "$RUN_ATTEMPT" \
+            --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --evidence-file .p1-learn-05/refs.json \
+            --out .p1-learn-05/receipt.json \
+            > .p1-learn-05/stdout.json
+
+      - name: Assert exact-head LEARN-05 receipt
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-learn-05/receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("LEARN-05 receipt head mismatch")
+          if receipt["task_id"] != "P1-LEARN-05":
+              raise SystemExit("LEARN-05 task identity mismatch")
+          if receipt["accountability_id"] != "ACC-P1-LEARN-05":
+              raise SystemExit("LEARN-05 accountability identity mismatch")
+          for field in ("subject_digest", "evidence_digest", "receipt_digest"):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print("LEARN-05 exact-head receipt OK", receipt["receipt_digest"])
+          PY

@@ -1,0 +1,14 @@
+{
+  "accountability_id": "ACC-AIQ-S0-GOV-02",
+  "event_type": "start_marker",
+  "actor_id": "chatgpt:gpt-5.6-sol",
+  "actor_type": "agent",
+  "role": "implementation-agent",
+  "signature_method": "github_identity",
+  "note": "Agent attestation through the user-authorized GitHub connector; not a human signature.",
+  "baseline_git_sha": "3ab9ca8edf4866cf925b03424b6fd14f8858ca83",
+  "timestamp_source": "GitHub commit created_at for this start-marker commit",
+  "from_status": "pending",
+  "intended_to_status": "in_progress",
+  "statement": "Begin AIQ-S0-GOV-02 lifecycle execution adapters for deletion, retention, and export."
+}

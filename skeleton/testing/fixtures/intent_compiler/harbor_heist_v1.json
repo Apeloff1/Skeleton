@@ -1,0 +1,52 @@
+{
+  "schema": "creator.intent.v1",
+  "schema_version": 1,
+  "request_id": "req_harbor_heist",
+  "title": "Harbor Heist",
+  "goal": "Stealth extraction around a harbor without networked play.",
+  "assumptions": [
+    {
+      "id": "a_presentation_2d",
+      "statement": "Presentation stays 2D."
+    }
+  ],
+  "constraints": [
+    {
+      "id": "c_no_network",
+      "field": "networking",
+      "op": "forbid",
+      "value": "realtime"
+    }
+  ],
+  "validations": [
+    {
+      "id": "v_extract_path",
+      "requirement": "spawn can reach extract",
+      "applies_to": ["n_world"]
+    }
+  ],
+  "nodes": [
+    {
+      "id": "n_world",
+      "kind": "world",
+      "title": "Harbor district",
+      "summary": "Connected rooms from spawn to extract.",
+      "depends_on": [],
+      "editable": true,
+      "assumption_ids": ["a_presentation_2d"],
+      "constraint_ids": [],
+      "validation_ids": ["v_extract_path"]
+    },
+    {
+      "id": "n_stealth",
+      "kind": "system",
+      "title": "Stealth loop",
+      "summary": "Heat and detection around patrols.",
+      "depends_on": ["n_world"],
+      "editable": true,
+      "assumption_ids": ["a_presentation_2d"],
+      "constraint_ids": ["c_no_network"],
+      "validation_ids": []
+    }
+  ]
+}

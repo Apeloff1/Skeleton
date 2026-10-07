@@ -1,0 +1,9 @@
+{
+  "skill_bank_per_room": {
+    "room_id": "TEMPLATE",
+    "unlocked_skills": [],
+    "github_contributions": [],
+    "unlocked_via_performance": true,
+    "feeds_into_jeeves_permanent_skill_bank": true
+  }
+}

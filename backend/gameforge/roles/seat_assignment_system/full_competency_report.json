@@ -1,0 +1,1548 @@
+{
+  "timestamp": "2026-07-20T18:05:59.487753",
+  "summary": {
+    "total_roles": 1833,
+    "passed": 217,
+    "failed": 1616,
+    "pass_rate_percent": 11.8,
+    "average_score": 70.5
+  },
+  "category_breakdown": {
+    "ai_npc_behavior": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "destruction_strategy": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "live_ops": {
+      "total": 51,
+      "passed": 1,
+      "avg_score": 66.9,
+      "pass_rate": 2.0
+    },
+    "balancing": {
+      "total": 54,
+      "passed": 2,
+      "avg_score": 66.2,
+      "pass_rate": 3.7
+    },
+    "faction_strategy": {
+      "total": 2,
+      "passed": 2,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "onboarding_tutorial": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "progression_sustainable": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "economy_longterm": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "esports": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "physics_simulation": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "stealth_player": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "destruction": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "housing_natural": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "voice_chat_communication": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "economy_strategy": {
+      "total": 2,
+      "passed": 2,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "social_natural": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "fluid_interactive": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "engineering": {
+      "total": 122,
+      "passed": 3,
+      "avg_score": 65.6,
+      "pass_rate": 2.5
+    },
+    "magic_strategy": {
+      "total": 2,
+      "passed": 2,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "trading_economy": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "fluid_scale": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "economy_health": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "fluid_player": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "group_emergent": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "localization": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "achievement_mastery": {
+      "total": 2,
+      "passed": 2,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "combat_impact": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "weather_strategy": {
+      "total": 2,
+      "passed": 2,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "trading_natural": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "stealth_natural": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "mounts_vehicles_feel": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "vfx": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "performance": {
+      "total": 201,
+      "passed": 1,
+      "avg_score": 68.7,
+      "pass_rate": 0.5
+    },
+    "faction_systems": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "player_housing_expression": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "telemetry": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "faction_world": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "group_behavior": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "faction_natural": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "dynamic_events": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "achievement_natural": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "group_natural": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "destruction_debris": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "trading_auction": {
+      "total": 2,
+      "passed": 2,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "housing_personal": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "progression_curves": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "guild_clan": {
+      "total": 2,
+      "passed": 2,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "narrative": {
+      "total": 143,
+      "passed": 2,
+      "avg_score": 62.0,
+      "pass_rate": 1.4
+    },
+    "magic_synergy": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "research": {
+      "total": 110,
+      "passed": 3,
+      "avg_score": 69.0,
+      "pass_rate": 2.7
+    },
+    "magic_ability": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "player_psychology": {
+      "total": 54,
+      "passed": 2,
+      "avg_score": 66.8,
+      "pass_rate": 3.7
+    },
+    "level_spatial": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "progression_mastery": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "level_pacing": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "faction_politics": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "destruction_physics": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "crafting_reward": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "destruction_interactive": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "core_gameplay": {
+      "total": 52,
+      "passed": 2,
+      "avg_score": 65.0,
+      "pass_rate": 3.8
+    },
+    "combat_readability": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "crafting_item": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "emergent_ai": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "fluid_strategy": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "crafting_depth": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "stealth_awareness": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "onboarding_strategy": {
+      "total": 2,
+      "passed": 2,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "asset_pipeline": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "stealth_strategy": {
+      "total": 2,
+      "passed": 2,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "pet_strategy": {
+      "total": 2,
+      "passed": 2,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "testing": {
+      "total": 223,
+      "passed": 1,
+      "avg_score": 69.0,
+      "pass_rate": 0.4
+    },
+    "economy_stability": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "housing_strategy": {
+      "total": 2,
+      "passed": 2,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "dynamic_weather_impact": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "magic_combo": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "mounts_strategic": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "destruction_natural": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "achievement_strategy": {
+      "total": 2,
+      "passed": 2,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "stealth": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "combat_weight": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "fluid_simulation": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "economy_progression": {
+      "total": 2,
+      "passed": 2,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "onboarding_natural": {
+      "total": 2,
+      "passed": 2,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "level_strategy": {
+      "total": 2,
+      "passed": 2,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "weather_state": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "pet_companion": {
+      "total": 2,
+      "passed": 2,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "player_progression_curves": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "social_dynamic": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "monetization": {
+      "total": 52,
+      "passed": 1,
+      "avg_score": 67.6,
+      "pass_rate": 1.9
+    },
+    "crafting_meaningful": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "onboarding_newplayer": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "level_choice": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "combat_systems": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "ui_ux": {
+      "total": 52,
+      "passed": 2,
+      "avg_score": 68.5,
+      "pass_rate": 3.8
+    },
+    "social_strategy": {
+      "total": 2,
+      "passed": 2,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "group_scale": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "magic_emergent": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "animation": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "achievement_sense": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "weather_environmental": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "level_design": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "faction_political": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "dynamic_weather": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "group_strategy": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "social_systems": {
+      "total": 2,
+      "passed": 2,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "crafting_natural": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "mounts_transportation": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "stealth_mechanics": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "fluid_natural": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "mounts_strategy": {
+      "total": 2,
+      "passed": 2,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "pvp_balance": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "weather_natural": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "guild_strategy": {
+      "total": 2,
+      "passed": 2,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "world_events": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "housing_investment": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "mounts_natural": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "achievement_meta": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "guild_natural": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "quest_mission": {
+      "total": 11,
+      "passed": 1,
+      "avg_score": 65.5,
+      "pass_rate": 9.1
+    },
+    "day_night_cycle": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "crafting_strategy": {
+      "total": 2,
+      "passed": 2,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "social_relationship": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "mounts_vehicles": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "onboarding_experience": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "weather_gameplay": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "exploration_strategy": {
+      "total": 2,
+      "passed": 2,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "trading_player": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "social_consequence": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "progression_strategy": {
+      "total": 2,
+      "passed": 2,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "exploration_discovery": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "player_economy": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "economy_natural": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "community_health": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "cosmetics": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "magic_natural": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "level_natural": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "faction_reactive": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "mounts_weight": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "seasonal_events": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "progression_earned": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "reputation_systems_game": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "stealth_detection": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "moderation_anti_griefing": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "exploration": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "worldgen": {
+      "total": 55,
+      "passed": 2,
+      "avg_score": 66.2,
+      "pass_rate": 3.6
+    },
+    "guild_progression": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "exploration_offpath": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "combat_natural": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "combat_strategy": {
+      "total": 2,
+      "passed": 2,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "pet_systems": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "fluid_dynamics": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "crafting": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "accessibility": {
+      "total": 212,
+      "passed": 1,
+      "avg_score": 69.5,
+      "pass_rate": 0.5
+    },
+    "multiplayer_networking": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "player_housing": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "guild_social": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "progression_natural": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "group_intelligence": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "fluid_water": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "pet_gameplay": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "destruction_scale": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "trading_strategy": {
+      "total": 2,
+      "passed": 2,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "housing_longterm": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "audio": {
+      "total": 11,
+      "passed": 1,
+      "avg_score": 64.5,
+      "pass_rate": 9.1
+    },
+    "exploration_rewards": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "destruction_readable": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "battle_pass": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "group_ai": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "exploration_secret": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "guild_organization": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "security": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "combat_feedback": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "social_features": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "exploration_natural": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "pet_attachment": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "achievement_longterm": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "level_flow": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "onboarding_gentle": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "pet_natural": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "trading_market": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "magic_power": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "limited_time_events": {
+      "total": 1,
+      "passed": 1,
+      "avg_score": 100.0,
+      "pass_rate": 100.0
+    },
+    "multiplayer": {
+      "total": 12,
+      "passed": 0,
+      "avg_score": 58.7,
+      "pass_rate": 0.0
+    },
+    "social": {
+      "total": 2,
+      "passed": 0,
+      "avg_score": 61.0,
+      "pass_rate": 0.0
+    },
+    "asset": {
+      "total": 1,
+      "passed": 0,
+      "avg_score": 60.0,
+      "pass_rate": 0.0
+    },
+    "economy": {
+      "total": 11,
+      "passed": 0,
+      "avg_score": 58.7,
+      "pass_rate": 0.0
+    },
+    "onboarding": {
+      "total": 50,
+      "passed": 0,
+      "avg_score": 67.6,
+      "pass_rate": 0.0
+    },
+    "community": {
+      "total": 50,
+      "passed": 0,
+      "avg_score": 67.8,
+      "pass_rate": 0.0
+    },
+    "innovation": {
+      "total": 1,
+      "passed": 0,
+      "avg_score": 60.0,
+      "pass_rate": 0.0
+    },
+    "analytics": {
+      "total": 50,
+      "passed": 0,
+      "avg_score": 67.4,
+      "pass_rate": 0.0
+    },
+    "retention": {
+      "total": 10,
+      "passed": 0,
+      "avg_score": 61.0,
+      "pass_rate": 0.0
+    },
+    "competition": {
+      "total": 1,
+      "passed": 0,
+      "avg_score": 52.0,
+      "pass_rate": 0.0
+    },
+    "ai_npc": {
+      "total": 10,
+      "passed": 0,
+      "avg_score": 62.0,
+      "pass_rate": 0.0
+    },
+    "feedback": {
+      "total": 1,
+      "passed": 0,
+      "avg_score": 52.0,
+      "pass_rate": 0.0
+    },
+    "progression": {
+      "total": 11,
+      "passed": 0,
+      "avg_score": 63.8,
+      "pass_rate": 0.0
+    },
+    "strategy": {
+      "total": 1,
+      "passed": 0,
+      "avg_score": 52.0,
+      "pass_rate": 0.0
+    },
+    "security_anti_cheat": {
+      "total": 10,
+      "passed": 0,
+      "avg_score": 62.0,
+      "pass_rate": 0.0
+    },
+    "ui_animation": {
+      "total": 2,
+      "passed": 0,
+      "avg_score": 52.0,
+      "pass_rate": 0.0
+    },
+    "optimization": {
+      "total": 1,
+      "passed": 0,
+      "avg_score": 60.0,
+      "pass_rate": 0.0
+    },
+    "creative": {
+      "total": 2,
+      "passed": 0,
+      "avg_score": 65.0,
+      "pass_rate": 0.0
+    },
+    "logic": {
+      "total": 2,
+      "passed": 0,
+      "avg_score": 61.0,
+      "pass_rate": 0.0
+    },
+    "customization": {
+      "total": 10,
+      "passed": 0,
+      "avg_score": 65.0,
+      "pass_rate": 0.0
+    }
+  },
+  "failed_roles_sample": [
+    {
+      "role_id": "multi_001",
+      "name": "Fairness Auditor",
+      "category": "multiplayer",
+      "score": 60,
+      "passed": false,
+      "issues": [
+        "Only 0 coder references (minimum 2 required for expert level)",
+        "Prompt template too short or generic",
+        "Competency level is 'None' instead of 'expert'"
+      ],
+      "recommendations": [
+        "Add 2+ specific coder style references with clear application notes.",
+        "Make prompt template more specific and directive.",
+        "Set competency_level to 'expert' for all production roles."
+      ]
+    },
+    {
+      "role_id": "multi_002",
+      "name": "Social Dynamics Analyst",
+      "category": "multiplayer",
+      "score": 60,
+      "passed": false,
+      "issues": [
+        "Only 0 coder references (minimum 2 required for expert level)",
+        "Prompt template too short or generic",
+        "Competency level is 'None' instead of 'expert'"
+      ],
+      "recommendations": [
+        "Add 2+ specific coder style references with clear application notes.",
+        "Make prompt template more specific and directive.",
+        "Set competency_level to 'expert' for all production roles."
+      ]
+    },
+    {
+      "role_id": "perf_121",
+      "name": "Frame Time Spike Root Cause Deep Analysis, Resolution, Prevention, Validation, Documentation, Prevention, Documentation, Prevention & Documentation Specialist",
+      "category": "performance",
+      "score": 70,
+      "passed": false,
+      "issues": [
+        "Only 0 coder references (minimum 2 required for expert level)",
+        "Competency level is 'None' instead of 'expert'"
+      ],
+      "recommendations": [
+        "Add 2+ specific coder style references with clear application notes.",
+        "Set competency_level to 'expert' for all production roles."
+      ]
+    },
+    {
+      "role_id": "perf_122",
+      "name": "Asset Loading & I/O Deep Bottleneck Analysis, Optimization, Prevention, Validation, Documentation, Prevention, Documentation, Prevention & Documentation Specialist",
+      "category": "performance",
+      "score": 70,
+      "passed": false,
+      "issues": [
+        "Only 0 coder references (minimum 2 required for expert level)",
+        "Competency level is 'None' instead of 'expert'"
+      ],
+      "recommendations": [
+        "Add 2+ specific coder style references with clear application notes.",
+        "Set competency_level to 'expert' for all production roles."
+      ]
+    },
+    {
+      "role_id": "perf_123",
+      "name": "Network Prediction Error & Desync Deep Prevention, Resolution, Prevention, Validation, Documentation, Prevention, Documentation, Prevention & Documentation Specialist",
+      "category": "performance",
+      "score": 70,
+      "passed": false,
+      "issues": [
+        "Only 0 coder references (minimum 2 required for expert level)",
+        "Competency level is 'None' instead of 'expert'"
+      ],
+      "recommendations": [
+        "Add 2+ specific coder style references with clear application notes.",
+        "Set competency_level to 'expert' for all production roles."
+      ]
+    },
+    {
+      "role_id": "perf_124",
+      "name": "Memory Allocation Pattern Deep Optimization, Fragmentation Resolution, Prevention, Validation, Documentation, Prevention, Documentation, Prevention & Documentation Specialist",
+      "category": "performance",
+      "score": 70,
+      "passed": false,
+      "issues": [
+        "Only 0 coder references (minimum 2 required for expert level)",
+        "Competency level is 'None' instead of 'expert'"
+      ],
+      "recommendations": [
+        "Add 2+ specific coder style references with clear application notes.",
+        "Set competency_level to 'expert' for all production roles."
+      ]
+    },
+    {
+      "role_id": "perf_125",
+      "name": "CPU Thread Contention Deep Analysis, Advanced Resolution, Prevention, Validation, Documentation, Prevention, Documentation, Prevention & Documentation Specialist",
+      "category": "performance",
+      "score": 70,
+      "passed": false,
+      "issues": [
+        "Only 0 coder references (minimum 2 required for expert level)",
+        "Competency level is 'None' instead of 'expert'"
+      ],
+      "recommendations": [
+        "Add 2+ specific coder style references with clear application notes.",
+        "Set competency_level to 'expert' for all production roles."
+      ]
+    },
+    {
+      "role_id": "perf_126",
+      "name": "GPU Draw Call Deep Reduction, Advanced Batching Optimization, Prevention, Validation, Documentation, Prevention, Documentation, Prevention & Documentation Specialist",
+      "category": "performance",
+      "score": 70,
+      "passed": false,
+      "issues": [
+        "Only 0 coder references (minimum 2 required for expert level)",
+        "Competency level is 'None' instead of 'expert'"
+      ],
+      "recommendations": [
+        "Add 2+ specific coder style references with clear application notes.",
+        "Set competency_level to 'expert' for all production roles."
+      ]
+    },
+    {
+      "role_id": "perf_127",
+      "name": "Background Loading & Preloading Deep Strategy Optimization, Seamless Experience, Prevention, Validation, Documentation, Prevention, Documentation, Prevention & Documentation Specialist",
+      "category": "performance",
+      "score": 70,
+      "passed": false,
+      "issues": [
+        "Only 0 coder references (minimum 2 required for expert level)",
+        "Competency level is 'None' instead of 'expert'"
+      ],
+      "recommendations": [
+        "Add 2+ specific coder style references with clear application notes.",
+        "Set competency_level to 'expert' for all production roles."
+      ]
+    },
+    {
+      "role_id": "perf_128",
+      "name": "Performance Budget Deep Definition, Strict Enforcement, Target Management, Prevention, Validation, Documentation, Prevention, Documentation, Prevention & Documentation Specialist",
+      "category": "performance",
+      "score": 70,
+      "passed": false,
+      "issues": [
+        "Only 0 coder references (minimum 2 required for expert level)",
+        "Competency level is 'None' instead of 'expert'"
+      ],
+      "recommendations": [
+        "Add 2+ specific coder style references with clear application notes.",
+        "Set competency_level to 'expert' for all production roles."
+      ]
+    },
+    {
+      "role_id": "perf_129",
+      "name": "Cross-Platform Performance Deep Consistency, Advanced Parity, Consistent Experience, Prevention, Validation, Documentation, Prevention, Documentation, Prevention & Documentation Specialist",
+      "category": "performance",
+      "score": 70,
+      "passed": false,
+      "issues": [
+        "Only 0 coder references (minimum 2 required for expert level)",
+        "Competency level is 'None' instead of 'expert'"
+      ],
+      "recommendations": [
+        "Add 2+ specific coder style references with clear application notes.",
+        "Set competency_level to 'expert' for all production roles."
+      ]
+    },
+    {
+      "role_id": "perf_130",
+      "name": "Performance Regression Deep Detection, Advanced Alerting, Prevention, Resolution, Validation, Documentation, Prevention, Documentation, Prevention, Documentation & Prevention Specialist",
+      "category": "performance",
+      "score": 70,
+      "passed": false,
+      "issues": [
+        "Only 0 coder references (minimum 2 required for expert level)",
+        "Competency level is 'None' instead of 'expert'"
+      ],
+      "recommendations": [
+        "Add 2+ specific coder style references with clear application notes.",
+        "Set competency_level to 'expert' for all production roles."
+      ]
+    },
+    {
+      "role_id": "bal_031",
+      "name": "Item & Gear Power Curve Deep Specialist",
+      "category": "balancing",
+      "score": 70,
+      "passed": false,
+      "issues": [
+        "Only 0 coder references (minimum 2 required for expert level)",
+        "Competency level is 'None' instead of 'expert'"
+      ],
+      "recommendations": [
+        "Add 2+ specific coder style references with clear application notes.",
+        "Set competency_level to 'expert' for all production roles."
+      ]
+    },
+    {
+      "role_id": "bal_032",
+      "name": "Ability & Spell Synergy Deep Designer",
+      "category": "balancing",
+      "score": 70,
+      "passed": false,
+      "issues": [
+        "Only 0 coder references (minimum 2 required for expert level)",
+        "Competency level is 'None' instead of 'expert'"
+      ],
+      "recommendations": [
+        "Add 2+ specific coder style references with clear application notes.",
+        "Set competency_level to 'expert' for all production roles."
+      ]
+    },
+    {
+      "role_id": "bal_033",
+      "name": "Encounter Difficulty & Player Power Scaling Deep Specialist",
+      "category": "balancing",
+      "score": 70,
+      "passed": false,
+      "issues": [
+        "Only 0 coder references (minimum 2 required for expert level)",
+        "Competency level is 'None' instead of 'expert'"
+      ],
+      "recommendations": [
+        "Add 2+ specific coder style references with clear application notes.",
+        "Set competency_level to 'expert' for all production roles."
+      ]
+    },
+    {
+      "role_id": "bal_034",
+      "name": "Economic Inflation & Deflation Deep Controller",
+      "category": "balancing",
+      "score": 70,
+      "passed": false,
+      "issues": [
+        "Only 0 coder references (minimum 2 required for expert level)",
+        "Competency level is 'None' instead of 'expert'"
+      ],
+      "recommendations": [
+        "Add 2+ specific coder style references with clear application notes.",
+        "Set competency_level to 'expert' for all production roles."
+      ]
+    },
+    {
+      "role_id": "bal_035",
+      "name": "PvE vs PvP Balance Parity Deep Specialist",
+      "category": "balancing",
+      "score": 70,
+      "passed": false,
+      "issues": [
+        "Only 0 coder references (minimum 2 required for expert level)",
+        "Competency level is 'None' instead of 'expert'"
+      ],
+      "recommendations": [
+        "Add 2+ specific coder style references with clear application notes.",
+        "Set competency_level to 'expert' for all production roles."
+      ]
+    },
+    {
+      "role_id": "bal_036",
+      "name": "New Player vs Veteran Power Gap Deep Controller",
+      "category": "balancing",
+      "score": 70,
+      "passed": false,
+      "issues": [
+        "Only 0 coder references (minimum 2 required for expert level)",
+        "Competency level is 'None' instead of 'expert'"
+      ],
+      "recommendations": [
+        "Add 2+ specific coder style references with clear application notes.",
+        "Set competency_level to 'expert' for all production roles."
+      ]
+    },
+    {
+      "role_id": "bal_037",
+      "name": "Seasonal & Limited-Time Content Balance Deep Specialist",
+      "category": "balancing",
+      "score": 70,
+      "passed": false,
+      "issues": [
+        "Only 0 coder references (minimum 2 required for expert level)",
+        "Competency level is 'None' instead of 'expert'"
+      ],
+      "recommendations": [
+        "Add 2+ specific coder style references with clear application notes.",
+        "Set competency_level to 'expert' for all production roles."
+      ]
+    },
+    {
+      "role_id": "bal_038",
+      "name": "Cross-Platform Input & Performance Balance Deep Specialist",
+      "category": "balancing",
+      "score": 70,
+      "passed": false,
+      "issues": [
+        "Only 0 coder references (minimum 2 required for expert level)",
+        "Competency level is 'None' instead of 'expert'"
+      ],
+      "recommendations": [
+        "Add 2+ specific coder style references with clear application notes.",
+        "Set competency_level to 'expert' for all production roles."
+      ]
+    }
+  ],
+  "top_recommendations": [
+    {
+      "recommendation": "Add 2+ specific coder style references with clear application notes.",
+      "occurrences": 1616
+    },
+    {
+      "recommendation": "Set competency_level to 'expert' for all production roles.",
+      "occurrences": 1616
+    },
+    {
+      "recommendation": "Make prompt template more specific and directive.",
+      "occurrences": 523
+    },
+    {
+      "recommendation": "Write a clear, specific perspective statement.",
+      "occurrences": 49
+    }
+  ]
+}

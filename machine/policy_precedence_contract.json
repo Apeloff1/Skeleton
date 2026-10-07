@@ -1,0 +1,20 @@
+{
+  "schema_version": "skeleton.ai.policy_precedence.v1",
+  "gap_id": "G131",
+  "title": "invariant/policy conflicts have no single precedence and conflict-resolution contract",
+  "authority": "skeleton/security/policy_precedence.py",
+  "precedence_low_to_high": ["tenant", "operator", "developer", "system", "invariant"],
+  "requirements": [
+    "highest authority wins across layers",
+    "contradiction at equal highest authority fails closed",
+    "absence of an authoritative rule fails closed",
+    "invariants cannot be overridden by mutable policy layers",
+    "decision identity is content-bound and input-order independent",
+    "replay must reproduce the exact prior decision under the exact policy content"
+  ],
+  "closure": {
+    "implementation_is_not_verification": true,
+    "independent_exact_head_evidence_required": true,
+    "self_signing_forbidden": true
+  }
+}

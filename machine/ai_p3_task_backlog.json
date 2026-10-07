@@ -1,0 +1,1113 @@
+{
+  "schema_version": "skeleton.ai.p3.task_backlog.v1",
+  "backlog_version": "0.1.0",
+  "status": "active",
+  "phase": "P3",
+  "title": "P3 Autonomous Intelligence Expansion Backlog",
+  "source_map": "machine/ai_p3_execution_map.json",
+  "completion_authority": "Task state is implementation scheduling/evidence state only. Masterplan maturity and independent sign-off remain separate authorities.",
+  "summary": {
+    "task_count": 6,
+    "in_progress_count": 0,
+    "ready_count": 0,
+    "blocked_count": 0,
+    "landed_unpromoted_count": 6,
+    "scheduled_volume_count": 23,
+    "queued_volume_count": 234,
+    "source_volume_count": 257
+  },
+  "tasks": [
+    {
+      "task_id": "P3-MODEL-FOUNDATION-01",
+      "lane_id": "P3-L0",
+      "status": "landed_unpromoted",
+      "title": "Model, research and multimodal foundation",
+      "depends_on": [],
+      "primary_volume_refs": [
+        "VOL-001",
+        "VOL-006",
+        "VOL-019",
+        "VOL-020"
+      ],
+      "objective": "Turn the remaining scientific/model-development/world-model/multimodal foundation into executable, provenance-bound capability without regressing the provider-independent Functional-AI frontier.",
+      "acceptance": [
+        "All inherited masterplan contracts, risks, gaps, tests, evaluations, accountability, and signing requirements remain explicit.",
+        "Executable evidence covers negative, boundary, cancellation/recovery, or adversarial behavior appropriate to the owned volumes.",
+        "No task may self-promote masterplan maturity, completion checkbox, implementation signature, or independent verification signature.",
+        "Exact-head CI evidence is required before landed_unpromoted state."
+      ],
+      "priority": "P3",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_refs": [
+        "source:machine/ai_p2_functional_ai_closure.json",
+        "source:machine/ai_p2_execution_map.json#/first_tranche/queued_volume_refs",
+        "source:machine/ai_master_plan.json",
+        "implementation:skeleton/ai/learning/model_program.py",
+        "implementation:skeleton/ai/research/source_lineage.py",
+        "implementation:skeleton/ai/simulation/environment.py",
+        "implementation:skeleton/ai/runtime/multimodal/intake.py",
+        "github:pr#2347",
+        "git-head:50939b4ba919b4308376d94395df55634dd0b731",
+        "workflow:P3 Model Foundation@50939b4ba919b4308376d94395df55634dd0b731:success",
+        "github-actions-run:36964035037"
+      ],
+      "masterplan_obligations": [
+        {
+          "volume_ref": "VOL-001",
+          "title": "Scientific & Historical Foundation",
+          "depth_pass": "DP-000-040",
+          "accountability_id": "ACC-VOL-001",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ResearchSource",
+            "ResearchClaim",
+            "ReplicationRecord",
+            "RetractionRecord"
+          ],
+          "risks": [
+            "cargo-culting historically famous techniques",
+            "source selection bias",
+            "retracted/corrected findings surviving as current truth"
+          ],
+          "gaps": [
+            "research ingestion implementation is incomplete",
+            "cross-source citation graph needs executable reconciliation"
+          ],
+          "implementation_paths": [
+            "planned:skeleton/research",
+            "docs/plan/EDGE_CASES_HISTORICAL.md",
+            "machine/ai_edge_case_catalog.json"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_research_lineage.py",
+            "scripts/check_ai_edge_case_catalog.py"
+          ],
+          "evaluations": [
+            "planned:source-quality calibration",
+            "planned:replication-status consistency evaluation"
+          ]
+        },
+        {
+          "volume_ref": "VOL-006",
+          "title": "Model Development Program",
+          "depth_pass": "DP-000-040",
+          "accountability_id": "ACC-VOL-006",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "DatasetManifest",
+            "TrainingRun",
+            "ModelArtifact",
+            "TrainingLineage"
+          ],
+          "risks": [
+            "data rights violations",
+            "benchmark contamination",
+            "irreproducible training provenance"
+          ],
+          "gaps": [
+            "native training infrastructure remains a target capability",
+            "model registry contract needs implementation"
+          ],
+          "implementation_paths": [
+            "planned:skeleton/modeling",
+            "planned:skeleton/training",
+            "planned:machine/model_registry.json"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_dataset_manifest.py",
+            "planned:skeleton/testing/test_training_lineage.py"
+          ],
+          "evaluations": [
+            "planned:contamination audit",
+            "planned:reproducible small-model training baseline"
+          ]
+        },
+        {
+          "volume_ref": "VOL-019",
+          "title": "World Models & Simulation",
+          "depth_pass": "DP-000-040",
+          "accountability_id": "ACC-VOL-019",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "WorldState",
+            "SimulationStep",
+            "SimulationResult",
+            "AssumptionSet"
+          ],
+          "risks": [
+            "simulation treated as real evidence",
+            "model bias compounds through rollouts",
+            "non-deterministic environment assumptions"
+          ],
+          "gaps": [
+            "environment adapter standard missing",
+            "uncertainty propagation policy needs definition"
+          ],
+          "implementation_paths": [
+            "planned:skeleton/simulation"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_simulation_authority_boundary.py",
+            "planned:skeleton/testing/test_simulation_determinism.py"
+          ],
+          "evaluations": [
+            "planned:sim-to-real calibration",
+            "planned:counterfactual planning eval"
+          ]
+        },
+        {
+          "volume_ref": "VOL-020",
+          "title": "Multimodal Intelligence",
+          "depth_pass": "DP-000-040",
+          "accountability_id": "ACC-VOL-020",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "MediaArtifact",
+            "ModalitySegment",
+            "MediaProvenance",
+            "CrossModalReference"
+          ],
+          "risks": [
+            "embedded prompt injection",
+            "metadata privacy leakage",
+            "cross-modal misalignment"
+          ],
+          "gaps": [
+            "document/audio/video pipelines need convergence",
+            "modality-specific sanitization policies need implementation"
+          ],
+          "implementation_paths": [
+            "planned:skeleton/multimodal",
+            "backend/routes/media.py"
+          ],
+          "tests": [
+            "backend/tests/test_ai_provider_media.py",
+            "planned:skeleton/testing/test_multimodal_trust.py"
+          ],
+          "evaluations": [
+            "planned:cross-modal retrieval eval",
+            "planned:hidden-instruction multimodal adversarial suite"
+          ]
+        }
+      ]
+    },
+    {
+      "task_id": "P3-DOMAIN-INTELLIGENCE-01",
+      "lane_id": "P3-L1",
+      "status": "landed_unpromoted",
+      "title": "Specialized and domain intelligence",
+      "depends_on": [
+        "P3-MODEL-FOUNDATION-01"
+      ],
+      "primary_volume_refs": [
+        "VOL-071",
+        "VOL-072",
+        "VOL-073",
+        "VOL-074"
+      ],
+      "objective": "Materialize bounded specialization, Jeeves domain custody, simulation intelligence, and education behavior on top of the local functional runtime.",
+      "acceptance": [
+        "All inherited masterplan contracts, risks, gaps, tests, evaluations, accountability, and signing requirements remain explicit.",
+        "Executable evidence covers negative, boundary, cancellation/recovery, or adversarial behavior appropriate to the owned volumes.",
+        "No task may self-promote masterplan maturity, completion checkbox, implementation signature, or independent verification signature.",
+        "Exact-head CI evidence is required before landed_unpromoted state."
+      ],
+      "priority": "P3",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_refs": [
+        "source:machine/ai_p2_functional_ai_closure.json",
+        "source:machine/ai_p2_execution_map.json#/first_tranche/queued_volume_refs",
+        "source:machine/ai_master_plan.json",
+        "implementation:skeleton/jeeves/domain_system.py",
+        "mirror:skeleton/ai/agents/jeeves/domain_system.py",
+        "test:skeleton/testing/test_p3_domain_intelligence.py",
+        "github:pr#2347",
+        "git-head:9a410187c6b46c665bed2cbbccc1d5f686882a7b",
+        "workflow:P3 Domain Intelligence@9a410187c6b46c665bed2cbbccc1d5f686882a7b:success",
+        "github-actions-run:36964519798",
+        "github-actions-job:110705819158"
+      ],
+      "masterplan_obligations": [
+        {
+          "volume_ref": "VOL-071",
+          "title": "Specialized Intelligence",
+          "depth_pass": "DP-041-080",
+          "accountability_id": "ACC-VOL-071",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "DomainProfile",
+            "SpecializedCapability",
+            "DomainFallbackPolicy"
+          ],
+          "risks": [
+            "scope leakage",
+            "overconfidence out of domain",
+            "specialist data drift"
+          ],
+          "gaps": [
+            "define domain registry",
+            "bind specialization to explicit eval ownership"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "skeleton/evaluation",
+            "machine"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_domain_profiles.py",
+            "planned:skeleton/testing/test_specialized_routing.py"
+          ],
+          "evaluations": [
+            "planned:out-of-domain abstention evaluation",
+            "planned:specialist-vs-general baseline"
+          ]
+        },
+        {
+          "volume_ref": "VOL-072",
+          "title": "Jeeves Domain System",
+          "depth_pass": "DP-041-080",
+          "accountability_id": "ACC-VOL-072",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "JeevesRequest",
+            "MarketEvidence",
+            "JeevesAnalysis"
+          ],
+          "risks": [
+            "parallel Jeeves authority",
+            "stale/unsourced market data",
+            "migration drift"
+          ],
+          "gaps": [
+            "finish Jeeves custody map",
+            "bind data freshness/provenance into responses"
+          ],
+          "implementation_paths": [
+            "skeleton/jeeves/ai",
+            "skeleton/ai",
+            "machine/ai_file_tree.json"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_jeeves_contracts.py",
+            "planned:skeleton/testing/test_jeeves_provenance.py"
+          ],
+          "evaluations": [
+            "planned:stale-market-data evaluation",
+            "planned:legacy/canonical parity test"
+          ]
+        },
+        {
+          "volume_ref": "VOL-073",
+          "title": "Game & Simulation Intelligence",
+          "depth_pass": "DP-041-080",
+          "accountability_id": "ACC-VOL-073",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "WorldState",
+            "SimulationAction",
+            "SimulationEvidence"
+          ],
+          "risks": [
+            "simulation/real confusion",
+            "unbounded rollouts",
+            "world model bias"
+          ],
+          "gaps": [
+            "define simulation state contract",
+            "materialize resource/authority guards"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "planned:skeleton/simulation",
+            "machine"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_simulation_authority_boundary.py",
+            "planned:skeleton/testing/test_simulation_budgets.py"
+          ],
+          "evaluations": [
+            "planned:rollout divergence evaluation",
+            "planned:simulated-to-real boundary attack suite"
+          ]
+        },
+        {
+          "volume_ref": "VOL-074",
+          "title": "Education & Teaching",
+          "depth_pass": "DP-041-080",
+          "accountability_id": "ACC-VOL-074",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "LearnerEvidence",
+            "LearningObjective",
+            "InstructionPlan"
+          ],
+          "risks": [
+            "bad learner inference",
+            "reinforced misconception",
+            "engagement metric gaming"
+          ],
+          "gaps": [
+            "define learner-state uncertainty model",
+            "bind pedagogy to outcome evaluations"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "planned:skeleton/education",
+            "skeleton/evaluation"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_learner_evidence.py",
+            "planned:skeleton/testing/test_instruction_plan.py"
+          ],
+          "evaluations": [
+            "planned:misconception correction evaluation",
+            "planned:personalization bias evaluation"
+          ]
+        }
+      ]
+    },
+    {
+      "task_id": "P3-TRUST-EXPERIENCE-01",
+      "lane_id": "P3-L2",
+      "status": "landed_unpromoted",
+      "title": "Explainability, accessibility, internationalization and compliance",
+      "depends_on": [
+        "P3-MODEL-FOUNDATION-01"
+      ],
+      "primary_volume_refs": [
+        "VOL-085",
+        "VOL-086",
+        "VOL-087",
+        "VOL-088"
+      ],
+      "objective": "Bind explanations, accessible interaction, locale behavior, and compliance controls to operation evidence instead of presentation-only claims.",
+      "acceptance": [
+        "All inherited masterplan contracts, risks, gaps, tests, evaluations, accountability, and signing requirements remain explicit.",
+        "Executable evidence covers negative, boundary, cancellation/recovery, or adversarial behavior appropriate to the owned volumes.",
+        "No task may self-promote masterplan maturity, completion checkbox, implementation signature, or independent verification signature.",
+        "Exact-head CI evidence is required before landed_unpromoted state."
+      ],
+      "priority": "P3",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_refs": [
+        "source:machine/ai_p2_functional_ai_closure.json",
+        "source:machine/ai_p2_execution_map.json#/first_tranche/queued_volume_refs",
+        "source:machine/ai_master_plan.json",
+        "implementation:skeleton/cognition/trust_experience.py",
+        "mirror:skeleton/ai/cognition/trust_experience.py",
+        "test:skeleton/testing/test_p3_trust_experience.py",
+        "github:pr#2347",
+        "git-head:9a410187c6b46c665bed2cbbccc1d5f686882a7b",
+        "workflow:P3 Trust Experience@9a410187c6b46c665bed2cbbccc1d5f686882a7b:success",
+        "github-actions-run:36964520163"
+      ],
+      "masterplan_obligations": [
+        {
+          "volume_ref": "VOL-085",
+          "title": "Explainability",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-085",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ExplanationRecord",
+            "DecisionFactor",
+            "ExplanationPolicy"
+          ],
+          "risks": [
+            "fabricated rationale",
+            "trace leakage",
+            "false certainty"
+          ],
+          "gaps": [
+            "define explanation evidence contract",
+            "bind explanations to operation provenance"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "skeleton/observability",
+            "frontend"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_explanation_records.py",
+            "planned:skeleton/testing/test_explanation_redaction.py"
+          ],
+          "evaluations": [
+            "planned:faithfulness/provenance evaluation",
+            "planned:privacy leakage evaluation"
+          ]
+        },
+        {
+          "volume_ref": "VOL-086",
+          "title": "Accessibility",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-086",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "AccessibilityRequirement",
+            "AccessibleControl",
+            "AccessibilityFinding"
+          ],
+          "risks": [
+            "inaccessible cancellation/approval",
+            "visual-only errors",
+            "motion-induced unusability"
+          ],
+          "gaps": [
+            "define accessibility acceptance matrix",
+            "automate critical semantic checks"
+          ],
+          "implementation_paths": [
+            "frontend",
+            "desktop",
+            "docs"
+          ],
+          "tests": [
+            "planned:frontend accessibility contract tests",
+            "planned:keyboard/screen-reader smoke tests"
+          ],
+          "evaluations": [
+            "planned:critical-flow accessibility audit",
+            "planned:reduced-motion evaluation"
+          ]
+        },
+        {
+          "volume_ref": "VOL-087",
+          "title": "Internationalization",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-087",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "LocaleId",
+            "TranslationCatalog",
+            "LocaleFallbackPolicy"
+          ],
+          "risks": [
+            "locale-dependent parsing",
+            "translation drift",
+            "unsafe fallback text"
+          ],
+          "gaps": [
+            "define canonical locale policy",
+            "materialize critical-string coverage"
+          ],
+          "implementation_paths": [
+            "frontend",
+            "skeleton/ai",
+            "docs"
+          ],
+          "tests": [
+            "planned:frontend locale tests",
+            "planned:skeleton/testing/test_locale_neutral_contracts.py"
+          ],
+          "evaluations": [
+            "planned:locale matrix evaluation",
+            "planned:missing-critical-translation test"
+          ]
+        },
+        {
+          "volume_ref": "VOL-088",
+          "title": "Compliance & Legal Engineering",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-088",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ComplianceRequirement",
+            "ComplianceControl",
+            "ComplianceEvidence"
+          ],
+          "risks": [
+            "overbroad legal assumptions",
+            "missing evidence",
+            "stale applicability"
+          ],
+          "gaps": [
+            "define compliance registry schema",
+            "bind controls to evidence owners"
+          ],
+          "implementation_paths": [
+            "docs",
+            "machine",
+            "skeleton/security"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_compliance_registry.py",
+            "planned:skeleton/testing/test_compliance_control_mapping.py"
+          ],
+          "evaluations": [
+            "planned:control evidence audit",
+            "planned:jurisdiction/applicability review"
+          ]
+        }
+      ]
+    },
+    {
+      "task_id": "P3-VERTICAL-SUITE-01",
+      "lane_id": "P3-L3",
+      "status": "landed_unpromoted",
+      "title": "VS-002 through VS-007 executable validation suite",
+      "depends_on": [
+        "P3-MODEL-FOUNDATION-01",
+        "P3-DOMAIN-INTELLIGENCE-01",
+        "P3-TRUST-EXPERIENCE-01"
+      ],
+      "primary_volume_refs": [
+        "VOL-098",
+        "VOL-099",
+        "VOL-100",
+        "VOL-101",
+        "VOL-102",
+        "VOL-103"
+      ],
+      "objective": "Materialize engineering, scientific-research, multi-agent, self-improvement, distributed-execution, and desktop-product vertical slices with independent evidence.",
+      "acceptance": [
+        "All inherited masterplan contracts, risks, gaps, tests, evaluations, accountability, and signing requirements remain explicit.",
+        "Executable evidence covers negative, boundary, cancellation/recovery, or adversarial behavior appropriate to the owned volumes.",
+        "No task may self-promote masterplan maturity, completion checkbox, implementation signature, or independent verification signature.",
+        "Exact-head CI evidence is required before landed_unpromoted state."
+      ],
+      "priority": "P3",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_refs": [
+        "source:machine/ai_p2_functional_ai_closure.json",
+        "source:machine/ai_p2_execution_map.json#/first_tranche/queued_volume_refs",
+        "source:machine/ai_master_plan.json",
+        "implementation:skeleton/eval/vertical_suite.py",
+        "mirror:skeleton/ai/evaluation/vertical_suite.py",
+        "tests:skeleton/testing/test_vs002_engineering_agent.py..test_vs007_desktop_product.py",
+        "test:skeleton/testing/test_p3_vertical_suite.py",
+        "test:skeleton/testing/test_vs002_engineering_agent.py",
+        "test:skeleton/testing/test_vs003_scientific_researcher.py",
+        "test:skeleton/testing/test_vs004_multi_agent_engineering.py",
+        "test:skeleton/testing/test_vs005_self_improvement.py",
+        "test:skeleton/testing/test_vs006_distributed_execution.py",
+        "test:skeleton/testing/test_vs007_desktop_product.py",
+        "github:pr#2347",
+        "git-head:633606bbea4ffdae25dab89b4839a24c012c8c17",
+        "workflow:P3 Vertical Suite@633606bbea4ffdae25dab89b4839a24c012c8c17:success",
+        "github-actions-run:36965987976"
+      ],
+      "masterplan_obligations": [
+        {
+          "volume_ref": "VOL-098",
+          "title": "VS-002 Engineering Agent",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-098",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "EngineeringTask",
+            "MutationLease",
+            "EngineeringEvidence"
+          ],
+          "risks": [
+            "unleased mutation",
+            "destructive edit",
+            "self-verification bias"
+          ],
+          "gaps": [
+            "materialize isolated repo fixture",
+            "bind lease and verifier roles"
+          ],
+          "implementation_paths": [
+            "skeleton/ai/build",
+            "skeleton/repo_intelligence",
+            "scripts"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_vs002_engineering_agent.py",
+            "planned:repository rollback integration"
+          ],
+          "evaluations": [
+            "planned:conflicting-agent lease evaluation",
+            "planned:test-gaming adversarial run"
+          ]
+        },
+        {
+          "volume_ref": "VOL-099",
+          "title": "VS-003 Scientific Researcher",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-099",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ResearchQuestion",
+            "EvidenceGraph",
+            "ResearchConclusion"
+          ],
+          "risks": [
+            "unsupported synthesis",
+            "method drift",
+            "publication/selection bias"
+          ],
+          "gaps": [
+            "materialize research fixture corpus",
+            "bind experiment/reproducibility records"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "experiments",
+            "skeleton/eval"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_vs003_scientific_researcher.py",
+            "planned:research provenance integration"
+          ],
+          "evaluations": [
+            "planned:source-conflict evaluation",
+            "planned:reproduction variance evaluation"
+          ]
+        },
+        {
+          "volume_ref": "VOL-100",
+          "title": "VS-004 Multi-Agent Engineering",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-100",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "MultiAgentTask",
+            "HandoffPacket",
+            "ConflictDomain"
+          ],
+          "risks": [
+            "authority amplification",
+            "lost update",
+            "deadlock/livelock"
+          ],
+          "gaps": [
+            "materialize multi-agent repo scenario",
+            "bind delegation subset checks"
+          ],
+          "implementation_paths": [
+            "skeleton/ai/agents",
+            "skeleton/ai/build",
+            "skeleton/swarm"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_vs004_multi_agent_engineering.py",
+            "planned:conflict/lease integration tests"
+          ],
+          "evaluations": [
+            "planned:agent-crash coordination drill",
+            "planned:false-consensus evaluation"
+          ]
+        },
+        {
+          "volume_ref": "VOL-101",
+          "title": "VS-005 Self-Improvement",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-101",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ImprovementCandidate",
+            "PromotionDecision",
+            "RollbackReceipt"
+          ],
+          "risks": [
+            "self-promotion",
+            "benchmark gaming",
+            "irreversible drift"
+          ],
+          "gaps": [
+            "materialize champion/challenger harness",
+            "bind promotion to independent verifier"
+          ],
+          "implementation_paths": [
+            "skeleton/ai/forge",
+            "skeleton/learning",
+            "skeleton/eval"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_vs005_self_improvement.py",
+            "planned:promotion rollback integration"
+          ],
+          "evaluations": [
+            "planned:reward-hacking challenge",
+            "planned:canary regression evaluation"
+          ]
+        },
+        {
+          "volume_ref": "VOL-102",
+          "title": "VS-006 Distributed Execution",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-102",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "DistributedTask",
+            "WorkerLease",
+            "DistributedReceipt"
+          ],
+          "risks": [
+            "duplicate effects",
+            "stale lease",
+            "lost terminal state"
+          ],
+          "gaps": [
+            "materialize fault-injected worker cluster",
+            "bind external effects to reconciliation"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "skeleton/network",
+            "skeleton/reliability"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_vs006_distributed_execution.py",
+            "planned:partition/failover integration"
+          ],
+          "evaluations": [
+            "planned:split-brain campaign",
+            "planned:unknown-outcome reconciliation drill"
+          ]
+        },
+        {
+          "volume_ref": "VOL-103",
+          "title": "VS-007 Desktop Product",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-103",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "DesktopAcceptanceRun",
+            "DesktopArtifactReceipt",
+            "DesktopRollbackEvidence"
+          ],
+          "risks": [
+            "install/runtime mismatch",
+            "migration loss",
+            "rollback failure"
+          ],
+          "gaps": [
+            "materialize clean-machine matrix",
+            "bind installer/updater/release evidence"
+          ],
+          "implementation_paths": [
+            "skeleton/app",
+            "installer",
+            "desktop"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_vs007_desktop_product.py",
+            "planned:clean-machine desktop release E2E"
+          ],
+          "evaluations": [
+            "planned:update interruption drill",
+            "planned:rollback data-compatibility evaluation"
+          ]
+        }
+      ]
+    },
+    {
+      "task_id": "P3-ACCEPTANCE-01",
+      "lane_id": "P3-L4",
+      "status": "landed_unpromoted",
+      "title": "Autonomous worker, research system and SOTA-candidate acceptance",
+      "depends_on": [
+        "P3-VERTICAL-SUITE-01"
+      ],
+      "primary_volume_refs": [
+        "VOL-105",
+        "VOL-106",
+        "VOL-107"
+      ],
+      "objective": "Create strict acceptance envelopes for autonomous work, research, and SOTA-candidate claims; require negative, aging, recovery, and independent-verification evidence.",
+      "acceptance": [
+        "All inherited masterplan contracts, risks, gaps, tests, evaluations, accountability, and signing requirements remain explicit.",
+        "Executable evidence covers negative, boundary, cancellation/recovery, or adversarial behavior appropriate to the owned volumes.",
+        "No task may self-promote masterplan maturity, completion checkbox, implementation signature, or independent verification signature.",
+        "Exact-head CI evidence is required before landed_unpromoted state."
+      ],
+      "priority": "P3",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_refs": [
+        "source:machine/ai_p2_functional_ai_closure.json",
+        "source:machine/ai_p2_execution_map.json#/first_tranche/queued_volume_refs",
+        "source:machine/ai_master_plan.json",
+        "implementation:skeleton/eval/p3_acceptance.py",
+        "mirror:skeleton/ai/evaluation/p3_acceptance.py",
+        "test:skeleton/testing/test_p3_acceptance.py",
+        "workflow:.github/workflows/p3-acceptance.yml",
+        "github:pr#2347",
+        "git-head:16a444e334b362084fac0a608b79f3b27c62e962",
+        "workflow:P3 Acceptance Frontier@16a444e334b362084fac0a608b79f3b27c62e962:success",
+        "github-actions-run:36966547069"
+      ],
+      "masterplan_obligations": [
+        {
+          "volume_ref": "VOL-105",
+          "title": "Acceptance: Autonomous AI Worker",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-105",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "AutonomousWorkerAcceptance",
+            "AutonomyBudgetEvidence",
+            "AutonomyControlEvidence"
+          ],
+          "risks": [
+            "zombie work",
+            "budget leakage",
+            "authority creep"
+          ],
+          "gaps": [
+            "define long-horizon acceptance envelope",
+            "materialize aging/recovery evidence"
+          ],
+          "implementation_paths": [
+            "machine",
+            "docs/plan",
+            "skeleton/ai/agents"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_autonomous_worker_acceptance.py",
+            "planned:long-horizon aging tests"
+          ],
+          "evaluations": [
+            "planned:multi-hour durability simulation",
+            "planned:authority revocation campaign"
+          ]
+        },
+        {
+          "volume_ref": "VOL-106",
+          "title": "Acceptance: Research System",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-106",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ResearchAcceptance",
+            "ClaimEvidenceCoverage",
+            "ReproductionEvidence"
+          ],
+          "risks": [
+            "unsupported claim",
+            "irreproducibility",
+            "selection bias"
+          ],
+          "gaps": [
+            "define research acceptance rubric",
+            "bind conclusions to evidence graph"
+          ],
+          "implementation_paths": [
+            "machine",
+            "docs/plan",
+            "skeleton/eval"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_research_system_acceptance.py",
+            "planned:claim-evidence coverage tests"
+          ],
+          "evaluations": [
+            "planned:conflicting-source review",
+            "planned:reproduction challenge"
+          ]
+        },
+        {
+          "volume_ref": "VOL-107",
+          "title": "Acceptance: SOTA Candidate",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-107",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "SOTACandidateClaim",
+            "BaselineComparison",
+            "QualificationEvidence"
+          ],
+          "risks": [
+            "overclaim",
+            "contamination",
+            "baseline weakness"
+          ],
+          "gaps": [
+            "define claim template and prohibited shortcuts",
+            "materialize independent replay path"
+          ],
+          "implementation_paths": [
+            "benchmarks",
+            "skeleton/eval",
+            "machine"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_sota_candidate_claims.py",
+            "planned:qualification evidence tests"
+          ],
+          "evaluations": [
+            "planned:independent benchmark replay",
+            "planned:robustness/cost characterization"
+          ]
+        }
+      ]
+    },
+    {
+      "task_id": "P3-CONSTRUCTION-AUTHORITY-01",
+      "lane_id": "P3-L5",
+      "status": "landed_unpromoted",
+      "title": "Construction manual and technology radar authority",
+      "depends_on": [
+        "P3-TRUST-EXPERIENCE-01",
+        "P3-ACCEPTANCE-01"
+      ],
+      "primary_volume_refs": [
+        "VOL-111",
+        "VOL-114"
+      ],
+      "objective": "Make the construction manual and technology radar deterministic projections of machine/runtime evidence with no self-promoting completion authority.",
+      "acceptance": [
+        "All inherited masterplan contracts, risks, gaps, tests, evaluations, accountability, and signing requirements remain explicit.",
+        "Executable evidence covers negative, boundary, cancellation/recovery, or adversarial behavior appropriate to the owned volumes.",
+        "No task may self-promote masterplan maturity, completion checkbox, implementation signature, or independent verification signature.",
+        "Exact-head CI evidence is required before landed_unpromoted state."
+      ],
+      "priority": "P3",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_refs": [
+        "source:machine/ai_p2_functional_ai_closure.json",
+        "source:machine/ai_p2_execution_map.json#/first_tranche/queued_volume_refs",
+        "source:machine/ai_master_plan.json",
+        "implementation:skeleton/ai/planning/construction_authority.py",
+        "test:skeleton/testing/test_p3_construction_authority.py",
+        "workflow:.github/workflows/p3-construction-authority.yml",
+        "github:pr#2347",
+        "git-head:16a444e334b362084fac0a608b79f3b27c62e962",
+        "workflow:P3 Construction Authority@16a444e334b362084fac0a608b79f3b27c62e962:success",
+        "github-actions-run:36966546962",
+        "dependency:P3-ACCEPTANCE-01:landed_unpromoted"
+      ],
+      "masterplan_obligations": [
+        {
+          "volume_ref": "VOL-111",
+          "title": "Full Construction Manual Format",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-111",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ConstructionPacket",
+            "PacketSection",
+            "PacketReference"
+          ],
+          "risks": [
+            "missing handoff context",
+            "prose/machine divergence",
+            "unreviewable giant packet"
+          ],
+          "gaps": [
+            "define packet schema",
+            "generate packet skeletons from machine plan"
+          ],
+          "implementation_paths": [
+            "docs/AI_APP_CONSTRUCTION_MANUAL.md",
+            "docs/plan",
+            "machine"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_construction_packet_format.py",
+            "planned:packet reference validation"
+          ],
+          "evaluations": [
+            "planned:delegation completeness evaluation",
+            "planned:stale-status duplication audit"
+          ]
+        },
+        {
+          "volume_ref": "VOL-114",
+          "title": "Technology Radar",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-114",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "TechnologyCandidate",
+            "RadarDecision",
+            "TechnologyExitCriteria"
+          ],
+          "risks": [
+            "novelty bias",
+            "permanent experiment",
+            "vendor lock-in"
+          ],
+          "gaps": [
+            "define radar state machine",
+            "bind adopted tech to architecture decisions"
+          ],
+          "implementation_paths": [
+            "docs/plan",
+            "machine",
+            "experiments"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_technology_radar.py",
+            "planned:radar decision evidence tests"
+          ],
+          "evaluations": [
+            "planned:candidate baseline evaluation",
+            "planned:stale experiment audit"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "accountability_id": "ACC-AIQ-S0-COST-02",
+  "event_type": "start_marker",
+  "actor_id": "chatgpt:gpt-5.6-sol",
+  "actor_type": "agent",
+  "role": "implementation-agent",
+  "signature_method": "github_identity",
+  "note": "Agent attestation through the user-authorized GitHub connector; not a human signature.",
+  "baseline_git_sha": "6871e1750ec650fd7b4c96052320cccc558688d5",
+  "timestamp_source": "GitHub commit created_at for this start-marker commit",
+  "from_status": "pending",
+  "intended_to_status": "in_progress",
+  "statement": "Begin AIQ-S0-COST-02 durable monotonic tool/artifact/storage usage metering and reconciliation."
+}

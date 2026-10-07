@@ -1,0 +1,121 @@
+name: P2 Master Traceability Spine
+
+on:
+  pull_request:
+    branches:
+      - main
+      - feat/p2-architecture-rule-registry
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_engineering_pass.json"
+      - "machine/ai_capabilities.json"
+      - "machine/state_topology.json"
+      - "machine/capability_interfaces.json"
+      - "machine/ai_runtime_schemas.json"
+      - "machine/contract_conformance.json"
+      - "machine/requirement_registry.json"
+      - "machine/capability_taxonomy.json"
+      - "machine/nfr_registry.json"
+      - "machine/behavior_specifications.json"
+      - "machine/state_machine_catalogue.json"
+      - "machine/interface_standard.json"
+      - "machine/schema_registry.json"
+      - "machine/compatibility_model.json"
+      - "machine/protocol_registry.json"
+      - "machine/maturity_registry.json"
+      - "machine/master_traceability.json"
+      - "machine/traceability/**"
+      - "skeleton/contracts/**"
+      - "skeleton/ai/runtime/contracts/**"
+      - "skeleton/shells/worker_protocol.py"
+      - "skeleton/shells/ai/protocol.py"
+      - "skeleton/distributed/network/_replication_protocol.py"
+      - "scripts/check_master_traceability.py"
+      - "scripts/check_nfr_registry.py"
+      - "scripts/check_traceability_spine.py"
+      - "scripts/check_trace_pr_impact.py"
+      - "tests/test_master_traceability.py"
+      - "tests/test_nfr_registry.py"
+      - "tests/test_traceability_spine.py"
+      - "tests/test_trace_pr_impact.py"
+      - "tests/test_internal_protocol_envelope.py"
+      - "docs/architecture/P2_TRACEABILITY_SPINE.md"
+      - ".github/workflows/p2-traceability-spine.yml"
+  push:
+    branches:
+      - main
+      - feat/p2-traceability-spine
+    paths:
+      - "machine/**"
+      - "skeleton/contracts/**"
+      - "skeleton/ai/runtime/contracts/**"
+      - "skeleton/shells/worker_protocol.py"
+      - "skeleton/shells/ai/protocol.py"
+      - "skeleton/distributed/network/_replication_protocol.py"
+      - "scripts/check_master_traceability.py"
+      - "scripts/check_nfr_registry.py"
+      - "scripts/check_traceability_spine.py"
+      - "scripts/check_trace_pr_impact.py"
+      - "tests/test_master_traceability.py"
+      - "tests/test_nfr_registry.py"
+      - "tests/test_traceability_spine.py"
+      - "tests/test_trace_pr_impact.py"
+      - "tests/test_internal_protocol_envelope.py"
+      - "docs/architecture/P2_TRACEABILITY_SPINE.md"
+      - ".github/workflows/p2-traceability-spine.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p2-master-traceability-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-traceability:
+    name: Validate requirements-to-runtime traceability
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Validate sharded master trace
+        run: python scripts/check_master_traceability.py --json
+
+      - name: Validate NFR registry
+        run: python scripts/check_nfr_registry.py --json
+
+      - name: Validate complete traceability spine
+        run: python scripts/check_traceability_spine.py --json
+
+      - name: Resolve PR impact
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python scripts/check_trace_pr_impact.py --base "$BASE_SHA" --head "$HEAD_SHA" --json
+
+      - name: Run focused traceability regressions
+        run: >-
+          python -m unittest -v
+          tests.test_master_traceability
+          tests.test_nfr_registry
+          tests.test_traceability_spine
+          tests.test_trace_pr_impact
+          tests.test_internal_protocol_envelope

@@ -1,0 +1,18 @@
+# Normalize line endings; keep shells/scripts LF.
+* text=auto eol=lf
+
+# Treat large/binary artifacts as binary (no diff/merge noise).
+*.zip   binary
+*.apk   binary
+*.aab   binary
+*.ipa   binary
+*.bson  binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.webp  binary
+
+# Mark generated data so GitHub's language stats ignore it.
+memory/mongo_backup/** linguist-generated
+backend/data/**        linguist-generated
+test_result.md         linguist-generated
