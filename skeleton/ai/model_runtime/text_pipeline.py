@@ -200,6 +200,33 @@ def materialize_causal_training_batch(batch: ModelInputBatch, *, ignore_index: i
     return CausalTrainingBatch(tuple(inputs), tuple(labels), tuple(masks), digests, batch.pad_token_id, ignore_index)
 
 
+@dataclass(frozen=True)
+class TrainingInputReceipt:
+    """Replayable identity for one prepared causal-training payload."""
+    pipeline_digest: str
+    tokenizer_digest: str
+    sequence_digest: str
+    batch_digests: tuple[str, ...]
+    example_count: int
+    supervised_token_count: int
+
+    def __post_init__(self) -> None:
+        for name in ("pipeline_digest", "tokenizer_digest", "sequence_digest"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value):
+                raise TokenizerContractError(f"invalid {name}")
+        if not self.batch_digests or any(not isinstance(d, str) or len(d) != 64 or any(ch not in "0123456789abcdef" for ch in d) for d in self.batch_digests):
+            raise TokenizerContractError("invalid training batch digests")
+        if isinstance(self.example_count, bool) or not isinstance(self.example_count, int) or self.example_count <= 0:
+            raise TokenizerContractError("invalid training example count")
+        if isinstance(self.supervised_token_count, bool) or not isinstance(self.supervised_token_count, int) or self.supervised_token_count <= 0:
+            raise TokenizerContractError("invalid supervised token count")
+
+    @property
+    def digest(self) -> str:
+        return digest_json({"pipeline_digest": self.pipeline_digest, "tokenizer_digest": self.tokenizer_digest, "sequence_digest": self.sequence_digest, "batch_digests": list(self.batch_digests), "example_count": self.example_count, "supervised_token_count": self.supervised_token_count})
+
+
 class TextTokenPipeline:
     """One admitted, immutable text-to-model-input pipeline."""
 
@@ -274,6 +301,26 @@ class TextTokenPipeline:
                     raise
         return tuple(output)
 
+    def training_receipt(self, prepared: PreparedText, *, pad_token_id: int | None = None, ignore_index: int = -100) -> TrainingInputReceipt:
+        batches = self.causal_training_batches(prepared, pad_token_id=pad_token_id, ignore_index=ignore_index)
+        if not batches:
+            raise TokenizerContractError("no trainable causal examples")
+        return TrainingInputReceipt(
+            self.digest,
+            self.tokenizer.digest,
+            prepared.sequence.digest,
+            tuple(batch.digest for batch in batches),
+            sum(len(batch.input_ids) for batch in batches),
+            sum(sum(row) for batch in batches for row in batch.loss_mask),
+        )
+
+    def verify_training_receipt(self, prepared: PreparedText, receipt: TrainingInputReceipt, *, pad_token_id: int | None = None, ignore_index: int = -100) -> None:
+        if not isinstance(receipt, TrainingInputReceipt):
+            raise TokenizerContractError("TrainingInputReceipt required")
+        expected = self.training_receipt(prepared, pad_token_id=pad_token_id, ignore_index=ignore_index)
+        if expected.digest != receipt.digest:
+            raise TokenizerContractError("training input receipt mismatch")
+
     def decode(self, sequence: TokenSequence, *, require_identity: bool = True) -> str:
         if not isinstance(sequence, TokenSequence):
             raise TokenizerContractError("TokenSequence required")
@@ -312,4 +359,4 @@ class TextTokenPipeline:
         return prepared
 
 
-__all__ = ["CausalTrainingBatch", "ModelInputBatch", "PreparedText", "TextPipelineConfig", "TextTokenPipeline", "materialize_causal_training_batch", "materialize_model_batch"]
+__all__ = ["CausalTrainingBatch", "ModelInputBatch", "PreparedText", "TextPipelineConfig", "TextTokenPipeline", "TrainingInputReceipt", "materialize_causal_training_batch", "materialize_model_batch"]
