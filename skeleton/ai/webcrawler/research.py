@@ -192,6 +192,15 @@ class EvidenceSet:
         rows=contradiction_persistence(self.qualified(),self.learned_regimes(threshold=threshold))
         return {"regimes":rows,**persistent_contestation(rows)}
 
+    def counterfactual_influence(self,*,now:float):
+        from .counterfactual import leave_one_out_influence
+        return leave_one_out_influence(self,now=now)
+
+    def citation_lineage(self):
+        from .citation_lineage import extract_citation_edges,citation_dependence
+        vals=self.qualified();edges=extract_citation_edges(vals)
+        return {"edges":edges,"known_dependencies":citation_dependence(vals,edges)}
+
     def assurance(self, *, now: float) -> Mapping[str, object]:
         ranked=self.ranked(now=now)
         relevant=[o for o in ranked if o.relevance >= self.query.min_relevance and o.source_score >= self.query.min_source_score]
