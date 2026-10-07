@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-10:deterministic_simulation:v1",
+  "title": "FLGB-10 deterministic simulation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tick",
+    "input_digest",
+    "state_digest_before",
+    "state_digest_after",
+    "event_digest"
+  ],
+  "properties": {
+    "tick": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "input_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "state_digest_before": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "state_digest_after": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "event_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
