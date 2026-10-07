@@ -142,11 +142,13 @@ class TextTokenPipeline:
         # Normalize only after assembly: Unicode composition and CRLF boundaries
         # can straddle arbitrary transport chunks.
         feed = StreamingTextFeed(limits=self.tokenizer.limits)
+        accepted: list[str] = []
         for chunk in chunks:
             feed.push(chunk)
-        raw = "".join(feed._chunks)
-        feed._closed = True
-        return self.prepare(raw)
+            accepted.append(chunk)
+        # Finalize to enforce one-shot lifecycle and tokenizer admission.
+        feed.finalize(self.tokenizer)
+        return self.prepare("".join(accepted))
 
 
 __all__ = ["PreparedText", "TextPipelineConfig", "TextTokenPipeline"]
