@@ -337,7 +337,7 @@
       "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
-      "implementation_note": "T01-T12 presentation/input/accessibility targets, schemas, and focused regressions are present; animation/audio/UI determinism, input ambiguity rejection, accessibility semantics, haptics, and presentation replay are explicit; exact-head dependency closure and independent verification remain required."
+      "implementation_note": "T01-T12 animation/audio/UI/input/accessibility targets, schemas, and focused regressions are present; deterministic graph ordering, explicit input/controller semantics, haptics, accessibility focus, and presentation replay are covered; exact-head dependency closure and independent verification remain required."
     },
     {
       "id": "FLGB-13",
