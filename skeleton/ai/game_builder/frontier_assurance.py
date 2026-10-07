@@ -267,6 +267,22 @@ class EffortDecision:
     signal_binding_digest: str
     reason_digest: str
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.mode, EffortMode):
+            raise TypeError("effort decision mode must be EffortMode")
+        object.__setattr__(self, "score", _unit(self.score, "score"))
+        _stable(self.signal_binding_digest, "signal_binding_digest")
+        _stable(self.reason_digest, "reason_digest")
+        expected = canonical_digest(
+            {
+                "mode": int(self.mode),
+                "score": self.score,
+                "signal_binding_digest": self.signal_binding_digest,
+            }
+        )
+        if self.reason_digest != expected:
+            raise FrontierAssuranceError("effort decision reason digest mismatch")
+
 
 class EffortPortfolioScheduler:
     """Chooses an exact forge tier without changing tier semantics."""
