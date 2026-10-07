@@ -18,15 +18,17 @@
   "volume_summary": {
     "total": 421,
     "implementation_signed": 273,
-    "verification_signed": 20,
-    "complete": 20,
-    "implementation_signed_open": 253,
+    "verification_signed": 22,
+    "complete": 22,
+    "implementation_signed_open": 251,
     "gap_free_waiting_verification": 24,
     "implementation_unsigned": 148
   },
   "fast_sets": {
     "fully_complete": [
       "VOL-000",
+      "VOL-001",
+      "VOL-002",
       "VOL-013",
       "VOL-014",
       "VOL-015",
@@ -228,7 +230,7 @@
     "DP-000-040": {
       "total": 41,
       "implementation_signed": 40,
-      "complete": 11,
+      "complete": 13,
       "gap_free_waiting_verification": 7
     },
     "DP-041-080": {
@@ -296,11 +298,11 @@
     "volume": {
       "total": 421,
       "implementation_signed": 273,
-      "verification_signed": 20,
-      "complete": 20,
+      "verification_signed": 22,
+      "complete": 22,
       "status_counts": {
-        "verified": 13,
-        "implemented": 253,
+        "verified": 15,
+        "implemented": 251,
         "hardened": 7,
         "unverified": 148
       }
