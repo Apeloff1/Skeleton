@@ -273,21 +273,21 @@
       "item_count": 1644,
       "gap_count": 664,
       "risk_count": 980,
-      "open_count": 1640,
+      "open_count": 1639,
       "closed_count": 0
     },
     "items": [
       {
-        "backlog_id": "BL-GAP-VOL-002-001",
+        "backlog_id": "BL-GAP-VOL-003-001",
         "source_kind": "gap",
-        "source_ref": "VOL-002:gap:001",
-        "volume_ref": "VOL-002",
-        "statement": "independent exact-head VOL-002 Architecture Fitness and Ownership Gate qualification remains pending",
-        "accountability_id": "ACC-VOL-002",
+        "source_ref": "VOL-003:gap:001",
+        "volume_ref": "VOL-003",
+        "statement": "independent exact-head VOL-003 Contract Conformance Closure qualification remains pending",
+        "accountability_id": "ACC-VOL-003",
         "requirement_refs": [
-          "REQ:VOL-002:001",
-          "REQ:VOL-002:002",
-          "REQ:VOL-002:003"
+          "REQ:VOL-003:001",
+          "REQ:VOL-003:002",
+          "REQ:VOL-003:003"
         ],
         "state": "open",
         "closure_evidence_refs": []
@@ -312,22 +312,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-005:gap:001",
         "volume_ref": "VOL-005",
-        "statement": "converge remaining legacy state owners",
-        "accountability_id": "ACC-VOL-005",
-        "requirement_refs": [
-          "REQ:VOL-005:001",
-          "REQ:VOL-005:002",
-          "REQ:VOL-005:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": []
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-005-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-005:gap:002",
-        "volume_ref": "VOL-005",
-        "statement": "add migration compatibility rehearsal to release qualification",
+        "statement": "independent exact-head VOL-005 Data & Persistence Closure qualification remains pending",
         "accountability_id": "ACC-VOL-005",
         "requirement_refs": [
           "REQ:VOL-005:001",

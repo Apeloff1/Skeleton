@@ -489,7 +489,7 @@
       "title": "System Architecture",
       "depth_pass": "DP-000-040",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -520,20 +520,20 @@
           "transitional roots becoming accidental owners",
           "cyclic dependency growth"
         ],
-        "gaps": [
-          "independent exact-head VOL-002 Architecture Fitness and Ownership Gate qualification remains pending"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_architecture_map.py",
           "tests/test_architecture_boundaries.py",
           "skeleton/testing/test_architecture_map.py::test_component_fitness_covers_all_runtime_planes_and_ai_mappings",
-          "skeleton/testing/test_architecture_map.py::test_owner_lookup_resolves_future_path_without_materialization"
+          "skeleton/testing/test_architecture_map.py::test_owner_lookup_resolves_future_path_without_materialization",
+          "tests/test_vol002_architecture_independent_verifier.py"
         ],
         "evaluations": [
           ".github/workflows/vol002-architecture-fitness.yml",
           "scripts/check_architecture_map.py --json",
           "skeleton/testing/test_architecture_map.py",
-          "tests/test_architecture_boundaries.py"
+          "tests/test_architecture_boundaries.py",
+          "scripts/verify_vol002_architecture_fitness.py"
         ],
         "existing_evidence": [
           "https://github.com/Apeloff1/Skeleton/commit/d4334086eaf1c7cbbff46890b727fc954fde1677",
@@ -542,7 +542,8 @@
           ".github/workflows/vol002-architecture-fitness.yml",
           "https://github.com/Apeloff1/Skeleton/commit/ce1a19f26c6b811c189d309440ab5b921c1ef7b8",
           "https://github.com/Apeloff1/Skeleton/commit/ce6d1736af9137dd07669ff17423ed1decf2a4c5",
-          "https://github.com/Apeloff1/Skeleton/commit/bae16164548a1cf7250c11ff00c0ce5ea970279f"
+          "https://github.com/Apeloff1/Skeleton/commit/bae16164548a1cf7250c11ff00c0ce5ea970279f",
+          "scripts/verify_vol002_architecture_fitness.py"
         ]
       },
       "implementation_levels": [
@@ -755,30 +756,38 @@
           "skeleton/contracts/canonical.py",
           "skeleton/ai/runtime/contracts/canonical.py",
           "scripts/check_architecture_contract_conformance.py",
-          "machine/contract_conformance.json"
+          "machine/contract_conformance.json",
+          "scripts/verify_vol003_contract_conformance.py"
         ],
         "risks": [
           "schema drift",
           "privileged defaults from unknown values",
           "cross-language round-trip divergence"
         ],
-        "gaps": [],
+        "gaps": [
+          "independent exact-head VOL-003 Contract Conformance Closure qualification remains pending"
+        ],
         "tests": [
           "skeleton/testing/test_contract_serialization_edges.py",
           "skeleton/testing/test_contract_compatibility.py",
           "skeleton/testing/test_contract_unicode_edges.py",
-          "tests/test_architecture_contract_conformance.py"
+          "tests/test_architecture_contract_conformance.py",
+          "tests/test_vol003_contract_conformance_independent.py"
         ],
         "evaluations": [
           "scripts/check_architecture_contract_conformance.py --json",
-          "tests/test_architecture_contract_conformance.py"
+          "tests/test_architecture_contract_conformance.py",
+          ".github/workflows/vol003-contract-conformance.yml",
+          "scripts/verify_vol003_contract_conformance.py"
         ],
         "existing_evidence": [
           "https://github.com/Apeloff1/Skeleton/commit/3118f3d4c5fcbd421c590b7724289abe8c411e11",
           "scripts/check_architecture_contract_conformance.py",
           "machine/contract_conformance.json",
           "skeleton/testing/test_contract_compatibility.py",
-          "tests/test_architecture_contract_conformance.py"
+          "tests/test_architecture_contract_conformance.py",
+          "scripts/verify_vol003_contract_conformance.py",
+          "tests/test_vol003_contract_conformance_independent.py"
         ]
       },
       "implementation_levels": [
@@ -1240,7 +1249,11 @@
           "machine/state_topology.json",
           "skeleton/persistence",
           "backend/services/database.py",
-          "scripts/state_recovery_drill.py"
+          "scripts/state_recovery_drill.py",
+          "machine/state_backup_policy.json",
+          "scripts/state_migration_compatibility.py",
+          "scripts/verify_state_authority_closure.py",
+          ".github/workflows/state-recovery-drill.yml"
         ],
         "risks": [
           "split-brain ownership",
@@ -1249,20 +1262,31 @@
           "backup that cannot restore"
         ],
         "gaps": [
-          "converge remaining legacy state owners",
-          "add migration compatibility rehearsal to release qualification"
+          "independent exact-head VOL-005 Data & Persistence Closure qualification remains pending"
         ],
         "tests": [
           "skeleton/testing/test_state_recovery_drill.py",
           "skeleton/testing/test_operation_store.py",
-          "backend/tests/test_rag_state_authority.py"
+          "backend/tests/test_rag_state_authority.py",
+          "skeleton/testing/test_state_migration_compatibility.py",
+          "tests/test_state_authority_independent_verifier.py"
         ],
         "evaluations": [
-          "planned:partial-commit fault matrix",
-          "planned:restore consistency evaluation"
+          "scripts/check_state_topology.py --json",
+          "scripts/state_migration_compatibility.py",
+          "scripts/verify_state_authority_closure.py",
+          ".github/workflows/state-recovery-drill.yml",
+          ".github/workflows/p1-migration-rollback-compatibility.yml"
         ],
         "existing_evidence": [
-          "https://github.com/Apeloff1/Skeleton/commit/f9053d8c9a2dfddcff431a4ff37863a5d962eded"
+          "https://github.com/Apeloff1/Skeleton/commit/f9053d8c9a2dfddcff431a4ff37863a5d962eded",
+          "machine/state_topology.json",
+          "machine/state_backup_policy.json",
+          "scripts/state_recovery_drill.py",
+          "scripts/state_migration_compatibility.py",
+          "skeleton/testing/test_state_recovery_drill.py",
+          "skeleton/testing/test_state_migration_compatibility.py",
+          "scripts/verify_state_authority_closure.py"
         ]
       },
       "implementation_levels": [
