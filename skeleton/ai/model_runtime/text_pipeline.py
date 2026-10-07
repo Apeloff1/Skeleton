@@ -594,11 +594,8 @@ class TextTokenPipeline:
                 remaining_prompt = max(0, example.prompt_token_count - consumed)
                 prefix_lengths.append(min(row_source_tokens, remaining_prompt))
                 consumed += row_source_tokens
-            try:
+            if any(any(bit and index >= max(0, prefix - 1) for index, bit in enumerate(mask)) for mask, prefix in zip(batch.loss_mask, prefix_lengths)):
                 output.append(mask_causal_prefix(batch, tuple(prefix_lengths)))
-            except TokenizerContractError as exc:
-                if str(exc) != "prefix masking removed all supervised targets":
-                    raise
         if not output:
             raise TokenizerContractError("supervised example produced no response targets")
         return tuple(output)
