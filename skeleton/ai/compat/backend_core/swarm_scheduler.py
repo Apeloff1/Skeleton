@@ -138,6 +138,8 @@ def execute_schedule(
     game_ctx: dict[str, Any] | None = None,
     rounds: int = 2,
     persist: bool = True,
+    *,
+    live_phase_cap: int | None = MAX_LIVE_PHASES,
 ) -> dict:
     """Plan + run the full DAG live via real platoons, persisting a run record."""
     game_ctx = dict(game_ctx or {})
@@ -147,11 +149,18 @@ def execute_schedule(
         build_id=build_id, phases=phases, objectives=objectives,
         deps=deps, seed=seed, platoon_size=platoon_size, game_ctx=game_ctx,
     )
-    if plan["phase_count"] > MAX_LIVE_PHASES:
-        raise ValueError(
-            f"{plan['phase_count']} phases exceeds the live cap of {MAX_LIVE_PHASES}; "
-            "use a smaller slice or the async build pipeline"
-        )
+    if live_phase_cap is not None:
+        if (
+            isinstance(live_phase_cap, bool)
+            or not isinstance(live_phase_cap, int)
+            or live_phase_cap < 1
+        ):
+            raise ValueError("live_phase_cap must be a positive integer or None")
+        if plan["phase_count"] > live_phase_cap:
+            raise ValueError(
+                f"{plan['phase_count']} phases exceeds the live cap of "
+                f"{live_phase_cap}; use a smaller slice or the async build pipeline"
+            )
 
     verification = planner.verify_plan(plan)
 
@@ -480,14 +489,13 @@ def start_async(kind: str, **kwargs) -> str:
                     platoon_size=kwargs.get("platoon_size", 5), rounds=kwargs.get("rounds", 2),
                 )
             else:
-                # async free-form: bypass the online cap via a temporary lift
-                global MAX_LIVE_PHASES
-                saved = MAX_LIVE_PHASES
-                MAX_LIVE_PHASES = max(saved, len(kwargs.get("phases") or []) or saved, 100)
-                try:
-                    res = execute_schedule(**kwargs)
-                finally:
-                    MAX_LIVE_PHASES = saved
+                # Async free-form execution bypasses the online cap per call.
+                # Never mutate MAX_LIVE_PHASES: background jobs may overlap
+                # request threads and tests, so process-global cap changes race.
+                res = execute_schedule(
+                    **kwargs,
+                    live_phase_cap=None,
+                )
             _set_job(job_id, status="done", finished_at=time.time(),
                      result={k: res[k] for k in ("plan_hash", "coverage", "verification",
                                                  "execution", "participation")})
