@@ -1241,3 +1241,20 @@ Still open before this plane can be signed complete:
 - CI evidence from the repository gates for the landed commits.
 
 Status: IMPLEMENTED / UNSIGNED pending CI and downstream adapter evidence.
+
+
+### 2026-10-07 research-intelligence expansion
+
+Inspired by current public discussion around agentic research, evidence/provenance, sustained context and temporal intelligence, the crawler plane now also includes:
+- query-directed candidate priority;
+- evidence observations with stable identities;
+- independent-host source-diversity accounting;
+- freshness decay and source-quality/relevance ranking;
+- explicit contradiction preservation and assurance penalties;
+- minimum-source research sufficiency gates;
+- bitemporal URL version history and point-in-time reads;
+- deterministic change events with bounded added/removed evidence excerpts.
+
+These controls deliberately prevent scraped volume from being mistaken for knowledge quality. A research result is not considered sufficient merely because many documents were collected; corroboration, diversity, relevance and contradiction state are represented separately.
+
+Status remains IMPLEMENTED / UNSIGNED until exact-head CI evidence and durable downstream knowledge-index integration are present.
