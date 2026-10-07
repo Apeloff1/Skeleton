@@ -1312,3 +1312,27 @@ def test_temporal_retention_gate_requires_current_cohort():
     historical = TemporalRetentionResult("historical", 90, 100, 90, 100)
     with pytest.raises(TokenizerContractError, match="current retention cohort"):
         temporal_retention_gate((historical,), maximum_regression_ppm=10_000)
+
+
+def test_temporal_retention_trajectory_exposes_transient_forgetting():
+    from skeleton.ai.model_runtime.text_pipeline import TemporalRetentionResult, build_temporal_retention_trajectory
+    stages = (
+        TemporalRetentionResult("historical", 90, 100, 80, 100),
+        TemporalRetentionResult("historical", 80, 100, 88, 100),
+        TemporalRetentionResult("historical", 88, 100, 89, 100),
+    )
+    trajectory = build_temporal_retention_trajectory(stages, cohort="historical")
+    assert trajectory.stage_scores_ppm == (900_000, 800_000, 880_000, 890_000)
+    assert trajectory.worst_regression_ppm == 100_000
+    assert trajectory.final_delta_ppm == -10_000
+
+
+def test_temporal_retention_trajectory_is_cohort_isolated():
+    from skeleton.ai.model_runtime.text_pipeline import TemporalRetentionResult, build_temporal_retention_trajectory
+    results = (
+        TemporalRetentionResult("historical", 90, 100, 89, 100),
+        TemporalRetentionResult("current", 50, 100, 90, 100),
+    )
+    trajectory = build_temporal_retention_trajectory(results, cohort="current")
+    assert trajectory.stage_scores_ppm == (500_000, 900_000)
+    assert trajectory.final_delta_ppm == 400_000
