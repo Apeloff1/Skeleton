@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-14:terrain_generation:v1",
+  "title": "FLGB-14 terrain generation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tile_id",
+    "x",
+    "y",
+    "resolution",
+    "height_digest",
+    "biome_digest",
+    "seed_digest"
+  ],
+  "properties": {
+    "tile_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "x": {
+      "type": "integer"
+    },
+    "y": {
+      "type": "integer"
+    },
+    "resolution": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 16384
+    },
+    "height_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "biome_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "seed_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
