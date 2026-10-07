@@ -398,6 +398,14 @@ def deserialize_token_sequence(payload: bytes) -> TokenSequence:
     token_ids = value["token_ids"]
     if not isinstance(token_ids, list):
         raise TokenizerContractError("serialized token_ids must be a list")
+    if len(token_ids) > MAX_TOKENS:
+        raise TokenizerContractError("serialized token sequence exceeds token budget")
+    if any(not _is_int(token_id) or token_id < 0 or token_id >= 2**31 for token_id in token_ids):
+        raise TokenizerContractError("serialized token_ids contain invalid id")
+    for name in ("tokenizer_digest", "source_text_digest"):
+        digest = value[name]
+        if not isinstance(digest, str) or len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
+            raise TokenizerContractError(f"serialized {name} is invalid")
     return TokenSequence(
         value["tokenizer_digest"],
         tuple(token_ids),
