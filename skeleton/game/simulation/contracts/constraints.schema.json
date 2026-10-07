@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-10:constraints:v1",
+  "title": "FLGB-10 constraints",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "constraint_id",
+    "kind",
+    "body_a",
+    "body_b",
+    "limit_value"
+  ],
+  "properties": {
+    "constraint_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "kind": {
+      "enum": [
+        "distance",
+        "hinge",
+        "fixed",
+        "spring",
+        "limit"
+      ]
+    },
+    "body_a": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "body_b": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 256
+    },
+    "limit_value": {
+      "type": "integer"
+    }
+  }
+}
