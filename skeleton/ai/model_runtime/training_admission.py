@@ -36,7 +36,7 @@ def _restore_in_place(runtime,checkpoint,prior):
 def admit_candidate_model(runtime:NativeLLMRuntime,candidate:CandidateWeights,promotion:PromotionEvidence,apply_candidate:Callable[[object],None],*,admission_authority:str,ledger:AdmissionLedger|None=None):
     if not isinstance(runtime,NativeLLMRuntime): raise RuntimePromotionError("NativeLLMRuntime required")
     if not isinstance(candidate,CandidateWeights) or not isinstance(promotion,PromotionEvidence): raise RuntimePromotionError("typed candidate and promotion evidence required")
-    if candidate.status not in {"candidate","promoted"}: raise RuntimePromotionError("candidate not admissible")
+    if candidate.status not in {"candidate","promoted"}: raise RuntimePromotionError("candidate not admissible")\n    if candidate.base_model_digest!=runtime.model_digest: raise RuntimePromotionError("candidate base model does not match active runtime")
     if promotion.candidate_digest!=candidate.digest or not promotion.qualified: raise RuntimePromotionError("candidate lacks qualified promotion")\n    require_id(admission_authority,"admission_authority")\n    if promotion.independent_verifier==admission_authority: raise RuntimePromotionError("evaluation and admission authorities must be separate")
     if ledger is not None: ledger.reserve_promotion(promotion.digest)
     checkpoint=runtime.checkpoint(); prior=runtime.model_digest
