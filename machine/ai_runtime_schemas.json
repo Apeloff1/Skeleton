@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "catalog_version": "1.0.0",
+  "catalog_version": "1.1.0",
   "status": "active",
   "architecture_tag": "arch-map/v3.7",
   "purpose": "Typed provider-neutral schema catalog for the fully functional AI runtime. These schemas refine, but do not replace, canonical ownership in machine/ai_app_construction.json.",
@@ -208,6 +208,43 @@
       "tool_call",
       "usage",
       "final"
+    ],
+    "ProtocolRetryClass": [
+      "never",
+      "idempotent",
+      "reconcile_then_retry"
+    ],
+    "ProtocolUnknownOutcomePolicy": [
+      "fail_closed",
+      "reconcile",
+      "idempotent_replay"
+    ],
+    "ProtocolOutcome": [
+      "accepted",
+      "rejected",
+      "duplicate",
+      "succeeded",
+      "failed",
+      "unknown"
+    ],
+    "ReadGuarantee": [
+      "authoritative_committed",
+      "eventual_projection",
+      "best_effort_scratch",
+      "recovery_aid_only"
+    ],
+    "WriteGuarantee": [
+      "durable_commit_ack",
+      "source_first_then_project",
+      "non_authoritative_recomputable",
+      "recovery_aid_no_authority"
+    ],
+    "StalePolicy": [
+      "reject",
+      "explicit_only"
+    ],
+    "UnknownPolicy": [
+      "reject"
     ]
   },
   "records": {
@@ -2153,6 +2190,247 @@
         "sequence is monotonic within one provider response",
         "non-final deltas carry exactly one payload matching kind",
         "final delta carries finish_reason and grants no durable stream authority by itself"
+      ]
+    },
+    "ProtocolEnvelope": {
+      "schema_version": 1,
+      "owner_plane": "foundation",
+      "fields": {
+        "protocol": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 192
+        },
+        "protocol_version": {
+          "type": "PositiveInt"
+        },
+        "message_id": {
+          "type": "OpaqueId"
+        },
+        "kind": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 192
+        },
+        "sender": {
+          "type": "OpaqueId"
+        },
+        "recipient": {
+          "type": "OpaqueId"
+        },
+        "operation_id": {
+          "type": "OpaqueId"
+        },
+        "correlation_id": {
+          "type": "OpaqueId"
+        },
+        "causation_id": {
+          "type": "OpaqueId",
+          "nullable": true
+        },
+        "trace_id": {
+          "type": "OpaqueId"
+        },
+        "span_id": {
+          "type": "OpaqueId",
+          "nullable": true
+        },
+        "deadline_utc": {
+          "type": "RFC3339",
+          "nullable": true
+        },
+        "idempotency_key": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 256
+        },
+        "attempt": {
+          "type": "PositiveInt"
+        },
+        "retry_class": {
+          "type": "ProtocolRetryClass"
+        },
+        "unknown_outcome_policy": {
+          "type": "ProtocolUnknownOutcomePolicy"
+        },
+        "payload": {
+          "type": "JsonObject"
+        }
+      },
+      "invariants": [
+        "canonical owner is skeleton/contracts/protocol.py and AI mirror must be byte-identical",
+        "message_id replay with changed canonical content is rejected",
+        "idempotent_replay requires a retryable retry_class",
+        "deadline_utc when present is normalized RFC3339 UTC",
+        "correlation/causation/trace/span identity is explicit on the envelope"
+      ]
+    },
+    "ProtocolExecutionEnvelope": {
+      "schema_version": 2,
+      "owner_plane": "orchestration",
+      "fields": {
+        "execution_version": {
+          "type": "PositiveInt"
+        },
+        "volume": {
+          "type": "string",
+          "enum": [
+            "VOL-131"
+          ]
+        },
+        "canonical_envelope_digest": {
+          "type": "Digest256"
+        },
+        "message_id": {
+          "type": "OpaqueId"
+        },
+        "operation_id": {
+          "type": "OpaqueId"
+        },
+        "correlation_id": {
+          "type": "OpaqueId"
+        },
+        "causation_id": {
+          "type": "OpaqueId",
+          "nullable": true
+        },
+        "trace_id": {
+          "type": "OpaqueId"
+        },
+        "span_id": {
+          "type": "OpaqueId",
+          "nullable": true
+        },
+        "tenant_id": {
+          "type": "TenantId"
+        },
+        "authority_digest": {
+          "type": "Digest256"
+        },
+        "issued_at_utc": {
+          "type": "RFC3339"
+        },
+        "deadline_utc": {
+          "type": "RFC3339",
+          "nullable": true
+        },
+        "attempt": {
+          "type": "PositiveInt"
+        },
+        "max_attempts": {
+          "type": "PositiveInt"
+        },
+        "retry_class": {
+          "type": "ProtocolRetryClass"
+        },
+        "unknown_outcome_policy": {
+          "type": "ProtocolUnknownOutcomePolicy"
+        },
+        "previous_execution_digest": {
+          "type": "Digest256",
+          "nullable": true
+        },
+        "attributes": {
+          "type": "array"
+        }
+      },
+      "invariants": [
+        "wraps one canonical ProtocolEnvelope rather than defining a second envelope authority",
+        "retry cannot widen payload, operation, correlation, tenant, authority or deadline identity",
+        "retry attempts are bounded and predecessor-digest chained",
+        "trace evidence excludes raw payload content"
+      ]
+    },
+    "ProtocolReceipt": {
+      "schema_version": 1,
+      "owner_plane": "observability",
+      "fields": {
+        "canonical_envelope_digest": {
+          "type": "Digest256"
+        },
+        "execution_digest": {
+          "type": "Digest256"
+        },
+        "operation_id": {
+          "type": "OpaqueId"
+        },
+        "correlation_id": {
+          "type": "OpaqueId"
+        },
+        "trace_id": {
+          "type": "OpaqueId"
+        },
+        "span_id": {
+          "type": "OpaqueId"
+        },
+        "observer": {
+          "type": "OpaqueId"
+        },
+        "outcome": {
+          "type": "ProtocolOutcome"
+        },
+        "observed_at_utc": {
+          "type": "RFC3339"
+        },
+        "reason": {
+          "type": "string",
+          "max_length": 1024,
+          "nullable": true
+        },
+        "result_digest": {
+          "type": "Digest256",
+          "nullable": true
+        }
+      },
+      "invariants": [
+        "receipt binds the exact canonical envelope and execution wrapper digests",
+        "receipt operation/correlation/trace/span identity must match the execution",
+        "receipt cannot predate the execution wrapper"
+      ]
+    },
+    "ConsistencyProfile": {
+      "schema_version": 1,
+      "owner_plane": "data-persistence",
+      "fields": {
+        "domain_id": {
+          "type": "OpaqueId"
+        },
+        "physical_store": {
+          "type": "OpaqueId"
+        },
+        "authority": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 64
+        },
+        "source_of_truth": {
+          "type": "boolean"
+        },
+        "read_guarantee": {
+          "type": "ReadGuarantee"
+        },
+        "write_guarantee": {
+          "type": "WriteGuarantee"
+        },
+        "stale_policy": {
+          "type": "StalePolicy"
+        },
+        "unknown_policy": {
+          "type": "UnknownPolicy"
+        },
+        "source_refs": {
+          "type": "array"
+        },
+        "max_staleness_ms": {
+          "type": "NonNegativeInt",
+          "nullable": true
+        }
+      },
+      "invariants": [
+        "authoritative domains reject stale and unknown reads and require durable commit acknowledgement",
+        "projection domains are source-first and may serve stale state only by explicit opt-in",
+        "unknown freshness always fails closed",
+        "numeric staleness bounds are not invented without a domain NFR"
       ]
     }
   },
