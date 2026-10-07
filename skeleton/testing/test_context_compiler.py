@@ -1369,3 +1369,29 @@ def test_context_envelope_rejects_selected_snapshot_substitution() -> None:
     )
     with pytest.raises(ContextContractError, match="source_snapshot does not bind selected segments"):
         ContextEnvelope(**payload)
+
+
+def test_context_envelope_rejects_duplicate_snapshot_identity() -> None:
+    envelope = _compile([_segment("custody evidence", source_id="custody")])
+    payload = {name: getattr(envelope, name) for name in envelope.__dataclass_fields__}
+    payload["source_snapshot"] = envelope.source_snapshot + (envelope.source_snapshot[0],)
+    with pytest.raises(ContextContractError, match="source_snapshot segment ids must be unique"):
+        ContextEnvelope(**payload)
+
+
+def test_context_envelope_rejects_unaccounted_snapshot_source() -> None:
+    envelope = _compile([_segment("custody evidence", source_id="custody")])
+    payload = {name: getattr(envelope, name) for name in envelope.__dataclass_fields__}
+    payload["source_snapshot"] = envelope.source_snapshot + ((str(uuid4()), "a" * 64),)
+    with pytest.raises(ContextContractError, match="source_snapshot must exactly cover"):
+        ContextEnvelope(**payload)
+
+
+def test_context_envelope_rejects_missing_omission_reason() -> None:
+    local = _segment("local", source_id="local")
+    foreign = _segment("foreign", source_id="foreign", tenant_id="tenant-b")
+    envelope = _compile([local, foreign])
+    payload = {name: getattr(envelope, name) for name in envelope.__dataclass_fields__}
+    payload["omission_reasons"] = ()
+    with pytest.raises(ContextContractError, match="omission_reasons must exactly cover"):
+        ContextEnvelope(**payload)
