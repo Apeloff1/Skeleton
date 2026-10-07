@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-13:combat_logic:v1",
+  "title": "FLGB-13 combat logic",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "action_id",
+    "damage_units",
+    "stamina_cost",
+    "cooldown_ticks"
+  ],
+  "properties": {
+    "action_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "damage_units": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "stamina_cost": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cooldown_ticks": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}
