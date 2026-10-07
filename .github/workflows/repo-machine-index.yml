@@ -23,10 +23,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout main
+      - name: Checkout triggering revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
         with:
-          ref: main
           fetch-depth: 1
           persist-credentials: false
 
@@ -42,12 +41,21 @@ jobs:
           mkdir -p .machine
           skeleton-repo-machine --root . --output .machine/repository-machine.json --build-code-search .machine/code-search-index.json
           python - <<'PY'
+          from hashlib import sha256
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+
           from skeleton.repo_machine.code_search import load_code_search_index
           from skeleton.repo_machine.manifest import load_manifest, validate_manifest
-          manifest = load_manifest(".machine/repository-machine.json")
+
+          manifest_path = Path(".machine/repository-machine.json")
+          code_index_path = Path(".machine/code-search-index.json")
+          manifest = load_manifest(manifest_path)
           validate_manifest(manifest)
           code_index = load_code_search_index(
-              ".machine/code-search-index.json",
+              code_index_path,
               expected_fingerprint=manifest["fingerprint"],
           )
           files = manifest["state"]["files"]
@@ -56,6 +64,34 @@ jobs:
           print(
               f"Code search contains {summary['documents']} documents, "
               f"{summary['terms']} terms, {summary['postings']} postings."
+          )
+
+          checked_out_sha = subprocess.check_output(
+              ["git", "rev-parse", "HEAD"],
+              text=True,
+          ).strip()
+          event_sha = os.environ["GITHUB_SHA"]
+          if checked_out_sha != event_sha:
+              raise RuntimeError(
+                  f"artifact source mismatch: checkout={checked_out_sha} event={event_sha}"
+              )
+
+          artifact_files = (manifest_path, code_index_path)
+          provenance = {
+              "schema": "skeleton.repository-machine-artifact.v1",
+              "source_commit": checked_out_sha,
+              "repository_fingerprint": manifest["fingerprint"],
+              "files": {
+                  path.as_posix(): {
+                      "sha256": sha256(path.read_bytes()).hexdigest(),
+                      "size_bytes": path.stat().st_size,
+                  }
+                  for path in artifact_files
+              },
+          }
+          Path(".machine/index-artifact-manifest.json").write_text(
+              json.dumps(provenance, sort_keys=True, separators=(",", ":")) + "\n",
+              encoding="utf-8",
           )
           PY
 
@@ -66,6 +102,7 @@ jobs:
           path: |
             .machine/repository-machine.json
             .machine/code-search-index.json
+            .machine/index-artifact-manifest.json
           if-no-files-found: error
           include-hidden-files: true
           retention-days: 14
