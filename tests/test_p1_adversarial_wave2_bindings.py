@@ -71,6 +71,11 @@ def _load(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _expected_total_obligations() -> int:
+    policy = _load(ROOT / POLICY)
+    return int(policy["inventory_expectations"]["total_obligation_count"])
+
+
 def _obligations():
     return derive_obligations(
         _load(ROOT / MASTER),
@@ -145,12 +150,12 @@ def test_wave2_advances_governed_frontier_to_513_0_0() -> None:
 
     report = reconcile_repository(ROOT, evaluated_at=NOW)
 
-    assert report["binding_count"] == 517
-    assert report["resolved_count"] == 517
+    assert report["binding_count"] == _expected_total_obligations()
+    assert report["resolved_count"] == _expected_total_obligations()
     assert report["unresolved_blocking_count"] == 0
     assert report["unclassified_count"] == 0
     assert report["disposition_counts"] == {
-        "evidence": 517,
+        "evidence": _expected_total_obligations(),
 
     }
 
