@@ -419,9 +419,9 @@
       "id": "ACC-VOL-001",
       "type": "volume",
       "title": "VOL-001 Scientific & Historical Foundation",
-      "status": "implemented",
-      "checkbox": false,
-      "checkbox_mark": "[ ]",
+      "status": "verified",
+      "checkbox": true,
+      "checkbox_mark": "[x]",
       "signing_required": true,
       "started_at_utc": "2026-10-05T18:21:38Z",
       "implementation_signoff": {
@@ -448,20 +448,29 @@
         "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/becaf3e926783065f8a42011303a6582a5fb2faf"
       },
       "verification_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "github-actions:AI Research Lineage Closure",
+        "signer_type": "ci",
+        "role": "independent-verifier",
+        "signed_at_utc": "2026-10-06T21:08:32Z",
+        "git_sha": "fad73d2f4a2eaf861dbeaf2792dec35ee2456677",
+        "evidence_refs": [
+          ".github/workflows/ai-research-lineage.yml",
+          "scripts/verify_research_lineage_closure.py",
+          "tests/test_research_lineage_independent_verifier.py",
+          "git-head:fad73d2f4a2eaf861dbeaf2792dec35ee2456677",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/37531442564",
+          "github-actions-job:112501537878",
+          "github-actions-job:112501538393",
+          "research-lineage-receipt:999ee1005c441f6c3ad4bd8e50a0bd2b597237650c69d2f16cb3d32ea649a8a0"
+        ],
+        "statement": "Independent exact-head AI Research Lineage Closure succeeded and emitted a valid VOL-001 receipt bound to fad73d2f4a2eaf861dbeaf2792dec35ee2456677. This independently verifies the implemented research-lineage boundary and authorizes the existing canonical verified projection.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/37531442564"
       },
       "independence_exception": null,
-      "completed_at_utc": null,
-      "last_event_at_utc": "2026-10-05T18:21:38Z",
+      "completed_at_utc": "2026-10-07T02:45:00Z",
+      "last_event_at_utc": "2026-10-07T02:45:00Z",
       "history": [
         {
           "sequence": 1,
@@ -505,6 +514,54 @@
             "skeleton/testing/test_research_lineage.py",
             "skeleton/testing/test_research_system_acceptance.py"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "verification_signed",
+          "actor_id": "github-actions:AI Research Lineage Closure",
+          "actor_type": "ci",
+          "role": "independent-verifier",
+          "at_utc": "2026-10-06T21:08:32Z",
+          "git_sha": "fad73d2f4a2eaf861dbeaf2792dec35ee2456677",
+          "statement": "Independent exact-head AI Research Lineage Closure succeeded and emitted a valid VOL-001 receipt bound to fad73d2f4a2eaf861dbeaf2792dec35ee2456677. This independently verifies the implemented research-lineage boundary and authorizes the existing canonical verified projection.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/37531442564",
+          "from_status": "implemented",
+          "to_status": "verified",
+          "evidence_refs": [
+            ".github/workflows/ai-research-lineage.yml",
+            "scripts/verify_research_lineage_closure.py",
+            "tests/test_research_lineage_independent_verifier.py",
+            "git-head:fad73d2f4a2eaf861dbeaf2792dec35ee2456677",
+            "https://github.com/Apeloff1/Skeleton/actions/runs/37531442564",
+            "github-actions-job:112501537878",
+            "github-actions-job:112501538393",
+            "research-lineage-receipt:999ee1005c441f6c3ad4bd8e50a0bd2b597237650c69d2f16cb3d32ea649a8a0"
+          ]
+        },
+        {
+          "sequence": 4,
+          "event_type": "completed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "completion-steward",
+          "at_utc": "2026-10-07T02:45:00Z",
+          "git_sha": "6fa0ae98d4abaf5cbb8783cf89e54d51fb798e45",
+          "statement": "Reconcile VOL-001 machine and human accountability projections to the already-succeeded independent exact-head verifier; no new verification claim is manufactured by this ledger update.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/pull/3404",
+          "from_status": "verified",
+          "to_status": "verified",
+          "evidence_refs": [
+            ".github/workflows/ai-research-lineage.yml",
+            "scripts/verify_research_lineage_closure.py",
+            "tests/test_research_lineage_independent_verifier.py",
+            "git-head:fad73d2f4a2eaf861dbeaf2792dec35ee2456677",
+            "https://github.com/Apeloff1/Skeleton/actions/runs/37531442564",
+            "github-actions-job:112501537878",
+            "github-actions-job:112501538393",
+            "research-lineage-receipt:999ee1005c441f6c3ad4bd8e50a0bd2b597237650c69d2f16cb3d32ea649a8a0"
+          ]
         }
       ],
       "evidence": [
@@ -517,7 +574,15 @@
         "skeleton/research/__init__.py",
         "skeleton/research/source_lineage.py",
         "skeleton/testing/test_research_lineage.py",
-        "skeleton/testing/test_research_system_acceptance.py"
+        "skeleton/testing/test_research_system_acceptance.py",
+        ".github/workflows/ai-research-lineage.yml",
+        "scripts/verify_research_lineage_closure.py",
+        "tests/test_research_lineage_independent_verifier.py",
+        "git-head:fad73d2f4a2eaf861dbeaf2792dec35ee2456677",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/37531442564",
+        "github-actions-job:112501537878",
+        "github-actions-job:112501538393",
+        "research-lineage-receipt:999ee1005c441f6c3ad4bd8e50a0bd2b597237650c69d2f16cb3d32ea649a8a0"
       ],
       "baseline_status": "unverified"
     },
@@ -525,9 +590,9 @@
       "id": "ACC-VOL-002",
       "type": "volume",
       "title": "VOL-002 System Architecture",
-      "status": "implemented",
-      "checkbox": false,
-      "checkbox_mark": "[ ]",
+      "status": "verified",
+      "checkbox": true,
+      "checkbox_mark": "[x]",
       "signing_required": true,
       "started_at_utc": "2026-10-05T17:03:00Z",
       "implementation_signoff": {
@@ -551,20 +616,29 @@
         "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/bb080fccd082fe969d695b82190be992e3b2aed3"
       },
       "verification_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "github-actions:VOL-002 Architecture Fitness and Ownership Gate",
+        "signer_type": "ci",
+        "role": "independent-verifier",
+        "signed_at_utc": "2026-10-06T22:07:34Z",
+        "git_sha": "8b9e691d8dbbb7a24906fc0e682ace7d76055aef",
+        "evidence_refs": [
+          ".github/workflows/vol002-architecture-fitness.yml",
+          "scripts/verify_vol002_architecture_fitness.py",
+          "tests/test_vol002_architecture_independent_verifier.py",
+          "git-head:8b9e691d8dbbb7a24906fc0e682ace7d76055aef",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/37537159128",
+          "github-actions-job:112520978858",
+          "github-actions-job:112520979326",
+          "architecture-fitness-receipt:4a740545cbf436651c0c55c63b50324d653ee7b2f600396c2ca4202c48662623"
+        ],
+        "statement": "Independent exact-head VOL-002 Architecture Fitness and Ownership Gate succeeded and emitted a valid receipt bound to 8b9e691d8dbbb7a24906fc0e682ace7d76055aef. This independently verifies the implemented architecture boundary and authorizes the existing canonical verified projection.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/37537159128"
       },
       "independence_exception": null,
-      "completed_at_utc": null,
-      "last_event_at_utc": "2026-10-05T17:03:00Z",
+      "completed_at_utc": "2026-10-07T02:45:00Z",
+      "last_event_at_utc": "2026-10-07T02:45:00Z",
       "history": [
         {
           "sequence": 1,
@@ -605,6 +679,54 @@
             "skeleton/testing/test_architecture_map.py",
             "tests/test_architecture_boundaries.py"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "verification_signed",
+          "actor_id": "github-actions:VOL-002 Architecture Fitness and Ownership Gate",
+          "actor_type": "ci",
+          "role": "independent-verifier",
+          "at_utc": "2026-10-06T22:07:34Z",
+          "git_sha": "8b9e691d8dbbb7a24906fc0e682ace7d76055aef",
+          "statement": "Independent exact-head VOL-002 Architecture Fitness and Ownership Gate succeeded and emitted a valid receipt bound to 8b9e691d8dbbb7a24906fc0e682ace7d76055aef. This independently verifies the implemented architecture boundary and authorizes the existing canonical verified projection.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/37537159128",
+          "from_status": "implemented",
+          "to_status": "verified",
+          "evidence_refs": [
+            ".github/workflows/vol002-architecture-fitness.yml",
+            "scripts/verify_vol002_architecture_fitness.py",
+            "tests/test_vol002_architecture_independent_verifier.py",
+            "git-head:8b9e691d8dbbb7a24906fc0e682ace7d76055aef",
+            "https://github.com/Apeloff1/Skeleton/actions/runs/37537159128",
+            "github-actions-job:112520978858",
+            "github-actions-job:112520979326",
+            "architecture-fitness-receipt:4a740545cbf436651c0c55c63b50324d653ee7b2f600396c2ca4202c48662623"
+          ]
+        },
+        {
+          "sequence": 4,
+          "event_type": "completed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "completion-steward",
+          "at_utc": "2026-10-07T02:45:00Z",
+          "git_sha": "6fa0ae98d4abaf5cbb8783cf89e54d51fb798e45",
+          "statement": "Reconcile VOL-002 machine and human accountability projections to the already-succeeded independent exact-head verifier; no new verification claim is manufactured by this ledger update.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/pull/3404",
+          "from_status": "verified",
+          "to_status": "verified",
+          "evidence_refs": [
+            ".github/workflows/vol002-architecture-fitness.yml",
+            "scripts/verify_vol002_architecture_fitness.py",
+            "tests/test_vol002_architecture_independent_verifier.py",
+            "git-head:8b9e691d8dbbb7a24906fc0e682ace7d76055aef",
+            "https://github.com/Apeloff1/Skeleton/actions/runs/37537159128",
+            "github-actions-job:112520978858",
+            "github-actions-job:112520979326",
+            "architecture-fitness-receipt:4a740545cbf436651c0c55c63b50324d653ee7b2f600396c2ca4202c48662623"
+          ]
         }
       ],
       "evidence": [
@@ -614,7 +736,15 @@
         "machine/architecture.json",
         "scripts/check_architecture_map.py",
         "skeleton/testing/test_architecture_map.py",
-        "tests/test_architecture_boundaries.py"
+        "tests/test_architecture_boundaries.py",
+        ".github/workflows/vol002-architecture-fitness.yml",
+        "scripts/verify_vol002_architecture_fitness.py",
+        "tests/test_vol002_architecture_independent_verifier.py",
+        "git-head:8b9e691d8dbbb7a24906fc0e682ace7d76055aef",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/37537159128",
+        "github-actions-job:112520978858",
+        "github-actions-job:112520979326",
+        "architecture-fitness-receipt:4a740545cbf436651c0c55c63b50324d653ee7b2f600396c2ca4202c48662623"
       ],
       "baseline_status": "unverified"
     },
