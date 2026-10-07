@@ -297,6 +297,30 @@ def materialize_causal_training_batch(batch: ModelInputBatch, *, ignore_index: i
     return CausalTrainingBatch(tuple(inputs), tuple(labels), tuple(masks), digests, batch.pad_token_id, ignore_index)
 
 
+def mask_causal_prefix(batch: CausalTrainingBatch, prefix_lengths: Sequence[int]) -> CausalTrainingBatch:
+    """Keep prompt tokens as context while supervising only response targets."""
+    if not isinstance(batch, CausalTrainingBatch):
+        raise TokenizerContractError("CausalTrainingBatch required")
+    if len(prefix_lengths) != len(batch.input_ids):
+        raise TokenizerContractError("prefix mask row count mismatch")
+    labels, masks = [], []
+    supervised = 0
+    for row_labels, row_mask, prefix_length in zip(batch.labels, batch.loss_mask, prefix_lengths):
+        if isinstance(prefix_length, bool) or not isinstance(prefix_length, int) or prefix_length < 0:
+            raise TokenizerContractError("invalid prefix length")
+        # label index i predicts source token i+1. A prefix of N source tokens
+        # therefore masks target indices < N-1 while preserving response targets.
+        cutoff = max(0, prefix_length - 1)
+        next_mask = tuple(bit if index >= cutoff else 0 for index, bit in enumerate(row_mask))
+        next_labels = tuple(label if bit else batch.ignore_index for label, bit in zip(row_labels, next_mask))
+        labels.append(next_labels)
+        masks.append(next_mask)
+        supervised += sum(next_mask)
+    if supervised <= 0:
+        raise TokenizerContractError("prefix masking removed all supervised targets")
+    return CausalTrainingBatch(batch.input_ids, tuple(labels), tuple(masks), batch.source_window_digests, batch.pad_token_id, batch.ignore_index)
+
+
 @dataclass(frozen=True)
 class TrainingInputReceipt:
     """Replayable identity for one prepared causal-training payload."""
