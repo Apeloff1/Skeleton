@@ -43,6 +43,7 @@ from .runtime_contracts import (
     RuntimeLimits,
     RuntimeUsage,
 )
+from .text_pipeline import PreparedText, TextPipelineConfig, TextTokenPipeline
 from .tokenization import (
     NativeTokenizer,
     StreamingTextFeed,
@@ -76,6 +77,7 @@ __all__ = [
     "ModelRuntimeError",
     "NativeLLMRuntime",
     "NativeTokenizer",
+    "PreparedText",
     "Placement",
     "QuantizationProfile",
     "ReplayMismatch",
@@ -88,6 +90,8 @@ __all__ = [
     "RuntimeUsage",
     "SpeculativeReceipt",
     "StreamingTextFeed",
+    "TextPipelineConfig",
+    "TextTokenPipeline",
     "TokenBatch",
     "TokenSequence",
     "TokenWindow",
