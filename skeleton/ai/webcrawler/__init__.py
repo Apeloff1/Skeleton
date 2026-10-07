@@ -42,3 +42,7 @@ from .citation_lineage import CitationEdge,extract_citation_edges,citation_depen
 from .calibration import CalibrationReport,calibration_report
 from .counterfactual import EvidenceInfluence,leave_one_out_influence
 from .evidence_revision import RevisionReceipt,revision_receipt
+
+from .shapley import SourceAttribution,approximate_shapley
+from .stopping import ResearchStopDecision,decide_research_stop
+from .temporal_retrieval import TemporalFragment,TemporalRetrievalCatalog
