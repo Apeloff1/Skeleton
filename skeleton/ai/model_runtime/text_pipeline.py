@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from hashlib import sha256
+import json
 from typing import Iterable, Iterator, Sequence
 
 from .flgb_model_runtime import TokenSequence, digest_json
@@ -185,6 +186,91 @@ class CausalTrainingBatch:
     @property
     def digest(self) -> str:
         return digest_json({"input_ids": [list(row) for row in self.input_ids], "labels": [list(row) for row in self.labels], "loss_mask": [list(row) for row in self.loss_mask], "source_window_digests": list(self.source_window_digests), "pad_token_id": self.pad_token_id, "ignore_index": self.ignore_index})
+
+
+MAX_SERIALIZED_BATCH_BYTES = 32_000_000
+
+
+def _serialize_batch_payload(payload: dict) -> bytes:
+    from .flgb_model_runtime import canonical_bytes
+    value = canonical_bytes(payload)
+    if len(value) > MAX_SERIALIZED_BATCH_BYTES:
+        raise TokenizerContractError("serialized batch exceeds byte budget")
+    return value
+
+
+def serialize_model_input_batch(batch: ModelInputBatch) -> bytes:
+    if not isinstance(batch, ModelInputBatch):
+        raise TokenizerContractError("ModelInputBatch required")
+    return _serialize_batch_payload({
+        "schema": "skeleton.ai.model-input-batch.v1",
+        "input_ids": [list(row) for row in batch.input_ids],
+        "attention_mask": [list(row) for row in batch.attention_mask],
+        "position_ids": [list(row) for row in batch.position_ids],
+        "source_window_digests": list(batch.source_window_digests),
+        "pad_token_id": batch.pad_token_id,
+        "digest": batch.digest,
+    })
+
+
+def deserialize_model_input_batch(payload: bytes) -> ModelInputBatch:
+    if not isinstance(payload, bytes) or len(payload) > MAX_SERIALIZED_BATCH_BYTES:
+        raise TokenizerContractError("invalid serialized model batch bytes")
+    try:
+        value = json.loads(payload.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise TokenizerContractError("invalid serialized model batch") from exc
+    expected = {"schema", "input_ids", "attention_mask", "position_ids", "source_window_digests", "pad_token_id", "digest"}
+    if not isinstance(value, dict) or set(value) != expected or value["schema"] != "skeleton.ai.model-input-batch.v1":
+        raise TokenizerContractError("serialized model batch has invalid shape")
+    batch = ModelInputBatch(
+        tuple(tuple(row) for row in value["input_ids"]),
+        tuple(tuple(row) for row in value["attention_mask"]),
+        tuple(tuple(row) for row in value["position_ids"]),
+        tuple(value["source_window_digests"]),
+        value["pad_token_id"],
+    )
+    if value["digest"] != batch.digest:
+        raise TokenizerContractError("serialized model batch digest mismatch")
+    return batch
+
+
+def serialize_causal_training_batch(batch: CausalTrainingBatch) -> bytes:
+    if not isinstance(batch, CausalTrainingBatch):
+        raise TokenizerContractError("CausalTrainingBatch required")
+    return _serialize_batch_payload({
+        "schema": "skeleton.ai.causal-training-batch.v1",
+        "input_ids": [list(row) for row in batch.input_ids],
+        "labels": [list(row) for row in batch.labels],
+        "loss_mask": [list(row) for row in batch.loss_mask],
+        "source_window_digests": list(batch.source_window_digests),
+        "pad_token_id": batch.pad_token_id,
+        "ignore_index": batch.ignore_index,
+        "digest": batch.digest,
+    })
+
+
+def deserialize_causal_training_batch(payload: bytes) -> CausalTrainingBatch:
+    if not isinstance(payload, bytes) or len(payload) > MAX_SERIALIZED_BATCH_BYTES:
+        raise TokenizerContractError("invalid serialized causal batch bytes")
+    try:
+        value = json.loads(payload.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise TokenizerContractError("invalid serialized causal batch") from exc
+    expected = {"schema", "input_ids", "labels", "loss_mask", "source_window_digests", "pad_token_id", "ignore_index", "digest"}
+    if not isinstance(value, dict) or set(value) != expected or value["schema"] != "skeleton.ai.causal-training-batch.v1":
+        raise TokenizerContractError("serialized causal batch has invalid shape")
+    batch = CausalTrainingBatch(
+        tuple(tuple(row) for row in value["input_ids"]),
+        tuple(tuple(row) for row in value["labels"]),
+        tuple(tuple(row) for row in value["loss_mask"]),
+        tuple(value["source_window_digests"]),
+        value["pad_token_id"],
+        value["ignore_index"],
+    )
+    if value["digest"] != batch.digest:
+        raise TokenizerContractError("serialized causal batch digest mismatch")
+    return batch
 
 
 def materialize_causal_training_batch(batch: ModelInputBatch, *, ignore_index: int = -100) -> CausalTrainingBatch:
