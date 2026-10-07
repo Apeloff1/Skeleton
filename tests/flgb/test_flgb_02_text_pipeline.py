@@ -1283,3 +1283,32 @@ def test_independent_confidence_fuses_distinct_groups(native_model):
     a = TemporalSourceEvidence(TemporalEvidence("a", "claim:x", value, signal, 800_000, True), "source-a", "group-a")
     b = TemporalSourceEvidence(TemporalEvidence("b", "claim:x", value, signal, 500_000, True), "source-b", "group-b")
     assert independent_confidence_ppm((a, b)) == 900_000
+
+
+def test_temporal_retention_gate_requires_learning_without_forgetting():
+    from skeleton.ai.model_runtime.text_pipeline import TemporalRetentionResult, temporal_retention_gate
+    current = TemporalRetentionResult("current", 70, 100, 90, 100)
+    historical = TemporalRetentionResult("historical", 90, 100, 88, 100)
+    stable = TemporalRetentionResult("stable", 95, 100, 94, 100)
+    unrelated = TemporalRetentionResult("unrelated", 92, 100, 92, 100)
+    gate = temporal_retention_gate((current, historical, stable, unrelated), maximum_regression_ppm=30_000, minimum_current_gain_ppm=100_000)
+    assert gate.passed
+    assert current.delta_ppm == 200_000
+    assert historical.delta_ppm == -20_000
+
+
+def test_temporal_retention_gate_rejects_destructive_update():
+    from skeleton.ai.model_runtime.text_pipeline import TemporalRetentionResult, temporal_retention_gate
+    current = TemporalRetentionResult("current", 50, 100, 95, 100)
+    historical = TemporalRetentionResult("historical", 90, 100, 60, 100)
+    gate = temporal_retention_gate((current, historical), maximum_regression_ppm=50_000, minimum_current_gain_ppm=100_000)
+    assert gate.passed is False
+
+
+def test_temporal_retention_gate_requires_current_cohort():
+    import pytest
+    from skeleton.ai.model_runtime.text_pipeline import TemporalRetentionResult, temporal_retention_gate
+    from skeleton.ai.model_runtime.tokenization import TokenizerContractError
+    historical = TemporalRetentionResult("historical", 90, 100, 90, 100)
+    with pytest.raises(TokenizerContractError, match="current retention cohort"):
+        temporal_retention_gate((historical,), maximum_regression_ppm=10_000)
