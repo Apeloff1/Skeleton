@@ -45,7 +45,7 @@ class TestRuntimeAdmissionScheduler(unittest.TestCase):
         s.submit(BatchRequest("new", 1, 1), kv_bytes=15)
         d = s.admit()
         self.assertEqual(d.admitted, ("new",))
-        self.assertEqual(d.evicted_kv, ("old",))
+        self.assertEqual(d.evicted_kv, ("old",))\n        self.assertEqual(d.kv_demand, 15)\n        self.assertEqual(d.kv_evicted_bytes, 15)\n        self.assertEqual(d.resident_kv_bytes, 15)
 
     def test_active_kv_is_never_evicted(self):
         s = self.scheduler(kv_capacity_bytes=25, max_batch_size=1, max_active_requests=2)
