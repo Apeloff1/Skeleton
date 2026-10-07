@@ -272,8 +272,8 @@ class RuntimeReplaySnapshot:
                 if (
                     selected
                     and record.action == selected
-                    and record.disposition
-                    == DecisionDisposition.ACCEPTED
+                    and record.disposition.value
+                    == DecisionDisposition.ACCEPTED.value
                 )
             )
             selected_id = (
@@ -287,8 +287,8 @@ class RuntimeReplaySnapshot:
             for record in session_records
             if (
                 record.action in rejected
-                and record.disposition
-                == DecisionDisposition.REJECTED
+                and record.disposition.value
+                == DecisionDisposition.REJECTED.value
             )
         )
         rejected_ids = tuple(
@@ -457,12 +457,12 @@ def audit_runtime(
     rejected_records = tuple(
         record
         for record in session_records
-        if record.disposition == DecisionDisposition.REJECTED
+        if record.disposition.value == DecisionDisposition.REJECTED.value
     )
     accepted_records = tuple(
         record
         for record in session_records
-        if record.disposition == DecisionDisposition.ACCEPTED
+        if record.disposition.value == DecisionDisposition.ACCEPTED.value
     )
 
     if snapshot.event_count and not session_records:
@@ -505,8 +505,8 @@ def audit_runtime(
                     "selected policy decision identity does not match selected action"
                 )
             elif (
-                selected_record.disposition
-                != DecisionDisposition.ACCEPTED
+                selected_record.disposition.value
+                != DecisionDisposition.ACCEPTED.value
             ):
                 violations.append(
                     "selected policy decision identity is not ACCEPTED"
@@ -545,8 +545,8 @@ def audit_runtime(
                 f"rejected policy decision {decision_id!r} crosses session boundary"
             )
         elif (
-            record.disposition
-            != DecisionDisposition.REJECTED
+            record.disposition.value
+            != DecisionDisposition.REJECTED.value
         ):
             violations.append(
                 f"rejected policy decision {decision_id!r} is not REJECTED"
