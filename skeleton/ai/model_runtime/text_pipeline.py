@@ -159,9 +159,17 @@ class CausalTrainingBatch:
             raise TokenizerContractError("causal provenance mismatch")
         if any(bit not in (0, 1) for row in self.loss_mask for bit in row):
             raise TokenizerContractError("invalid causal loss mask")
-        for labels, mask in zip(self.labels, self.loss_mask):
-            if any((bit == 0) != (label == self.ignore_index) for label, bit in zip(labels, mask)):
-                raise TokenizerContractError("ignored labels/loss mask mismatch")
+        for inputs, labels, mask in zip(self.input_ids, self.labels, self.loss_mask):
+            for token_id in inputs:
+                if isinstance(token_id, bool) or not isinstance(token_id, int) or token_id < 0:
+                    raise TokenizerContractError("invalid causal input token")
+            for label, bit in zip(labels, mask):
+                if isinstance(label, bool) or not isinstance(label, int):
+                    raise TokenizerContractError("invalid causal label")
+                if (bit == 0) != (label == self.ignore_index):
+                    raise TokenizerContractError("ignored labels/loss mask mismatch")
+                if bit == 1 and label < 0:
+                    raise TokenizerContractError("invalid active causal label")
 
     @property
     def digest(self) -> str:
