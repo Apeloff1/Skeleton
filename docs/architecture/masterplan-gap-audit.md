@@ -1499,3 +1499,18 @@ Canonical provenance restart durability is now implemented:
 Remaining crash-timing boundary: record() mutates the in-memory ledger before a separate checkpoint save call. A hard process death between those calls can still lose the idempotency binding even though the crawler outbox preserves operation identity. Final closure requires a persistence-aware record path (or durable provenance backend transaction) that does not acknowledge mutation until the checkpoint/backend commit succeeds.
 
 SIGNED status remains withheld pending that timing closure and observable exact-head validation.
+
+
+### 2026-10-07 durable provenance acknowledgement closure
+
+The provenance crash-timing window is now closed for checkpoint-backed durable mode:
+- ProvenanceLedger accepts an optional persistence callback;
+- a new record is not acknowledged until persistence succeeds;
+- persistence failure rolls back the entry, idempotency binding, chain membership and recorded statistic before propagating the error;
+- ProvenanceCheckpoint.load(durable=True) automatically returns a persistence-aware ledger;
+- checkpoint save fsyncs file content, atomically replaces the target, then fsyncs the containing directory where supported;
+- regressions prove persistence-before-return, rollback on simulated disk failure, and combined crawler SQLite outbox + durable provenance replay across process reconstruction.
+
+The canonical in-memory ledger remains available for callers that do not request durable mode; the crawler's crash-safe deployment contract should use the durable checkpoint-backed ledger or an equivalent durable backend.
+
+Repository-side architecture for the previously identified provenance crash window is now IMPLEMENTED. SIGNED remains withheld only until observable exact-head validation executes successfully and any resulting failures are resolved.
