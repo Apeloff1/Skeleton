@@ -195,6 +195,12 @@ function patchHttpCacheSemanticsMaxStale() {
   if (!fs.existsSync(pkgPath)) return;
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
+  if (version === '4.3.0') {
+    // 4.3.0 is the reviewed patched line resolved by the frozen lockfile.
+    // Do not rewrite patched upstream code; keep future version drift fail-closed.
+    skipped++;
+    return;
+  }
   if (version !== '4.2.0') {
     throw new Error(`[patch-node-modules] http-cache-semantics ${version} requires security patch review`);
   }
