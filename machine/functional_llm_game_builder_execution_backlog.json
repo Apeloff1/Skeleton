@@ -137,9 +137,10 @@
         "FLGB-05-T11",
         "FLGB-05-T12"
       ],
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
-      "independent_verification_signed": false
+      "independent_verification_signed": false,
+      "implementation_note": "T01-T12 defensive policy/privacy/security targets are present; canonical VOL-175 tenant isolation is reused rather than duplicated; exact-head CI and independent verification remain required."
     },
     {
       "id": "FLGB-06",
@@ -3690,7 +3691,7 @@
       "implementation_target": "skeleton/security/policy_evaluation.py",
       "contract_target": "skeleton/security/contracts/policy_evaluation.schema.json",
       "test_target": "tests/flgb/test_flgb_05_policy_evaluation.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -3756,7 +3757,7 @@
       "implementation_target": "skeleton/security/prompt_injection_resistance.py",
       "contract_target": "skeleton/security/contracts/prompt_injection_resistance.schema.json",
       "test_target": "tests/flgb/test_flgb_05_prompt_injection_resistance.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -3822,7 +3823,7 @@
       "implementation_target": "skeleton/security/secret_isolation.py",
       "contract_target": "skeleton/security/contracts/secret_isolation.schema.json",
       "test_target": "tests/flgb/test_flgb_05_secret_isolation.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -3888,7 +3889,7 @@
       "implementation_target": "skeleton/security/tenant_isolation.py",
       "contract_target": "skeleton/security/contracts/tenant_isolation.schema.json",
       "test_target": "tests/flgb/test_flgb_05_tenant_isolation.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -3954,7 +3955,7 @@
       "implementation_target": "skeleton/security/pii_handling.py",
       "contract_target": "skeleton/security/contracts/pii_handling.schema.json",
       "test_target": "tests/flgb/test_flgb_05_pii_handling.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -4020,7 +4021,7 @@
       "implementation_target": "skeleton/security/data_classification.py",
       "contract_target": "skeleton/security/contracts/data_classification.schema.json",
       "test_target": "tests/flgb/test_flgb_05_data_classification.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -4086,7 +4087,7 @@
       "implementation_target": "skeleton/security/authorization.py",
       "contract_target": "skeleton/security/contracts/authorization.schema.json",
       "test_target": "tests/flgb/test_flgb_05_authorization.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -4152,7 +4153,7 @@
       "implementation_target": "skeleton/security/approval_gates.py",
       "contract_target": "skeleton/security/contracts/approval_gates.schema.json",
       "test_target": "tests/flgb/test_flgb_05_approval_gates.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -4218,7 +4219,7 @@
       "implementation_target": "skeleton/security/sandbox_boundary.py",
       "contract_target": "skeleton/security/contracts/sandbox_boundary.schema.json",
       "test_target": "tests/flgb/test_flgb_05_sandbox_boundary.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -4284,7 +4285,7 @@
       "implementation_target": "skeleton/security/supply_chain_trust.py",
       "contract_target": "skeleton/security/contracts/supply_chain_trust.schema.json",
       "test_target": "tests/flgb/test_flgb_05_supply_chain_trust.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -4350,7 +4351,7 @@
       "implementation_target": "skeleton/security/audit_evidence.py",
       "contract_target": "skeleton/security/contracts/audit_evidence.schema.json",
       "test_target": "tests/flgb/test_flgb_05_audit_evidence.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -4416,7 +4417,7 @@
       "implementation_target": "skeleton/security/incident_fail_closed.py",
       "contract_target": "skeleton/security/contracts/incident_fail_closed.schema.json",
       "test_target": "tests/flgb/test_flgb_05_incident_fail_closed.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
