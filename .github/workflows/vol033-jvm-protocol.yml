@@ -78,10 +78,12 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: Install focused dependency
+      - name: Install focused dependencies
         run: >-
           python -m pip install --disable-pip-version-check
           "pytest>=8,<9"
+          "pydantic>=2,<3"
+          "pydantic-settings>=2,<3"
 
       - name: Compile JVM governance boundaries
         run: >-
