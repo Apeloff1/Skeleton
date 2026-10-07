@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-02:model_registry:v1",
+  "title": "FLGB-02 model registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "model_id",
+    "revision",
+    "architecture",
+    "config_digest",
+    "tokenizer_digest",
+    "weights_digest"
+  ],
+  "properties": {
+    "model_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "revision": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "architecture": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "config_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "tokenizer_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "weights_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
