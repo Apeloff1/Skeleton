@@ -1,6 +1,6 @@
 """Socket-bound HTTP transport: DNS validation is enforced at connect time."""
 from __future__ import annotations
-import http.client,ssl,time
+import http.client,ipaddress,ssl,time
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 from .core import FetchResponse
@@ -34,11 +34,14 @@ class SocketBoundFetcher:
  ssl_context:ssl.SSLContext|None=None
  def fetch_once(self,url,*,user_agent,max_bytes):
   target=resolve_target(url,self.allowed_hosts);p=urlsplit(target.url)
+  if max_bytes < 0:raise ValueError("max_bytes must be non-negative")
   context=self.ssl_context or ssl.create_default_context()
   conn=(_PinnedHTTPSConnection(target,self.timeout_seconds,context) if p.scheme=="https" else _PinnedHTTPConnection(target,self.timeout_seconds))
   path=p.path or "/"
   if p.query:path+="?"+p.query
-  headers={"Host":target.host if p.port is None else f"{target.host}:{p.port}","User-Agent":user_agent,
+  host_header=f"[{target.host}]" if ":" in target.host else target.host
+  if p.port is not None:host_header=f"{host_header}:{p.port}"
+  headers={"Host":host_header,"User-Agent":user_agent,
    "Accept":"text/html,text/plain,application/xhtml+xml;q=0.9,*/*;q=0.1","Accept-Encoding":"identity","Connection":"close"}
   try:
    conn.request("GET",path,headers=headers);response=conn.getresponse()
