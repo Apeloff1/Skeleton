@@ -363,9 +363,10 @@
         "FLGB-13-T11",
         "FLGB-13-T12"
       ],
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
-      "independent_verification_signed": false
+      "independent_verification_signed": false,
+      "implementation_note": "T01-T12 gameplay/scripting/quest/dialogue/canon/NPC/combat/economy/save targets, schemas, and focused regressions are present; ambiguous transitions, graph cycles, canon contradictions, unreachable plans, and economy bound violations fail closed; exact-head dependency closure and independent verification remain required."
     },
     {
       "id": "FLGB-14",
@@ -10034,7 +10035,7 @@
       "implementation_target": "skeleton/game/gameplay/gameplay_ability.py",
       "contract_target": "skeleton/game/gameplay/contracts/gameplay_ability.schema.json",
       "test_target": "tests/flgb/test_flgb_13_gameplay_ability.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -10100,7 +10101,7 @@
       "implementation_target": "skeleton/game/gameplay/script_sandbox.py",
       "contract_target": "skeleton/game/gameplay/contracts/script_sandbox.schema.json",
       "test_target": "tests/flgb/test_flgb_13_script_sandbox.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -10166,7 +10167,7 @@
       "implementation_target": "skeleton/game/gameplay/event_bus.py",
       "contract_target": "skeleton/game/gameplay/contracts/event_bus.schema.json",
       "test_target": "tests/flgb/test_flgb_13_event_bus.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -10232,7 +10233,7 @@
       "implementation_target": "skeleton/game/gameplay/state_machine.py",
       "contract_target": "skeleton/game/gameplay/contracts/state_machine.schema.json",
       "test_target": "tests/flgb/test_flgb_13_state_machine.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -10298,7 +10299,7 @@
       "implementation_target": "skeleton/game/gameplay/quest_graph.py",
       "contract_target": "skeleton/game/gameplay/contracts/quest_graph.schema.json",
       "test_target": "tests/flgb/test_flgb_13_quest_graph.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -10364,7 +10365,7 @@
       "implementation_target": "skeleton/game/gameplay/dialogue_graph.py",
       "contract_target": "skeleton/game/gameplay/contracts/dialogue_graph.schema.json",
       "test_target": "tests/flgb/test_flgb_13_dialogue_graph.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -10430,7 +10431,7 @@
       "implementation_target": "skeleton/game/gameplay/narrative_canon.py",
       "contract_target": "skeleton/game/gameplay/contracts/narrative_canon.schema.json",
       "test_target": "tests/flgb/test_flgb_13_narrative_canon.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -10496,7 +10497,7 @@
       "implementation_target": "skeleton/game/gameplay/npc_planner.py",
       "contract_target": "skeleton/game/gameplay/contracts/npc_planner.schema.json",
       "test_target": "tests/flgb/test_flgb_13_npc_planner.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -10562,7 +10563,7 @@
       "implementation_target": "skeleton/game/gameplay/behavior_tree.py",
       "contract_target": "skeleton/game/gameplay/contracts/behavior_tree.schema.json",
       "test_target": "tests/flgb/test_flgb_13_behavior_tree.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -10628,7 +10629,7 @@
       "implementation_target": "skeleton/game/gameplay/combat_logic.py",
       "contract_target": "skeleton/game/gameplay/contracts/combat_logic.schema.json",
       "test_target": "tests/flgb/test_flgb_13_combat_logic.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -10694,7 +10695,7 @@
       "implementation_target": "skeleton/game/gameplay/economy_rules.py",
       "contract_target": "skeleton/game/gameplay/contracts/economy_rules.schema.json",
       "test_target": "tests/flgb/test_flgb_13_economy_rules.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -10760,7 +10761,7 @@
       "implementation_target": "skeleton/game/gameplay/saveable_gameplay_state.py",
       "contract_target": "skeleton/game/gameplay/contracts/saveable_gameplay_state.schema.json",
       "test_target": "tests/flgb/test_flgb_13_saveable_gameplay_state.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
