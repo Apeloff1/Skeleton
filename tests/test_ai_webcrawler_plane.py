@@ -123,3 +123,27 @@ def test_retry_is_bounded_and_backed_off():
     assert e.step(now=5) is None
     assert e.step(now=6) is None
     assert len(f.calls) == 3
+
+
+def test_robots_bootstrap_is_self_directed_and_budgeted():
+    pages = {
+        "https://example.com/robots.txt": (200, "text/plain", "User-agent: *\nAllow: /"),
+        "https://example.com/": (200, "text/plain", "public"),
+    }
+    e = CrawlEngine(FakeFetcher(pages), policy=CrawlPolicy(min_host_delay_seconds=0))
+    e.enqueue("https://example.com/")
+    doc = e.step(now=1)
+    assert doc and doc.text == "public"
+    assert e.fetcher.calls == [
+        "https://example.com/robots.txt",
+        "https://example.com/",
+    ]
+    assert e.budget.requests == 2
+
+
+def test_robots_server_error_fails_closed():
+    pages = {"https://example.com/robots.txt": (503, "text/plain", "unavailable")}
+    e = CrawlEngine(FakeFetcher(pages), policy=CrawlPolicy(min_host_delay_seconds=0))
+    e.enqueue("https://example.com/")
+    assert e.step(now=1) is None
+    assert e.fetcher.calls == ["https://example.com/robots.txt"]
