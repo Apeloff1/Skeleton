@@ -106,8 +106,10 @@ def validate(root:Path=ROOT, *, head:str|None=None)->dict[str,Any]:
         volume=by_key.get(key)
         if not isinstance(volume,dict):
             raise ObservabilityEconomicsCandidateError(f"masterplan volume missing: {key}")
-        if volume.get("implementation_status")!="implemented":
-            raise ObservabilityEconomicsCandidateError(f"{key} must be implemented but not verified")
+        if volume.get("implementation_status")!="unverified":
+            raise ObservabilityEconomicsCandidateError(
+                f"{key} must remain unverified until independent exact-head closure"
+            )
         if volume.get("completion_checkbox") is not False:
             raise ObservabilityEconomicsCandidateError(f"{key} completion checkbox self-promoted")
         module=modules[key]
