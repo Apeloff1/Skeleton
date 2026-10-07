@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-09:prefab_inheritance:v1",
+  "title": "FLGB-09 prefab inheritance",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "prefab_id",
+    "revision",
+    "parent_prefab_digest",
+    "component_overrides"
+  ],
+  "properties": {
+    "prefab_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "parent_prefab_digest": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "component_overrides": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    }
+  }
+}
