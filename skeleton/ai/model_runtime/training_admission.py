@@ -1,13 +1,24 @@
 """Atomic promoted-candidate admission bound to the native runtime's observed state."""
 from __future__ import annotations
-from copy import deepcopy
 from typing import Callable
 from skeleton.ai.training.flgb_training_runtime import CandidateWeights, PromotionEvidence
 from skeleton.ai.training.promotion_lifecycle import RuntimeAdmission, RollbackProof
 from .native_llm_runtime import NativeLLMRuntime
-from .runtime_checkpoint import snapshot_digest
 
 class RuntimePromotionError(ValueError): pass
+
+def _restore_in_place(runtime:NativeLLMRuntime, checkpoint:object, prior_digest:str)->None:
+    restored=NativeLLMRuntime.restore(checkpoint,device_policy=runtime.device_policy)
+    runtime.model=restored.model
+    runtime.limits=restored.limits
+    runtime.device_policy=restored.device_policy
+    runtime._model_snapshot=restored._model_snapshot
+    runtime._model_digest=restored._model_digest
+    runtime._model_bytes=restored._model_bytes
+    runtime.tokenizer=restored.tokenizer
+    runtime.architecture=restored.architecture
+    runtime.device=restored.device
+    if runtime.model_digest!=prior_digest: raise RuntimePromotionError("in-place rollback failed")
 
 def admit_candidate_model(
     runtime:NativeLLMRuntime,
@@ -31,8 +42,7 @@ def admit_candidate_model(
         if observed!=candidate.weights_digest: raise RuntimePromotionError("observed candidate weights do not match declared digest")
         if observed==prior: raise RuntimePromotionError("candidate did not change model identity")
     except Exception:
-        restored=NativeLLMRuntime.restore(checkpoint,device_policy=runtime.device_policy)
-        if restored.model_digest!=prior: raise RuntimePromotionError("automatic rollback failed")
+        _restore_in_place(runtime,checkpoint,prior)
         raise
     admission=RuntimeAdmission(candidate.digest,prior,observed,checkpoint["digest"],admission_authority,True)
     restored=NativeLLMRuntime.restore(checkpoint,device_policy=runtime.device_policy)
