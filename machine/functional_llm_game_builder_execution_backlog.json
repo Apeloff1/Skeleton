@@ -419,9 +419,10 @@
         "FLGB-15-T11",
         "FLGB-15-T12"
       ],
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
-      "independent_verification_signed": false
+      "independent_verification_signed": false,
+      "implementation_note": "T01-T12 network/replication/prediction/rollback/save/cloud/mod/plugin/localization/platform/achievement/migration targets, schemas, and focused regressions are present; protocol compatibility, rollback chains, plugin isolation, cloud lineage, and migration gaps fail closed; exact-head dependency closure and independent verification remain required."
     },
     {
       "id": "FLGB-16",
@@ -11620,7 +11621,7 @@
       "implementation_target": "skeleton/game/platform/network_protocol.py",
       "contract_target": "skeleton/game/platform/contracts/network_protocol.schema.json",
       "test_target": "tests/flgb/test_flgb_15_network_protocol.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -11686,7 +11687,7 @@
       "implementation_target": "skeleton/game/platform/replication.py",
       "contract_target": "skeleton/game/platform/contracts/replication.schema.json",
       "test_target": "tests/flgb/test_flgb_15_replication.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -11752,7 +11753,7 @@
       "implementation_target": "skeleton/game/platform/prediction.py",
       "contract_target": "skeleton/game/platform/contracts/prediction.schema.json",
       "test_target": "tests/flgb/test_flgb_15_prediction.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -11818,7 +11819,7 @@
       "implementation_target": "skeleton/game/platform/rollback_netcode.py",
       "contract_target": "skeleton/game/platform/contracts/rollback_netcode.schema.json",
       "test_target": "tests/flgb/test_flgb_15_rollback_netcode.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -11884,7 +11885,7 @@
       "implementation_target": "skeleton/game/platform/save_schema.py",
       "contract_target": "skeleton/game/platform/contracts/save_schema.schema.json",
       "test_target": "tests/flgb/test_flgb_15_save_schema.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -11950,7 +11951,7 @@
       "implementation_target": "skeleton/game/platform/cloud_save.py",
       "contract_target": "skeleton/game/platform/contracts/cloud_save.schema.json",
       "test_target": "tests/flgb/test_flgb_15_cloud_save.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -12016,7 +12017,7 @@
       "implementation_target": "skeleton/game/platform/mod_api.py",
       "contract_target": "skeleton/game/platform/contracts/mod_api.schema.json",
       "test_target": "tests/flgb/test_flgb_15_mod_api.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -12082,7 +12083,7 @@
       "implementation_target": "skeleton/game/platform/plugin_isolation.py",
       "contract_target": "skeleton/game/platform/contracts/plugin_isolation.schema.json",
       "test_target": "tests/flgb/test_flgb_15_plugin_isolation.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -12148,7 +12149,7 @@
       "implementation_target": "skeleton/game/platform/localization.py",
       "contract_target": "skeleton/game/platform/contracts/localization.schema.json",
       "test_target": "tests/flgb/test_flgb_15_localization.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -12214,7 +12215,7 @@
       "implementation_target": "skeleton/game/platform/platform_identity.py",
       "contract_target": "skeleton/game/platform/contracts/platform_identity.schema.json",
       "test_target": "tests/flgb/test_flgb_15_platform_identity.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -12280,7 +12281,7 @@
       "implementation_target": "skeleton/game/platform/achievements.py",
       "contract_target": "skeleton/game/platform/contracts/achievements.schema.json",
       "test_target": "tests/flgb/test_flgb_15_achievements.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -12346,7 +12347,7 @@
       "implementation_target": "skeleton/game/platform/cross_version_migration.py",
       "contract_target": "skeleton/game/platform/contracts/cross_version_migration.schema.json",
       "test_target": "tests/flgb/test_flgb_15_cross_version_migration.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
