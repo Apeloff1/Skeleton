@@ -213,6 +213,9 @@
         "VOL-076",
         "VOL-096",
         "VOL-177",
+        "VOL-247",
+        "VOL-260",
+        "VOL-295",
         "VOL-361",
         "VOL-364",
         "VOL-365",
@@ -394,7 +397,9 @@
         "VOL-040",
         "VOL-042",
         "VOL-044",
-        "VOL-045"
+        "VOL-045",
+        "VOL-288",
+        "VOL-295"
       ]
     },
     {
@@ -720,6 +725,7 @@
         "swarm"
       ],
       "volume_refs": [
+        "VOL-004",
         "VOL-015",
         "VOL-016",
         "VOL-017",
@@ -736,7 +742,9 @@
         "VOL-116",
         "VOL-118",
         "VOL-119",
-        "VOL-121"
+        "VOL-121",
+        "VOL-290",
+        "VOL-294"
       ]
     },
     {
@@ -823,6 +831,11 @@
         "VOL-187",
         "VOL-191",
         "VOL-204",
+        "VOL-235",
+        "VOL-236",
+        "VOL-279",
+        "VOL-280",
+        "VOL-282",
         "VOL-325",
         "VOL-390",
         "VOL-403",
@@ -931,6 +944,9 @@
         "VOL-233",
         "VOL-256",
         "VOL-257",
+        "VOL-276",
+        "VOL-277",
+        "VOL-283",
         "VOL-318",
         "VOL-320",
         "VOL-321",
@@ -990,8 +1006,10 @@
         "VOL-206",
         "VOL-207",
         "VOL-208",
+        "VOL-242",
         "VOL-248",
         "VOL-252",
+        "VOL-296",
         "VOL-323",
         "VOL-324",
         "VOL-362",
@@ -1078,7 +1096,14 @@
       "volume_refs": [
         "VOL-029",
         "VOL-102",
-        "VOL-188"
+        "VOL-188",
+        "VOL-288",
+        "VOL-289",
+        "VOL-290",
+        "VOL-291",
+        "VOL-292",
+        "VOL-293",
+        "VOL-294"
       ]
     },
     {
@@ -1273,7 +1298,8 @@
       "volume_refs": [
         "VOL-019",
         "VOL-073",
-        "VOL-197"
+        "VOL-197",
+        "VOL-284"
       ],
       "move_tags": [
         "ai-tree:mapped",
@@ -1643,7 +1669,10 @@
         "VOL-003",
         "VOL-005",
         "VOL-028",
-        "VOL-038"
+        "VOL-038",
+        "VOL-297",
+        "VOL-298",
+        "VOL-299"
       ],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
@@ -6090,7 +6119,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "178_mapping_plus_23_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "178_mapping_plus_24_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -6896,7 +6925,7 @@
       "BASE-FRONTEND-SSR-RAF-01"
     ],
     "invariant": "Preparation metadata and move tags authorize staging only; the reconciled mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion.",
-    "native_ai_owner_count": 23
+    "native_ai_owner_count": 24
   },
   "validation_request": {
     "requested_at_utc": "2026-09-22T15:47:00Z",
@@ -7439,7 +7468,11 @@
       "volume_refs": [
         "VOL-098",
         "VOL-100",
-        "VOL-259"
+        "VOL-259",
+        "VOL-263",
+        "VOL-264",
+        "VOL-265",
+        "VOL-266"
       ]
     },
     {
@@ -7468,7 +7501,8 @@
         "VOL-204",
         "VOL-205",
         "VOL-206",
-        "VOL-207"
+        "VOL-207",
+        "VOL-237"
       ]
     },
     {
@@ -7597,7 +7631,9 @@
         "VOL-007",
         "VOL-227",
         "VOL-228",
-        "VOL-229"
+        "VOL-229",
+        "VOL-239",
+        "VOL-240"
       ]
     },
     {
@@ -7693,10 +7729,15 @@
         "VOL-217",
         "VOL-218",
         "VOL-237",
+        "VOL-238",
         "VOL-239",
         "VOL-240",
+        "VOL-241",
         "VOL-243",
+        "VOL-247",
         "VOL-248",
+        "VOL-249",
+        "VOL-250",
         "VOL-251",
         "VOL-252",
         "VOL-258",
@@ -7706,6 +7747,9 @@
         "VOL-264",
         "VOL-265",
         "VOL-266",
+        "VOL-285",
+        "VOL-286",
+        "VOL-287",
         "VOL-320",
         "VOL-321",
         "VOL-322",
