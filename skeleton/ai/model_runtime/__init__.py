@@ -117,5 +117,5 @@ __all__ = [
     "validate_model_snapshot",
 ]
 
-from .training_admission import RuntimePromotionError, admit_candidate_model
-__all__ += ["RuntimePromotionError","admit_candidate_model"]
+from .training_admission import RuntimePromotionError, admit_candidate_model, execute_rollback
+__all__ += ["RuntimePromotionError","admit_candidate_model","execute_rollback"]
