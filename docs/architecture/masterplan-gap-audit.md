@@ -1408,3 +1408,17 @@ The previously explicit DNS resolution-to-connect TOCTOU blocker is now closed i
 The legacy urllib implementation remains available only behind bind_dns_to_socket=False for compatibility; the safe default is socket-bound.
 
 With atomic durable frontier claiming and socket-bound DNS enforcement both landed, remaining SIGNED blockers are now verification/evidence oriented: observed exact-head CI execution, broader platform/load characterization, and any failures those gates expose.
+
+
+### 2026-10-07 verification-closure hardening tranche
+
+Post-architecture verification found and closed additional operational edges:
+- socket-bound transport rejects negative response byte limits before DNS/network activity;
+- IPv6 literal authorities are correctly bracketed in the HTTP Host header;
+- unused transport imports removed;
+- SQLite durable store now uses a 30-second connection/busy timeout for bounded shared-worker lock contention;
+- regression coverage verifies fresh schema version, durable-frontier presence, future-schema fail-closed behavior and busy-timeout configuration;
+- a deterministic scripts/check_ai_webcrawler.py entrypoint now compiles the complete crawler package, discovers every tests/test_ai_webcrawler_*.py regression and fails if the corpus is absent;
+- the dedicated GitHub Actions gate now invokes that exact runner, reducing local/CI command drift and triggers when the runner changes.
+
+Architecture remains IMPLEMENTED. Signing remains withheld until an execution result from the exact-head gate is observable; the repository-side validation contract itself is now materially complete.
