@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-13:script_sandbox:v1",
+  "title": "FLGB-13 script sandbox",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "policy_id",
+    "allowed_apis",
+    "max_instructions",
+    "max_memory_bytes",
+    "allow_network",
+    "allow_process_spawn"
+  ],
+  "properties": {
+    "policy_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "allowed_apis": {
+      "type": "array",
+      "maxItems": 1024,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "max_instructions": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "max_memory_bytes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "allow_network": {
+      "type": "boolean"
+    },
+    "allow_process_spawn": {
+      "type": "boolean"
+    }
+  }
+}
