@@ -1139,3 +1139,55 @@ def test_temporal_retrieval_fails_closed_when_nothing_is_valid(native_model):
     future = TemporalRetrievalCandidate("d" * 64, 2025, 2025, None, 1_000_000)
     with pytest.raises(TokenizerContractError, match="no temporally admissible"):
         pipeline.temporal_retrieval_plan((future,), query_year=2020)
+
+
+def test_temporal_evidence_prefers_confidence_before_recency(native_model):
+    from hashlib import sha256
+    from skeleton.ai.model_runtime.text_pipeline import TemporalEvidence, TextTokenPipeline, arbitrate_temporal_evidence
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    old = TemporalEvidence("old", "claim:x", sha256(b"old").hexdigest(), pipeline.temporal_signal(source_year=2020, observed_year=2020, knowledge_cutoff_year=2026), 900_000, True)
+    new = TemporalEvidence("new", "claim:x", sha256(b"new").hexdigest(), pipeline.temporal_signal(source_year=2026, observed_year=2026, knowledge_cutoff_year=2026), 700_000, True)
+    cluster = arbitrate_temporal_evidence((old, new))
+    assert cluster.conflict is True
+    assert cluster.preferred_evidence_digest == old.digest
+    assert cluster.arbitration_reason == "confidence"
+
+
+def test_temporal_evidence_uses_recency_only_for_tied_mutable_facts(native_model):
+    from hashlib import sha256
+    from skeleton.ai.model_runtime.text_pipeline import TemporalEvidence, TextTokenPipeline, arbitrate_temporal_evidence
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    old = TemporalEvidence("old", "claim:x", sha256(b"old").hexdigest(), pipeline.temporal_signal(source_year=2020, observed_year=2020, knowledge_cutoff_year=2026), 800_000, True)
+    new = TemporalEvidence("new", "claim:x", sha256(b"new").hexdigest(), pipeline.temporal_signal(source_year=2026, observed_year=2026, knowledge_cutoff_year=2026), 800_000, True)
+    cluster = arbitrate_temporal_evidence((new, old))
+    assert cluster.preferred_evidence_digest == new.digest
+    assert cluster.arbitration_reason == "recency"
+    assert cluster.evidence_digests == (old.digest, new.digest)
+
+
+def test_temporal_evidence_does_not_newest_wins_stable_conflict(native_model):
+    from hashlib import sha256
+    from skeleton.ai.model_runtime.text_pipeline import TemporalEvidence, TextTokenPipeline, arbitrate_temporal_evidence
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    old = TemporalEvidence("old", "claim:stable", sha256(b"a").hexdigest(), pipeline.temporal_signal(source_year=2020, observed_year=2020, knowledge_cutoff_year=2026), 900_000, False)
+    new = TemporalEvidence("new", "claim:stable", sha256(b"b").hexdigest(), pipeline.temporal_signal(source_year=2026, observed_year=2026, knowledge_cutoff_year=2026), 900_000, False)
+    cluster = arbitrate_temporal_evidence((old, new))
+    assert cluster.arbitration_reason == "stable-conflict"
+    assert cluster.preferred_evidence_digest == old.digest
+
+
+def test_temporal_evidence_agreement_is_not_a_conflict(native_model):
+    from hashlib import sha256
+    from skeleton.ai.model_runtime.text_pipeline import TemporalEvidence, TextTokenPipeline, arbitrate_temporal_evidence
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    value = sha256(b"same").hexdigest()
+    old = TemporalEvidence("old", "claim:x", value, pipeline.temporal_signal(source_year=2020, observed_year=2020, knowledge_cutoff_year=2026), 700_000, True)
+    new = TemporalEvidence("new", "claim:x", value, pipeline.temporal_signal(source_year=2026, observed_year=2026, knowledge_cutoff_year=2026), 900_000, True)
+    cluster = arbitrate_temporal_evidence((old, new))
+    assert cluster.conflict is False
+    assert cluster.arbitration_reason == "agreement"
+    assert cluster.preferred_evidence_digest == new.digest
