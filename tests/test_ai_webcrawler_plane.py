@@ -147,3 +147,14 @@ def test_robots_server_error_fails_closed():
     e.enqueue("https://example.com/")
     assert e.step(now=1) is None
     assert e.fetcher.calls == ["https://example.com/robots.txt"]
+
+
+def test_http_transport_rejects_private_literal_before_network():
+    from skeleton.ai.webcrawler.http import SafeHttpFetcher, UnsafeDestination
+    fetcher = SafeHttpFetcher()
+    try:
+        fetcher.fetch("http://127.0.0.1/", user_agent="test", max_bytes=100)
+    except UnsafeDestination:
+        pass
+    else:
+        raise AssertionError("private destination must fail closed")
