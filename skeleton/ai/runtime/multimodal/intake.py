@@ -76,6 +76,7 @@ class MultimodalAsset:
     content_digest: str
     sanitized_metadata: Mapping[str, object]
     embedded_instruction_detected: bool
+    instruction_trusted: bool = False
     authority_scope: str = "untrusted-media-evidence"
 
     def __post_init__(self) -> None:
