@@ -59,7 +59,7 @@ def audit_session(ledger: DecisionLedger, session_id: str) -> SessionAudit:
     if any(record.predecessors for record in records):
         checks.append("causal-ancestry")
 
-    rejected = tuple(record for record in records if record.disposition is DecisionDisposition.REJECTED)
+    rejected = tuple(record for record in records if record.disposition.value == DecisionDisposition.REJECTED.value)
     if rejected:
         checks.append("counterfactual-audit")
         for record in rejected:
@@ -82,7 +82,7 @@ def audit_session(ledger: DecisionLedger, session_id: str) -> SessionAudit:
             failures.append(f"cross-session supersession for {replacement.decision_id}")
         if target.sequence >= replacement.sequence:
             failures.append(f"superseded target is not earlier: {replacement.decision_id}")
-        if replacement.disposition is not DecisionDisposition.ACCEPTED:
+        if replacement.disposition.value != DecisionDisposition.ACCEPTED.value:
             failures.append(f"superseding replacement must be accepted: {replacement.decision_id}")
         if len(replacement.predecessors) != 1 or replacement.predecessors[0] != target_id:
             failures.append(f"supersession predecessor must name target: {replacement.decision_id}")
@@ -92,7 +92,7 @@ def audit_session(ledger: DecisionLedger, session_id: str) -> SessionAudit:
         if target.supersedes is not None:
             failures.append(f"supersession target is itself a replacement: {replacement.decision_id}")
 
-    superseded = tuple(record for record in records if record.disposition is DecisionDisposition.SUPERSEDED)
+    superseded = tuple(record for record in records if record.disposition.value == DecisionDisposition.SUPERSEDED.value)
     if superseded:
         checks.append("legacy-superseded-disposition")
         for record in superseded:
@@ -104,7 +104,7 @@ def audit_session(ledger: DecisionLedger, session_id: str) -> SessionAudit:
     expected_active = tuple(
         record
         for record in records
-        if record.decision_id not in superseded_ids and record.disposition is not DecisionDisposition.SUPERSEDED
+        if record.decision_id not in superseded_ids and record.disposition.value != DecisionDisposition.SUPERSEDED.value
     )
     if tuple(record.decision_id for record in active) == tuple(record.decision_id for record in expected_active):
         checks.append("active-record-filter")
@@ -122,5 +122,5 @@ def policy_chain(records: Sequence[DecisionRecord]) -> tuple[str, ...]:
     return tuple(
         record.action
         for record in records
-        if record.disposition is not DecisionDisposition.REJECTED and record.policy_digest
+        if record.disposition.value != DecisionDisposition.REJECTED.value and record.policy_digest
     )
