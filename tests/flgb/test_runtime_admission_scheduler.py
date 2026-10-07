@@ -85,6 +85,53 @@ class TestRuntimeAdmissionScheduler(unittest.TestCase):
         self.assertEqual(s.admit().admitted, ("b",))
         self.assertNotIn("a", [e["request_id"] for e in s.snapshot()["kv"]])
 
+    def test_cancel_queued_and_active_work(self):
+        s = self.scheduler(max_batch_size=1)
+        s.submit(BatchRequest("active", 1, 1), kv_bytes=10)
+        s.submit(BatchRequest("queued", 1, 1), kv_bytes=10)
+        s.admit()
+        self.assertEqual(s.cancel("queued"), "queued")
+        self.assertEqual(s.cancel("active"), "active")
+        self.assertEqual(s.active_ids, ())
+        self.assertEqual(s.queued_ids, ())
+        self.assertEqual(s.capacity()["kv_used_bytes"], 0)
+
+    def test_retry_requeues_with_fresh_priority_and_drops_stale_kv(self):
+        s = self.scheduler(max_batch_size=1)
+        s.submit(BatchRequest("work", 2, 2, priority=1), kv_bytes=20)
+        s.admit()
+        s.retry("work", priority_delta=5)
+        self.assertEqual(s.active_ids, ())
+        self.assertEqual(s.queued_ids, ("work",))
+        self.assertEqual(s.capacity()["kv_used_bytes"], 0)
+        self.assertEqual(s.admit().admitted, ("work",))
+
+    def test_pinned_retained_kv_blocks_eviction_until_unpinned(self):
+        s = self.scheduler(kv_capacity_bytes=25, max_batch_size=1)
+        s.submit(BatchRequest("old", 1, 1), kv_bytes=15, pinned_kv=True)
+        s.admit()
+        s.complete("old", retain_kv=True)
+        s.submit(BatchRequest("new", 1, 1), kv_bytes=15)
+        blocked = s.admit()
+        self.assertEqual(blocked.admitted, ())
+        self.assertEqual(blocked.deferred, ("new",))
+        s.set_kv_pinned("old", False)
+        admitted = s.admit()
+        self.assertEqual(admitted.admitted, ("new",))
+        self.assertEqual(admitted.evicted_kv, ("old",))
+
+    def test_capacity_telemetry_is_exact(self):
+        s = self.scheduler(max_batch_size=1, kv_capacity_bytes=100)
+        s.submit(BatchRequest("a", 2, 3), kv_bytes=25)
+        s.submit(BatchRequest("b", 4, 2), kv_bytes=30)
+        s.admit()
+        cap = s.capacity()
+        self.assertEqual(cap["active_requests"], 1)
+        self.assertEqual(cap["queued_requests"], 1)
+        self.assertEqual(cap["active_tokens"], 5)
+        self.assertEqual(cap["queued_tokens"], 6)
+        self.assertEqual(cap["kv_used_bytes"], 25)
+        self.assertEqual(cap["kv_free_bytes"], 75)
 
 if __name__ == "__main__":
     unittest.main()
