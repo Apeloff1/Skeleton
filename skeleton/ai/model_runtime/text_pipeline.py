@@ -292,6 +292,34 @@ class DecadeSamplingPlan:
 
 
 @dataclass(frozen=True)
+class TemporalContradiction:
+    """Explicit evidence that two time-scoped claims disagree."""
+    left_signal_digest: str
+    right_signal_digest: str
+    left_source_year: int
+    right_source_year: int
+    cutoff_year: int
+    resolution: str
+
+    def __post_init__(self) -> None:
+        for value in (self.left_signal_digest, self.right_signal_digest):
+            if not isinstance(value, str) or len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value):
+                raise TokenizerContractError("invalid contradiction signal digest")
+        if self.left_signal_digest == self.right_signal_digest:
+            raise TokenizerContractError("contradiction requires distinct signals")
+        if self.resolution not in {"unresolved", "newer-wins", "coexists-by-validity"}:
+            raise TokenizerContractError("invalid contradiction resolution")
+        if max(self.left_source_year, self.right_source_year) > self.cutoff_year:
+            raise TokenizerContractError("contradiction evidence exceeds cutoff")
+        if self.resolution == "newer-wins" and self.left_source_year == self.right_source_year:
+            raise TokenizerContractError("same-year contradiction cannot resolve by recency")
+
+    @property
+    def digest(self) -> str:
+        return digest_json(self.__dict__)
+
+
+@dataclass(frozen=True)
 class TemporalSupersession:
     """Deterministic relationship between older and newer temporal evidence."""
     older_signal_digest: str
@@ -888,6 +916,13 @@ class TextTokenPipeline:
         if not ordered:
             raise TokenizerContractError("decade sampling produced no documents")
         return DecadeSamplingPlan(coverage.digest, tuple(ordered), max_documents_per_decade)
+
+    def temporal_contradiction(self, left: TemporalTrainingSignal, right: TemporalTrainingSignal, *, resolution: str = "unresolved") -> TemporalContradiction:
+        if not isinstance(left, TemporalTrainingSignal) or not isinstance(right, TemporalTrainingSignal):
+            raise TokenizerContractError("temporal signals required")
+        if left.knowledge_cutoff_year != right.knowledge_cutoff_year:
+            raise TokenizerContractError("temporal signals use different knowledge cutoffs")
+        return TemporalContradiction(left.digest, right.digest, left.source_year, right.source_year, left.knowledge_cutoff_year, resolution)
 
     def temporal_supersession(self, older: TemporalTrainingSignal, newer: TemporalTrainingSignal, *, supersedes: bool) -> TemporalSupersession:
         if not isinstance(older, TemporalTrainingSignal) or not isinstance(newer, TemporalTrainingSignal):
