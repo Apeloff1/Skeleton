@@ -196,3 +196,45 @@ def test_training_receipt_fails_closed_without_trainable_examples(native_model):
     prepared = pipeline.prepare("alpha")
     with pytest.raises(TokenizerContractError, match="no trainable"):
         pipeline.training_receipt(prepared)
+
+
+def test_governed_training_input_binds_dataset_lineage(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextPipelineConfig, TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    from skeleton.ai.training.flgb_training_runtime import DatasetRevision
+
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model), TextPipelineConfig(context_size=4))
+    prepared = pipeline.prepare("alpha beta gamma delta epsilon")
+    rights_digest = "1" * 64
+    revision = DatasetRevision("dataset", 0, prepared.raw_text_digest, rights_digest, pipeline.digest)
+    governed = pipeline.governed_training_input(prepared, revision)
+
+    assert governed.dataset_revision_digest == revision.digest
+    assert governed.transform_digest == pipeline.digest
+    assert governed.rights_digest == rights_digest
+    assert governed.receipt_digest == pipeline.training_receipt(prepared).digest
+    assert len(governed.digest) == 64
+
+
+def test_governed_training_input_rejects_wrong_content(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    from skeleton.ai.training.flgb_training_runtime import DatasetRevision
+
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    prepared = pipeline.prepare("alpha beta")
+    revision = DatasetRevision("dataset", 0, "0" * 64, "1" * 64, pipeline.digest)
+    with pytest.raises(TokenizerContractError, match="content"):
+        pipeline.governed_training_input(prepared, revision)
+
+
+def test_governed_training_input_rejects_wrong_transform(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    from skeleton.ai.training.flgb_training_runtime import DatasetRevision
+
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    prepared = pipeline.prepare("alpha beta")
+    revision = DatasetRevision("dataset", 0, prepared.raw_text_digest, "1" * 64, "2" * 64)
+    with pytest.raises(TokenizerContractError, match="transform"):
+        pipeline.governed_training_input(prepared, revision)
