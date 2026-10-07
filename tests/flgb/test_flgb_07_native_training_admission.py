@@ -49,6 +49,13 @@ class TestNativeTrainingAdmission(unittest.TestCase):
  def test_tampered_ledger_snapshot_is_rejected(self):
   ledger=AdmissionLedger(); snap=ledger.snapshot(); snap["promotions"]=["f"*64]
   with self.assertRaisesRegex(RuntimePromotionError,"invalid admission ledger snapshot"): AdmissionLedger.restore(snap)
+ def test_ledger_rejects_duplicate_and_invalid_receipts(self):
+  with self.assertRaises(RuntimePromotionError): AdmissionLedger(("a"*64,"a"*64),())
+  with self.assertRaises(Exception): AdmissionLedger(("not-a-digest",),())
+ def test_admission_authority_must_be_independent(self):
+  rt,cp,prior,c,p,apply=setup()
+  with self.assertRaisesRegex(RuntimePromotionError,"authorities must be separate"):
+   admit_candidate_model(rt,c,p,apply,admission_authority=p.independent_verifier)
  def test_declared_digest_cannot_lie_about_observed_weights(self):
   rt,cp,prior,c,p,apply=setup()
   c=CandidateWeights("candidate","f"*64,c.training_lineage_digest,prior)
