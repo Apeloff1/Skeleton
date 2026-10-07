@@ -502,6 +502,106 @@ def temporal_weight_ppm(signal: TemporalTrainingSignal) -> int:
 
 
 @dataclass(frozen=True)
+class TemporalEvidence:
+    """One temporally scoped claim version with integer confidence semantics."""
+    evidence_id: str
+    claim_key: str
+    value_digest: str
+    signal: TemporalTrainingSignal
+    confidence_ppm: int
+    mutable: bool
+
+    def __post_init__(self) -> None:
+        for name in ("evidence_id", "claim_key"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value or value != value.strip() or any(ord(ch) < 32 for ch in value):
+                raise TokenizerContractError(f"invalid {name}")
+        if not isinstance(self.value_digest, str) or len(self.value_digest) != 64 or any(ch not in "0123456789abcdef" for ch in self.value_digest):
+            raise TokenizerContractError("invalid temporal evidence value digest")
+        if not isinstance(self.signal, TemporalTrainingSignal):
+            raise TokenizerContractError("TemporalTrainingSignal required")
+        if isinstance(self.confidence_ppm, bool) or not isinstance(self.confidence_ppm, int) or not 0 <= self.confidence_ppm <= 1_000_000:
+            raise TokenizerContractError("invalid temporal evidence confidence")
+        if not isinstance(self.mutable, bool):
+            raise TokenizerContractError("invalid temporal evidence mutability")
+
+    @property
+    def digest(self) -> str:
+        return digest_json({
+            "evidence_id": self.evidence_id,
+            "claim_key": self.claim_key,
+            "value_digest": self.value_digest,
+            "signal_digest": self.signal.digest,
+            "confidence_ppm": self.confidence_ppm,
+            "mutable": self.mutable,
+        })
+
+
+@dataclass(frozen=True)
+class TemporalConflictCluster:
+    """Ordered competing versions of one claim, preserving all evidence."""
+    claim_key: str
+    evidence_digests: tuple[str, ...]
+    preferred_evidence_digest: str
+    conflict: bool
+    arbitration_reason: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.claim_key, str) or not self.claim_key:
+            raise TokenizerContractError("invalid conflict claim key")
+        if len(self.evidence_digests) < 1 or len(set(self.evidence_digests)) != len(self.evidence_digests):
+            raise TokenizerContractError("invalid conflict evidence set")
+        if self.preferred_evidence_digest not in self.evidence_digests:
+            raise TokenizerContractError("preferred evidence absent from cluster")
+        if not isinstance(self.conflict, bool):
+            raise TokenizerContractError("invalid conflict flag")
+        if self.arbitration_reason not in {"single", "agreement", "confidence", "recency", "stable-conflict"}:
+            raise TokenizerContractError("invalid arbitration reason")
+
+    @property
+    def digest(self) -> str:
+        return digest_json({
+            "claim_key": self.claim_key,
+            "evidence_digests": list(self.evidence_digests),
+            "preferred_evidence_digest": self.preferred_evidence_digest,
+            "conflict": self.conflict,
+            "arbitration_reason": self.arbitration_reason,
+        })
+
+
+def arbitrate_temporal_evidence(items: Sequence[TemporalEvidence]) -> TemporalConflictCluster:
+    evidence = tuple(items)
+    if not evidence or any(not isinstance(item, TemporalEvidence) for item in evidence):
+        raise TokenizerContractError("temporal evidence required")
+    claim = evidence[0].claim_key
+    if any(item.claim_key != claim for item in evidence):
+        raise TokenizerContractError("cannot arbitrate different temporal claims")
+    if len({item.evidence_id for item in evidence}) != len(evidence):
+        raise TokenizerContractError("duplicate temporal evidence id")
+    cutoffs = {item.signal.knowledge_cutoff_year for item in evidence}
+    if len(cutoffs) != 1:
+        raise TokenizerContractError("temporal evidence uses different knowledge cutoffs")
+    ordered = tuple(sorted(evidence, key=lambda item: (item.signal.source_year, item.signal.observed_year, item.evidence_id)))
+    values = {item.value_digest for item in ordered}
+    if len(ordered) == 1:
+        preferred, reason, conflict = ordered[0], "single", False
+    elif len(values) == 1:
+        preferred = max(ordered, key=lambda item: (item.confidence_ppm, item.signal.source_year, item.evidence_id))
+        reason, conflict = "agreement", False
+    else:
+        conflict = True
+        best_confidence = max(item.confidence_ppm for item in ordered)
+        leaders = tuple(item for item in ordered if item.confidence_ppm == best_confidence)
+        if len(leaders) == 1:
+            preferred, reason = leaders[0], "confidence"
+        elif all(item.mutable for item in leaders):
+            preferred, reason = max(leaders, key=lambda item: (item.signal.source_year, item.signal.observed_year, item.evidence_id)), "recency"
+        else:
+            preferred, reason = min(leaders, key=lambda item: (item.signal.source_year, item.signal.observed_year, item.evidence_id)), "stable-conflict"
+    return TemporalConflictCluster(claim, tuple(item.digest for item in ordered), preferred.digest, conflict, reason)
+
+
+@dataclass(frozen=True)
 class SupervisedTextExample:
     """One prompt/response example with a deterministic normalized boundary."""
     example_id: str
