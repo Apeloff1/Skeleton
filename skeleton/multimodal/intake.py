@@ -47,6 +47,24 @@ _AUTHORITY_METADATA_KEYS = frozenset(
         "tool_authority",
     }
 )
+_SAFE_METADATA_KEYS = frozenset(
+    {
+        "channels",
+        "codec",
+        "container",
+        "duration_ms",
+        "filename",
+        "frame_rate",
+        "height",
+        "language",
+        "orientation",
+        "page_count",
+        "sample_rate_hz",
+        "source_id",
+        "timestamp",
+        "width",
+    }
+)
 _MEDIA_PREFIX = {
     Modality.DOCUMENT: ("text/", "application/"),
     Modality.IMAGE: ("image/",),
@@ -93,9 +111,12 @@ def _sanitize_metadata(metadata: Mapping[str, object]) -> dict[str, object]:
     result: dict[str, object] = {}
     for raw_key, raw_value in metadata.items():
         key = _text("metadata key", raw_key, maximum=MAX_METADATA_KEY_CHARS)
-        if key.casefold() in _AUTHORITY_METADATA_KEYS:
+        normalized_key = key.casefold()
+        if normalized_key in _AUTHORITY_METADATA_KEYS:
             continue
-        result[key] = _metadata_value(raw_value)
+        if normalized_key not in _SAFE_METADATA_KEYS:
+            continue
+        result[normalized_key] = _metadata_value(raw_value)
     try:
         json.dumps(
             result,
@@ -169,6 +190,12 @@ class MultimodalAsset:
             "sanitized_metadata",
             MappingProxyType(dict(self.sanitized_metadata)),
         )
+
+    @property
+    def instruction_trusted(self) -> bool:
+        """Multimodal content never gains instruction or policy authority."""
+
+        return False
 
 
 class MultimodalIntake:
