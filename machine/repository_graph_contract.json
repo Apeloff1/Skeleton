@@ -1,6 +1,6 @@
 {
   "schema_version": "skeleton.repository_graph_contract.v1",
-  "contract_version": "0.1.0",
+  "contract_version": "0.1.1",
   "status": "active",
   "purpose": "Bind repository files, symbols, imports, dependencies, ownership, tests and trace impact into one freshness-aware code-intelligence contract.",
   "masterplan_binding": {
@@ -28,7 +28,7 @@
     },
     {
       "path": "machine/master_traceability.json",
-      "git_blob_sha": "bb6115a18d5acda6b7c1f73310f56cc3e7763906",
+      "git_blob_sha": "4a668760af52baea18e09a74fa58864cc53363ac",
       "role": "requirement/capability change-impact authority"
     }
   ],
