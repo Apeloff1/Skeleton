@@ -1,3 +1,5 @@
+from .retrieval_bridge import CanonicalRetrievalBridge, RetrievalBridgeReceipt
+from .mime import ExtractedPayload, MimeExtractor
 from .leases import Lease, SqliteLeaseStore
 from .traps import TrapDecision, TrapGuard
 from .knowledge_bridge import CanonicalKnowledgeBridge, KnowledgeBridgeReceipt
