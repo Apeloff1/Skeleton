@@ -61,6 +61,7 @@ REQUIRED_INVARIANTS = (
     "tool restart handling cannot convert consequential ambiguity into reexecution before canonical reconciliation evidence",
     "governed attachment bindings contain content-addressed and artifact references but never raw attachment payload bytes",
     "structured claim evidence is bound to exact operation and context identity before the live acceptance gate can require it",
+    "chat verification profiles consume canonical verification receipts and never create a second verification authority",
 )
 
 
@@ -137,6 +138,8 @@ def validate() -> list[str]:
         "attachment_tests",
         "live_evidence",
         "live_evidence_tests",
+        "verification_acceptance",
+        "verification_acceptance_tests",
     }
     if set(files) != expected_roles:
         errors.append("AI chat runtime contract file roles drifted")
@@ -318,6 +321,16 @@ def validate() -> list[str]:
             "attachment-sha256:",
             "ready_for_context",
             "UNTRUSTED_EVIDENCE",
+        ),
+        "verification_acceptance": (
+            "ChatVerificationProfile",
+            "ChatVerificationAcceptanceDecision",
+            "CHAT_VERIFICATION_PROFILES",
+            "evaluate_chat_verification",
+            "verification_outcome_requires_quarantine",
+            "independent_verification_receipt_missing",
+            "postcondition_observation_missing",
+            "production_authority: bool = False",
         ),
         "live_evidence": (
             "ProviderReceiptSetBinding",
