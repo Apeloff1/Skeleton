@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-02:native-llm-checkpoint:v2",
+  "title": "FLGB-02 native LLM checkpoint",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "runtime_schema",
+    "model",
+    "tokenizer",
+    "limits",
+    "model_digest",
+    "tokenizer_digest",
+    "checkpoint_digest"
+  ],
+  "properties": {
+    "schema": {"const": "skeleton.ai.native-llm-checkpoint.v2"},
+    "runtime_schema": {"const": "skeleton.ai.native-llm-runtime.v2"},
+    "model": {"type": "object"},
+    "tokenizer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "vocabulary", "bpe"],
+      "properties": {
+        "schema": {"const": "skeleton.ai.model-tokenizer.v1"},
+        "vocabulary": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1000000,
+          "items": {"type": "string"}
+        },
+        "bpe": {"type": ["object", "null"]}
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_context_tokens",
+        "max_output_tokens",
+        "max_batch_size",
+        "max_batch_tokens",
+        "max_model_bytes",
+        "max_kv_bytes",
+        "trace_capacity"
+      ],
+      "properties": {
+        "max_context_tokens": {"type": "integer", "minimum": 1, "maximum": 1000000},
+        "max_output_tokens": {"type": "integer", "minimum": 1, "maximum": 1000000},
+        "max_batch_size": {"type": "integer", "minimum": 1, "maximum": 4096},
+        "max_batch_tokens": {"type": "integer", "minimum": 1},
+        "max_model_bytes": {"type": "integer", "minimum": 1},
+        "max_kv_bytes": {"type": "integer", "minimum": 1},
+        "trace_capacity": {"type": "integer", "minimum": 1, "maximum": 100000}
+      }
+    },
+    "model_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "tokenizer_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "checkpoint_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

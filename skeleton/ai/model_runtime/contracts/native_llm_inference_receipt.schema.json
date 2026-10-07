@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-02:native-llm-inference-receipt:v2",
+  "title": "FLGB-02 native LLM inference receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "request_digest",
+    "model_digest",
+    "tokenizer_digest",
+    "prompt_digest",
+    "prompt_tokens",
+    "generated_token_ids",
+    "output_digest",
+    "sampling_digest",
+    "cache_requested",
+    "cache_used",
+    "context_truncated",
+    "actual_device",
+    "trace_digest"
+  ],
+  "properties": {
+    "request_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "model_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "tokenizer_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "prompt_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "prompt_tokens": {"type": "integer", "minimum": 1, "maximum": 1000000},
+    "generated_token_ids": {
+      "type": "array",
+      "maxItems": 1000000,
+      "items": {"type": "integer", "minimum": 0, "maximum": 2147483647}
+    },
+    "output_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "sampling_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "cache_requested": {"type": "boolean"},
+    "cache_used": {"type": "boolean"},
+    "context_truncated": {"type": "boolean"},
+    "actual_device": {"type": "string", "minLength": 1, "maxLength": 256},
+    "trace_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

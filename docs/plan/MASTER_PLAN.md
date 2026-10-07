@@ -215,6 +215,12 @@ Training data flows through acquisition, rights checks, integrity, deduplication
 
 Inference eventually supports streaming, structured output, tools, multimodality, cancellation, failover, continuous batching, prefix/KV caching, quantization, speculative decoding and distributed placement where measurements justify them.
 
+### 8.1 Native runtime core implementation evidence — 2026-10-07
+
+The FLGB-02 native runtime path now has executable branch evidence under `skeleton/ai/model_runtime`, without asserting independent verification or whole-plane completion. The implementation binds model-specific tokenization identity to `TokenSequence`, exposes token+position embeddings and a forward/logits interface over the existing stacked causal transformer, performs continuation-only bounded sampling, uses the existing incremental host KV cache, records deterministic replay receipts, enforces context/output/batch/model-memory/KV-memory limits, preserves optional BPE state in portable content-addressed checkpoints, supports explicit CPU/Torch/CUDA device binding, and emits prompt-redacted deterministic telemetry.
+
+Focused regression evidence is owned by `tests/flgb/test_flgb_02_native_llm_runtime.py`. Required closeout remains exact-head execution of the FLGB-02 suite plus repository integration gates. Until that evidence is green, this slice remains **implemented-pending-verification**, never signed complete merely from code presence.
+
 Model lifecycle states remain distinct from capability maturity and include registry, evaluation, staging, canary, active, deprecated and retired.
 
 ## 9. Context and cognition

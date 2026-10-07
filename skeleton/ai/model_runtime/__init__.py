@@ -1,4 +1,4 @@
-"""Provider-neutral FLGB-02 model runtime control contracts."""
+"""Provider-neutral FLGB-02 model runtime and native LLM execution contracts."""
 from .flgb_model_runtime import (
     ALLOWED_TRANSITIONS,
     BatchRequest,
@@ -23,11 +23,33 @@ from .flgb_model_runtime import (
     plan_kv_admission,
     route_request,
 )
+from .native_llm_runtime import (
+    CHECKPOINT_SCHEMA,
+    RUNTIME_SCHEMA,
+    ForwardPass,
+    GenerationConfig,
+    GenerationResult,
+    InferenceReceipt,
+    InferenceRequest,
+    NativeLLMRuntime,
+    RuntimeContractError,
+    RuntimeEvent,
+    RuntimeLimits,
+    RuntimeMemoryReport,
+    SamplingConfig,
+)
+from .tokenization import NativeTokenizer, TOKENIZER_SCHEMA, TokenizerState
 
 __all__ = [
     "ALLOWED_TRANSITIONS",
     "BatchRequest",
+    "CHECKPOINT_SCHEMA",
     "DeviceDescriptor",
+    "ForwardPass",
+    "GenerationConfig",
+    "GenerationResult",
+    "InferenceReceipt",
+    "InferenceRequest",
     "KVCacheEntry",
     "LocalModelReceipt",
     "LocalModelRequest",
@@ -35,11 +57,21 @@ __all__ = [
     "ModelLifecycle",
     "ModelRegistry",
     "ModelRuntimeError",
+    "NativeLLMRuntime",
+    "NativeTokenizer",
     "Placement",
     "QuantizationProfile",
+    "RUNTIME_SCHEMA",
     "Replica",
+    "RuntimeContractError",
+    "RuntimeEvent",
+    "RuntimeLimits",
+    "RuntimeMemoryReport",
+    "SamplingConfig",
     "SpeculativeReceipt",
+    "TOKENIZER_SCHEMA",
     "TokenSequence",
+    "TokenizerState",
     "VocabularyManifest",
     "WeightLoadPlan",
     "WeightShard",
