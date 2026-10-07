@@ -95,6 +95,7 @@ def test_materialized_batch_is_rectangular_and_masked():
 
     assert batch.input_ids == ((1, 2, 3), (4, 0, 0))
     assert batch.attention_mask == ((1, 1, 1), (1, 0, 0))
+    assert batch.position_ids == ((0, 1, 2), (0, 0, 0))
     assert batch.source_window_digests == (first.digest, second.digest)
     assert len(batch.digest) == 64
 
@@ -649,3 +650,15 @@ def test_governed_training_scope_changes_durable_identity(native_model):
     assert training.authorized_scope == "training"
     assert continued.authorized_scope == "continued-training"
     assert training.digest != continued.digest
+
+
+def test_model_batch_rejects_position_ids_in_padding():
+    from dataclasses import replace
+    from skeleton.ai.model_runtime.text_pipeline import materialize_model_batch
+    from skeleton.ai.model_runtime.tokenization import TokenizerContractError, TokenWindow
+    batch = materialize_model_batch((
+        TokenWindow(0, 2, (1, 2), "a" * 64),
+        TokenWindow(2, 3, (3,), "a" * 64),
+    ), pad_token_id=0)
+    with pytest.raises(TokenizerContractError, match="position ids"):
+        replace(batch, position_ids=((0, 1), (0, 1)))
