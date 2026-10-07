@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-05:audit_evidence:v1",
+  "title": "FLGB-05 audit evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "sequence",
+    "actor_id",
+    "action",
+    "object_digest",
+    "outcome",
+    "prior_event_digest"
+  ],
+  "properties": {
+    "sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "actor_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "action": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "object_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "outcome": {
+      "enum": [
+        "allowed",
+        "denied",
+        "failed",
+        "completed"
+      ]
+    },
+    "prior_event_digest": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}
