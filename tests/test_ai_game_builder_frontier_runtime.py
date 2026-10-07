@@ -231,15 +231,71 @@ def test_horizon_probe_rejects_unattributed_evidence() -> None:
         )
 
 
+def _effort_signal(
+    risk: float,
+    uncertainty: float,
+    blast_radius: float,
+    novelty: float,
+    marginal_gain: float,
+    *,
+    label: str,
+) -> EffortSignal:
+    evidence = f"effort-{label}-" + "e" * 24
+    return EffortSignal(
+        risk,
+        uncertainty,
+        blast_radius,
+        novelty,
+        marginal_gain,
+        _authority(f"effort-{label}-evaluator", evidence),
+        evidence,
+    )
+
+
+def _regret(
+    policy_id: str,
+    champion_score: float,
+    alternative_score: float,
+    *,
+    weight: float = 1.0,
+) -> RegretObservation:
+    evidence = f"regret-{policy_id}-" + "r" * 24
+    return RegretObservation(
+        policy_id,
+        champion_score,
+        alternative_score,
+        _authority(f"regret-{policy_id}-evaluator", evidence),
+        evidence,
+        weight,
+    )
+
+
 def test_effort_scheduler_selects_exact_supported_tiers() -> None:
     scheduler = EffortPortfolioScheduler(medium_threshold=0.4, extreme_threshold=0.7)
-    low = scheduler.choose(EffortSignal(0.1, 0.1, 0.1, 0.2, 0.1))
-    mid = scheduler.choose(EffortSignal(0.5, 0.5, 0.5, 0.2, 0.2))
-    high = scheduler.choose(EffortSignal(0.95, 0.9, 0.95, 0.7, 0.7))
+    low = scheduler.choose(_effort_signal(0.1, 0.1, 0.1, 0.2, 0.1, label="low"))
+    mid = scheduler.choose(_effort_signal(0.5, 0.5, 0.5, 0.2, 0.2, label="mid"))
+    high = scheduler.choose(_effort_signal(0.95, 0.9, 0.95, 0.7, 0.7, label="high"))
     assert low.mode is EffortMode.FORGE_100
     assert mid.mode is EffortMode.FORGE_1000
     assert high.mode is EffortMode.FORGE_10000
     assert len(low.reason_digest) == 64
+
+
+def test_effort_signal_rejects_unattributed_score_evidence() -> None:
+    evidence = "effort-unbound-" + "e" * 24
+    with pytest.raises(
+        FrontierAssuranceError,
+        match="referenced by evaluator authority",
+    ):
+        EffortSignal(
+            0.5,
+            0.5,
+            0.5,
+            0.5,
+            0.5,
+            _authority("wrong-effort-evaluator", "other-effort-" + "x" * 24),
+            evidence,
+        )
 
 
 def test_genealogy_requires_known_parents_and_recovers_ancestry() -> None:
@@ -317,14 +373,29 @@ def test_evaluator_independence_detects_correlated_quorum() -> None:
 
 def test_regret_ledger_blocks_champion_that_hurts_alternate_player_policy() -> None:
     ledger = RegretLedger(maximum_weighted_regret=0.05)
-    ledger.record(RegretObservation("novice-policy", champion_score=0.75, alternative_score=0.78, weight=2))
-    ledger.record(RegretObservation("expert-policy", champion_score=0.8, alternative_score=0.81, weight=1))
+    ledger.record(_regret("novice-policy", 0.75, 0.78, weight=2))
+    ledger.record(_regret("expert-policy", 0.8, 0.81, weight=1))
     assert ledger.promotion_allowed()
 
     bad = RegretLedger(maximum_weighted_regret=0.05)
-    bad.record(RegretObservation("novice-policy", champion_score=0.5, alternative_score=0.9, weight=1))
+    bad.record(_regret("novice-policy", 0.5, 0.9, weight=1))
     assert bad.weighted_regret > 0.05
     assert not bad.promotion_allowed()
+
+
+def test_regret_observation_rejects_unattributed_counterfactual_scores() -> None:
+    evidence = "regret-unbound-" + "r" * 24
+    with pytest.raises(
+        FrontierAssuranceError,
+        match="referenced by evaluator authority",
+    ):
+        RegretObservation(
+            "novice-policy",
+            0.5,
+            0.8,
+            _authority("wrong-regret-evaluator", "other-regret-" + "x" * 24),
+            evidence,
+        )
 
 
 def test_evidence_invalidation_propagates_to_release_qualification() -> None:
