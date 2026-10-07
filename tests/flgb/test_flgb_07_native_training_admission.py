@@ -2,7 +2,7 @@ import unittest
 from skeleton.cortex.transformer import TinyTransformer
 from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
 from skeleton.ai.model_runtime.runtime_checkpoint import portable_model_snapshot,snapshot_digest
-from skeleton.ai.model_runtime.training_admission import RuntimePromotionError,admit_candidate_model,execute_rollback
+from skeleton.ai.model_runtime.training_admission import RuntimePromotionError,AdmissionLedger,admit_candidate_model,execute_rollback
 from skeleton.ai.training.flgb_training_runtime import CandidateWeights,PromotionEvidence
 
 def setup():
@@ -34,7 +34,7 @@ class TestNativeTrainingAdmission(unittest.TestCase):
   admitted,a,rb=admit_candidate_model(rt,c,p,apply,admission_authority="runtime")
   admitted.model.E[0][0]+=1
   with self.assertRaises(RuntimePromotionError): execute_rollback(admitted,a,rb,cp)
- def test_declared_digest_cannot_lie_about_observed_weights(self):
+ def test_promotion_receipt_is_single_use_when_ledger_enabled(self):\n  rt,cp,prior,c,p,apply=setup(); ledger=AdmissionLedger()\n  admit_candidate_model(rt,c,p,apply,admission_authority="runtime",ledger=ledger)\n  fresh=NativeLLMRuntime.restore(cp)\n  with self.assertRaisesRegex(RuntimePromotionError,"already consumed"):\n   admit_candidate_model(fresh,c,p,apply,admission_authority="runtime",ledger=ledger)\n def test_declared_digest_cannot_lie_about_observed_weights(self):
   rt,cp,prior,c,p,apply=setup()
   c=CandidateWeights("candidate","f"*64,c.training_lineage_digest,prior)
   p=PromotionEvidence(c.digest,p.exact_head_commit,p.rights_digest,p.contamination_scan_digest,p.evaluation_digest,p.rollback_digest,p.independent_verifier,True,True,True,True)
