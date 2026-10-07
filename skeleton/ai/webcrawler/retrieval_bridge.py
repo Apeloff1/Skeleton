@@ -1,6 +1,7 @@
 """Canonical crawler handoff into Skeleton retrieval index and provenance ledger."""
 from __future__ import annotations
 from dataclasses import asdict,dataclass
+import time
 from .core import CrawlDocument
 from .governance import PromotionDecision
 from .ingestion_registry import DurableIngestionRegistry,IngestionLease
@@ -14,7 +15,8 @@ class CanonicalRetrievalBridge:
  def _key(self,doc,decision):return f"{doc.content_hash}:{decision.decision_id}"
  @staticmethod
  def _receipt(raw):return RetrievalBridgeReceipt(raw["content_hash"],raw["chunks"],raw["index_revision"],tuple(raw["provenance_entry_ids"]))
- def ingest(self,doc:CrawlDocument,decision:PromotionDecision,*,now:float=0.0)->RetrievalBridgeReceipt:
+ def ingest(self,doc:CrawlDocument,decision:PromotionDecision,*,now:float|None=None)->RetrievalBridgeReceipt:
+  now=time.time() if now is None else now
   if decision.action!="promote" or decision.content_hash!=doc.content_hash:raise ValueError("retrieval admission requires matching promotion")
   key=self._key(doc,decision)
   if key in self._receipts:return self._receipts[key]
