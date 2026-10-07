@@ -290,7 +290,7 @@ def test_evidence_digest_binds_verifier_identity():
 
 def test_conflicting_equally_fresh_evidence_fails_closed_regardless_of_order():
     ctrl = control()
-    reg = registry(ctrl=ctrl)
+    reg, _ = registry(ctrl=ctrl)
     passed = evidence(ctrl, evidence_id="EV-PASS", artifact_digest="a"*64, result=EvidenceResult.PASS)
     failed = evidence(ctrl, evidence_id="EV-FAIL", artifact_digest="b"*64, result=EvidenceResult.FAIL)
 
