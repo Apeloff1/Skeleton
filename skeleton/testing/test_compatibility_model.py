@@ -117,3 +117,31 @@ def test_interface_matrix_still_requires_rollback_for_every_boundary() -> None:
     assert model["interface_matrix"]
     assert all(row["rollback_required"] is True for row in model["interface_matrix"])
     assert all(row["compatibility_semantics"] for row in model["interface_matrix"])
+
+
+def test_nonbreaking_change_cannot_promote_after_old_version_leaves_window() -> None:
+    guard = SchemaEvolutionGuard("backward")
+    old = {
+        "properties": {"id": {"type": "string"}},
+        "required": ["id"],
+        "additionalProperties": True,
+    }
+    new = {
+        "properties": {
+            "id": {"type": "string"},
+            "note": {"type": "string"},
+        },
+        "required": ["id"],
+        "additionalProperties": True,
+    }
+    window = VersionWindow(current_version=2, supported_versions=(2,))
+    decision = guard.check_transition(
+        old,
+        new,
+        from_version=1,
+        to_version=2,
+        window=window,
+    )
+    assert decision["compatible"] is True
+    assert decision["old_version_supported"] is False
+    assert decision["eligible_for_promotion"] is False
