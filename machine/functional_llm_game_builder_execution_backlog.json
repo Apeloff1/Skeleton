@@ -254,9 +254,10 @@
         "FLGB-09-T11",
         "FLGB-09-T12"
       ],
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
-      "independent_verification_signed": false
+      "independent_verification_signed": false,
+      "implementation_note": "T01-T12 game project/editor/world targets, schemas, and focused regressions are present; identity, transaction, scene, partition, migration, history, and recovery invariants are explicit; exact-head dependency closure and independent verification remain required."
     },
     {
       "id": "FLGB-10",
@@ -6862,7 +6863,7 @@
       "implementation_target": "skeleton/game/project_manifest.py",
       "contract_target": "skeleton/game/contracts/project_manifest.schema.json",
       "test_target": "tests/flgb/test_flgb_09_project_manifest.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -6928,7 +6929,7 @@
       "implementation_target": "skeleton/game/editor_transaction.py",
       "contract_target": "skeleton/game/contracts/editor_transaction.schema.json",
       "test_target": "tests/flgb/test_flgb_09_editor_transaction.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -6994,7 +6995,7 @@
       "implementation_target": "skeleton/game/world_identity.py",
       "contract_target": "skeleton/game/contracts/world_identity.schema.json",
       "test_target": "tests/flgb/test_flgb_09_world_identity.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -7060,7 +7061,7 @@
       "implementation_target": "skeleton/game/scene_graph.py",
       "contract_target": "skeleton/game/contracts/scene_graph.schema.json",
       "test_target": "tests/flgb/test_flgb_09_scene_graph.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -7126,7 +7127,7 @@
       "implementation_target": "skeleton/game/entity_identity.py",
       "contract_target": "skeleton/game/contracts/entity_identity.schema.json",
       "test_target": "tests/flgb/test_flgb_09_entity_identity.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -7192,7 +7193,7 @@
       "implementation_target": "skeleton/game/component_schema.py",
       "contract_target": "skeleton/game/contracts/component_schema.schema.json",
       "test_target": "tests/flgb/test_flgb_09_component_schema.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -7258,7 +7259,7 @@
       "implementation_target": "skeleton/game/prefab_inheritance.py",
       "contract_target": "skeleton/game/contracts/prefab_inheritance.schema.json",
       "test_target": "tests/flgb/test_flgb_09_prefab_inheritance.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -7324,7 +7325,7 @@
       "implementation_target": "skeleton/game/asset_references.py",
       "contract_target": "skeleton/game/contracts/asset_references.schema.json",
       "test_target": "tests/flgb/test_flgb_09_asset_references.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -7390,7 +7391,7 @@
       "implementation_target": "skeleton/game/undo_redo.py",
       "contract_target": "skeleton/game/contracts/undo_redo.schema.json",
       "test_target": "tests/flgb/test_flgb_09_undo_redo.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -7456,7 +7457,7 @@
       "implementation_target": "skeleton/game/world_partition.py",
       "contract_target": "skeleton/game/contracts/world_partition.schema.json",
       "test_target": "tests/flgb/test_flgb_09_world_partition.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -7522,7 +7523,7 @@
       "implementation_target": "skeleton/game/project_migration.py",
       "contract_target": "skeleton/game/contracts/project_migration.schema.json",
       "test_target": "tests/flgb/test_flgb_09_project_migration.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -7588,7 +7589,7 @@
       "implementation_target": "skeleton/game/editor_recovery.py",
       "contract_target": "skeleton/game/contracts/editor_recovery.schema.json",
       "test_target": "tests/flgb/test_flgb_09_editor_recovery.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
