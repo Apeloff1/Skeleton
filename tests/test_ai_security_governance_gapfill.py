@@ -40,9 +40,13 @@ def test_other_exact_head_is_rejected() -> None:
         validate(ROOT,head=other)
 
 
-def test_candidate_volume_set_is_deferred_not_scheduled() -> None:
+def test_candidate_preserves_frontier_membership_without_reintroduction() -> None:
     frontier=json.loads((ROOT/"machine/ai_masterplan_continuation_frontier.json").read_text())
     candidate=json.loads((ROOT/"machine/ai_security_governance_gapfill_candidate.json").read_text())
     refs=set(candidate["volume_refs"])
-    assert refs.issubset(set(frontier["next_tranche"]["queued_volume_refs"]))
-    assert refs.isdisjoint(set(frontier["next_tranche"]["scheduled_volume_refs"]))
+    source=set(frontier["continuation_source"]["volume_refs"])
+    queued=set(frontier["next_tranche"]["queued_volume_refs"])
+    scheduled=set(frontier["next_tranche"]["scheduled_volume_refs"])
+    assert (refs & source).issubset(queued)
+    assert (refs - source).isdisjoint(queued)
+    assert refs.isdisjoint(scheduled)
