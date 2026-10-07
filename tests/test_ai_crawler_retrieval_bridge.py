@@ -3,6 +3,7 @@ from dataclasses import replace
 
 from skeleton.ai.webcrawler.core import CrawlDocument
 from skeleton.ai.webcrawler.governance import PromotionDecision
+from skeleton.ai.webcrawler.ingestion import IngestionReceipt
 from skeleton.ai.webcrawler.retrieval_bridge import (
     CrawlRetrievalBridgeError,
     bridge_crawl_document,
@@ -126,3 +127,40 @@ if __name__ == "__main__":
         )
         with self.assertRaises(CrawlRetrievalBridgeError):
             bridge_crawl_document(doc, token_cost=1, promotion=wrong_schema)
+
+
+    def test_accepted_ingestion_receipt_binds_exact_promoted_document(self):
+        doc = self.document()
+        promotion = PromotionDecision(
+            "d" * 64, doc.content_hash, "promote", (), 101.0, 0.9,
+            "skeleton.ai.crawl.provenance.v1",
+        )
+        ingestion = IngestionReceipt(doc.content_hash, "retrieval", True, "promoted")
+        record = bridge_crawl_document(
+            doc, token_cost=1, promotion=promotion, ingestion=ingestion
+        )
+        self.assertEqual(record.candidate.content_digest, ingestion.content_hash)
+
+    def test_ingestion_receipt_rebinding_fails_closed(self):
+        doc = self.document()
+        promotion = PromotionDecision(
+            "d" * 64, doc.content_hash, "promote", (), 101.0, 0.9,
+            "skeleton.ai.crawl.provenance.v1",
+        )
+        cases = (
+            IngestionReceipt("0" * 64, "retrieval", True, "promoted"),
+            IngestionReceipt(doc.content_hash, "training", True, "promoted"),
+            IngestionReceipt(doc.content_hash, "retrieval", False, "not_promoted"),
+        )
+        for receipt in cases:
+            with self.subTest(receipt=receipt):
+                with self.assertRaises(CrawlRetrievalBridgeError):
+                    bridge_crawl_document(
+                        doc, token_cost=1, promotion=promotion, ingestion=receipt
+                    )
+
+    def test_accepted_ingestion_without_promotion_evidence_fails_closed(self):
+        doc = self.document()
+        receipt = IngestionReceipt(doc.content_hash, "retrieval", True, "promoted")
+        with self.assertRaises(CrawlRetrievalBridgeError):
+            bridge_crawl_document(doc, token_cost=1, ingestion=receipt)
