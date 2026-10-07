@@ -28,8 +28,8 @@ class VideoStreamSession:
         """Flush complete time windows; late-arrival allowance prevents premature sealing."""
         cutoff=max(0,self._watermark_ms-self.max_lateness_ms)
         ready_before=(cutoff//self.window_ms)*self.window_ms
-        ready=[o for o in self._buffer if o.start_ms//self.window_ms*self.window_ms<ready_before]
-        self._buffer=[o for o in self._buffer if o not in ready]
+        ready=[o for o in self._buffer if ((o.start_ms//self.window_ms)+1)*self.window_ms<=ready_before and o.end_ms<=ready_before]
+        self._buffer=[o for o in self._buffer if not (((o.start_ms//self.window_ms)+1)*self.window_ms<=ready_before and o.end_ms<=ready_before)]
         return digest_video_observations(self.source_url,ready,window_ms=self.window_ms)
 
     def close(self)->tuple[VideoKnowledgeChunk,...]:
