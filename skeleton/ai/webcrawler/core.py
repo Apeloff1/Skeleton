@@ -449,26 +449,30 @@ class CrawlEngine:
         """Load an origin's robots policy once, charging the crawl budget."""
         p = urlsplit(url)
         origin = f"{p.scheme}://{p.netloc}"
-        if self.robots.known(url):
+        at=time.time() if now is None else now
+        if self.robots.known(url) and self.robots.fresh(url,now=at,ttl=self.policy.robots_ttl_seconds):
             return True
         if not self.budget.can_request():
             return False
         robots_url = origin + "/robots.txt"
         try:
             from .redirects import fetch_robots_with_policy
-            response = fetch_robots_with_policy(self, robots_url, now=time.time() if now is None else now)
+            response = fetch_robots_with_policy(self, robots_url, now=at, extra_headers=self.robots.validators(url))
         except Exception:
             return False
         body = response.body[:512_000]
+        if response.status == 304 and self.robots.known(url):
+            self.robots.touch(url,fetched_at=at)
+            return True
         if response.status in {404, 410}:
-            self.robots.install(origin, "")
+            self.robots.install(origin, "",fetched_at=at,etag=response.headers.get("etag"),last_modified=response.headers.get("last-modified"))
             return True
         if response.status != 200:
             return False
         ctype = response.headers.get("content-type", "text/plain").split(";", 1)[0].lower()
         if ctype not in {"text/plain", "text/html"}:
             return False
-        self.robots.install(origin, body.decode("utf-8", errors="replace"))
+        self.robots.install(origin, body.decode("utf-8", errors="replace"),fetched_at=at,etag=response.headers.get("etag"),last_modified=response.headers.get("last-modified"))
         return True
 
     def step(self, *, now: float | None = None) -> CrawlDocument | None:
