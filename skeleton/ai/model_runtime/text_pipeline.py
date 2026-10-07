@@ -68,6 +68,8 @@ class PreparedText:
             raise TokenizerContractError("invalid pipeline digest")
         if len(self.raw_text_digest) != 64 or len(self.normalized_text_digest) != 64:
             raise TokenizerContractError("invalid text provenance digest")
+        if any(ch not in "0123456789abcdef" for ch in self.raw_text_digest + self.normalized_text_digest):
+            raise TokenizerContractError("text provenance digest must be lowercase hex")
         expected_normalized = sha256(self.normalized_text.encode("utf-8")).hexdigest()
         if self.normalized_text_digest != expected_normalized:
             raise TokenizerContractError("normalized text digest mismatch")
@@ -164,8 +166,13 @@ class TextTokenPipeline:
             feed.push(chunk)
             accepted.append(chunk)
         # Finalize to enforce one-shot lifecycle and tokenizer admission.
-        feed.finalize(self.tokenizer)
-        return self.prepare("".join(accepted))
+        # The finalized sequence is deliberately checked against prepare() so
+        # streaming can never silently use a different tokenizer identity.
+        streamed = feed.finalize(self.tokenizer)
+        prepared = self.prepare("".join(accepted))
+        if streamed.tokenizer_digest != prepared.sequence.tokenizer_digest:
+            raise TokenizerContractError("stream tokenizer identity mismatch")
+        return prepared
 
 
 __all__ = ["PreparedText", "TextPipelineConfig", "TextTokenPipeline"]
