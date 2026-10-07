@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-14:continuity_verifier:v1",
+  "title": "FLGB-14 continuity verifier",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "issue_id",
+    "category",
+    "left_digest",
+    "right_digest",
+    "severity"
+  ],
+  "properties": {
+    "issue_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "category": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "left_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "right_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "severity": {
+      "enum": [
+        "warning",
+        "error",
+        "critical"
+      ]
+    }
+  }
+}
