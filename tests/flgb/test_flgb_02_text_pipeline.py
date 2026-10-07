@@ -911,3 +911,38 @@ def test_temporal_supersession_rejects_mixed_cutoffs(native_model):
     new = pipeline.temporal_signal(source_year=2025, observed_year=2025, knowledge_cutoff_year=2026)
     with pytest.raises(TokenizerContractError, match="different knowledge cutoffs"):
         pipeline.temporal_supersession(old, new, supersedes=True)
+
+
+def test_decade_signal_preserves_exact_year_anchor(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    year = pipeline.temporal_signal(source_year=1987, observed_year=1994, knowledge_cutoff_year=2026)
+    decade = pipeline.decade_signal(year)
+    assert decade.source_decade == 1980
+    assert decade.observed_decade == 1990
+    assert decade.cutoff_decade == 2020
+    assert decade.source_year == 1987
+    assert decade.cutoff_year == 2026
+    assert decade.distance_decades == 4
+    assert decade.cohort == "long-history"
+
+
+def test_decade_weight_ppm_uses_deterministic_cohorts(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline, decade_weight_ppm
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    cases = ((2026, 1_000_000), (2019, 800_000), (2001, 600_000), (1980, 350_000), (1900, 150_000))
+    for source_year, expected in cases:
+        year = pipeline.temporal_signal(source_year=source_year, observed_year=source_year, knowledge_cutoff_year=2026)
+        assert decade_weight_ppm(pipeline.decade_signal(year)) == expected
+
+
+def test_decade_signal_digest_distinguishes_exact_years_within_same_decade(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    early = pipeline.decade_signal(pipeline.temporal_signal(source_year=1981, observed_year=1981, knowledge_cutoff_year=2026))
+    late = pipeline.decade_signal(pipeline.temporal_signal(source_year=1989, observed_year=1989, knowledge_cutoff_year=2026))
+    assert early.source_decade == late.source_decade == 1980
+    assert early.digest != late.digest
