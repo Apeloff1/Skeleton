@@ -1542,3 +1542,16 @@ Crawler-controlled redirects now enforce accounting and pacing per actual networ
 - regressions cover two-hop accounting, destination pacing and deterministic HTTP-date retry delay.
 
 Further audit note: robots retrieval itself still uses fetcher.fetch rather than crawler-controlled fetch_once traversal, so robots redirect accounting/policy should be reviewed separately before final signing.
+
+
+### 2026-10-07 robots redirect unification tranche
+
+Robots policy retrieval now shares crawler-controlled redirect safety instead of delegating redirect traversal to transport.fetch:
+- robots redirect hops enforce crawl destination admission, redirect loop/limit controls, per-hop request/byte budget and host-ready pacing;
+- robots authorization is intentionally not recursively required while obtaining robots.txt;
+- the policy is still installed against the original requested origin after a permitted redirect response;
+- scheduler time is threaded through load_robots and redirect-triggered robots bootstrap, preserving deterministic replay when step(now=...) is used;
+- transport failures are charged as attempted requests while policy/pacing rejection creates no phantom request;
+- regressions cover redirected robots accounting, original-origin policy installation and destination-host pacing.
+
+This closes the previously documented robots redirect inconsistency. Further adversarial work should inspect robots cache freshness/revalidation and canonical URL input bounds before final signing.
