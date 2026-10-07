@@ -1,12 +1,16 @@
 """Explicit durable crawler schema migrations."""
 from __future__ import annotations
-SCHEMA_VERSION=2
+SCHEMA_VERSION=3
 MIGRATIONS={
  1:(),
  2:(
   "CREATE TABLE IF NOT EXISTS crawl_meta(key TEXT PRIMARY KEY,value TEXT NOT NULL)",
   "CREATE INDEX IF NOT EXISTS idx_documents_fetched_at ON documents(fetched_at)",
   "CREATE INDEX IF NOT EXISTS idx_urls_content_hash ON urls(content_hash)",
+ ),
+ 3:(
+  "CREATE TABLE IF NOT EXISTS durable_frontier(url TEXT PRIMARY KEY, ready_at REAL NOT NULL, priority REAL NOT NULL, depth INTEGER NOT NULL, parent_url TEXT, attempts INTEGER NOT NULL, owner TEXT, lease_token TEXT, lease_expires REAL)",
+  "CREATE INDEX IF NOT EXISTS idx_frontier_ready ON durable_frontier(ready_at,priority,url)",
  ),
 }
 def migrate(db):
