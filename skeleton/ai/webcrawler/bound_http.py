@@ -32,7 +32,7 @@ class SocketBoundFetcher:
  timeout_seconds:float=15.0
  allowed_hosts:frozenset[str]|None=None
  ssl_context:ssl.SSLContext|None=None
- def fetch_once(self,url,*,user_agent,max_bytes):
+ def fetch_once(self,url,*,user_agent,max_bytes,extra_headers=None):
   target=resolve_target(url,self.allowed_hosts);p=urlsplit(target.url)
   if max_bytes < 0:raise ValueError("max_bytes must be non-negative")
   context=self.ssl_context or ssl.create_default_context()
@@ -43,6 +43,10 @@ class SocketBoundFetcher:
   if p.port is not None:host_header=f"{host_header}:{p.port}"
   headers={"Host":host_header,"User-Agent":user_agent,
    "Accept":"text/html,text/plain,application/xhtml+xml;q=0.9,*/*;q=0.1","Accept-Encoding":"identity","Connection":"close"}
+  if extra_headers:
+   for k,v in extra_headers.items():
+    if k.lower() in {"host","connection","content-length","transfer-encoding"}:raise ValueError("unsafe transport header override")
+    headers[str(k)]=str(v)
   try:
    conn.request("GET",path,headers=headers);response=conn.getresponse()
    status=int(response.status);out_headers={k.lower():v for k,v in response.getheaders()}
