@@ -185,8 +185,12 @@ def main() -> int:
         if token not in master_plan_md and token not in master_index_md:
             fail(f"canonical human authority lost overlay marker: {token}")
 
-    if "2.5.0" not in master_plan_md:
-        fail("human masterplan is not version 2.5.0")
+    expected_human_version = f"Plan version: **{plan['plan_version']}**"
+    if expected_human_version not in master_plan_md:
+        fail(
+            "human masterplan version does not match machine authority: "
+            f"{plan['plan_version']}"
+        )
 
     result = {
         "ok": True,
