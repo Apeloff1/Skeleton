@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-14:regeneration_diff:v1",
+  "title": "FLGB-14 regeneration diff",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "object_id",
+    "before_digest",
+    "after_digest",
+    "reason"
+  ],
+  "properties": {
+    "object_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "before_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "after_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    }
+  }
+}
