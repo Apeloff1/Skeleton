@@ -48,4 +48,16 @@ class TestTemporalSignals(unittest.TestCase):
  def test_future_observation_fails_closed(self):
   with self.assertRaisesRegex(TemporalSignalError,"future-observed"):
    assess_year_signals((sig(1,2025,observed=2027),),policy_year=2026,subject="runtime-safety")
+ def test_cross_scale_consensus_uses_conservative_support_floor(self):
+  signals=(sig(1,2026,confidence=800000),)
+  y=assess_year_signals(signals,policy_year=2026,subject="runtime-safety")
+  p=DecadePolicy("modern","runtime-safety",2020,500000,2,"b"*64)
+  d=assess_decade_signals(signals,policy=p,policy_year=2026)
+  x=reconcile_temporal_scales(y,d)
+  self.assertEqual(x.support_floor_ppm,800000); self.assertEqual(require_consensus_authority(x),x.digest)
+ def test_cross_scale_period_mismatch_fails(self):
+  y=assess_year_signals((sig(1,2026),),policy_year=2026,subject="runtime-safety")
+  p=DecadePolicy("old","runtime-safety",2010,500000,2,"b"*64)
+  d=DecadeAssessment(2010,"runtime-safety",p.digest,(sig(2,2016).digest,),900000,0,0,2010,False)
+  with self.assertRaisesRegex(TemporalSignalError,"period mismatch"): reconcile_temporal_scales(y,d)
 if __name__=="__main__": unittest.main()
