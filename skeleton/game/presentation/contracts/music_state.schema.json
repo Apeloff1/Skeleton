@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-12:music_state:v1",
+  "title": "FLGB-12 music state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "state_id",
+    "track_digest",
+    "bpm_milli",
+    "bar_beats",
+    "allowed_next"
+  ],
+  "properties": {
+    "state_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "track_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "bpm_milli": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "bar_beats": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 32
+    },
+    "allowed_next": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    }
+  }
+}
