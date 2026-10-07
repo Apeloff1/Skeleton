@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-10:collision_broadphase:v1",
+  "title": "FLGB-10 collision broadphase",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "entity_id",
+    "min_x",
+    "min_y",
+    "min_z",
+    "max_x",
+    "max_y",
+    "max_z"
+  ],
+  "properties": {
+    "entity_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "min_x": {
+      "type": "integer"
+    },
+    "min_y": {
+      "type": "integer"
+    },
+    "min_z": {
+      "type": "integer"
+    },
+    "max_x": {
+      "type": "integer"
+    },
+    "max_y": {
+      "type": "integer"
+    },
+    "max_z": {
+      "type": "integer"
+    }
+  }
+}
