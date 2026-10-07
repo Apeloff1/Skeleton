@@ -137,9 +137,14 @@ def _pairs(
     items = values.items() if isinstance(values, Mapping) else values
     normalized: dict[str, str] = {}
     for key, value in items:
-        normalized[
-            _token(key, f"{field}.key", maximum=MAX_ATTRIBUTE_KEY_CHARS)
-        ] = _text(
+        normalized_key = _token(
+            key,
+            f"{field}.key",
+            maximum=MAX_ATTRIBUTE_KEY_CHARS,
+        )
+        if normalized_key in normalized:
+            raise ProtocolError(f"{field} contains duplicate key: {normalized_key}")
+        normalized[normalized_key] = _text(
             value,
             f"{field}.value",
             maximum=MAX_ATTRIBUTE_VALUE_CHARS,
