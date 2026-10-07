@@ -375,6 +375,9 @@ class ContextEnvelope:
             if not isinstance(item, tuple) or len(item) != 2:
                 raise ContextContractError("source_snapshot entries must be pairs")
             snapshot.append((_text(item[0], "snapshot segment id"), _text(item[1], "snapshot digest", max_length=64)))
+        snapshot_ids = [item[0] for item in snapshot]
+        if len(snapshot_ids) != len(set(snapshot_ids)):
+            raise ContextContractError("source_snapshot segment ids must be unique")
         object.__setattr__(self, "source_snapshot", tuple(snapshot))
         digest = _text(self.context_digest, "context_digest", max_length=64)
         if len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
@@ -401,8 +404,17 @@ class ContextEnvelope:
                 key=lambda item: item[0],
             )
         )
+        selected_ids = set(ids)
+        omitted_ids = set(self.omitted_segment_ids)
+        if selected_ids & omitted_ids:
+            raise ContextContractError("selected and omitted segment ids must be disjoint")
+        snapshot_ids = {item[0] for item in self.source_snapshot}
+        if snapshot_ids != selected_ids | omitted_ids:
+            raise ContextContractError("source_snapshot must exactly cover selected and omitted segments")
+        if set(dict(self.omission_reasons)) != omitted_ids:
+            raise ContextContractError("omission_reasons must exactly cover omitted segments")
         selected_snapshot = tuple(
-            item for item in self.source_snapshot if item[0] in set(ids)
+            item for item in self.source_snapshot if item[0] in selected_ids
         )
         if tuple(sorted(selected_snapshot, key=lambda item: item[0])) != expected_snapshot:
             raise ContextContractError("source_snapshot does not bind selected segments")
