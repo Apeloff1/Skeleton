@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-06:slo_budget:v1",
+  "title": "FLGB-06 slo budget",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "slo_id",
+    "objective_ppm",
+    "window_units"
+  ],
+  "properties": {
+    "slo_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "objective_ppm": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000000
+    },
+    "window_units": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}
