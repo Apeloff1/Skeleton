@@ -5,6 +5,10 @@ from .core import (
     InMemoryCrawlStore, canonicalize_url, extract_document,
 )
 from .context_bridge import CrawlContextBundle, compile_crawl_context
+from .generation_bridge import (
+    EvidenceGenerationError, EvidenceGenerationReceipt, EvidenceGenerationResult,
+    generate_from_crawl_context,
+)
 from .retrieval_bridge import (
     CrawlRetrievalBridgeError, CrawlRetrievalRecord, bridge_crawl_document,
 )
@@ -14,4 +18,6 @@ __all__ = [
     "FrontierItem", "InMemoryCrawlStore", "canonicalize_url", "extract_document",
     "CrawlRetrievalBridgeError", "CrawlRetrievalRecord", "bridge_crawl_document",
     "CrawlContextBundle", "compile_crawl_context",
+    "EvidenceGenerationError", "EvidenceGenerationReceipt", "EvidenceGenerationResult",
+    "generate_from_crawl_context",
 ]
