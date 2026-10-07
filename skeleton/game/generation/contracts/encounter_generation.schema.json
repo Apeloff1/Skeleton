@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-14:encounter_generation:v1",
+  "title": "FLGB-14 encounter generation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "encounter_id",
+    "threat_cost",
+    "enemy_tags",
+    "environment_tags"
+  ],
+  "properties": {
+    "encounter_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "threat_cost": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "enemy_tags": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "environment_tags": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    }
+  }
+}
