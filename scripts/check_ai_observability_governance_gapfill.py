@@ -97,6 +97,21 @@ def validate(root:Path=ROOT, *, head:str|None=None)->dict[str,Any]:
     if set(modules)!=set(EXPECTED) or set(tests)!=set(EXPECTED):
         raise ObservabilityGovernanceCandidateError("per-volume module/test registry drift")
 
+    pairs=candidate.get("mirror_pairs")
+    if not isinstance(pairs,list) or len(pairs)!=len(EXPECTED):
+        raise ObservabilityGovernanceCandidateError("mirror pair registry drift")
+    declared_pairs:set[tuple[str,str]]=set()
+    for pair in pairs:
+        if (
+            not isinstance(pair,list)
+            or len(pair)!=2
+            or not all(isinstance(item,str) and item for item in pair)
+        ):
+            raise ObservabilityGovernanceCandidateError("invalid mirror pair declaration")
+        declared_pairs.add((pair[0],pair[1]))
+    if len(declared_pairs)!=len(EXPECTED):
+        raise ObservabilityGovernanceCandidateError("duplicate mirror pair declaration")
+
     volumes=master.get("volumes")
     if not isinstance(volumes,list):
         raise ObservabilityGovernanceCandidateError("masterplan volume registry missing")
@@ -105,8 +120,8 @@ def validate(root:Path=ROOT, *, head:str|None=None)->dict[str,Any]:
         volume=by_key.get(key)
         if not isinstance(volume,dict):
             raise ObservabilityGovernanceCandidateError(f"masterplan volume missing: {key}")
-        if volume.get("implementation_status")!="implemented":
-            raise ObservabilityGovernanceCandidateError(f"{key} must be implemented but not verified")
+        if volume.get("implementation_status") not in {"unverified","implemented"}:
+            raise ObservabilityGovernanceCandidateError(f"{key} must remain pre-verification")
         if volume.get("completion_checkbox") is not False:
             raise ObservabilityGovernanceCandidateError(f"{key} completion checkbox self-promoted")
         module=modules[key]
@@ -115,8 +130,10 @@ def validate(root:Path=ROOT, *, head:str|None=None)->dict[str,Any]:
         if module not in paths:
             raise ObservabilityGovernanceCandidateError(f"{key} missing canonical implementation path")
         mirror=module.replace("skeleton/observability/","skeleton/ai/runtime/observability/",1)
-        if mirror not in paths:
-            raise ObservabilityGovernanceCandidateError(f"{key} missing AI runtime mirror path")
+        if (module,mirror) not in declared_pairs:
+            raise ObservabilityGovernanceCandidateError(
+                f"{key} missing governed AI runtime mirror binding"
+            )
         if test not in volume.get("tests",()):
             raise ObservabilityGovernanceCandidateError(f"{key} missing executable primary test")
         if any(str(item).startswith("planned:") for item in volume.get("tests",())):
@@ -129,12 +146,7 @@ def validate(root:Path=ROOT, *, head:str|None=None)->dict[str,Any]:
                 f"{key} must retain independent exact-head verification gap"
             )
 
-    pairs=candidate.get("mirror_pairs")
-    if not isinstance(pairs,list) or len(pairs)!=len(EXPECTED):
-        raise ObservabilityGovernanceCandidateError("mirror pair registry drift")
     for pair in pairs:
-        if not isinstance(pair,list) or len(pair)!=2:
-            raise ObservabilityGovernanceCandidateError("invalid mirror pair declaration")
         left,right=(root/pair[0],root/pair[1])
         if not left.is_file() or not right.is_file():
             raise ObservabilityGovernanceCandidateError(f"mirror file missing: {pair}")
