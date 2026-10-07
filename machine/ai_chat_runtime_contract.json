@@ -74,7 +74,12 @@
     "live response-acceptance receipts hash output and evidence references instead of storing response prose or provider receipt contents",
     "engine-backed live chat requires an accepted verification identity and at least one canonical provider receipt before transcript commit",
     "synchronous and deferred engine results must pass the same canonical response-acceptance policy before transcript commit",
-    "live response acceptance binds both engine operation identity and execution identity before transcript promotion"
+    "live response acceptance binds both engine operation identity and execution identity before transcript promotion",
+    "complete provider receipt sets are bound into durable chat events by a content-minimized aggregate reference",
+    "tool restart handling cannot convert consequential ambiguity into reexecution before canonical reconciliation evidence",
+    "governed attachment bindings contain content-addressed and artifact references but never raw attachment payload bytes",
+    "structured claim evidence is bound to exact operation and context identity before the live acceptance gate can require it",
+    "chat verification profiles consume canonical verification receipts and never create a second verification authority"
   ],
   "budget_dimensions": [
     "wall_seconds",
@@ -127,14 +132,23 @@
     "ownership_tests": "skeleton/testing/test_ai_chat_turn_ownership.py",
     "ownership_repository_tests": "skeleton/testing/test_ai_chat_turn_ownership_repository.py",
     "response_acceptance": "skeleton/ai/assistant/response_acceptance.py",
-    "response_acceptance_tests": "skeleton/testing/test_ai_chat_response_acceptance.py"
+    "response_acceptance_tests": "skeleton/testing/test_ai_chat_response_acceptance.py",
+    "tool_recovery": "skeleton/ai/assistant/tool_recovery.py",
+    "tool_recovery_tests": "skeleton/testing/test_ai_chat_tool_recovery.py",
+    "attachments": "skeleton/ai/assistant/attachments.py",
+    "attachment_tests": "skeleton/testing/test_ai_chat_attachments.py",
+    "live_evidence": "skeleton/ai/assistant/live_evidence.py",
+    "live_evidence_tests": "skeleton/testing/test_ai_chat_live_evidence.py",
+    "verification_acceptance": "skeleton/ai/assistant/verification_acceptance.py",
+    "verification_acceptance_tests": "skeleton/testing/test_ai_chat_verification_acceptance.py"
   },
   "promotion_rule": "implemented candidate only; no completion or verification signoff until exact-head CI and independent verification pass",
   "next_integrations": [
-    "bind model/provider execution receipts into turn events",
-    "bind canonical tool receipt reconciliation into restart handling",
-    "move attachment payloads to governed content-addressed references",
-    "bind structured claim evidence receipts into the live response-acceptance gate"
+    "bind canonical VerificationReceipt sets from the engine terminal result into the Volume-9 chat verification acceptance profile before response promotion",
+    "make the canonical engine emit structured VerificationClaim objects plus Volume-8 ClaimEvidenceReceipt records and enable require_structured_claim_evidence on the product route",
+    "cut remaining product attachment upload paths over to governed artifact storage and sandbox extraction receipts before context admission",
+    "connect external-system reconciliation probes to resolve_tool_restart so in-doubt effects can be proven committed or no-effect",
+    "qualify the expanded AI-chat evidence surface with exact-head CI and independent digest verification"
   ],
   "persistence": {
     "portable": "skeleton/persistence/chat_turn_repository.py",

@@ -542,7 +542,7 @@ def audit_launcher_convergence() -> None:
             f"{name} must converge on /product",
         )
 
-    check("Enter Product" in launch, "launch cascade product label drift")
+    check(\n        ("Enter Product" in launch or "launcher.enter_product" in launch),\n        "launch cascade product label drift",\n    )
     check("Enter Product" in welcome, "welcome product label drift")
     check("id: 'assembly_contract'" in stages, "boot pipeline missing assembly contract stage")
     check("id: 'app_runtime'" in stages, "boot pipeline missing aggregate runtime stage")

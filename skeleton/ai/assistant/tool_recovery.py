@@ -18,6 +18,8 @@ from enum import Enum
 
 from .contracts import SideEffectClass
 from .turn_runtime import (
+    RecoveryAction,
+    RecoveryPlanner,
     TurnEvent,
     TurnRuntimeError,
     TurnSnapshot,
@@ -444,14 +446,177 @@ def reconciliation_event(
     raise ToolRecoveryError("unknown reconciliation outcome")
 
 
+@dataclass(frozen=True, slots=True)
+class ToolRestartResolution:
+    """Bounded restart/reconciliation result for one canonical tool call.
+
+    The resolution never executes a tool.  It either returns the exact durable
+    event that may advance the chat journal, or a non-executing decision saying
+    which canonical recovery step remains required.
+    """
+
+    action: RecoveryAction
+    reason_code: str
+    event: TurnEvent | None
+    requires_reconciliation: bool
+    safe_to_reexecute: bool
+    authority_scope: str = "tool-restart-reconciliation-only"
+    production_authority: bool = False
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.action, RecoveryAction):
+            object.__setattr__(
+                self,
+                "action",
+                RecoveryAction(str(self.action)),
+            )
+        if not isinstance(self.reason_code, str) or not self.reason_code.strip():
+            raise ToolRecoveryError("restart resolution reason_code is required")
+        object.__setattr__(self, "reason_code", self.reason_code.strip())
+        if self.event is not None and not isinstance(self.event, TurnEvent):
+            raise TypeError("event must be TurnEvent or None")
+        if self.requires_reconciliation and self.safe_to_reexecute:
+            raise ToolRecoveryError(
+                "reconciliation-required restart cannot be safe to reexecute"
+            )
+        if self.authority_scope != "tool-restart-reconciliation-only":
+            raise ToolRecoveryError("restart resolution authority scope escalated")
+        if self.production_authority is not False:
+            raise ToolRecoveryError("restart resolution cannot execute tools")
+
+
+def resolve_tool_restart(
+    snapshot: TurnSnapshot,
+    request: ToolExecutionRequest,
+    manifest: ToolManifest,
+    *,
+    observed_at: datetime,
+    reservation: ToolReservation | None = None,
+    reconciliation: ToolReconciliationReceipt | None = None,
+    committed_receipt: ToolExecutionReceipt | None = None,
+) -> ToolRestartResolution:
+    """Bind RecoveryPlanner output to canonical tool receipt reconciliation.
+
+    Consequential ambiguity is never converted into a retry.  A durable
+    reconciliation receipt is required before the journal can leave the
+    ambiguous TOOL_EXECUTING state.  Read-only work may be re-executed only
+    when the generic turn recovery planner already classified it as safe.
+    """
+
+    _validate_binding(snapshot, request, manifest)
+    if snapshot.state is not TurnState.TOOL_EXECUTING:
+        raise ToolRecoveryError(
+            "tool restart resolution requires TOOL_EXECUTING state"
+        )
+
+    recovery = RecoveryPlanner.plan(snapshot)
+
+    if recovery.action is RecoveryAction.RECONCILE_TOOL:
+        if reconciliation is None:
+            return ToolRestartResolution(
+                action=recovery.action,
+                reason_code=recovery.reason_code,
+                event=None,
+                requires_reconciliation=True,
+                safe_to_reexecute=False,
+            )
+        event = reconciliation_event(
+            snapshot,
+            request,
+            reconciliation,
+            observed_at=observed_at,
+            committed_receipt=committed_receipt,
+        )
+        return ToolRestartResolution(
+            action=recovery.action,
+            reason_code=(
+                "canonical-tool-reconciliation:"
+                + reconciliation.outcome.value
+            ),
+            event=event,
+            requires_reconciliation=False,
+            safe_to_reexecute=False,
+        )
+
+    if recovery.action is RecoveryAction.RESUME_VERIFICATION:
+        receipt = committed_receipt
+        if receipt is None and reservation is not None:
+            if not isinstance(reservation, ToolReservation):
+                raise TypeError("reservation must be ToolReservation or None")
+            receipt = reservation.receipt
+        if receipt is None:
+            raise ToolRecoveryError(
+                "durable tool receipt reference has no canonical receipt body"
+            )
+        event = committed_receipt_event(
+            snapshot,
+            request,
+            receipt,
+            observed_at=observed_at,
+        )
+        return ToolRestartResolution(
+            action=recovery.action,
+            reason_code="canonical-tool-receipt-recovered",
+            event=event,
+            requires_reconciliation=False,
+            safe_to_reexecute=False,
+        )
+
+    if recovery.action is RecoveryAction.RETRY_TOOL:
+        side_effect = map_tool_side_effect(manifest)
+        if side_effect is not SideEffectClass.READ_ONLY:
+            raise ToolRecoveryError(
+                "only read-only tool work may be reexecuted without reconciliation"
+            )
+        if reservation is not None:
+            if not isinstance(reservation, ToolReservation):
+                raise TypeError("reservation must be ToolReservation or None")
+            if reservation.status == "in_doubt":
+                raise ToolRecoveryError(
+                    "in-doubt reservation overrides generic retry safety"
+                )
+            if reservation.status == "committed":
+                if reservation.receipt is None:
+                    raise ToolRecoveryError(
+                        "committed reservation is missing canonical receipt"
+                    )
+                event = committed_receipt_event(
+                    snapshot,
+                    request,
+                    reservation.receipt,
+                    observed_at=observed_at,
+                )
+                return ToolRestartResolution(
+                    action=RecoveryAction.RESUME_VERIFICATION,
+                    reason_code="canonical-tool-receipt-recovered",
+                    event=event,
+                    requires_reconciliation=False,
+                    safe_to_reexecute=False,
+                )
+        return ToolRestartResolution(
+            action=recovery.action,
+            reason_code=recovery.reason_code,
+            event=None,
+            requires_reconciliation=False,
+            safe_to_reexecute=True,
+        )
+
+    raise ToolRecoveryError(
+        "turn recovery state is not a tool restart state: "
+        + recovery.action.value
+    )
+
+
 __all__ = [
     "ToolRecoveryAction",
     "ToolRecoveryDecision",
     "ToolRecoveryError",
+    "ToolRestartResolution",
     "committed_receipt_event",
     "decide_tool_preflight",
     "map_tool_side_effect",
     "preflight_event",
     "reconciliation_event",
+    "resolve_tool_restart",
     "tool_receipt_ref",
 ]

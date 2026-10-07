@@ -15,6 +15,7 @@ from skeleton.ai.assistant.tool_recovery import (
     map_tool_side_effect,
     preflight_event,
     reconciliation_event,
+    resolve_tool_restart,
 )
 from skeleton.ai.assistant.turn_runtime import (
     RecoveryAction,
@@ -413,3 +414,133 @@ def test_cross_operation_request_is_rejected():
             _manifest(),
             None,
         )
+
+
+
+def test_restart_resolution_keeps_ambiguous_write_fenced_without_evidence():
+    snapshot = _snapshot()
+    request = _request(snapshot.operation_id)
+    manifest = _manifest(
+        effect=ToolEffect.REVERSIBLE,
+        authority_class=ToolAuthorityClass.WRITE,
+    )
+    executing = snapshot.apply(
+        preflight_event(
+            snapshot,
+            request,
+            decide_tool_preflight(snapshot, request, manifest, None),
+            observed_at=NOW,
+        )
+    )
+    resolution = resolve_tool_restart(
+        executing,
+        request,
+        manifest,
+        observed_at=NOW,
+    )
+    assert resolution.action is RecoveryAction.RECONCILE_TOOL
+    assert resolution.event is None
+    assert resolution.requires_reconciliation is True
+    assert resolution.safe_to_reexecute is False
+    assert resolution.production_authority is False
+
+
+def test_restart_resolution_uses_no_effect_reconciliation_before_retry():
+    snapshot = _snapshot()
+    request = _request(snapshot.operation_id)
+    manifest = _manifest(
+        effect=ToolEffect.REVERSIBLE,
+        authority_class=ToolAuthorityClass.WRITE,
+    )
+    executing = snapshot.apply(
+        preflight_event(
+            snapshot,
+            request,
+            decide_tool_preflight(snapshot, request, manifest, None),
+            observed_at=NOW,
+        )
+    )
+    resolution = resolve_tool_restart(
+        executing,
+        request,
+        manifest,
+        observed_at=NOW,
+        reconciliation=_reconciliation(
+            request,
+            ToolReconciliationOutcome.NO_EFFECT,
+        ),
+    )
+    assert resolution.event is not None
+    recovered = executing.apply(resolution.event)
+    assert recovered.state is TurnState.TOOL_REQUIRED
+    assert recovered.has_ambiguous_external_effect is False
+    assert resolution.requires_reconciliation is False
+    assert resolution.safe_to_reexecute is False
+
+
+def test_restart_resolution_requires_committed_receipt_for_committed_effect():
+    snapshot = _snapshot()
+    request = _request(snapshot.operation_id)
+    manifest = _manifest(
+        effect=ToolEffect.REVERSIBLE,
+        authority_class=ToolAuthorityClass.WRITE,
+    )
+    executing = snapshot.apply(
+        preflight_event(
+            snapshot,
+            request,
+            decide_tool_preflight(snapshot, request, manifest, None),
+            observed_at=NOW,
+        )
+    )
+    committed = _receipt(request)
+    reconciliation = _reconciliation(
+        request,
+        ToolReconciliationOutcome.COMMITTED,
+        receipt_id=committed.receipt_id,
+    )
+    with pytest.raises(ToolRecoveryError, match="requires canonical receipt"):
+        resolve_tool_restart(
+            executing,
+            request,
+            manifest,
+            observed_at=NOW,
+            reconciliation=reconciliation,
+        )
+
+    resolution = resolve_tool_restart(
+        executing,
+        request,
+        manifest,
+        observed_at=NOW,
+        reconciliation=reconciliation,
+        committed_receipt=committed,
+    )
+    assert resolution.event is not None
+    recovered = executing.apply(resolution.event)
+    assert recovered.state is TurnState.MODEL_RUNNING
+    assert recovered.has_ambiguous_external_effect is False
+
+
+def test_restart_resolution_allows_only_read_only_generic_reexecution():
+    snapshot = _snapshot()
+    request = _request(snapshot.operation_id)
+    manifest = _manifest()
+    executing = snapshot.apply(
+        preflight_event(
+            snapshot,
+            request,
+            decide_tool_preflight(snapshot, request, manifest, None),
+            observed_at=NOW,
+        )
+    )
+    resolution = resolve_tool_restart(
+        executing,
+        request,
+        manifest,
+        observed_at=NOW,
+    )
+    assert resolution.action is RecoveryAction.RETRY_TOOL
+    assert resolution.event is None
+    assert resolution.safe_to_reexecute is True
+    assert resolution.requires_reconciliation is False

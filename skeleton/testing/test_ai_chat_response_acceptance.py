@@ -7,8 +7,10 @@ from skeleton.ai.assistant.evidence import (
     PublicationDisposition,
 )
 from skeleton.ai.assistant.response_acceptance import (
+    LiveClaimEvidenceBinding,
     LiveResponseAcceptancePolicy,
     ResponseAcceptancePolicy,
+    bind_live_claim_evidence,
     evaluate_live_response_acceptance,
     evaluate_response_acceptance,
 )
@@ -30,6 +32,8 @@ def claim(
     kind: ClaimKind = ClaimKind.FACT,
     risk: VerificationRisk = VerificationRisk.LOW,
     text: str = "System A decreases latency by 10 percent.",
+    operation_id: str | None = None,
+    context_digest: str | None = None,
 ) -> VerificationClaim:
     return VerificationClaim(
         claim_id=claim_id,
@@ -39,6 +43,13 @@ def claim(
         risk=risk,
         created_at=NOW - timedelta(minutes=1),
         generated_by_model=True,
+        operation_id=operation_id,
+        context_id=(
+            "33333333-3333-4333-8333-333333333333"
+            if context_digest is not None
+            else None
+        ),
+        context_digest=context_digest,
     )
 
 
@@ -405,3 +416,125 @@ def test_live_response_receipt_is_order_invariant_for_receipt_sets() -> None:
     assert first.accepted is True
     assert second.accepted is True
     assert first.digest == second.digest
+
+
+
+def live_claim_binding(
+    *,
+    operation_id: str = "operation-1",
+    context_digest: str = "d" * 64,
+    disposition: PublicationDisposition = PublicationDisposition.PUBLISH,
+) -> LiveClaimEvidenceBinding:
+    item = claim(
+        operation_id=operation_id,
+        context_digest=context_digest,
+    )
+    return bind_live_claim_evidence(
+        operation_id=operation_id,
+        context_digest=context_digest,
+        claims=(item,),
+        receipts=(receipt(item, disposition=disposition),),
+        policy=policy(),
+        finalized_at=NOW,
+    )
+
+
+def test_live_claim_evidence_binds_structured_claims_to_turn_lineage() -> None:
+    binding = live_claim_binding()
+    assert binding.accepted is True
+    assert binding.required_claim_count == 1
+    assert binding.accepted_claim_count == 1
+    assert binding.operation_id == "operation-1"
+    assert binding.context_digest == "d" * 64
+    assert len(binding.decision_digest) == 64
+    assert binding.production_authority is False
+
+
+def test_live_claim_evidence_rejects_claim_operation_drift() -> None:
+    item = claim(
+        operation_id="operation-2",
+        context_digest="d" * 64,
+    )
+    binding = bind_live_claim_evidence(
+        operation_id="operation-1",
+        context_digest="d" * 64,
+        claims=(item,),
+        receipts=(receipt(item),),
+        policy=policy(),
+        finalized_at=NOW,
+    )
+    assert binding.accepted is False
+    assert "claim_operation_identity_mismatch" in binding.reasons
+
+
+def test_live_claim_evidence_rejects_claim_context_drift() -> None:
+    item = claim(
+        operation_id="operation-1",
+        context_digest="e" * 64,
+    )
+    binding = bind_live_claim_evidence(
+        operation_id="operation-1",
+        context_digest="d" * 64,
+        claims=(item,),
+        receipts=(receipt(item),),
+        policy=policy(),
+        finalized_at=NOW,
+    )
+    assert binding.accepted is False
+    assert "claim_context_identity_mismatch" in binding.reasons
+
+
+def test_live_claim_evidence_rejects_missing_required_receipt() -> None:
+    item = claim(
+        operation_id="operation-1",
+        context_digest="d" * 64,
+    )
+    binding = bind_live_claim_evidence(
+        operation_id="operation-1",
+        context_digest="d" * 64,
+        claims=(item,),
+        receipts=(),
+        policy=policy(),
+        finalized_at=NOW,
+    )
+    assert binding.accepted is False
+    assert "required_claim_receipt_missing" in binding.reasons
+
+
+def test_live_gate_can_require_structured_claim_evidence() -> None:
+    rejected = live_acceptance(
+        policy=LiveResponseAcceptancePolicy(
+            require_structured_claim_evidence=True,
+        )
+    )
+    assert rejected.accepted is False
+    assert "claim_evidence_missing" in rejected.reasons
+
+    binding = live_claim_binding()
+    accepted = live_acceptance(
+        claim_evidence=binding,
+        policy=LiveResponseAcceptancePolicy(
+            require_structured_claim_evidence=True,
+        ),
+    )
+    assert accepted.accepted is True
+    assert accepted.claim_evidence_digest == binding.digest
+
+
+def test_live_gate_rejects_present_but_rejected_claim_evidence() -> None:
+    binding = live_claim_binding(
+        disposition=PublicationDisposition.CONTESTED,
+    )
+    assert binding.accepted is False
+    receipt_value = live_acceptance(claim_evidence=binding)
+    assert receipt_value.accepted is False
+    assert "claim_evidence_rejected" in receipt_value.reasons
+    assert "claim_evidence:required_claim_contested" in receipt_value.reasons
+
+
+def test_live_claim_binding_is_content_minimized() -> None:
+    binding = live_claim_binding()
+    encoded = str(binding.as_dict())
+    assert "System A decreases latency by 10 percent." not in encoded
+    assert CLAIM_ID not in encoded
+    assert binding.authority_scope == "live-claim-evidence-binding-only"
