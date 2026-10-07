@@ -7,6 +7,7 @@ import json
 from typing import Iterable
 
 from .flgb_model_runtime import BatchRequest, KVCacheEntry, ModelRuntimeError, plan_kv_admission
+from .runtime_policy import RuntimePolicy
 
 
 def _digest(value: object) -> str:
@@ -66,8 +67,11 @@ class AdmissionDecision:
 class RuntimeAdmissionScheduler:
     """Stateful, deterministic and fail-closed local inference admission scheduler."""
 
-    def __init__(self, limits: AdmissionLimits | None = None) -> None:
+    def __init__(self, limits: AdmissionLimits | None = None, *, policy: RuntimePolicy | None = None) -> None:
         self.limits = limits or AdmissionLimits()
+        if policy is not None and not isinstance(policy, RuntimePolicy):
+            raise ModelRuntimeError("RuntimePolicy required")
+        self.policy = policy
         self._queued: dict[str, ScheduledRequest] = {}
         self._active: dict[str, ScheduledRequest] = {}
         self._kv: dict[str, KVCacheEntry] = {}
@@ -242,6 +246,12 @@ class RuntimeAdmissionScheduler:
                 "max_age_boost": self.limits.max_age_boost,
             },
             "sequence": self._sequence,
+            "policy": None if self.policy is None else {
+                "through_year": self.policy.through_year,
+                "capabilities": list(self.policy.capabilities),
+                "experimental": list(self.policy.experimental),
+                "digest": self.policy.digest,
+            },
             "capacity": self.capacity(),
             "queued": list(self.queued_ids),
             "active": list(self.active_ids),
