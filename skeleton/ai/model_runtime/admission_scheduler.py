@@ -127,9 +127,18 @@ class RuntimeAdmissionScheduler:
                 deferred.append(rid)
                 continue
             incoming = KVCacheEntry(rid, item.kv_bytes, self._sequence, item.pinned_kv)
+            # Active decode state is resident by definition. Treat it as pinned
+            # during planning even if the retained-cache pin flag is false.
+            planning_kv = [
+                KVCacheEntry(
+                    entry.request_id, entry.bytes, entry.last_used_sequence,
+                    entry.pinned or entry.request_id in self._active,
+                )
+                for entry in working_kv
+            ]
             try:
                 victims, ok = plan_kv_admission(
-                    working_kv, incoming, capacity_bytes=self.limits.kv_capacity_bytes
+                    planning_kv, incoming, capacity_bytes=self.limits.kv_capacity_bytes
                 )
             except ModelRuntimeError as exc:
                 rejected.append((rid, str(exc)))
