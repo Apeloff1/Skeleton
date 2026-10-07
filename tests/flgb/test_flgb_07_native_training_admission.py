@@ -34,7 +34,13 @@ class TestNativeTrainingAdmission(unittest.TestCase):
   admitted,a,rb=admit_candidate_model(rt,c,p,apply,admission_authority="runtime")
   admitted.model.E[0][0]+=1
   with self.assertRaises(RuntimePromotionError): execute_rollback(admitted,a,rb,cp)
- def test_promotion_receipt_is_single_use_when_ledger_enabled(self):\n  rt,cp,prior,c,p,apply=setup(); ledger=AdmissionLedger()\n  admit_candidate_model(rt,c,p,apply,admission_authority="runtime",ledger=ledger)\n  fresh=NativeLLMRuntime.restore(cp)\n  with self.assertRaisesRegex(RuntimePromotionError,"already consumed"):\n   admit_candidate_model(fresh,c,p,apply,admission_authority="runtime",ledger=ledger)\n def test_ledger_snapshot_survives_restart_and_rejects_replay(self):
+ def test_promotion_receipt_is_single_use_when_ledger_enabled(self):
+  rt,cp,prior,c,p,apply=setup(); ledger=AdmissionLedger()
+  admit_candidate_model(rt,c,p,apply,admission_authority="runtime",ledger=ledger)
+  fresh=NativeLLMRuntime.restore(cp)
+  with self.assertRaisesRegex(RuntimePromotionError,"already consumed"):
+   admit_candidate_model(fresh,c,p,apply,admission_authority="runtime",ledger=ledger)
+ def test_ledger_snapshot_survives_restart_and_rejects_replay(self):
   rt,cp,prior,c,p,apply=setup(); ledger=AdmissionLedger()
   admit_candidate_model(rt,c,p,apply,admission_authority="runtime",ledger=ledger)
   recovered=AdmissionLedger.restore(ledger.snapshot()); fresh=NativeLLMRuntime.restore(cp)
