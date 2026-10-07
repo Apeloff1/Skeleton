@@ -1568,3 +1568,17 @@ Crawler admission and robots policy handling now include operational bounds and 
 - regressions cover pathological URL dimensions, fresh-cache reuse, stale ETag revalidation and 304 freshness renewal.
 
 Advanced follow-up: integrate TrapGuard directly into CrawlEngine admission, validate CrawlPolicy numeric configuration at construction, and persist robots metadata across crawler checkpoints so restart does not force unconditional robots refetch.
+
+
+### 2026-10-07 year-indexed signal intelligence tranche
+
+Research evidence now models signals by the year the evidence explicitly discusses rather than conflating subject year with fetch/publication recency:
+- EvidenceObservation records deterministic explicit 19xx/20xx signal years extracted from title/excerpt;
+- EvidenceSet.signals_by_year aggregates qualified evidence into yearly observation volume, independent-host diversity, mean relevance, mean source quality and positive/negative polarity;
+- undercovered_years identifies historical coverage holes against a requested range/minimum independent-source threshold;
+- frontier_priority accepts target years and rewards candidates that explicitly match missing years, enabling active temporal gap filling;
+- YearSignalSeries computes deterministic year-over-year deltas for host diversity, observation volume, relevance, source quality and net polarity while preserving gaps between observed years;
+- strongest-year ranking prioritizes independent evidence diversity before raw page volume;
+- regressions cover year extraction/bucketing, temporal coverage gaps, year-directed frontier priority, gap-preserving deltas and diversity-first ranking.
+
+Advanced follow-up: separate explicit subject-year extraction from stronger date semantics (published_at/event_at/valid_from), add decade/regime segmentation, and use year-coverage objectives inside federated provider discovery rather than only frontier scoring.
