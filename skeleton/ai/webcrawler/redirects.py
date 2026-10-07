@@ -11,7 +11,7 @@ def fetch_with_policy(engine,url,*,now):
         if current in seen:raise RedirectPolicyError("redirect loop")
         seen.add(current)
         if not engine.policy.admits(current):raise RedirectPolicyError("redirect destination rejected by crawl policy")
-        if not engine.robots.known(current) and not engine.load_robots(current):
+        if not engine.robots.known(current) and not engine.load_robots(current,now=now):
             raise RedirectPolicyError("redirect destination robots unavailable")
         if not engine.budget.can_request():raise RedirectPolicyError("crawl request budget exhausted")
         if not engine.robots.allowed(current):raise RedirectPolicyError("redirect destination denied by robots")
