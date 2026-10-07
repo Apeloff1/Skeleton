@@ -270,8 +270,8 @@
   ],
   "backlog": {
     "summary": {
-      "item_count": 1644,
-      "gap_count": 664,
+      "item_count": 1639,
+      "gap_count": 659,
       "risk_count": 980,
       "open_count": 1639,
       "closed_count": 0
@@ -8189,7 +8189,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-366:gap:001",
         "volume_ref": "VOL-366",
-        "statement": "inventory current strategies",
+        "statement": "bind selection engine",
         "accountability_id": "ACC-VOL-366",
         "requirement_refs": [
           "REQ:VOL-366:001",
@@ -8203,7 +8203,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-366:gap:002",
         "volume_ref": "VOL-366",
-        "statement": "bind selection engine",
+        "statement": "bind the registry to production selection and benchmark-backed promotion evidence",
         "accountability_id": "ACC-VOL-366",
         "requirement_refs": [
           "REQ:VOL-366:001",
@@ -8217,7 +8217,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-367:gap:001",
         "volume_ref": "VOL-367",
-        "statement": "define baseline selector",
+        "statement": "bind performance evidence",
         "accountability_id": "ACC-VOL-367",
         "requirement_refs": [
           "REQ:VOL-367:001",
@@ -8231,7 +8231,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-367:gap:002",
         "volume_ref": "VOL-367",
-        "statement": "bind performance evidence",
+        "statement": "bind selector decisions to runtime routing receipts and comparative performance evidence",
         "accountability_id": "ACC-VOL-367",
         "requirement_refs": [
           "REQ:VOL-367:001",
@@ -8245,7 +8245,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-368:gap:001",
         "volume_ref": "VOL-368",
-        "statement": "define stage IDs",
+        "statement": "bind cost governor",
         "accountability_id": "ACC-VOL-368",
         "requirement_refs": [
           "REQ:VOL-368:001",
@@ -8259,7 +8259,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-368:gap:002",
         "volume_ref": "VOL-368",
-        "statement": "bind cost governor",
+        "statement": "bind reasoning-cost attribution to the runtime budget governor and aggregate telemetry",
         "accountability_id": "ACC-VOL-368",
         "requirement_refs": [
           "REQ:VOL-368:001",
@@ -8329,7 +8329,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-371:gap:001",
         "volume_ref": "VOL-371",
-        "statement": "seed core lint rules",
+        "statement": "bind workflow compiler",
         "accountability_id": "ACC-VOL-371",
         "requirement_refs": [
           "REQ:VOL-371:001",
@@ -8343,7 +8343,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-371:gap:002",
         "volume_ref": "VOL-371",
-        "statement": "bind workflow compiler",
+        "statement": "bind static analysis to canonical plan admission and CI with versioned rule policy",
         "accountability_id": "ACC-VOL-371",
         "requirement_refs": [
           "REQ:VOL-371:001",
@@ -8385,7 +8385,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-373:gap:001",
         "volume_ref": "VOL-373",
-        "statement": "define composition IR",
+        "statement": "bind tool SDK/workflows",
         "accountability_id": "ACC-VOL-373",
         "requirement_refs": [
           "REQ:VOL-373:001",
@@ -8399,7 +8399,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-373:gap:002",
         "volume_ref": "VOL-373",
-        "statement": "bind tool SDK/workflows",
+        "statement": "bind composition validation into the executable tool runtime and authorization receipts",
         "accountability_id": "ACC-VOL-373",
         "requirement_refs": [
           "REQ:VOL-373:001",
@@ -8441,7 +8441,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-375:gap:001",
         "volume_ref": "VOL-375",
-        "statement": "define safe probes",
+        "statement": "bind tool routing",
         "accountability_id": "ACC-VOL-375",
         "requirement_refs": [
           "REQ:VOL-375:001",
@@ -8455,7 +8455,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-375:gap:002",
         "volume_ref": "VOL-375",
-        "statement": "bind tool routing",
+        "statement": "bind safe health probes to tool admission without granting authority from liveness alone",
         "accountability_id": "ACC-VOL-375",
         "requirement_refs": [
           "REQ:VOL-375:001",
@@ -8469,7 +8469,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-376:gap:001",
         "volume_ref": "VOL-376",
-        "statement": "define discovery trust contract",
+        "statement": "bind tool SDK",
         "accountability_id": "ACC-VOL-376",
         "requirement_refs": [
           "REQ:VOL-376:001",
@@ -8483,7 +8483,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-376:gap:002",
         "volume_ref": "VOL-376",
-        "statement": "bind tool SDK",
+        "statement": "bind discovery manifests to the canonical capability registry and signed/verified attestation sources",
         "accountability_id": "ACC-VOL-376",
         "requirement_refs": [
           "REQ:VOL-376:001",
@@ -8497,7 +8497,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-377:gap:001",
         "volume_ref": "VOL-377",
-        "statement": "define result trust levels",
+        "statement": "bind context compiler",
         "accountability_id": "ACC-VOL-377",
         "requirement_refs": [
           "REQ:VOL-377:001",
@@ -8511,7 +8511,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-377:gap:002",
         "volume_ref": "VOL-377",
-        "statement": "bind context compiler",
+        "statement": "bind result-trust admission to provenance/evidence policy across all high-impact tool consumers",
         "accountability_id": "ACC-VOL-377",
         "requirement_refs": [
           "REQ:VOL-377:001",
@@ -8525,7 +8525,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-378:gap:001",
         "volume_ref": "VOL-378",
-        "statement": "define effect state machine",
+        "statement": "bind tools/sagas",
         "accountability_id": "ACC-VOL-378",
         "requirement_refs": [
           "REQ:VOL-378:001",
@@ -8539,7 +8539,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-378:gap:002",
         "volume_ref": "VOL-378",
-        "statement": "bind tools/sagas",
+        "statement": "bind side-effect receipts to durable operation finalization and retry/compensation policy",
         "accountability_id": "ACC-VOL-378",
         "requirement_refs": [
           "REQ:VOL-378:001",
@@ -8665,7 +8665,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-383:gap:001",
         "volume_ref": "VOL-383",
-        "statement": "define memory accounting",
+        "statement": "bind model/KV caches",
         "accountability_id": "ACC-VOL-383",
         "requirement_refs": [
           "REQ:VOL-383:001",
@@ -8679,7 +8679,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-383:gap:002",
         "volume_ref": "VOL-383",
-        "statement": "bind model/KV caches",
+        "statement": "bind GPU reservation accounting to model/KV allocation lifecycle and stress/fault evidence",
         "accountability_id": "ACC-VOL-383",
         "requirement_refs": [
           "REQ:VOL-383:001",
@@ -8693,7 +8693,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-384:gap:001",
         "volume_ref": "VOL-384",
-        "statement": "define pin/drain semantics",
+        "statement": "bind warming",
         "accountability_id": "ACC-VOL-384",
         "requirement_refs": [
           "REQ:VOL-384:001",
@@ -8707,7 +8707,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-384:gap:002",
         "volume_ref": "VOL-384",
-        "statement": "bind warming",
+        "statement": "bind safe eviction decisions to warming/placement state and pressure telemetry",
         "accountability_id": "ACC-VOL-384",
         "requirement_refs": [
           "REQ:VOL-384:001",
@@ -8777,7 +8777,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-387:gap:001",
         "volume_ref": "VOL-387",
-        "statement": "formalize key identity",
+        "statement": "bind GPU memory manager",
         "accountability_id": "ACC-VOL-387",
         "requirement_refs": [
           "REQ:VOL-387:001",
@@ -8791,7 +8791,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-387:gap:002",
         "volume_ref": "VOL-387",
-        "statement": "bind GPU memory manager",
+        "statement": "bind KV allocation identity to GPU reservation receipts and eviction invalidation",
         "accountability_id": "ACC-VOL-387",
         "requirement_refs": [
           "REQ:VOL-387:001",
@@ -8805,7 +8805,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-388:gap:001",
         "volume_ref": "VOL-388",
-        "statement": "define key composition",
+        "statement": "bind instruction registry",
         "accountability_id": "ACC-VOL-388",
         "requirement_refs": [
           "REQ:VOL-388:001",
@@ -8819,7 +8819,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-388:gap:002",
         "volume_ref": "VOL-388",
-        "statement": "bind instruction registry",
+        "statement": "bind instruction/tokenizer/version digests to canonical registry issuance",
         "accountability_id": "ACC-VOL-388",
         "requirement_refs": [
           "REQ:VOL-388:001",
@@ -8973,7 +8973,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-394:gap:001",
         "volume_ref": "VOL-394",
-        "statement": "model interconnect graph",
+        "statement": "bind distributed inference/training",
         "accountability_id": "ACC-VOL-394",
         "requirement_refs": [
           "REQ:VOL-394:001",
@@ -8987,7 +8987,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-394:gap:002",
         "volume_ref": "VOL-394",
-        "statement": "bind distributed inference/training",
+        "statement": "bind measured interconnect discovery, topology refresh and distributed-runtime placement receipts",
         "accountability_id": "ACC-VOL-394",
         "requirement_refs": [
           "REQ:VOL-394:001",
@@ -9001,7 +9001,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-395:gap:001",
         "volume_ref": "VOL-395",
-        "statement": "define tiers",
+        "statement": "bind CAS/model/data registries",
         "accountability_id": "ACC-VOL-395",
         "requirement_refs": [
           "REQ:VOL-395:001",
@@ -9015,7 +9015,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-395:gap:002",
         "volume_ref": "VOL-395",
-        "statement": "bind CAS/model/data registries",
+        "statement": "bind typed storage tiers to CAS/model/data registries, migration receipts and capacity telemetry",
         "accountability_id": "ACC-VOL-395",
         "requirement_refs": [
           "REQ:VOL-395:001",
@@ -9155,7 +9155,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-400:gap:002",
         "volume_ref": "VOL-400",
-        "statement": "integrate worker attestation",
+        "statement": "bind reproducibility consensus and attestation evidence to release provenance and remote-execution identity",
         "accountability_id": "ACC-VOL-400",
         "requirement_refs": [
           "REQ:VOL-400:001",
@@ -9197,7 +9197,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-402:gap:001",
         "volume_ref": "VOL-402",
-        "statement": "define research classes",
+        "statement": "bind quotas/fairness",
         "accountability_id": "ACC-VOL-402",
         "requirement_refs": [
           "REQ:VOL-402:001",
@@ -9211,7 +9211,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-402:gap:002",
         "volume_ref": "VOL-402",
-        "statement": "bind quotas/fairness",
+        "statement": "bind research workload classes to quota/fairness policy and durable allocation receipts",
         "accountability_id": "ACC-VOL-402",
         "requirement_refs": [
           "REQ:VOL-402:001",
@@ -9365,7 +9365,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-408:gap:001",
         "volume_ref": "VOL-408",
-        "statement": "bind lineage/training/exports",
+        "statement": "bind rights lineage and grant decisions to training/export admission, derivative registries and revocation evidence",
         "accountability_id": "ACC-VOL-408",
         "requirement_refs": [
           "REQ:VOL-408:001",
@@ -9407,7 +9407,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-410:gap:001",
         "volume_ref": "VOL-410",
-        "statement": "define trigger criteria",
+        "statement": "bind research proposals",
         "accountability_id": "ACC-VOL-410",
         "requirement_refs": [
           "REQ:VOL-410:001",
@@ -9421,7 +9421,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-410:gap:002",
         "volume_ref": "VOL-410",
-        "statement": "bind research proposals",
+        "statement": "bind explicit sensitive-research triggers to proposal admission, oversight identity and durable review receipts",
         "accountability_id": "ACC-VOL-410",
         "requirement_refs": [
           "REQ:VOL-410:001",
@@ -9477,7 +9477,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-413:gap:001",
         "volume_ref": "VOL-413",
-        "statement": "bind shadow traffic",
+        "statement": "bind shadow/canary promotion and rollback receipts to live provider routing, parity evidence and release gates",
         "accountability_id": "ACC-VOL-413",
         "requirement_refs": [
           "REQ:VOL-413:001",
@@ -9547,7 +9547,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-416:gap:001",
         "volume_ref": "VOL-416",
-        "statement": "bind feature flags/technology radar",
+        "statement": "bind monotonic kill-switch exposure receipts to feature routing, operator controls and technology-radar lifecycle",
         "accountability_id": "ACC-VOL-416",
         "requirement_refs": [
           "REQ:VOL-416:001",
@@ -9575,7 +9575,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-417:gap:002",
         "volume_ref": "VOL-417",
-        "statement": "bind evidence packages",
+        "statement": "bind research promotion receipts/evidence packages to PR/release gates and branch-retention policy",
         "accountability_id": "ACC-VOL-417",
         "requirement_refs": [
           "REQ:VOL-417:001",
