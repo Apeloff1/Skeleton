@@ -673,3 +673,39 @@ def test_model_batches_require_declared_or_explicit_padding(native_model):
         pipeline.model_batches(prepared)
     batches = pipeline.model_batches(prepared, pad_token_id=native_model.unk)
     assert batches
+
+
+def test_model_input_batch_canonical_serialization_round_trip():
+    from skeleton.ai.model_runtime.text_pipeline import deserialize_model_input_batch, materialize_model_batch, serialize_model_input_batch
+    from skeleton.ai.model_runtime.tokenization import TokenWindow
+    batch = materialize_model_batch((
+        TokenWindow(0, 3, (1, 2, 3), "a" * 64),
+        TokenWindow(3, 4, (4,), "a" * 64),
+    ), pad_token_id=0)
+    payload = serialize_model_input_batch(batch)
+    restored = deserialize_model_input_batch(payload)
+    assert restored == batch
+    assert serialize_model_input_batch(restored) == payload
+
+
+def test_model_input_batch_serialization_rejects_tampering():
+    import json
+    from skeleton.ai.model_runtime.text_pipeline import deserialize_model_input_batch, materialize_model_batch, serialize_model_input_batch
+    from skeleton.ai.model_runtime.tokenization import TokenizerContractError, TokenWindow
+    batch = materialize_model_batch((TokenWindow(0, 2, (1, 2), "a" * 64),), pad_token_id=0)
+    value = json.loads(serialize_model_input_batch(batch))
+    value["input_ids"][0][0] = 9
+    payload = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+    with pytest.raises(TokenizerContractError, match="digest mismatch"):
+        deserialize_model_input_batch(payload)
+
+
+def test_causal_training_batch_canonical_serialization_round_trip():
+    from skeleton.ai.model_runtime.text_pipeline import deserialize_causal_training_batch, materialize_causal_training_batch, materialize_model_batch, serialize_causal_training_batch
+    from skeleton.ai.model_runtime.tokenization import TokenWindow
+    model = materialize_model_batch((TokenWindow(0, 3, (1, 2, 3), "b" * 64),), pad_token_id=0)
+    batch = materialize_causal_training_batch(model)
+    payload = serialize_causal_training_batch(batch)
+    restored = deserialize_causal_training_batch(payload)
+    assert restored == batch
+    assert serialize_causal_training_batch(restored) == payload
