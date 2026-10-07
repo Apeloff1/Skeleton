@@ -222,6 +222,14 @@ class NativeRuntimeLocalModel:
             )
             if (
                 isinstance(payload, dict)
+                and "skeleton_local_response" in payload
+                and not (type(version) is int and version == 1)
+            ):
+                raise NativeRuntimeBackendError(
+                    "unsupported native local response protocol version"
+                )
+            if (
+                isinstance(payload, dict)
                 and type(version) is int
                 and version == 1
             ):
