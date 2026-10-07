@@ -4,6 +4,22 @@ This package holds replication and rollback primitives that later transport,
 session, and engine adapters can consume. It does not open sockets.
 """
 
+from skeleton.distributed.network.internal_protocol import (
+    INTERNAL_PROTOCOL_SCHEMA_VERSION,
+    VOL_131_ID,
+    DeliverySemantics,
+    ProtocolEnvelope,
+    ProtocolError,
+    ProtocolOutcome,
+    ProtocolReceipt,
+    TraceContext,
+    UnknownOutcomePolicy,
+    canonical_digest as protocol_canonical_digest,
+    canonical_json_bytes as protocol_canonical_json_bytes,
+    canonical_payload_digest,
+    validate_receipt,
+)
+
 from skeleton.distributed.network.model_placement import (
     MODEL_PLACEMENT_ACCOUNTABILITY_ID,
     MODEL_PLACEMENT_SCHEMA_VERSION,
@@ -106,4 +122,17 @@ __all__ = [
     "WarmReadiness",
     "qualify_model_placement",
     "qualify_model_warmup",
+    "INTERNAL_PROTOCOL_SCHEMA_VERSION",
+    "VOL_131_ID",
+    "DeliverySemantics",
+    "ProtocolEnvelope",
+    "ProtocolError",
+    "ProtocolOutcome",
+    "ProtocolReceipt",
+    "TraceContext",
+    "UnknownOutcomePolicy",
+    "protocol_canonical_digest",
+    "protocol_canonical_json_bytes",
+    "canonical_payload_digest",
+    "validate_receipt",
 ]
