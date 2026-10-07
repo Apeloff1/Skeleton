@@ -36,6 +36,7 @@ from skeleton.ai.game_builder.contracts import (  # noqa: E402
     Candidate,
     Challenge,
     EffortMode,
+    EvaluatorProvenance,
     GateResult,
     PromotionReceipt,
     ProducerProvenance,
@@ -126,12 +127,61 @@ def _challenge(challenger: Rival, target: Candidate, token: str) -> Challenge:
     )
 
 
-def _gates(*, passed: bool = True) -> tuple[GateResult, ...]:
-    return (
-        GateResult("rights", passed, "evidence-rights-0000000000000000"),
-        GateResult("continuity", passed, "evidence-canon-00000000000000000"),
-        GateResult("state", passed, "evidence-state-000000000000000000"),
+def _evaluator_provenance(
+    evaluator_id: str,
+    *,
+    method_id: str = "deterministic-gate",
+    evidence_refs: tuple[str, ...] = ("authority-evidence-0000000000000000",),
+) -> EvaluatorProvenance:
+    return EvaluatorProvenance(
+        evaluator_id=evaluator_id,
+        operation_id=f"operation:{evaluator_id}",
+        execution_id=f"execution:{evaluator_id}",
+        execution_identity_digest=canonical_digest({"execution": evaluator_id}),
+        finalization_intent_digest=canonical_digest({"finalization": evaluator_id}),
+        authority_kind="ai_execution",
+        authority_identity_digest=canonical_digest({"model": evaluator_id}),
+        method_id=method_id,
+        source_revision=canonical_digest({"source": evaluator_id})[:40],
+        provider_receipt_refs=(f"provider-receipt:{evaluator_id}",),
+        output_evidence_refs=evidence_refs,
     )
+
+
+def _adjudicator(
+    evaluator_id: str = "independent-judge",
+) -> tuple[EvaluatorProvenance, str]:
+    evidence = f"authority-{evaluator_id}-0000000000000000"
+    return (
+        _evaluator_provenance(
+            evaluator_id,
+            method_id="promotion-adjudication",
+            evidence_refs=(evidence,),
+        ),
+        evidence,
+    )
+
+
+def _gates(*, passed: bool = True) -> tuple[GateResult, ...]:
+    rows = []
+    for gate_id, evidence in (
+        ("rights", "evidence-rights-0000000000000000"),
+        ("continuity", "evidence-canon-00000000000000000"),
+        ("state", "evidence-state-000000000000000000"),
+    ):
+        evaluator_id = f"gate-{gate_id}-judge"
+        rows.append(
+            GateResult(
+                gate_id,
+                passed,
+                evidence,
+                evaluator_provenance=_evaluator_provenance(
+                    evaluator_id,
+                    evidence_refs=(evidence,),
+                ),
+            )
+        )
+    return tuple(rows)
 
 
 def test_effort_modes_are_exact_and_have_three_stage_executions() -> None:
@@ -155,7 +205,13 @@ def test_stage_order_and_role_rotation_are_fail_closed() -> None:
 
     attack = _challenge(Rival.B, built, "b")
     assert forge.submit_attack(attack).stage is Stage.RECONCILE_AND_PROMOTE
-    forge.reconcile(submitted=None, evaluator_id="independent-judge", gate_results=_gates())
+    forge.reconcile(
+        submitted=None,
+        evaluator_id="independent-judge",
+        evaluator_provenance=_adjudicator("independent-judge")[0],
+        authority_evidence_digest=_adjudicator("independent-judge")[1],
+        gate_results=_gates(),
+    )
 
     assert forge.completed_rounds == 1
     assert forge.builder is Rival.B
@@ -174,11 +230,17 @@ def test_compensable_only_gate_set_cannot_promote() -> None:
     receipt = forge.reconcile(
         submitted=challenge.improved_candidate,
         evaluator_id="independent-judge",
+        evaluator_provenance=_adjudicator("independent-judge")[0],
+        authority_evidence_digest=_adjudicator("independent-judge")[1],
         gate_results=(
             GateResult(
                 "advisory",
                 True,
                 "evidence-advisory-0000000000000000",
+                evaluator_provenance=_evaluator_provenance(
+                    "gate-advisory-judge",
+                    evidence_refs=("evidence-advisory-0000000000000000",),
+                ),
                 non_compensable=False,
             ),
         ),
@@ -206,11 +268,53 @@ def test_gate_result_rejects_non_boolean_authority_states(
         "gate_id": "rights",
         "passed": True,
         "evidence_digest": "evidence-rights-0000000000000000",
+        "evaluator_provenance": _evaluator_provenance(
+            "gate-rights-judge",
+            evidence_refs=("evidence-rights-0000000000000000",),
+        ),
         "non_compensable": True,
     }
     kwargs[field] = value
     with pytest.raises(TypeError, match=message):
         GateResult(**kwargs)
+
+
+def test_gate_rejects_evidence_not_emitted_by_evaluator_execution() -> None:
+    provenance = _evaluator_provenance(
+        "gate-substitution-judge",
+        evidence_refs=("gate-produced-evidence-0000000000000",),
+    )
+    with pytest.raises(
+        ValueError,
+        match="gate evidence must be referenced by evaluator execution output",
+    ):
+        GateResult(
+            "rights",
+            True,
+            "gate-substituted-evidence-0000000000",
+            evaluator_provenance=provenance,
+        )
+
+
+def test_promotion_rejects_authority_evidence_not_emitted_by_adjudicator() -> None:
+    incumbent = _candidate("seed", "authority-seed", quality=_quality(0.4))
+    forge = DualRivalForge(effort_mode=100, champion=incumbent)
+    built = _candidate(Rival.A.value, "authority-built", quality=_quality(0.5))
+    forge.submit_construct(built)
+    challenge = _challenge(Rival.B, built, "authority-challenge")
+    forge.submit_attack(challenge)
+    provenance, _ = _adjudicator("authority-judge")
+    with pytest.raises(
+        ValueError,
+        match="promotion authority evidence must be referenced",
+    ):
+        forge.reconcile(
+            submitted=challenge.improved_candidate,
+            evaluator_id="authority-judge",
+            evaluator_provenance=provenance,
+            authority_evidence_digest="authority-substituted-000000000000000",
+            gate_results=_gates(),
+        )
 
 
 def test_duplicate_gate_ids_are_rejected_before_promotion() -> None:
@@ -225,11 +329,17 @@ def test_duplicate_gate_ids_are_rejected_before_promotion() -> None:
         "rights",
         True,
         "evidence-rights-1111111111111111",
+        evaluator_provenance=_evaluator_provenance(
+            "gate-rights-duplicate",
+            evidence_refs=("evidence-rights-1111111111111111",),
+        ),
     )
     with pytest.raises(ValueError, match="unique gate ids"):
         forge.reconcile(
             submitted=challenge.improved_candidate,
             evaluator_id="independent-judge",
+            evaluator_provenance=_adjudicator("independent-judge")[0],
+            authority_evidence_digest=_adjudicator("independent-judge")[1],
             gate_results=(_gates()[0], duplicate),
         )
 
@@ -246,6 +356,8 @@ def test_malformed_gate_object_is_rejected_before_promotion() -> None:
         forge.reconcile(
             submitted=challenge.improved_candidate,
             evaluator_id="independent-judge",
+            evaluator_provenance=_adjudicator("independent-judge")[0],
+            authority_evidence_digest=_adjudicator("independent-judge")[1],
             gate_results=(object(),),
         )
 
@@ -412,10 +524,59 @@ def test_non_compensable_gate_failure_retains_incumbent() -> None:
     receipt = forge.reconcile(
         submitted=challenge.improved_candidate,
         evaluator_id="independent-judge",
+        evaluator_provenance=_adjudicator("independent-judge")[0],
+        authority_evidence_digest=_adjudicator("independent-judge")[1],
         gate_results=_gates(passed=False),
     )
     assert receipt.decision == "retain_incumbent"
     assert forge.champion.digest == incumbent.digest
+
+
+def test_evaluated_quality_override_requires_attributed_evaluation_decision() -> None:
+    incumbent = _candidate("seed", "override-seed", quality=_quality(0.4))
+    forge = DualRivalForge(effort_mode=100, champion=incumbent)
+    built = _candidate(Rival.A.value, "override-built", quality=_quality(0.5))
+    forge.submit_construct(built)
+    challenge = _challenge(Rival.B, built, "override-challenge")
+    forge.submit_attack(challenge)
+    provenance, authority_evidence = _adjudicator("override-judge")
+
+    with pytest.raises(
+        ValueError,
+        match="requires evaluation_decision_digest",
+    ):
+        forge.reconcile(
+            submitted=challenge.improved_candidate,
+            evaluator_id="override-judge",
+            evaluator_provenance=provenance,
+            authority_evidence_digest=authority_evidence,
+            gate_results=_gates(),
+            evaluated_quality=_quality(0.7),
+        )
+
+
+def test_evaluated_quality_override_rejects_decision_authority_mismatch() -> None:
+    incumbent = _candidate("seed", "override-mismatch-seed", quality=_quality(0.4))
+    forge = DualRivalForge(effort_mode=100, champion=incumbent)
+    built = _candidate(Rival.A.value, "override-mismatch-built", quality=_quality(0.5))
+    forge.submit_construct(built)
+    challenge = _challenge(Rival.B, built, "override-mismatch-challenge")
+    forge.submit_attack(challenge)
+    provenance, authority_evidence = _adjudicator("override-mismatch-judge")
+
+    with pytest.raises(
+        ValueError,
+        match="must equal promotion authority evidence",
+    ):
+        forge.reconcile(
+            submitted=challenge.improved_candidate,
+            evaluator_id="override-mismatch-judge",
+            evaluator_provenance=provenance,
+            authority_evidence_digest=authority_evidence,
+            gate_results=_gates(),
+            evaluated_quality=_quality(0.7),
+            evaluation_decision_digest=canonical_digest({"other": "decision"}),
+        )
 
 
 def test_pareto_safe_candidate_promotes_with_independent_judge() -> None:
@@ -444,6 +605,8 @@ def test_pareto_safe_candidate_promotes_with_independent_judge() -> None:
     receipt = forge.reconcile(
         submitted=improved,
         evaluator_id="independent-judge",
+        evaluator_provenance=_adjudicator("independent-judge")[0],
+        authority_evidence_digest=_adjudicator("independent-judge")[1],
         gate_results=_gates(),
     )
     assert receipt.decision == "promote"
@@ -461,6 +624,8 @@ def test_rivals_cannot_be_final_promotion_judge(evaluator: str) -> None:
         forge.reconcile(
             submitted=challenge.improved_candidate,
             evaluator_id=evaluator,
+            evaluator_provenance=_adjudicator(evaluator)[0],
+            authority_evidence_digest=_adjudicator(evaluator)[1],
             gate_results=_gates(),
         )
 
@@ -480,6 +645,8 @@ def test_synthesis_requires_both_parent_candidates_and_non_rival_identity() -> N
         forge.reconcile(
             submitted=bad,
             evaluator_id="independent-judge",
+            evaluator_provenance=_adjudicator("independent-judge")[0],
+            authority_evidence_digest=_adjudicator("independent-judge")[1],
             gate_results=_gates(),
         )
 
@@ -492,6 +659,8 @@ def test_synthesis_requires_both_parent_candidates_and_non_rival_identity() -> N
     receipt = forge.reconcile(
         submitted=synthesis,
         evaluator_id="independent-judge",
+        evaluator_provenance=_adjudicator("independent-judge")[0],
+        authority_evidence_digest=_adjudicator("independent-judge")[1],
         gate_results=_gates(),
     )
     assert receipt.decision == "promote"
@@ -578,6 +747,8 @@ def test_promotion_receipt_rehashes_public_decision_evidence() -> None:
     receipt = forge.reconcile(
         submitted=challenge.improved_candidate,
         evaluator_id="independent-judge",
+        evaluator_provenance=_adjudicator("independent-judge")[0],
+        authority_evidence_digest=_adjudicator("independent-judge")[1],
         gate_results=_gates(),
     )
 
@@ -590,8 +761,11 @@ def test_promotion_receipt_rehashes_public_decision_evidence() -> None:
             submitted_digest=receipt.submitted_digest,
             promoted_digest=receipt.promoted_digest,
             evaluator_id=receipt.evaluator_id,
+            evaluator_provenance=receipt.evaluator_provenance,
+            authority_evidence_digest=receipt.authority_evidence_digest,
             gate_results=receipt.gate_results,
             evaluated_submitted_quality=receipt.evaluated_submitted_quality,
+            evaluation_decision_digest=receipt.evaluation_decision_digest,
             decision=receipt.decision,
             decision_digest="tampered-" + "0" * 64,
         )
@@ -620,12 +794,14 @@ def test_forge_rejects_terminal_champion_not_bound_to_receipt_chain() -> None:
     receipt = forge.reconcile(
         submitted=None,
         evaluator_id="independent-judge",
+        evaluator_provenance=_adjudicator("independent-judge")[0],
+        authority_evidence_digest=_adjudicator("independent-judge")[1],
         gate_results=_gates(),
     )
 
     with pytest.raises(
         ForgeStateError,
-        match="forge champion must match terminal promotion receipt",
+        match="first promotion receipt incumbent must match forge origin champion",
     ):
         DualRivalForge(
             effort_mode=100,
@@ -695,6 +871,8 @@ def test_forge_100_completes_only_after_exactly_100_three_stage_rounds() -> None
         forge.reconcile(
             submitted=None,
             evaluator_id="independent-judge",
+            evaluator_provenance=_adjudicator("independent-judge")[0],
+            authority_evidence_digest=_adjudicator("independent-judge")[1],
             gate_results=_gates(),
         )
         assert forge.completed_rounds == round_number

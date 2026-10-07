@@ -34,6 +34,10 @@ _load("skeleton.ai.game_builder.canon", "skeleton/ai/game_builder/canon.py")
 _load("skeleton.ai.game_builder.rights", "skeleton/ai/game_builder/rights.py")
 
 from skeleton.ai.game_builder.atomizer import ArtifactAtom, AtomGraph, AtomGraphError  # noqa: E402
+from skeleton.ai.game_builder.contracts import (  # noqa: E402
+    EvaluatorProvenance,
+    canonical_digest,
+)
 from skeleton.ai.game_builder.canon import (  # noqa: E402
     CanonAssertion,
     CanonError,
@@ -52,6 +56,24 @@ from skeleton.ai.game_builder.rights import (  # noqa: E402
 
 def _digest(label: str) -> str:
     return (label + "-" + ("0" * 64))[:64]
+
+
+def _authority(
+    authority_id: str,
+    *evidence_refs: str,
+) -> EvaluatorProvenance:
+    return EvaluatorProvenance(
+        evaluator_id=authority_id,
+        operation_id=f"operation:{authority_id}",
+        execution_id=f"execution:{authority_id}",
+        execution_identity_digest=canonical_digest({"execution": authority_id}),
+        finalization_intent_digest=canonical_digest({"finalization": authority_id}),
+        authority_kind="deterministic_control",
+        authority_identity_digest=canonical_digest({"authority": authority_id}),
+        method_id="rights-review",
+        source_revision=canonical_digest({"source": authority_id})[:40],
+        output_evidence_refs=tuple(evidence_refs),
+    )
 
 
 def test_canon_blocks_accidental_same_branch_contradiction() -> None:
@@ -193,6 +215,7 @@ def test_unresolved_high_similarity_risk_blocks_release_until_reviewed() -> None
             "image",
             SimilarityRisk.HIGH,
             _digest("similarity"),
+            _authority("similarity-judge", _digest("similarity")),
         )
     )
     allowed, blockers = ledger.release_gate(
@@ -205,6 +228,8 @@ def test_unresolved_high_similarity_risk_blocks_release_until_reviewed() -> None
     ledger.resolve_similarity(
         "sim-1",
         resolution="independent review cleared false positive",
+        resolution_evidence_digest=_digest("resolution"),
+        resolution_authority=_authority("rights-reviewer", _digest("resolution")),
     )
     allowed, blockers = ledger.release_gate(
         artifact_digest=artifact,
@@ -212,6 +237,85 @@ def test_unresolved_high_similarity_risk_blocks_release_until_reviewed() -> None
     )
     assert allowed
     assert blockers == ()
+
+
+def test_similarity_finding_rejects_unattributed_detection_evidence() -> None:
+    with pytest.raises(RightsError, match="similarity evidence must be referenced"):
+        SimilarityFinding(
+            "sim-unbound",
+            _digest("artifact"),
+            "owned",
+            "image",
+            SimilarityRisk.HIGH,
+            _digest("similarity"),
+            _authority("similarity-judge", _digest("different")),
+        )
+
+
+def test_similarity_resolution_requires_attributed_review_evidence() -> None:
+    ledger = RightsLedger()
+    ledger.register_source(
+        SourceRecord(
+            "owned",
+            _digest("owned"),
+            RightsState.PROJECT_OWNED,
+            frozenset({UseKind.RELEASE_DISTRIBUTION}),
+            "project-source",
+        )
+    )
+    finding = SimilarityFinding(
+        "sim-resolution",
+        _digest("artifact"),
+        "owned",
+        "image",
+        SimilarityRisk.HIGH,
+        _digest("similarity"),
+        _authority("similarity-judge", _digest("similarity")),
+    )
+    ledger.record_similarity(finding)
+    with pytest.raises(RightsError, match="resolution evidence must be referenced"):
+        ledger.resolve_similarity(
+            "sim-resolution",
+            resolution="cleared",
+            resolution_evidence_digest=_digest("resolution"),
+            resolution_authority=_authority(
+                "rights-reviewer",
+                _digest("different-resolution"),
+            ),
+        )
+
+
+def test_high_risk_similarity_cannot_be_self_cleared_by_detector() -> None:
+    ledger = RightsLedger()
+    ledger.register_source(
+        SourceRecord(
+            "owned-self-review",
+            _digest("owned-self-review"),
+            RightsState.PROJECT_OWNED,
+            frozenset({UseKind.RELEASE_DISTRIBUTION}),
+            "project-source",
+        )
+    )
+    finding = SimilarityFinding(
+        "sim-self-review",
+        _digest("artifact-self-review"),
+        "owned-self-review",
+        "image",
+        SimilarityRisk.HIGH,
+        _digest("similarity-self-review"),
+        _authority("same-reviewer", _digest("similarity-self-review")),
+    )
+    ledger.record_similarity(finding)
+    with pytest.raises(RightsError, match="requires independent authority"):
+        ledger.resolve_similarity(
+            "sim-self-review",
+            resolution="self-cleared",
+            resolution_evidence_digest=_digest("resolution-self-review"),
+            resolution_authority=_authority(
+                "same-reviewer",
+                _digest("resolution-self-review"),
+            ),
+        )
 
 
 def test_atom_graph_preserves_pixel_to_scene_parent_context() -> None:

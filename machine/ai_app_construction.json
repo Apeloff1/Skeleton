@@ -2669,7 +2669,7 @@
     {
       "id": "repository-automation",
       "state": "active",
-      "client": "skeleton/automation/free_model.py:FreeModelClient",
+      "client": "skeleton/ai/build/automation/free_model.py:FreeModelClient",
       "protocol": "OpenAI-compatible chat completions over configured HTTPS endpoint",
       "architecture_read_required": true,
       "construction_manual_read_required": true,
@@ -2758,7 +2758,7 @@
       "id": "repository-automation",
       "family": "automation_model",
       "role": "repository automation and maintenance model execution",
-      "owner": "skeleton/automation/free_model.py",
+      "owner": "skeleton/ai/build/automation/free_model.py",
       "credential_bearing": true,
       "receipt_required": true,
       "status": "canonical",
@@ -2775,7 +2775,7 @@
       "id": "shift-supervisor-model-gateway",
       "family": "automation_model",
       "role": "shift-supervisor planning JSON model execution within the governed repository-automation provider family",
-      "owner": "skeleton/automation/shift_supervisor/model_gateway.py",
+      "owner": "skeleton/ai/build/shift_supervisor/model_gateway.py",
       "credential_bearing": true,
       "receipt_required": true,
       "status": "canonical",
@@ -2792,7 +2792,7 @@
       "id": "repository-automation-chatgpt-adapter",
       "family": "automation_model",
       "role": "legacy advisory ChatGPT adapter for repository automation; explicitly separate from product runtime provider ownership",
-      "owner": "skeleton/automation/chatgpt_adapter.py",
+      "owner": "skeleton/ai/build/automation/chatgpt_adapter.py",
       "credential_bearing": true,
       "receipt_required": true,
       "status": "compatibility",
@@ -3571,7 +3571,7 @@
         "backend/routes/ai_reader.py",
         "backend/core/expressive_tts.py",
         "skeleton/jeeves/providers.py",
-        "skeleton/automation/free_model.py"
+        "skeleton/ai/build/automation/free_model.py"
       ],
       "objective": "One mandatory receipt semantics across every credential-bearing AI edge.",
       "steps": [

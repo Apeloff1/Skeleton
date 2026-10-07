@@ -41,6 +41,7 @@ from skeleton.ai.game_builder.contracts import (  # noqa: E402
     ArtifactIdentity,
     Candidate,
     Challenge,
+    EvaluatorProvenance,
     GateResult,
     ProducerProvenance,
     QUALITY_AXES,
@@ -154,12 +155,61 @@ def _challenge(challenger: Rival, target: Candidate, token: str, quality: float)
     )
 
 
-def _gates() -> tuple[GateResult, ...]:
-    return (
-        GateResult("rights", True, "rights-evidence-0000000000000000"),
-        GateResult("continuity", True, "canon-evidence-00000000000000000"),
-        GateResult("state", True, "state-evidence-000000000000000000"),
+def _evaluator_provenance(
+    evaluator_id: str,
+    *,
+    method_id: str,
+    evidence_refs: tuple[str, ...],
+) -> EvaluatorProvenance:
+    return EvaluatorProvenance(
+        evaluator_id=evaluator_id,
+        operation_id=f"operation:{evaluator_id}",
+        execution_id=f"execution:{evaluator_id}",
+        execution_identity_digest=canonical_digest({"execution": evaluator_id}),
+        finalization_intent_digest=canonical_digest({"finalization": evaluator_id}),
+        authority_kind="ai_execution",
+        authority_identity_digest=canonical_digest({"model": evaluator_id}),
+        method_id=method_id,
+        source_revision=canonical_digest({"source": evaluator_id})[:40],
+        provider_receipt_refs=(f"provider-receipt:{evaluator_id}",),
+        output_evidence_refs=evidence_refs,
     )
+
+
+def _adjudicator(
+    evaluator_id: str,
+) -> tuple[EvaluatorProvenance, str]:
+    evidence = f"authority-{evaluator_id}-0000000000000000"
+    return (
+        _evaluator_provenance(
+            evaluator_id,
+            method_id="promotion-adjudication",
+            evidence_refs=(evidence,),
+        ),
+        evidence,
+    )
+
+
+def _gates() -> tuple[GateResult, ...]:
+    rows = []
+    for gate_id, evidence in (
+        ("rights", "rights-evidence-0000000000000000"),
+        ("continuity", "canon-evidence-00000000000000000"),
+        ("state", "state-evidence-000000000000000000"),
+    ):
+        rows.append(
+            GateResult(
+                gate_id,
+                True,
+                evidence,
+                evaluator_provenance=_evaluator_provenance(
+                    f"gate-{gate_id}-judge",
+                    method_id="deterministic-gate",
+                    evidence_refs=(evidence,),
+                ),
+            )
+        )
+    return tuple(rows)
 
 
 def _panel(candidate: Candidate, value: float, *, spread: float = 0.0) -> tuple[EvaluationPanel, object]:
@@ -173,6 +223,11 @@ def _panel(candidate: Candidate, value: float, *, spread: float = 0.0) -> tuple[
         panel.submit(
             JudgeVerdict.create(
                 evaluator_id=evaluator,
+                evaluator_provenance=_evaluator_provenance(
+                    evaluator,
+                    method_id="simulator" if index < 2 else "human-calibrated",
+                    evidence_refs=(f"eval-{index}-0000000000000000000000000000",),
+                ),
                 candidate_digest=candidate.digest,
                 quality=_quality(score),
                 confidence=0.9,
@@ -204,6 +259,11 @@ def test_panel_requires_three_independent_judges_and_multiple_methods() -> None:
         panel.submit(
             JudgeVerdict.create(
                 evaluator_id=evaluator,
+                evaluator_provenance=_evaluator_provenance(
+                    evaluator,
+                    method_id="sim",
+                    evidence_refs=(f"{evaluator}-evidence-000000000000",),
+                ),
                 candidate_digest=candidate.digest,
                 quality=_quality(0.5),
                 confidence=0.9,
@@ -230,6 +290,11 @@ def test_panel_disagreement_forces_appeal() -> None:
         panel.submit(
             JudgeVerdict.create(
                 evaluator_id=evaluator,
+                evaluator_provenance=_evaluator_provenance(
+                    evaluator,
+                    method_id=method,
+                    evidence_refs=(f"{evaluator}-evidence-000000000000",),
+                ),
                 candidate_digest=candidate.digest,
                 quality=_quality(score),
                 confidence=0.9,
@@ -241,6 +306,85 @@ def test_panel_disagreement_forces_appeal() -> None:
     assert decision.eligible is False
     assert decision.requires_appeal is True
     assert set(decision.disagreement_axes) == set(QUALITY_AXES)
+
+
+def test_panel_decision_rehashes_policy_and_attributed_verdict_evidence() -> None:
+    candidate = _candidate(Rival.A.value, "panel-rehash", 0.5)
+    panel, decision = _panel(candidate, 0.6)
+    assert canonical_digest(decision.decision_payload()) == decision.decision_digest
+    assert len(decision.evidence_root) == 64
+    assert len(decision.verdict_digests) == 3
+    assert len(decision.evidence_binding_digests) == 3
+
+
+def test_panel_decision_rejects_digest_tampering() -> None:
+    candidate = _candidate(Rival.A.value, "panel-tamper", 0.5)
+    _, decision = _panel(candidate, 0.6)
+    with pytest.raises(ValueError, match="panel decision digest mismatch"):
+        type(decision)(
+            candidate_digest=decision.candidate_digest,
+            evaluator_ids=decision.evaluator_ids,
+            method_ids=decision.method_ids,
+            verdict_digests=decision.verdict_digests,
+            evidence_binding_digests=decision.evidence_binding_digests,
+            aggregate_quality=decision.aggregate_quality,
+            per_axis_spread=decision.per_axis_spread,
+            median_confidence=decision.median_confidence,
+            minimum_confidence=decision.minimum_confidence,
+            max_disagreement=decision.max_disagreement,
+            disagreement_axes=decision.disagreement_axes,
+            eligible=decision.eligible,
+            requires_appeal=decision.requires_appeal,
+            minimum_quorum=decision.minimum_quorum,
+            required_minimum_confidence=decision.required_minimum_confidence,
+            max_axis_disagreement_limit=decision.max_axis_disagreement_limit,
+            minimum_method_diversity=decision.minimum_method_diversity,
+            decision_digest="0" * 64,
+        )
+
+
+def test_direct_judge_verdict_construction_cannot_bypass_provenance() -> None:
+    candidate = _candidate(Rival.A.value, "direct-verdict", 0.5)
+    provenance = _evaluator_provenance(
+        "direct-judge",
+        method_id="sim",
+        evidence_refs=("direct-produced-evidence-0000000000000",),
+    )
+    with pytest.raises(
+        ValueError,
+        match="verdict evidence must be referenced by evaluator execution output",
+    ):
+        JudgeVerdict(
+            evaluator_id="direct-judge",
+            evaluator_provenance=provenance,
+            candidate_digest=candidate.digest,
+            quality=tuple((axis, 0.5) for axis in QUALITY_AXES),
+            confidence=0.9,
+            evidence_digest="direct-substituted-evidence-000000000",
+            method_id="sim",
+        )
+
+
+def test_judge_verdict_rejects_unattributed_evidence() -> None:
+    candidate = _candidate(Rival.A.value, "verdict-substitution", 0.5)
+    provenance = _evaluator_provenance(
+        "judge-substitution",
+        method_id="sim",
+        evidence_refs=("judge-produced-evidence-000000000000",),
+    )
+    with pytest.raises(
+        ValueError,
+        match="verdict evidence must be referenced by evaluator execution output",
+    ):
+        JudgeVerdict.create(
+            evaluator_id="judge-substitution",
+            evaluator_provenance=provenance,
+            candidate_digest=candidate.digest,
+            quality=_quality(0.5),
+            confidence=0.9,
+            evidence_digest="judge-substituted-evidence-000000000",
+            method_id="sim",
+        )
 
 
 def test_blind_candidate_tokens_are_stable_but_salt_scoped() -> None:
@@ -529,23 +673,33 @@ def _forge_release_binding(
         forge.reconcile(
             submitted=None,
             evaluator_id="release-binding-judge",
+            evaluator_provenance=_adjudicator("release-binding-judge")[0],
+            authority_evidence_digest=_adjudicator("release-binding-judge")[1],
             gate_results=_gates(),
         )
     return forge.release_binding()
 
 
 def _gold_bundle(*, failed_family: str | None = None) -> GoldMasterBundle:
-    families = [
-        FamilyQualification(
-            family_id=f"GB{i:02d}",
-            passed=f"GB{i:02d}" != failed_family,
-            evidence_digest=f"family-{i:02d}-" + "e" * 24,
-        )
-        for i in range(1, 51)
-    ]
     artifact_digest = "artifact-" + "a" * 32
     canon_digest = "canon-" + "c" * 32
     provenance_digest = "provenance-" + "d" * 32
+    families = []
+    for i in range(1, 51):
+        evidence = f"family-{i:02d}-" + "e" * 24
+        families.append(
+            FamilyQualification(
+                family_id=f"GB{i:02d}",
+                artifact_digest=artifact_digest,
+                passed=f"GB{i:02d}" != failed_family,
+                evidence_digest=evidence,
+                evaluator_provenance=_evaluator_provenance(
+                    f"family-{i:02d}-judge",
+                    method_id="family-qualification",
+                    evidence_refs=(evidence,),
+                ),
+            )
+        )
     return GoldMasterBundle.create(
         artifact_digest=artifact_digest,
         build_digest="build-" + "b" * 32,
@@ -561,9 +715,33 @@ def _gold_bundle(*, failed_family: str | None = None) -> GoldMasterBundle:
         ),
         family_qualifications=families,
         critical_gate_results={
-            "rights": (True, "rights-" + "2" * 32),
-            "security": (True, "security-" + "3" * 32),
-            "reproducibility": (True, "repro-" + "4" * 32),
+            "rights": (
+                True,
+                "rights-" + "2" * 32,
+                _evaluator_provenance(
+                    "release-rights-judge",
+                    method_id="release-critical-gate",
+                    evidence_refs=("rights-" + "2" * 32,),
+                ),
+            ),
+            "security": (
+                True,
+                "security-" + "3" * 32,
+                _evaluator_provenance(
+                    "release-security-judge",
+                    method_id="release-critical-gate",
+                    evidence_refs=("security-" + "3" * 32,),
+                ),
+            ),
+            "reproducibility": (
+                True,
+                "repro-" + "4" * 32,
+                _evaluator_provenance(
+                    "release-repro-judge",
+                    method_id="release-critical-gate",
+                    evidence_refs=("repro-" + "4" * 32,),
+                ),
+            ),
         },
     )
 
@@ -572,8 +750,14 @@ def test_gold_master_rejects_truthy_non_boolean_family_state() -> None:
     with pytest.raises(TypeError, match="family qualification passed state must be boolean"):
         FamilyQualification(
             family_id="GB01",
+            artifact_digest="artifact-" + "a" * 32,
             passed="false",
             evidence_digest="family-01-" + "e" * 24,
+            evaluator_provenance=_evaluator_provenance(
+                "family-01-judge",
+                method_id="family-qualification",
+                evidence_refs=("family-01-" + "e" * 24,),
+            ),
         )
 
 
@@ -583,8 +767,14 @@ def test_gold_master_rejects_truthy_non_boolean_critical_gate_state() -> None:
     with pytest.raises(TypeError, match="critical gate passed state must be boolean"):
         CriticalGateQualification(
             gate_id="rights",
+            artifact_digest="artifact-" + "a" * 32,
             passed="false",
             evidence_digest="rights-" + "2" * 32,
+            evaluator_provenance=_evaluator_provenance(
+                "release-rights-judge",
+                method_id="release-critical-gate",
+                evidence_refs=("rights-" + "2" * 32,),
+            ),
         )
 
 
@@ -597,6 +787,74 @@ def test_gold_master_rejects_truthy_non_boolean_tribunal_vote() -> None:
             accept="false",
             evidence_digest="gm-1-evidence-" + "a" * 24,
             rationale_digest="gm-1-rationale-" + "b" * 24,
+            authority_provenance=_evaluator_provenance(
+                "gm-1",
+                method_id="gold-master-tribunal",
+                evidence_refs=(
+                    "gm-1-evidence-" + "a" * 24,
+                    "gm-1-rationale-" + "b" * 24,
+                ),
+            ),
+        )
+
+
+def test_family_qualification_rejects_unattributed_evidence() -> None:
+    with pytest.raises(ValueError, match="referenced by evaluator authority"):
+        FamilyQualification(
+            family_id="GB01",
+            artifact_digest="artifact-" + "a" * 32,
+            passed=True,
+            evidence_digest="family-01-" + "e" * 24,
+            evaluator_provenance=_evaluator_provenance(
+                "family-01-judge",
+                method_id="family-qualification",
+                evidence_refs=("family-other-" + "x" * 24,),
+            ),
+        )
+
+
+def test_tribunal_vote_rejects_unattributed_rationale() -> None:
+    bundle = _gold_bundle()
+    evidence = "gm-1-evidence-" + "a" * 24
+    rationale = "gm-1-rationale-" + "b" * 24
+    with pytest.raises(ValueError, match="rationale must be referenced"):
+        TribunalVote(
+            authority_id="gm-1",
+            bundle_digest=bundle.digest,
+            accept=True,
+            evidence_digest=evidence,
+            rationale_digest=rationale,
+            authority_provenance=_evaluator_provenance(
+                "gm-1",
+                method_id="gold-master-tribunal",
+                evidence_refs=(evidence,),
+            ),
+        )
+
+
+def test_gold_master_rejects_family_qualification_from_other_artifact() -> None:
+    bundle = _gold_bundle()
+    families = list(bundle.family_qualifications)
+    first = families[0]
+    families[0] = FamilyQualification(
+        family_id=first.family_id,
+        artifact_digest="artifact-other-" + "9" * 32,
+        passed=first.passed,
+        evidence_digest=first.evidence_digest,
+        evaluator_provenance=first.evaluator_provenance,
+    )
+    with pytest.raises(ValueError, match="family qualification targets another artifact"):
+        type(bundle)(
+            artifact_digest=bundle.artifact_digest,
+            build_digest=bundle.build_digest,
+            canon_digest=bundle.canon_digest,
+            provenance_digest=bundle.provenance_digest,
+            replay_digest=bundle.replay_digest,
+            rollback_target_digest=bundle.rollback_target_digest,
+            red_team_digest=bundle.red_team_digest,
+            forge_binding=bundle.forge_binding,
+            family_qualifications=tuple(families),
+            critical_gate_qualifications=bundle.critical_gate_qualifications,
         )
 
 
@@ -617,13 +875,64 @@ def test_gold_master_requires_unanimous_independent_quorum() -> None:
                 accept=accept,
                 evidence_digest=f"{authority}-evidence-" + "a" * 24,
                 rationale_digest=f"{authority}-rationale-" + "b" * 24,
+                authority_provenance=_evaluator_provenance(
+                    authority,
+                    method_id="gold-master-tribunal",
+                    evidence_refs=(
+                        f"{authority}-evidence-" + "a" * 24,
+                        f"{authority}-rationale-" + "b" * 24,
+                    ),
+                ),
             )
         )
     verdict = tribunal.decide(bundle)
     assert verdict.accepted is False
     assert len(verdict.authority_ids) == 3
     assert len(verdict.vote_digests) == 3
+    assert canonical_digest(verdict.decision_payload()) == verdict.verdict_digest
 
+
+
+def test_gold_master_verdict_rejects_acceptance_tampering() -> None:
+    bundle = _gold_bundle()
+    tribunal = GoldMasterTribunal(("gm-1", "gm-2", "gm-3"))
+    for authority in ("gm-1", "gm-2", "gm-3"):
+        evidence = f"{authority}-evidence-" + "a" * 24
+        rationale = f"{authority}-rationale-" + "b" * 24
+        tribunal.vote(
+            TribunalVote(
+                authority_id=authority,
+                bundle_digest=bundle.digest,
+                accept=False if authority == "gm-3" else True,
+                evidence_digest=evidence,
+                rationale_digest=rationale,
+                authority_provenance=_evaluator_provenance(
+                    authority,
+                    method_id="gold-master-tribunal",
+                    evidence_refs=(evidence, rationale),
+                ),
+            )
+        )
+    verdict = tribunal.decide(bundle)
+    with pytest.raises(ValueError, match="acceptance does not match recorded votes"):
+        type(verdict)(
+            bundle_digest=verdict.bundle_digest,
+            accepted=True,
+            authority_ids=verdict.authority_ids,
+            vote_digests=verdict.vote_digests,
+            vote_acceptances=verdict.vote_acceptances,
+            quorum=verdict.quorum,
+            verdict_digest=canonical_digest(
+                {
+                    "accepted": True,
+                    "authority_ids": list(verdict.authority_ids),
+                    "bundle_digest": verdict.bundle_digest,
+                    "quorum": verdict.quorum,
+                    "vote_acceptances": list(verdict.vote_acceptances),
+                    "vote_digests": list(verdict.vote_digests),
+                }
+            ),
+        )
 
 
 def test_forge_release_binding_rejects_incomplete_forge() -> None:
@@ -654,6 +963,8 @@ def test_completed_forge_release_binding_matches_terminal_champion() -> None:
         forge.reconcile(
             submitted=None,
             evaluator_id="independent-release-judge",
+            evaluator_provenance=_adjudicator("independent-release-judge")[0],
+            authority_evidence_digest=_adjudicator("independent-release-judge")[1],
             gate_results=_gates(),
         )
 
@@ -701,14 +1012,23 @@ def test_gold_master_rejects_artifact_substitution_after_forge() -> None:
         canon_digest="canon-" + "c" * 32,
         provenance_digest="provenance-" + "d" * 32,
     )
-    families = [
-        FamilyQualification(
-            family_id=f"GB{i:02d}",
-            passed=True,
-            evidence_digest=f"family-{i:02d}-" + "e" * 24,
+    artifact_digest = binding.champion_artifact_digest
+    families = []
+    for i in range(1, 51):
+        evidence = f"family-{i:02d}-" + "e" * 24
+        families.append(
+            FamilyQualification(
+                family_id=f"GB{i:02d}",
+                artifact_digest=artifact_digest,
+                passed=True,
+                evidence_digest=evidence,
+                evaluator_provenance=_evaluator_provenance(
+                    f"family-{i:02d}-judge",
+                    method_id="family-qualification",
+                    evidence_refs=(evidence,),
+                ),
+            )
         )
-        for i in range(1, 51)
-    ]
     with pytest.raises(ValueError, match="artifact must match forge champion artifact"):
         GoldMasterBundle.create(
             artifact_digest="artifact-substitute-" + "9" * 32,
@@ -721,7 +1041,15 @@ def test_gold_master_rejects_artifact_substitution_after_forge() -> None:
             forge_binding=binding,
             family_qualifications=families,
             critical_gate_results={
-                "rights": (True, "rights-" + "2" * 32),
+                "rights": (
+                    True,
+                    "rights-" + "2" * 32,
+                    _evaluator_provenance(
+                        "release-rights-judge",
+                        method_id="release-critical-gate",
+                        evidence_refs=("rights-" + "2" * 32,),
+                    ),
+                ),
             },
         )
 
@@ -775,17 +1103,25 @@ def test_release_reconstruction_rejects_rehashed_checkpoint_without_external_mat
 
 
 def test_gold_master_failed_critical_gate_blocks_release() -> None:
-    families = [
-        FamilyQualification(
-            family_id=f"GB{i:02d}",
-            passed=True,
-            evidence_digest=f"family-{i:02d}-" + "e" * 24,
-        )
-        for i in range(1, 51)
-    ]
     artifact_digest = "artifact-" + "a" * 32
     canon_digest = "canon-" + "c" * 32
     provenance_digest = "provenance-" + "d" * 32
+    families = []
+    for i in range(1, 51):
+        evidence = f"family-{i:02d}-" + "e" * 24
+        families.append(
+            FamilyQualification(
+                family_id=f"GB{i:02d}",
+                artifact_digest=artifact_digest,
+                passed=True,
+                evidence_digest=evidence,
+                evaluator_provenance=_evaluator_provenance(
+                    f"family-{i:02d}-judge",
+                    method_id="family-qualification",
+                    evidence_refs=(evidence,),
+                ),
+            )
+        )
     bundle = GoldMasterBundle.create(
         artifact_digest=artifact_digest,
         build_digest="build-" + "b" * 32,
@@ -801,8 +1137,24 @@ def test_gold_master_failed_critical_gate_blocks_release() -> None:
         ),
         family_qualifications=families,
         critical_gate_results={
-            "rights": (False, "rights-" + "2" * 32),
-            "security": (True, "security-" + "3" * 32),
+            "rights": (
+                False,
+                "rights-" + "2" * 32,
+                _evaluator_provenance(
+                    "release-rights-judge",
+                    method_id="release-critical-gate",
+                    evidence_refs=("rights-" + "2" * 32,),
+                ),
+            ),
+            "security": (
+                True,
+                "security-" + "3" * 32,
+                _evaluator_provenance(
+                    "release-security-judge",
+                    method_id="release-critical-gate",
+                    evidence_refs=("security-" + "3" * 32,),
+                ),
+            ),
         },
     )
     tribunal = GoldMasterTribunal(("gm-1", "gm-2", "gm-3"))
