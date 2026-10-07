@@ -146,6 +146,7 @@ class SupervisedTextExample:
     prompt_token_count: int
     prompt_digest: str
     response_digest: str
+    temporal_signal_digest: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.example_id, str) or not self.example_id or self.example_id != self.example_id.strip():
@@ -160,6 +161,8 @@ class SupervisedTextExample:
             value = getattr(self, name)
             if not isinstance(value, str) or len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value):
                 raise TokenizerContractError(f"invalid {name}")
+        if self.temporal_signal_digest is not None and (not isinstance(self.temporal_signal_digest, str) or len(self.temporal_signal_digest) != 64 or any(ch not in "0123456789abcdef" for ch in self.temporal_signal_digest)):
+            raise TokenizerContractError("invalid temporal signal digest")
 
     @property
     def digest(self) -> str:
@@ -170,6 +173,7 @@ class SupervisedTextExample:
             "prompt_digest": self.prompt_digest,
             "response_digest": self.response_digest,
             "pipeline_digest": self.prepared.pipeline_digest,
+            "temporal_signal_digest": self.temporal_signal_digest,
         })
 
 
@@ -622,7 +626,7 @@ class TextTokenPipeline:
     def temporal_signal(self, *, source_year: int, observed_year: int, knowledge_cutoff_year: int, valid_from_year: int | None = None, valid_to_year: int | None = None) -> TemporalTrainingSignal:
         return TemporalTrainingSignal(source_year, observed_year, knowledge_cutoff_year, valid_from_year, valid_to_year)
 
-    def prepare_supervised_example(self, example_id: str, prompt: str, response: str) -> SupervisedTextExample:
+    def prepare_supervised_example(self, example_id: str, prompt: str, response: str, *, temporal_signal: TemporalTrainingSignal | None = None) -> SupervisedTextExample:
         if not isinstance(prompt, str) or not isinstance(response, str) or not prompt or not response:
             raise TokenizerContractError("supervised prompt and response required")
         normalized_prompt = self.normalize(prompt)
@@ -638,6 +642,7 @@ class TextTokenPipeline:
             prompt_count,
             sha256(normalized_prompt.encode("utf-8")).hexdigest(),
             sha256(normalized_response.encode("utf-8")).hexdigest(),
+            temporal_signal.digest if temporal_signal is not None else None,
         )
 
     def supervised_training_batches(self, example: SupervisedTextExample, *, pad_token_id: int | None = None, ignore_index: int = -100) -> tuple[CausalTrainingBatch, ...]:
