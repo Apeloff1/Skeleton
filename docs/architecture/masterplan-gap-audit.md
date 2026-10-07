@@ -1436,3 +1436,20 @@ Live-source audit closed additional integration drift:
 Scope note: retrieval duplicate protection is currently process/session-local. Durable cross-process retrieval idempotency still requires a canonical persisted ingestion-key contract in the downstream provenance/index layer and is not overstated as complete.
 
 SIGNED status remains withheld pending observed execution of scripts/check_ai_webcrawler.py at exact head and resolution of any failures it exposes.
+
+
+### 2026-10-07 durable ingestion idempotency tranche
+
+Cross-process retrieval admission is now durable and fenced:
+- crawler schema advanced to v4 with persistent ingestion receipts;
+- ingestion keys have reserved/complete state, owner, opaque fencing token, lease expiry and replayable receipt payload;
+- a live reservation excludes competing workers;
+- expired reservations may be taken over while stale completion is rejected;
+- explicit abandon makes downstream failures immediately retryable;
+- completed receipts survive process/store restart;
+- CanonicalRetrievalBridge can use the durable registry and replays completed receipts without another index/provenance mutation;
+- focused regressions cover restart replay, competing reservation, stale fencing, abandonment, bridge restart dedupe and downstream-failure retry.
+
+Correctness boundary: this provides durable exactly-once admission and replay. It cannot make mutations to an unrelated downstream index/provenance store transactionally atomic with SQLite. A crash after downstream mutation but before receipt commit can still require downstream idempotent writes or a shared transactional/outbox contract. This boundary remains explicit and is not mislabeled as globally atomic exactly-once delivery.
+
+SIGNED status remains withheld pending observable exact-head verification execution.
