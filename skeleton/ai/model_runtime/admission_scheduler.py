@@ -289,16 +289,20 @@ class RuntimeAdmissionScheduler:
                     "enqueue_sequence": item.enqueue_sequence,
                     "pinned_kv": item.pinned_kv,
                 }
-        body["digest"] = _digest(body)
-        return body
                 for item in sorted(self._active.values(), key=lambda x: x.request.request_id)
             ],
             "kv": [
-                {"request_id": e.request_id, "bytes": e.bytes,
-                 "last_used_sequence": e.last_used_sequence, "pinned": e.pinned}
-                for e in sorted(self._kv.values(), key=lambda x: x.request_id)
+                {
+                    "request_id": entry.request_id,
+                    "bytes": entry.bytes,
+                    "last_used_sequence": entry.last_used_sequence,
+                    "pinned": entry.pinned,
+                }
+                for entry in sorted(self._kv.values(), key=lambda x: x.request_id)
             ],
         }
+        body["digest"] = _digest(body)
+        return body
 
 
 __all__ = [
