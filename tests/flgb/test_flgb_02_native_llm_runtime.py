@@ -240,6 +240,22 @@ class TestNativeLLMRuntime(unittest.TestCase):
                 GenerationConfig(max_new_tokens=1),
             )
 
+    def test_failed_model_readmission_does_not_partially_commit_identity(self):
+        runtime = self.runtime()
+        original_digest = runtime.model_digest
+        original_tokenizer = runtime.tokenizer
+        runtime.model.bout[0] += 0.5
+
+        class BrokenBPE:
+            pass
+
+        runtime.model.bpe = BrokenBPE()
+        with self.assertRaises(RuntimeContractError):
+            runtime.refresh_model_identity()
+
+        self.assertEqual(runtime.model_digest, original_digest)
+        self.assertIs(runtime.tokenizer, original_tokenizer)
+
     def test_context_total_model_and_kv_budgets_fail_closed(self):
         runtime = NativeLLMRuntime(
             self.model(ctx=4),
