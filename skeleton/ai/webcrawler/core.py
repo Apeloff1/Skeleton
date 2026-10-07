@@ -74,6 +74,10 @@ class CrawlPolicy:
     retry_base_seconds: float = 2.0
     max_retry_delay_seconds: float = 300.0
     max_links_per_document: int = 500
+    max_url_length: int = 4096
+    max_query_pairs: int = 32
+    max_path_segments: int = 64
+    robots_ttl_seconds: float = 86_400.0
     retry_statuses: tuple[int, ...] = (408, 425, 429, 500, 502, 503, 504)
     allowed_content_types: tuple[str, ...] = (
         "text/html", "text/plain", "application/xhtml+xml",
@@ -84,6 +88,12 @@ class CrawlPolicy:
         try:
             p = urlsplit(canonicalize_url(url))
         except (ValueError, UnicodeError):
+            return False
+        if len(url) > self.max_url_length:
+            return False
+        if len(parse_qsl(p.query, keep_blank_values=True)) > self.max_query_pairs:
+            return False
+        if len([x for x in p.path.split("/") if x]) > self.max_path_segments:
             return False
         if not destination_allowed(p.hostname or ""):
             return False
@@ -307,16 +317,32 @@ class RobotsCache:
     def __init__(self, user_agent: str) -> None:
         self.user_agent = user_agent
         self._parsers: dict[str, RobotFileParser] = {}
+        self._meta: dict[str, dict[str, object]] = {}
 
-    def install(self, origin: str, robots_text: str) -> None:
+    def install(self, origin: str, robots_text: str, *, fetched_at: float = 0.0, etag: str | None = None, last_modified: str | None = None) -> None:
         parser = RobotFileParser()
         parser.set_url(origin.rstrip("/") + "/robots.txt")
         parser.parse(robots_text.splitlines())
         self._parsers[origin] = parser
+        self._meta[origin] = {"fetched_at": fetched_at, "etag": etag, "last_modified": last_modified}
 
     def known(self, url: str) -> bool:
         p = urlsplit(url)
         return f"{p.scheme}://{p.netloc}" in self._parsers
+
+    def fresh(self, url: str, *, now: float, ttl: float) -> bool:
+        p=urlsplit(url);meta=self._meta.get(f"{p.scheme}://{p.netloc}")
+        return bool(meta and now-float(meta["fetched_at"]) < ttl)
+
+    def validators(self, url: str) -> dict[str, str]:
+        p=urlsplit(url);meta=self._meta.get(f"{p.scheme}://{p.netloc}") or {};out={}
+        if meta.get("etag"):out["If-None-Match"]=str(meta["etag"])
+        if meta.get("last_modified"):out["If-Modified-Since"]=str(meta["last_modified"])
+        return out
+
+    def touch(self,url: str, *, fetched_at: float) -> None:
+        p=urlsplit(url);origin=f"{p.scheme}://{p.netloc}"
+        if origin in self._meta:self._meta[origin]["fetched_at"]=fetched_at
 
     def allowed(self, url: str) -> bool:
         p = urlsplit(url)
@@ -419,30 +445,34 @@ class CrawlEngine:
             except (ValueError,TypeError,OverflowError):
                 return None
 
-    def load_robots(self, url: str) -> bool:
+    def load_robots(self, url: str, *, now: float | None = None) -> bool:
         """Load an origin's robots policy once, charging the crawl budget."""
         p = urlsplit(url)
         origin = f"{p.scheme}://{p.netloc}"
-        if self.robots.known(url):
+        at=time.time() if now is None else now
+        if self.robots.known(url) and self.robots.fresh(url,now=at,ttl=self.policy.robots_ttl_seconds):
             return True
         if not self.budget.can_request():
             return False
         robots_url = origin + "/robots.txt"
         try:
             from .redirects import fetch_robots_with_policy
-            response = fetch_robots_with_policy(self, robots_url, now=time.time())
+            response = fetch_robots_with_policy(self, robots_url, now=at, extra_headers=self.robots.validators(url))
         except Exception:
             return False
         body = response.body[:512_000]
+        if response.status == 304 and self.robots.known(url):
+            self.robots.touch(url,fetched_at=at)
+            return True
         if response.status in {404, 410}:
-            self.robots.install(origin, "")
+            self.robots.install(origin, "",fetched_at=at,etag=response.headers.get("etag"),last_modified=response.headers.get("last-modified"))
             return True
         if response.status != 200:
             return False
         ctype = response.headers.get("content-type", "text/plain").split(";", 1)[0].lower()
         if ctype not in {"text/plain", "text/html"}:
             return False
-        self.robots.install(origin, body.decode("utf-8", errors="replace"))
+        self.robots.install(origin, body.decode("utf-8", errors="replace"),fetched_at=at,etag=response.headers.get("etag"),last_modified=response.headers.get("last-modified"))
         return True
 
     def step(self, *, now: float | None = None) -> CrawlDocument | None:
@@ -455,7 +485,7 @@ class CrawlEngine:
         if item.url in self._seen:
             return None
         self._seen.add(item.url)
-        if not self.robots.known(item.url) and not self.load_robots(item.url):
+        if not self.robots.known(item.url) and not self.load_robots(item.url, now=now):
             self._seen.discard(item.url)
             if self.budget.can_request(): self._retry(item, now=now)
             return None

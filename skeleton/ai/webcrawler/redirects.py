@@ -11,7 +11,7 @@ def fetch_with_policy(engine,url,*,now):
         if current in seen:raise RedirectPolicyError("redirect loop")
         seen.add(current)
         if not engine.policy.admits(current):raise RedirectPolicyError("redirect destination rejected by crawl policy")
-        if not engine.robots.known(current) and not engine.load_robots(current):
+        if not engine.robots.known(current) and not engine.load_robots(current,now=now):
             raise RedirectPolicyError("redirect destination robots unavailable")
         if not engine.budget.can_request():raise RedirectPolicyError("crawl request budget exhausted")
         if not engine.robots.allowed(current):raise RedirectPolicyError("redirect destination denied by robots")
@@ -35,7 +35,7 @@ def fetch_with_policy(engine,url,*,now):
         current=canonicalize_url(urljoin(current,location))
     raise RedirectPolicyError("redirect limit exceeded")
 
-def fetch_robots_with_policy(engine,url,*,now):
+def fetch_robots_with_policy(engine,url,*,now,extra_headers=None):
     """Fetch robots without recursively requiring robots authorization."""
     current=canonicalize_url(url);seen=set();limit=min(engine.policy.max_response_bytes,512_000)
     for hop in range(engine.policy.max_redirects+1):
@@ -48,7 +48,7 @@ def fetch_robots_with_policy(engine,url,*,now):
         engine._host_ready[host]=now+engine.policy.min_host_delay_seconds
         fetch_once=getattr(engine.fetcher,"fetch_once",None)
         try:
-            response=(fetch_once(current,user_agent=engine.policy.user_agent,max_bytes=limit)
+            response=(fetch_once(current,user_agent=engine.policy.user_agent,max_bytes=limit,extra_headers=extra_headers)
                       if fetch_once else engine.fetcher.fetch(current,user_agent=engine.policy.user_agent,max_bytes=limit))
         except Exception as exc:
             engine.budget.requests+=1

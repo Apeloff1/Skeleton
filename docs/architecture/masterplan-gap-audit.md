@@ -1542,3 +1542,29 @@ Crawler-controlled redirects now enforce accounting and pacing per actual networ
 - regressions cover two-hop accounting, destination pacing and deterministic HTTP-date retry delay.
 
 Further audit note: robots retrieval itself still uses fetcher.fetch rather than crawler-controlled fetch_once traversal, so robots redirect accounting/policy should be reviewed separately before final signing.
+
+
+### 2026-10-07 robots redirect unification tranche
+
+Robots policy retrieval now shares crawler-controlled redirect safety instead of delegating redirect traversal to transport.fetch:
+- robots redirect hops enforce crawl destination admission, redirect loop/limit controls, per-hop request/byte budget and host-ready pacing;
+- robots authorization is intentionally not recursively required while obtaining robots.txt;
+- the policy is still installed against the original requested origin after a permitted redirect response;
+- scheduler time is threaded through load_robots and redirect-triggered robots bootstrap, preserving deterministic replay when step(now=...) is used;
+- transport failures are charged as attempted requests while policy/pacing rejection creates no phantom request;
+- regressions cover redirected robots accounting, original-origin policy installation and destination-host pacing.
+
+This closes the previously documented robots redirect inconsistency. Further adversarial work should inspect robots cache freshness/revalidation and canonical URL input bounds before final signing.
+
+
+### 2026-10-07 advanced admission and robots freshness tranche
+
+Crawler admission and robots policy handling now include operational bounds and cache revalidation:
+- CrawlPolicy bounds canonical URL length, query-pair cardinality and path-segment depth before frontier admission;
+- robots cache state records fetched_at, ETag and Last-Modified validators with deterministic TTL freshness checks;
+- stale robots policies are conditionally revalidated through crawler-controlled redirect traversal;
+- 304 refreshes policy freshness without reparsing while 200/404/410 replace cached policy metadata appropriately;
+- conditional headers flow through the DNS/socket-bound transport; connection-critical header overrides are rejected;
+- regressions cover pathological URL dimensions, fresh-cache reuse, stale ETag revalidation and 304 freshness renewal.
+
+Advanced follow-up: integrate TrapGuard directly into CrawlEngine admission, validate CrawlPolicy numeric configuration at construction, and persist robots metadata across crawler checkpoints so restart does not force unconditional robots refetch.
