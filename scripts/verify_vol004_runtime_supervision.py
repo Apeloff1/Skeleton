@@ -362,8 +362,19 @@ def _verify_masterplan(master: dict[str, Any], errors: list[str]) -> dict[str, A
         return {}
     if volume.get("title") != "Kernel & Execution Foundation":
         errors.append("VOL-004 title drifted")
+    if volume.get("scope") != "canonical-plan":
+        errors.append("VOL-004 scope drifted")
     if volume.get("implementation_status") not in {"implemented", "hardened", "verified"}:
         errors.append("VOL-004 implementation status below implemented")
+
+    requirements = tuple(str(item) for item in volume.get("requirements") or [])
+    for phrase in (
+        "deterministic dependency order",
+        "cancellation, deadline, budget and operation identity",
+        "Prevent orphan work and unbounded background execution",
+    ):
+        if not any(phrase in requirement for requirement in requirements):
+            errors.append(f"VOL-004 requirement invariant lost: {phrase}")
 
     paths = set(volume.get("implementation_paths") or [])
     tests = set(volume.get("tests") or [])
