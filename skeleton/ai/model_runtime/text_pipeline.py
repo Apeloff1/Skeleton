@@ -87,6 +87,7 @@ class ModelInputBatch:
     """Rectangular model-ready token ids with explicit attention semantics."""
     input_ids: tuple[tuple[int, ...], ...]
     attention_mask: tuple[tuple[int, ...], ...]
+    position_ids: tuple[tuple[int, ...], ...]
     source_window_digests: tuple[str, ...]
     pad_token_id: int
 
@@ -98,13 +99,22 @@ class ModelInputBatch:
             raise TokenizerContractError("ragged model input ids")
         if len(self.attention_mask) != len(self.input_ids) or any(len(row) != width for row in self.attention_mask):
             raise TokenizerContractError("attention mask shape mismatch")
+        if len(self.position_ids) != len(self.input_ids) or any(len(row) != width for row in self.position_ids):
+            raise TokenizerContractError("position ids shape mismatch")
         if len(self.source_window_digests) != len(self.input_ids):
             raise TokenizerContractError("model batch provenance mismatch")
         if any(bit not in (0, 1) for row in self.attention_mask for bit in row):
             raise TokenizerContractError("invalid attention mask")
-        for ids, mask in zip(self.input_ids, self.attention_mask):
+        for ids, mask, positions in zip(self.input_ids, self.attention_mask, self.position_ids):
             seen_padding = False
-            for token_id, bit in zip(ids, mask):
+            expected_position = 0
+            for token_id, bit, position in zip(ids, mask, positions):
+                if isinstance(position, bool) or not isinstance(position, int) or position < 0:
+                    raise TokenizerContractError("invalid position id")
+                if position != (expected_position if bit else 0):
+                    raise TokenizerContractError("position ids do not match attention mask")
+                if bit:
+                    expected_position += 1
                 if bit == 0:
                     seen_padding = True
                     if token_id != self.pad_token_id:
@@ -114,7 +124,7 @@ class ModelInputBatch:
 
     @property
     def digest(self) -> str:
-        return digest_json({"input_ids": [list(row) for row in self.input_ids], "attention_mask": [list(row) for row in self.attention_mask], "source_window_digests": list(self.source_window_digests), "pad_token_id": self.pad_token_id})
+        return digest_json({"input_ids": [list(row) for row in self.input_ids], "attention_mask": [list(row) for row in self.attention_mask], "position_ids": [list(row) for row in self.position_ids], "source_window_digests": list(self.source_window_digests), "pad_token_id": self.pad_token_id})
 
 
 def materialize_model_batch(windows: Sequence[TokenWindow], *, pad_token_id: int) -> ModelInputBatch:
@@ -126,13 +136,14 @@ def materialize_model_batch(windows: Sequence[TokenWindow], *, pad_token_id: int
     if any(not isinstance(window, TokenWindow) for window in items):
         raise TokenizerContractError("TokenWindow required")
     width = max(len(window.token_ids) for window in items)
-    rows, masks, digests = [], [], []
+    rows, masks, positions, digests = [], [], [], []
     for window in items:
         padding = width - len(window.token_ids)
         rows.append(tuple(window.token_ids) + (pad_token_id,) * padding)
         masks.append((1,) * len(window.token_ids) + (0,) * padding)
+        positions.append(tuple(range(len(window.token_ids))) + (0,) * padding)
         digests.append(window.digest)
-    return ModelInputBatch(tuple(rows), tuple(masks), tuple(digests), pad_token_id)
+    return ModelInputBatch(tuple(rows), tuple(masks), tuple(positions), tuple(digests), pad_token_id)
 
 
 @dataclass(frozen=True)
