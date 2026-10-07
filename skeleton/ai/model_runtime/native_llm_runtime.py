@@ -511,23 +511,89 @@ class NativeLLMRuntime:
             raise RuntimeContractError("KV payload exceeds runtime memory budget")
         return report
 
+    @staticmethod
+    def _matrix_shape(matrix: Any, rows: int, cols: int) -> bool:
+        return (
+            isinstance(matrix, list)
+            and len(matrix) == rows
+            and all(
+                isinstance(row, list)
+                and len(row) == cols
+                and all(
+                    not isinstance(value, bool)
+                    and isinstance(value, (int, float))
+                    and math.isfinite(float(value))
+                    for value in row
+                )
+                for row in matrix
+            )
+        )
+
+    @staticmethod
+    def _vector_shape(vector: Any, size: int) -> bool:
+        return (
+            isinstance(vector, list)
+            and len(vector) == size
+            and all(
+                not isinstance(value, bool)
+                and isinstance(value, (int, float))
+                and math.isfinite(float(value))
+                for value in vector
+            )
+        )
+
     def _validate_runtime_model(self) -> None:
         if self.model.ctx < 2 or self.model.dim < 1 or self.model.n_layers < 1:
             raise RuntimeContractError("invalid model geometry")
-        if len(self.model.itos) != len(self.model.E) or len(self.model.itos) != len(self.model.Wout):
+        if self.model.n_layers != len(self.model.layers):
+            raise RuntimeContractError("model layer count mismatch")
+        if len(self.model.itos) != len(set(self.model.itos)):
+            raise RuntimeContractError("model vocabulary contains duplicates")
+        vocab = len(self.model.itos)
+        dim = self.model.dim
+        if vocab != len(self.model.E) or vocab != len(self.model.Wout):
             raise RuntimeContractError("vocabulary/embedding/unembedding size mismatch")
         if len(self.model.P) < self.model.ctx:
             raise RuntimeContractError("positional table shorter than model context")
-        if any(len(row) != self.model.dim for row in self.model.E):
-            raise RuntimeContractError("token embedding dimension mismatch")
-        if any(len(row) != self.model.dim for row in self.model.P[: self.model.ctx]):
-            raise RuntimeContractError("positional embedding dimension mismatch")
-        if any(len(row) != self.model.dim for row in self.model.Wout):
-            raise RuntimeContractError("unembedding dimension mismatch")
-        if len(self.model.bout) != len(self.model.itos):
-            raise RuntimeContractError("unembedding bias size mismatch")
-        if self.model.dim % self.model.n_heads:
-            raise RuntimeContractError("attention head dimension mismatch")
+        if not self._matrix_shape(self.model.E, vocab, dim):
+            raise RuntimeContractError("token embedding geometry mismatch")
+        if not self._matrix_shape(self.model.P[: self.model.ctx], self.model.ctx, dim):
+            raise RuntimeContractError("positional embedding geometry mismatch")
+        if not self._matrix_shape(self.model.Wout, vocab, dim):
+            raise RuntimeContractError("unembedding geometry mismatch")
+        if not self._vector_shape(self.model.bout, vocab):
+            raise RuntimeContractError("unembedding bias geometry mismatch")
+        if self.model.n_heads < 1 or dim % self.model.n_heads:
+            raise RuntimeContractError("attention head geometry mismatch")
+
+        for index, layer in enumerate(self.model.layers):
+            if layer.dim != dim:
+                raise RuntimeContractError(f"layer {index} dimension mismatch")
+            for name in ("Wq", "Wk", "Wv", "Wo"):
+                if not self._matrix_shape(getattr(layer, name), dim, dim):
+                    raise RuntimeContractError(f"layer {index} {name} geometry mismatch")
+            for name in ("ln1_g", "ln1_b", "ln2_g", "ln2_b"):
+                if not self._vector_shape(getattr(layer, name), dim):
+                    raise RuntimeContractError(f"layer {index} {name} geometry mismatch")
+            ff = layer.d_ff
+            if ff != self.model.d_ff:
+                raise RuntimeContractError(f"layer {index} feed-forward width mismatch")
+            if ff:
+                if not self._matrix_shape(layer.W1, ff, dim):
+                    raise RuntimeContractError(f"layer {index} W1 geometry mismatch")
+                if not self._matrix_shape(layer.Wu, ff, dim):
+                    raise RuntimeContractError(f"layer {index} Wu geometry mismatch")
+                if not self._matrix_shape(layer.W2, dim, ff):
+                    raise RuntimeContractError(f"layer {index} W2 geometry mismatch")
+                if not self._vector_shape(layer.b1, ff):
+                    raise RuntimeContractError(f"layer {index} b1 geometry mismatch")
+                if not self._vector_shape(layer.bu, ff):
+                    raise RuntimeContractError(f"layer {index} bu geometry mismatch")
+                if not self._vector_shape(layer.b2, dim):
+                    raise RuntimeContractError(f"layer {index} b2 geometry mismatch")
+            elif any((layer.W1, layer.Wu, layer.W2, layer.b1, layer.bu, layer.b2)):
+                raise RuntimeContractError(f"layer {index} unexpected feed-forward state")
+
         self._count_numeric_payload(self._semantic_model_snapshot())
 
     def bind_device(self, device: str, *, allow_fallback: bool = True) -> Mapping[str, Any]:
