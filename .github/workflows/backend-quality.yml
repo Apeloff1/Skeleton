@@ -256,6 +256,7 @@ jobs:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: >-
           PYTHONPATH=.:backend python -m pytest -q --noconftest --rootdir=. --import-mode=importlib
+          tests/test_architecture_boundaries.py
           backend/tests/test_ai_provider_reliability.py
           backend/tests/test_auth_security.py
           backend/tests/test_process_safety_gate.py
