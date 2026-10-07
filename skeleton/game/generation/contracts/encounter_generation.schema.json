@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-14:encounter_generation:v1",
+  "title": "FLGB-14 encounter generation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "encounter_id",
+    "cost",
+    "difficulty_ppm",
+    "canon_digest"
+  ],
+  "properties": {
+    "encounter_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "cost": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "difficulty_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "canon_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
