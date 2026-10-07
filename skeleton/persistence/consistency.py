@@ -86,7 +86,7 @@ class ConsistencyProfile:
     write_guarantee: WriteGuarantee
     stale_policy: str
     unknown_policy: str
-    source_domain_ids: tuple[str, ...] = ()
+    source_refs: tuple[str, ...] = ()
     max_staleness_ms: int | None = None
     schema_version: int = 1
 
@@ -117,8 +117,14 @@ class ConsistencyProfile:
             raise ConsistencyError("unsupported stale_policy")
         if self.unknown_policy != "reject":
             raise ConsistencyError("unknown_policy must fail closed")
-        sources = tuple(sorted({_id(item, "source_domain_id") for item in self.source_domain_ids}))
-        object.__setattr__(self, "source_domain_ids", sources)
+        sources: list[str] = []
+        for item in self.source_refs:
+            if not isinstance(item, str) or not item.strip() or len(item) > 512:
+                raise ConsistencyError("source_ref must be a bounded non-empty string")
+            if item != item.strip():
+                raise ConsistencyError("source_ref must be normalized")
+            sources.append(item)
+        object.__setattr__(self, "source_refs", tuple(sorted(set(sources))))
         if self.max_staleness_ms is not None:
             object.__setattr__(
                 self,
@@ -144,7 +150,7 @@ class ConsistencyProfile:
         if self.authority in {"derived", "durable-projection"}:
             if self.source_of_truth:
                 raise ConsistencyError("projection profile cannot be source_of_truth")
-            if not self.source_domain_ids:
+            if not self.source_refs:
                 raise ConsistencyError("projection profile requires source domains")
             if self.read_guarantee is not ReadGuarantee.EVENTUAL_PROJECTION:
                 raise ConsistencyError("projection profile requires eventual reads")
@@ -174,7 +180,7 @@ class ConsistencyProfile:
             "write_guarantee": self.write_guarantee.value,
             "stale_policy": self.stale_policy,
             "unknown_policy": self.unknown_policy,
-            "source_domain_ids": list(self.source_domain_ids),
+            "source_refs": list(self.source_refs),
             "max_staleness_ms": self.max_staleness_ms,
         }
 
@@ -193,7 +199,7 @@ class ConsistencyProfile:
             write_guarantee=value["write_guarantee"],
             stale_policy=value["stale_policy"],
             unknown_policy=value["unknown_policy"],
-            source_domain_ids=tuple(value.get("source_domain_ids", ())),
+            source_refs=tuple(value.get("source_refs", ())),
             max_staleness_ms=value.get("max_staleness_ms"),
             schema_version=value.get("schema_version", 1),
         )
