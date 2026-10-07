@@ -212,6 +212,11 @@ class NativeModelService:
         runtime events. A transformer kernel invocation remains one bounded
         atomic step; this service does not attempt unsafe thread interruption.
         """
+        if not isinstance(request, LocalModelRequest):
+            raise NativeServiceError("LocalModelRequest required")
+        start_ns = self._now_ns()
+        deadline_ns = start_ns + request.deadline_ms * 1_000_000
+
         self._validate_request(request, prompt, config)
         token = cancellation or CancellationToken()
         if not isinstance(token, CancellationToken):
@@ -226,8 +231,6 @@ class NativeModelService:
                 events=events,
             )
 
-        start_ns = self._now_ns()
-        deadline_ns = start_ns + request.deadline_ms * 1_000_000
         if self._now_ns() >= deadline_ns:
             return self._terminal(
                 request,
