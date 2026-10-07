@@ -42,11 +42,16 @@ from skeleton.ai.game_builder.contracts import (  # noqa: E402
     Candidate,
     Challenge,
     GateResult,
+    ProducerProvenance,
     QUALITY_AXES,
     Rival,
+    canonical_digest,
 )
 from skeleton.ai.game_builder.control_plane import ForgeControlPlane  # noqa: E402
-from skeleton.ai.game_builder.dual_rival_forge import DualRivalForge  # noqa: E402
+from skeleton.ai.game_builder.dual_rival_forge import (  # noqa: E402
+    DualRivalForge,
+    ForgeStateError,
+)
 from skeleton.ai.game_builder.evaluation import (  # noqa: E402
     EvaluationError,
     EvaluationPanel,
@@ -77,6 +82,7 @@ from skeleton.ai.game_builder.resilience import (  # noqa: E402
 )
 from skeleton.ai.game_builder.release import (  # noqa: E402
     FamilyQualification,
+    ForgeReleaseBinding,
     GoldMasterBundle,
     GoldMasterTribunal,
     ReleaseArbitrationError,
@@ -88,10 +94,31 @@ def _quality(value: float) -> dict[str, float]:
     return {axis: value for axis in QUALITY_AXES}
 
 
+def _producer_provenance(
+    token: str,
+    *,
+    project_id: str = "project:test-game",
+    run_id: str = "run:test-forge",
+) -> ProducerProvenance:
+    return ProducerProvenance(
+        project_id=project_id,
+        run_id=run_id,
+        operation_id=f"operation:{token}",
+        execution_id=f"execution:{token}",
+        execution_identity_digest=canonical_digest({"execution": token}),
+        finalization_intent_digest=canonical_digest({"finalization": token}),
+        model_identity_digest=canonical_digest({"model": token}),
+        producer_behavior_digest=canonical_digest({"behavior": token}),
+        source_revision=canonical_digest({"source": token})[:40],
+        provider_receipt_refs=(f"provider-receipt:{token}",),
+    )
+
+
 def _candidate(producer: str, token: str, quality: float) -> Candidate:
     suffix = (token * 40)[:40]
     return Candidate.create(
         producer_id=producer,
+        producer_provenance=_producer_provenance(token),
         artifact=ArtifactIdentity(
             artifact_digest=f"artifact-{suffix}",
             canon_digest=f"canon-{suffix}",
@@ -446,6 +473,50 @@ def test_invariant_registry_rejects_ambiguous_cross_pillar_duplicate() -> None:
         )
 
 
+def _forge_release_binding(
+    *,
+    artifact_digest: str,
+    canon_digest: str,
+    provenance_digest: str,
+) -> ForgeReleaseBinding:
+    champion = Candidate.create(
+        producer_id="release-champion",
+        producer_provenance=_producer_provenance("release-champion"),
+        artifact=ArtifactIdentity(
+            artifact_digest=artifact_digest,
+            canon_digest=canon_digest,
+            provenance_digest=provenance_digest,
+            family_id="GB03",
+            level_id="GBL-021",
+        ),
+        quality=_quality(0.9),
+        evidence_digests=("release-champion-evidence-" + "e" * 24,),
+        assumption_digest="release-champion-assumption-" + "a" * 24,
+    )
+    forge = DualRivalForge(effort_mode=100, champion=champion)
+    for round_number in range(1, 101):
+        built = _candidate(
+            forge.builder.value,
+            f"release-build-{round_number}",
+            0.5,
+        )
+        forge.submit_construct(built)
+        forge.submit_attack(
+            _challenge(
+                forge.challenger,
+                built,
+                f"release-attack-{round_number}",
+                0.5,
+            )
+        )
+        forge.reconcile(
+            submitted=None,
+            evaluator_id="release-binding-judge",
+            gate_results=_gates(),
+        )
+    return forge.release_binding()
+
+
 def _gold_bundle(*, failed_family: str | None = None) -> GoldMasterBundle:
     families = [
         FamilyQualification(
@@ -455,14 +526,22 @@ def _gold_bundle(*, failed_family: str | None = None) -> GoldMasterBundle:
         )
         for i in range(1, 51)
     ]
+    artifact_digest = "artifact-" + "a" * 32
+    canon_digest = "canon-" + "c" * 32
+    provenance_digest = "provenance-" + "d" * 32
     return GoldMasterBundle.create(
-        artifact_digest="artifact-" + "a" * 32,
+        artifact_digest=artifact_digest,
         build_digest="build-" + "b" * 32,
-        canon_digest="canon-" + "c" * 32,
-        provenance_digest="provenance-" + "d" * 32,
+        canon_digest=canon_digest,
+        provenance_digest=provenance_digest,
         replay_digest="replay-" + "e" * 32,
         rollback_target_digest="rollback-" + "f" * 32,
         red_team_digest="redteam-" + "1" * 32,
+        forge_binding=_forge_release_binding(
+            artifact_digest=artifact_digest,
+            canon_digest=canon_digest,
+            provenance_digest=provenance_digest,
+        ),
         family_qualifications=families,
         critical_gate_results={
             "rights": (True, "rights-" + "2" * 32),
@@ -470,6 +549,38 @@ def _gold_bundle(*, failed_family: str | None = None) -> GoldMasterBundle:
             "reproducibility": (True, "repro-" + "4" * 32),
         },
     )
+
+
+def test_gold_master_rejects_truthy_non_boolean_family_state() -> None:
+    with pytest.raises(TypeError, match="family qualification passed state must be boolean"):
+        FamilyQualification(
+            family_id="GB01",
+            passed="false",
+            evidence_digest="family-01-" + "e" * 24,
+        )
+
+
+def test_gold_master_rejects_truthy_non_boolean_critical_gate_state() -> None:
+    from skeleton.ai.game_builder.release import CriticalGateQualification
+
+    with pytest.raises(TypeError, match="critical gate passed state must be boolean"):
+        CriticalGateQualification(
+            gate_id="rights",
+            passed="false",
+            evidence_digest="rights-" + "2" * 32,
+        )
+
+
+def test_gold_master_rejects_truthy_non_boolean_tribunal_vote() -> None:
+    bundle = _gold_bundle()
+    with pytest.raises(TypeError, match="tribunal vote accept state must be boolean"):
+        TribunalVote(
+            authority_id="gm-1",
+            bundle_digest=bundle.digest,
+            accept="false",
+            evidence_digest="gm-1-evidence-" + "a" * 24,
+            rationale_digest="gm-1-rationale-" + "b" * 24,
+        )
 
 
 def test_gold_master_requires_all_fifty_families() -> None:
@@ -498,6 +609,124 @@ def test_gold_master_requires_unanimous_independent_quorum() -> None:
 
 
 
+def test_forge_release_binding_rejects_incomplete_forge() -> None:
+    forge = DualRivalForge(
+        effort_mode=100,
+        champion=_candidate("seed", "release-incomplete", 0.5),
+    )
+    with pytest.raises(ForgeStateError, match="completed effort budget"):
+        forge.release_binding()
+
+
+def test_completed_forge_release_binding_matches_terminal_champion() -> None:
+    forge = DualRivalForge(
+        effort_mode=100,
+        champion=_candidate("seed", "release-seed", 0.4),
+    )
+    for round_number in range(1, 101):
+        built = _candidate(forge.builder.value, f"build-{round_number}", 0.5)
+        forge.submit_construct(built)
+        forge.submit_attack(
+            _challenge(
+                forge.challenger,
+                built,
+                f"attack-{round_number}",
+                0.5,
+            )
+        )
+        forge.reconcile(
+            submitted=None,
+            evaluator_id="independent-release-judge",
+            gate_results=_gates(),
+        )
+
+    binding = forge.release_binding()
+    assert binding.champion_candidate_digest == forge.champion.digest
+    assert binding.project_id == forge.champion.producer_provenance.project_id
+    assert binding.run_id == forge.champion.producer_provenance.run_id
+    assert binding.operation_id == forge.champion.producer_provenance.operation_id
+    assert binding.execution_id == forge.champion.producer_provenance.execution_id
+    assert (
+        binding.execution_identity_digest
+        == forge.champion.producer_provenance.execution_identity_digest
+    )
+    assert (
+        binding.finalization_intent_digest
+        == forge.champion.producer_provenance.finalization_intent_digest
+    )
+    assert (
+        binding.model_identity_digest
+        == forge.champion.producer_provenance.model_identity_digest
+    )
+    assert (
+        binding.producer_behavior_digest
+        == forge.champion.producer_provenance.producer_behavior_digest
+    )
+    assert binding.source_revision == forge.champion.producer_provenance.source_revision
+    assert (
+        binding.champion_producer_provenance_digest
+        == forge.champion.producer_provenance.digest
+    )
+    assert binding.champion_artifact_digest == forge.champion.artifact.artifact_digest
+    assert binding.champion_canon_digest == forge.champion.artifact.canon_digest
+    assert binding.champion_provenance_digest == forge.champion.artifact.provenance_digest
+    assert binding.receipt_count == 100
+    assert len(binding.digest) == 64
+
+
+def test_gold_master_rejects_artifact_substitution_after_forge() -> None:
+    binding = _forge_release_binding(
+        artifact_digest="artifact-" + "a" * 32,
+        canon_digest="canon-" + "c" * 32,
+        provenance_digest="provenance-" + "d" * 32,
+    )
+    families = [
+        FamilyQualification(
+            family_id=f"GB{i:02d}",
+            passed=True,
+            evidence_digest=f"family-{i:02d}-" + "e" * 24,
+        )
+        for i in range(1, 51)
+    ]
+    with pytest.raises(ValueError, match="artifact must match forge champion artifact"):
+        GoldMasterBundle.create(
+            artifact_digest="artifact-substitute-" + "9" * 32,
+            build_digest="build-" + "b" * 32,
+            canon_digest=binding.champion_canon_digest,
+            provenance_digest=binding.champion_provenance_digest,
+            replay_digest="replay-" + "e" * 32,
+            rollback_target_digest="rollback-" + "f" * 32,
+            red_team_digest="redteam-" + "1" * 32,
+            forge_binding=binding,
+            family_qualifications=families,
+            critical_gate_results={
+                "rights": (True, "rights-" + "2" * 32),
+            },
+        )
+
+
+def test_forge_release_binding_rejects_self_consistent_incomplete_checkpoint() -> None:
+    champion = _candidate("seed", "incomplete-binding", 0.5)
+    core = {
+        "builder": Rival.A.value,
+        "champion": champion.to_payload(),
+        "completed_rounds": 99,
+        "effort_mode": 100,
+        "pending_challenge": None,
+        "pending_construct": None,
+        "receipt_digests": [
+            f"receipt-{index:03d}-" + "r" * 48
+            for index in range(1, 100)
+        ],
+        "round_index": 100,
+        "schema": DualRivalForge.SCHEMA,
+        "stage": "construct",
+    }
+    checkpoint = {**core, "checkpoint_digest": canonical_digest(core)}
+    with pytest.raises(ValueError, match="not at exact terminal round"):
+        ForgeReleaseBinding.from_checkpoint(checkpoint, receipts=())
+
+
 def test_gold_master_failed_critical_gate_blocks_release() -> None:
     families = [
         FamilyQualification(
@@ -507,14 +736,22 @@ def test_gold_master_failed_critical_gate_blocks_release() -> None:
         )
         for i in range(1, 51)
     ]
+    artifact_digest = "artifact-" + "a" * 32
+    canon_digest = "canon-" + "c" * 32
+    provenance_digest = "provenance-" + "d" * 32
     bundle = GoldMasterBundle.create(
-        artifact_digest="artifact-" + "a" * 32,
+        artifact_digest=artifact_digest,
         build_digest="build-" + "b" * 32,
-        canon_digest="canon-" + "c" * 32,
-        provenance_digest="provenance-" + "d" * 32,
+        canon_digest=canon_digest,
+        provenance_digest=provenance_digest,
         replay_digest="replay-" + "e" * 32,
         rollback_target_digest="rollback-" + "f" * 32,
         red_team_digest="redteam-" + "1" * 32,
+        forge_binding=_forge_release_binding(
+            artifact_digest=artifact_digest,
+            canon_digest=canon_digest,
+            provenance_digest=provenance_digest,
+        ),
         family_qualifications=families,
         critical_gate_results={
             "rights": (False, "rights-" + "2" * 32),

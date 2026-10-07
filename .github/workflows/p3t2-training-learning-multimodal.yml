@@ -18,6 +18,8 @@ on:
       - "skeleton/speech/runtime.py"
       - "skeleton/video/pipeline.py"
       - "skeleton/ai/runtime/extensions/multimodal.py"
+      - "skeleton/ai/runtime/extensions/ecosystem.py"
+      - "tests/test_ai_runtime_extensions_hardening.py"
       - "scripts/p3t2_candidate_common.py"
       - "scripts/check_p3t2_*candidate*.py"
       - "scripts/check_ai_masterplan_continuation.py"
@@ -43,6 +45,8 @@ on:
       - "skeleton/speech/runtime.py"
       - "skeleton/video/pipeline.py"
       - "skeleton/ai/runtime/extensions/multimodal.py"
+      - "skeleton/ai/runtime/extensions/ecosystem.py"
+      - "tests/test_ai_runtime_extensions_hardening.py"
       - "scripts/p3t2_candidate_common.py"
       - "scripts/check_p3t2_*candidate*.py"
       - "scripts/check_ai_masterplan_continuation.py"
@@ -105,6 +109,7 @@ jobs:
           skeleton/speech/runtime.py
           skeleton/video/pipeline.py
           skeleton/ai/runtime/extensions/multimodal.py
+          skeleton/ai/runtime/extensions/ecosystem.py
           scripts/p3t2_candidate_common.py
           scripts/check_p3t2_training_candidate.py
           scripts/check_p3t2_learning_candidate.py
@@ -153,6 +158,7 @@ jobs:
           skeleton/testing/test_live_speech_runtime.py
           skeleton/testing/test_video_pipeline.py
           skeleton/testing/test_p3_deferred_multimodal_tools.py
+          tests/test_ai_runtime_extensions_hardening.py
 
       - name: Execute cross-plane acceptance
         run: >-
