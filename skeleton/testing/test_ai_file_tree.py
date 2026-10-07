@@ -204,6 +204,7 @@ def test_ai_file_tree_overlay_children_are_separately_governed() -> None:
     mappings = manifest["mappings"]
     destinations = {item["destination"] for item in mappings}
     sources = {item["source"] for item in mappings}
+    native_owners = {item["path"] for item in manifest["native_ai_owners"]}
     overlay_count = 0
     for item in mappings:
         for child in item.get("overlay_children", []):
@@ -214,7 +215,11 @@ def test_ai_file_tree_overlay_children_are_separately_governed() -> None:
                 candidate == full_source or candidate.startswith(full_source.rstrip("/") + "/")
                 for candidate in sources
             )
-            assert full_destination in destinations or source_governed
+            assert (
+                full_destination in destinations
+                or full_destination in native_owners
+                or source_governed
+            )
     assert overlay_count >= 12
 
 
