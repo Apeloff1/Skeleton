@@ -339,6 +339,9 @@ async def test_full_server_gate_defers_engine_auth_to_service_boundary(
 
     service = _service(tmp_path)
     app = create_app()
+    app.state.runtime_lifecycle.mark_ready(
+        reason="test-engine-http-boundary",
+    )
     app.dependency_overrides[_engine_service] = lambda: service
     app.dependency_overrides[_engine_service_token] = lambda: _SERVICE_TOKEN
     app.dependency_overrides[_engine_coordinator] = lambda: None
