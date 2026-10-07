@@ -271,6 +271,48 @@ class ExperienceReport:
     unresolved_critical_defects: tuple[str, ...]
     report_digest: str
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "artifact_digest", _digest(self.artifact_digest, "artifact_digest"))
+        object.__setattr__(self, "project_revision", _text(self.project_revision, "project_revision"))
+        evaluators = tuple(_text(x, "evaluator_id") for x in self.evaluator_ids)
+        if not evaluators or evaluators != tuple(sorted(set(evaluators))):
+            raise ExperienceEvaluationError("report evaluator ids must be unique canonical order")
+        object.__setattr__(self, "evaluator_ids", evaluators)
+        observations = tuple(_digest(x, "observation_digest") for x in self.observation_digests)
+        if not observations or observations != tuple(sorted(set(observations))):
+            raise ExperienceEvaluationError(
+                "report observation digests must be unique canonical order"
+            )
+        object.__setattr__(self, "observation_digests", observations)
+        defects = tuple(_digest(x, "defect_digest") for x in self.defect_digests)
+        if defects != tuple(sorted(set(defects))):
+            raise ExperienceEvaluationError(
+                "report defect digests must be unique canonical order"
+            )
+        object.__setattr__(self, "defect_digests", defects)
+        metrics = normalize_experience_metrics(dict(self.aggregate_metrics))
+        object.__setattr__(self, "aggregate_metrics", metrics)
+        critical = tuple(_text(x, "critical_defect_id") for x in self.unresolved_critical_defects)
+        if critical != tuple(sorted(set(critical))):
+            raise ExperienceEvaluationError(
+                "critical defect ids must be unique canonical order"
+            )
+        object.__setattr__(self, "unresolved_critical_defects", critical)
+        object.__setattr__(self, "report_digest", _digest(self.report_digest, "report_digest"))
+        expected = canonical_digest(
+            {
+                "aggregate_metrics": dict(metrics),
+                "artifact_digest": self.artifact_digest,
+                "defect_digests": list(defects),
+                "evaluator_ids": list(evaluators),
+                "observation_digests": list(observations),
+                "project_revision": self.project_revision,
+                "unresolved_critical_defects": list(critical),
+            }
+        )
+        if self.report_digest != expected:
+            raise ExperienceEvaluationError("experience report digest mismatch")
+
     @property
     def metric_map(self) -> dict[str, float]:
         return dict(self.aggregate_metrics)
@@ -348,12 +390,52 @@ def build_experience_report(
 
 @dataclass(frozen=True, slots=True)
 class ExperiencePromotionDecision:
+    baseline_report_digest: str
+    candidate_report_digest: str
     eligible: bool
     pareto_safe: bool
     improved_metrics: tuple[str, ...]
     regressed_metrics: tuple[str, ...]
     blockers: tuple[str, ...]
     decision_digest: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "baseline_report_digest",
+            _digest(self.baseline_report_digest, "baseline_report_digest"),
+        )
+        object.__setattr__(
+            self,
+            "candidate_report_digest",
+            _digest(self.candidate_report_digest, "candidate_report_digest"),
+        )
+        if not isinstance(self.eligible, bool) or not isinstance(self.pareto_safe, bool):
+            raise TypeError("experience promotion states must be boolean")
+        improved = tuple(self.improved_metrics)
+        regressed = tuple(self.regressed_metrics)
+        if len(improved) != len(set(improved)) or len(regressed) != len(set(regressed)):
+            raise ExperienceEvaluationError("promotion metric ids must be unique")
+        if any(metric not in EXPERIENCE_METRICS for metric in (*improved, *regressed)):
+            raise ExperienceEvaluationError("promotion metric id is outside contract")
+        blockers = tuple(_text(x, "promotion blocker", max_length=512) for x in self.blockers)
+        object.__setattr__(self, "improved_metrics", improved)
+        object.__setattr__(self, "regressed_metrics", regressed)
+        object.__setattr__(self, "blockers", blockers)
+        object.__setattr__(self, "decision_digest", _digest(self.decision_digest, "decision_digest"))
+        expected = canonical_digest(
+            {
+                "baseline_report_digest": self.baseline_report_digest,
+                "blockers": list(blockers),
+                "candidate_report_digest": self.candidate_report_digest,
+                "eligible": self.eligible,
+                "improved_metrics": list(improved),
+                "pareto_safe": self.pareto_safe,
+                "regressed_metrics": list(regressed),
+            }
+        )
+        if self.decision_digest != expected:
+            raise ExperienceEvaluationError("experience promotion decision digest mismatch")
 
 
 def evaluate_experience_promotion(
@@ -393,6 +475,8 @@ def evaluate_experience_promotion(
         "regressed_metrics": list(regressions),
     }
     return ExperiencePromotionDecision(
+        baseline_report_digest=baseline.report_digest,
+        candidate_report_digest=candidate.report_digest,
         eligible=eligible,
         pareto_safe=pareto_safe,
         improved_metrics=improvements,
