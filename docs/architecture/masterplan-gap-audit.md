@@ -1555,3 +1555,16 @@ Robots policy retrieval now shares crawler-controlled redirect safety instead of
 - regressions cover redirected robots accounting, original-origin policy installation and destination-host pacing.
 
 This closes the previously documented robots redirect inconsistency. Further adversarial work should inspect robots cache freshness/revalidation and canonical URL input bounds before final signing.
+
+
+### 2026-10-07 advanced admission and robots freshness tranche
+
+Crawler admission and robots policy handling now include operational bounds and cache revalidation:
+- CrawlPolicy bounds canonical URL length, query-pair cardinality and path-segment depth before frontier admission;
+- robots cache state records fetched_at, ETag and Last-Modified validators with deterministic TTL freshness checks;
+- stale robots policies are conditionally revalidated through crawler-controlled redirect traversal;
+- 304 refreshes policy freshness without reparsing while 200/404/410 replace cached policy metadata appropriately;
+- conditional headers flow through the DNS/socket-bound transport; connection-critical header overrides are rejected;
+- regressions cover pathological URL dimensions, fresh-cache reuse, stale ETag revalidation and 304 freshness renewal.
+
+Advanced follow-up: integrate TrapGuard directly into CrawlEngine admission, validate CrawlPolicy numeric configuration at construction, and persist robots metadata across crawler checkpoints so restart does not force unconditional robots refetch.
