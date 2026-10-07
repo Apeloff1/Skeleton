@@ -6,6 +6,8 @@ from uuid import uuid4
 import pytest
 
 from skeleton.contracts.context import (
+    ContextContractError,
+    ContextEnvelope,
     ContextBudget,
     ContextKind,
     ContextSegment,
@@ -1339,3 +1341,31 @@ def test_multiple_canonical_current_turns_fail_closed() -> None:
             segments=(first, second),
             compiled_at=BASE,
         )
+
+
+def test_context_envelope_rejects_digest_substitution() -> None:
+    envelope = _compile([_segment("bound evidence", source_id="bound")])
+    payload = {name: getattr(envelope, name) for name in envelope.__dataclass_fields__}
+    payload["context_digest"] = "0" * 64
+    with pytest.raises(ContextContractError, match="context_digest does not match envelope"):
+        ContextEnvelope(**payload)
+
+
+def test_context_envelope_rejects_context_id_substitution() -> None:
+    envelope = _compile([_segment("bound evidence", source_id="bound")])
+    payload = {name: getattr(envelope, name) for name in envelope.__dataclass_fields__}
+    payload["context_id"] = str(uuid4())
+    with pytest.raises(ContextContractError, match="context_id does not match context_digest"):
+        ContextEnvelope(**payload)
+
+
+def test_context_envelope_rejects_selected_snapshot_substitution() -> None:
+    envelope = _compile([_segment("bound evidence", source_id="bound")])
+    payload = {name: getattr(envelope, name) for name in envelope.__dataclass_fields__}
+    selected_id = envelope.selected_segments[0].segment_id
+    payload["source_snapshot"] = tuple(
+        (segment_id, "f" * 64 if segment_id == selected_id else digest)
+        for segment_id, digest in envelope.source_snapshot
+    )
+    with pytest.raises(ContextContractError, match="source_snapshot does not bind selected segments"):
+        ContextEnvelope(**payload)
