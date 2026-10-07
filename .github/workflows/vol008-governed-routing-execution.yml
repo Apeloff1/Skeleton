@@ -1,0 +1,90 @@
+name: VOL-008 Governed Route Execution
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/intelligence/router_registry.py"
+      - "skeleton/intelligence/routing_governance.py"
+      - "skeleton/intelligence/routing_execution.py"
+      - "skeleton/ai/runtime/intelligence/router_registry.py"
+      - "skeleton/ai/runtime/intelligence/routing_governance.py"
+      - "skeleton/ai/runtime/intelligence/routing_execution.py"
+      - "skeleton/frontier/runtime/model_routing.py"
+      - "skeleton/testing/test_routing_governance_oct2026.py"
+      - "skeleton/testing/test_vol008_routing_execution.py"
+      - ".github/workflows/vol008-governed-routing-execution.yml"
+  push:
+    branches: [main]
+    paths:
+      - "skeleton/intelligence/router_registry.py"
+      - "skeleton/intelligence/routing_governance.py"
+      - "skeleton/intelligence/routing_execution.py"
+      - "skeleton/ai/runtime/intelligence/router_registry.py"
+      - "skeleton/ai/runtime/intelligence/routing_governance.py"
+      - "skeleton/ai/runtime/intelligence/routing_execution.py"
+      - "skeleton/frontier/runtime/model_routing.py"
+      - "skeleton/testing/test_routing_governance_oct2026.py"
+      - "skeleton/testing/test_vol008_routing_execution.py"
+      - ".github/workflows/vol008-governed-routing-execution.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vol008-governed-route-execution-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  governed-route-execution:
+    name: Qualified route execution fence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          .
+          "pytest>=8,<9"
+
+      - name: Compile governed routing surfaces
+        run: >-
+          python -m compileall -q
+          skeleton/intelligence/router_registry.py
+          skeleton/intelligence/routing_governance.py
+          skeleton/intelligence/routing_execution.py
+          skeleton/ai/runtime/intelligence/router_registry.py
+          skeleton/ai/runtime/intelligence/routing_governance.py
+          skeleton/ai/runtime/intelligence/routing_execution.py
+
+      - name: Require canonical AI mirror parity
+        run: |
+          cmp skeleton/intelligence/router_registry.py skeleton/ai/runtime/intelligence/router_registry.py
+          cmp skeleton/intelligence/routing_governance.py skeleton/ai/runtime/intelligence/routing_governance.py
+          cmp skeleton/intelligence/routing_execution.py skeleton/ai/runtime/intelligence/routing_execution.py
+
+      - name: Run governed routing regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_routing_governance_oct2026.py
+          skeleton/testing/test_vol008_routing_execution.py
+
+      - name: Validate masterplan consistency
+        run: python scripts/check_ai_master_plan.py

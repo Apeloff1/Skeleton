@@ -959,16 +959,21 @@
         "skeleton/intelligence/router_registry.py",
         "skeleton/ai/runtime/intelligence/router_registry.py",
         "skeleton/intelligence/routing_governance.py",
-        "skeleton/ai/runtime/intelligence/routing_governance.py"
+        "skeleton/ai/runtime/intelligence/routing_governance.py",
+        "skeleton/intelligence/routing_execution.py",
+        "skeleton/ai/runtime/intelligence/routing_execution.py",
+        ".github/workflows/vol008-governed-routing-execution.yml"
       ],
       "tests": [
         "skeleton/testing/test_routing_context_receipt.py",
         "tests/test_model_routing.py",
         "skeleton/testing/test_context_compiler.py",
-        "skeleton/testing/test_routing_governance_oct2026.py"
+        "skeleton/testing/test_routing_governance_oct2026.py",
+        "skeleton/testing/test_vol008_routing_execution.py"
       ],
       "evaluations": [
-        ".github/workflows/p1-intel-routing-context.yml"
+        ".github/workflows/p1-intel-routing-context.yml",
+        ".github/workflows/vol008-governed-routing-execution.yml"
       ],
       "evidence": [
         "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
@@ -976,7 +981,10 @@
         "https://github.com/Apeloff1/Skeleton/actions/runs/36453604716",
         "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94",
         "skeleton/intelligence/routing_governance.py",
-        "skeleton/testing/test_routing_governance_oct2026.py"
+        "skeleton/testing/test_routing_governance_oct2026.py",
+        "skeleton/intelligence/routing_execution.py",
+        "skeleton/testing/test_vol008_routing_execution.py",
+        ".github/workflows/vol008-governed-routing-execution.yml"
       ],
       "risks": [
         "fallback changes privacy boundary",
@@ -984,7 +992,7 @@
         "stale provider health"
       ],
       "gaps": [
-        "bind evidence-qualified canonical router decisions into every live model-routing entrypoint",
+        "bind governed route execution permits into remaining product/backend provider-routing entrypoints",
         "add learned-routing experiments only behind champion/challenger evaluation"
       ],
       "accountability_id": "ACC-VOL-008",
