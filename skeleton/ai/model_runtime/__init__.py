@@ -4,6 +4,7 @@ from .runtime_signals import DEFAULT_RUNTIME_SIGNALS, RuntimeSignal, RuntimeSign
 from .runtime_policy import DEFAULT_RUNTIME_POLICY_COMPILER, RuntimePolicy, RuntimePolicyCompiler
 from .runtime_epochs import DEFAULT_RUNTIME_EPOCHS, EpochStatus, RuntimeEpoch, RuntimeEpochRegistry
 from .temporal_policy import DEFAULT_TEMPORAL_RUNTIME_POLICY_COMPILER, TemporalRuntimePolicy, TemporalRuntimePolicyCompiler
+from .serving_policy import PolicyAwareServingPlanner, ServiceClass, ServingPlan, ServingRequest
 from .flgb_model_runtime import (
     ALLOWED_TRANSITIONS,
     BatchRequest,
@@ -99,6 +100,7 @@ __all__ = [
     "NativeServiceResult",
     "NativeTokenizer",
     "Placement",
+    "PolicyAwareServingPlanner",
     "QuantizationProfile",
     "ReplayMismatch",
     "ReplayReceipt",
@@ -116,6 +118,9 @@ __all__ = [
     "RuntimeLimits",
     "RuntimeUsage",
     "ScheduledRequest",
+    "ServiceClass",
+    "ServingPlan",
+    "ServingRequest",
     "SignalMaturity",
     "SpeculativeReceipt",
     "StreamingTextFeed",
