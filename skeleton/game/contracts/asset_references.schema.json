@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-09:asset_references:v1",
+  "title": "FLGB-09 asset references",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "asset_id",
+    "artifact_digest",
+    "kind",
+    "rights_digest",
+    "import_settings_digest"
+  ],
+  "properties": {
+    "asset_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "artifact_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "kind": {
+      "enum": [
+        "texture",
+        "mesh",
+        "audio",
+        "video",
+        "script",
+        "material",
+        "animation",
+        "font",
+        "data"
+      ]
+    },
+    "rights_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "import_settings_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
