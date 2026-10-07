@@ -1336,3 +1336,43 @@ def test_temporal_retention_trajectory_is_cohort_isolated():
     trajectory = build_temporal_retention_trajectory(results, cohort="current")
     assert trajectory.stage_scores_ppm == (500_000, 900_000)
     assert trajectory.final_delta_ppm == 400_000
+
+
+def test_provenance_graph_collapses_mirrors_to_common_root():
+    from skeleton.ai.model_runtime.text_pipeline import SourceProvenanceGraph, SourceProvenanceNode, provenance_independence_group
+    graph = SourceProvenanceGraph((
+        SourceProvenanceNode("wire"),
+        SourceProvenanceNode("mirror-a", ("wire",)),
+        SourceProvenanceNode("mirror-b", ("wire",)),
+        SourceProvenanceNode("independent"),
+    ))
+    assert graph.roots_for("mirror-a") == ("wire",)
+    assert provenance_independence_group(graph, "mirror-a") == provenance_independence_group(graph, "mirror-b")
+    assert provenance_independence_group(graph, "mirror-a") != provenance_independence_group(graph, "independent")
+
+
+def test_provenance_graph_supports_multi_root_derivation():
+    from skeleton.ai.model_runtime.text_pipeline import SourceProvenanceGraph, SourceProvenanceNode
+    graph = SourceProvenanceGraph((
+        SourceProvenanceNode("root-a"),
+        SourceProvenanceNode("root-b"),
+        SourceProvenanceNode("synthesis", ("root-b", "root-a")),
+    ))
+    assert graph.roots_for("synthesis") == ("root-a", "root-b")
+
+
+def test_provenance_graph_rejects_cycles():
+    from skeleton.ai.model_runtime.text_pipeline import SourceProvenanceGraph, SourceProvenanceNode
+    from skeleton.ai.model_runtime.tokenization import TokenizerContractError
+    with pytest.raises(TokenizerContractError, match="cycle"):
+        SourceProvenanceGraph((
+            SourceProvenanceNode("a", ("b",)),
+            SourceProvenanceNode("b", ("a",)),
+        ))
+
+
+def test_provenance_graph_digest_is_input_order_independent():
+    from skeleton.ai.model_runtime.text_pipeline import SourceProvenanceGraph, SourceProvenanceNode
+    a = SourceProvenanceNode("a")
+    b = SourceProvenanceNode("b", ("a",))
+    assert SourceProvenanceGraph((a, b)).digest == SourceProvenanceGraph((b, a)).digest
