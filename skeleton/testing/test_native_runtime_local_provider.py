@@ -222,6 +222,19 @@ def test_native_runtime_structured_output_protocol_validates_schema() -> None:
     ):
         backend._parse_output('{"answer":7}', request)
 
+    non_object = LocalInferenceRequest(
+        prompt="alpha",
+        structured_output_schema={
+            "type": "array",
+            "items": {"type": "string"},
+        },
+    )
+    with pytest.raises(
+        NativeRuntimeBackendError,
+        match="must describe an object",
+    ):
+        backend._render_prompt(non_object)
+
 
 def test_native_runtime_tool_protocol_enforces_declared_ids() -> None:
     backend = _native_backend()
