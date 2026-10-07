@@ -33,6 +33,7 @@ def _fixture_root(tmp_path: Path) -> Path:
     for relative in (
         verifier.COMPOSE_PATH,
         verifier.RECOVERY_WORKFLOW_PATH,
+        verifier.RELEASE_WORKFLOW_PATH,
     ):
         source = verifier.ROOT / relative
         target = root / relative
@@ -43,6 +44,8 @@ def _fixture_root(tmp_path: Path) -> Path:
         Path("scripts/state_backup_bundle.py"),
         Path("scripts/state_recovery_drill.py"),
         Path("scripts/verify_state_authority_closure.py"),
+        verifier.MIGRATION_TOOL_PATH,
+        verifier.MIGRATION_TEST_PATH,
     ):
         target = root / relative
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -238,5 +241,93 @@ def test_verifier_allows_other_explicit_unbound_gap_but_not_state_gap(
         "state-authority gap still owns unbound domain "
         "verification-receipt-ledger"
         == error
+        for error in receipt["errors"]
+    )
+
+
+
+def test_verifier_rejects_partial_authoritative_status(
+    tmp_path: Path,
+) -> None:
+    root = _fixture_root(tmp_path)
+
+    def mutate(payload):
+        domain = next(
+            item
+            for item in payload["state_domains"]
+            if item["id"] == "engine-mongo-state"
+        )
+        domain["status"] = "declared-partial"
+
+    _mutate_topology(root, mutate)
+    receipt = verifier.verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "engine-mongo-state remains partially bound" in error
+        for error in receipt["errors"]
+    )
+
+
+def test_verifier_rejects_retired_authority_gap_reference(
+    tmp_path: Path,
+) -> None:
+    root = _fixture_root(tmp_path)
+
+    def mutate(payload):
+        domain = next(
+            item
+            for item in payload["state_domains"]
+            if item["id"] == "canonical-ai-memory-records"
+        )
+        domain["gap"] = "gap-memory-durable-authority"
+
+    _mutate_topology(root, mutate)
+    receipt = verifier.verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "canonical-ai-memory-records retains retired gap" in error
+        for error in receipt["errors"]
+    )
+
+
+def test_verifier_rejects_lost_release_migration_binding(
+    tmp_path: Path,
+) -> None:
+    root = _fixture_root(tmp_path)
+    path = root / verifier.RELEASE_WORKFLOW_PATH
+    source = path.read_text(encoding="utf-8")
+    source = source.replace(
+        verifier.MIGRATION_TOOL_PATH.as_posix(),
+        "scripts/missing-state-migration-compatibility.py",
+    )
+    path.write_text(source, encoding="utf-8")
+
+    receipt = verifier.verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "Release migration gate lost state rehearsal binding" in error
+        for error in receipt["errors"]
+    )
+
+
+def test_verifier_rejects_topology_migration_contract_drift(
+    tmp_path: Path,
+) -> None:
+    root = _fixture_root(tmp_path)
+
+    def mutate(payload):
+        payload["migration_compatibility"]["release_workflow"] = (
+            ".github/workflows/other.yml"
+        )
+
+    _mutate_topology(root, mutate)
+    receipt = verifier.verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "migration_compatibility.release_workflow" in error
         for error in receipt["errors"]
     )

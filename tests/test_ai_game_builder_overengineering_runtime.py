@@ -472,6 +472,38 @@ def _gold_bundle(*, failed_family: str | None = None) -> GoldMasterBundle:
     )
 
 
+def test_gold_master_rejects_truthy_non_boolean_family_state() -> None:
+    with pytest.raises(TypeError, match="family qualification passed state must be boolean"):
+        FamilyQualification(
+            family_id="GB01",
+            passed="false",
+            evidence_digest="family-01-" + "e" * 24,
+        )
+
+
+def test_gold_master_rejects_truthy_non_boolean_critical_gate_state() -> None:
+    from skeleton.ai.game_builder.release import CriticalGateQualification
+
+    with pytest.raises(TypeError, match="critical gate passed state must be boolean"):
+        CriticalGateQualification(
+            gate_id="rights",
+            passed="false",
+            evidence_digest="rights-" + "2" * 32,
+        )
+
+
+def test_gold_master_rejects_truthy_non_boolean_tribunal_vote() -> None:
+    bundle = _gold_bundle()
+    with pytest.raises(TypeError, match="tribunal vote accept state must be boolean"):
+        TribunalVote(
+            authority_id="gm-1",
+            bundle_digest=bundle.digest,
+            accept="false",
+            evidence_digest="gm-1-evidence-" + "a" * 24,
+            rationale_digest="gm-1-rationale-" + "b" * 24,
+        )
+
+
 def test_gold_master_requires_all_fifty_families() -> None:
     tribunal = GoldMasterTribunal(("gm-1", "gm-2", "gm-3"))
     with pytest.raises(ReleaseArbitrationError, match="failed family or critical-gate qualification"):
