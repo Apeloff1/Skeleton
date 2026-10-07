@@ -1514,3 +1514,16 @@ The provenance crash-timing window is now closed for checkpoint-backed durable m
 The canonical in-memory ledger remains available for callers that do not request durable mode; the crawler's crash-safe deployment contract should use the durable checkpoint-backed ledger or an equivalent durable backend.
 
 Repository-side architecture for the previously identified provenance crash window is now IMPLEMENTED. SIGNED remains withheld only until observable exact-head validation executes successfully and any resulting failures are resolved.
+
+
+### 2026-10-07 crawler runtime correctness tranche
+
+Adversarial runtime review closed additional non-persistence defects:
+- ResearchQuery now rejects empty text, non-positive source requirements, non-finite/non-positive freshness half-life, out-of-range assurance weights/thresholds, and diversity+contradiction weights exceeding the score budget;
+- contradiction detection now considers qualified evidence only, matching assurance/diversity admission semantics;
+- FederatedDiscovery rejects empty/duplicate provider identities, invalid queries/limits and non-finite candidate scores;
+- CrawlEngine no longer permanently loses a URL when autonomous robots bootstrap fails transiently: seen state is cleared and bounded retry is scheduled when budget permits;
+- request budget is rechecked after robots bootstrap, preventing the robots request from consuming the final allowance followed by an over-budget resource fetch;
+- focused regressions cover contract validation, non-finite discovery scores, duplicate providers, transient robots failure preservation and the one-request robots budget boundary.
+
+These repairs are IMPLEMENTED. Remaining signing blocker is still observable exact-head validation; further runtime audit should examine redirect-hop budget/pacing accounting and Retry-After HTTP-date handling.
