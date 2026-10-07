@@ -12,6 +12,8 @@ from skeleton.ai.model_runtime import (
     ReplayReceipt,
     RuntimeContractError,
     RuntimeLimits,
+    StreamingTextFeed,
+    TokenSequence,
 )
 
 
@@ -358,6 +360,54 @@ class TestNativeLLMRuntime(unittest.TestCase):
                     top_k=runtime.tokenizer.vocab_size + 1,
                 ),
             )
+
+
+    def test_streaming_text_feed_executes_without_retokenization_boundary(self):
+        runtime = self.runtime()
+        feed = StreamingTextFeed()
+        feed.push("hello ")
+        feed.push("world")
+        result = runtime.generate_feed(
+            feed,
+            GenerationConfig(max_new_tokens=3, seed=17, temperature=0.0),
+        )
+        direct = runtime.generate(
+            "hello world",
+            GenerationConfig(max_new_tokens=3, seed=17, temperature=0.0),
+        )
+        self.assertTrue(feed.closed)
+        self.assertEqual(result.prompt_sequence, direct.prompt_sequence)
+        self.assertEqual(result.generated_ids, direct.generated_ids)
+        self.assertEqual(result.output_digest, direct.output_digest)
+
+    def test_pretokenized_sequence_executes_and_preserves_identity(self):
+        runtime = self.runtime()
+        sequence = runtime.encode("hello world")
+        result = runtime.generate_sequence(
+            sequence,
+            GenerationConfig(max_new_tokens=2, seed=5, temperature=0.0),
+        )
+        self.assertIs(result.prompt_sequence, sequence)
+        self.assertEqual(result.replay_receipt.tokenizer_digest, sequence.tokenizer_digest)
+        self.assertEqual(result.usage.prompt_tokens, len(sequence.token_ids))
+
+    def test_pretokenized_sequence_rejects_foreign_tokenizer_and_vocab(self):
+        runtime = self.runtime()
+        sequence = runtime.encode("hello")
+        foreign = TokenSequence(
+            "0" * 64,
+            sequence.token_ids,
+            sequence.source_text_digest,
+        )
+        with self.assertRaises(RuntimeContractError):
+            runtime.generate_sequence(foreign, GenerationConfig(max_new_tokens=1))
+        invalid = TokenSequence(
+            sequence.tokenizer_digest,
+            (runtime.tokenizer.vocab_size,),
+            sequence.source_text_digest,
+        )
+        with self.assertRaises(RuntimeContractError):
+            runtime.generate_sequence(invalid, GenerationConfig(max_new_tokens=1))
 
 
 if __name__ == "__main__":
