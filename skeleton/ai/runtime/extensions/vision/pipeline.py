@@ -37,6 +37,15 @@ def _positive_int(value: object, field: str, maximum: int) -> int:
     return value
 
 
+def _confidence(value: object) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise VisionError("invalid confidence")
+    normalized = float(value)
+    if not math.isfinite(normalized) or not 0 <= normalized <= 1:
+        raise VisionError("invalid confidence")
+    return normalized
+
+
 @dataclass(frozen=True, slots=True)
 class ImageAsset:
     asset_id: str
@@ -131,10 +140,7 @@ class VisionResult:
         object.__setattr__(self, "source_digest", _sha(self.source_digest, "source_digest"))
         object.__setattr__(self, "model_digest", _sha(self.model_digest, "model_digest"))
         object.__setattr__(self, "payload_digest", _sha(self.payload_digest, "payload_digest"))
-        if isinstance(self.confidence, bool) or not isinstance(self.confidence, (int, float)):
-            raise VisionError("invalid confidence")
-        if not math.isfinite(self.confidence) or not 0 <= self.confidence <= 1:
-            raise VisionError("invalid confidence")
+        object.__setattr__(self, "confidence", _confidence(self.confidence))
         expected = hashlib.sha256(
             json.dumps(
                 {
@@ -172,18 +178,26 @@ class VisionResult:
         if not isinstance(region, ImageRegion) or not isinstance(asset, ImageAsset):
             raise VisionError("typed region and asset required")
         region.validate(asset)
+        normalized_confidence = _confidence(confidence)
         body = {
             "asset_id": region.asset_id,
             "source_digest": asset.source_digest,
             "region": (region.x, region.y, region.width, region.height, region.transform_digest),
             "model_digest": _sha(model_digest, "model_digest"),
-            "confidence": float(confidence),
+            "confidence": normalized_confidence,
             "payload_digest": _sha(payload_digest, "payload_digest"),
         }
         digest = hashlib.sha256(
             json.dumps(body, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
         ).hexdigest()
-        return cls(region, asset.source_digest, model_digest, confidence, payload_digest, digest)
+        return cls(
+            region,
+            asset.source_digest,
+            model_digest,
+            normalized_confidence,
+            payload_digest,
+            digest,
+        )
 
 
 __all__ = ["ImageAsset", "ImageLimits", "ImageRegion", "VisionError", "VisionResult"]
