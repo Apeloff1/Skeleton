@@ -415,7 +415,12 @@ class TextTokenPipeline:
     def model_batches(self, prepared: PreparedText, *, pad_token_id: int | None = None) -> tuple[ModelInputBatch, ...]:
         if not isinstance(prepared, PreparedText) or prepared.pipeline_digest != self.digest:
             raise TokenizerContractError("prepared text belongs to another pipeline")
-        pad = self.tokenizer.vocabulary_manifest.special_tokens["unk"] if pad_token_id is None else pad_token_id
+        if pad_token_id is None:
+            pad = self.tokenizer.special_token_id("pad")
+            if pad is None:
+                raise TokenizerContractError("tokenizer does not declare pad token; explicit pad_token_id required")
+        else:
+            pad = pad_token_id
         if isinstance(pad, bool) or not isinstance(pad, int) or not 0 <= pad < self.tokenizer.vocab_size:
             raise TokenizerContractError("padding token outside vocabulary")
         return tuple(materialize_model_batch(batch.windows, pad_token_id=pad) for batch in prepared.batches)
