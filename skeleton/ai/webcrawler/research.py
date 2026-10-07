@@ -157,6 +157,14 @@ class EvidenceSet:
         signals=self.signals_by_year()
         return tuple(y for y in range(start_year,end_year+1) if int(signals.get(y,{}).get("distinct_hosts",0))<minimum_hosts)
 
+    def signals_by_decade(self) -> dict[int, Mapping[str, object]]:
+        from .decade_signals import DecadeSignalSeries
+        return DecadeSignalSeries(self.signals_by_year()).aggregate()
+
+    def undercovered_decades(self,start_decade:int,end_decade:int,*,minimum_coverage:float=.5) -> tuple[int,...]:
+        from .decade_signals import DecadeSignalSeries
+        return DecadeSignalSeries(self.signals_by_year()).undercovered_decades(start_decade,end_decade,minimum_coverage=minimum_coverage)
+
     def assurance(self, *, now: float) -> Mapping[str, object]:
         ranked=self.ranked(now=now)
         relevant=[o for o in ranked if o.relevance >= self.query.min_relevance and o.source_score >= self.query.min_source_score]
@@ -177,11 +185,13 @@ class EvidenceSet:
             "sufficient":self.distinct_hosts >= self.query.required_sources and score >= .45,
         }
 
-def frontier_priority(query: str, candidate_url: str, anchor_text: str="", *, same_host: bool=False, target_years: Iterable[int]=()) -> float:
+def frontier_priority(query: str, candidate_url: str, anchor_text: str="", *, same_host: bool=False, target_years: Iterable[int]=(), target_decades: Iterable[int]=()) -> float:
     """Cheap query-directed priority usable before a candidate has been fetched."""
     relevance=lexical_relevance(query, candidate_url.replace("/"," ")+" "+anchor_text)
     exploration=0.0 if same_host else 0.15
     years={int(x) for x in _YEAR.findall(candidate_url+" "+anchor_text)}
     target={int(y) for y in target_years}
     temporal=0.20 if target and years & target else 0.0
-    return relevance+exploration+temporal
+    decades={(y//10)*10 for y in years};wanted={int(d) for d in target_decades}
+    regime=0.15 if wanted and decades & wanted else 0.0
+    return relevance+exploration+temporal+regime
