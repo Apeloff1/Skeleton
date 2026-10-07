@@ -274,9 +274,13 @@ class GateResult:
     non_compensable: bool = True
 
     def __post_init__(self) -> None:
-        if not self.gate_id.strip():
+        if not isinstance(self.gate_id, str) or not self.gate_id.strip():
             raise ValueError("gate_id must be non-empty")
-        if len(self.evidence_digest) < 16:
+        if not isinstance(self.passed, bool):
+            raise TypeError("gate passed state must be boolean")
+        if not isinstance(self.non_compensable, bool):
+            raise TypeError("gate non_compensable state must be boolean")
+        if not isinstance(self.evidence_digest, str) or len(self.evidence_digest) < 16:
             raise ValueError("gate evidence must use a stable digest")
 
 
@@ -315,9 +319,15 @@ class PromotionReceipt:
 
 
 def hard_gates_pass(gates: Sequence[GateResult]) -> bool:
-    if not gates:
+    normalized = tuple(gates)
+    if not normalized:
         return False
-    return all(gate.passed for gate in gates if gate.non_compensable)
+    if any(not isinstance(gate, GateResult) for gate in normalized):
+        raise TypeError("gate_results must contain GateResult values")
+    hard_gates = tuple(gate for gate in normalized if gate.non_compensable)
+    if not hard_gates:
+        return False
+    return all(gate.passed for gate in hard_gates)
 
 
 def pareto_safe_scores(
@@ -375,6 +385,11 @@ def promotion_receipt(
         raise ValueError("promotion evaluator must be independent from both rivals")
 
     gates = tuple(gate_results)
+    if any(not isinstance(gate, GateResult) for gate in gates):
+        raise TypeError("gate_results must contain GateResult values")
+    gate_ids = [gate.gate_id for gate in gates]
+    if len(gate_ids) != len(set(gate_ids)):
+        raise ValueError("gate_results must use unique gate ids")
     proposed_quality = (
         submitted.quality_map
         if submitted is not None and submitted_quality_override is None
