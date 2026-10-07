@@ -43,3 +43,18 @@ def test_failed_ingestion_abandons_reservation_for_retry(tmp_path):
  except RuntimeError:pass
  else:raise AssertionError("expected failure")
  assert registry.reserve("h:p","retry",now=0,ttl=10)
+
+def test_outbox_and_durable_provenance_replay_after_restart(tmp_path):
+ from skeleton.ai.webcrawler.storage import SqliteCrawlStore
+ from skeleton.ai.webcrawler.ingestion_registry import DurableIngestionRegistry
+ from skeleton.ai.webcrawler.outbox import IngestionOutbox
+ from skeleton.retrieval.provenance_checkpoint import ProvenanceCheckpoint
+ p=tmp_path/"crawler.db";cp=ProvenanceCheckpoint(tmp_path/"provenance.json")
+ s=SqliteCrawlStore(p);registry=DurableIngestionRegistry(s.db);outbox=IngestionOutbox(s.db);ledger=cp.load(durable=True);i=Index()
+ d=CrawlDocument("https://a/x","https://a/x","","text","text/plain","h",1,.9,{"schema":"p"},())
+ promo=PromotionDecision("p","h","promote",(),1,.9,"p",2,2)
+ first=CanonicalRetrievalBridge(i,ledger,Chunker(),registry=registry,outbox=outbox,owner="a").ingest(d,promo,now=0)
+ s.close()
+ s=SqliteCrawlStore(p);registry=DurableIngestionRegistry(s.db);outbox=IngestionOutbox(s.db);ledger=cp.load(durable=True)
+ second=CanonicalRetrievalBridge(i,ledger,Chunker(),registry=registry,outbox=outbox,owner="b").ingest(d,promo,now=100)
+ assert first==second and ledger.stats()["recorded"]==1 and i.revision==1
