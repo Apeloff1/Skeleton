@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-14:canon_constraints:v1",
+  "title": "FLGB-14 canon constraints",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "constraint_id",
+    "subject_id",
+    "predicate",
+    "object_digest",
+    "mode"
+  ],
+  "properties": {
+    "constraint_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "subject_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "predicate": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "object_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "mode": {
+      "enum": [
+        "must-equal",
+        "must-not-equal"
+      ]
+    }
+  }
+}
