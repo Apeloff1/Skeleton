@@ -88,6 +88,8 @@ jobs:
       - name: Run AI chat and inherited assistant regressions
         run: >-
           python -m pytest -q --noconftest
+          --import-mode=importlib
+          -p pytest_asyncio.plugin
           skeleton/testing/test_ai_chat_turn_runtime.py
           skeleton/testing/test_ai_chat_streaming.py
           skeleton/testing/test_ai_chat_turn_ownership.py
