@@ -4,9 +4,16 @@ from .mime import ExtractedPayload, MimeExtractor
 from .leases import Lease, SqliteLeaseStore
 from .traps import TrapDecision, TrapGuard
 from .knowledge_bridge import CanonicalKnowledgeBridge, KnowledgeBridgeReceipt
-from .storage import SqliteCrawlStore\nfrom .governance import HostBudgetController, PromotionDecision, PromotionGate\nfrom .ingestion import GovernedIngestor, IngestionReceipt\nfrom .session import ResearchSession, SessionLimits\nfrom .recrawl import RecrawlItem, RecrawlScheduler\n"""Policy-bound webcrawler plane for AI information gathering."""
+from .storage import SqliteCrawlStore
+from .governance import HostBudgetController, PromotionDecision, PromotionGate
+from .ingestion import GovernedIngestor, IngestionReceipt
+from .session import ResearchSession, SessionLimits
+from .recrawl import RecrawlItem, RecrawlScheduler
+"""Policy-bound webcrawler plane for AI information gathering."""
 
-from .temporal import ChangeEvent, TemporalCorpus, TemporalVersion\nfrom .research import EvidenceObservation, EvidenceSet, ResearchQuery, frontier_priority\nfrom .core import (
+from .temporal import ChangeEvent, TemporalCorpus, TemporalVersion
+from .research import EvidenceObservation, EvidenceSet, ResearchQuery, frontier_priority
+from .core import (
     CrawlBudget, CrawlDocument, CrawlEngine, CrawlPolicy, FrontierItem,
     InMemoryCrawlStore, canonicalize_url, extract_document,
 )
