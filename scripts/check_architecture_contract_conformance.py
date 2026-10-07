@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 from pathlib import Path
 import sys
 from typing import Any
@@ -45,11 +46,31 @@ def _strict_json(text: str) -> Any:
             out[key] = value
         return out
 
-    return json.loads(
+    value = json.loads(
         text,
         parse_constant=reject_constant,
         object_pairs_hook=reject_duplicates,
     )
+    _validate_portable_scalars(value)
+    return value
+
+
+def _validate_portable_scalars(value: Any) -> None:
+    if isinstance(value, dict):
+        for child in value.values():
+            _validate_portable_scalars(child)
+        return
+    if isinstance(value, list):
+        for child in value:
+            _validate_portable_scalars(child)
+        return
+    if type(value) is int and abs(value) > 9_007_199_254_740_991:
+        raise ValueError("integer exceeds portable JSON range")
+    if type(value) is float:
+        if not math.isfinite(value):
+            raise ValueError("non-finite number")
+        if value == 0.0 and math.copysign(1.0, value) < 0:
+            raise ValueError("negative zero is not portable")
 
 
 def _sample_value(field: dict[str, Any], scalars: dict[str, Any], enums: dict[str, Any]) -> Any:
