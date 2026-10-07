@@ -267,6 +267,28 @@ class PromotionAuthorizationRequest:
         return digest_json(self.__dict__)
 
 
+@dataclass(frozen=True)
+class PreparedCorpus:
+    """Ordered, boundary-preserving collection of independently prepared documents."""
+    documents: tuple[PreparedText, ...]
+    document_ids: tuple[str, ...]
+    pipeline_digest: str
+
+    def __post_init__(self) -> None:
+        if not self.documents or len(self.documents) != len(self.document_ids):
+            raise TokenizerContractError("invalid prepared corpus")
+        if len(set(self.document_ids)) != len(self.document_ids):
+            raise TokenizerContractError("duplicate document id")
+        if any(not isinstance(value, str) or not value or value != value.strip() for value in self.document_ids):
+            raise TokenizerContractError("invalid document id")
+        if any(document.pipeline_digest != self.pipeline_digest for document in self.documents):
+            raise TokenizerContractError("mixed pipeline corpus")
+
+    @property
+    def digest(self) -> str:
+        return digest_json({"document_ids": list(self.document_ids), "sequence_digests": [document.sequence.digest for document in self.documents], "raw_text_digests": [document.raw_text_digest for document in self.documents], "pipeline_digest": self.pipeline_digest})
+
+
 class TextTokenPipeline:
     """One admitted, immutable text-to-model-input pipeline."""
 
@@ -321,6 +343,20 @@ class TextTokenPipeline:
             sha256(text.encode("utf-8")).hexdigest(),
             sha256(normalized.encode("utf-8")).hexdigest(),
         )
+
+    def prepare_corpus(self, documents: Iterable[tuple[str, str]]) -> PreparedCorpus:
+        prepared, document_ids = [], []
+        for document_id, text in documents:
+            if not isinstance(document_id, str) or not isinstance(text, str):
+                raise TokenizerContractError("corpus entries require string id and text")
+            document_ids.append(document_id)
+            prepared.append(self.prepare(text))
+        return PreparedCorpus(tuple(prepared), tuple(document_ids), self.digest)
+
+    def corpus_training_receipts(self, corpus: PreparedCorpus, *, pad_token_id: int | None = None, ignore_index: int = -100) -> tuple[TrainingInputReceipt, ...]:
+        if not isinstance(corpus, PreparedCorpus) or corpus.pipeline_digest != self.digest:
+            raise TokenizerContractError("corpus belongs to another pipeline")
+        return tuple(self.training_receipt(document, pad_token_id=pad_token_id, ignore_index=ignore_index) for document in corpus.documents)
 
     def model_batches(self, prepared: PreparedText, *, pad_token_id: int | None = None) -> tuple[ModelInputBatch, ...]:
         if not isinstance(prepared, PreparedText) or prepared.pipeline_digest != self.digest:
@@ -524,4 +560,4 @@ class TextTokenPipeline:
         return prepared
 
 
-__all__ = ["CausalTrainingBatch", "GovernedTrainingInput", "ModelInputBatch", "PreparedText", "PromotionAuthorizationRequest", "TextPipelineConfig", "TextTokenPipeline", "TrainingInputReceipt", "materialize_causal_training_batch", "materialize_model_batch"]
+__all__ = ["CausalTrainingBatch", "GovernedTrainingInput", "ModelInputBatch", "PreparedCorpus", "PreparedText", "PromotionAuthorizationRequest", "TextPipelineConfig", "TextTokenPipeline", "TrainingInputReceipt", "materialize_causal_training_batch", "materialize_model_batch"]
