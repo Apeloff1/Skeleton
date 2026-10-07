@@ -68,7 +68,7 @@ def _effective_confidence(signal,policy_year,decay_ppm):
     for _ in range(age): value=(value*decay_ppm)//1_000_000
     return value
 
-def assess_year_signals(signals,*,policy_year,subject,annual_decay_ppm=900_000):
+def assess_year_signals(signals,*,policy_year,subject,annual_decay_ppm=900_000,era_boundaries=()):
     _year(policy_year,"policy_year")
     if not isinstance(annual_decay_ppm,int) or not 0<=annual_decay_ppm<=1_000_000: raise TemporalSignalError("invalid annual decay")
     signals=tuple(signals)
@@ -92,4 +92,4 @@ def require_signal_authority(assessment,*,min_support_ppm=700_000,max_oppose_ppm
     if assessment.contradiction and not allow_contradiction: raise TemporalSignalError("contradictory temporal evidence")
     return assessment.digest
 
-__all__=["TemporalSignalError","YearSignal","SignalAssessment","assess_year_signals","require_signal_authority"]
+__all__=["TemporalSignalError","YearSignal","EraBoundary","SignalAssessment","assess_year_signals","require_signal_authority"]
