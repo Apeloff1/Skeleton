@@ -61,6 +61,8 @@ class AdmissionDecision:
     rejected: tuple[tuple[str, str], ...]
     token_demand: int
     kv_demand: int
+    kv_evicted_bytes: int
+    resident_kv_bytes: int
     snapshot_digest: str
 
 
@@ -118,6 +120,7 @@ class RuntimeAdmissionScheduler:
         rejected: list[tuple[str, str]] = []
         token_demand = 0
         kv_demand = 0
+        kv_evicted_bytes = 0
 
         working_kv = list(self._kv.values())
         for item in self._ordered_queue():
@@ -150,6 +153,7 @@ class RuntimeAdmissionScheduler:
             if victim_set & set(self._active):
                 deferred.append(rid)
                 continue
+            kv_evicted_bytes += sum(entry.bytes for entry in working_kv if entry.request_id in victim_set)
             working_kv = [entry for entry in working_kv if entry.request_id not in victim_set]
             for victim in victims:
                 if victim not in evicted:
@@ -171,7 +175,8 @@ class RuntimeAdmissionScheduler:
         payload = self.snapshot()
         return AdmissionDecision(
             tuple(admitted), tuple(deferred), tuple(evicted), tuple(rejected),
-            token_demand, kv_demand, _digest(payload)
+            token_demand, kv_demand, kv_evicted_bytes,
+            sum(entry.bytes for entry in self._kv.values()), _digest(payload)
         )
 
     def cancel(self, request_id: str) -> str:
@@ -262,8 +267,30 @@ class RuntimeAdmissionScheduler:
                 "digest": self.policy.digest,
             },
             "capacity": self.capacity(),
-            "queued": list(self.queued_ids),
-            "active": list(self.active_ids),
+            "queued": [
+                {
+                    "request_id": item.request.request_id,
+                    "prompt_tokens": item.request.prompt_tokens,
+                    "max_new_tokens": item.request.max_new_tokens,
+                    "priority": item.request.priority,
+                    "kv_bytes": item.kv_bytes,
+                    "enqueue_sequence": item.enqueue_sequence,
+                    "pinned_kv": item.pinned_kv,
+                }
+                for item in sorted(self._queued.values(), key=lambda x: x.request.request_id)
+            ],
+            "active": [
+                {
+                    "request_id": item.request.request_id,
+                    "prompt_tokens": item.request.prompt_tokens,
+                    "max_new_tokens": item.request.max_new_tokens,
+                    "priority": item.request.priority,
+                    "kv_bytes": item.kv_bytes,
+                    "enqueue_sequence": item.enqueue_sequence,
+                    "pinned_kv": item.pinned_kv,
+                }
+                for item in sorted(self._active.values(), key=lambda x: x.request.request_id)
+            ],
             "kv": [
                 {"request_id": e.request_id, "bytes": e.bytes,
                  "last_used_sequence": e.last_used_sequence, "pinned": e.pinned}
