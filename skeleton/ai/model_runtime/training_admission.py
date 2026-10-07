@@ -50,4 +50,10 @@ def admit_candidate_model(
     rollback=RollbackProof(admission.digest,checkpoint["digest"],restored.model_digest,"native-runtime-restore",True,False)
     return runtime,admission,rollback
 
-def execute_rollback(runtime:NativeLLMRuntime, admission:RuntimeAdmission, rollback:RollbackProof, checkpoint:object)->RollbackProof:\n    if rollback.admission_digest!=admission.digest or rollback.checkpoint_digest!=admission.checkpoint_digest: raise RuntimePromotionError("rollback authority mismatch")\n    if not rollback.verified: raise RuntimePromotionError("rollback was not verified ready")\n    _restore_in_place(runtime,checkpoint,admission.prior_model_digest)\n    return RollbackProof(admission.digest,admission.checkpoint_digest,runtime.model_digest,rollback.verifier_id,True,True)\n\n__all__=["RuntimePromotionError","admit_candidate_model","execute_rollback"]
+def execute_rollback(runtime:NativeLLMRuntime, admission:RuntimeAdmission, rollback:RollbackProof, checkpoint:object)->RollbackProof:
+    if rollback.admission_digest!=admission.digest or rollback.checkpoint_digest!=admission.checkpoint_digest: raise RuntimePromotionError("rollback authority mismatch")
+    if not rollback.verified: raise RuntimePromotionError("rollback was not verified ready")
+    _restore_in_place(runtime,checkpoint,admission.prior_model_digest)
+    return RollbackProof(admission.digest,admission.checkpoint_digest,runtime.model_digest,rollback.verifier_id,True,True)
+
+__all__=["RuntimePromotionError","admit_candidate_model","execute_rollback"]
