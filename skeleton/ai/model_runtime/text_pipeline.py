@@ -602,6 +602,76 @@ def arbitrate_temporal_evidence(items: Sequence[TemporalEvidence]) -> TemporalCo
 
 
 @dataclass(frozen=True)
+class TemporalEvolutionNode:
+    """One version in an append-only event-evolution chain."""
+    evidence_digest: str
+    predecessor_digest: str | None
+    valid_from_year: int
+    valid_to_year: int | None
+    sequence_number: int
+
+    def __post_init__(self) -> None:
+        for name in ("evidence_digest",):
+            value = getattr(self, name)
+            if not isinstance(value, str) or len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value):
+                raise TokenizerContractError(f"invalid {name}")
+        if self.predecessor_digest is not None and (len(self.predecessor_digest) != 64 or any(ch not in "0123456789abcdef" for ch in self.predecessor_digest)):
+            raise TokenizerContractError("invalid predecessor digest")
+        if isinstance(self.sequence_number, bool) or not isinstance(self.sequence_number, int) or self.sequence_number < 0:
+            raise TokenizerContractError("invalid evolution sequence")
+        if self.valid_to_year is not None and self.valid_to_year < self.valid_from_year:
+            raise TokenizerContractError("invalid evolution validity interval")
+
+    @property
+    def digest(self) -> str:
+        return digest_json(self.__dict__)
+
+
+@dataclass(frozen=True)
+class TemporalEvolutionChain:
+    """Replayable chronological history for one claim."""
+    claim_key: str
+    nodes: tuple[TemporalEvolutionNode, ...]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.claim_key, str) or not self.claim_key:
+            raise TokenizerContractError("invalid evolution claim key")
+        if not self.nodes:
+            raise TokenizerContractError("empty evolution chain")
+        for index, node in enumerate(self.nodes):
+            if not isinstance(node, TemporalEvolutionNode) or node.sequence_number != index:
+                raise TokenizerContractError("non-contiguous evolution sequence")
+            expected = None if index == 0 else self.nodes[index - 1].digest
+            if node.predecessor_digest != expected:
+                raise TokenizerContractError("broken evolution predecessor")
+            if index and node.valid_from_year < self.nodes[index - 1].valid_from_year:
+                raise TokenizerContractError("evolution chronology runs backward")
+
+    @property
+    def digest(self) -> str:
+        return digest_json({"claim_key": self.claim_key, "nodes": [node.digest for node in self.nodes]})
+
+
+def build_temporal_evolution_chain(items: Sequence[TemporalEvidence]) -> TemporalEvolutionChain:
+    evidence = tuple(items)
+    if not evidence or any(not isinstance(item, TemporalEvidence) for item in evidence):
+        raise TokenizerContractError("temporal evidence required")
+    claim = evidence[0].claim_key
+    if any(item.claim_key != claim for item in evidence):
+        raise TokenizerContractError("evolution chain requires one claim")
+    if len({item.evidence_id for item in evidence}) != len(evidence):
+        raise TokenizerContractError("duplicate temporal evidence id")
+    ordered = tuple(sorted(evidence, key=lambda item: (item.signal.source_year, item.signal.observed_year, item.evidence_id)))
+    nodes = []
+    for index, item in enumerate(ordered):
+        valid_from = item.signal.valid_from_year if item.signal.valid_from_year is not None else item.signal.source_year
+        valid_to = item.signal.valid_to_year
+        predecessor = None if not nodes else nodes[-1].digest
+        nodes.append(TemporalEvolutionNode(item.digest, predecessor, valid_from, valid_to, index))
+    return TemporalEvolutionChain(claim, tuple(nodes))
+
+
+@dataclass(frozen=True)
 class SupervisedTextExample:
     """One prompt/response example with a deterministic normalized boundary."""
     example_id: str
