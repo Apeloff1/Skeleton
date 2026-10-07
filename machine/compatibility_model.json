@@ -1,6 +1,6 @@
 {
   "schema_version": "skeleton.trace.compatibility_model.v1",
-  "model_version": "0.1.0",
+  "model_version": "0.2.0",
   "status": "active",
   "purpose": "Producer/consumer compatibility and mixed-version policy for canonical schemas and interfaces.",
   "masterplan_binding": {
@@ -14,7 +14,8 @@
   "sources": {
     "schemas": "machine/schema_registry.json",
     "interfaces": "machine/capability_interfaces.json",
-    "guard": "skeleton/data/schema_evolution.py"
+    "guard": "skeleton/data/schema_evolution.py",
+    "executable_guard": "skeleton/data/schema_evolution.py"
   },
   "support_window_policy": {
     "default_supported_versions": 2,
@@ -553,6 +554,83 @@
       "consumer_planes": [
         "application-api",
         "model-routing",
+        "retrieval"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-ProtocolEnvelope",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "foundation",
+      "consumer_planes": [
+        "configuration-secrets",
+        "data-persistence",
+        "identity",
+        "memory",
+        "model-provider",
+        "observability",
+        "orchestration",
+        "prompt-context",
+        "tool-runtime"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-ProtocolExecutionEnvelope",
+      "current_version": 2,
+      "supported_versions": [
+        2
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "orchestration",
+      "consumer_planes": [
+        "application-api",
+        "engine-api",
+        "reasoning-verification"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-ProtocolReceipt",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "observability",
+      "consumer_planes": [
+        "cost-capacity",
+        "deployment-release",
+        "engine-api",
+        "evaluation",
+        "feedback-learning",
+        "jobs-durability",
+        "model-routing",
+        "operator-control",
+        "product-experience",
+        "resilience",
+        "streaming-realtime",
+        "tool-runtime"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-ConsistencyProfile",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "data-persistence",
+      "consumer_planes": [
+        "artifact-files",
+        "jobs-durability",
+        "memory",
+        "resilience",
         "retrieval"
       ],
       "migration_required_for_breaking_change": true
