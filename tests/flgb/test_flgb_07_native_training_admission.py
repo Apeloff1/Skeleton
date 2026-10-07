@@ -2,7 +2,7 @@ import unittest
 from skeleton.cortex.transformer import TinyTransformer
 from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
 from skeleton.ai.model_runtime.runtime_checkpoint import portable_model_snapshot,snapshot_digest
-from skeleton.ai.model_runtime.training_admission import RuntimePromotionError,admit_candidate_model
+from skeleton.ai.model_runtime.training_admission import RuntimePromotionError,admit_candidate_model,execute_rollback
 from skeleton.ai.training.flgb_training_runtime import CandidateWeights,PromotionEvidence
 
 def setup():
@@ -24,8 +24,7 @@ class TestNativeTrainingAdmission(unittest.TestCase):
   self.assertNotEqual(admitted.model_digest,prior)
   self.assertEqual(a.prior_model_digest,prior)
   self.assertEqual(rb.restored_model_digest,prior)
-  self.assertEqual(NativeLLMRuntime.restore(cp).model_digest,prior)
- def test_declared_digest_cannot_lie_about_observed_weights(self):
+  self.assertEqual(NativeLLMRuntime.restore(cp).model_digest,prior)\n  executed=execute_rollback(admitted,a,rb,cp)\n  self.assertTrue(executed.executed)\n  self.assertEqual(admitted.model_digest,prior)\n  self.assertEqual(admitted._current_model_digest(),prior)\n def test_declared_digest_cannot_lie_about_observed_weights(self):
   rt,cp,prior,c,p,apply=setup()
   c=CandidateWeights("candidate","f"*64,c.training_lineage_digest,prior)
   p=PromotionEvidence(c.digest,p.exact_head_commit,p.rights_digest,p.contamination_scan_digest,p.evaluation_digest,p.rollback_digest,p.independent_verifier,True,True,True,True)
