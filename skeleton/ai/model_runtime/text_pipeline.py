@@ -139,6 +139,61 @@ class TemporalTrainingSignal:
 
 
 @dataclass(frozen=True)
+class DecadeTrainingSignal:
+    """Coarse temporal feature derived from an exact leakage-safe year signal."""
+    source_decade: int
+    observed_decade: int
+    cutoff_decade: int
+    source_year: int
+    cutoff_year: int
+
+    def __post_init__(self) -> None:
+        for value in (self.source_decade, self.observed_decade, self.cutoff_decade):
+            if isinstance(value, bool) or not isinstance(value, int) or value % 10 or not 1000 <= value <= 9990:
+                raise TokenizerContractError("invalid decade signal")
+        if self.source_decade != (self.source_year // 10) * 10 or self.cutoff_decade != (self.cutoff_year // 10) * 10:
+            raise TokenizerContractError("decade signal does not match exact year")
+        if self.source_decade > self.observed_decade or self.observed_decade > self.cutoff_decade:
+            raise TokenizerContractError("invalid decade chronology")
+
+    @property
+    def distance_decades(self) -> int:
+        return (self.cutoff_decade - self.source_decade) // 10
+
+    @property
+    def cohort(self) -> str:
+        distance = self.distance_decades
+        if distance == 0:
+            return "same-decade"
+        if distance == 1:
+            return "previous-decade"
+        if distance <= 3:
+            return "modern-history"
+        if distance <= 7:
+            return "long-history"
+        return "deep-history"
+
+    @property
+    def digest(self) -> str:
+        return digest_json(self.__dict__)
+
+
+def decade_weight_ppm(signal: DecadeTrainingSignal) -> int:
+    if not isinstance(signal, DecadeTrainingSignal):
+        raise TokenizerContractError("DecadeTrainingSignal required")
+    distance = signal.distance_decades
+    if distance == 0:
+        return 1_000_000
+    if distance == 1:
+        return 800_000
+    if distance <= 3:
+        return 600_000
+    if distance <= 7:
+        return 350_000
+    return 150_000
+
+
+@dataclass(frozen=True)
 class TemporalSupersession:
     """Deterministic relationship between older and newer temporal evidence."""
     older_signal_digest: str
@@ -674,6 +729,17 @@ class TextTokenPipeline:
 
     def temporal_signal(self, *, source_year: int, observed_year: int, knowledge_cutoff_year: int, valid_from_year: int | None = None, valid_to_year: int | None = None) -> TemporalTrainingSignal:
         return TemporalTrainingSignal(source_year, observed_year, knowledge_cutoff_year, valid_from_year, valid_to_year)
+
+    def decade_signal(self, signal: TemporalTrainingSignal) -> DecadeTrainingSignal:
+        if not isinstance(signal, TemporalTrainingSignal):
+            raise TokenizerContractError("TemporalTrainingSignal required")
+        return DecadeTrainingSignal(
+            (signal.source_year // 10) * 10,
+            (signal.observed_year // 10) * 10,
+            (signal.knowledge_cutoff_year // 10) * 10,
+            signal.source_year,
+            signal.knowledge_cutoff_year,
+        )
 
     def temporal_supersession(self, older: TemporalTrainingSignal, newer: TemporalTrainingSignal, *, supersedes: bool) -> TemporalSupersession:
         if not isinstance(older, TemporalTrainingSignal) or not isinstance(newer, TemporalTrainingSignal):
