@@ -429,15 +429,11 @@ class CrawlEngine:
             return False
         robots_url = origin + "/robots.txt"
         try:
-            response = self.fetcher.fetch(
-                robots_url, user_agent=self.policy.user_agent,
-                max_bytes=min(self.policy.max_response_bytes, 512_000),
-            )
+            from .redirects import fetch_robots_with_policy
+            response = fetch_robots_with_policy(self, robots_url, now=time.time())
         except Exception:
-            self.budget.requests += 1
             return False
         body = response.body[:512_000]
-        self.budget.charge_response(len(body), accepted=False)
         if response.status in {404, 410}:
             self.robots.install(origin, "")
             return True
