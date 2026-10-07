@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-16:content_addressing:v1",
+  "title": "FLGB-16 content addressing",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "namespace",
+    "algorithm",
+    "digest"
+  ],
+  "properties": {
+    "namespace": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "algorithm": {
+      "const": "sha256"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
