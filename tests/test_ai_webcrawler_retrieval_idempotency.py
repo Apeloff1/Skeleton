@@ -20,3 +20,26 @@ def test_duplicate_delivery_returns_same_receipt_without_duplicate_provenance():
  p=PromotionDecision("p","h","promote",(),1,.9,"p",2,2)
  a=b.ingest(d,p);z=b.ingest(d,p)
  assert a==z and i.revision==1 and l.n==1
+
+def test_durable_receipt_prevents_duplicate_after_bridge_restart(tmp_path):
+ from skeleton.ai.webcrawler.storage import SqliteCrawlStore
+ from skeleton.ai.webcrawler.ingestion_registry import DurableIngestionRegistry
+ s=SqliteCrawlStore(tmp_path/"c.db");registry=DurableIngestionRegistry(s.db)
+ i=Index();l=Ledger();d=CrawlDocument("https://a/x","https://a/x","","text","text/plain","h",1,.9,{"schema":"p"},())
+ p=PromotionDecision("p","h","promote",(),1,.9,"p",2,2)
+ first=CanonicalRetrievalBridge(i,l,Chunker(),registry=registry,owner="a").ingest(d,p,now=0)
+ second=CanonicalRetrievalBridge(i,l,Chunker(),registry=registry,owner="b").ingest(d,p,now=100)
+ assert first==second and i.revision==1 and l.n==1
+def test_failed_ingestion_abandons_reservation_for_retry(tmp_path):
+ from skeleton.ai.webcrawler.storage import SqliteCrawlStore
+ from skeleton.ai.webcrawler.ingestion_registry import DurableIngestionRegistry
+ class BadIndex:
+  revision=0
+  def add(self,*a):raise RuntimeError("boom")
+ s=SqliteCrawlStore(tmp_path/"c.db");registry=DurableIngestionRegistry(s.db)
+ d=CrawlDocument("https://a/x","https://a/x","","text","text/plain","h",1,.9,{"schema":"p"},())
+ p=PromotionDecision("p","h","promote",(),1,.9,"p",2,2)
+ try:CanonicalRetrievalBridge(BadIndex(),Ledger(),Chunker(),registry=registry).ingest(d,p,now=0)
+ except RuntimeError:pass
+ else:raise AssertionError("expected failure")
+ assert registry.reserve("h:p","retry",now=0,ttl=10)
