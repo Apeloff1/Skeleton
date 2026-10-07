@@ -113,11 +113,21 @@ class NativeTokenizer:
             raise TokenizerContractError("model embedding/vocabulary size mismatch")
         if not _is_int(model.unk) or not 0 <= model.unk < len(self._vocab):
             raise TokenizerContractError("invalid model unknown-token id")
+        declared_specials = {"unk": int(model.unk)}
+        for name in ("pad", "bos", "eos"):
+            attr = getattr(model, name, None)
+            if attr is None:
+                continue
+            if not _is_int(attr) or not 0 <= attr < len(self._vocab):
+                raise TokenizerContractError(f"invalid model {name}-token id")
+            declared_specials[name] = int(attr)
+        if len(set(declared_specials.values())) != len(declared_specials):
+            raise TokenizerContractError("special token ids must be distinct")
         self._manifest = VocabularyManifest(
             "native-transformer",
             "v1",
             tuple((token, index) for index, token in enumerate(self._vocab)),
-            {"unk": model.unk},
+            declared_specials,
         )
         self._bpe_snapshot = self._capture_bpe()
         self._digest = self._identity_digest(self._bpe_snapshot)
@@ -157,10 +167,26 @@ class NativeTokenizer:
     def vocabulary_manifest(self) -> VocabularyManifest:
         return self._manifest
 
+    def special_token_id(self, name: str, *, required: bool = False) -> int | None:
+        if not isinstance(name, str) or not name:
+            raise TokenizerContractError("special token name required")
+        token_id = self._manifest.special_tokens.get(name)
+        if token_id is None and required:
+            raise TokenizerContractError(f"tokenizer does not declare {name} token")
+        return token_id
+
     def assert_unchanged(self) -> None:
         current_vocab = tuple(str(token) for token in self.model.itos)
         if current_vocab != self._vocab or int(self.model.unk) != self._manifest.special_tokens["unk"]:
             raise TokenizerContractError("model vocabulary changed after admission")
+        for name in ("pad", "bos", "eos"):
+            admitted = self._manifest.special_tokens.get(name)
+            current = getattr(self.model, name, None)
+            if admitted is None:
+                if current is not None:
+                    raise TokenizerContractError("model special-token policy changed after admission")
+            elif current != admitted:
+                raise TokenizerContractError("model special-token policy changed after admission")
         if self._identity_digest(self._capture_bpe()) != self._digest:
             raise TokenizerContractError("BPE/tokenizer state changed after admission")
 
