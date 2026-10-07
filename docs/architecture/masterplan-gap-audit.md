@@ -1685,3 +1685,17 @@ The research plane now reasons about the value and sufficiency of future evidenc
 - regressions cover information-value ranking, sequential evidence continuation/acceptance, posterior source learning and durable assurance-state restart.
 
 This enables a future orchestrator to choose the next research action based on expected uncertainty reduction per cost, update source priors when claims resolve, and preserve learned assurance state across restarts. Remaining work: derive information gain from current posterior entropy instead of accepting it as an action input; combine dependence clusters with source posteriors; persist calibrated outcomes; and integrate the action ranker with acquisition targets/provider budgets.
+
+
+### 2026-10-08 SOTA self-measuring research controller tranche
+
+The research plane now closes the loop between uncertainty, action selection and empirical performance:
+- expected_binary_information_gain derives action value from expected posterior entropy reduction using candidate sensitivity/specificity rather than accepting an arbitrary information-gain scalar;
+- dependence_adjusted_trust combines learned source-quality posteriors with the evidence-dependence graph and caps a correlated component at its strongest calibrated member, preventing copied/cited evidence from multiplying trust;
+- ActionEconomics incrementally learns empirical action success probability, mean cost and mean latency;
+- schema v7 persists action economics and resolved calibration outcomes;
+- ResearchLearningStore exposes deterministic empirical learning state for calibration and action planning;
+- choose_next_action is a budget-bound controller that selects feasible research actions by entropy reduction after explicit cost/latency penalties;
+- regressions cover uninformative tests, high-information tests, hard budget exclusion, dependence-adjusted trust, durable action economics and empirical Brier calibration.
+
+This creates a self-measuring research controller: it can estimate uncertainty, choose an information-seeking action, observe its cost/outcome, update action/source models, measure calibration, and improve future action choice. Remaining frontier work is model uncertainty around action sensitivity/specificity themselves, contextual/bandit action learning, multi-hypothesis entropy instead of binary claims, calibration drift detection, and exact-head executable validation.
