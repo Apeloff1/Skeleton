@@ -234,10 +234,32 @@ def test_character_knowledge_rejects_unattributed_observation_evidence() -> None
         )
 
 
+def _source_record(
+    source_id: str,
+    content_digest: str,
+    rights_state: RightsState,
+    allowed_uses: frozenset[UseKind],
+    source_class: str,
+    *,
+    license_id: str | None = None,
+) -> SourceRecord:
+    evidence = _digest(f"rights-{source_id}")
+    return SourceRecord(
+        source_id,
+        content_digest,
+        rights_state,
+        allowed_uses,
+        source_class,
+        _authority(f"rights-{source_id}-authority", evidence),
+        evidence,
+        license_id=license_id,
+    )
+
+
 def test_unknown_rights_fail_closed_and_reference_only_cannot_supply_expression() -> None:
     ledger = RightsLedger()
     ledger.register_source(
-        SourceRecord(
+        _source_record(
             "unknown",
             _digest("unknown"),
             RightsState.UNKNOWN_QUARANTINE,
@@ -253,7 +275,7 @@ def test_unknown_rights_fail_closed_and_reference_only_cannot_supply_expression(
     assert blocked.allowed is False
 
     ledger.register_source(
-        SourceRecord(
+        _source_record(
             "reference",
             _digest("reference"),
             RightsState.FACTS_IDEAS_REFERENCE_ONLY,
@@ -273,9 +295,37 @@ def test_unknown_rights_fail_closed_and_reference_only_cannot_supply_expression(
     ).allowed
 
 
+def test_source_rights_claim_rejects_unattributed_review_evidence() -> None:
+    evidence = _digest("rights-unbound")
+    with pytest.raises(RightsError, match="rights evidence must be referenced"):
+        SourceRecord(
+            "forged-rights",
+            _digest("forged-rights"),
+            RightsState.PROJECT_OWNED,
+            frozenset({UseKind.RELEASE_DISTRIBUTION}),
+            "project-source",
+            _authority("wrong-rights-authority", _digest("other-rights")),
+            evidence,
+        )
+
+
+def test_licensed_reuse_requires_license_identity() -> None:
+    evidence = _digest("rights-licensed")
+    with pytest.raises(ValueError, match="requires license identity"):
+        SourceRecord(
+            "licensed",
+            _digest("licensed"),
+            RightsState.LICENSED_REUSE,
+            frozenset({UseKind.RELEASE_DISTRIBUTION}),
+            "licensed-source",
+            _authority("licensed-rights-authority", evidence),
+            evidence,
+        )
+
+
 def test_unresolved_high_similarity_risk_blocks_release_until_reviewed() -> None:
     ledger = RightsLedger()
-    source = SourceRecord(
+    source = _source_record(
         "owned",
         _digest("owned"),
         RightsState.PROJECT_OWNED,
@@ -340,7 +390,7 @@ def test_similarity_finding_rejects_unattributed_detection_evidence() -> None:
 def test_similarity_resolution_requires_attributed_review_evidence() -> None:
     ledger = RightsLedger()
     ledger.register_source(
-        SourceRecord(
+        _source_record(
             "owned",
             _digest("owned"),
             RightsState.PROJECT_OWNED,
@@ -373,7 +423,7 @@ def test_similarity_resolution_requires_attributed_review_evidence() -> None:
 def test_high_risk_similarity_cannot_be_self_cleared_by_detector() -> None:
     ledger = RightsLedger()
     ledger.register_source(
-        SourceRecord(
+        _source_record(
             "owned-self-review",
             _digest("owned-self-review"),
             RightsState.PROJECT_OWNED,
