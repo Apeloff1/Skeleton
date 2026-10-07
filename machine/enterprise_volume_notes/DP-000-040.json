@@ -1724,7 +1724,9 @@
           "ModelRequest",
           "ModelResult",
           "ModelStreamEvent",
-          "InferenceUsage"
+          "InferenceUsage",
+          "BatchPlan",
+          "SpeculationDecision"
         ],
         "canonical_paths": [
           "skeleton/provider_runtime.py",
@@ -1742,8 +1744,7 @@
           "uncancelled expensive work"
         ],
         "gaps": [
-          "continuous batching and local serving optimization remain future performance work",
-          "speculative decoding requires measured correctness gates"
+          "independent exact-head VOL-007 Inference Engine Closure qualification remains pending"
         ],
         "tests": [
           "tests/test_model_runtime.py",
@@ -1752,14 +1753,24 @@
           "skeleton/testing/test_vol007_inference_session.py",
           "skeleton/testing/test_vol007_provider_bridge.py",
           "skeleton/testing/test_vol007_inference_replay.py",
-          "skeleton/testing/test_vol007_async_runtime.py"
+          "skeleton/testing/test_vol007_async_runtime.py",
+          "skeleton/testing/test_vol007_batching.py"
         ],
         "evaluations": [
           "planned:stream/cancel/failover matrix",
-          "planned:latency-cost-quality characterization"
+          "planned:latency-cost-quality characterization",
+          ".github/workflows/vol007-inference.yml",
+          "scripts/verify_vol007_inference.py"
         ],
         "existing_evidence": [
-          "implementation-head:a6bacd6b09b83c09ff1f397a05bb48a8cfcdd2f9"
+          "implementation-head:a6bacd6b09b83c09ff1f397a05bb48a8cfcdd2f9",
+          "skeleton/inference/batching.py",
+          "skeleton/inference/speculation.py",
+          "skeleton/testing/test_vol007_batching.py",
+          "skeleton/testing/test_vol007_speculation.py",
+          "scripts/verify_vol007_inference.py",
+          "tests/test_vol007_inference_independent.py",
+          ".github/workflows/vol007-inference.yml"
         ]
       },
       "implementation_levels": [
@@ -1982,17 +1993,19 @@
           "stale provider health"
         ],
         "gaps": [
-          "bind evidence-qualified canonical router decisions into every live model-routing entrypoint",
+          "bind governed route execution permits into remaining product/backend provider-routing entrypoints",
           "add learned-routing experiments only behind champion/challenger evaluation"
         ],
         "tests": [
           "skeleton/testing/test_routing_context_receipt.py",
           "tests/test_model_routing.py",
           "skeleton/testing/test_context_compiler.py",
-          "skeleton/testing/test_routing_governance_oct2026.py"
+          "skeleton/testing/test_routing_governance_oct2026.py",
+          "skeleton/testing/test_vol008_routing_execution.py"
         ],
         "evaluations": [
-          ".github/workflows/p1-intel-routing-context.yml"
+          ".github/workflows/p1-intel-routing-context.yml",
+          ".github/workflows/vol008-governed-routing-execution.yml"
         ],
         "existing_evidence": [
           "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
@@ -2000,7 +2013,9 @@
           "https://github.com/Apeloff1/Skeleton/actions/runs/36453604716",
           "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94",
           "skeleton/intelligence/routing_governance.py",
-          "skeleton/testing/test_routing_governance_oct2026.py"
+          "skeleton/testing/test_routing_governance_oct2026.py",
+          "skeleton/intelligence/routing_execution.py",
+          "skeleton/testing/test_vol008_routing_execution.py"
         ]
       },
       "implementation_levels": [
