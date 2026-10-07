@@ -1111,7 +1111,7 @@
       "source": "skeleton/learning",
       "destination": "skeleton/ai/learning",
       "kind": "tree",
-      "source_git_object_sha": "4c6cdadff67847d2a1fdbd42f346fbd735124eec",
+      "source_git_object_sha": "28193016f82b75b4585fcb51dd83aecdf566de62",
       "role": "controlled learning support with evidence-grounded learner-state inference, objective planning, and outcome evaluation",
       "work_package_refs": [
         "WP-W00",
@@ -2670,7 +2670,7 @@
       "source": "skeleton/learning/school",
       "destination": "skeleton/ai/learning/school",
       "kind": "tree",
-      "source_git_object_sha": "4f14ed170585eec28d6ae8fcad300690275e09a5",
+      "source_git_object_sha": "caa988b6e01ad0fccee5ba09eafb11f5cc41c257",
       "role": "Curriculum, assessment, tutoring, code-intelligence, and learning-control modules deepen the existing controlled-learning owner.",
       "work_package_refs": [
         "WP-W28"
