@@ -763,6 +763,71 @@ def independent_confidence_ppm(items: Sequence[TemporalSourceEvidence]) -> int:
 
 
 @dataclass(frozen=True)
+class TemporalRetentionResult:
+    """Before/after cohort score used to detect destructive temporal updates."""
+    cohort: str
+    before_correct: int
+    before_total: int
+    after_correct: int
+    after_total: int
+
+    def __post_init__(self) -> None:
+        if self.cohort not in {"historical", "current", "stable", "unrelated"}:
+            raise TokenizerContractError("invalid retention cohort")
+        for value in (self.before_correct, self.before_total, self.after_correct, self.after_total):
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise TokenizerContractError("invalid retention count")
+        if self.before_total <= 0 or self.after_total <= 0 or self.before_correct > self.before_total or self.after_correct > self.after_total:
+            raise TokenizerContractError("invalid retention accounting")
+
+    @property
+    def before_ppm(self) -> int:
+        return self.before_correct * 1_000_000 // self.before_total
+
+    @property
+    def after_ppm(self) -> int:
+        return self.after_correct * 1_000_000 // self.after_total
+
+    @property
+    def delta_ppm(self) -> int:
+        return self.after_ppm - self.before_ppm
+
+    @property
+    def digest(self) -> str:
+        return digest_json(self.__dict__)
+
+
+@dataclass(frozen=True)
+class TemporalRetentionGate:
+    """Promotion receipt requiring acquisition without destructive forgetting."""
+    result_digests: tuple[str, ...]
+    maximum_regression_ppm: int
+    minimum_current_gain_ppm: int
+    passed: bool
+
+    @property
+    def digest(self) -> str:
+        return digest_json({"result_digests": list(self.result_digests), "maximum_regression_ppm": self.maximum_regression_ppm, "minimum_current_gain_ppm": self.minimum_current_gain_ppm, "passed": self.passed})
+
+
+def temporal_retention_gate(results: Sequence[TemporalRetentionResult], *, maximum_regression_ppm: int, minimum_current_gain_ppm: int = 0) -> TemporalRetentionGate:
+    items = tuple(results)
+    if not items or any(not isinstance(item, TemporalRetentionResult) for item in items):
+        raise TokenizerContractError("temporal retention results required")
+    if len({item.cohort for item in items}) != len(items):
+        raise TokenizerContractError("duplicate retention cohort")
+    if "current" not in {item.cohort for item in items}:
+        raise TokenizerContractError("current retention cohort required")
+    for value in (maximum_regression_ppm, minimum_current_gain_ppm):
+        if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 1_000_000:
+            raise TokenizerContractError("invalid retention threshold")
+    current = next(item for item in items if item.cohort == "current")
+    protected = tuple(item for item in items if item.cohort != "current")
+    passed = current.delta_ppm >= minimum_current_gain_ppm and all(item.delta_ppm >= -maximum_regression_ppm for item in protected)
+    return TemporalRetentionGate(tuple(item.digest for item in items), maximum_regression_ppm, minimum_current_gain_ppm, passed)
+
+
+@dataclass(frozen=True)
 class SupervisedTextExample:
     """One prompt/response example with a deterministic normalized boundary."""
     example_id: str
