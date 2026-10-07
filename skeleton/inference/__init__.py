@@ -4,3 +4,10 @@ __all__=["InferenceContractError","InferenceSession","InferenceUsage","ModelRequ
 from .provider_bridge import consume_provider_deltas, finish_provider_response, provider_payload_digest, record_provider_delta, terminate_provider_failure
 from .replay import InferenceReplay, verify_replay
 from .async_runtime import StreamBudgetExceeded, StreamDeadlineExceeded, consume_provider_stream
+
+from .batching import BatchCompatibilityKey, BatchItem, BatchPlan, ContinuousBatchScheduler, verify_batch_membership
+from .speculation import SpeculativeCandidate, SpeculationDecision, assess_speculative_candidate, require_speculative_equivalence
+__all__ += [
+    "BatchCompatibilityKey","BatchItem","BatchPlan","ContinuousBatchScheduler","verify_batch_membership",
+    "SpeculativeCandidate","SpeculationDecision","assess_speculative_candidate","require_speculative_equivalence",
+]
