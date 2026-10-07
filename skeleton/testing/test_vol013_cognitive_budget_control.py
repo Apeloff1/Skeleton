@@ -436,6 +436,54 @@ def test_reservation_rejects_expected_usage_above_hard_ceiling() -> None:
         )
 
 
+def test_control_decision_rejects_candidate_manifest_digest_drift() -> None:
+    policy = _policy()
+    candidate = _candidate(ReasoningStrategy.DIRECT, tokens=120, cost=1.5, time_s=6.0)
+    decision = evaluate_cognitive_control(
+        policy,
+        (candidate,),
+        (_step(1, tokens=100, cost=1.0, elapsed=5.0),),
+        risk=ReasoningRisk.LOW,
+    )
+
+    tampered = replace(candidate, expected_tokens=119)
+    with pytest.raises(ReasoningPolicyError, match="candidate manifest identity drift"):
+        replace(decision, candidates=(tampered,))
+
+
+def test_control_decision_binds_reservation_estimates_to_selected_candidate() -> None:
+    policy = _policy()
+    candidate = _candidate(ReasoningStrategy.DIRECT, tokens=120, cost=1.5, time_s=6.0)
+    decision = evaluate_cognitive_control(
+        policy,
+        (candidate,),
+        (_step(1, tokens=100, cost=1.0, elapsed=5.0),),
+        risk=ReasoningRisk.LOW,
+    )
+    assert decision.reservation is not None
+
+    understated = replace(decision.reservation, expected_tokens=119)
+    with pytest.raises(ReasoningPolicyError, match="reservation token estimate drift"):
+        replace(decision, reservation=understated)
+
+
+def test_control_decision_canonicalizes_candidate_manifest_order() -> None:
+    policy = _policy()
+    search = _candidate(ReasoningStrategy.SEARCH, quality=0.82)
+    direct = _candidate(ReasoningStrategy.DIRECT, quality=0.80)
+    decision = evaluate_cognitive_control(
+        policy,
+        (search, direct),
+        (_step(1, tokens=100, cost=1.0, elapsed=5.0),),
+        risk=ReasoningRisk.LOW,
+    )
+
+    assert tuple(row.strategy for row in decision.candidates) == (
+        ReasoningStrategy.DIRECT,
+        ReasoningStrategy.SEARCH,
+    )
+
+
 def test_terminal_decision_cannot_smuggle_a_selection_or_reservation() -> None:
     policy = _policy()
     terminal = evaluate_cognitive_control(
