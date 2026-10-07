@@ -22,13 +22,13 @@ class SafeHttpFetcher:
     max_redirects:int=5
     allowed_hosts:frozenset[str]|None=None
     bind_dns_to_socket:bool=True
-    def fetch_once(self,url,*,user_agent,max_bytes):
+    def fetch_once(self,url,*,user_agent,max_bytes,extra_headers=None):
         if self.bind_dns_to_socket:
             from .bound_http import SocketBoundFetcher
-            return SocketBoundFetcher(self.timeout_seconds,self.allowed_hosts).fetch_once(url,user_agent=user_agent,max_bytes=max_bytes)
+            return SocketBoundFetcher(self.timeout_seconds,self.allowed_hosts).fetch_once(url,user_agent=user_agent,max_bytes=max_bytes,extra_headers=extra_headers)
         current=_validate_destination(url,self.allowed_hosts)
         opener=urllib.request.build_opener(_NoRedirect)
-        request=urllib.request.Request(current,headers={"User-Agent":user_agent,"Accept":"text/html,text/plain,application/xhtml+xml;q=0.9,*/*;q=0.1","Accept-Encoding":"identity"},method="GET")
+        request=urllib.request.Request(current,headers={"User-Agent":user_agent,"Accept":"text/html,text/plain,application/xhtml+xml;q=0.9,*/*;q=0.1","Accept-Encoding":"identity",**({str(k):str(v) for k,v in (extra_headers or {}).items()} )},method="GET")
         try:response=opener.open(request,timeout=self.timeout_seconds)
         except urllib.error.HTTPError as exc:response=exc
         status=int(response.status);headers={k.lower():v for k,v in response.headers.items()}
