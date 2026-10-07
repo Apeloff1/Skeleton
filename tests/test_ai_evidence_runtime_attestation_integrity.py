@@ -42,6 +42,17 @@ from skeleton.ai.learning.school.session_runtime import (
     SessionEvent,
     SessionPhase,
 )
+from skeleton.learning.school.runtime_attestation import (
+    RuntimeAttestation as CanonicalRuntimeAttestation,
+    verify_attestation as verify_canonical_attestation,
+)
+from skeleton.learning.school.runtime_capsule import (
+    RuntimeIntegrityCapsule as CanonicalRuntimeIntegrityCapsule,
+)
+from skeleton.learning.school.runtime_replay import (
+    audit_runtime as audit_canonical_runtime,
+    replay_digest as canonical_replay_digest,
+)
 from skeleton.shells.evidence_chain import EvidenceNode
 
 
@@ -198,6 +209,36 @@ def runtime_snapshot(
 
 
 class EvidenceRuntimeAttestationIntegrityTests(unittest.TestCase):
+    def test_canonical_runtime_accepts_governed_ai_tree_twins(self) -> None:
+        ledger = decision_ledger()
+        snapshot = runtime_snapshot(ledger)
+
+        audit = audit_canonical_runtime(snapshot, ledger)
+        self.assertTrue(audit.valid, audit.violations)
+        self.assertEqual(
+            canonical_replay_digest(snapshot),
+            replay_digest(snapshot),
+        )
+
+        capsule = CanonicalRuntimeIntegrityCapsule.capture(
+            snapshot,
+            ledger,
+        )
+        self.assertTrue(capsule.verify(ledger).valid)
+
+        attestation = CanonicalRuntimeAttestation.capture(
+            snapshot,
+            ledger,
+        )
+        self.assertEqual(
+            verify_canonical_attestation(
+                attestation,
+                snapshot,
+                ledger,
+            ),
+            (),
+        )
+
     def test_canonical_fingerprint_rejects_runtime_object_coercion(self) -> None:
         class RuntimeOnly:
             pass
