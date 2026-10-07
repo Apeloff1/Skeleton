@@ -132,6 +132,12 @@ chroma_data/
 .git_workspaces/
 backend/.git_workspaces/
 
+
+# Generated repository-machine snapshots are CI artifacts, not source Git.
+/.machine/repository-machine.json
+/.machine/code-search-index.json
+/.machine/index-artifact-manifest.json
+
 # Generated build / vault artifacts — never commit (large binaries)
 backend/artifacts/
 backend/artifacts_media/
