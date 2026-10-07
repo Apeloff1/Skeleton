@@ -34,10 +34,16 @@ def _authority(
 
 
 def _novelty(digest: str, quality: float, x: float, y: float) -> NoveltyRecord:
+    evidence = "novelty-" + digest[:16] + "-evidence"
     return NoveltyRecord.create(
         candidate_digest=digest,
         quality_score=quality,
         features={"x": x, "y": y},
+        evaluator_provenance=_authority(
+            "novelty-" + digest[:8] + "-judge",
+            evidence,
+        ),
+        evidence_digest=evidence,
     )
 
 
@@ -63,6 +69,21 @@ def test_novelty_identity_reuse_with_changed_payload_fails_closed() -> None:
 
     with pytest.raises(ResilienceError, match="identity reused"):
         reservoir.admit(changed)
+
+
+def test_novelty_record_rejects_unattributed_evaluation() -> None:
+    evidence = "novelty-evidence-" + "e" * 24
+    with pytest.raises(ResilienceError, match="referenced by evaluator authority"):
+        NoveltyRecord.create(
+            candidate_digest="n" * 64,
+            quality_score=0.7,
+            features={"x": 0.2},
+            evaluator_provenance=_authority(
+                "wrong-novelty-judge",
+                "other-novelty-" + "x" * 24,
+            ),
+            evidence_digest=evidence,
+        )
 
 
 def test_dissent_ledger_preserves_blocker_until_explicit_resolution() -> None:
@@ -198,24 +219,81 @@ def test_impact_graph_computes_transitive_blast_radius_and_rejects_unknown_depen
         graph.add_node("bad", depends_on=("missing",))
 
 
+def test_invariant_revision_requires_attributed_change_authority() -> None:
+    registry = InvariantRegistry()
+    evidence = "invariant-base-" + "a" * 24
+    base = Invariant(
+        invariant_id="INV-REV",
+        scope="combat",
+        expression="health >= 0",
+        source_pillar="mechanics",
+        severity=8,
+        authority_provenance=_authority("invariant-author", evidence),
+        evidence_digest=evidence,
+    )
+    registry.add(base)
+
+    revised_evidence = "invariant-revised-" + "b" * 24
+    revised = Invariant(
+        invariant_id="INV-REV",
+        scope="combat",
+        expression="health >= -1",
+        source_pillar="mechanics",
+        severity=8,
+        authority_provenance=_authority("invariant-revised-author", revised_evidence),
+        evidence_digest=revised_evidence,
+    )
+    with pytest.raises(
+        ResilienceError,
+        match="revision evidence must be referenced",
+    ):
+        registry.revise(
+            revised,
+            authority_provenance=_authority(
+                "wrong-change-authority",
+                "other-change-" + "x" * 24,
+            ),
+            evidence_digest="change-evidence-" + "c" * 24,
+        )
+
+    change_evidence = "change-evidence-" + "c" * 24
+    receipt = registry.revise(
+        revised,
+        authority_provenance=_authority(
+            "invariant-change-authority",
+            change_evidence,
+        ),
+        evidence_digest=change_evidence,
+    )
+    assert receipt.prior_digest == base.digest
+    assert receipt.revised_digest == revised.digest
+    assert canonical_digest(receipt.payload()) == receipt.receipt_digest
+
+
 def test_invariant_registry_rejects_cross_pillar_duplicate_and_is_order_stable() -> None:
     left = InvariantRegistry()
     right = InvariantRegistry()
 
+    a_evidence = "invariant-a-" + "a" * 24
     a = Invariant(
         invariant_id="INV-A",
         scope="combat",
         expression="health >= 0",
         source_pillar="mechanics",
         severity=8,
+        authority_provenance=_authority("invariant-a-author", a_evidence),
+        evidence_digest=a_evidence,
         inherited_by=("boss",),
     )
+    b_evidence = "invariant-b-" + "b" * 24
     b = Invariant(
         invariant_id="INV-B",
         scope="narrative",
         expression="knowledge <= observed_events",
         source_pillar="canon",
         severity=8,
+        authority_provenance=_authority("invariant-b-author", b_evidence),
+        evidence_digest=b_evidence,
     )
 
     left.add(a)
@@ -235,5 +313,10 @@ def test_invariant_registry_rejects_cross_pillar_duplicate_and_is_order_stable()
                 expression="health >= 0",
                 source_pillar="narrative",
                 severity=8,
+                authority_provenance=_authority(
+                    "invariant-c-author",
+                    "invariant-c-" + "c" * 24,
+                ),
+                evidence_digest="invariant-c-" + "c" * 24,
             )
         )

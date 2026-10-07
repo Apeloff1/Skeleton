@@ -541,15 +541,29 @@ def test_control_plane_checkpoint_bundle_is_content_addressed() -> None:
 
 def test_novelty_reservoir_rejects_repetitive_weaker_candidate() -> None:
     reservoir = NoveltyReservoir(capacity=4, minimum_distance=0.15)
+    first_evidence = "novelty-a-evidence-" + "a" * 24
     first = NoveltyRecord.create(
         candidate_digest="candidate-a-" + "a" * 32,
         quality_score=0.8,
         features={"mechanic": 0.5, "style": 0.5, "structure": 0.5},
+        evaluator_provenance=_evaluator_provenance(
+            "novelty-a-judge",
+            method_id="novelty-evaluation",
+            evidence_refs=(first_evidence,),
+        ),
+        evidence_digest=first_evidence,
     )
+    repetitive_evidence = "novelty-b-evidence-" + "b" * 24
     repetitive = NoveltyRecord.create(
         candidate_digest="candidate-b-" + "b" * 32,
         quality_score=0.7,
         features={"mechanic": 0.51, "style": 0.49, "structure": 0.5},
+        evaluator_provenance=_evaluator_provenance(
+            "novelty-b-judge",
+            method_id="novelty-evaluation",
+            evidence_refs=(repetitive_evidence,),
+        ),
+        evidence_digest=repetitive_evidence,
     )
     assert reservoir.admit(first)
     assert not reservoir.admit(repetitive)
@@ -625,6 +639,12 @@ def test_invariant_registry_rejects_ambiguous_cross_pillar_duplicate() -> None:
             expression="player_damage >= 0",
             source_pillar="fairness",
             severity=8,
+            authority_provenance=_evaluator_provenance(
+                "invariant-001-author",
+                method_id="invariant-authoring",
+                evidence_refs=("invariant-001-" + "a" * 24,),
+            ),
+            evidence_digest="invariant-001-" + "a" * 24,
             inherited_by=("boss.scene",),
         )
     )
@@ -637,6 +657,12 @@ def test_invariant_registry_rejects_ambiguous_cross_pillar_duplicate() -> None:
                 expression="player_damage >= 0",
                 source_pillar="realism",
                 severity=4,
+                authority_provenance=_evaluator_provenance(
+                    "invariant-002-author",
+                    method_id="invariant-authoring",
+                    evidence_refs=("invariant-002-" + "b" * 24,),
+                ),
+                evidence_digest="invariant-002-" + "b" * 24,
             )
         )
 

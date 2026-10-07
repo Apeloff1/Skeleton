@@ -231,17 +231,53 @@ def test_constraint_proof_extracts_blocking_conflict_core() -> None:
 
 
 def test_intent_preservation_rejects_silent_semantic_drift() -> None:
+    fantasy_evidence = _d("fantasy-evidence")
+    tone_evidence = _d("tone-evidence")
+    changed_evidence = _d("changed-evidence")
     gate = IntentPreservationGate(
         (
-            IntentInvariant("player-fantasy", _d("fantasy")),
-            IntentInvariant("violence-tone", _d("tone")),
+            IntentInvariant(
+                "player-fantasy",
+                _d("fantasy"),
+                _authority("fantasy-authority", fantasy_evidence),
+                fantasy_evidence,
+            ),
+            IntentInvariant(
+                "violence-tone",
+                _d("tone"),
+                _authority("tone-authority", tone_evidence),
+                tone_evidence,
+            ),
         )
     )
     current = (
-        IntentInvariant("player-fantasy", _d("fantasy")),
-        IntentInvariant("violence-tone", _d("changed")),
+        IntentInvariant(
+            "player-fantasy",
+            _d("fantasy"),
+            _authority("fantasy-current-authority", fantasy_evidence),
+            fantasy_evidence,
+        ),
+        IntentInvariant(
+            "violence-tone",
+            _d("changed"),
+            _authority("tone-current-authority", changed_evidence),
+            changed_evidence,
+        ),
     )
     assert gate.verify(current) == ("violence-tone",)
+
+
+def test_intent_invariant_rejects_unattributed_authorship_evidence() -> None:
+    with pytest.raises(
+        DeepAssuranceError,
+        match="referenced by authoring authority",
+    ):
+        IntentInvariant(
+            "player-fantasy",
+            _d("fantasy"),
+            _authority("wrong-intent-authority", _d("other-evidence")),
+            _d("fantasy-evidence"),
+        )
 
 
 def test_hermetic_transform_requires_exact_reproduction_identity() -> None:
@@ -351,15 +387,55 @@ def test_tail_risk_uses_conservative_upper_bound() -> None:
 
 
 def test_telemetry_feedback_rejects_raw_identity_and_tiny_cohorts() -> None:
+    raw_evidence = _d("telemetry-raw")
+    small_evidence = _d("telemetry-small")
+    good_evidence = _d("telemetry-good")
     assert not TelemetryFeedbackGate.admit(
-        TelemetryAggregate("quit-rate", _d("cohort"), 100, 0.2, contains_raw_identifier=True)
+        TelemetryAggregate(
+            "quit-rate",
+            _d("cohort"),
+            100,
+            0.2,
+            _authority("telemetry-raw-collector", raw_evidence),
+            raw_evidence,
+            contains_raw_identifier=True,
+        )
     )
     assert not TelemetryFeedbackGate.admit(
-        TelemetryAggregate("quit-rate", _d("cohort2"), 5, 0.2)
+        TelemetryAggregate(
+            "quit-rate",
+            _d("cohort2"),
+            5,
+            0.2,
+            _authority("telemetry-small-collector", small_evidence),
+            small_evidence,
+        )
     )
-    assert TelemetryFeedbackGate.admit(
-        TelemetryAggregate("quit-rate", _d("cohort3"), 100, 0.2)
+    good = TelemetryAggregate(
+        "quit-rate",
+        _d("cohort3"),
+        100,
+        0.2,
+        _authority("telemetry-good-collector", good_evidence),
+        good_evidence,
     )
+    assert TelemetryFeedbackGate.admit(good)
+    assert len(good.authority_binding_digest) == 64
+
+
+def test_telemetry_rejects_unattributed_collection_evidence() -> None:
+    with pytest.raises(
+        DeepAssuranceError,
+        match="referenced by collector authority",
+    ):
+        TelemetryAggregate(
+            "quit-rate",
+            _d("cohort"),
+            100,
+            0.2,
+            _authority("wrong-telemetry-collector", _d("other-telemetry")),
+            _d("telemetry-evidence"),
+        )
 
 
 def test_project_resurrection_is_exact_and_content_addressed() -> None:
