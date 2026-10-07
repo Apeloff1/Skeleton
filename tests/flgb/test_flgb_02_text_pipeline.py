@@ -985,3 +985,66 @@ def test_decade_signal_vector_does_not_change_token_identity(native_model):
     assert before.sequence.digest == after.sequence.digest
     assert before.sequence.token_ids == after.sequence.token_ids
     assert vector.chronology_digest == signal.digest
+
+
+def test_decade_coverage_accounts_documents_and_tokens(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    corpus = pipeline.prepare_corpus((("a", "alpha beta"), ("b", "gamma delta epsilon"), ("c", "zeta eta")))
+    signals = (
+        pipeline.temporal_signal(source_year=1984, observed_year=1985, knowledge_cutoff_year=2026),
+        pipeline.temporal_signal(source_year=2021, observed_year=2022, knowledge_cutoff_year=2026),
+        pipeline.temporal_signal(source_year=1989, observed_year=1990, knowledge_cutoff_year=2026),
+    )
+    receipt = pipeline.decade_coverage(corpus, signals)
+    assert tuple(b.decade for b in receipt.buckets) == (1980, 2020)
+    assert receipt.buckets[0].document_ids == ("a", "c")
+    assert receipt.buckets[1].document_ids == ("b",)
+    assert receipt.document_count == 3
+    assert receipt.token_count == sum(len(d.sequence.token_ids) for d in corpus.documents)
+    assert len(receipt.digest) == 64
+
+
+def test_decade_coverage_rejects_mixed_cutoffs(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    corpus = pipeline.prepare_corpus((("a", "alpha beta"), ("b", "gamma delta")))
+    signals = (
+        pipeline.temporal_signal(source_year=1980, observed_year=1980, knowledge_cutoff_year=2025),
+        pipeline.temporal_signal(source_year=1990, observed_year=1990, knowledge_cutoff_year=2026),
+    )
+    with pytest.raises(TokenizerContractError, match="different knowledge cutoffs"):
+        pipeline.decade_coverage(corpus, signals)
+
+
+def test_decade_sampling_is_balanced_deterministic_and_capped(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    corpus = pipeline.prepare_corpus((
+        ("old-a", "alpha beta"), ("old-b", "gamma delta"), ("old-c", "epsilon zeta"),
+        ("new-a", "eta theta"), ("new-b", "iota kappa"),
+    ))
+    signals = tuple(
+        pipeline.temporal_signal(source_year=year, observed_year=year, knowledge_cutoff_year=2026)
+        for year in (1981, 1982, 1983, 2021, 2022)
+    )
+    coverage = pipeline.decade_coverage(corpus, signals)
+    first = pipeline.decade_sampling_plan(coverage, max_documents_per_decade=2)
+    second = pipeline.decade_sampling_plan(coverage, max_documents_per_decade=2)
+    assert first.ordered_document_ids == ("old-a", "new-a", "old-b", "new-b")
+    assert first == second
+    assert first.digest == second.digest
+    assert "old-c" not in first.ordered_document_ids
+
+
+def test_decade_coverage_requires_signal_for_every_document(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    corpus = pipeline.prepare_corpus((("a", "alpha beta"), ("b", "gamma delta")))
+    signal = pipeline.temporal_signal(source_year=2001, observed_year=2001, knowledge_cutoff_year=2026)
+    with pytest.raises(TokenizerContractError, match="one temporal signal"):
+        pipeline.decade_coverage(corpus, (signal,))
