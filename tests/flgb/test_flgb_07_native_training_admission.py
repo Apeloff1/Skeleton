@@ -56,7 +56,13 @@ class TestNativeTrainingAdmission(unittest.TestCase):
   rt,cp,prior,c,p,apply=setup()
   with self.assertRaisesRegex(RuntimePromotionError,"authorities must be separate"):
    admit_candidate_model(rt,c,p,apply,admission_authority=p.independent_verifier)
- def test_admitter_cannot_certify_own_live_rollback(self):\n  rt,cp,prior,c,p,apply=setup()\n  admitted,a,rb=admit_candidate_model(rt,c,p,apply,admission_authority="runtime")\n  with self.assertRaisesRegex(RuntimePromotionError,"must differ"):\n   execute_rollback(admitted,a,rb,cp,verifier_id="runtime")\n def test_declared_digest_cannot_lie_about_observed_weights(self):
+ def test_admitter_cannot_certify_own_live_rollback(self):\n  rt,cp,prior,c,p,apply=setup()\n  admitted,a,rb=admit_candidate_model(rt,c,p,apply,admission_authority="runtime")\n  with self.assertRaisesRegex(RuntimePromotionError,"must differ"):\n   execute_rollback(admitted,a,rb,cp,verifier_id="runtime")\n def test_rollback_rejects_different_valid_checkpoint(self):
+  rt,cp,prior,c,p,apply=setup()
+  admitted,a,rb=admit_candidate_model(rt,c,p,apply,admission_authority="runtime")
+  other=NativeLLMRuntime(TinyTransformer(["a","b"],dim=4,ctx=4,seed=2)).checkpoint()
+  with self.assertRaisesRegex(RuntimePromotionError,"checkpoint identity mismatch"):
+   execute_rollback(admitted,a,rb,other)
+ def test_declared_digest_cannot_lie_about_observed_weights(self):
   rt,cp,prior,c,p,apply=setup()
   c=CandidateWeights("candidate","f"*64,c.training_lineage_digest,prior)
   p=PromotionEvidence(c.digest,p.exact_head_commit,p.rights_digest,p.contamination_scan_digest,p.evaluation_digest,p.rollback_digest,p.independent_verifier,True,True,True,True)
