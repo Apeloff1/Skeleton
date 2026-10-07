@@ -4,7 +4,13 @@ import unittest
 
 from skeleton.cortex.transformer import TinyTransformer
 from skeleton.ai.model_runtime import DevicePolicy, NativeLLMRuntime
-from skeleton.ai.runtime.inference import LocalInferenceCancelled, LocalInferenceEngine, LocalModelAdapter, NativeTransformerModel
+from skeleton.ai.runtime.inference import (
+    LocalInferenceCancelled,
+    LocalInferenceEngine,
+    LocalModelAdapter,
+    NativeTransformerModel,
+    build_native_transformer_adapter,
+)
 from skeleton.provider_runtime import ProviderRequest
 from skeleton.providers.contract import FinishReason
 
@@ -115,6 +121,37 @@ class TestNativeTransformerProviderBoundary(unittest.TestCase):
             self.assertEqual(response.provider, "local")
             self.assertEqual(response.usage.output_tokens, 2)
         asyncio.run(scenario())
+
+    def test_factory_publishes_bound_runtime_artifact_identity(self):
+        runtime = NativeLLMRuntime(
+            TinyTransformer(
+                vocab=("system", "user", "assistant", "hello", "world"),
+                dim=16,
+                ctx=16,
+                seed=912,
+                n_heads=4,
+                n_layers=2,
+                d_ff=32,
+            ),
+            device_policy=DevicePolicy("cpu"),
+        )
+        adapter = build_native_transformer_adapter(
+            runtime,
+            model_id="native-factory-test",
+            cache_size=3,
+            default_seed=17,
+        )
+        status = adapter.status()
+        artifact = status["artifact"]
+        self.assertEqual(adapter.model, "native-factory-test")
+        self.assertEqual(adapter.engine.cache_size, 3)
+        self.assertEqual(adapter.default_seed, 17)
+        self.assertEqual(artifact["kind"], "native_transformer")
+        self.assertEqual(artifact["model_digest"], runtime.model_digest)
+        self.assertEqual(artifact["tokenizer_digest"], runtime.tokenizer.digest)
+        self.assertEqual(artifact["architecture_digest"], runtime.architecture.digest)
+        self.assertEqual(artifact["runtime_digest"], adapter.runtime_digest)
+        self.assertEqual(artifact["device"]["actual"], "cpu")
 
 
 if __name__ == "__main__":
