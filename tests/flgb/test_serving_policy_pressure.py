@@ -37,5 +37,27 @@ class TestServingPolicyPressure(unittest.TestCase):
         with self.assertRaises(ValueError):
             planner.plan(ServingRequest("r", 1, 1), kv_pressure_pct=101)
 
+    def test_speculative_decode_requires_validated_opt_in_and_draft(self):
+        capability = "speculative_decoding"
+        base = PolicyAwareServingPlanner(RuntimePolicyCompiler().compile(2024))
+        req = ServingRequest("s", 20, 32, draft_model_available=True)
+        self.assertFalse(base.plan(req).speculative)
+        enabled = PolicyAwareServingPlanner(
+            RuntimePolicyCompiler().compile(2024, requested=(capability,))
+        )
+        self.assertTrue(enabled.plan(req).speculative)
+        no_draft = ServingRequest("n", 20, 32, draft_model_available=False)
+        self.assertFalse(enabled.plan(no_draft).speculative)
+
+    def test_kv_pressure_disables_speculation(self):
+        capability = "speculative_decoding"
+        planner = PolicyAwareServingPlanner(
+            RuntimePolicyCompiler().compile(2024, requested=(capability,))
+        )
+        req = ServingRequest("s", 20, 32, draft_model_available=True)
+        plan = planner.plan(req, kv_pressure_pct=95)
+        self.assertFalse(plan.speculative)
+        self.assertIn("disable_speculative_under_kv_pressure", plan.degradation)
+
 if __name__ == "__main__":
     unittest.main()
