@@ -49,7 +49,7 @@ from .runtime_contracts import (
     RuntimeLimits,
     RuntimeUsage,
 )
-from .text_pipeline import ModelInputBatch, PreparedText, TextPipelineConfig, TextTokenPipeline, materialize_model_batch
+from .text_pipeline import CausalTrainingBatch, ModelInputBatch, PreparedText, TextPipelineConfig, TextTokenPipeline, materialize_causal_training_batch, materialize_model_batch
 from .tokenization import (
     NativeTokenizer,
     StreamingTextFeed,
@@ -69,6 +69,7 @@ __all__ = [
     "BatchGenerationResult",
     "CancellationToken",
     "BatchRequest",
+    "CausalTrainingBatch",
     "DeviceDescriptor",
     "DevicePolicy",
     "DeviceReceipt",
@@ -114,6 +115,7 @@ __all__ = [
     "batch_token_windows",
     "deserialize_token_sequence",
     "iter_context_windows",
+    "materialize_causal_training_batch",
     "materialize_model_batch",
     "plan_continuous_batches",
     "plan_device_placement",
