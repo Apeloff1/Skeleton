@@ -200,9 +200,10 @@ class NativeLLMRuntime:
     def bind_device(self, policy: DevicePolicy) -> DeviceReceipt:
         if not isinstance(policy, DevicePolicy):
             raise RuntimeContractError("DevicePolicy required")
+        receipt = self._bind_device(policy)
         self.device_policy = policy
-        self.device = self._bind_device(policy)
-        return self.device
+        self.device = receipt
+        return receipt
 
     def _current_model_digest(self) -> str:
         snapshot = portable_model_snapshot(self.model)
@@ -216,19 +217,25 @@ class NativeLLMRuntime:
             )
 
     def refresh_model_identity(self) -> str:
+        """Atomically re-admit mutable model state after training/weight updates."""
         snapshot = portable_model_snapshot(self.model)
         validate_model_snapshot(snapshot)
         size = logical_bytes(snapshot)
         if size > self.limits.max_model_bytes:
             raise RuntimeContractError("mutated model exceeds runtime memory budget")
-        self._model_snapshot = snapshot
-        self._model_digest = snapshot_digest(snapshot)
-        self._model_bytes = size
+        digest = snapshot_digest(snapshot)
         try:
-            self.tokenizer = NativeTokenizer(self.model)
+            tokenizer = NativeTokenizer(self.model)
         except TokenizerContractError as exc:
             raise RuntimeContractError("native tokenizer re-admission failed") from exc
-        self.architecture = self._architecture()
+        architecture = self._architecture()
+
+        # Commit only after every new identity component has validated.
+        self._model_snapshot = snapshot
+        self._model_digest = digest
+        self._model_bytes = size
+        self.tokenizer = tokenizer
+        self.architecture = architecture
         return self.model_digest
 
     def health_snapshot(self) -> Mapping[str, Any]:
