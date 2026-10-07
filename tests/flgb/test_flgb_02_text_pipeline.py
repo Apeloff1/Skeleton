@@ -829,3 +829,42 @@ def test_supervised_example_requires_response_tokens(native_model):
     pipeline = TextTokenPipeline(NativeTokenizer(native_model))
     with pytest.raises(TokenizerContractError):
         pipeline.prepare_supervised_example("example-1", "alpha", "")
+
+
+def test_temporal_training_signal_derives_year_age_buckets(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    assert pipeline.temporal_signal(source_year=2026, observed_year=2026, knowledge_cutoff_year=2026).age_bucket == "current"
+    assert pipeline.temporal_signal(source_year=2024, observed_year=2025, knowledge_cutoff_year=2026).age_bucket == "recent"
+    assert pipeline.temporal_signal(source_year=2021, observed_year=2025, knowledge_cutoff_year=2026).age_bucket == "medium"
+    assert pipeline.temporal_signal(source_year=2018, observed_year=2024, knowledge_cutoff_year=2026).age_bucket == "historical"
+    assert pipeline.temporal_signal(source_year=2000, observed_year=2020, knowledge_cutoff_year=2026).age_bucket == "archive"
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"source_year": 2027, "observed_year": 2026, "knowledge_cutoff_year": 2026},
+    {"source_year": 2025, "observed_year": 2027, "knowledge_cutoff_year": 2026},
+    {"source_year": 2025, "observed_year": 2025, "knowledge_cutoff_year": 2026, "valid_from_year": 2027},
+    {"source_year": 2020, "observed_year": 2025, "knowledge_cutoff_year": 2026, "valid_from_year": 2024, "valid_to_year": 2023},
+])
+def test_temporal_training_signal_rejects_chronology_leakage(native_model, kwargs):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    with pytest.raises(TokenizerContractError):
+        pipeline.temporal_signal(**kwargs)
+
+
+def test_supervised_example_identity_binds_temporal_signal(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    old = pipeline.temporal_signal(source_year=2020, observed_year=2020, knowledge_cutoff_year=2026)
+    new = pipeline.temporal_signal(source_year=2026, observed_year=2026, knowledge_cutoff_year=2026)
+    left = pipeline.prepare_supervised_example("temporal-1", "alpha beta ", "gamma delta", temporal_signal=old)
+    right = pipeline.prepare_supervised_example("temporal-1", "alpha beta ", "gamma delta", temporal_signal=new)
+    assert left.prepared.sequence.digest == right.prepared.sequence.digest
+    assert left.temporal_signal_digest == old.digest
+    assert right.temporal_signal_digest == new.digest
+    assert left.digest != right.digest
