@@ -1,9 +1,10 @@
 import asyncio
+from datetime import datetime, timedelta, timezone
 import unittest
 
 from skeleton.cortex.transformer import TinyTransformer
 from skeleton.ai.model_runtime import DevicePolicy, NativeLLMRuntime
-from skeleton.ai.runtime.inference import LocalInferenceEngine, LocalModelAdapter, NativeTransformerModel
+from skeleton.ai.runtime.inference import LocalInferenceCancelled, LocalInferenceEngine, LocalModelAdapter, NativeTransformerModel
 from skeleton.provider_runtime import ProviderRequest
 from skeleton.providers.contract import FinishReason
 
@@ -71,6 +72,48 @@ class TestNativeTransformerProviderBoundary(unittest.TestCase):
             self.assertEqual(first.text, second.text)
             self.assertEqual(first.response_id, second.response_id)
             self.assertEqual(first.usage.output_tokens, second.usage.output_tokens)
+        asyncio.run(scenario())
+
+    def test_expired_deadline_fails_before_native_decode(self):
+        async def scenario():
+            adapter, _ = self.adapter()
+            request = ProviderRequest(
+                instructions="answer locally",
+                prompt="hello",
+                max_output_tokens=4,
+                deadline=datetime.now(timezone.utc) - timedelta(seconds=1),
+            )
+            with self.assertRaisesRegex(LocalInferenceCancelled, "deadline exceeded"):
+                await adapter.generate(request)
+        asyncio.run(scenario())
+
+    def test_naive_deadline_is_rejected(self):
+        async def scenario():
+            adapter, _ = self.adapter()
+            request = ProviderRequest(
+                instructions="answer locally",
+                prompt="hello",
+                deadline=datetime(2026, 10, 7, 21, 0, 0),
+            )
+            with self.assertRaisesRegex(ValueError, "timezone-aware"):
+                await adapter.generate(request)
+        asyncio.run(scenario())
+
+    def test_live_deadline_preserves_deterministic_response(self):
+        async def scenario():
+            adapter, _ = self.adapter()
+            request = ProviderRequest(
+                instructions="answer locally",
+                prompt="hello world",
+                max_output_tokens=2,
+                operation_id="op-deadline-live",
+                execution_id="exec-deadline-live",
+                turn_id="turn-deadline-live",
+                deadline=datetime.now(timezone.utc) + timedelta(seconds=30),
+            )
+            response = await adapter.generate(request)
+            self.assertEqual(response.provider, "local")
+            self.assertEqual(response.usage.output_tokens, 2)
         asyncio.run(scenario())
 
 
