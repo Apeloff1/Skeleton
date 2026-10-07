@@ -1,7 +1,6 @@
 """Convex quadratic-programming KKT and box active-set reference solvers."""
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
 from numbers import Real
 from typing import Sequence

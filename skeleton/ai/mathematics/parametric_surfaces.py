@@ -103,10 +103,24 @@ class BSplineSurface:
 
     def __post_init__(self) -> None:
         points = _control_net(self.control_points)
-        # bspline_basis performs full knot/degree validation. Probe each active domain midpoint
-        # lazily through evaluation, but enforce control-count identities immediately.
-        expected_u = len(self.knots_u) - self.degree_u - 1
-        expected_v = len(self.knots_v) - self.degree_v - 1
+        for name, degree in (("degree_u", self.degree_u), ("degree_v", self.degree_v)):
+            if isinstance(degree, bool) or not isinstance(degree, int) or degree < 0:
+                raise MathInvariantError(
+                    "B-spline surface degrees must be non-negative integers",
+                    reason="invalid_polynomial_degree",
+                    field=name,
+                )
+        knots_u = finite_vector("knots_u", self.knots_u)
+        knots_v = finite_vector("knots_v", self.knots_v)
+        for name, knots in (("knots_u", knots_u), ("knots_v", knots_v)):
+            if any(knots[index] < knots[index - 1] for index in range(1, len(knots))):
+                raise MathInvariantError(
+                    "B-spline surface knots must be non-decreasing",
+                    reason="non_monotonic_nodes",
+                    field=name,
+                )
+        expected_u = len(knots_u) - self.degree_u - 1
+        expected_v = len(knots_v) - self.degree_v - 1
         if expected_u != len(points) or expected_v != len(points[0]):
             raise MathInvariantError(
                 "B-spline surface knot vectors must match control-net dimensions",
@@ -114,6 +128,8 @@ class BSplineSurface:
                 field="knots",
             )
         object.__setattr__(self, "control_points", points)
+        object.__setattr__(self, "knots_u", knots_u)
+        object.__setattr__(self, "knots_v", knots_v)
 
     def evaluate(self, u: Real, v: Real) -> Vector:
         basis_u = bspline_basis(self.knots_u, self.degree_u, u)
