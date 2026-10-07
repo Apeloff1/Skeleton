@@ -55,6 +55,16 @@ Use external object/model storage when the asset is large, frequently replaced, 
 
 Generated caches, runtime vaults, package-manager stores, test caches, and build outputs must not become tracked source. `.gitignore` remains the first line of defense; the artifact policy is the fail-closed backstop for force-added files and ignore drift.
 
+### Repository-machine indexes
+
+The repository-machine manifest and durable code-search index are generated under
+`.machine/` and are **CI artifacts, not source files**. The
+`Repository machine index` workflow validates both indexes, then uploads the
+exact pair as a commit-bound workflow artifact named
+`repository-machine-index-<source-sha>`. Fresh checkouts may regenerate them
+with `skeleton-repo-machine`; consumers that need a persisted snapshot must
+select an artifact bound to the source commit they are inspecting.
+
 ## Local usage
 
 Pre-commit checks staged files automatically. Manual equivalents:
