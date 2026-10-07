@@ -388,6 +388,8 @@ def bind_live_claim_evidence(
 
     operation = _canonical_live_text(operation_id, "operation_id", maximum=512)
     context = _canonical_sha256(context_digest, "context_digest")
+    if not isinstance(policy, ResponseAcceptancePolicy):
+        raise TypeError("policy must be ResponseAcceptancePolicy")
     claim_values = tuple(claims)
     receipt_values = tuple(receipts)
     if any(not isinstance(item, VerificationClaim) for item in claim_values):
@@ -411,8 +413,13 @@ def bind_live_claim_evidence(
         policy=policy,
         finalized_at=finalized_at,
     )
+    decision_reasons = list(decision.reasons)
+    if decision.missing_receipt_claim_ids:
+        decision_reasons.append("required_claim_receipt_missing")
+    if decision.rejected_claim_ids:
+        decision_reasons.append("required_claim_rejected")
     combined_reasons = tuple(
-        sorted(set(decision.reasons).union(lineage_reasons))
+        sorted(set(decision_reasons).union(lineage_reasons))
     )
     accepted = decision.accepted and not combined_reasons
     claim_hashes = tuple(
