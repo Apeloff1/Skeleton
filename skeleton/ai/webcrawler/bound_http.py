@@ -1,6 +1,6 @@
 """Socket-bound HTTP transport: DNS validation is enforced at connect time."""
 from __future__ import annotations
-import http.client,ipaddress,ssl,time
+import http.client,ssl,time
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 from .core import FetchResponse
