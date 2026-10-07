@@ -1,6 +1,7 @@
 """Provider-neutral FLGB-02 model-runtime and native execution contracts."""
 from .admission_scheduler import AdmissionDecision, AdmissionLimits, RuntimeAdmissionScheduler, ScheduledRequest
 from .runtime_signals import DEFAULT_RUNTIME_SIGNALS, RuntimeSignal, RuntimeSignalRegistry, SignalMaturity
+from .runtime_policy import DEFAULT_RUNTIME_POLICY_COMPILER, RuntimePolicy, RuntimePolicyCompiler
 from .flgb_model_runtime import (
     ALLOWED_TRANSITIONS,
     BatchRequest,
@@ -72,6 +73,7 @@ __all__ = [
     "BatchGenerationResult",
     "CancellationToken",
     "BatchRequest",
+    "DEFAULT_RUNTIME_POLICY_COMPILER",
     "DEFAULT_RUNTIME_SIGNALS",
     "DeviceDescriptor",
     "DevicePolicy",
@@ -97,6 +99,8 @@ __all__ = [
     "ReplayReceipt",
     "Replica",
     "RuntimeAdmissionScheduler",
+    "RuntimePolicy",
+    "RuntimePolicyCompiler",
     "RuntimeSignal",
     "RuntimeSignalRegistry",
     "RuntimeArchitecture",
