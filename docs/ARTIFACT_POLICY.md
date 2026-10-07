@@ -59,11 +59,16 @@ Generated caches, runtime vaults, package-manager stores, test caches, and build
 
 The repository-machine manifest and durable code-search index are generated under
 `.machine/` and are **CI artifacts, not source files**. The
-`Repository machine index` workflow validates both indexes, then uploads the
-exact pair as a commit-bound workflow artifact named
-`repository-machine-index-<source-sha>`. Fresh checkouts may regenerate them
+`Repository machine index` workflow validates both indexes, verifies that the
+checked-out revision matches the workflow event revision, and uploads a
+commit-bound artifact named `repository-machine-index-<source-sha>`. The
+bundle also contains `.machine/index-artifact-manifest.json`, which binds the
+source commit and repository fingerprint to exact SHA-256 and byte-size metadata
+for both generated indexes. Fresh checkouts may regenerate the same surfaces
 with `skeleton-repo-machine`; consumers that need a persisted snapshot must
-select an artifact bound to the source commit they are inspecting.
+select an artifact bound to the source commit they are inspecting. The tracked
+`.machine/README.md` and `.machine/repository.toml` remain source contracts
+and must not be hidden by a directory-wide ignore rule.
 
 ## Local usage
 
