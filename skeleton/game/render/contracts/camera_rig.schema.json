@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-11:camera_rig:v1",
+  "title": "FLGB-11 camera rig",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "camera_id",
+    "pos_x",
+    "pos_y",
+    "pos_z",
+    "target_x",
+    "target_y",
+    "target_z",
+    "fov_mdeg",
+    "near_mm",
+    "far_mm"
+  ],
+  "properties": {
+    "camera_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "pos_x": {
+      "type": "integer"
+    },
+    "pos_y": {
+      "type": "integer"
+    },
+    "pos_z": {
+      "type": "integer"
+    },
+    "target_x": {
+      "type": "integer"
+    },
+    "target_y": {
+      "type": "integer"
+    },
+    "target_z": {
+      "type": "integer"
+    },
+    "fov_mdeg": {
+      "type": "integer",
+      "minimum": 1000,
+      "maximum": 178999
+    },
+    "near_mm": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "far_mm": {
+      "type": "integer",
+      "minimum": 2
+    }
+  }
+}
