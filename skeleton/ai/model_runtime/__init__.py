@@ -49,7 +49,7 @@ from .runtime_contracts import (
     RuntimeLimits,
     RuntimeUsage,
 )
-from .text_pipeline import CausalTrainingBatch, CorpusTrainingReceipt, DecadeCorpusBucket, DecadeCoverageReceipt, DecadeSamplingPlan, DecadeSignalVector, DecadeTrainingSignal, GovernedTrainingInput, ModelInputBatch, PipelineReplayCheckpoint, PreparedCorpus, PreparedText, PromotionAuthorizationRequest, SourceProvenanceGraph, SourceProvenanceNode, SupervisedTextExample, TemporalContradiction, TemporalEvaluationGate, TemporalEvaluationResult, TemporalEvaluationSlice, TemporalRetrievalCandidate, TemporalRetrievalPlan, TemporalRetentionResult, TemporalRetentionGate, TemporalRetentionTrajectory, TemporalConflictCluster, TemporalEvidence, TemporalSourceEvidence, TemporalSupersession, WalkForwardSnapshot, TemporalTrainingSignal, TextPipelineConfig, TextTokenPipeline, TrainingInputReceipt, deserialize_causal_training_batch, arbitrate_temporal_evidence, decade_weight_ppm, independent_confidence_ppm, provenance_independence_group, source_evidence_from_provenance, walk_forward_snapshot, deserialize_model_input_batch, mask_causal_prefix, materialize_causal_training_batch, materialize_model_batch, serialize_causal_training_batch, serialize_model_input_batch
+from .text_pipeline import CausalTrainingBatch, CorpusTrainingReceipt, DecadeCorpusBucket, DecadeCoverageReceipt, DecadeSamplingPlan, DecadeSignalVector, DecadeTrainingSignal, GovernedTrainingInput, ModelInputBatch, PipelineReplayCheckpoint, PreparedCorpus, PreparedText, PromotionAuthorizationRequest, SourceProvenanceGraph, SourceProvenanceNode, SupervisedTextExample, TemporalContradiction, TemporalEvaluationGate, TemporalEvaluationResult, TemporalEvaluationSlice, TemporalRetrievalCandidate, TemporalRetrievalPlan, TemporalRetentionResult, TemporalRetentionGate, TemporalRetentionTrajectory, TemporalConflictCluster, TemporalEvidence, TemporalSourceEvidence, TemporalSupersession, WalkForwardSnapshot, TemporalTrainingSignal, TemporalInstant, TemporalInterval, TextPipelineConfig, TextTokenPipeline, TrainingInputReceipt, deserialize_causal_training_batch, arbitrate_temporal_evidence, decade_weight_ppm, independent_confidence_ppm, provenance_independence_group, source_evidence_from_provenance, walk_forward_snapshot, deserialize_model_input_batch, mask_causal_prefix, materialize_causal_training_batch, materialize_model_batch, serialize_causal_training_batch, serialize_model_input_batch
 from .tokenization import (
     NativeTokenizer,
     StreamingTextFeed,
@@ -129,6 +129,8 @@ __all__ = [
     "TemporalSupersession",
     "WalkForwardSnapshot",
     "TemporalTrainingSignal",
+    "TemporalInstant",
+    "TemporalInterval",
     "TextPipelineConfig",
     "TextTokenPipeline",
     "TokenBatch",
