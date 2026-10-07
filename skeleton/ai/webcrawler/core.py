@@ -419,7 +419,7 @@ class CrawlEngine:
             except (ValueError,TypeError,OverflowError):
                 return None
 
-    def load_robots(self, url: str) -> bool:
+    def load_robots(self, url: str, *, now: float | None = None) -> bool:
         """Load an origin's robots policy once, charging the crawl budget."""
         p = urlsplit(url)
         origin = f"{p.scheme}://{p.netloc}"
@@ -430,7 +430,7 @@ class CrawlEngine:
         robots_url = origin + "/robots.txt"
         try:
             from .redirects import fetch_robots_with_policy
-            response = fetch_robots_with_policy(self, robots_url, now=time.time())
+            response = fetch_robots_with_policy(self, robots_url, now=time.time() if now is None else now)
         except Exception:
             return False
         body = response.body[:512_000]
@@ -455,7 +455,7 @@ class CrawlEngine:
         if item.url in self._seen:
             return None
         self._seen.add(item.url)
-        if not self.robots.known(item.url) and not self.load_robots(item.url):
+        if not self.robots.known(item.url) and not self.load_robots(item.url, now=now):
             self._seen.discard(item.url)
             if self.budget.can_request(): self._retry(item, now=now)
             return None
