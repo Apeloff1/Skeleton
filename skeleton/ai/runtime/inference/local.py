@@ -91,6 +91,7 @@ class LocalInferenceRequest:
     stop: tuple[str, ...] = ()
     tools: tuple[Mapping[str, Any], ...] = ()
     structured_output_schema: Mapping[str, Any] | None = None
+    context_digest: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.prompt, str) or not self.prompt.strip():
@@ -127,6 +128,8 @@ class LocalInferenceRequest:
             if len(encoded.encode("utf-8")) > 512 * 1024:
                 raise ValueError("structured_output_schema exceeds size limit")
             object.__setattr__(self, "structured_output_schema", schema)
+        if self.context_digest is not None and (len(self.context_digest) != 64 or any(ch not in "0123456789abcdef" for ch in self.context_digest)):
+            raise ValueError("context_digest must be lowercase sha256")
 
     @property
     def rendered_input(self) -> str:
@@ -150,6 +153,7 @@ class LocalInferenceRequest:
                 "stop": self.stop,
                 "tools": self.tools,
                 "structured_output_schema": self.structured_output_schema,
+                "context_digest": self.context_digest,
             }
         )
 
@@ -800,6 +804,7 @@ class LocalModelAdapter(ProviderAdapter):
                 if request.structured_output_schema is None
                 else dict(request.structured_output_schema)
             ),
+            context_digest=request.context_digest,
         )
         result = await self.engine.generate(local_request)
         tool_calls = tuple(
