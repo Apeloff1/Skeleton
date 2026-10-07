@@ -839,13 +839,15 @@ def command_from_context(
             )
 
     normalized_history: list[tuple[str, str]] = []
-    # Explicit caller history is already canonicalized by the owning
-    # conversation authority. Context projection is only a fallback for
-    # callers that do not provide authoritative conversation history.
+    # The compiled ContextEnvelope is the canonical authority for provider
+    # history. Legacy caller-supplied history is accepted only when the
+    # projection contains no conversation/evidence history of its own.
+    # This prevents stale or attacker-controlled compatibility text from
+    # overriding compiled conversation lineage or untrusted evidence framing.
     projected_history = (
-        tuple(history)
-        if history
-        else projection.history
+        projection.history
+        if projection.history
+        else tuple(history)
     )
     for index, item in enumerate(projected_history):
         if not isinstance(item, Mapping):
