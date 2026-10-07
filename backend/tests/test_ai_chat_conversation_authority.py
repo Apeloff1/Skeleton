@@ -185,6 +185,9 @@ def test_chat_uses_server_transcript_and_commits_assistant_lineage(
             execution_timeout_s=5.0,
         )
 
+        async def wait_for_terminal(self, **_kwargs):
+            raise route.EngineNotFoundError("engine execution not found")
+
         async def execute(self, command):
             captured["command"] = command
             return SimpleNamespace(
@@ -414,6 +417,9 @@ def test_provider_failure_keeps_user_message_canonical_for_retry(
             execution_timeout_s=5.0,
         )
 
+        async def wait_for_terminal(self, **_kwargs):
+            raise route.EngineNotFoundError("engine execution not found")
+
         async def execute(self, _command):
             raise route.EngineUnavailableError("engine unavailable")
 
@@ -598,6 +604,9 @@ def test_chat_compiles_immutable_context_and_keeps_ephemeral_context_untrusted(
             service_principal="codedock-backend",
             execution_timeout_s=5.0,
         )
+
+        async def wait_for_terminal(self, **_kwargs):
+            raise route.EngineNotFoundError("engine execution not found")
 
         async def execute(self, command):
             return SimpleNamespace(
