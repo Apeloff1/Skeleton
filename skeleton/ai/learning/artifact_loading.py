@@ -9,7 +9,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
-from typing import Mapping, Sequence
+import json
+from pathlib import PurePosixPath
 
 
 class ArtifactLoadError(RuntimeError):
@@ -32,6 +33,48 @@ def _sha(name: str, value: object) -> str:
     return result
 
 
+def _non_negative_int(name: str, value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ArtifactLoadError(f"{name} must be a non-negative integer")
+    return value
+
+
+def _artifact_path(name: str, value: object) -> str:
+    path = _text(name, value, maximum=2048)
+    if value != path or "\x00" in path or "\\" in path:
+        raise ArtifactLoadError(f"{name} must be a canonical artifact-relative path")
+    pure = PurePosixPath(path)
+    parts = pure.parts
+    if (
+        pure.is_absolute()
+        or not parts
+        or any(part in {"", ".", ".."} for part in parts)
+        or pure.as_posix() != path
+    ):
+        raise ArtifactLoadError(f"{name} must be a canonical artifact-relative path")
+    first = parts[0]
+    if len(first) == 2 and first[0].isalpha() and first[1] == ":":
+        raise ArtifactLoadError(f"{name} must be a canonical artifact-relative path")
+    return path
+
+
+def _stable_json(value: object) -> str:
+    try:
+        return json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        )
+    except (TypeError, ValueError) as exc:
+        raise ArtifactLoadError("artifact evidence must be deterministic JSON") from exc
+
+
+def _digest(value: object) -> str:
+    return hashlib.sha256(_stable_json(value).encode("utf-8")).hexdigest()
+
+
 def digest_bytes(payload: bytes) -> str:
     if not isinstance(payload, bytes):
         raise TypeError("payload must be bytes")
@@ -48,6 +91,8 @@ class ArtifactLoadPolicy:
     max_metadata_bytes: int = 16 << 20
     max_tensor_rank: int = 8
     max_tensor_elements: int = 1 << 40
+    max_tensors: int = 1_000_000
+    max_total_tensor_elements: int = 1 << 40
     max_decompression_ratio: int = 64
     require_safe_parser: bool = True
     allow_embedded_executable_code: bool = False
@@ -60,6 +105,8 @@ class ArtifactLoadPolicy:
             "max_metadata_bytes",
             "max_tensor_rank",
             "max_tensor_elements",
+            "max_tensors",
+            "max_total_tensor_elements",
             "max_decompression_ratio",
         ):
             value = getattr(self, field_name)
@@ -73,6 +120,30 @@ class ArtifactLoadPolicy:
             raise ArtifactLoadError("allowed_dtypes must be non-empty and unique")
         object.__setattr__(self, "allowed_weight_formats", formats)
         object.__setattr__(self, "allowed_dtypes", dtypes)
+        for field_name in ("require_safe_parser", "allow_embedded_executable_code"):
+            if not isinstance(getattr(self, field_name), bool):
+                raise TypeError(f"{field_name} must be boolean")
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "allowed_weight_formats": list(self.allowed_weight_formats),
+            "allowed_dtypes": list(self.allowed_dtypes),
+            "max_shards": self.max_shards,
+            "max_total_bytes": self.max_total_bytes,
+            "max_single_shard_bytes": self.max_single_shard_bytes,
+            "max_metadata_bytes": self.max_metadata_bytes,
+            "max_tensor_rank": self.max_tensor_rank,
+            "max_tensor_elements": self.max_tensor_elements,
+            "max_tensors": self.max_tensors,
+            "max_total_tensor_elements": self.max_total_tensor_elements,
+            "max_decompression_ratio": self.max_decompression_ratio,
+            "require_safe_parser": self.require_safe_parser,
+            "allow_embedded_executable_code": self.allow_embedded_executable_code,
+        }
+
+    @property
+    def digest(self) -> str:
+        return _digest(self.as_dict())
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,6 +171,14 @@ class TensorDescriptor:
             total *= dim
         return total
 
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "name": self.name,
+            "dtype": self.dtype,
+            "shape": list(self.shape),
+            "element_count": self.element_count,
+        }
+
 
 @dataclass(frozen=True, slots=True)
 class ArtifactShard:
@@ -110,17 +189,28 @@ class ArtifactShard:
     tensors: tuple[TensorDescriptor, ...] = ()
 
     def __post_init__(self) -> None:
-        name = _text("shard name", self.name)
-        if name.startswith("/") or "\\" in name or ".." in name.split("/"):
-            raise ArtifactLoadError("shard name must be artifact-relative")
-        object.__setattr__(self, "name", name)
+        object.__setattr__(self, "name", _artifact_path("shard name", self.name))
         object.__setattr__(self, "digest", _sha("shard digest", self.digest))
         for field_name in ("encoded_bytes", "decoded_bytes"):
             value = getattr(self, field_name)
             if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
                 raise ArtifactLoadError(f"{field_name} must be a positive integer")
-        if any(not isinstance(item, TensorDescriptor) for item in self.tensors):
+        tensors = tuple(self.tensors)
+        if any(not isinstance(item, TensorDescriptor) for item in tensors):
             raise TypeError("tensors must contain TensorDescriptor values")
+        object.__setattr__(self, "tensors", tensors)
+        tensor_names = [item.name for item in tensors]
+        if len(tensor_names) != len(set(tensor_names)):
+            raise ArtifactLoadError("tensor names within a shard must be unique")
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "name": self.name,
+            "digest": self.digest,
+            "encoded_bytes": self.encoded_bytes,
+            "decoded_bytes": self.decoded_bytes,
+            "tensors": [item.as_dict() for item in self.tensors],
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -137,11 +227,13 @@ class ArtifactLoadRequest:
     def __post_init__(self) -> None:
         object.__setattr__(self, "artifact_id", _text("artifact_id", self.artifact_id))
         object.__setattr__(self, "weight_format", _text("weight_format", self.weight_format))
-        if not self.shards:
+        shards = tuple(self.shards)
+        if not shards:
             raise ArtifactLoadError("artifact requires at least one shard")
-        if any(not isinstance(item, ArtifactShard) for item in self.shards):
+        if any(not isinstance(item, ArtifactShard) for item in shards):
             raise TypeError("shards must contain ArtifactShard values")
-        names = [item.name for item in self.shards]
+        object.__setattr__(self, "shards", shards)
+        names = [item.name for item in shards]
         if len(names) != len(set(names)):
             raise ArtifactLoadError("shard names must be unique")
         if isinstance(self.metadata_bytes, bool) or not isinstance(self.metadata_bytes, int):
@@ -161,6 +253,31 @@ class ArtifactLoadRequest:
                 "trusted_model_code_digest",
                 _sha("trusted_model_code_digest", self.trusted_model_code_digest),
             )
+        tensor_names = [
+            tensor.name
+            for shard in self.shards
+            for tensor in shard.tensors
+        ]
+        if len(tensor_names) != len(set(tensor_names)):
+            raise ArtifactLoadError(
+                "tensor names must be globally unique across artifact shards"
+            )
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "artifact_id": self.artifact_id,
+            "weight_format": self.weight_format,
+            "shards": [item.as_dict() for item in self.shards],
+            "metadata_bytes": self.metadata_bytes,
+            "safe_parser": self.safe_parser,
+            "embedded_executable_code": self.embedded_executable_code,
+            "model_code_digest": self.model_code_digest,
+            "trusted_model_code_digest": self.trusted_model_code_digest,
+        }
+
+    @property
+    def digest(self) -> str:
+        return _digest(self.as_dict())
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,6 +288,97 @@ class ArtifactLoadReceipt:
     total_decoded_bytes: int
     tensor_count: int
     blockers: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "artifact_id", _text("artifact_id", self.artifact_id))
+        if not isinstance(self.admitted, bool):
+            raise TypeError("admitted must be boolean")
+        for field_name in (
+            "total_encoded_bytes",
+            "total_decoded_bytes",
+            "tensor_count",
+        ):
+            object.__setattr__(
+                self,
+                field_name,
+                _non_negative_int(field_name, getattr(self, field_name)),
+            )
+        blockers = tuple(_text("blocker", item, maximum=4096) for item in self.blockers)
+        if self.admitted and blockers:
+            raise ArtifactLoadError("admitted artifact cannot contain blockers")
+        if not self.admitted and not blockers:
+            raise ArtifactLoadError("rejected artifact must explain at least one blocker")
+        object.__setattr__(self, "blockers", blockers)
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "artifact_id": self.artifact_id,
+            "admitted": self.admitted,
+            "total_encoded_bytes": self.total_encoded_bytes,
+            "total_decoded_bytes": self.total_decoded_bytes,
+            "tensor_count": self.tensor_count,
+            "blockers": list(self.blockers),
+        }
+
+    @property
+    def digest(self) -> str:
+        return _digest(self.as_dict())
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactAdmissionEvidence:
+    request_digest: str
+    policy_digest: str
+    receipt: ArtifactLoadReceipt
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self, "request_digest", _sha("request_digest", self.request_digest)
+        )
+        object.__setattr__(
+            self, "policy_digest", _sha("policy_digest", self.policy_digest)
+        )
+        if not isinstance(self.receipt, ArtifactLoadReceipt):
+            raise TypeError("receipt must be ArtifactLoadReceipt")
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "request_digest": self.request_digest,
+            "policy_digest": self.policy_digest,
+            "receipt": self.receipt.as_dict(),
+        }
+
+    @property
+    def digest(self) -> str:
+        return _digest(self.as_dict())
+
+
+@dataclass(frozen=True, slots=True)
+class ManifestLoadBinding:
+    artifact_id: str
+    manifest_weight_identity: str
+    request_digest: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "artifact_id", _text("artifact_id", self.artifact_id))
+        object.__setattr__(
+            self,
+            "manifest_weight_identity",
+            _sha("manifest_weight_identity", self.manifest_weight_identity),
+        )
+        object.__setattr__(
+            self, "request_digest", _sha("request_digest", self.request_digest)
+        )
+
+    @property
+    def digest(self) -> str:
+        return _digest(
+            {
+                "artifact_id": self.artifact_id,
+                "manifest_weight_identity": self.manifest_weight_identity,
+                "request_digest": self.request_digest,
+            }
+        )
 
 
 def admit_artifact(
@@ -197,6 +405,7 @@ def admit_artifact(
     total_encoded = 0
     total_decoded = 0
     tensor_count = 0
+    total_tensor_elements = 0
     for shard in request.shards:
         total_encoded += shard.encoded_bytes
         total_decoded += shard.decoded_bytes
@@ -208,6 +417,7 @@ def admit_artifact(
             blockers.append(f"{shard.name}: decompression ratio exceeds policy")
         for tensor in shard.tensors:
             tensor_count += 1
+            total_tensor_elements += tensor.element_count
             if tensor.dtype not in policy.allowed_dtypes:
                 blockers.append(f"{shard.name}:{tensor.name}: dtype is not allowlisted")
             if len(tensor.shape) > policy.max_tensor_rank:
@@ -215,6 +425,10 @@ def admit_artifact(
             if tensor.element_count > policy.max_tensor_elements:
                 blockers.append(f"{shard.name}:{tensor.name}: tensor elements exceed policy")
 
+    if tensor_count > policy.max_tensors:
+        blockers.append("tensor count exceeds policy")
+    if total_tensor_elements > policy.max_total_tensor_elements:
+        blockers.append("total tensor elements exceed policy")
     if total_encoded > policy.max_total_bytes:
         blockers.append("total encoded artifact size exceeds policy")
     if total_decoded > policy.max_total_bytes:
@@ -222,6 +436,8 @@ def admit_artifact(
 
     # Weight/data trust never grants model-code trust.  If executable model
     # code is present, its identity must be separately and exactly authorized.
+    if request.embedded_executable_code and request.model_code_digest is None:
+        blockers.append("embedded executable model code has no content digest")
     if request.model_code_digest is not None:
         if request.trusted_model_code_digest is None:
             blockers.append("model code has no independent trusted digest")
@@ -240,6 +456,64 @@ def admit_artifact(
     )
 
 
+def admit_artifact_evidence(
+    request: ArtifactLoadRequest,
+    policy: ArtifactLoadPolicy,
+) -> ArtifactAdmissionEvidence:
+    receipt = admit_artifact(request, policy)
+    return ArtifactAdmissionEvidence(
+        request_digest=request.digest,
+        policy_digest=policy.digest,
+        receipt=receipt,
+    )
+
+
+def bind_model_manifest(
+    manifest: object,
+    request: ArtifactLoadRequest,
+) -> ManifestLoadBinding:
+    """Bind a model identity manifest to the exact bytes admitted for loading."""
+
+    from .model_identity import ModelArtifactManifest
+
+    if not isinstance(manifest, ModelArtifactManifest):
+        raise TypeError("manifest must be ModelArtifactManifest")
+    if not isinstance(request, ArtifactLoadRequest):
+        raise TypeError("request must be ArtifactLoadRequest")
+    if request.artifact_id != manifest.artifact_id:
+        raise ArtifactLoadError("load request artifact identity does not match manifest")
+    if request.weight_format != manifest.weight_format:
+        raise ArtifactLoadError("load request weight format does not match manifest")
+
+    expected = {
+        shard.path: (shard.digest, shard.size_bytes)
+        for shard in manifest.weight_shards
+    }
+    observed = {
+        shard.name: (shard.digest, shard.encoded_bytes)
+        for shard in request.shards
+    }
+    if observed != expected:
+        raise ArtifactLoadError(
+            "load request shard set/digest/size does not match manifest"
+        )
+    if request.model_code_digest != manifest.model_code_digest:
+        raise ArtifactLoadError("load request model code identity does not match manifest")
+    if (
+        request.trusted_model_code_digest is not None
+        and request.trusted_model_code_digest != manifest.model_code_digest
+    ):
+        raise ArtifactLoadError(
+            "trusted model code identity does not match manifest"
+        )
+
+    return ManifestLoadBinding(
+        artifact_id=manifest.artifact_id,
+        manifest_weight_identity=manifest.weight_identity,
+        request_digest=request.digest,
+    )
+
+
 def verify_shard_payload(shard: ArtifactShard, payload: bytes) -> None:
     if not isinstance(shard, ArtifactShard):
         raise TypeError("shard must be ArtifactShard")
@@ -251,13 +525,17 @@ def verify_shard_payload(shard: ArtifactShard, payload: bytes) -> None:
 
 
 __all__ = [
+    "ArtifactAdmissionEvidence",
     "ArtifactLoadError",
     "ArtifactLoadPolicy",
     "ArtifactLoadReceipt",
     "ArtifactLoadRequest",
     "ArtifactShard",
+    "ManifestLoadBinding",
     "TensorDescriptor",
     "admit_artifact",
+    "admit_artifact_evidence",
+    "bind_model_manifest",
     "digest_bytes",
     "verify_shard_payload",
 ]
