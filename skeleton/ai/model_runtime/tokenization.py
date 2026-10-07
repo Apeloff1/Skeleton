@@ -199,7 +199,18 @@ class NativeTokenizer:
             text.encode("utf-8", errors="strict")
         except UnicodeEncodeError as exc:
             raise TokenizerContractError("text is not UTF-8 encodable Unicode") from exc
-        ids = tuple(int(value) for value in self.model._ids(text))
+        try:
+            raw_ids = self.model._ids(text)
+        except Exception as exc:
+            raise TokenizerContractError("native tokenizer encode failed") from exc
+        if not isinstance(raw_ids, (list, tuple)):
+            raise TokenizerContractError("native tokenizer emitted invalid token container")
+        ids_list: list[int] = []
+        for value in raw_ids:
+            if not _is_int(value):
+                raise TokenizerContractError("native tokenizer emitted non-integer token id")
+            ids_list.append(int(value))
+        ids = tuple(ids_list)
         if not ids:
             ids = (self.model.unk,)
         if len(ids) > self.limits.max_tokens:
@@ -232,9 +243,17 @@ class NativeTokenizer:
         decode = getattr(bpe, "decode", None)
         if isinstance(bpe_vocab, Mapping) and callable(decode):
             if all(piece != UNK and piece in bpe_vocab for piece in pieces):
-                value = decode(pieces)
-                if isinstance(value, str):
-                    return value
+                try:
+                    value = decode(pieces)
+                except Exception as exc:
+                    raise TokenizerContractError("BPE decode failed") from exc
+                if not isinstance(value, str):
+                    raise TokenizerContractError("BPE decode emitted non-string value")
+                try:
+                    value.encode("utf-8", errors="strict")
+                except UnicodeEncodeError as exc:
+                    raise TokenizerContractError("BPE decode emitted invalid Unicode") from exc
+                return value
         return " ".join(pieces)
 
     def checkpoint(self) -> Mapping[str, Any]:
