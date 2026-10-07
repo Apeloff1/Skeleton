@@ -11,17 +11,17 @@ from dataclasses import dataclass
 import hashlib
 import json
 
-from skeleton.ai.learning.school.decision_ledger import (
+from skeleton.learning.school.decision_ledger import (
     DecisionDisposition,
     DecisionLedger,
 )
-from skeleton.ai.learning.school.runtime_replay import (
+from skeleton.learning.school.runtime_replay import (
     RuntimeAudit,
     RuntimeReplaySnapshot,
     audit_runtime,
     replay_digest,
 )
-from skeleton.ai.learning.school.session_audit import (
+from skeleton.learning.school.session_audit import (
     SessionAudit,
     audit_session,
 )
