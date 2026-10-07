@@ -98,6 +98,8 @@ class MultimodalAsset:
             raise MultimodalSanitizationError(
                 "embedded_instruction_detected must be bool"
             )
+        if self.instruction_trusted is not False:
+            raise MultimodalSanitizationError("instruction_trusted must remain false")
         if self.authority_scope != "untrusted-media-evidence":
             raise MultimodalSanitizationError("multimodal intake cannot grant authority")
 
