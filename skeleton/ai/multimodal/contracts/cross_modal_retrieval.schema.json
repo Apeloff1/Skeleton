@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-08:cross_modal_retrieval:v1",
+  "title": "FLGB-08 cross modal retrieval",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "candidate_id",
+    "modality",
+    "artifact_digest",
+    "provenance_digest",
+    "semantic_ppm",
+    "temporal_ppm"
+  ],
+  "properties": {
+    "candidate_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "modality": {
+      "enum": [
+        "text",
+        "image",
+        "document",
+        "audio",
+        "video"
+      ]
+    },
+    "artifact_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "provenance_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "semantic_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "temporal_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    }
+  }
+}
