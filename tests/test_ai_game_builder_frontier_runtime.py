@@ -437,11 +437,11 @@ def test_evidence_invalidation_propagates_to_release_qualification() -> None:
 
 def test_evidence_invalidation_receipt_rejects_false_dependency_closure() -> None:
     graph = EvidenceInvalidationGraph()
-    graph.add("source")
-    graph.add("proof", depends_on=("source",))
+    graph.add("source.node")
+    graph.add("proof.node", depends_on=("source.node",))
     evidence = "invalidation-proof-" + "e" * 24
     receipt = graph.invalidate(
-        "source",
+        "source.node",
         authority_provenance=_authority("invalidation-authority", evidence),
         evidence_digest=evidence,
     )
@@ -451,7 +451,7 @@ def test_evidence_invalidation_receipt_rejects_false_dependency_closure() -> Non
     ):
         type(receipt)(
             node_id=receipt.node_id,
-            affected_ids=("source",),
+            affected_ids=("source.node",),
             graph_edges=receipt.graph_edges,
             authority_provenance=receipt.authority_provenance,
             evidence_digest=receipt.evidence_digest,
