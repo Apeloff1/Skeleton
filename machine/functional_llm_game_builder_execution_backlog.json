@@ -166,9 +166,10 @@
         "FLGB-06-T11",
         "FLGB-06-T12"
       ],
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
-      "independent_verification_signed": false
+      "independent_verification_signed": false,
+      "implementation_note": "T01-T12 assurance/evaluation/recovery targets, schemas, and focused regressions are present; FLGB-01/03/04/05 dependency closure and exact-head independent verification remain required before signoff."
     },
     {
       "id": "FLGB-07",
@@ -4483,7 +4484,7 @@
       "implementation_target": "skeleton/ai/assurance/evaluation_harness.py",
       "contract_target": "skeleton/ai/assurance/contracts/evaluation_harness.schema.json",
       "test_target": "tests/flgb/test_flgb_06_evaluation_harness.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -4549,7 +4550,7 @@
       "implementation_target": "skeleton/ai/assurance/benchmark_registry.py",
       "contract_target": "skeleton/ai/assurance/contracts/benchmark_registry.schema.json",
       "test_target": "tests/flgb/test_flgb_06_benchmark_registry.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -4615,7 +4616,7 @@
       "implementation_target": "skeleton/ai/assurance/golden_fixtures.py",
       "contract_target": "skeleton/ai/assurance/contracts/golden_fixtures.schema.json",
       "test_target": "tests/flgb/test_flgb_06_golden_fixtures.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -4681,7 +4682,7 @@
       "implementation_target": "skeleton/ai/assurance/trace_correlation.py",
       "contract_target": "skeleton/ai/assurance/contracts/trace_correlation.schema.json",
       "test_target": "tests/flgb/test_flgb_06_trace_correlation.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -4747,7 +4748,7 @@
       "implementation_target": "skeleton/ai/assurance/metric_semantics.py",
       "contract_target": "skeleton/ai/assurance/contracts/metric_semantics.schema.json",
       "test_target": "tests/flgb/test_flgb_06_metric_semantics.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -4813,7 +4814,7 @@
       "implementation_target": "skeleton/ai/assurance/slo_budget.py",
       "contract_target": "skeleton/ai/assurance/contracts/slo_budget.schema.json",
       "test_target": "tests/flgb/test_flgb_06_slo_budget.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -4879,7 +4880,7 @@
       "implementation_target": "skeleton/ai/assurance/fault_taxonomy.py",
       "contract_target": "skeleton/ai/assurance/contracts/fault_taxonomy.schema.json",
       "test_target": "tests/flgb/test_flgb_06_fault_taxonomy.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -4945,7 +4946,7 @@
       "implementation_target": "skeleton/ai/assurance/checkpoint_restore.py",
       "contract_target": "skeleton/ai/assurance/contracts/checkpoint_restore.schema.json",
       "test_target": "tests/flgb/test_flgb_06_checkpoint_restore.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -5011,7 +5012,7 @@
       "implementation_target": "skeleton/ai/assurance/disaster_recovery.py",
       "contract_target": "skeleton/ai/assurance/contracts/disaster_recovery.schema.json",
       "test_target": "tests/flgb/test_flgb_06_disaster_recovery.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -5077,7 +5078,7 @@
       "implementation_target": "skeleton/ai/assurance/rollback_orchestration.py",
       "contract_target": "skeleton/ai/assurance/contracts/rollback_orchestration.schema.json",
       "test_target": "tests/flgb/test_flgb_06_rollback_orchestration.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -5143,7 +5144,7 @@
       "implementation_target": "skeleton/ai/assurance/drift_detection.py",
       "contract_target": "skeleton/ai/assurance/contracts/drift_detection.schema.json",
       "test_target": "tests/flgb/test_flgb_06_drift_detection.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
@@ -5209,7 +5210,7 @@
       "implementation_target": "skeleton/ai/assurance/release_qualification.py",
       "contract_target": "skeleton/ai/assurance/contracts/release_qualification.schema.json",
       "test_target": "tests/flgb/test_flgb_06_release_qualification.py",
-      "state": "planned",
+      "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
       "required_lifecycle": [
