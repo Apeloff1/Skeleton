@@ -530,3 +530,39 @@ def test_foreign_candidate_evidence_cannot_request_authorization(native_model):
     foreign = replace(evidence, candidate_digest="e" * 64)
     with pytest.raises(TokenizerContractError, match="does not belong"):
         pipeline.promotion_authorization_request(candidate, foreign, requester="release-authority")
+
+
+def test_prepared_corpus_preserves_document_boundaries(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextPipelineConfig, TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model), TextPipelineConfig(context_size=8))
+    corpus = pipeline.prepare_corpus((("doc-a", "alpha beta"), ("doc-b", "gamma delta")))
+    receipts = pipeline.corpus_training_receipts(corpus)
+
+    assert corpus.document_ids == ("doc-a", "doc-b")
+    assert len(corpus.documents) == 2
+    assert len(receipts) == 2
+    assert receipts[0].sequence_digest == corpus.documents[0].sequence.digest
+    assert receipts[1].sequence_digest == corpus.documents[1].sequence.digest
+    assert corpus.documents[0].raw_text_digest != corpus.documents[1].raw_text_digest
+    assert len(corpus.digest) == 64
+
+
+def test_prepared_corpus_rejects_duplicate_document_ids(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    with pytest.raises(TokenizerContractError, match="duplicate document id"):
+        pipeline.prepare_corpus((("doc", "alpha beta"), ("doc", "gamma delta")))
+
+
+def test_prepared_corpus_digest_is_order_sensitive(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    left = pipeline.prepare_corpus((("a", "alpha beta"), ("b", "gamma delta")))
+    right = pipeline.prepare_corpus((("b", "gamma delta"), ("a", "alpha beta")))
+    assert left.digest != right.digest
