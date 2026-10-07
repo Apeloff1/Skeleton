@@ -258,7 +258,10 @@ def _validate_capabilities(
         master_by_ref,
         by_ref.get("VOL-113", {}),
         "VOL-113",
-        ("unify capability descriptors", "bind runtime discovery to registry"),
+        (
+            "repository-wide capability descriptor/evidence population remains separate",
+            "independent capability maturity verification remains pending",
+        ),
     )
     _binding(
         master_by_ref,
