@@ -1422,3 +1422,17 @@ Post-architecture verification found and closed additional operational edges:
 - the dedicated GitHub Actions gate now invokes that exact runner, reducing local/CI command drift and triggers when the runner changes.
 
 Architecture remains IMPLEMENTED. Signing remains withheld until an execution result from the exact-head gate is observable; the repository-side validation contract itself is now materially complete.
+
+
+### 2026-10-07 crawler integration and idempotency tranche
+
+Live-source audit closed additional integration drift:
+- crawler package public surface now exports the full implemented plane rather than only the original core symbols;
+- promotion decisions bind assurance to qualified_sources and required_sources;
+- canonical knowledge handoff refuses CORROBORATED admission unless qualified independent sources satisfy the receipt;
+- retrieval bridge prevalidates duplicate chunk IDs and is idempotent for repeated content+promotion delivery within the bridge lifetime;
+- durable distributed frontier now supports fenced lease renewal and refuses expired/stale renewal.
+
+Scope note: retrieval duplicate protection is currently process/session-local. Durable cross-process retrieval idempotency still requires a canonical persisted ingestion-key contract in the downstream provenance/index layer and is not overstated as complete.
+
+SIGNED status remains withheld pending observed execution of scripts/check_ai_webcrawler.py at exact head and resolution of any failures it exposes.
