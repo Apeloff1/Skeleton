@@ -316,3 +316,18 @@ def test_candidate_rejects_base_model_mismatch(native_model):
         pipeline.candidate_from_checkpoint(
             manifest, checkpoint, candidate_id="candidate-1", base_model_digest="9" * 64,
         )
+
+
+def test_checkpoint_advancement_forms_hash_chain(native_model):
+    pipeline, manifest = _training_lineage_fixture(native_model)
+    genesis = pipeline.initial_training_checkpoint(
+        manifest, weights_digest="5" * 64, optimizer_digest="6" * 64, rng_digest="7" * 64,
+    )
+    second = pipeline.advance_training_checkpoint(
+        manifest, genesis, weights_digest="8" * 64, optimizer_digest="9" * 64, rng_digest="a" * 64,
+    )
+
+    assert second.sequence == 1
+    assert second.prior_checkpoint_digest == genesis.digest
+    assert second.run_manifest_digest == manifest.digest
+    assert second.digest != genesis.digest
