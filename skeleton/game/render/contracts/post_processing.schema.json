@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-11:post_processing:v1",
+  "title": "FLGB-11 post processing",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "effect_id",
+    "stage",
+    "parameter_digest",
+    "enabled"
+  ],
+  "properties": {
+    "effect_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "stage": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "parameter_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "enabled": {
+      "type": "boolean"
+    }
+  }
+}
