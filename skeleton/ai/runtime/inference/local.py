@@ -172,6 +172,7 @@ class LocalInferenceResult:
     output_tokens: int
     finish_reason: str = "completed"
     response_id: str | None = None
+    execution_receipt_digest: str | None = None
     tool_calls: tuple[LocalToolCall, ...] = ()
     structured_output: Mapping[str, Any] | None = None
     latency_ms: float | None = None
@@ -194,6 +195,12 @@ class LocalInferenceResult:
             or self.output_tokens < 0
         ):
             raise ValueError("token counts must be non-negative integers")
+        if self.execution_receipt_digest is not None and (
+            not isinstance(self.execution_receipt_digest, str)
+            or len(self.execution_receipt_digest) != 64
+            or any(ch not in "0123456789abcdef" for ch in self.execution_receipt_digest)
+        ):
+            raise ValueError("execution_receipt_digest must be lowercase sha256")
         if self.finish_reason not in {
             "completed",
             "tool_calls",
