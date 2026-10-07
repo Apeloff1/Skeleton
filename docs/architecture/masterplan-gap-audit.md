@@ -1483,3 +1483,19 @@ The crawler outbox is now connected to an idempotent downstream provenance contr
 Remaining durability boundary: ProvenanceLedger itself is currently in-memory. Its idempotency map therefore does not survive reconstruction unless the ledger state is persisted/restored by a higher layer. The durable crawler outbox preserves operation identity across restart, but a newly empty provenance ledger cannot know that a prior process already emitted the side effect. Full process-crash exactly-once provenance requires persistence of provenance entries/idempotency mappings or a durable provenance backend.
 
 SIGNED status remains withheld pending observable exact-head execution and that persistence decision.
+
+
+### 2026-10-07 durable provenance reconstruction tranche
+
+Canonical provenance restart durability is now implemented:
+- ProvenanceLedger exposes deterministic versioned snapshots containing entries, idempotency bindings and statistics;
+- snapshots carry a BLAKE2 integrity digest and restore fails closed on tampering;
+- restore validates unique/non-empty entry IDs, complete parent relationships, idempotency references and statistics;
+- idempotent replay after snapshot reconstruction returns the original entry;
+- ProvenanceCheckpoint persists snapshots atomically using temp file, fsync and os.replace;
+- missing checkpoints produce a clean ledger while corrupt checkpoints fail closed;
+- crawler CI path filters and focused validation now include provenance checkpoint recovery.
+
+Remaining crash-timing boundary: record() mutates the in-memory ledger before a separate checkpoint save call. A hard process death between those calls can still lose the idempotency binding even though the crawler outbox preserves operation identity. Final closure requires a persistence-aware record path (or durable provenance backend transaction) that does not acknowledge mutation until the checkpoint/backend commit succeeds.
+
+SIGNED status remains withheld pending that timing closure and observable exact-head validation.
