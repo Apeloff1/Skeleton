@@ -1191,3 +1191,31 @@ def test_temporal_evidence_agreement_is_not_a_conflict(native_model):
     assert cluster.conflict is False
     assert cluster.arbitration_reason == "agreement"
     assert cluster.preferred_evidence_digest == new.digest
+
+
+def test_temporal_evolution_chain_is_order_independent_and_hash_linked(native_model):
+    from hashlib import sha256
+    from skeleton.ai.model_runtime.text_pipeline import TemporalEvidence, TextTokenPipeline, build_temporal_evolution_chain
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    old = TemporalEvidence("old", "claim:evolution", sha256(b"v1").hexdigest(), pipeline.temporal_signal(source_year=2010, observed_year=2010, knowledge_cutoff_year=2026, valid_from_year=2010, valid_to_year=2019), 900_000, True)
+    new = TemporalEvidence("new", "claim:evolution", sha256(b"v2").hexdigest(), pipeline.temporal_signal(source_year=2020, observed_year=2020, knowledge_cutoff_year=2026, valid_from_year=2020), 900_000, True)
+    left = build_temporal_evolution_chain((new, old))
+    right = build_temporal_evolution_chain((old, new))
+    assert left.digest == right.digest
+    assert left.nodes[0].predecessor_digest is None
+    assert left.nodes[1].predecessor_digest == left.nodes[0].digest
+    assert left.nodes[0].valid_to_year == 2019
+    assert left.nodes[1].valid_from_year == 2020
+
+
+def test_temporal_evolution_chain_rejects_multiple_claims(native_model):
+    from hashlib import sha256
+    from skeleton.ai.model_runtime.text_pipeline import TemporalEvidence, TextTokenPipeline, build_temporal_evolution_chain
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    signal = pipeline.temporal_signal(source_year=2020, observed_year=2020, knowledge_cutoff_year=2026)
+    a = TemporalEvidence("a", "claim:a", sha256(b"a").hexdigest(), signal, 900_000, True)
+    b = TemporalEvidence("b", "claim:b", sha256(b"b").hexdigest(), signal, 900_000, True)
+    with pytest.raises(TokenizerContractError, match="one claim"):
+        build_temporal_evolution_chain((a, b))
