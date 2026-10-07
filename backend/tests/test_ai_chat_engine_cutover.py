@@ -40,9 +40,30 @@ def _thread(*, version: int = 1, sequence: int = 0) -> ConversationThread:
 def route(monkeypatch):
     import routes.ai as ai
     import routes.gameforge_auth as auth
+    from core.chat_turn_lifecycle import ChatTurnLifecycle
+    from skeleton.persistence.chat_turn_repository import SQLiteChatTurnRepository
 
+    class _AsyncChatTurnAuthority:
+        def __init__(self, repository):
+            self.repository = repository
+
+        def __getattr__(self, name):
+            target = getattr(self.repository, name)
+
+            async def invoke(*args, **kwargs):
+                return target(*args, **kwargs)
+
+            return invoke
+
+    turn_repository = SQLiteChatTurnRepository()
     monkeypatch.setattr(auth, "_enforced", lambda: False)
-    return ai
+    monkeypatch.setattr(
+        ai,
+        "chat_turn_lifecycle",
+        ChatTurnLifecycle(_AsyncChatTurnAuthority(turn_repository)),
+    )
+    yield ai
+    turn_repository.close()
 
 
 @pytest.fixture
