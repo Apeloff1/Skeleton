@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-11:render_recovery:v1",
+  "title": "FLGB-11 render recovery",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "frame_id",
+    "render_graph_digest",
+    "resource_manifest_digest",
+    "failed_backend",
+    "fallback_backend",
+    "restored_state_digest",
+    "expected_state_digest"
+  ],
+  "properties": {
+    "frame_id": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "render_graph_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "resource_manifest_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "failed_backend": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "fallback_backend": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "restored_state_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "expected_state_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
