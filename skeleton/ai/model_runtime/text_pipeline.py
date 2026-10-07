@@ -234,12 +234,15 @@ class GovernedTrainingInput:
     dataset_revision_digest: str
     transform_digest: str
     rights_digest: str
+    authorized_scope: str
 
     def __post_init__(self) -> None:
         for name in ("receipt_digest", "dataset_revision_digest", "transform_digest", "rights_digest"):
             value = getattr(self, name)
             if not isinstance(value, str) or len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value):
                 raise TokenizerContractError(f"invalid {name}")
+        if not isinstance(self.authorized_scope, str) or not self.authorized_scope or self.authorized_scope != self.authorized_scope.strip() or any(ord(ch) < 32 for ch in self.authorized_scope):
+            raise TokenizerContractError("invalid authorized_scope")
 
     @property
     def digest(self) -> str:
@@ -452,7 +455,7 @@ class TextTokenPipeline:
             raise TokenizerContractError("dataset content does not match prepared source")
         if dataset_revision.transform_digest != self.digest:
             raise TokenizerContractError("dataset transform does not match pipeline")
-        return GovernedTrainingInput(receipt.digest, dataset_revision.digest, dataset_revision.transform_digest, dataset_rights.digest)
+        return GovernedTrainingInput(receipt.digest, dataset_revision.digest, dataset_revision.transform_digest, dataset_rights.digest, scope)
 
     def training_manifest(self, prepared: PreparedText, dataset_revision, dataset_rights, *, scope: str = "training", run_id: str, base_model_digest: str, code_digest: str, seed_manifest_digest: str, max_steps: int, pad_token_id: int | None = None, ignore_index: int = -100):
         from skeleton.ai.training.flgb_training_runtime import TrainingManifest
