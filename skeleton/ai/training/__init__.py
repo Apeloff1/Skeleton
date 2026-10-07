@@ -24,3 +24,6 @@ __all__ += [
     "LearningApproval", "ProjectLearningError", "ProjectOutcome",
     "ProjectTrainingAdmission", "admit_project_outcome",
 ]
+
+from .project_learning_run import ProjectLearningRun, build_project_learning_manifest
+__all__ += ["ProjectLearningRun", "build_project_learning_manifest"]
