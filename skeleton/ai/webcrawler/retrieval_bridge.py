@@ -14,6 +14,7 @@ from typing import Mapping
 from skeleton.ai.context.flgb_context_runtime import ContextItem, RetrievalCandidate
 
 from .core import CrawlDocument
+from .governance import PromotionDecision
 
 
 class CrawlRetrievalBridgeError(ValueError):
@@ -91,9 +92,23 @@ def bridge_crawl_document(
     freshness_score: float = 1.0,
     token_cost: int,
     priority: int = 0,
+    promotion: PromotionDecision | None = None,
 ) -> CrawlRetrievalRecord:
-    """Verify crawler evidence and emit canonical retrieval/context contracts."""
+    """Verify crawler evidence and emit canonical retrieval/context contracts.
+
+    When crawler governance is present, only the exact promoted decision may
+    cross this authority boundary.
+    """
     provenance, provenance_digest = _verified_provenance(doc)
+    if promotion is not None:
+        if not isinstance(promotion, PromotionDecision):
+            raise CrawlRetrievalBridgeError("PromotionDecision required")
+        if promotion.content_hash != doc.content_hash:
+            raise CrawlRetrievalBridgeError("promotion content identity mismatch")
+        if promotion.action != "promote":
+            raise CrawlRetrievalBridgeError("crawler evidence is not promoted")
+        if promotion.provenance_schema != provenance.get("schema"):
+            raise CrawlRetrievalBridgeError("promotion provenance schema mismatch")
     if isinstance(token_cost, bool) or not isinstance(token_cost, int) or token_cost < 0:
         raise CrawlRetrievalBridgeError("invalid token_cost")
     if isinstance(priority, bool) or not isinstance(priority, int):
