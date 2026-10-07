@@ -102,9 +102,9 @@ def test_overlong_line_recovery_scans_following_line(
     candidate.write_text(
         "x" * 300
         + "\n"
-        + "API_KEY='"
-        + "Ab9_" * 12
-        + "'\n",
+        + "token=sk-"
+        + "Ab9_" * 8
+        + "\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(checker, "REPO_ROOT", tmp_path)
