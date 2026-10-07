@@ -143,8 +143,8 @@ class RuntimeIntegrityCapsule:
             )
             if (
                 selected_record is None
-                or selected_record.disposition
-                != DecisionDisposition.ACCEPTED
+                or selected_record.disposition.value
+                != DecisionDisposition.ACCEPTED.value
             ):
                 raise ValueError(
                     "selected policy decision is not an accepted session record"
