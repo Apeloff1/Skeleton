@@ -9,7 +9,7 @@ from skeleton.ai.webcrawler.dragon_analysis_chains import AnalysisLayer,LayerRec
 from skeleton.ai.webcrawler.dragon_runtime_events import DragonRuntimeEventLedger
 from skeleton.ai.webcrawler.dragon_frame_custody import CapturedFrame
 from skeleton.ai.webcrawler.dragon_visual_features import VisualObservation
-from skeleton.ai.webcrawler.dragon_browser_visual_import import BrowserVisualEnvelope,SCHEMA,canonical_browser_visual_fingerprint
+from skeleton.ai.webcrawler.dragon_browser_visual_import import BrowserVisualEnvelope,SCHEMA,DECODER_VERSION,canonical_browser_visual_fingerprint
 from skeleton.ai.webcrawler.dragon_visual_runtime_ingest import ingest_browser_visual,_commit_stage
 
 def setup():
@@ -18,7 +18,7 @@ def setup():
  cq=ConsentBoundAnalysisQueue(q,l);j=cq.submit("u",recording_digest="b"*64,game_label="g",consent_id=c.consent_id,scope_digest="a"*64,now=2,authorized=True)
  fs=tuple(CapturedFrame(("%064x"%(i+1))[-64:],"x","x","x","x","x",i*500,("%064x"%(i+20))[-64:],90,f"local://{i}") for i in range(4))
  os=tuple(VisualObservation(f.frame_id,f.frame_digest,.2,.2,.1 if i<2 else .9,.1 if i<2 else .9) for i,f in enumerate(fs))
- e=BrowserVisualEnvelope(SCHEMA,"u",j.job_id,"b"*64,c.consent_id,"a"*64,90,fs,os,"")
+ e=BrowserVisualEnvelope(SCHEMA,"u",j.job_id,"b"*64,c.consent_id,"a"*64,DECODER_VERSION,90,fs,os,"")
  e=replace(e,payload_fingerprint=canonical_browser_visual_fingerprint(e))
  rt=DragonAnalysisRuntime(db);rt.create("u","run",now=2,authorized=True)
  return l,cq,c,j,e,rt
