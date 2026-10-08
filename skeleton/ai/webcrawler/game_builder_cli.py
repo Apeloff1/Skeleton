@@ -22,7 +22,8 @@ import sqlite3
 from .core import CrawlDocument, FetchResponse, CrawlPolicy, extract_document
 from .game_builder_knowledge_runtime import KnowledgeDrivenGameBuilder
 from .game_scale_integration import build_enhanced_game
-from .game_scale_campaign import generate_game_campaign,export_campaign_archive
+from .game_scale_campaign import generate_game_campaign
+from .game_scale_campaign_hub import export_interactive_campaign
 from .game_scale_mass_production import produce_game_portfolio
 
 
@@ -130,11 +131,14 @@ def run(args=None) -> int:
                 builder.knowledge,title=opts.title,genre=opts.genre,
                 engine="web",seed=opts.seed,chapters=opts.campaign_levels,
             )
-            archive=export_campaign_archive(campaign)
+            archive=export_interactive_campaign(campaign)
             report={
                 "game_title":opts.title,"target":"web",
                 "campaign_levels":len(campaign.chapters),
                 "campaign_id":campaign.campaign_id,
+                "campaign_unlocks":True,
+                "xp_skill_progression":True,
+                "portable_save":True,
                 "knowledge_sources":builder.knowledge.db.execute(
                     "SELECT COUNT(*) FROM game_knowledge_sources WHERE active=1"
                 ).fetchone()[0],
