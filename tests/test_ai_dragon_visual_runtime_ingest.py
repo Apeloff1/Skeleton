@@ -15,7 +15,7 @@ from skeleton.ai.webcrawler.dragon_visual_runtime_ingest import ingest_browser_v
 def setup():
  db=sqlite3.connect(":memory:");q=DragonAnalysisQueue(db);l=DragonConsentLedger(db)
  c=l.issue("u",capture=True,analysis=True,issued_at=1,expires_at=100,policy_version="v1",scope_digest="a"*64,authorized=True)
- cq=ConsentBoundAnalysisQueue(q,l,db);j=cq.submit("u","b"*64,"g",consent_id=c.consent_id,scope_digest="a"*64,now=2,authorized=True)
+ cq=ConsentBoundAnalysisQueue(q,l);j=cq.submit("u",recording_digest="b"*64,game_label="g",consent_id=c.consent_id,scope_digest="a"*64,now=2,authorized=True)
  fs=tuple(CapturedFrame(("%064x"%(i+1))[-64:],"x","x","x","x","x",i*500,("%064x"%(i+20))[-64:],90,f"local://{i}") for i in range(4))
  os=tuple(VisualObservation(f.frame_id,f.frame_digest,.2,.2,.1 if i<2 else .9,.1 if i<2 else .9) for i,f in enumerate(fs))
  e=BrowserVisualEnvelope(SCHEMA,"u",j.job_id,"b"*64,c.consent_id,"a"*64,90,fs,os,"")
@@ -34,7 +34,7 @@ def test_cancelled_runtime_rejects_ingest():
  with pytest.raises(PermissionError,match="not active"):ingest_browser_visual(rt,cq,e,"run",now=4,authorized=True)
 
 def test_revoked_consent_rejects_before_runtime_receipt():
- l,cq,c,_,e,rt=setup();l.revoke("u",c.consent_id,revoked_at=3,authorized=True)
+ l,cq,c,_,e,rt=setup();l.revoke("u",c.consent_id,now=3,authorized=True)
  with pytest.raises(PermissionError):ingest_browser_visual(rt,cq,e,"run",now=4,authorized=True)
  assert rt.checkpoint("u","run",authorized=True).revision==0
 
