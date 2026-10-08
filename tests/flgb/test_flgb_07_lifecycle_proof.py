@@ -14,9 +14,10 @@ def chain():
 
 class TestLifecycleProof(unittest.TestCase):
  def test_complete_learning_authority_chain_is_hash_linked(self):
-  p=prove_project_learning("cycle-1",*chain())
+  outcome,approval,admission,run=chain()
+  p=prove_project_learning("cycle-1",outcome,approval,admission,run)
   self.assertEqual([s.stage for s in p.stages],["successful-project-outcome","explicit-learning-approval","dataset-admission","candidate-training-run"])
-  self.assertEqual(p.stages[-1].subject_digest,p.stages[-1].subject_digest)
+  self.assertEqual(p.stages[-1].subject_digest,run.manifest.digest)
   self.assertEqual(len(p.digest),64)
  def test_outcome_substitution_rejected(self):
   o,a,ad,r=chain()
