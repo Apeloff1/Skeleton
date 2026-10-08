@@ -6,6 +6,10 @@ import pytest
 from skeleton.ai.webcrawler.dragon_knowledge_promotion import PromotionPolicy
 from skeleton.ai.webcrawler.dragon_probabilistic_distillation import EvidencePass
 from skeleton.ai.webcrawler.dragon_source_independence import SourceProvenance
+from skeleton.ai.webcrawler.dragon_provenance_registry import (
+    ProvenanceRegistry, SourceAttestation,
+)
+from skeleton.ai.webcrawler.dragon_provenance_assurance import AssurancePolicy
 from skeleton.ai.webcrawler.dragon_provenance_promotion import (
     assess_custodied_promotion,
 )
@@ -119,3 +123,47 @@ def test_source_manifest_order_does_not_change_decision():
                     sources=tuple(reversed(manifest())))
     assert before.manifest_fingerprint == after.manifest_fingerprint
     assert before.decision == after.decision
+
+
+def verified_registry(*, same_owner=False):
+    return ProvenanceRegistry((
+        SourceAttestation(
+            "one.example", "editorial-a", "distribution-a", "audit", "record-a",
+        ),
+        SourceAttestation(
+            "two.example", "editorial-a" if same_owner else "editorial-b",
+            "distribution-b", "audit", "record-b",
+        ),
+    ))
+
+
+def test_promotion_rejects_shared_attested_owner():
+    result = assess_custodied_promotion(
+        "buffered-jump", corpus(), manifest(), (), (),
+        authorized=True, policy=RELAXED,
+        assurance_policy=AssurancePolicy(require_attestations=True),
+        attestation_registry=verified_registry(same_owner=True),
+    )
+    assert not result.decision.eligible
+    assert result.assurance.independent_groups == 1
+    assert "Custody assurance: insufficient independent sources" in result.decision.reasons
+
+
+def test_promotion_accepts_distinct_attested_owners_with_relaxed_other_gates():
+    result = assess_custodied_promotion(
+        "buffered-jump", corpus(), manifest(), (), (),
+        authorized=True, policy=RELAXED,
+        assurance_policy=AssurancePolicy(require_attestations=True),
+        attestation_registry=verified_registry(),
+    )
+    assert result.assurance.candidate_for_review
+    assert result.decision.eligible
+
+
+def test_promotion_requires_verified_registry_when_attestations_mandatory():
+    with pytest.raises(ValueError, match="registry required"):
+        assess_custodied_promotion(
+            "buffered-jump", corpus(), manifest(), (), (),
+            authorized=True, policy=RELAXED,
+            assurance_policy=AssurancePolicy(require_attestations=True),
+        )
