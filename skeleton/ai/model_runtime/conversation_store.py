@@ -207,7 +207,8 @@ class ConversationStore:
                 result[sid] = row[0]
             return result
 
-    def save_many(self, updates: tuple[tuple[str, int, NativeConversationSession], ...]) -> Mapping[str, int]:
+    def save_many(self, updates: tuple[tuple[str, int, NativeConversationSession], ...],
+                  *, pinned: Mapping[str, bool] | None = None) -> Mapping[str, int]:
         """Atomic multi-session compare-and-swap; no partial commits."""
         items = tuple(updates)
         ids = [item[0] for item in items]
@@ -218,13 +219,22 @@ class ConversationStore:
             if type(revision) is not int or revision < 0:
                 raise RuntimeContractError("invalid expected revision")
             encoded.append((sid, revision, self._encode(session)))
+        if pinned is not None:
+            if set(pinned) != set(ids) or any(type(value) is not bool for value in pinned.values()):
+                raise RuntimeContractError("invalid batch pin policy")
         now = time.time()
         with self._transaction():
             for sid, revision, payload in encoded:
-                cursor = self._db.execute(
-                    "UPDATE conversations SET revision=revision+1, updated_at=?, snapshot_json=? "
-                    "WHERE session_id=? AND revision=?",
-                    (now, payload, sid, revision))
+                if pinned is None:
+                    cursor = self._db.execute(
+                        "UPDATE conversations SET revision=revision+1, updated_at=?, snapshot_json=? "
+                        "WHERE session_id=? AND revision=?",
+                        (now, payload, sid, revision))
+                else:
+                    cursor = self._db.execute(
+                        "UPDATE conversations SET revision=revision+1, updated_at=?, snapshot_json=?, pinned=? "
+                        "WHERE session_id=? AND revision=?",
+                        (now, payload, int(pinned[sid]), sid, revision))
                 if cursor.rowcount != 1:
                     raise RuntimeContractError("conversation batch revision conflict")
         return {sid: revision + 1 for sid, revision, _ in encoded}
