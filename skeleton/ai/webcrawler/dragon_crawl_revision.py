@@ -209,7 +209,15 @@ def compare_crawl_revisions(
     added = tuple(x.source_id for x in changes if x.change is SourceChange.NEW)
     missing = tuple(x.source_id for x in changes if x.change is SourceChange.MISSING)
     invalid = sum(x.requires_human_review for x in rechecks)
-    reusable = bool(rechecks) and not added and not missing and invalid == 0
+    # Every source in the custody inventory contributes to a claim's
+    # provenance context, even when it provided no direct reading. A changed
+    # unobserved parent or attestation-related source can invalidate the
+    # dependency model without moving a single quoted passage.
+    reusable = (
+        bool(rechecks)
+        and invalid == 0
+        and all(delta.change is SourceChange.UNCHANGED for delta in changes)
+    )
     fingerprint = _hash({
         "schema": "skeleton.crawler.revision_revalidation.v1",
         "claim_id": claim_id,
