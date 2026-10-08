@@ -183,6 +183,22 @@ class ChatTranscript:
             chunks.append("[message role=assistant name= bytes=?]\n")
         return "".join(chunks)
 
+    def latest_user_index(self) -> int | None:
+        return next((i for i in range(len(self.messages) - 1, -1, -1)
+                     if self.messages[i].role == "user"), None)
+
+    def dialogue_turns(self) -> tuple["ChatTranscript", ...]:
+        """Group dialogue by user turn, retaining attached assistant/tool output."""
+        groups: list[list[ChatMessage]] = []
+        for message in self.messages:
+            if message.role == "user":
+                groups.append([message])
+            elif message.role in ("assistant", "tool"):
+                if not groups:
+                    raise RuntimeContractError("orphan dialogue response")
+                groups[-1].append(message)
+        return tuple(ChatTranscript(tuple(group)) for group in groups)
+
     def validate_turn_order(self) -> None:
         """Require user/assistant turns after optional initial instructions."""
         active = False
