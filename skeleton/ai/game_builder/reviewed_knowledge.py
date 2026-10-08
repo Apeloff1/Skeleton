@@ -407,7 +407,10 @@ class ReviewedKnowledgeStore:
         if not isinstance(body["allowed_scopes"], list):
             raise KnowledgeError("stored rights scopes invalid")
         scopes = body["allowed_scopes"]
-        if not scopes or set(scopes) - _ALLOWED_SCOPES or scopes != sorted(set(scopes)):
+        if (
+            not scopes or any(not isinstance(scope, str) for scope in scopes)
+            or set(scopes) - _ALLOWED_SCOPES or scopes != sorted(set(scopes))
+        ):
             raise KnowledgeError("stored rights scopes invalid")
         if body["status"] not in ("active", "retracted"):
             raise KnowledgeError("stored source status invalid")
@@ -496,6 +499,12 @@ class ReviewedKnowledgeStore:
         self.db.execute("BEGIN IMMEDIATE")
         try:
             self._rows(document.owner)  # fail closed on existing corruption
+            count = self.db.execute(
+                "SELECT COUNT(*) FROM game_builder_knowledge WHERE owner=?",
+                (document.owner,),
+            ).fetchone()[0]
+            if count >= self.policy.max_revisions_per_owner:
+                raise KnowledgeError("owner revision budget exceeded")
             last = self.db.execute(
                 """SELECT revision, digest, payload FROM game_builder_knowledge
                 WHERE owner=? AND source_id=?
@@ -681,15 +690,19 @@ class ReviewedKnowledgeStore:
             limit=self.policy.max_query_results, authorized=True,
             diversify=False,
         )
-        keys = {
-            (hit.source_id, hit.revision, hit.note_id, hit.revision_digest)
-            for hit in current
-        }
-        if any(
-            (hit.source_id, hit.revision, hit.note_id, hit.revision_digest) not in keys
-            for hit in brief.citations
-        ):
+        if not brief.citations or any(hit not in current for hit in brief.citations):
             raise KnowledgeError("brief evidence is no longer available")
+        if brief.independent_groups != len({hit.dependence_group for hit in brief.citations}):
+            raise KnowledgeError("brief source independence was altered")
+        stance_map: dict[str, set[str]] = {}
+        for hit in brief.citations:
+            stance_map.setdefault(hit.mechanic, set()).add(hit.stance)
+        conflicts = tuple(sorted(
+            mechanic for mechanic, stances in stance_map.items()
+            if "supports" in stances and "challenges" in stances
+        ))
+        if conflicts != brief.conflicts:
+            raise KnowledgeError("brief contradiction status was altered")
 
     def erase_owner(self, owner: str, *, authorized: bool) -> int:
         if not authorized:
