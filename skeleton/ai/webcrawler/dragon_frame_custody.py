@@ -2,7 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
-import math
+import math,json
 from .dragon_consent_bound_queue import ConsentBoundAnalysisQueue
 
 @dataclass(frozen=True)
@@ -17,15 +17,20 @@ class FrameBatch:
     batch_fingerprint:str
 
 def bind_extracted_frames(custody:ConsentBoundAnalysisQueue,owner:str,job_id:str,
-    extracted:tuple[tuple[int,str,str],...],*,retention_until:float,
+    extracted:tuple[tuple[int,str,str],...],*,now:float,retention_until:float,
     authorized:bool,max_frames:int=100000)->FrameBatch:
     if not authorized: raise PermissionError("frame binding requires authorization")
     if not 1<=max_frames<=1000000 or len(extracted)>max_frames:
         raise ValueError("frame budget exceeded")
-    if not math.isfinite(retention_until) or retention_until<=0:
+    if not math.isfinite(now) or now<0: raise ValueError("invalid frame binding time")
+    if not math.isfinite(retention_until) or retention_until<=now:
         raise ValueError("invalid retention deadline")
-    job=custody.require_active(owner,job_id,authorized=True)
+    job=custody.require_active(owner,job_id,now=now,authorized=True)
     binding=custody.binding(owner,job_id,authorized=True)
+    consent=custody.consent.require_active(owner,binding.consent_id,now=now,
+        scope_digest=binding.scope_digest,authorized=True)
+    if retention_until>consent.expires_at:
+        raise PermissionError("frame retention exceeds consent lifetime")
     frames=[];last=-1;seen=set()
     for timestamp,digest,locator in extracted:
         if not isinstance(timestamp,int) or timestamp<0 or timestamp<last:
@@ -40,6 +45,7 @@ def bind_extracted_frames(custody:ConsentBoundAnalysisQueue,owner:str,job_id:str
         frames.append(CapturedFrame(identity,owner,job_id,job.recording_digest,
             binding.consent_id,binding.scope_digest,timestamp,digest,retention_until,locator))
     if not frames: raise ValueError("at least one extracted frame required")
-    custody.require_active(owner,job_id,authorized=True)
-    fingerprint=sha256("\n".join(f.frame_id for f in frames).encode()).hexdigest()
+    custody.require_active(owner,job_id,now=now,authorized=True)
+    fingerprint=sha256(json.dumps([[f.frame_id,f.retention_until] for f in frames],
+        separators=(",",":"),allow_nan=False).encode()).hexdigest()
     return FrameBatch(tuple(frames),fingerprint)
