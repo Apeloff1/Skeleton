@@ -6,7 +6,7 @@ from skeleton.ai.webcrawler.archivex import ArchiveX
 from skeleton.ai.webcrawler.archivex_journals import ingest_open_access_journal
 
 
-XML = b"""<article><front><article-meta><title-group>
+XML = b"""<article xmlns:xlink="http://www.w3.org/1999/xlink"><front><article-meta><permissions><license xlink:href="https://creativecommons.org/licenses/by/4.0/"/></permissions><title-group>
 <article-title>Evidence review</article-title>
 </title-group></article-meta></front><body>
 <sec><title>Methods</title><p>Reproducible method A.</p></sec>
@@ -88,3 +88,32 @@ def test_pmc_identifier_validation():
             fetch_xml=lambda url: XML, observed_at=100, now=100,
             license_id="CC-BY-4.0", authorized=True,
         )
+
+def test_missing_article_license_fails_closed():
+    store = archive()
+    without = XML.replace(b"<permissions>", b"<ignored>").replace(b"</permissions>", b"</ignored>")
+    without = without.replace(b"<license xlink:href=", b"<other xlink:href=")
+    with pytest.raises(PermissionError, match="license"):
+        ingest(store, without)
+    assert store.db.execute("SELECT COUNT(*) FROM archivex_snapshots").fetchone()[0] == 0
+
+
+def test_spoofed_article_license_fails_closed():
+    store = archive()
+    restricted = XML.replace(
+        b"https://creativecommons.org/licenses/by/4.0/",
+        b"https://publisher.example.org/all-rights-reserved",
+    )
+    with pytest.raises(PermissionError, match="license"):
+        ingest(store, restricted)
+    assert store.db.execute("SELECT COUNT(*) FROM archivex_snapshots").fetchone()[0] == 0
+
+
+def test_mismatched_license_fails_closed():
+    store = archive()
+    cc0 = XML.replace(
+        b"https://creativecommons.org/licenses/by/4.0/",
+        b"https://creativecommons.org/publicdomain/zero/1.0/",
+    )
+    with pytest.raises(PermissionError, match="disagrees"):
+        ingest(store, cc0)
