@@ -1456,3 +1456,29 @@ def test_verify_round_trip_preserves_legacy_default(native_model, monkeypatch):
     monkeypatch.setattr(pipeline.tokenizer, "decode_ids", lambda token_ids: "different")
     sequence = pipeline.verify_round_trip("alpha beta")
     assert sequence.source_text_digest == pipeline.encode("alpha beta").source_text_digest
+
+
+def test_stream_equivalence_across_unicode_and_crlf_chunks(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    chunks = ("Cafe", "\u0301\r", "\nline", " two")
+    streamed = pipeline.stream(iter(chunks))
+    direct = pipeline.prepare("".join(chunks))
+    assert streamed.sequence == direct.sequence
+    assert streamed.normalized_text == direct.normalized_text
+    assert streamed.digest == direct.digest
+
+
+def test_verify_round_trip_encodes_only_once(native_model, monkeypatch):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    original = pipeline.tokenizer.encode_sequence
+    calls = []
+    def counted(value):
+        calls.append(value)
+        return original(value)
+    monkeypatch.setattr(pipeline.tokenizer, "encode_sequence", counted)
+    pipeline.verify_round_trip("alpha beta")
+    assert len(calls) == 1
