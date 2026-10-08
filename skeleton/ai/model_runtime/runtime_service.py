@@ -9,6 +9,7 @@ cancellation state, and deadline.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import sha256
 from threading import Event
 import time
 from typing import Callable
@@ -16,7 +17,6 @@ from typing import Callable
 from .flgb_model_runtime import LocalModelReceipt, LocalModelRequest, ModelIdentity, digest_json
 from .native_llm_runtime import GenerationResult, NativeLLMRuntime
 from .runtime_contracts import GenerationConfig, RuntimeContractError, RuntimeEvent
-from .tokenization import TokenizerContractError
 
 
 class NativeServiceError(RuntimeContractError):
@@ -141,14 +141,17 @@ class NativeModelService:
         generated_events: int,
         terminal_reason: str,
     ) -> str:
+        # Terminal accounting must not call model or tokenizer code again:
+        # the original request may have failed because those contracts drifted.
         try:
-            prompt_sequence = self.runtime.encode(prompt)
-            prompt_tokens = len(prompt_sequence.token_ids)
-        except (RuntimeContractError, TokenizerContractError):
-            prompt_tokens = None
+            prompt_bytes = prompt.encode("utf-8", errors="strict")
+        except (AttributeError, UnicodeEncodeError) as exc:
+            raise NativeServiceError("prompt is not valid UTF-8 text") from exc
         return digest_json(
             {
-                "prompt_tokens": prompt_tokens,
+                "schema": "skeleton.ai.native-failure-usage.v2",
+                "prompt_bytes": len(prompt_bytes),
+                "prompt_digest": sha256(prompt_bytes).hexdigest(),
                 "generated_events": generated_events,
                 "terminal_reason": terminal_reason,
                 "model_identity_digest": self.identity_digest,
