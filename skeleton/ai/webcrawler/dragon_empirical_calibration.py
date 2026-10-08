@@ -25,6 +25,13 @@ class CalibrationBin:
 
 
 @dataclass(frozen=True)
+class CalibratedScore:
+    raw_score: float
+    calibrated_probability: float
+    artifact_fingerprint: str
+
+
+@dataclass(frozen=True)
 class CalibrationArtifact:
     bins: tuple[CalibrationBin, ...]
     training_periods: tuple[str, ...]
@@ -126,10 +133,17 @@ def fit_histogram_calibrator(
     )
 
 
-def apply_calibrator(score: float, artifact: CalibrationArtifact) -> float:
+def apply_calibrator(
+    score: float, artifact: CalibrationArtifact, *, authorized: bool = True,
+) -> CalibratedScore:
+    if not authorized:
+        raise PermissionError("calibration application requires authorization")
     if not artifact.eligible:
         raise ValueError("calibration artifact is not eligible")
     if not isfinite(score) or not 0 <= score <= 1:
         raise ValueError("invalid heuristic score")
     index = min(len(artifact.bins) - 1, int(score * len(artifact.bins)))
-    return artifact.bins[index].observed_rate
+    return CalibratedScore(
+        score, artifact.bins[index].observed_rate,
+        artifact.artifact_fingerprint,
+    )
