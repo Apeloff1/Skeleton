@@ -70,6 +70,8 @@ class ConversationStore:
                 self._db.execute("COMMIT")
 
     def _encode(self, session: NativeConversationSession) -> str:
+        if not isinstance(session, NativeConversationSession) or session.runtime is not self.runtime:
+            raise RuntimeContractError("session belongs to another native runtime")
         snapshot = session.snapshot()
         payload = json.dumps(snapshot, sort_keys=True, separators=(",", ":"), allow_nan=False)
         if len(payload.encode("utf-8")) > self.max_snapshot_bytes:
