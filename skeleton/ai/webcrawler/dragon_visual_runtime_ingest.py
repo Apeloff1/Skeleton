@@ -22,6 +22,19 @@ class VisualRuntimeIngest:
 def _digest(value:object)->str:
     return sha256(json.dumps(value,sort_keys=True,separators=(",",":")).encode()).hexdigest()
 
+
+def _commit_stage(runtime:DragonAnalysisRuntime,ledger:DragonRuntimeEventLedger,
+    owner:str,run_id:str,receipt:LayerReceipt,*,now:float,
+    expected_revision:int)->RunCheckpoint:
+    with runtime.db:
+        cp=runtime._commit_receipt_uncommitted(owner,run_id,receipt,now=now,
+            expected_revision=expected_revision,authorized=True)
+        ledger._append_uncommitted(owner,run_id,event_type="receipt",
+            layer=receipt.layer.value,outcome="accepted",
+            evidence_fingerprint=receipt.output_fingerprint,error_code="",
+            occurred_at=now,authorized=True)
+        return cp
+
 def ingest_browser_visual(runtime:DragonAnalysisRuntime,custody:ConsentBoundAnalysisQueue,
     envelope:BrowserVisualEnvelope,run_id:str,*,now:float,authorized:bool,
     chunk_size:int=512)->VisualRuntimeIngest:
@@ -36,9 +49,8 @@ def ingest_browser_visual(runtime:DragonAnalysisRuntime,custody:ConsentBoundAnal
         ledger.append(envelope.owner,run_id,event_type="attempt",layer="source_integrity",outcome="failed",error_code=type(exc).__name__,occurred_at=now,authorized=True)
         raise
     source=LayerReceipt(AnalysisLayer.SOURCE_INTEGRITY,(),accepted.envelope_fingerprint,1,True)
-    cp=runtime.commit_receipt(envelope.owner,run_id,source,now=now,
-        expected_revision=cp.revision,authorized=True)
-    ledger.append(envelope.owner,run_id,event_type="receipt",layer="source_integrity",outcome="accepted",evidence_fingerprint=source.output_fingerprint,occurred_at=now,authorized=True)
+    cp=_commit_stage(runtime,ledger,envelope.owner,run_id,source,now=now,
+        expected_revision=cp.revision)
     # Consent is checked inside the chunk worker before each bounded slice.
     ledger.append(envelope.owner,run_id,event_type="attempt",layer="temporal_segmentation",outcome="started",evidence_fingerprint=source.output_fingerprint,occurred_at=now,authorized=True)
     try:
@@ -53,7 +65,6 @@ def ingest_browser_visual(runtime:DragonAnalysisRuntime,custody:ConsentBoundAnal
       "events":[[e.start_ms,e.peak_ms,e.end_ms,e.source_frame_ids] for e in trace.events]})
     temporal=LayerReceipt(AnalysisLayer.TEMPORAL_SEGMENTATION,
         (source.output_fingerprint,),temporal_fp,1,True)
-    cp=runtime.commit_receipt(envelope.owner,run_id,temporal,now=now,
-        expected_revision=cp.revision,authorized=True)
-    ledger.append(envelope.owner,run_id,event_type="receipt",layer="temporal_segmentation",outcome="accepted",evidence_fingerprint=temporal.output_fingerprint,occurred_at=now,authorized=True)
+    cp=_commit_stage(runtime,ledger,envelope.owner,run_id,temporal,now=now,
+        expected_revision=cp.revision)
     return VisualRuntimeIngest(source,temporal,cp,len(trace.events))
