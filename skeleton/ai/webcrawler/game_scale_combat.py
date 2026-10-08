@@ -177,7 +177,7 @@ def generate_combat_wave(*, wave: int,seed: int,capacity: int = 32,
                          base_health: float = 30.) -> tuple[Fighter,...]:
     if not 1<=wave<=1000 or not 1<=capacity<=256 or not 1<=base_health<=100000:
         raise ValueError("invalid encounter wave")
-    rng=random.Random((seed,wave).__hash__() if False else seed+wave*104729)
+    rng=random.Random(seed+wave*104729)
     count=min(capacity,2+wave//2)
     result=[]
     for i in range(count):
