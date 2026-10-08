@@ -49,9 +49,7 @@ class NativeChatEngine:
         if not isinstance(config, GenerationConfig):
             raise RuntimeContractError("generation config required")
         transcript.validate_turn_order()
-        budget = self.runtime.limits.max_context - max(self.reserve_tokens, config.max_new_tokens)
-        if budget < 1:
-            raise RuntimeContractError("generation exceeds model context")
+        budget = self.token_budget(config)
         messages = list(transcript.messages)
         while True:
             candidate = ChatTranscript(tuple(messages))
