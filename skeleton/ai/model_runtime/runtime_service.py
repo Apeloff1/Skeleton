@@ -198,7 +198,10 @@ class NativeModelService:
         if config.max_new_tokens > request.max_output_tokens:
             raise NativeServiceError("generation exceeds local request output-token budget")
         self.runtime.assert_model_unchanged()
-        self.runtime.tokenizer.assert_unchanged()
+        try:
+            self.runtime.tokenizer.assert_unchanged()
+        except TokenizerContractError as exc:
+            raise NativeServiceError("tokenizer identity changed after admission") from exc
         self._validate_identity(self.identity)
 
     def execute(
