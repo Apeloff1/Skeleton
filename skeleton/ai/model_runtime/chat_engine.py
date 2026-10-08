@@ -48,6 +48,7 @@ class NativeChatEngine:
             raise RuntimeContractError("chat generation requires a final user message")
         if not isinstance(config, GenerationConfig):
             raise RuntimeContractError("generation config required")
+        transcript.validate_turn_order()
         budget = self.runtime.limits.max_context - max(self.reserve_tokens, config.max_new_tokens)
         if budget < 1:
             raise RuntimeContractError("generation exceeds model context")
