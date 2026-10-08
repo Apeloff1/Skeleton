@@ -2,7 +2,8 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
-import json
+import json,math,time
+from typing import Callable
 
 from .dragon_analysis_chains import AnalysisLayer,LayerReceipt
 from .dragon_analysis_runtime import DragonAnalysisRuntime,RunCheckpoint
@@ -37,14 +38,17 @@ def _commit_stage(runtime:DragonAnalysisRuntime,ledger:DragonRuntimeEventLedger,
 
 def ingest_browser_visual(runtime:DragonAnalysisRuntime,custody:ConsentBoundAnalysisQueue,
     envelope:BrowserVisualEnvelope,run_id:str,*,now:float,authorized:bool,
-    chunk_size:int=512)->VisualRuntimeIngest:
+    chunk_size:int=512,clock:Callable[[],float]=time.time)->VisualRuntimeIngest:
     if not authorized: raise PermissionError("visual runtime ingestion requires authorization")
     cp=runtime.checkpoint(envelope.owner,run_id,authorized=True)
     if cp.cancelled or cp.state!="running": raise PermissionError("analysis run is not active")
     ledger=DragonRuntimeEventLedger(runtime.db)
+    consent_now=clock()
+    if isinstance(consent_now,bool) or not isinstance(consent_now,(int,float)) or not math.isfinite(consent_now):
+        raise ValueError("invalid visual ingestion clock")
     ledger.append(envelope.owner,run_id,event_type="attempt",layer="source_integrity",outcome="started",occurred_at=now,authorized=True)
     try:
-        accepted=accept_browser_visual(custody,envelope,now=now,authorized=True)
+        accepted=accept_browser_visual(custody,envelope,now=float(consent_now),authorized=True)
     except Exception as exc:
         ledger.append(envelope.owner,run_id,event_type="attempt",layer="source_integrity",outcome="failed",error_code=type(exc).__name__,occurred_at=now,authorized=True)
         raise
@@ -56,7 +60,7 @@ def ingest_browser_visual(runtime:DragonAnalysisRuntime,custody:ConsentBoundAnal
     try:
         motion=derive_motion_features(accepted.features,authorized=True)
         trace=segment_streaming_with_consent(custody,envelope.owner,envelope.job_id,
-            motion.frames,now=now,authorized=True,checkpoint_frames=chunk_size)
+            motion.frames,clock=clock,authorized=True,checkpoint_frames=chunk_size)
     except Exception as exc:
         ledger.append(envelope.owner,run_id,event_type="attempt",layer="temporal_segmentation",outcome="failed",evidence_fingerprint=source.output_fingerprint,error_code=type(exc).__name__,occurred_at=now,authorized=True)
         raise
