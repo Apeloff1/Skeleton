@@ -65,7 +65,8 @@ def plan_and_invoke(
                 "output_tokens": request.output_tokens,
             }, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
             lease = ledger.acquire(request.request_id, fingerprint,
-                                   request.prompt_tokens + request.output_tokens)
+                                   request.prompt_tokens + request.output_tokens,
+                                   exclusive=True)
         try:
             plan = planner.plan(request)
             result = invoke(plan)
