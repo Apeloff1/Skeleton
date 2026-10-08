@@ -479,6 +479,96 @@ class NativeConversationService:
         with self._lock:
             return tuple(sorted(sid for sid, m in self._meta.items() if not m["pinned"]))
 
+    # Fleet observability and bounded diagnostics
+    def event_count(self) -> int:
+        with self._lock:
+            return len(self._events)
+
+    def event_capacity(self) -> int:
+        return self._events.maxlen
+
+    def events_for(self, session_id: str, limit: int = 100) -> tuple[Mapping[str, Any], ...]:
+        with self._lock:
+            self._get(session_id)
+            if type(limit) is not int or not 0 <= limit <= self._events.maxlen:
+                raise RuntimeContractError("invalid event limit")
+            items = [e for e in self._events if e["session_id"] == session_id]
+            return tuple(items[-limit:]) if limit else ()
+
+    def events_by_action(self, action: str, limit: int = 100) -> tuple[Mapping[str, Any], ...]:
+        with self._lock:
+            if not isinstance(action, str) or not action:
+                raise RuntimeContractError("invalid event action")
+            if type(limit) is not int or not 0 <= limit <= self._events.maxlen:
+                raise RuntimeContractError("invalid event limit")
+            items = [e for e in self._events if e["action"] == action]
+            return tuple(items[-limit:]) if limit else ()
+
+    def clear_events(self) -> int:
+        with self._lock:
+            count = len(self._events)
+            self._events.clear()
+            return count
+
+    def failure_rate(self) -> float:
+        with self._lock:
+            return self._failures / self._requests if self._requests else 0.0
+
+    def average_generated_tokens(self) -> float:
+        with self._lock:
+            successful = self._requests - self._failures
+            return self._generated / successful if successful else 0.0
+
+    def utilization_ratio(self) -> float:
+        with self._lock:
+            return len(self._sessions) / self.max_sessions
+
+    def total_context_tokens(self) -> int:
+        with self._lock:
+            return sum(s.context_used for s in self._sessions.values())
+
+    def max_context_tokens(self) -> int:
+        with self._lock:
+            return max((s.context_used for s in self._sessions.values()), default=0)
+
+    def sessions_with_history(self) -> int:
+        with self._lock:
+            return sum(not s.is_empty for s in self._sessions.values())
+
+    def sessions_without_history(self) -> int:
+        with self._lock:
+            return sum(s.is_empty for s in self._sessions.values())
+
+    def sessions_above_context(self, threshold: int) -> tuple[str, ...]:
+        with self._lock:
+            if type(threshold) is not int or threshold < 0:
+                raise RuntimeContractError("invalid context threshold")
+            return tuple(sorted(sid for sid, s in self._sessions.items()
+                                if s.context_used > threshold))
+
+    def sessions_below_context(self, threshold: int) -> tuple[str, ...]:
+        with self._lock:
+            if type(threshold) is not int or threshold < 0:
+                raise RuntimeContractError("invalid context threshold")
+            return tuple(sorted(sid for sid, s in self._sessions.items()
+                                if s.context_used < threshold))
+
+    def busiest_sessions(self, limit: int = 10) -> tuple[SessionRecord, ...]:
+        with self._lock:
+            if type(limit) is not int or not 0 <= limit <= self.max_sessions:
+                raise RuntimeContractError("invalid listing limit")
+            ids = sorted(self._sessions, key=lambda sid: (
+                -self._sessions[sid].turns, sid))
+            return tuple(self.describe(sid) for sid in ids[:limit])
+
+    def largest_contexts(self, limit: int = 10) -> tuple[SessionRecord, ...]:
+        with self._lock:
+            if type(limit) is not int or not 0 <= limit <= self.max_sessions:
+                raise RuntimeContractError("invalid listing limit")
+            ids = sorted(self._sessions, key=lambda sid: (
+                -self._sessions[sid].context_used, sid))
+            return tuple(self.describe(sid) for sid in ids[:limit])
+
     # Portability, governance and observability (31-40)
     def snapshot(self, session_id: str) -> Mapping[str, Any]:
         with self._lock:
