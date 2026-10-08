@@ -374,6 +374,20 @@ class TestNativeModelService(unittest.TestCase):
                 service.execute(request, "alpha", config)
         self.assertIsInstance(caught.exception.__cause__, TokenizerContractError)
 
+    def test_falsey_invalid_cancellation_handle_is_rejected(self):
+        from unittest.mock import patch
+
+        service = NativeModelService(self.runtime())
+        config = GenerationConfig(max_new_tokens=1)
+        request = service.request("invalid-cancellation", "alpha", config, deadline_ms=1000)
+        with patch.object(service.runtime, "stream", side_effect=AssertionError("generated")):
+            for invalid in (False, 0, "", (), []):
+                with self.subTest(invalid=repr(invalid)):
+                    with self.assertRaisesRegex(
+                        NativeServiceError, "CancellationToken required"
+                    ):
+                        service.execute(request, "alpha", config, cancellation=invalid)
+
     def test_clock_contract_fails_closed(self):
         service = NativeModelService(self.runtime(), clock_ns=lambda: -1)
         config = GenerationConfig(max_new_tokens=1, temperature=0.0)
