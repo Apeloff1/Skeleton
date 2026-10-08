@@ -140,6 +140,19 @@ _GOVERNANCE_EXPORTS = {
     "TemporalPromotionBinding": ".temporal_promotion",
     "bind_temporal_promotion": ".temporal_promotion",
     "require_temporal_promotion": ".temporal_promotion",
+    "TemporalBudget": ".temporal_budget",
+    "enforce_signal_budget": ".temporal_budget",
+    "enforce_fact_budget": ".temporal_budget",
+    "CounterfactualBranch": ".temporal_counterfactual",
+    "CounterfactualOutcome": ".temporal_counterfactual",
+    "require_observed_evidence_not_counterfactual": ".temporal_counterfactual",
+    "validate_counterfactual_outcome": ".temporal_counterfactual",
+    "TemporalEdit": ".temporal_editing",
+    "RippleConstraint": ".temporal_editing",
+    "TemporalEditReceipt": ".temporal_editing",
+    "validate_temporal_edit": ".temporal_editing",
+    "YearInterval": ".temporal_intervals",
+    "require_temporal_compatibility": ".temporal_intervals",
 }
 
 
