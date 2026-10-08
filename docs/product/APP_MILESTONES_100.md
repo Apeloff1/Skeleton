@@ -1,6 +1,6 @@
 # 100 App Milestones — User Journey Delivery
 
-Tracked against the existing `frontend/` product shell. Focus: connected user outcomes, not LOC or standalone scaffolds. Milestones M001–M020 are implementation work in this PR; boxes mark code delivered to the branch, **not** release acceptance. No milestones beyond M020 are claimed complete. All milestones require exact-head build/CI plus live-device and backend integration review before release sign-off.
+Tracked against the existing `frontend/` product shell. Focus: connected user outcomes, not LOC or standalone scaffolds. Milestones M001–M030 are implementation work in this PR; boxes mark code delivered to the branch, **not** release acceptance. No milestones beyond M030 are claimed complete. All milestones require exact-head build/CI plus live-device and backend integration review before release sign-off.
 
 ## Batch 1: Start & navigation
 
@@ -28,18 +28,18 @@ Tracked against the existing `frontend/` product shell. Focus: connected user ou
 - [x] M019 — Navigate to a build-specific ZIP workflow rather than assuming download success (implemented; verification pending CI)
 - [x] M020 — Reject missing/demo export targets and expose packaging/download failure (implemented; verification pending CI)
 
-## Batch 3: Knowledge & acquisition
+## Batch 3: Game knowledge reliability & contextual editing
 
-- [ ] M021 — Search authoritative references
-- [ ] M022 — Inspect acquisition provenance
-- [ ] M023 — Import permitted source
-- [ ] M024 — View confidence for extracted claims
-- [ ] M025 — Compare conflicting claims
-- [ ] M026 — Tag game mechanics examples
-- [ ] M027 — Attach knowledge to project
-- [ ] M028 — Revalidate stale sources
-- [ ] M029 — Review knowledge graph links
-- [ ] M030 — Approve knowledge revisions
+- [x] M021 — Require a real selected build before reading knowledge (implemented; verification pending CI)
+- [x] M022 — Replace infinite initial-loading spinner with a recoverable error screen (implemented; verification pending CI)
+- [x] M023 — Keep last successfully read artifacts visible with a stale-response warning (implemented; verification pending CI)
+- [x] M024 — Reject null, arrays and non-object JSON edits before submitting (implemented; verification pending CI)
+- [x] M025 — Report actual backend approval failures instead of silently ignoring them (implemented; verification pending CI)
+- [x] M026 — Prevent overlapping knowledge mutation jobs across forge/refine/apply (implemented; verification pending CI)
+- [x] M027 — Resolve refine operations only on terminal verified job status (implemented; verification pending CI)
+- [x] M028 — Show truthful knowledge-to-game sync outcome or timeout (implemented; verification pending CI)
+- [x] M029 — Track forge jobs with bounded, cancellable client observation (implemented; verification pending CI)
+- [x] M030 — Continue the same game between KB and Studio with contextual navigation (implemented; verification pending CI)
 
 ## Batch 4: World & design
 

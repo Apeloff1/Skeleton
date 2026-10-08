@@ -26,7 +26,8 @@
     "test:localization": "node --test scripts/test-localization-contract.mjs",
     "test:dragon-wire": "node scripts/test-dragon-canonical-wire.cjs",
     "test:product-journeys": "node --test scripts/test-product-journeys.mjs",
-    "test:build-lifecycle": "node --test scripts/test-build-job-lifecycle.mjs"
+    "test:build-lifecycle": "node --test scripts/test-build-job-lifecycle.mjs",
+    "test:knowledge-experience": "node --test scripts/test-knowledge-experience.mjs"
   },
   "engines": {
     "node": ">=24"
