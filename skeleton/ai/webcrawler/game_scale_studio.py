@@ -16,8 +16,8 @@ def generate_level_studio(blueprint:GameBlueprint, *,
     initial=json.dumps({
         "grid":blueprint.grid,"title":blueprint.title,
         "width":blueprint.width,"height":blueprint.height,
-    },ensure_ascii=True).replace("<","\\u003c")
-    template=json.dumps(game,ensure_ascii=True).replace("<","\\u003c")
+    },ensure_ascii=True).replace("<","\\u003c").replace(">","\\u003e").replace("&","\\u0026")
+    template=json.dumps(game,ensure_ascii=True).replace("<","\\u003c").replace(">","\\u003e").replace("&","\\u0026")
     page=r'''<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Game Knowledge Studio</title>
@@ -69,7 +69,7 @@ Every edit is checked against a route from spawn to exit. Keyboard: Ctrl+Z
 undo, Ctrl+Y redo. Preview shows the exact edited level; export saves a
 working standalone game. Imported map files are treated as data.</p>
 </article>
-<article><h2>Live Playable Preview</h2><iframe title="Original game preview" id="game"></iframe>
+<article><h2>Live Playable Preview</h2><iframe title="Original game preview" id="game" sandbox="allow-scripts"></iframe>
 <p class="info">The preview is a real Canvas game: move A/D, jump Space,
 attack J, dash Shift when enabled, restart R and pause P.</p></article>
 </main>
@@ -200,16 +200,22 @@ function buildScene(){
 function buildHtml(){
   const scene=buildScene();
   const regex=/const scene=\{[^\n]*\};/;
-  if(!regex.test(gameTemplate))throw Error("Missing game-scene injection point");
-  // The template is from our own local compiler, not from imported JSON.
-  return gameTemplate.replace(regex,
-    "const scene="+JSON.stringify({...JSON.parse(
-      gameTemplate.match(regex)[0].slice(12,-1)),...scene})+";");
+  const match=gameTemplate.match(regex);
+  if(!match)throw Error("Missing game-scene injection point");
+  // The fixed executable code is locally generated. Imported scene tiles
+  // cannot inject script or alter the functions executing in the preview.
+  const baseline=JSON.parse(match[0].slice("const scene=".length,-1));
+  const payload=JSON.stringify({...baseline,...scene})
+    .replace(/</g,"\\u003c").replace(/>/g,"\\u003e");
+  return gameTemplate.replace(regex,"const scene="+payload+";");
 }
-document.getElementById("preview").onclick=()=>{
-  try{document.getElementById("game").srcdoc=buildHtml();
-  message("Playable preview refreshed")}catch(err){message(err.message,true)}
-};
+function refreshPreview(){
+  try{
+    document.getElementById("game").srcdoc=buildHtml();
+    message("Playable preview refreshed");
+  }catch(err){message(err.message,true)}
+}
+document.getElementById("preview").onclick=refreshPreview;
 function download(data,name,mime){
   const blob=new Blob([data],{type:mime});
   const url=URL.createObjectURL(blob);
@@ -238,5 +244,6 @@ document.getElementById("file").onchange=async event=>{
   }catch(err){message("Map import rejected: "+err.message,true)}
 };
 redraw();
+refreshPreview();
 </script></body></html>'''
     return page.replace("__INITIAL__",initial).replace("__TEMPLATE__",template)
