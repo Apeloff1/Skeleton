@@ -3,7 +3,7 @@ import sqlite3
 from skeleton.ai.webcrawler.dragon_analysis_queue import DragonAnalysisQueue
 from skeleton.ai.webcrawler.dragon_consent_ledger import DragonConsentLedger
 from skeleton.ai.webcrawler.dragon_consent_bound_queue import ConsentBoundAnalysisQueue
-from skeleton.ai.webcrawler.dragon_temporal_segmentation import FeatureFrame
+from skeleton.ai.webcrawler.dragon_temporal_segmentation import FeatureFrame,SegmentationConfig,segment_feature_trace
 from skeleton.ai.webcrawler.dragon_streaming_temporal import segment_streaming_with_consent
 
 def setup():
@@ -36,3 +36,45 @@ def test_checkpoint_clock_regression_fails_closed():
  cq,j,f=setup();times=iter([3,2])
  with __import__("pytest").raises(RuntimeError,match="clock regressed"):
   segment_streaming_with_consent(cq,"u",j.job_id,f,clock=lambda:next(times),authorized=True,checkpoint_frames=2)
+
+
+def test_streaming_matches_monolithic_across_checkpoint_sizes():
+ cq,j,_=setup()
+ values=(.05,.05,.05,.8,.85,.82,.06,.05,.7,.72,.05,.05,.05,.9,.91,.92,.93,.05)
+ frames=tuple(FeatureFrame(i*17,(v,1-v),f"f{i}") for i,v in enumerate(values))
+ config=SegmentationConfig(baseline_window=3,onset_multiplier=2.5,release_multiplier=1.1,
+  noise_floor=.02,min_event_frames=1,max_event_frames=5)
+ expected=segment_feature_trace(frames,authorized=True,config=config)
+ fingerprints=set()
+ for size in (2,3,4,7,16):
+  out=segment_streaming_with_consent(cq,"u",j.job_id,frames,now=3,authorized=True,
+   checkpoint_frames=size,config=config)
+  assert out.events==expected
+  fingerprints.add(out.trace_fingerprint)
+ assert len(fingerprints)==1
+
+
+def test_streaming_matches_monolithic_when_event_starts_on_final_change():
+ cq,j,_=setup()
+ frames=(
+  FeatureFrame(0,(.1,),"a"),
+  FeatureFrame(10,(.1,),"b"),
+  FeatureFrame(20,(.1,),"c"),
+  FeatureFrame(30,(.9,),"d"),
+ )
+ expected=segment_feature_trace(frames,authorized=True)
+ for size in (2,3,10):
+  out=segment_streaming_with_consent(cq,"u",j.job_id,frames,now=3,authorized=True,
+   checkpoint_frames=size)
+  assert out.events==expected
+
+
+def test_streaming_matches_monolithic_for_forced_max_event_close():
+ cq,j,_=setup()
+ frames=tuple(FeatureFrame(i*10,((.1 if i==0 else .9),),f"x{i}") for i in range(9))
+ config=SegmentationConfig(baseline_window=3,onset_multiplier=2,release_multiplier=1,
+  noise_floor=.02,min_event_frames=1,max_event_frames=3)
+ expected=segment_feature_trace(frames,authorized=True,config=config)
+ for size in (2,4,8):
+  assert segment_streaming_with_consent(cq,"u",j.job_id,frames,now=3,authorized=True,
+   checkpoint_frames=size,config=config).events==expected
