@@ -6,12 +6,14 @@ import pytest
 
 from skeleton.ai.webcrawler.core import CrawlDocument, FetchResponse, extract_document
 from skeleton.ai.webcrawler.dragon_crawl_custody import (
-    CapturedSource, CustodyPolicy, LocatedReading, bind_crawl_evidence,\n    assure_captured_crawl,
+    CapturedSource, CustodyPolicy, LocatedReading, bind_crawl_evidence,
+    assure_captured_crawl,
 )
 from skeleton.ai.webcrawler.dragon_probabilistic_distillation import (
     EvidencePolicy, ProbabilisticKnowledgeDistiller,
 )
-from skeleton.ai.webcrawler.dragon_provenance_assurance import assure_crawler_evidence\nfrom skeleton.ai.webcrawler.dragon_provenance_registry import ProvenanceRegistry, SourceAttestation
+from skeleton.ai.webcrawler.dragon_provenance_assurance import assure_crawler_evidence
+from skeleton.ai.webcrawler.dragon_provenance_registry import ProvenanceRegistry, SourceAttestation
 
 
 def captured(sid, *, body=None):
