@@ -198,7 +198,7 @@
       "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
-      "implementation_note": "T01-T12 governed dataset/training/candidate-weight targets, schemas, and focused regressions are present; the existing VOL-149 post-training owner is reused; exact-head dependency closure and independent verification remain required."
+      "implementation_note": "T01-T12 governed dataset/training/candidate-weight targets, schemas, and focused regressions are present; the existing VOL-149 post-training owner is reused. Executable native-transformer training now binds explicit rights evidence and normalized dataset lineage to deterministic BPE vocabulary construction, pre-admitted step budgets, TinyTransformer weight updates, FLGB-07 manifest/checkpoint/candidate lineage, and candidate-only native runtime artifacts that reload through the canonical local-provider path. Exact-head dependency closure, evaluation/promotion evidence, and independent verification remain required."
     },
     {
       "id": "FLGB-08",
