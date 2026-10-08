@@ -379,6 +379,10 @@ class NativeChatWorkspace:
             raise RuntimeContractError("invalid workspace import schema")
         if set(data) - {"schema", "title", "tags", "pinned", "archived", "transcript"}:
             raise RuntimeContractError("unexpected workspace import fields")
+        if type(data.get("pinned", False)) is not bool or type(data.get("archived", False)) is not bool:
+            raise RuntimeContractError("invalid imported conversation flags")
+        if not isinstance(data.get("title"), str) or not isinstance(data.get("transcript"), list):
+            raise RuntimeContractError("invalid imported conversation fields")
         transcript = ChatTranscript.parse(data["transcript"])
         cid = self.create(title=data["title"], transcript=transcript)
         try:
