@@ -154,6 +154,19 @@ def integrate_advanced_gameplay(html: str, *, require_quests: bool = False) -> s
     html=html.replace(timing,
         "      updateEnemies(1/60);\n      updateAdvancedCombat(1/60);\n"
         "      updateGameState();\n      updateGameQuests();",1)
+    # Enemies now react to the player along the same walkable platform,
+    # rather than being permanently confined to predetermined patrol paths.
+    patrol="    const next=e.x+e.direction*scene.physics.enemy_speed*TILE*dt;"
+    if patrol not in html:
+        raise ValueError("missing original enemy movement")
+    html=html.replace(patrol,
+        """    const p=state.player;
+    const horizontal=Math.abs(p.x-e.x);
+    const visible=(horizontal<TILE*7 && Math.abs(p.y-e.y)<TILE*1.6);
+    if(visible && p.alive){
+      e.direction=Math.sign(p.x-e.x)||e.direction;
+    }
+    const next=e.x+e.direction*scene.physics.enemy_speed*TILE*dt;""",1)
     # Spawn initialization happens before the JS body starts the first frame.
     start="requestAnimationFrame(frame);"
     at=html.rfind(start)
