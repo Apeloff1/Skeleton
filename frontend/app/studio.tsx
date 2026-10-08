@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import api from '../src/utils/apiClient';
 import BuildJourney from '../src/components/BuildJourney';
+import { watchBuildJob } from '../src/product/buildJobLifecycle';
 
 const BACKEND = CANONICAL_API_BASE || '';
 
@@ -52,27 +53,48 @@ export default function UnifiedStudio() {
   const [apkBusy, setApkBusy] = React.useState(false);
   const [journeyKey, setJourneyKey] = React.useState(0);
   const [axesInfo, setAxesInfo] = React.useState<{ axis_count: number; combined_choice_points: number; era: string } | null>(null);
-  const pollRef = React.useRef<any>(null);
+  const pollRef = React.useRef<AbortController | null>(null);
+  const [applying, setApplying] = React.useState<string | null>(null);
+  const [jobMessage, setJobMessage] = React.useState('');
+  const [loadError, setLoadError] = React.useState('');
 
   const load = React.useCallback(async () => {
-    if (!game) return;
+    if (!game) {
+      setSteps([]);
+      setNextKey(null);
+      return;
+    }
     setLoading(true);
-    const r = await api.get<any>(`/api/snowball/${game}`, { timeoutMs: 15000 });
-    if (r.ok && r.data) {
-      const d = r.data;
-      // mount once if nothing is built yet (generates the GDD + vault)
-      if (!Array.isArray(d.steps) || d.steps.length === 0) {
-        await api.post<any>(`/api/snowball/${game}/mount`, {}, { timeoutMs: 20000 });
+    setLoadError('');
+    try {
+      let result = await api.get<any>(`/api/snowball/${encodeURIComponent(game)}`, { timeoutMs: 15000 });
+      if (!result.ok || !result.data) {
+        setLoadError('Could not load the build. Verify your connection and retry.');
+        return;
       }
-      setSteps((d.steps || []).filter((s: Step) => s.key !== 'mode'));
-      setNextKey(d.next || (d.steps || []).find((s: Step) => s.is_next)?.key || null);
+      // Mount once, then re-read the authoritative stages. An empty initial
+      // read is not proof the mount succeeded.
+      if (!Array.isArray(result.data.steps) || result.data.steps.length === 0) {
+        const mounted = await api.post<any>(`/api/snowball/${encodeURIComponent(game)}/mount`, {}, { timeoutMs: 20000 });
+        if (!mounted.ok) {
+          setLoadError('The build could not be initialized. Retry when the service recovers.');
+          return;
+        }
+        result = await api.get<any>(`/api/snowball/${encodeURIComponent(game)}`, { timeoutMs: 15000 });
+        if (!result.ok || !result.data) {
+          setLoadError('The build was initialized, but its stages could not be read. Refresh to retry.');
+          return;
+        }
+      }
+      const d = result.data;
+      const stages: Step[] = Array.isArray(d.steps) ? d.steps.filter((s: Step) => s.key !== 'mode') : [];
+      setSteps(stages);
+      setNextKey(d.next || stages.find((s: Step) => s.is_next)?.key || null);
       if (d.title) setTitle(String(d.title));
-      // ── Spec-aware axes: only options that fit this build's spec + are
-      //    unlocked at the current stage are surfaced (server-enforced).
       const genre = String(d.genre || d.mode || 'rpg');
-      const stageIdx = (d.steps || []).filter((s: Step) => s.done).length;
+      const stageIdx = stages.filter((s) => s.done).length;
       const ax = await api.get<any>(
-        `/api/galaxy-studio/axes?genre=${encodeURIComponent(genre)}&era=${d.era || 'modern'}&dimension=3d&stage_index=${stageIdx}`,
+        `/api/galaxy-studio/axes?genre=${encodeURIComponent(genre)}&era=${encodeURIComponent(String(d.era || 'modern'))}&dimension=3d&stage_index=${stageIdx}`,
         { timeoutMs: 12000 });
       if (ax.ok && ax.data && !ax.data.error) {
         setAxesInfo({
@@ -80,45 +102,80 @@ export default function UnifiedStudio() {
           combined_choice_points: ax.data.combined_choice_points || ax.data.total_options || 0,
           era: ax.data.spec?.era || d.era || 'modern',
         });
+      } else {
+        setAxesInfo(null);
       }
+    } catch {
+      setLoadError('Build details are temporarily unavailable. Refresh to retry.');
+    } finally {
+      setLoading(false);
+      setJourneyKey((k) => k + 1);
     }
-    setLoading(false);
-    setJourneyKey((k) => k + 1);
   }, [game]);
 
   React.useEffect(() => {
-    load();
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    void load();
+    return () => {
+      // Stop client monitoring on navigation; server jobs continue according
+      // to their own authority and must be checked before resubmitting.
+      pollRef.current?.abort();
+      pollRef.current = null;
+    };
+  }, [load]);
+
+  const observeJob = React.useCallback(async (jobId: string, controller: AbortController) => {
+    const outcome = await watchBuildJob(
+      () => api.get<any>(`/api/playable/job/${encodeURIComponent(jobId)}`, {
+        signal: controller.signal, timeoutMs: 12_000, retries: 0,
+      }),
+      {
+        signal: controller.signal,
+        onPending: (count) => { if (count === 1 || count % 8 === 0) setJobMessage('Build job running or queued. Waiting for a confirmed result…'); },
+      },
+    );
+    if (controller.signal.aborted) return;
+    setJobMessage(outcome.message);
+    if (outcome.phase === 'completed') await load();
   }, [load]);
 
   const runStage = React.useCallback(async (key: string) => {
-    if (running || !game) return;
+    if (running || applying || pollRef.current || !game) return;
+    const controller = new AbortController();
+    pollRef.current = controller;
     setRunning(key);
-    const r = await api.post<any>(`/api/pipeline/${game}/forge/${key}/async`, {}, { timeoutMs: 15000 });
-    const jobId = r.data?.job_id;
-    if (!jobId) { setRunning(null); Alert.alert('Could not start', r.data?.error || 'Try again.'); return; }
-    pollRef.current = setInterval(async () => {
-      const pr = await api.get<any>(`/api/playable/job/${jobId}`, { timeoutMs: 12000 });
-      const st = pr.data?.job_status || pr.data?.status;
-      if (st && st !== 'running') {
-        clearInterval(pollRef.current); pollRef.current = null;
-        setRunning(null);
-        await load();
+    setJobMessage('Submitting build stage…');
+    try {
+      const r = await api.post<any>(`/api/pipeline/${encodeURIComponent(game)}/forge/${encodeURIComponent(key)}/async`, {},
+        { timeoutMs: 15000, signal: controller.signal });
+      const jobId = r.data?.job_id;
+      if (!r.ok || typeof jobId !== 'string' || !jobId) {
+        setJobMessage('The build stage could not start. Check the service and retry.');
+        return;
       }
-    }, 3000);
-  }, [running, game, load]);
+      await observeJob(jobId, controller);
+    } catch {
+      if (!controller.signal.aborted) setJobMessage('Build monitoring failed. Refresh to check the authoritative job status.');
+    } finally {
+      if (pollRef.current === controller) pollRef.current = null;
+      if (!controller.signal.aborted) setRunning(null);
+    }
+  }, [running, applying, game, observeJob]);
 
   const skipStage = React.useCallback(async (key: string, undo: boolean) => {
-    if (!game) return;
-    await api.post<any>(`/api/snowball/${game}/skip/${key}?undo=${undo}`, {}, { timeoutMs: 12000 });
+    if (!game || running || applying) return;
+    const r = await api.post<any>(`/api/snowball/${encodeURIComponent(game)}/skip/${encodeURIComponent(key)}?undo=${undo}`, {},
+      { timeoutMs: 12000 });
+    if (!r.ok) {
+      setJobMessage('Could not change the stage. Its current state has been preserved.');
+      return;
+    }
+    setJobMessage('');
     await load();
-  }, [game, load]);
+  }, [game, running, applying, load]);
 
   // ── Advanced options per stage (the exhaustive alternatives the forge generated) ──
   const [openStage, setOpenStage] = React.useState<string | null>(null);
   const [opts, setOpts] = React.useState<Record<string, any[]>>({});
-  const [applying, setApplying] = React.useState<string | null>(null);
-
   const toggleAdvanced = React.useCallback(async (key: string) => {
     if (openStage === key) { setOpenStage(null); return; }
     setOpenStage(key);
@@ -129,27 +186,44 @@ export default function UnifiedStudio() {
   }, [openStage, opts, game]);
 
   const applyOption = React.useCallback(async (stage: string, area: string, choice: any) => {
-    if (!game || applying) return;
+    if (!game || running || applying || pollRef.current) return;
+    const controller = new AbortController();
+    pollRef.current = controller;
     setApplying(stage);
-    const instruction = `For "${area}", adopt this option: ${choice.option}.` +
-      (choice.pros ? ` Rationale: ${choice.pros}.` : '') + ' Re-forge the whole stage around this choice.';
-    const r = await api.post<any>(`/api/pipeline/${game}/refine/${stage}/async`, { instruction }, { timeoutMs: 15000 });
-    const jobId = r.data?.job_id;
-    if (!jobId) { setApplying(null); Alert.alert('Could not apply', r.data?.error || 'Try again.'); return; }
-    const t = setInterval(async () => {
-      const pr = await api.get<any>(`/api/playable/job/${jobId}`, { timeoutMs: 12000 });
-      const stt = pr.data?.job_status || pr.data?.status;
-      if (stt && stt !== 'running') {
-        clearInterval(t); setApplying(null); setOpts((p) => ({ ...p, [stage]: [] })); await load();
+    setJobMessage('Submitting refinement…');
+    try {
+      const instruction = `For "${area}", adopt this option: ${choice.option}.` +
+        (choice.pros ? ` Rationale: ${choice.pros}.` : '') + ' Re-forge the whole stage around this choice.';
+      const r = await api.post<any>(`/api/pipeline/${encodeURIComponent(game)}/refine/${encodeURIComponent(stage)}/async`,
+        { instruction }, { timeoutMs: 15000, signal: controller.signal });
+      const jobId = r.data?.job_id;
+      if (!r.ok || typeof jobId !== 'string' || !jobId) {
+        setJobMessage('Could not start refinement. The prior stage is unchanged.');
+        return;
       }
-    }, 3000);
-  }, [game, applying, load]);
+      const result = await watchBuildJob(
+        () => api.get<any>(`/api/playable/job/${encodeURIComponent(jobId)}`,
+          { timeoutMs: 12000, signal: controller.signal, retries: 0 }),
+        { signal: controller.signal },
+      );
+      if (controller.signal.aborted) return;
+      setJobMessage(result.message);
+      if (result.phase === 'completed') {
+        setOpts((p) => ({ ...p, [stage]: [] }));
+        await load();
+      }
+    } catch {
+      if (!controller.signal.aborted) setJobMessage('Refinement status is unavailable. Refresh before retrying.');
+    } finally {
+      if (pollRef.current === controller) pollRef.current = null;
+      if (!controller.signal.aborted) setApplying(null);
+    }
+  }, [game, applying, running, load]);
 
-  const downloadZip = React.useCallback(async () => {
+  const downloadZip = React.useCallback(() => {
     if (!game) return;
-    try { await Linking.openURL(`${BACKEND}/api/galaxy-studio/vault/zip/${game}`); }
-    catch { Alert.alert('ZIP', 'Could not open the ZIP download.'); }
-  }, [game]);
+    router.push(`/zip-export?game=${encodeURIComponent(game)}` as never);
+  }, [game, router]);
 
   const buildApk = React.useCallback(async () => {
     if (!game) return;
@@ -188,6 +262,24 @@ export default function UnifiedStudio() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
+        {!!loadError && (
+          <View testID="studio-load-error" style={{ borderRadius: 12, borderWidth: 1, borderColor: '#A85151', padding: 12, marginBottom: 12 }}>
+            <Text style={{ color: '#FEB2B2', fontSize: 12 }}>{loadError}</Text>
+            <TouchableOpacity accessibilityRole="button" onPress={() => void load()} style={{ paddingVertical: 12 }}>
+              <Text style={{ color: '#C4B5FD', fontWeight: '800' }}>Retry build load →</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {!!jobMessage && (
+          <View testID="studio-job-status" accessibilityLiveRegion="polite"
+            style={{ backgroundColor: '#191D2C', borderRadius: 12, padding: 12, marginBottom: 12 }}>
+            <Text style={{ color: '#E4E7F8', fontSize: 12 }}>{jobMessage}</Text>
+            <TouchableOpacity accessibilityRole="button" onPress={() => void load()} disabled={!!running || !!applying}
+              style={{ paddingVertical: 10, opacity: running || applying ? 0.4 : 1 }}>
+              <Text style={{ color: '#C4B5FD', fontWeight: '800' }}>Refresh actual build state</Text>
+            </TouchableOpacity>
+          </View>
+        )}
         {/* ── The Build Journey — one coherent, gamified flow ── */}
         <BuildJourney
           game={game}
@@ -209,6 +301,11 @@ export default function UnifiedStudio() {
               <View style={st.activePill}>
                 <Ionicons name="checkmark-circle" size={15} color="#34d399" />
                 <Text style={st.activeTxt} numberOfLines={1}>Active build: {title || game.slice(0, 10)}</Text>
+                <TouchableOpacity accessibilityRole="button" testID="studio-knowledge-link"
+                  accessibilityLabel="Open knowledge base for this build"
+                  onPress={() => router.push(`/game-kb?game=${encodeURIComponent(game)}` as never)}>
+                  <Text style={{ color: '#C4B5FD', fontWeight: '800', fontSize: 12 }}>Knowledge →</Text>
+                </TouchableOpacity>
               </View>
             ) : null}
             {axesInfo ? (
@@ -356,7 +453,7 @@ export default function UnifiedStudio() {
                 style={[st.btn, st.btnGhost, (!game || !snowballComplete) && { opacity: 0.45 }]}
               >
                 <Ionicons name="download-outline" size={15} color="#a78bfa" />
-                <Text style={st.btnGhostTxt}>Download ZIP</Text>
+                <Text style={st.btnGhostTxt}>Export ZIP</Text>
               </TouchableOpacity>
             </View>
           </View>

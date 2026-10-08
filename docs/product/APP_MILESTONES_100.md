@@ -1,6 +1,6 @@
 # 100 App Milestones — User Journey Delivery
 
-Tracked against the existing `frontend/` product shell. Focus: connected user outcomes, not LOC or standalone scaffolds. Milestones M001–M010 are implementation work in this PR; boxes mark code delivered to the branch, **not** release acceptance. No milestones beyond M010 are claimed complete. All milestones require exact-head build/CI plus live-device and backend integration review before release sign-off.
+Tracked against the existing `frontend/` product shell. Focus: connected user outcomes, not LOC or standalone scaffolds. Milestones M001–M020 are implementation work in this PR; boxes mark code delivered to the branch, **not** release acceptance. No milestones beyond M020 are claimed complete. All milestones require exact-head build/CI plus live-device and backend integration review before release sign-off.
 
 ## Batch 1: Start & navigation
 
@@ -15,18 +15,18 @@ Tracked against the existing `frontend/` product shell. Focus: connected user ou
 - [x] M009 — Context handoff knowledge ↔ journeys (implemented in journey workspace; verification pending CI)
 - [x] M010 — Bounded recent-build picker (implemented in journey workspace; verification pending CI)
 
-## Batch 2: Create & build
+## Batch 2: Build reliability & export
 
-- [ ] M011 — Create project from natural-language brief
-- [ ] M012 — Edit game vision and constraints
-- [ ] M013 — Validate design questionnaire
-- [ ] M014 — Select era and platform
-- [ ] M015 — Visualize build phase plan
-- [ ] M016 — Execute a single phase
-- [ ] M017 — Pause active phase
-- [ ] M018 — Resume interrupted phase
-- [ ] M019 — Review phase diagnostics
-- [ ] M020 — Version build assets
+- [x] M011 — Distinguish queued, running, done and failed asynchronous build jobs (implemented; verification pending CI)
+- [x] M012 — Poll one job request at a time without overlapping intervals (implemented; verification pending CI)
+- [x] M013 — Bound build observation and show truthful timeout recovery (implemented; verification pending CI)
+- [x] M014 — Stop client monitoring on build navigation without cancelling server work (implemented; verification pending CI)
+- [x] M015 — Show build-stage and refinement errors with refresh/retry controls (implemented; verification pending CI)
+- [x] M016 — Re-fetch actual stages after mounting an empty build (implemented; verification pending CI)
+- [x] M017 — Prevent a failed skip/refinement from looking successful (implemented; verification pending CI)
+- [x] M018 — Open this build's knowledge base directly from Studio (implemented; verification pending CI)
+- [x] M019 — Navigate to a build-specific ZIP workflow rather than assuming download success (implemented; verification pending CI)
+- [x] M020 — Reject missing/demo export targets and expose packaging/download failure (implemented; verification pending CI)
 
 ## Batch 3: Knowledge & acquisition
 
