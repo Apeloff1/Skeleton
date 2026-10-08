@@ -11,13 +11,13 @@ export default function DragonCompanion({state,reducedMotion=false,motion='gentl
  return <View style={s.wrap} accessibilityRole="summary" accessibilityLabel={`Dragon companion. ${state.label}. ${state.detail}`}>
   <View style={s.scene}>
    <View style={s.eggBack}/><DragonAtmosphere direction={life.direction} life={life}/><View style={s.nest}><Text style={s.nestText}>✦  ·  ✧  ·  ✦</Text></View>
-   <Animated.View style={[s.dragon,{transform:[{translateY:life.v.bob.interpolate({inputRange:[0,1],outputRange:[0,-7*life.direction.amplitude]})},{rotate:life.v.tilt.interpolate({inputRange:[-1,1],outputRange:['-3deg','3deg']})}]}]}>
-    <Animated.View style={[s.tail,{transform:[{rotate:life.v.tail.interpolate({inputRange:[-1,1],outputRange:['8deg','34deg']})}]}]}/>{state.wings&&<><Animated.View style={[s.wing,s.wingL,{transform:[{rotate:life.v.wings.interpolate({inputRange:[-1,1],outputRange:['-52deg','-10deg']})}]}]}/><Animated.View style={[s.wing,s.wingR,{transform:[{rotate:life.v.wings.interpolate({inputRange:[-1,1],outputRange:['10deg','52deg']})}]}]}/></>}
+   <Animated.View style={[s.dragon,{transform:[{translateY:life.v.bob.interpolate({inputRange:[0,1],outputRange:[0,-7*life.direction.amplitude]})},{translateY:life.v.lift},{rotate:life.v.tilt.interpolate({inputRange:[-1,1],outputRange:['-3deg','3deg']})}]}]}>
+    <Animated.View style={[s.tail,{transform:[{rotate:life.v.tail.interpolate({inputRange:[-1,1],outputRange:['8deg','34deg']})},{translateX:life.v.tailGesture}]}]}/>{state.wings&&<><Animated.View style={[s.wing,s.wingL,{transform:[{rotate:life.v.wings.interpolate({inputRange:[-1,1],outputRange:['-52deg','-10deg']})},{translateY:life.v.wingGesture}]}]}/><Animated.View style={[s.wing,s.wingR,{transform:[{rotate:life.v.wings.interpolate({inputRange:[-1,1],outputRange:['10deg','52deg']})},{translateY:life.v.wingGesture}]}]}/></>}
     <View style={s.body}/><View style={s.belly}/>
-    <Animated.View style={[s.head,{transform:[{rotate:life.v.tilt.interpolate({inputRange:[-1,1],outputRange:['-5deg','6deg']})}]}]}>
-     <View style={s.earL}/><View style={s.earR}/><Animated.View style={[s.eyeL,{transform:[{scaleY:life.v.blink}]}]}><View style={s.pupil}/></Animated.View><Animated.View style={[s.eyeR,{transform:[{scaleY:life.v.blink}]}]}><View style={s.pupil}/></Animated.View>
+    <Animated.View style={[s.head,{transform:[{rotate:life.v.tilt.interpolate({inputRange:[-1,1],outputRange:['-5deg','6deg']})},{rotate:life.v.headGesture.interpolate({inputRange:[-25,25],outputRange:['-25deg','25deg']})}]}]}>
+     <View style={s.earL}/><View style={s.earR}/><Animated.View style={[s.eyeL,{transform:[{scaleY:life.v.blink}]}]}><Animated.View style={[s.pupil,{transform:[{translateX:life.v.eyeGesture}]}]}/></Animated.View><Animated.View style={[s.eyeR,{transform:[{scaleY:life.v.blink}]}]}><Animated.View style={[s.pupil,{transform:[{translateX:life.v.eyeGesture}]}]}/></Animated.View>
      <View style={s.snout}/><View style={s.smile}/>
-     <Animated.View style={[s.shellHat,{transform:[{rotate:life.v.shell.interpolate({inputRange:[-1,1],outputRange:['-11deg','-3deg']})}]}]}><View style={s.shellCrack}/></Animated.View>
+     <Animated.View style={[s.shellHat,{transform:[{rotate:life.v.shell.interpolate({inputRange:[-1,1],outputRange:['-11deg','-3deg']})},{translateY:life.v.hatGesture}]}]}><View style={s.shellCrack}/></Animated.View>
      {state.glasses&&<View style={s.glasses}><View style={s.lens}/><View style={s.bridge}/><View style={s.lens}/><View style={s.bandage}><View style={s.bandagePad}/></View></View>}
     </Animated.View>
     {state.fire&&<Animated.View style={[s.fire,{opacity:life.v.glow}]}><Text style={s.fireText}>🔥</Text></Animated.View>}

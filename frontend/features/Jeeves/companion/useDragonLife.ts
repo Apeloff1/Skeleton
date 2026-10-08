@@ -3,6 +3,7 @@ import {Animated,AppState,Easing} from 'react-native';
 import type {DragonCompanionState} from './dragonCompanion';
 import type {CompanionMotion} from './dragonPreferences';
 import {directDragon} from './dragonChoreography';
+import {DRAGON_POSES} from './dragonGesturePoses';
 
 const PET_REACTIONS=[
  'Mrrp! Tiny nose boop.', 'A happy little squeak!', 'His tail says thank you.',
@@ -19,7 +20,10 @@ const defaultValues=()=>({
  blink:new Animated.Value(1),tail:new Animated.Value(0),
  wings:new Animated.Value(0),shell:new Animated.Value(0),
  glow:new Animated.Value(1),twinkle:new Animated.Value(0),
- heart:new Animated.Value(0),
+ heart:new Animated.Value(0),lift:new Animated.Value(0),
+ headGesture:new Animated.Value(0),wingGesture:new Animated.Value(0),
+ tailGesture:new Animated.Value(0),hatGesture:new Animated.Value(0),
+ eyeGesture:new Animated.Value(0),fxGesture:new Animated.Value(0),
 });
 type Values=ReturnType<typeof defaultValues>;
 
@@ -62,6 +66,9 @@ export function useDragonLife(
    v.bob.setValue(0);v.tilt.setValue(0);v.blink.setValue(1);
    v.tail.setValue(0);v.wings.setValue(0);v.shell.setValue(0);
    v.glow.setValue(1);v.twinkle.setValue(0);v.heart.setValue(0);
+   v.lift.setValue(0);v.headGesture.setValue(0);v.wingGesture.setValue(0);
+   v.tailGesture.setValue(0);v.hatGesture.setValue(0);
+   v.eyeGesture.setValue(0);v.fxGesture.setValue(0);
    return;
   }
   const duration=mode==='gentle'?2000:1250;
@@ -85,6 +92,31 @@ export function useDragonLife(
   loops.forEach(a=>a.start());
   return ()=>loops.forEach(a=>a.stop());
  },[enabled,mode,state.phase,state.wings,state.fire,state.embers,state.snuggly,direction.particle,v]);
+ // Each authored beat produces a distinct, bounded physical pose; no JS frame loop.
+ useEffect(()=>{
+  const channels=[v.lift,v.headGesture,v.wingGesture,v.tailGesture,v.hatGesture,v.eyeGesture,v.fxGesture];
+  channels.forEach(value=>{value.stopAnimation();value.setValue(0);});
+  if(!enabled)return;
+  const p=DRAGON_POSES[direction.beat.gesture];
+  const scale=direction.amplitude;
+  const pulse=(value:Animated.Value,target:number)=>Animated.sequence([
+   Animated.timing(value,{toValue:target*scale,duration:mode==='gentle'?510:280,
+    easing:Easing.out(Easing.cubic),useNativeDriver:true}),
+   Animated.timing(value,{toValue:0,duration:mode==='gentle'?850:570,
+    easing:Easing.inOut(Easing.sin),useNativeDriver:true}),
+  ]);
+  const moves=[
+   pulse(v.lift,p.lift),pulse(v.headGesture,p.nod),
+   pulse(v.eyeGesture,p.gaze),
+  ];
+  if(mode==='full')moves.push(
+   pulse(v.wingGesture,p.wing),pulse(v.tailGesture,p.tail),
+   pulse(v.hatGesture,p.hat),pulse(v.fxGesture,p.aura*10),
+  );
+  const action=Animated.parallel(moves);
+  action.start();
+  return ()=>action.stop();
+ },[enabled,direction.beat.gesture,direction.amplitude,mode,v]);
  const pet=useCallback(()=>{
   const count=petCount+1;
   setPetCount(count);

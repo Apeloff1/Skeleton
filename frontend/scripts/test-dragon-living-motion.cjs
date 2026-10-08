@@ -24,7 +24,13 @@ vm.runInNewContext(authored.code,{module:scope,exports:scope.exports,Math,Number
 const {DRAGON_BEATS,DRAGON_CHOREOGRAPHY_COUNT,directDragon}=scope.exports;
 const phases=['snuggle','listening','curious','launching','crawling','acquiring','burning','distilling','celebrating','sleeping'];
 assert.equal(DRAGON_CHOREOGRAPHY_COUNT,120,'120 hand-authored beats are required');
-assert.deepEqual(Object.keys(DRAGON_BEATS).sort(),[...phases].sort());
+assert.equal(Object.keys(DRAGON_BEATS).sort().join('|'),[...phases].sort().join('|'));
+const physical=transpile('dragonGesturePoses.ts');
+const poseScope={exports:{}};
+vm.runInNewContext(physical.code,{module:poseScope,exports:poseScope.exports,Math,Number,Object,Array},{timeout:1500});
+const poses=poseScope.exports.DRAGON_POSES;
+assert.equal(Object.keys(poses).length,30,'30 distinct physical gesture definitions required');
+assert.ok(new Set(Object.values(poses).map(x=>JSON.stringify(x))).size>=29,'physical gestures should not be cosmetic aliases');
 for(const phase of phases){
  const variants=DRAGON_BEATS[phase];
  assert.equal(variants.length,12,phase+' should have 12 meaningful moments');
@@ -54,10 +60,11 @@ const life=fs.readFileSync(path.join(root,'useDragonLife.ts'),'utf8');
 const component=fs.readFileSync(path.join(root,'DragonCompanion.tsx'),'utf8');
 const panel=fs.readFileSync(path.join(root,'DragonCompanionPanel.tsx'),'utf8');
 assert.ok(life.includes("AppState.addEventListener('change'"),'background work must stop');
+assert.ok(life.includes('DRAGON_POSES[direction.beat.gesture]'),'gesture beats must actually drive physical animation');
 assert.ok(life.includes('useNativeDriver:true'),'no JS frame loop');
 assert.ok(life.includes('loops.forEach(a=>a.stop())'),'cleanup required');
 assert.ok(life.includes('reducedMotion'),'respect OS preferences');
 assert.ok(component.includes('DragonAtmosphere')&&component.includes('life.pet'),'scene and touch reaction must render');
 assert.ok(panel.includes('motion={motion}')&&panel.includes('skeleton.dragon.motion.v1'),'gentle/off prefs must reach animator and persist');
 assert.ok(panel.includes('never start research or change memory'),'pet interactions must remain cosmetic');
-console.log('Dragon life: 120 real phase beats, 10 phases, bounded motion, reduced-motion and syntax checks passed.');
+console.log('Dragon life: 120 real phase beats, 30 physical gestures, 10 phases, bounded motion, reduced-motion and syntax checks passed.');
