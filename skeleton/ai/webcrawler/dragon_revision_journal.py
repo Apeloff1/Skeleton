@@ -157,8 +157,6 @@ class RevisionJournal:
         ):
             if not _valid_digest(field):
                 raise ValueError("invalid review fingerprint")
-        if review.fingerprint != revision_report_fingerprint(review):
-            raise ValueError("revision review fingerprint mismatch")
         if not isinstance(review.prior_readings_reusable, bool):
             raise ValueError("invalid reuse decision")
         if not isinstance(review.invalidated_readings, int) or isinstance(
@@ -178,6 +176,8 @@ class RevisionJournal:
             review.invalidated_readings or review.missing_sources or review.added_sources
         ):
             raise ValueError("inconsistent revalidation decision")
+        if review.fingerprint != revision_report_fingerprint(review):
+            raise ValueError("revision review fingerprint mismatch")
 
     def append(
         self, owner: str, review: RevisionRevalidation, *,
