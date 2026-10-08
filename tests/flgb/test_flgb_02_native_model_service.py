@@ -39,6 +39,23 @@ class TestNativeModelService(unittest.TestCase):
             )
         )
 
+    def test_failure_usage_digest_survives_tokenizer_rejection(self):
+        from unittest.mock import patch
+
+        service = NativeModelService(self.runtime())
+        with patch.object(
+            service.runtime, "encode",
+            side_effect=RuntimeContractError("encoding rejected"),
+        ):
+            first = service._usage_digest(
+                prompt="alpha", generated_events=0, terminal_reason="model_error"
+            )
+            second = service._usage_digest(
+                prompt="alpha", generated_events=0, terminal_reason="model_error"
+            )
+        self.assertEqual(first, second)
+        self.assertEqual(len(first), 64)
+
     def test_service_uses_runtime_canonical_identity(self):
         runtime = self.runtime()
         service = NativeModelService(runtime)
