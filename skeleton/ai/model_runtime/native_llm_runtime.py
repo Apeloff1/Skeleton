@@ -281,7 +281,10 @@ class NativeLLMRuntime:
         except TokenizerContractError as exc:
             raise RuntimeContractError("tokenizer mutated after admission") from exc
 
-        sequence = self.encode(prompt)
+        try:
+            sequence = self.encode(prompt)
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("prompt tokenization failed admission") from exc
         prompt_tokens = len(sequence.token_ids)
         if prompt_tokens > self.limits.max_context:
             raise RuntimeContractError("prompt exceeds context budget")

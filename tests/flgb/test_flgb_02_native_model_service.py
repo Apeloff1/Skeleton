@@ -39,6 +39,75 @@ class TestNativeModelService(unittest.TestCase):
             )
         )
 
+    def test_failure_usage_digest_survives_tokenizer_rejection(self):
+        from unittest.mock import patch
+
+        service = NativeModelService(self.runtime())
+        with patch.object(
+            service.runtime, "encode",
+            side_effect=RuntimeContractError("encoding rejected"),
+        ):
+            first = service._usage_digest(
+                prompt="alpha", generated_events=0, terminal_reason="model_error"
+            )
+            second = service._usage_digest(
+                prompt="alpha", generated_events=0, terminal_reason="model_error"
+            )
+        self.assertEqual(first, second)
+        self.assertEqual(len(first), 64)
+
+    def test_failure_receipt_survives_raw_tokenizer_contract_error(self):
+        from unittest.mock import patch
+        from skeleton.ai.model_runtime.tokenization import TokenizerContractError
+
+        service = NativeModelService(self.runtime())
+        config = GenerationConfig(max_new_tokens=1)
+        request = service.request("op-tokenizer-error", "alpha", config, deadline_ms=1000)
+        with patch.object(
+            service.runtime, "encode",
+            side_effect=TokenizerContractError("encoding rejected"),
+        ):
+            self.assertEqual(
+                len(service._usage_digest(
+                    prompt="alpha", generated_events=0, terminal_reason="model_error"
+                )),
+                64,
+            )
+            result = service.execute(request, "alpha", config)
+        self.assertEqual(result.receipt.terminal_reason, "model_error")
+        self.assertIsNone(result.generation)
+        self.assertIsNone(result.receipt.output_digest)
+        self.assertEqual(len(result.receipt.usage_digest), 64)
+
+    def test_cancelled_request_does_not_run_generation(self):
+        from unittest.mock import patch
+
+        service = NativeModelService(self.runtime())
+        config = GenerationConfig(max_new_tokens=2)
+        request = service.request("op-cancel-no-generate", "alpha", config, deadline_ms=1000)
+        cancellation = CancellationToken()
+        cancellation.cancel()
+        with patch.object(service.runtime, "stream", side_effect=AssertionError("generated")):
+            first = service.execute(request, "alpha", config, cancellation=cancellation)
+            second = service.execute(request, "alpha", config, cancellation=cancellation)
+        self.assertEqual(first.receipt.terminal_reason, "cancelled")
+        self.assertIsNone(first.receipt.output_digest)
+        self.assertIsNone(first.generation)
+        self.assertEqual(first.receipt.usage_digest, second.receipt.usage_digest)
+
+    def test_expired_deadline_does_not_run_generation(self):
+        from unittest.mock import patch
+
+        service = NativeModelService(self.runtime(), clock_ns=_Clock((0, 2_000_000)))
+        config = GenerationConfig(max_new_tokens=2)
+        request = service.request("op-deadline-no-generate", "alpha", config, deadline_ms=1)
+        with patch.object(service.runtime, "stream", side_effect=AssertionError("generated")):
+            result = service.execute(request, "alpha", config)
+        self.assertEqual(result.receipt.terminal_reason, "deadline")
+        self.assertIsNone(result.generation)
+        self.assertIsNone(result.receipt.output_digest)
+        self.assertEqual(result.events, ())
+
     def test_service_uses_runtime_canonical_identity(self):
         runtime = self.runtime()
         service = NativeModelService(runtime)
