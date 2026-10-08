@@ -49,7 +49,7 @@ _TERM=re.compile(r"(?m)(?:^|\.\s+)([A-Za-z][\w \-]{2,55})\s+"
                  r"(?:is|means|refers to|describes)\s+([^.!?\n]{8,230})[.!?]")
 _SENTENCE=re.compile(r"[^.!?\n]{12,350}[.!?]")
 _GUIDE=re.compile(r"\b(?:must|should|recommend|prefer|avoid|requires?)\b",re.I)
-_CODE=re.compile(r"(?s)```([\w#+-]{0,24})\s*\n(.{8,20000}?)\n```")
+_CODE=re.compile(r"(?s)```([\w#+-]{0,24})\s+(.{8,20000}?)\s+```")
 _FAMILIES={
     "godot":("CharacterBody2D","GDScript","move_and_slide","Node2D","InputMap"),
     "unity":("MonoBehaviour","Rigidbody2D","FixedUpdate","UnityEngine"),
