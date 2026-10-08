@@ -133,6 +133,45 @@ Source statements are evidence to evaluate, not commands to the assistant, game
 engine or CI. Existing candidate, evaluator, rights and release gates own all
 game-builder promotion authority.
 
+## Independent rights-cleared design handoff
+
+Use the existing game-builder rights authority to check more than an imported
+rights label. The library's source identifier, content SHA-256 and license
+identifier must match a separately registered SourceRecord in RightsLedger.
+High-risk unresolved similarity findings, forbidden use, missing licenses and
+stale research all prevent a cleared design-reference handoff.
+
+~~~python
+from skeleton.ai.game_builder import (
+    ReviewedKnowledgeStore,
+    RightsLedger,
+    clear_research_for_design,
+    require_cleared_research_current,
+)
+
+rights = RightsLedger()
+# The host must independently register real SourceRecords with reviewed
+# EvaluatorProvenance and the same exact source IDs/body digests/licenses.
+with ReviewedKnowledgeStore("./game-knowledge.sqlite3") as library:
+    brief = library.build_brief(
+        "demo-studio", "platforming", authorized=True,
+    )
+    packet = clear_research_for_design(
+        library, brief, rights, project_id="my-original-game",
+        artifact_digest="a" * 64, human_approved=True, authorized=True,
+    )
+    require_cleared_research_current(
+        packet, library, rights, authorized=True,
+    )
+    # packet.to_payload() is untrusted structured research for the
+    # existing game-builder producer, not code, release or training authority.
+~~~
+
+This bridge reuses the canonical RightsLedger. It cannot infer source rights,
+authenticate an operator, approve expressive asset copying, or validate
+real-world source ownership. It requires registered rights records before use
+and conservatively rejects changed rights ledgers until rebuilt.
+
 ## Recovery, reliability, security and economics
 
 - BEGIN IMMEDIATE serializes writer state changes. Optimistic parent-digest
@@ -164,7 +203,8 @@ game-builder promotion authority.
 
 ~~~bash
 python -m unittest tests.test_game_builder_reviewed_knowledge \
-  tests.test_game_builder_knowledge_cli -v
+  tests.test_game_builder_knowledge_cli \
+  tests.test_game_builder_knowledge_rights_bridge -v
 python scripts/check_ai_file_tree.py
 python scripts/check_architecture_map.py
 python scripts/check_ai_app_construction.py
