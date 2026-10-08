@@ -23,6 +23,7 @@ from .core import CrawlDocument, FetchResponse, CrawlPolicy, extract_document
 from .game_builder_knowledge_runtime import KnowledgeDrivenGameBuilder
 from .game_scale_integration import build_enhanced_game
 from .game_scale_campaign import generate_game_campaign,export_campaign_archive
+from .game_scale_mass_production import produce_game_portfolio
 
 
 def import_research_captures(
@@ -85,6 +86,10 @@ def run(args=None) -> int:
                         help="Ship original SVG art, audio, route balancing and interactive studio")
     parser.add_argument("--theme", choices=("fantasy","cyber","desert","ice","forest","space"),
                         default="fantasy")
+    parser.add_argument("--batch-games", type=int, default=0,
+                        help="10x production: compile 1-1000 distinct playable games")
+    parser.add_argument("--batch-offset", type=int, default=0,
+                        help="Resume production with new deterministic game numbers")
     parser.add_argument("--campaign-levels", type=int, default=1,
                         help="Generate 1-50 connected playable campaign levels")
     parser.add_argument("--approve", action="store_true",
@@ -102,7 +107,23 @@ def run(args=None) -> int:
             )
         if not 1<=opts.campaign_levels<=50:
             parser.error("Campaign length must be between 1 and 50")
-        if opts.campaign_levels>1:
+        if opts.batch_games:
+            if opts.engine!="web" or opts.campaign_levels!=1:
+                parser.error("Batch production currently requires a web target and a single campaign")
+            output=produce_game_portfolio(
+                builder.knowledge,title=opts.title,count=opts.batch_games,
+                seed=opts.seed,batch_offset=opts.batch_offset,
+                width=opts.width,height=opts.height,
+                authorized=True,human_approved=True,
+            )
+            archive=output.archive
+            report={
+                "game_title":opts.title,"target":"web",
+                "batch_games":len(output.games),
+                "source_count":output.source_count,
+                "total_bytes":output.total_bytes,
+            }
+        elif opts.campaign_levels>1:
             if opts.engine!="web":
                 parser.error("Multi-level campaign ZIP is currently a web target")
             campaign=generate_game_campaign(
