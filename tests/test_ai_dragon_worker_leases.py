@@ -82,3 +82,40 @@ def test_successful_atomic_commit_persists_all_evidence_before_release():
  assert len(events)==1 and events[0].evidence_fingerprint=="a"*64
  with pytest.raises(PermissionError,match="missing"):
   leases.require(lease,now=2.1,authorized=True)
+
+
+def test_heartbeat_renews_same_lease_identity_without_generation_change():
+ db=sqlite3.connect(":memory:"); leases=DragonWorkerLeases(db)
+ lease=leases.acquire("u","r","source_integrity","w","impl","1",now=1,ttl=5,authorized=True)
+ renewed=leases.renew(lease,now=3,ttl=10,authorized=True)
+ assert renewed.token==lease.token
+ assert renewed.generation==lease.generation
+ assert renewed.expires_at==13
+ with pytest.raises(PermissionError,match="stale"):
+  leases.require(lease,now=4,authorized=True)
+ assert leases.require(renewed,now=12,authorized=True)==renewed
+
+
+def test_expired_or_replaced_worker_cannot_heartbeat():
+ db=sqlite3.connect(":memory:"); leases=DragonWorkerLeases(db)
+ old=leases.acquire("u","r","source_integrity","w1","impl","1",now=1,ttl=2,authorized=True)
+ with pytest.raises(PermissionError,match="expired"):
+  leases.renew(old,now=3,ttl=5,authorized=True)
+ replacement=leases.acquire("u","r","source_integrity","w2","impl","2",now=3,ttl=5,authorized=True)
+ with pytest.raises(PermissionError,match="stale"):
+  leases.renew(old,now=3.5,ttl=5,authorized=True)
+ assert leases.require(replacement,now=4,authorized=True)==replacement
+
+
+def test_heartbeat_rejects_time_regression():
+ db=sqlite3.connect(":memory:"); leases=DragonWorkerLeases(db)
+ lease=leases.acquire("u","r","source_integrity","w","impl","1",now=5,ttl=10,authorized=True)
+ with pytest.raises(ValueError,match="time regression"):
+  leases.renew(lease,now=4,ttl=5,authorized=True)
+
+
+def test_new_lease_tokens_are_unpredictable_across_identical_reacquisitions():
+ db=sqlite3.connect(":memory:"); leases=DragonWorkerLeases(db)
+ a=leases.acquire("u","r","source_integrity","w","impl","1",now=1,ttl=1,authorized=True)
+ b=leases.acquire("u","r","source_integrity","w","impl","1",now=2,ttl=1,authorized=True)
+ assert len(a.token)==64 and len(b.token)==64 and a.token!=b.token
