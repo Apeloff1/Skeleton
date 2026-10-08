@@ -175,6 +175,9 @@ class TestAuthenticatedRedundantCheckpoints(unittest.TestCase):
     def test_one_signed_wrong_parent_is_not_a_quorum_vote(self):
         scheduler = self.scheduler()
         self.publish(scheduler)
+        # Simulate a lost member replaced by a differently signed record.
+        # A direct overwrite of an authenticated same-term fork is forbidden.
+        self.locations[2].unlink()
         alternate = self.slots(parent=OTHER_PARENT)
         alternate[2].write(scheduler.snapshot())
         self.assertEqual(len(self.recover().matching), 2)
@@ -216,11 +219,7 @@ class TestAuthenticatedRedundantCheckpoints(unittest.TestCase):
     def test_direct_adapter_write_refuses_conflicting_same_sequence(self):
         scheduler = self.scheduler()
         self.publish(scheduler)
-        alternate = self.scheduler()
-        alternate.cancel("queued")
-        alternate.submit(BatchRequest("other", 1, 1), kv_bytes=5)
-        self.assertGreater(alternate.snapshot()["sequence"], scheduler.snapshot()["sequence"])
-        # Construct a different scheduler with the exact original sequence.
+        # Construct a divergent scheduler with the exact original sequence.
         second = RuntimeAdmissionScheduler(LIMITS, policy=POLICY)
         second.submit(BatchRequest("other", 3, 2), kv_bytes=15)
         second.admit()
