@@ -1,13 +1,12 @@
 """Auditable native game-generator candidate selection and static route scoring."""
 from __future__ import annotations
-from dataclasses import asdict
 from hashlib import sha256
 import json
 import pytest
 
 from skeleton.ai.webcrawler.dragon_game_blueprints import design_campaign
 from skeleton.ai.webcrawler.dragon_game_fitness import (
-    analyze_stage,evaluate_campaign,choose_campaign,selection_report,
+    evaluate_campaign,choose_campaign,selection_report,
 )
 from skeleton.ai.webcrawler.dragon_native_projects import render_native_project
 from skeleton.ai.webcrawler.dragon_game_mechanics import Mechanic

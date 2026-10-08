@@ -1,7 +1,6 @@
 """Real MOS6510 C64 source and optional cc65 PRG compile validation."""
 from __future__ import annotations
 from hashlib import sha256
-from pathlib import Path
 import shutil
 import subprocess
 import pytest

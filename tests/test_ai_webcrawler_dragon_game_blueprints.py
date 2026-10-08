@@ -1,14 +1,13 @@
 """Deterministic original world generation and actual native SDL runtime gates."""
 from __future__ import annotations
 from collections import deque
-from pathlib import Path
 import json
 import os
 import shutil
 import subprocess
 import pytest
 from skeleton.ai.webcrawler.dragon_game_blueprints import (
-    GAME_MODES, GENRES, PALETTES, W, H, design_campaign, PRNG,
+    PALETTES, W, H, design_campaign, PRNG,
 )
 from skeleton.ai.webcrawler.dragon_native_arcade_runtime import render_sdl_campaign
 from skeleton.ai.webcrawler.dragon_native_projects import render_native_project

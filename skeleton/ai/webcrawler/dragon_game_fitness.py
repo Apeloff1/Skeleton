@@ -11,7 +11,6 @@ from collections import deque
 from dataclasses import dataclass,asdict
 from hashlib import sha256
 from heapq import heappush,heappop
-from math import isfinite
 import json
 
 from .dragon_game_blueprints import Campaign, Stage, design_campaign, W, H

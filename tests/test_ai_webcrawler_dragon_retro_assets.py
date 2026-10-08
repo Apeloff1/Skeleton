@@ -2,7 +2,7 @@
 from hashlib import sha256
 import pytest
 from skeleton.ai.webcrawler.dragon_retro_assets import (
-    BITMAPS,NAMES,asset_tiles,compile_tile,decode_tile,gb_assembly,
+    BITMAPS,asset_tiles,compile_tile,decode_tile,gb_assembly,
     nes_assembly,enrich_gb_asm,enrich_nes_asm,
 )
 from skeleton.ai.webcrawler.dragon_native_projects import render_native_project
