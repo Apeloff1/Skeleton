@@ -76,6 +76,14 @@ _SPINE_EXPORTS = {
     "EvidenceGenerationReceipt": ".generation_bridge",
     "EvidenceGenerationResult": ".generation_bridge",
     "generate_from_crawl_context": ".generation_bridge",
+    "AssurancePolicy": ".dragon_provenance_assurance",
+    "ProvenanceAssurance": ".dragon_provenance_assurance",
+    "SourceCluster": ".dragon_provenance_assurance",
+    "ClusterHoldout": ".dragon_provenance_assurance",
+    "ResearchNextAction": ".dragon_provenance_assurance",
+    "assure_crawler_evidence": ".dragon_provenance_assurance",
+    "CustodyPromotionReview": ".dragon_provenance_promotion",
+    "assess_custodied_promotion": ".dragon_provenance_promotion",
 }
 
 def __getattr__(name: str):
