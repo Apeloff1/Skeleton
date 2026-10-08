@@ -448,6 +448,17 @@ class NativeRuntimeLocalModel:
         else:
             finish_reason = parsed_finish
 
+        published_digest = hashlib.sha256(
+            (request.digest + ":" + result.output_digest + ":" + self.runtime_digest).encode("ascii")
+        ).hexdigest()
+        visible_digest = hashlib.sha256((text or "").encode("utf-8")).hexdigest()
+        execution_receipt_digest = hashlib.sha256(
+            (
+                result.replay_receipt.digest + ":" + request.digest + ":"
+                + self.runtime_digest + ":" + published_digest + ":"
+                + visible_digest + ":" + finish_reason
+            ).encode("ascii")
+        ).hexdigest()
         return LocalInferenceResult(
             text=text,
             model_id=self.model_id,
@@ -455,9 +466,8 @@ class NativeRuntimeLocalModel:
             input_tokens=len(result.prompt_sequence.token_ids),
             output_tokens=len(result.generated_ids),
             finish_reason=finish_reason,
-            response_id="native:" + hashlib.sha256(
-                (request.digest + ":" + result.output_digest + ":" + self.runtime_digest).encode("ascii")
-            ).hexdigest()[:32],
+            response_id="native:" + published_digest[:32],
+            execution_receipt_digest=execution_receipt_digest,
             tool_calls=tool_calls,
             structured_output=structured,
             latency_ms=(time.perf_counter() - started) * 1000.0,

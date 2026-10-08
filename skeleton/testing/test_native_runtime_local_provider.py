@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
@@ -40,7 +41,7 @@ from skeleton.contracts.operation import OperationEnvelope
 from skeleton.cortex.transformer import TinyTransformer
 from skeleton.intelligence.execution_runtime import ExecutionVerificationDecision
 from skeleton.persistence.execution_repository import SQLiteExecutionRepository
-from skeleton.provider_runtime import ProviderRegistry, ProviderRequest
+from skeleton.provider_runtime import ProviderRegistry, ProviderRequest, ProviderResponse
 from skeleton.skills.tool_runtime import AsyncToolRuntime
 
 
@@ -141,6 +142,8 @@ async def test_native_runtime_executes_through_local_inference_engine(tmp_path) 
     assert second.cached is True
     assert second.text == first.text
     assert second.model_digest == first.model_digest
+    assert len(first.execution_receipt_digest) == 64
+    assert second.execution_receipt_digest == first.execution_receipt_digest
 
 
 @pytest.mark.asyncio
@@ -181,6 +184,30 @@ async def test_provider_registry_activates_native_runtime_artifact_offline(
     assert 0 < response.usage.output_tokens <= 3
     assert response.usage.billed_cost == "0"
     assert response.usage.usage_source == "local_model"
+    assert isinstance(response.execution_receipt_digest, str)
+    assert len(response.execution_receipt_digest) == 64
+
+
+def test_native_runtime_execution_receipts_bind_exact_context_identity() -> None:
+    backend = _native_backend()
+    first_request = LocalInferenceRequest(
+        prompt="alpha beta", max_output_tokens=2, seed=17, context_digest="a" * 64,
+    )
+    second_request = LocalInferenceRequest(
+        prompt="alpha beta", max_output_tokens=2, seed=17, context_digest="b" * 64,
+    )
+    first = backend.infer(first_request, threading.Event())
+    second = backend.infer(second_request, threading.Event())
+    assert first.text == second.text
+    assert first.execution_receipt_digest != second.execution_receipt_digest
+    assert len(first.execution_receipt_digest) == 64
+    with pytest.raises(ValueError, match="execution_receipt_digest"):
+        replace(first, execution_receipt_digest="not-a-digest")
+    with pytest.raises(ValueError, match="execution_receipt_digest"):
+        ProviderResponse(
+            text="alpha", provider="local", model="test",
+            execution_receipt_digest="malformed",
+        )
 
 
 def test_native_runtime_backend_honors_precancel() -> None:

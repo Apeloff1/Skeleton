@@ -172,10 +172,18 @@ class LocalInferenceResult:
     structured_output: Mapping[str, Any] | None = None
     latency_ms: float | None = None
     cached: bool = False
+    execution_receipt_digest: str | None = None
 
     def __post_init__(self) -> None:
         if not self.model_id.strip():
             raise ValueError("model_id must be non-empty")
+        if self.execution_receipt_digest is not None and (
+            not isinstance(self.execution_receipt_digest, str)
+            or len(self.execution_receipt_digest) != 64
+            or any(ch not in "0123456789abcdef" for ch in self.execution_receipt_digest)
+        ):
+            raise ValueError("execution_receipt_digest must be lowercase sha256")
+
         if (
             len(self.model_digest) != 64
             or any(ch not in "0123456789abcdef" for ch in self.model_digest)
@@ -863,6 +871,7 @@ class LocalModelAdapter(ProviderAdapter):
             model=result.model_id,
             request_id="local-request:" + local_request.digest[:24],
             response_id=result.response_id,
+            execution_receipt_digest=result.execution_receipt_digest,
             structured_output=(
                 dict(result.structured_output)
                 if result.structured_output is not None
