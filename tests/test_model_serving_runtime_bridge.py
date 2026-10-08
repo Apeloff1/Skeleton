@@ -57,5 +57,24 @@ class BridgeTests(unittest.TestCase):
                 self.backend.assert_not_called()
 
 
+    def test_invalid_backend_callback_rejected_before_planning(self):
+        from skeleton.ai.model_runtime.serving_policy import PolicyAwareServingPlanner
+        from skeleton.ai.model_serving.capacity import CapacityLedger, CapacityLimits
+        planner = object.__new__(PolicyAwareServingPlanner)
+        planner.plan = Mock(return_value="planned")
+        ledger = CapacityLedger(CapacityLimits(2, 100, 1_000_000_000))
+        for invalid_callback in (None, object()):
+            with self.subTest(callback=invalid_callback):
+                with self.assertRaisesRegex(AdmissionDenied, "trusted backend"):
+                    plan_and_invoke(
+                        policy=self.policy, planner=planner,
+                        request=self.request, model_bytes=self.model,
+                        evaluation_bytes=self.evaluation, backend="local",
+                        invoke=invalid_callback, ledger=ledger,
+                    )
+        planner.plan.assert_not_called()
+        self.assertEqual(ledger.snapshot(), (0, 0))
+
+
 if __name__ == "__main__":
     unittest.main()
