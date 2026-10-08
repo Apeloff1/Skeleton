@@ -1482,3 +1482,27 @@ def test_verify_round_trip_encodes_only_once(native_model, monkeypatch):
     monkeypatch.setattr(pipeline.tokenizer, "encode_sequence", counted)
     pipeline.verify_round_trip("alpha beta")
     assert len(calls) == 1
+
+
+def test_stream_feed_consumption_is_one_shot_and_clears_chunks():
+    from skeleton.ai.model_runtime.tokenization import StreamingTextFeed, TokenizerContractError
+    feed = StreamingTextFeed()
+    feed.push("Cafe")
+    feed.push("\u0301\r\n")
+    assert feed.consume_text() == "Cafe\u0301\r\n"
+    assert feed.closed
+    assert feed._chunks == []
+    with pytest.raises(TokenizerContractError, match="already finalized"):
+        feed.consume_text()
+    with pytest.raises(TokenizerContractError, match="already finalized"):
+        feed.push("again")
+
+
+def test_stream_feed_rejects_invalid_chunk_without_closing():
+    from skeleton.ai.model_runtime.tokenization import StreamingTextFeed, TokenizerContractError
+    feed = StreamingTextFeed()
+    with pytest.raises(TokenizerContractError):
+        feed.push("\ud800")
+    assert not feed.closed
+    feed.push("valid")
+    assert feed.consume_text() == "valid"
