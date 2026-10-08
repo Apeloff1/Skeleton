@@ -232,3 +232,10 @@ def test_reordered_custody_lineage_is_semantically_equivalent():
     assert not review.sources[0].lineage_changed
     assert review.sources[0].change is SourceChange.UNCHANGED
     # Original custody includes readings; the current inventory deliberately does not.
+
+
+def test_public_crawler_namespace_exposes_revision_review():
+    from skeleton.ai import webcrawler
+    assert webcrawler.compare_crawl_revisions is compare_crawl_revisions
+    assert webcrawler.SourceChange is SourceChange
+    assert webcrawler.ReadingDisposition is ReadingDisposition
