@@ -20,6 +20,8 @@ class CanonicalRetrievalBridge:
   if decision.action!="promote" or decision.content_hash!=doc.content_hash:raise ValueError("retrieval admission requires matching promotion")
   key=self._key(doc,decision)
   if key in self._receipts:return self._receipts[key]
+  # Incomplete durable batches must not be treated as successfully promoted.
+  # Recovery is owned by the ingestion registry/outbox, not this local cache.
   lease=None
   if self.registry:
    reservation=self.registry.reserve(key,self.owner,now=now,ttl=self.lease_ttl)
