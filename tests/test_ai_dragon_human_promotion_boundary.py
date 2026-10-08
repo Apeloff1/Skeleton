@@ -5,9 +5,16 @@ from dataclasses import replace
 from skeleton.ai.webcrawler.dragon_analysis_chains import AnalysisLayer,LayerReceipt
 from skeleton.ai.webcrawler.dragon_analysis_execution import LayerDispatch
 from skeleton.ai.webcrawler.dragon_adversarial_review_worker import AdversarialReviewOutput
-from skeleton.ai.webcrawler.dragon_human_review import DragonHumanReviewLedger
+from skeleton.ai.webcrawler.dragon_human_review import DragonHumanReviewLedger,ReviewerPrincipal
 from skeleton.ai.webcrawler.dragon_knowledge_normalization_worker import NormalizedKnowledge
 from skeleton.ai.webcrawler.dragon_memory_promotion_worker import execute_memory_promotion
+
+
+def principal(reviewer_id):
+    return ReviewerPrincipal(reviewer_id,"test-auth","subject:"+reviewer_id,9,"f"*64)
+
+def verify_principal(value):
+    return value.issuer=="test-auth" and value.credential_fingerprint=="f"*64
 
 
 def setup():
@@ -19,7 +26,8 @@ def setup():
     review=AdversarialReviewOutput(ar,(),(k.knowledge_id,))
     ledger=DragonHumanReviewLedger(sqlite3.connect(":memory:"))
     decision,hr=ledger.review("u",review,reviewer_id="human-1",approved=True,
-      reviewed_at=10,rationale="evidence reviewed",authorized=True,records=(k,))
+      reviewed_at=10,rationale="evidence reviewed",authorized=True,records=(k,),
+      reviewer_principal=principal("human-1"),principal_verifier=verify_principal)
     dispatch=LayerDispatch(AnalysisLayer.MEMORY_PROMOTION,(hr.output_fingerprint,),"promote","v1")
     return k,review,ledger,decision,hr,dispatch
 
@@ -49,7 +57,8 @@ def test_failed_adversarial_review_cannot_be_approved():
 def test_rejected_human_review_cannot_promote():
     k,review,ledger,_,_,_=setup()
     decision,hr=ledger.review("u",review,reviewer_id="human-2",approved=False,
-      reviewed_at=12,rationale="reject",authorized=True,records=(k,))
+      reviewed_at=12,rationale="reject",authorized=True,records=(k,),
+      reviewer_principal=principal("human-2"),principal_verifier=verify_principal)
     d=LayerDispatch(AnalysisLayer.MEMORY_PROMOTION,(hr.output_fingerprint,),"promote","v1")
     with pytest.raises(PermissionError,match="human approval"):
         execute_memory_promotion(d,(k,),human_receipt=hr,human_decision=decision,
@@ -93,3 +102,31 @@ def test_legacy_review_schema_migrates_but_legacy_approval_stays_untrusted():
  assert "survivor_manifest" in columns
  with pytest.raises(PermissionError,match="legacy human review"):
   ledger.get("u","r",authorized=True)
+
+
+def test_review_requires_verified_reviewer_principal():
+ k,review,ledger,_,_,_=setup()
+ with pytest.raises(PermissionError,match="verified reviewer principal"):
+  ledger.review("u",review,reviewer_id="human-3",approved=True,reviewed_at=13,
+   rationale="approve",authorized=True,records=(k,))
+
+def test_reviewer_principal_must_match_declared_reviewer():
+ k,review,ledger,_,_,_=setup()
+ with pytest.raises(PermissionError,match="identity mismatch"):
+  ledger.review("u",review,reviewer_id="human-3",approved=True,reviewed_at=13,
+   rationale="approve",authorized=True,records=(k,),
+   reviewer_principal=principal("human-other"),principal_verifier=verify_principal)
+
+def test_host_reviewer_verifier_can_reject_principal():
+ k,review,ledger,_,_,_=setup()
+ with pytest.raises(PermissionError,match="verification failed"):
+  ledger.review("u",review,reviewer_id="human-3",approved=True,reviewed_at=13,
+   rationale="approve",authorized=True,records=(k,),
+   reviewer_principal=principal("human-3"),principal_verifier=lambda _:False)
+
+def test_promotion_rejects_decision_without_verified_principal_fingerprint():
+ k,_,_,decision,hr,d=setup()
+ forged=replace(decision,reviewer_principal_fingerprint="")
+ with pytest.raises(PermissionError,match="verified reviewer principal"):
+  execute_memory_promotion(d,(k,),human_receipt=hr,human_decision=forged,
+   surviving_knowledge_ids=(k.knowledge_id,),authorized=True)
