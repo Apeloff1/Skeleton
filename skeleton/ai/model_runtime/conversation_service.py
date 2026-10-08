@@ -390,6 +390,95 @@ class NativeConversationService:
                 session._assert_identity()
             return len(self._sessions)
 
+    # Optimistic concurrency controls
+    def revision(self, session_id: str) -> int:
+        with self._lock:
+            return self.describe(session_id).revision
+
+    def require_revision(self, session_id: str, expected_revision: int) -> None:
+        with self._lock:
+            if type(expected_revision) is not int or self.revision(session_id) != expected_revision:
+                raise RuntimeContractError("session revision conflict")
+
+    def compare_and_reset(self, session_id: str, expected_revision: int) -> None:
+        with self._lock:
+            self.require_revision(session_id, expected_revision)
+            self.reset(session_id)
+
+    def compare_and_replace(self, session_id: str, expected_revision: int,
+                            token_ids: tuple[int, ...]) -> None:
+        with self._lock:
+            self.require_revision(session_id, expected_revision)
+            self.replace(session_id, token_ids)
+
+    def compare_and_truncate(self, session_id: str, expected_revision: int,
+                             keep_last: int) -> None:
+        with self._lock:
+            self.require_revision(session_id, expected_revision)
+            self.truncate(session_id, keep_last)
+
+    def compare_and_delete(self, session_id: str, expected_revision: int) -> None:
+        with self._lock:
+            self.require_revision(session_id, expected_revision)
+            self.delete(session_id)
+
+    def compare_and_merge(self, target_id: str, expected_revision: int,
+                          source_id: str) -> None:
+        with self._lock:
+            self.require_revision(target_id, expected_revision)
+            self.merge(target_id, source_id)
+
+    def compare_and_append_text(self, session_id: str, expected_revision: int,
+                                text: str) -> None:
+        with self._lock:
+            self.require_revision(session_id, expected_revision)
+            self.append_text(session_id, text)
+
+    def compare_and_drop_prefix(self, session_id: str, expected_revision: int,
+                                count: int) -> None:
+        with self._lock:
+            self.require_revision(session_id, expected_revision)
+            self.drop_prefix(session_id, count)
+
+    def compare_and_pin(self, session_id: str, expected_revision: int) -> None:
+        with self._lock:
+            self.require_revision(session_id, expected_revision)
+            self.pin(session_id)
+
+    def compare_and_unpin(self, session_id: str, expected_revision: int) -> None:
+        with self._lock:
+            self.require_revision(session_id, expected_revision)
+            self.unpin(session_id)
+
+    def clone_into(self, target_id: str, source_id: str) -> None:
+        with self._lock:
+            if target_id == source_id:
+                raise RuntimeContractError("cannot clone session into itself")
+            source = self._get(source_id)
+            target = self._get(target_id)
+            source._assert_identity()
+            target.replace_history(source.token_ids)
+            self._touch(target_id)
+            self._event("clone", target_id, source_id=source_id)
+
+    def compare_and_clone_into(self, target_id: str, expected_revision: int,
+                               source_id: str) -> None:
+        with self._lock:
+            self.require_revision(target_id, expected_revision)
+            self.clone_into(target_id, source_id)
+
+    def active_session_ids(self) -> tuple[str, ...]:
+        with self._lock:
+            return tuple(sorted(self._sessions))
+
+    def pinned_session_ids(self) -> tuple[str, ...]:
+        with self._lock:
+            return tuple(sorted(sid for sid, m in self._meta.items() if m["pinned"]))
+
+    def unpinned_session_ids(self) -> tuple[str, ...]:
+        with self._lock:
+            return tuple(sorted(sid for sid, m in self._meta.items() if not m["pinned"]))
+
     # Portability, governance and observability (31-40)
     def snapshot(self, session_id: str) -> Mapping[str, Any]:
         with self._lock:
