@@ -59,6 +59,8 @@ class ChatTranscript:
 
     @classmethod
     def parse(cls, data: Iterable[Mapping[str, str]]) -> "ChatTranscript":
+        if isinstance(data, (str, bytes, Mapping)):
+            raise RuntimeContractError("transcript requires a message iterable")
         messages = []
         for item in data:
             if len(messages) >= MAX_MESSAGES:
