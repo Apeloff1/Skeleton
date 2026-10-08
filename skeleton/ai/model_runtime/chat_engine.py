@@ -70,6 +70,20 @@ class NativeChatEngine:
             if not messages:
                 raise RuntimeContractError("chat prompt cannot fit model context")
 
+    def token_budget(self, config: GenerationConfig) -> int:
+        if not isinstance(config, GenerationConfig):
+            raise RuntimeContractError("generation config required")
+        budget = self.runtime.limits.max_context - max(
+            self.reserve_tokens, config.max_new_tokens)
+        if budget <= 0:
+            raise RuntimeContractError("generation exceeds model context")
+        return budget
+
+    def prompt_token_count(self, transcript: ChatTranscript) -> int:
+        if not isinstance(transcript, ChatTranscript):
+            raise RuntimeContractError("chat transcript required")
+        return len(self._token_ids(transcript))
+
     def preflight(self, transcript: ChatTranscript,
                   config: GenerationConfig) -> dict[str, int]:
         fitted = self.fit(transcript, config)
