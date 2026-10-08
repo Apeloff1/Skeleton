@@ -286,6 +286,8 @@ class NativeConversationService:
         """Delete a cohort after validating every identifier."""
         with self._lock:
             ids = tuple(session_ids)
+            if any(not isinstance(sid, str) for sid in ids):
+                raise RuntimeContractError("invalid session identifier")
             if len(set(ids)) != len(ids):
                 raise RuntimeContractError("duplicate session identifiers")
             for sid in ids:
