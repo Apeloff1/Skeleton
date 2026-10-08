@@ -25,3 +25,14 @@ def test_trace_fingerprint_changes_when_source_trace_changes():
  changed=f[:-1]+(FeatureFrame(f[-1].timestamp_ms,(.5,),f[-1].source_frame_id),)
  b=segment_streaming_with_consent(cq,"u",j.job_id,changed,now=3,authorized=True,checkpoint_frames=3)
  assert a.trace_fingerprint!=b.trace_fingerprint
+
+
+def test_consent_expiry_during_checkpoints_fails_closed():
+ cq,j,f=setup();times=iter([3,4,101])
+ with __import__("pytest").raises(PermissionError):
+  segment_streaming_with_consent(cq,"u",j.job_id,f,clock=lambda:next(times),authorized=True,checkpoint_frames=2)
+
+def test_checkpoint_clock_regression_fails_closed():
+ cq,j,f=setup();times=iter([3,2])
+ with __import__("pytest").raises(RuntimeError,match="clock regressed"):
+  segment_streaming_with_consent(cq,"u",j.job_id,f,clock=lambda:next(times),authorized=True,checkpoint_frames=2)
