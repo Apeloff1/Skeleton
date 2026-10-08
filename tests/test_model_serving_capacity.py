@@ -136,6 +136,8 @@ class CapacityTests(unittest.TestCase):
         self.assertIsNot(original, forged_copy)
         self.assertFalse(self.ledger.is_active(forged_copy))
         self.assertFalse(self.ledger.release(forged_copy))
+        with self.assertRaisesRegex(CapacityDenied, "active reservation"):
+            self.ledger.acquire("owner", "fingerprint", 5)
         self.assertTrue(self.ledger.is_active(original))
         self.assertEqual(self.ledger.snapshot(), (1, 5))
         self.assertTrue(self.ledger.release(original))
