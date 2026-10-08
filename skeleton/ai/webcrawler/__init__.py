@@ -193,6 +193,47 @@ _SPINE_EXPORTS = {
     "import_research_captures": ".game_builder_cli",
 }
 
+# Expand the public knowledge-to-game-building API with one hundred
+# introspectable, *implemented* capabilities; modules remain lazy-loaded.
+from .game_scale_catalog import MILESTONES as GAME_SCALE_MILESTONES
+from .game_scale_catalog import game_milestone_by_number, grouped_game_milestones
+_SPINE_EXPORTS.update({
+    milestone.operation: milestone.module for milestone in GAME_SCALE_MILESTONES
+})
+_SPINE_EXPORTS.update({
+    "generate_level_studio": ".game_scale_studio",
+    "EnhancedGame": ".game_scale_integration",
+    "build_enhanced_game": ".game_scale_integration",
+    "Room": ".game_scale_world",
+    "WorldRegion": ".game_scale_world",
+    "AgentIntent": ".game_scale_npc_ai",
+    "Weapon": ".game_scale_combat",
+    "Fighter": ".game_scale_combat",
+    "Projectile": ".game_scale_combat",
+    "Status": ".game_scale_combat",
+    "Item": ".game_scale_economy",
+    "Inventory": ".game_scale_economy",
+    "Recipe": ".game_scale_economy",
+    "TradingPost": ".game_scale_economy",
+    "Quest": ".game_scale_story",
+    "Objective": ".game_scale_story",
+    "QuestProgress": ".game_scale_story",
+    "StoryState": ".game_scale_story",
+    "DialogueNode": ".game_scale_story",
+    "DialogueChoice": ".game_scale_story",
+    "Sprite": ".game_scale_assets",
+    "PlayBalance": ".game_scale_balancing",
+    "EditorHistory": ".game_scale_editor",
+    "open_editor_history": ".game_scale_editor",
+    "record_editor_edit": ".game_scale_editor",
+    "LearningStep": ".game_scale_research",
+    "Campaign": ".game_scale_campaign",
+    "Chapter": ".game_scale_campaign",
+    "HeroProgress": ".game_scale_campaign",
+    "decode_campaign_save": ".game_scale_campaign",
+    "restore_story_slot": ".game_scale_story",
+})
+
 def __getattr__(name: str):
     target = _SPINE_EXPORTS.get(name)
     if target is None:
