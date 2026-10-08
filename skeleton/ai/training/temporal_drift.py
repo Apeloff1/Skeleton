@@ -13,6 +13,9 @@ def _ppm(v,n):
 class ForecastObservation:
  observation_id:str; year:int; forecast_ppm:int; outcome:bool; source_digest:str
  def __post_init__(self):
+  if not self.observation_id: raise TemporalSignalError("observation identity required")
+  if isinstance(self.year,bool) or not isinstance(self.year,int) or not 1900<=self.year<=2200: raise TemporalSignalError("invalid forecast year")
+  if not isinstance(self.source_digest,str) or len(self.source_digest)!=64 or any(c not in "0123456789abcdef" for c in self.source_digest): raise TemporalSignalError("invalid forecast source digest")
   _ppm(self.forecast_ppm,"forecast"); 
   if not isinstance(self.outcome,bool): raise TemporalSignalError("outcome must be boolean")
  @property
@@ -59,6 +62,9 @@ def score_calibration(observations):
 
 def adaptive_drift_window(year_support,*,subject,min_window=2,threshold_ppm=200_000):
  items=tuple(sorted(year_support))
+ if any(isinstance(y,bool) or not isinstance(y,int) or isinstance(v,bool) or not isinstance(v,int) or not 0<=v<=1_000_000 for y,v in items): raise TemporalSignalError("invalid year/support evidence")
+ if len({y for y,_ in items})!=len(items): raise TemporalSignalError("duplicate drift year")
+ if isinstance(min_window,bool) or not isinstance(min_window,int) or min_window<1: raise TemporalSignalError("invalid drift window width")
  if len(items)<min_window*2: raise TemporalSignalError("insufficient drift history")
  _ppm(threshold_ppm,"drift threshold")
  best=None
