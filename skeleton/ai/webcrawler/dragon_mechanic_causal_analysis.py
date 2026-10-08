@@ -21,6 +21,17 @@ class MechanicTrial:
 
 
 @dataclass(frozen=True)
+class TrialProtocol:
+    protocol_id: str
+    assignment_digest: str
+    preregistered: bool
+    allocation_verified: bool
+    outcome_definition_locked: bool
+    attrition_accounted: bool
+    interference_assessed: bool
+
+
+@dataclass(frozen=True)
 class MechanicEffect:
     mechanic: str
     treated_trials: int
@@ -30,6 +41,8 @@ class MechanicEffect:
     observed_difference: float
     difference_interval: tuple[float, float]
     causal_claim_permitted: bool
+    randomized_effect_estimate_eligible: bool
+    protocol_id: str | None
     independent_sources: int
     warnings: tuple[str, ...]
 
@@ -48,6 +61,7 @@ def analyze_mechanic_trials(
     trials: tuple[MechanicTrial, ...], *,
     authorized: bool, minimum_per_arm: int = 10,
     max_trials: int = 100000,
+    protocol: TrialProtocol | None = None,
 ) -> MechanicEffect:
     if not authorized:
         raise PermissionError("mechanics analysis requires authorization")
@@ -98,16 +112,40 @@ def analyze_mechanic_trials(
         warnings.append("Only one independent source identity")
     if len(contexts) > 1:
         warnings.append("Context heterogeneity may confound the contrast")
-    causal = (
+    design_eligible = (
         randomized and len(treated) >= minimum_per_arm
         and len(control) >= minimum_per_arm
         and len(contexts) == 1
     )
+    protocol_verified = False
+    if protocol is None:
+        warnings.append("No verified experimental protocol: causal claim prohibited")
+    else:
+        if not isinstance(protocol.protocol_id, str) or not protocol.protocol_id:
+            raise ValueError("invalid protocol id")
+        if len(protocol.assignment_digest) != 64 or any(
+            c not in "0123456789abcdef" for c in protocol.assignment_digest
+        ):
+            raise ValueError("invalid assignment digest")
+        protocol_verified = all((
+            protocol.preregistered,
+            protocol.allocation_verified,
+            protocol.outcome_definition_locked,
+            protocol.attrition_accounted,
+            protocol.interference_assessed,
+        ))
+        if not protocol_verified:
+            warnings.append("Experimental protocol verification incomplete")
+    # Even a verified protocol only establishes eligibility to interpret this
+    # bounded randomized contrast causally under its recorded assumptions.
+    causal = design_eligible and protocol_verified
     return MechanicEffect(
         mechanic, len(treated), len(control),
         round(t_rate, 6), round(c_rate, 6),
         round(t_rate - c_rate, 6),
         (round(max(-1, t_low - c_high), 6),
          round(min(1, t_high - c_low), 6)),
-        causal, len(sources), tuple(warnings),
+        causal, design_eligible,
+        protocol.protocol_id if protocol is not None else None,
+        len(sources), tuple(warnings),
     )
