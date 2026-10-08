@@ -62,7 +62,10 @@ class NativeChatEngine:
                 raise RuntimeContractError("system instructions exceed model context")
             if first_dialogue == len(messages) - 1:
                 raise RuntimeContractError("latest chat message cannot fit model context")
+            # Drop an entire oldest dialogue exchange, never leave an orphan reply.
             messages.pop(first_dialogue)
+            while first_dialogue < len(messages) and messages[first_dialogue].role in ("assistant", "tool"):
+                messages.pop(first_dialogue)
             if not messages:
                 raise RuntimeContractError("chat prompt cannot fit model context")
 
