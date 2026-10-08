@@ -51,6 +51,20 @@ class ChatProtocolTests(unittest.TestCase):
         with self.assertRaises(RuntimeContractError):
             ChatTranscript.from_json("{}")
 
+    def test_group_dialogue(self):
+        transcript = ChatTranscript((ChatMessage("system", "rule"),
+                                     ChatMessage("user", "first"),
+                                     ChatMessage("assistant", "reply"),
+                                     ChatMessage("user", "second")))
+        turns = transcript.dialogue_turns()
+        self.assertEqual(len(turns), 2)
+        self.assertEqual(len(turns[0].messages), 2)
+        self.assertEqual(transcript.latest_user_index(), 3)
+
+    def test_parse_rejects_mapping_container(self):
+        with self.assertRaises(RuntimeContractError):
+            ChatTranscript.parse({"role": "user", "content": "hello"})
+
     def test_immutability_and_composition(self):
         initial = ChatTranscript((ChatMessage("user", "first"),))
         appended = initial.append("assistant", "second")
