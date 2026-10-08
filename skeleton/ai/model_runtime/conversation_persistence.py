@@ -40,9 +40,9 @@ class DurableConversationCoordinator:
             sid = self.service.create()
             try:
                 session = self.service._get(sid)
-                self.store.create(sid, session, pinned=pinned)
                 if pinned:
                     self.service.pin(sid)
+                self.store.create(sid, session, pinned=pinned)
                 self._bindings[sid] = PersistenceBinding(
                     sid, 0, self.service.revision(sid))
                 return sid
