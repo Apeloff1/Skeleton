@@ -6,8 +6,9 @@ Operator and contract supplement to [RUNTIME_CORE.md](RUNTIME_CORE.md).
 ## Governed serving-policy decision identity
 
 `PolicyAwareServingPlanner` validates a bounded native serving request before
-policy evaluation. Request IDs must be canonical non-control UTF-8 text,
-service class must be typed, token counts must honor the model-runtime token
+policy evaluation. Request IDs must be NFC-normalized UTF-8 and exclude
+Unicode control, format and surrogate code points (including DEL, C1, and
+bidirectional overrides); service class must be typed, token counts must honor the model-runtime token
 budget, and prefix/draft availability flags must be explicit booleans. No
 network/provider/model execution authority is introduced.
 
