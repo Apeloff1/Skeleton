@@ -63,7 +63,7 @@
       "state": "implemented-pending-verification",
       "implementation_signed": false,
       "independent_verification_signed": false,
-      "implementation_note": "T01-T12 model-runtime/serving contracts now include deterministic text-to-token ingestion, executable transformer inference, canonical model identity, governed local serving with deadline/cancellation fencing, deterministic replay/checkpoint recovery, versioned schemas, and focused regressions; FLGB-01 dependency, exact-head CI, and independent verification remain required before signoff."
+      "implementation_note": "T01-T12 model-runtime/serving contracts now include deterministic text-to-token ingestion, executable transformer inference, canonical model identity, governed local serving with deadline/cancellation fencing, deterministic replay/checkpoint recovery, versioned schemas, and focused regressions; the native runtime is also available through the canonical AI_PROVIDER=local checkpoint/provider path with offline engine-coordinator coverage (#3514), runtime-identity-safe caching (#3525), pretokenized graph inference (#3517), fail-closed tokenizer and terminal receipts (#3523/#3526), and the P2 native-provider acceptance workflow; FLGB-01 dependency, exact-head CI, and independent verification remain required before signoff."
     },
     {
       "id": "FLGB-03",
