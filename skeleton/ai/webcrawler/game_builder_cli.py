@@ -21,6 +21,8 @@ import sqlite3
 
 from .core import CrawlDocument, FetchResponse, CrawlPolicy, extract_document
 from .game_builder_knowledge_runtime import KnowledgeDrivenGameBuilder
+from .game_scale_integration import build_enhanced_game
+from .game_scale_campaign import generate_game_campaign,export_campaign_archive
 
 
 def import_research_captures(
@@ -79,6 +81,12 @@ def run(args=None) -> int:
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--width", type=int, default=32)
     parser.add_argument("--height", type=int, default=14)
+    parser.add_argument("--enhanced", action="store_true",
+                        help="Ship original SVG art, audio, route balancing and interactive studio")
+    parser.add_argument("--theme", choices=("fantasy","cyber","desert","ice","forest","space"),
+                        default="fantasy")
+    parser.add_argument("--campaign-levels", type=int, default=1,
+                        help="Generate 1-50 connected playable campaign levels")
     parser.add_argument("--approve", action="store_true",
                         help="Explicitly approve original game generation")
     opts=parser.parse_args(args)
@@ -92,22 +100,51 @@ def run(args=None) -> int:
                 import_research_captures(opts.sources),
                 engine=opts.engine,authorized=True,
             )
-        generated=builder.build_game(
-            title=opts.title,genre=opts.genre,engine=opts.engine,
-            seed=opts.seed,width=opts.width,height=opts.height,
-            authorized=True,human_approved=True,
-        )
+        if not 1<=opts.campaign_levels<=50:
+            parser.error("Campaign length must be between 1 and 50")
+        if opts.campaign_levels>1:
+            if opts.engine!="web":
+                parser.error("Multi-level campaign ZIP is currently a web target")
+            campaign=generate_game_campaign(
+                builder.knowledge,title=opts.title,genre=opts.genre,
+                engine="web",seed=opts.seed,chapters=opts.campaign_levels,
+            )
+            archive=export_campaign_archive(campaign)
+            report={
+                "game_title":opts.title,"target":"web",
+                "campaign_levels":len(campaign.chapters),
+                "campaign_id":campaign.campaign_id,
+                "knowledge_sources":builder.knowledge.db.execute(
+                    "SELECT COUNT(*) FROM game_knowledge_sources WHERE active=1"
+                ).fetchone()[0],
+            }
+        else:
+            generated=builder.build_game(
+                title=opts.title,genre=opts.genre,engine=opts.engine,
+                seed=opts.seed,width=opts.width,height=opts.height,
+                authorized=True,human_approved=True,
+            )
+            if opts.enhanced:
+                if opts.engine!="web":
+                    parser.error("Enhanced sprite/audio studio is currently a web target")
+                enriched=build_enhanced_game(generated.blueprint,theme=opts.theme)
+                archive=enriched.archive
+            else:
+                archive=generated.archive
+            report={
+                "game_title":generated.title,"target":opts.engine,
+                "knowledge_sources":generated.knowledge_sources,
+                "missing_topics":[g.topic for g in generated.missing_topics if g.coverage<1],
+                "playable_route":generated.metrics.playable,
+                "mechanics":generated.blueprint.mechanics,
+                "interactive_studio":bool(opts.enhanced),
+            }
         opts.output.parent.mkdir(parents=True,exist_ok=True)
-        opts.output.write_bytes(generated.archive)
+        opts.output.write_bytes(archive)
         print(json.dumps({
             "output":str(opts.output),
-            "game_title":generated.title,
-            "target":opts.engine,
-            "archive_sha256":sha256(generated.archive).hexdigest(),
-            "knowledge_sources":generated.knowledge_sources,
-            "missing_topics":[g.topic for g in generated.missing_topics if g.coverage<1],
-            "playable_route":generated.metrics.playable,
-            "mechanics":generated.blueprint.mechanics,
+            "archive_sha256":sha256(archive).hexdigest(),
+            **report,
         },sort_keys=True,indent=2))
         return 0
     finally:
