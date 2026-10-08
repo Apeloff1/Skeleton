@@ -79,6 +79,22 @@ class TestNativeModelService(unittest.TestCase):
         self.assertIsNone(result.receipt.output_digest)
         self.assertEqual(len(result.receipt.usage_digest), 64)
 
+    def test_cancelled_request_does_not_run_generation(self):
+        from unittest.mock import patch
+
+        service = NativeModelService(self.runtime())
+        config = GenerationConfig(max_new_tokens=2)
+        request = service.request("op-cancel-no-generate", "alpha", config, deadline_ms=1000)
+        cancellation = CancellationToken()
+        cancellation.cancel()
+        with patch.object(service.runtime, "stream", side_effect=AssertionError("generated")):
+            first = service.execute(request, "alpha", config, cancellation=cancellation)
+            second = service.execute(request, "alpha", config, cancellation=cancellation)
+        self.assertEqual(first.receipt.terminal_reason, "cancelled")
+        self.assertIsNone(first.receipt.output_digest)
+        self.assertIsNone(first.generation)
+        self.assertEqual(first.receipt.usage_digest, second.receipt.usage_digest)
+
     def test_service_uses_runtime_canonical_identity(self):
         runtime = self.runtime()
         service = NativeModelService(runtime)
