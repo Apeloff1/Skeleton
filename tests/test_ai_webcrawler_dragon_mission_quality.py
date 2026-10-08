@@ -167,3 +167,29 @@ def test_04_offsets_stable_with_unicode_and_newlines():
     windows=segment_passages(text,max_chars=80,overlap=12)
     assert all(text[w.start:w.end]==w.text for w in windows)
     assert windows[-1].end==len(text)
+
+
+def test_07_near_duplicate_pair_budget_stops_quadratic_scan():
+    docs=tuple(document(f"https://host{i}.example/study") for i in range(8))
+    with pytest.raises(ValueError,match="pair budget"):
+        near_duplicate_groups(docs,max_pairs=10)
+
+
+def test_08_low_lexical_diversity_is_not_mistaken_for_quality():
+    text="battery " * 300
+    result=measure_information_quality(
+        text,min_words=100,max_repetition=.9,minimum_unique_ratio=.05,
+    )
+    assert result.unique_ratio < .05
+    assert result.low_information
+
+
+def test_10_citation_with_credentials_is_not_sanitized_into_trusted_url():
+    text="Do not collect https://alice:secret@publisher.example/private"
+    found=extract_citation_candidates(text)
+    assert found==()
+
+
+def test_08_invalid_unique_ratio_fail_closed():
+    with pytest.raises(ValueError,match="information-quality"):
+        measure_information_quality("hi there",minimum_unique_ratio=float("nan"))
