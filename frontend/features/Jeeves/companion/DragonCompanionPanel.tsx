@@ -6,6 +6,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { extractConversationInterests, proposeResearchMission } from './conversationInterests';
 import { Ionicons } from '@expo/vector-icons';
 import DragonCompanion from './DragonCompanion';
+import DragonQuestBoard from './DragonQuestBoard';
+import {type DragonPracticeProgress,type DragonPracticeAttempt,type DragonPracticeSubscription,validateDragonProgress} from './dragonProgression';
 import { companionForConversation, companionFromCrawler, type DragonEventKind } from './dragonCompanion';
 
 export interface CompanionTelemetry {
@@ -16,12 +18,25 @@ export interface CompanionTelemetry {
   quality?: number;
 }
 
-export default function DragonCompanionPanel({ draft, lastUserText, telemetry }: {
+export interface CompanionAcademyInput {
+  progress?:DragonPracticeProgress|null;
+  attempts?:readonly DragonPracticeAttempt[];
+  subscription?:DragonPracticeSubscription|null;
+  onRunPractice?:()=>void;
+  onOpenDemo?:(attemptId:string)=>void;
+  onStopPractice?:()=>void;
+  practiceBusy?:boolean;
+}
+
+export default function DragonCompanionPanel({ draft, lastUserText, telemetry, academy }: {
   draft: string;
   lastUserText?: string;
   telemetry?: CompanionTelemetry;
+  academy?: CompanionAcademyInput;
 }) {
   const [showResearch, setShowResearch] = useState(false);
+  const [showAcademy,setShowAcademy]=useState(true);
+  const verifiedProgress=validateDragonProgress(academy?.progress);
   const [motion, setMotion] = useState<CompanionMotion>(DEFAULT_COMPANION_PREFERENCES.motion);
   const systemReducedMotion = useReducedMotion();
   const [motionLoaded, setMotionLoaded] = useState(false);
@@ -42,7 +57,8 @@ export default function DragonCompanionPanel({ draft, lastUserText, telemetry }:
     ? companionFromCrawler(telemetry.kind, telemetry.payload)
     : companionForConversation(interest);
   return <View style={s.panel}>
-    <DragonCompanion state={state} motion={motion} reducedMotion={systemReducedMotion} />
+    <DragonCompanion state={state} motion={motion} reducedMotion={systemReducedMotion}
+      level={verifiedProgress?.level} unlocked={verifiedProgress?.unlocked} />
     <View style={s.motionRow}><Text style={s.label}>Animation · 120 tiny moments</Text>{(['full','gentle','off'] as const).map(choice => <Pressable key={choice} accessibilityRole="button" accessibilityState={{selected:motion===choice}} onPress={() => setMotion(choice)} style={[s.motionButton,motion===choice && s.motionSelected]}><Text style={s.value}>{choice}</Text></Pressable>)}</View>
     <View style={s.stats}>
       <Metric icon="chatbubble-ellipses-outline" label="Interest" value={interest ? interest.split(/\s+/).slice(0, 5).join(' ') : 'Listening'} />
@@ -52,6 +68,11 @@ export default function DragonCompanionPanel({ draft, lastUserText, telemetry }:
     </View>
     <Pressable accessibilityRole="button" accessibilityLabel="Inspect suggested research interests" onPress={() => setShowResearch(v => !v)} style={s.metric}><Ionicons name="bulb-outline" size={16} color="#fb923c" /><Text style={s.value}>{showResearch ? 'Hide research interests' : 'Inspect research interests'}</Text></Pressable>
     {showResearch && <View style={s.metric}><Text style={s.value}>{proposal ? proposal.query : 'No research interest yet'}</Text><Text style={s.note}>Suggestion only · no web crawl starts without a separate explicit command.</Text></View>}
+    <Pressable accessibilityRole="button" accessibilityLabel="Toggle Dragon Academy" onPress={()=>setShowAcademy(x=>!x)} style={s.academyButton}><Ionicons name="trophy-outline" color="#fbbf24" size={16}/><Text style={s.academyText}>{showAcademy?"Hide":"Show"} Dragon Academy · capability levels & game practice</Text></Pressable>
+    {showAcademy&&<DragonQuestBoard progress={academy?.progress} attempts={academy?.attempts}
+      subscription={academy?.subscription} onRunPractice={academy?.onRunPractice}
+      onOpenDemo={academy?.onOpenDemo} onStopPractice={academy?.onStopPractice}
+      busy={academy?.practiceBusy} />}
     <Text style={s.note}>Petting and animation are just for fun. System reduced-motion settings take priority. These reactions never start research or change memory.</Text>
     <Text style={s.note}>Conversation creates interest signals. Only policy-compliant, provenance-preserved acquisitions may become distilled memory.</Text>
   </View>;
@@ -61,6 +82,8 @@ function Metric({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; 
 }
 const s = StyleSheet.create({
   panel: { gap: 10, width: '100%' },
+  academyButton:{flexDirection:'row',alignItems:'center',gap:7,padding:11,borderRadius:11,backgroundColor:'#2b2537',borderColor:'#a16207',borderWidth:1},
+  academyText:{fontSize:12,fontWeight:'800',color:'#fef3c7',flex:1},
   motionRow:{flexDirection:'row',alignItems:'center',gap:5,flexWrap:'wrap'},motionButton:{paddingHorizontal:9,paddingVertical:5,borderRadius:10,backgroundColor:'#1e293b'},motionSelected:{backgroundColor:'#7c3f25'},
   stats: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   metric: { flexGrow: 1, minWidth: 112, flexDirection: 'row', alignItems: 'center', gap: 7, padding: 9, borderRadius: 11, borderWidth: 1, borderColor: '#334155', backgroundColor: '#111827' },

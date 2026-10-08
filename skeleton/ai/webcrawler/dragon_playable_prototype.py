@@ -47,6 +47,7 @@ def render_playable_prototype(spec: GamePrototypeSpec, *,
         "jump": Mechanic.PLATFORMING in enabled or Mechanic.PHYSICS in enabled,
         "exploration": Mechanic.EXPLORATION in enabled,
         "physics": Mechanic.PHYSICS in enabled,
+        "arena": sha256(spec.candidate_id.encode()).digest()[0] % 4,
     }, separators=(",", ":"))
     html = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -62,7 +63,7 @@ button{margin:8px 6px 8px 0;padding:10px 15px;border:0;border-radius:8px;backgro
 p{line-height:1.5}small{opacity:.8}
 </style></head><body><main>
 <h1>""" + title + """</h1><p>""" + goal + """</p>
-<p>Move: A/D or arrows. Jump: Space. Restart: R. Reach the golden crystal.</p>
+<p>Move: A/D or arrows. Jump: Space. Restart: R. Explore the original arena. Find all stars if shown, then reach the golden crystal.</p>
 <canvas id="game" width="800" height="450" aria-label="Playable original game prototype"></canvas>
 <p id="status" role="status" aria-live="polite">Ready to explore</p>
 <button id="restart" type="button">Restart</button>
@@ -76,13 +77,19 @@ const status=document.getElementById("status");
 const keys=new Set();
 const player={x:45,y:330,vx:0,vy:0,w:25,h:32,grounded:false};
 const goal={x:715,y:330,w:27,h:30};
-const platforms=[
-{x:0,y:405,w:800,h:45},{x:175,y:330,w:130,h:15},
-{x:375,y:275,w:140,h:15},{x:590,y:340,w:110,h:15}];
-let won=false;
+const layouts=[
+ [{x:175,y:330,w:130,h:15},{x:375,y:275,w:140,h:15},{x:590,y:340,w:110,h:15}],
+ [{x:145,y:354,w:120,h:15},{x:325,y:298,w:110,h:15},{x:520,y:322,w:160,h:15}],
+ [{x:110,y:315,w:120,h:15},{x:312,y:254,w:125,h:15},{x:565,y:291,w:130,h:15}],
+ [{x:200,y:347,w:135,h:15},{x:400,y:300,w:95,h:15},{x:555,y:248,w:175,h:15}]
+];
+const platforms=[{x:0,y:405,w:800,h:45},...layouts[settings.arena]];
+const pad={x:300,y:390,w:64,h:14};
+const stars=[{x:145,y:370,w:16,h:16},{x:420,y:240,w:16,h:16},{x:635,y:307,w:16,h:16}];
+let secrets=new Set(),won=false;
 function reset(){
  player.x=45;player.y=330;player.vx=0;player.vy=0;
- player.grounded=false;won=false;status.textContent="Explore the level";
+ player.grounded=false;won=false;secrets.clear();status.textContent="Explore the level";
 }
 document.getElementById("restart").addEventListener("click",reset);
 window.addEventListener("keydown",e=>{
@@ -112,8 +119,18 @@ function update(dt){
    player.y=platform.y-player.h;player.vy=0;player.grounded=true;
   }
  }
+ if(settings.physics&&player.vy>=0&&previousBottom<=pad.y+8&&overlap(player,pad)){
+   player.y=pad.y-player.h;player.vy=-13.5;player.grounded=false;
+ }
+ if(settings.exploration)stars.forEach((star,i)=>{
+   if(!secrets.has(i)&&overlap(player,star))secrets.add(i);
+ });
  if(player.y>480)reset();
- if(overlap(player,goal)){won=true;status.textContent="Crystal found! Prototype complete.";}
+ if(overlap(player,goal)&&(!settings.exploration||secrets.size===stars.length)){
+   won=true;status.textContent="Crystal found! Prototype complete.";
+ }else if(settings.exploration&&!won){
+   status.textContent="Find the 3 stars, then reach the golden crystal: "+secrets.size+"/3";
+ }
 }
 function draw(){
  ctx.clearRect(0,0,800,450);
@@ -123,6 +140,10 @@ function draw(){
  }
  ctx.fillStyle="#6aa38c";
  for(const platform of platforms)ctx.fillRect(platform.x,platform.y,platform.w,platform.h);
+ if(settings.physics){ctx.fillStyle="#f4a261";ctx.fillRect(pad.x,pad.y,pad.w,pad.h);}
+ if(settings.exploration){ctx.fillStyle="#c4b5fd";stars.forEach((star,i)=>{
+   if(!secrets.has(i))ctx.fillRect(star.x,star.y,star.w,star.h);
+ });}
  ctx.fillStyle="#f3cf6a";ctx.fillRect(goal.x,goal.y,goal.w,goal.h);
  ctx.fillStyle="#a3e2b6";ctx.fillRect(player.x,player.y,player.w,player.h);
  ctx.fillStyle="#f9e4c5";ctx.fillRect(player.x+15,player.y+6,4,4);
