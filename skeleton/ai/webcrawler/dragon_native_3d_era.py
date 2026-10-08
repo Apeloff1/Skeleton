@@ -107,19 +107,22 @@ int main(void){
     make="""\
 N64_INST ?= /opt/libdragon
 BUILD_DIR := build
+SOURCE_DIR := src
 N64_ROM_TITLE := DRAGON QUEST N64
 include $(N64_INST)/include/n64.mk
-OBJS := $(BUILD_DIR)/main.o
+.PHONY: all clean
 all: dragon.z64
-$(BUILD_DIR)/main.o: src/main.c
-\tmkdir -p $(BUILD_DIR)
-\t$(N64_CC) $(N64_CFLAGS) -c $< -o $@
-dragon.elf: $(OBJS)
-\t$(N64_LD) $(N64_LDFLAGS) -o $@ $(OBJS) $(N64_LIBS)
-dragon.z64: dragon.elf
-\t$(N64_ELF2ROM) -o $@ $<
+build/main.o: src/main.c
+	mkdir -p build
+	$(N64_CC) $(N64_CFLAGS) -c $< -o $@
+build/dragon.elf: build/main.o
+	$(N64_CC) -o $@ $^ $(N64_LDFLAGS)
+dragon.z64: build/dragon.elf
+	$(N64_OBJCOPY) -O binary $< $<.bin
+	$(N64_TOOL) $(N64_TOOLFLAGS) --size 1M --output $@ $<.bin
+	$(N64_CHKSUM) $@
 clean:
-\trm -rf $(BUILD_DIR) dragon.elf dragon.z64
+	rm -rf build dragon.z64
 """
     return {"src/main.c":code,"Makefile":make}
 
@@ -169,7 +172,7 @@ int main(void){
  reset();
  while(pmMainLoop()){
   scanKeys();
-  uint32 keys=keysHeld(),pressed=keysDown();
+  u32 keys=keysHeld(),pressed=keysDown();
   touchPosition touch;
   touchRead(&touch);
   if(pressed&KEY_START)reset();
@@ -229,24 +232,40 @@ int main(void){
     # Build separately using the official devkitPro nds_rules target with
     # standard ARM9/ARM7 structure, rather than reusing GBA output.
     make="""\
-ifeq ($(strip $(DEVKITPRO)),)
-$(error DEVKITPRO is required; install devkitPro Nintendo DS homebrew toolchain)
+.SUFFIXES:
+ifeq ($(strip $(DEVKITARM)),)
+$(error DEVKITARM is required: install devkitPro's Nintendo DS toolchain)
 endif
-include $(DEVKITPRO)/libnds/nds_rules
+include $(DEVKITARM)/ds_rules
 TARGET := dragon_ds
 BUILD := build
 SOURCES := src
 INCLUDES := include
-LIBDIRS := $(DEVKITPRO)/libnds
+ARCH := -march=armv5te -mtune=arm946e-s -mthumb
+CFLAGS := -Wall -O2 -ffunction-sections -fdata-sections $(ARCH) $(INCLUDE) -DARM9
+LDFLAGS := -specs=ds_arm9.specs $(ARCH) -Wl,-Map,$(notdir $*.map)
 LIBS := -lnds9
-ARCH := -mthumb -mthumb-interwork
-all: $(TARGET).nds
-$(TARGET).nds: $(TARGET).elf
-\tndstool -c $@ -9 $< -7 $(DEVKITPRO)/libnds/lib/default_arm7/arm7.elf
-$(TARGET).elf: src/main.c
-\t$(CC) $(ARCH) -O2 -I$(DEVKITPRO)/libnds/include -L$(DEVKITPRO)/libnds/lib -o $@ $< $(LIBS)
+LIBDIRS := $(LIBNDS)
+ifneq ($(BUILD),$(notdir $(CURDIR)))
+export OUTPUT := $(CURDIR)/$(TARGET)
+export VPATH := $(CURDIR)/src
+export DEPSDIR := $(CURDIR)/$(BUILD)
+CFILES := $(notdir $(wildcard src/*.c))
+export OFILES := $(CFILES:.c=.o)
+export INCLUDE := -I$(CURDIR)/include -I$(LIBNDS)/include -I$(CURDIR)/build
+export LIBPATHS := -L$(LIBNDS)/lib
+export LD := $(CC)
+.PHONY: $(BUILD) clean
+$(BUILD):
+	@mkdir -p $@
+	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 clean:
-\trm -rf $(BUILD) $(TARGET).nds $(TARGET).elf
+	rm -rf build $(TARGET).nds $(TARGET).elf
+else
+$(OUTPUT).nds : $(OUTPUT).elf
+$(OUTPUT).elf : $(OFILES)
+-include $(DEPSDIR)/*.d
+endif
 """
     return {"src/main.c":code,"Makefile":make}
 

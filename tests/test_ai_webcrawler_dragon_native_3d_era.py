@@ -57,6 +57,10 @@ def test_nintendo64_native_joypad_analog_and_real_framebuffer():
         assert part in src
     assert "N64_INST" in p.files["Makefile"]
     assert "n64.mk" in p.files["Makefile"]
+    assert "N64_TOOLFLAGS" in p.files["Makefile"]
+    assert "N64_OBJCOPY" in p.files["Makefile"]
+    assert "N64_CHKSUM" in p.files["Makefile"]
+    assert "N64_ELF2ROM" not in p.files["Makefile"]
     assert "dragon.z64" in p.files["Makefile"]
 
 def test_nintendo_ds_actual_two_screen_touch_and_bitmap_video():
@@ -71,7 +75,11 @@ def test_nintendo_ds_actual_two_screen_touch_and_bitmap_video():
                  "stage++","life--"):
         assert part in source
     make=p.files["Makefile"]
-    assert "libnds" in make and "ndstool" in make
+    assert "$(DEVKITARM)/ds_rules" in make
+    assert "-specs=ds_arm9.specs" in make
+    assert "LIBDIRS := $(LIBNDS)" in make
+    assert "$(OUTPUT).nds : $(OUTPUT).elf" in make
+    assert "ndstool" not in make # emitted automatically by devkitARM ds_rules
     assert "dragon_ds.nds" not in source
     assert "EBOOT.PBP" not in make
 
