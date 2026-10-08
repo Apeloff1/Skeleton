@@ -71,7 +71,8 @@ def compile_tile_collision(blueprint: GameBlueprint) -> tuple[tuple[int,...],...
 def compile_input_controls_js() -> str:
     return r"""
 const keys = new Set();
-const touch = {left:false,right:false,jump:false};
+const touch = {left:false,right:false,up:false,down:false,
+  jump:false,dash:false,attack:false,shoot:false,heal:false,shop:false};
 const actionKeys = new Set(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"]);
 addEventListener("keydown", e => {
   if(actionKeys.has(e.code)) e.preventDefault();
@@ -90,10 +91,10 @@ document.querySelectorAll("[data-button]").forEach(node=>{
 const left = () => keys.has("ArrowLeft")||keys.has("KeyA")||touch.left;
 const right = () => keys.has("ArrowRight")||keys.has("KeyD")||touch.right;
 const jump = () => keys.has("Space")||keys.has("ArrowUp")||keys.has("KeyW")||touch.jump;
-const up = () => keys.has("ArrowUp")||keys.has("KeyW");
-const down = () => keys.has("ArrowDown")||keys.has("KeyS");
-const attack = () => keys.has("KeyJ")||keys.has("KeyK");
-const dash = () => keys.has("ShiftLeft")||keys.has("ShiftRight");
+const up = () => keys.has("ArrowUp")||keys.has("KeyW")||touch.up;
+const down = () => keys.has("ArrowDown")||keys.has("KeyS")||touch.down;
+const attack = () => keys.has("KeyJ")||keys.has("KeyK")||touch.attack;
+const dash = () => keys.has("ShiftLeft")||keys.has("ShiftRight")||touch.dash;
 """
 
 
@@ -428,7 +429,7 @@ requestAnimationFrame(frame);
 font:16px system-ui;display:flex;flex-direction:column;align-items:center;
 min-height:100vh;padding:18px}canvas{width:min(100%,960px);
 border:2px solid #6686a8;aspect-ratio:16/9;image-rendering:pixelated}
-.controls{display:flex;gap:16px;margin-top:20px}
+.controls{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;justify-content:center}
 button{border:0;border-radius:12px;padding:16px 23px;
 font-size:20px;background:#365474;color:white;touch-action:none}
 button:focus-visible{outline:3px solid #ffd373}
@@ -442,7 +443,14 @@ button:focus-visible{outline:3px solid #ffd373}
         'aria-label="Original playable platform game"></canvas>'
         '<div class="controls"><button data-button="left" aria-label="Move left">◀</button>'
         '<button data-button="right" aria-label="Move right">▶</button>'
-        '<button data-button="jump" aria-label="Jump">⤒</button></div>'
+        '<button data-button="up" aria-label="Move up">▲</button>'
+        '<button data-button="down" aria-label="Move down">▼</button>'
+        '<button data-button="jump" aria-label="Jump">⤒</button>'
+        '<button data-button="dash" aria-label="Dash">Dash</button>'
+        '<button data-button="attack" aria-label="Attack">Hit</button>'
+        '<button data-button="shoot" aria-label="Shoot">Fire</button>'
+        '<button data-button="heal" aria-label="Drink potion">Heal</button>'
+        '<button data-button="shop" aria-label="Buy potion">Shop</button></div>'
         '<p class="note">Keyboard or touch controls. Offline, original art.</p>'
         '<script>'+js+'</script></body></html>'
     )
