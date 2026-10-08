@@ -1,4 +1,3 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /studio — 🌌 Galaxy Studio (Unified).
  * The single, clean entry point that runs the whole pipeline IN ORDER on one screen:
@@ -11,7 +10,7 @@ import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 import React from 'react';
 import {
   View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity,
-  ActivityIndicator, Linking, Alert,
+  ActivityIndicator, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -19,7 +18,6 @@ import api from '../src/utils/apiClient';
 import BuildJourney from '../src/components/BuildJourney';
 import { watchBuildJob } from '../src/product/buildJobLifecycle';
 
-const BACKEND = CANONICAL_API_BASE || '';
 
 type Step = {
   key: string; label: string; icon: string; done?: boolean; locked?: boolean;
