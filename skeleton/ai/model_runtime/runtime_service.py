@@ -262,7 +262,7 @@ class NativeModelService:
             generation = stream.result
             if generation is None:
                 raise NativeServiceError("native runtime completed without generation result")
-        except RuntimeContractError:
+        except (RuntimeContractError, TokenizerContractError):
             return self._terminal(
                 request,
                 prompt=prompt,
