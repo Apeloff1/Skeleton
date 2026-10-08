@@ -211,17 +211,31 @@ function updateEnemies(dt){
   }
   for(const e of state.enemies){
     if(!e.active) continue;
-    const next=e.x+e.direction*scene.physics.enemy_speed*TILE*dt;
-    const preview={x:next,y:e.y,w:e.w,h:e.h};
-    const lookX=Math.floor((next+(e.direction>0?e.w:0))/TILE);
-    const floorY=Math.floor((e.y+e.h+3)/TILE);
-    if(hitsSolid(preview)||!solid(lookX,floorY)||
-       Math.abs(next-e.home)>TILE*2){
-      e.direction*=-1;
-    }else e.x=next;
+    if(scene.genre==="exploration"){
+      // Actual top-down pursuit within nearby rooms; tile collision blocks
+      // pursuit around barriers and prevents NPCs moving through walls.
+      const p=state.player;
+      const dx=p.x-e.x,dy=p.y-e.y,dist=Math.hypot(dx,dy);
+      if(p.alive&&dist<TILE*8&&dist>1){
+        const stride=scene.physics.enemy_speed*TILE*dt;
+        const horizontal={x:e.x+dx/dist*stride,y:e.y,w:e.w,h:e.h};
+        if(!hitsSolid(horizontal))e.x=horizontal.x;
+        const vertical={x:e.x,y:e.y+dy/dist*stride,w:e.w,h:e.h};
+        if(!hitsSolid(vertical))e.y=vertical.y;
+      }
+    }else{
+      const next=e.x+e.direction*scene.physics.enemy_speed*TILE*dt;
+      const preview={x:next,y:e.y,w:e.w,h:e.h};
+      const lookX=Math.floor((next+(e.direction>0?e.w:0))/TILE);
+      const floorY=Math.floor((e.y+e.h+3)/TILE);
+      if(hitsSolid(preview)||!solid(lookX,floorY)||
+         Math.abs(next-e.home)>TILE*2){
+        e.direction*=-1;
+      }else e.x=next;
+    }
     if(state.player.alive&&intersects(e,state.player) &&
        state.player.invincible<=0){
-      if(state.player.vy>0 &&
+      if(scene.genre!=="exploration"&&state.player.vy>0 &&
          state.player.y+state.player.h < e.y+e.h*.5){
         e.active=false; state.score+=100;
         state.player.vy=-scene.physics.jump_speed*TILE*.55;
