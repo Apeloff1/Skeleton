@@ -120,8 +120,10 @@ class TestTemporalEvidenceCustody(unittest.TestCase):
         self.assertEqual(first.sequence, 1)
         with self.assertRaisesRegex(TemporalSignalError, "replayed"):
             ledger.append(A, "system", 2028)
+        before = ledger.snapshot()
         bad = ledger.snapshot()
         bad["entries"][0]["authority_digest"] = C
+        self.assertEqual(ledger.snapshot(), before)
         with self.assertRaisesRegex(TemporalSignalError, "snapshot"):
             TemporalAuthorityLedger.restore(bad)
 
