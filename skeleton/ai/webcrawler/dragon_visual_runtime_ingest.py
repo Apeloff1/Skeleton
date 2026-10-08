@@ -9,7 +9,7 @@ from .dragon_analysis_runtime import DragonAnalysisRuntime,RunCheckpoint
 from .dragon_browser_visual_import import BrowserVisualEnvelope,accept_browser_visual
 from .dragon_consent_bound_queue import ConsentBoundAnalysisQueue
 from .dragon_motion_features import derive_motion_features
-from .dragon_chunked_temporal import segment_with_consent_checkpoints
+from .dragon_streaming_temporal import segment_streaming_with_consent
 from .dragon_runtime_events import DragonRuntimeEventLedger
 
 @dataclass(frozen=True)
@@ -43,8 +43,8 @@ def ingest_browser_visual(runtime:DragonAnalysisRuntime,custody:ConsentBoundAnal
     ledger.append(envelope.owner,run_id,event_type="attempt",layer="temporal_segmentation",outcome="started",evidence_fingerprint=source.output_fingerprint,occurred_at=now,authorized=True)
     try:
         motion=derive_motion_features(accepted.features,authorized=True)
-        trace=segment_with_consent_checkpoints(custody,envelope.owner,envelope.job_id,
-            motion.frames,now=now,authorized=True,chunk_size=chunk_size)
+        trace=segment_streaming_with_consent(custody,envelope.owner,envelope.job_id,
+            motion.frames,now=now,authorized=True,checkpoint_frames=chunk_size)
     except Exception as exc:
         ledger.append(envelope.owner,run_id,event_type="attempt",layer="temporal_segmentation",outcome="failed",evidence_fingerprint=source.output_fingerprint,error_code=type(exc).__name__,occurred_at=now,authorized=True)
         raise
