@@ -300,6 +300,11 @@ class NativeLLMRuntime:
             raise RuntimeContractError("TokenSequence required")
         if not isinstance(use_cache, bool):
             raise RuntimeContractError("use_cache must be boolean")
+        self.assert_model_unchanged()
+        try:
+            self.tokenizer.assert_unchanged()
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("tokenizer mutated after admission") from exc
         if not hmac.compare_digest(sequence.tokenizer_digest, self.tokenizer.digest):
             raise RuntimeContractError("token sequence tokenizer identity mismatch")
         if not sequence.token_ids:
