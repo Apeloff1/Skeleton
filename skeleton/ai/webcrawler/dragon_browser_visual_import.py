@@ -21,6 +21,7 @@ class BrowserVisualEnvelope:
 @dataclass(frozen=True)
 class AcceptedBrowserVisual:
     envelope_fingerprint:str
+    canonical_evidence_fingerprint:str
     features:VisualFeatureBatch
 
 def canonical_browser_visual_fingerprint(envelope:BrowserVisualEnvelope)->str:
@@ -53,4 +54,10 @@ def accept_browser_visual(custody:ConsentBoundAnalysisQueue,envelope:BrowserVisu
     if len(observations)!=len(envelope.observations): raise ValueError("observation references unknown browser frame")
     features=bind_visual_observations(custody,envelope.owner,envelope.job_id,source,
       observations,now=now,authorized=True)
-    return AcceptedBrowserVisual(expected,features)
+    canonical_evidence=sha256(json.dumps({"schema":"dragon.accepted-visual.v1",
+      "owner":envelope.owner,"job_id":envelope.job_id,"recording_digest":job.recording_digest,
+      "consent_id":binding.consent_id,"consent_scope_digest":binding.scope_digest,
+      "retention_until":envelope.retention_until,"source_batch":source.batch_fingerprint,
+      "observations":features.observation_fingerprint},sort_keys=True,separators=(",",":"),
+      allow_nan=False).encode()).hexdigest()
+    return AcceptedBrowserVisual(expected,canonical_evidence,features)
