@@ -70,6 +70,7 @@ jobs:
           scripts/check_ai_master_plan.py
           skeleton/ai/game_builder/*.py
           tests/test_ai_game_builder_*.py
+          tests/test_game_builder_*.py
 
       - name: Validate 500-level authority
         run: python scripts/check_ai_game_builder_500_levels.py --json
@@ -81,6 +82,9 @@ jobs:
         run: >-
           python -m pytest -q --noconftest
           tests/test_ai_game_builder_*.py
+
+      - name: Test reviewed gameplay knowledge
+        run: python -m unittest tests.test_game_builder_reviewed_knowledge tests.test_game_builder_knowledge_cli -v
 
       - name: Validate masterplan JSON
         run: python -m json.tool machine/ai_master_plan.json >/dev/null
