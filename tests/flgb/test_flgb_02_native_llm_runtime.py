@@ -561,5 +561,22 @@ class TestNativeLLMRuntime(unittest.TestCase):
         self.assertEqual(model._logits_window(ids, cache), expected)
 
 
+    def test_inference_rejects_mutated_tokenizer_with_runtime_contract(self):
+        runtime = self.runtime()
+        sequence = runtime.encode("hello world")
+        original_digest = runtime.tokenizer.digest
+        runtime.tokenizer.digest = "0" * 64 if original_digest != "0" * 64 else "1" * 64
+        with self.assertRaisesRegex(RuntimeContractError, "token sequence tokenizer identity mismatch|tokenizer mutated"):
+            runtime.infer_sequence(sequence)
+
+    def test_inference_rejects_nonboolean_cache_policy(self):
+        runtime = self.runtime()
+        sequence = runtime.encode("hello world")
+        for invalid in (0, 1, None, "yes"):
+            with self.subTest(invalid=invalid):
+                with self.assertRaisesRegex(RuntimeContractError, "use_cache must be boolean"):
+                    runtime.infer_sequence(sequence, use_cache=invalid)
+
+
 if __name__ == "__main__":
     unittest.main()
