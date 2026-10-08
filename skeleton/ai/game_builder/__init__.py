@@ -235,3 +235,31 @@ __all__ = [
     "TelemetryFeedbackGate",
     "TransformReceipt",
 ]
+
+
+# The persistent knowledge library is loaded only when requested. It never
+# implicitly creates a database, crawls a URL, or promotes a game design.
+from importlib import import_module as _game_builder_import_module
+
+_KNOWLEDGE_EXPORTS = {
+    "KnowledgeError": ".reviewed_knowledge",
+    "KnowledgePolicy": ".reviewed_knowledge",
+    "ReviewedNote": ".reviewed_knowledge",
+    "ReviewedDocument": ".reviewed_knowledge",
+    "RevisionReceipt": ".reviewed_knowledge",
+    "KnowledgeHit": ".reviewed_knowledge",
+    "KnowledgeBrief": ".reviewed_knowledge",
+    "ReviewedKnowledgeStore": ".reviewed_knowledge",
+}
+
+
+def __getattr__(name: str):
+    module = _KNOWLEDGE_EXPORTS.get(name)
+    if module is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(_game_builder_import_module(module, __name__), name)
+    globals()[name] = value
+    return value
+
+
+__all__ += list(_KNOWLEDGE_EXPORTS)
