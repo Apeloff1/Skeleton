@@ -420,6 +420,103 @@ class NativeChatWorkspace:
                    if item["archived"] and not item["pinned"] and item["updated_at"] < older_than]
             return self.delete_many(ids)
 
+    def compare_and_rename(self, cid: str, expected_revision: int, title: str) -> int:
+        if not isinstance(title, str) or not 1 <= len(title) <= 256:
+            raise RuntimeContractError("invalid conversation title")
+        with self._lock:
+            item = self._get(cid)
+            self._check(item, expected_revision)
+            self.rename(cid, title)
+            return item["revision"]
+
+    def compare_and_archive(self, cid: str, expected_revision: int) -> int:
+        with self._lock:
+            item = self._get(cid)
+            self._check(item, expected_revision)
+            self.archive(cid)
+            return item["revision"]
+
+    def compare_and_pin(self, cid: str, expected_revision: int) -> int:
+        with self._lock:
+            item = self._get(cid)
+            self._check(item, expected_revision)
+            self.pin(cid)
+            return item["revision"]
+
+    def compare_and_tags(self, cid: str, expected_revision: int,
+                         tags: Iterable[str]) -> int:
+        with self._lock:
+            item = self._get(cid)
+            self._check(item, expected_revision)
+            self.set_tags(cid, tags)
+            return item["revision"]
+
+    def message_at(self, cid: str, index: int) -> ChatMessage:
+        with self._lock:
+            messages = self.get(cid).messages
+            if type(index) is not int or not 0 <= index < len(messages):
+                raise RuntimeContractError("invalid message index")
+            return messages[index]
+
+    def message_count(self, cid: str) -> int:
+        return len(self.get(cid).messages)
+
+    def role_counts(self, cid: str) -> dict[str, int]:
+        return self.get(cid).count_by_role()
+
+    def transcript_bytes(self, cid: str) -> int:
+        return self.get(cid).byte_size()
+
+    def transcript_digest(self, cid: str) -> str:
+        return self.get(cid).digest()
+
+    def list_by_tag(self, tag: str) -> tuple[WorkspaceRecord, ...]:
+        return tuple(self.describe(cid) for cid in self.filter_tag(tag))
+
+    def list_pinned(self) -> tuple[WorkspaceRecord, ...]:
+        return tuple(self.describe(cid) for cid in self.filter_pinned())
+
+    def list_archived(self) -> tuple[WorkspaceRecord, ...]:
+        return tuple(self.describe(cid) for cid in self.filter_archived())
+
+    def has_undo(self, cid: str) -> bool:
+        with self._lock:
+            return bool(self._get(cid)["undo"])
+
+    def has_redo(self, cid: str) -> bool:
+        with self._lock:
+            return bool(self._get(cid)["redo"])
+
+    def clear_history(self, cid: str) -> None:
+        with self._lock:
+            item = self._get(cid)
+            item["undo"].clear()
+            item["redo"].clear()
+            self._record(cid, "clear_history")
+
+    def history_depth(self, cid: str) -> tuple[int, int]:
+        with self._lock:
+            item = self._get(cid)
+            return len(item["undo"]), len(item["redo"])
+
+    def recent_events(self, cid: str, limit: int = 100) -> tuple[WorkspaceEvent, ...]:
+        return self.events(conversation_id=cid, limit=limit)
+
+    def event_count(self) -> int:
+        with self._lock:
+            return len(self._events)
+
+    def event_actions(self) -> dict[str, int]:
+        with self._lock:
+            counts: dict[str, int] = {}
+            for event in self._events:
+                counts[event.action] = counts.get(event.action, 0) + 1
+            return counts
+
+    def workspace_capacity_remaining(self) -> int:
+        with self._lock:
+            return self.max_conversations - len(self._data)
+
     def clear_events(self) -> None:
         with self._lock:
             self._events.clear()
