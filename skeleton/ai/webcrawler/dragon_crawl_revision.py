@@ -31,6 +31,7 @@ class ReadingDisposition(str, Enum):
     ORIGIN_CHANGED = "origin_changed"
     LINEAGE_CHANGED = "lineage_changed"
     DELIVERY_CHANGED = "delivery_changed"
+    QUALITY_CHANGED = "quality_changed"
     QUOTE_ABSENT = "quote_absent"
     QUOTE_AMBIGUOUS = "quote_ambiguous"
     REASSESS_REVISED_DOCUMENT = "reassess_revised_document"
@@ -48,6 +49,7 @@ class SourceRevisionDelta:
     origin_changed: bool
     lineage_changed: bool
     delivery_changed: bool
+    quality_changed: bool
 
 
 @dataclass(frozen=True)
@@ -152,18 +154,32 @@ def compare_crawl_revisions(
             prior.document.fetched_url != current.document.fetched_url
             or prior.document.content_type != current.document.content_type
         ))
+        # Recrawl timestamp alone is not epistemic evidence of content drift.
+        # Changes to source scoring or the acquisition's remaining policy
+        # receipt do, however, require a fresh evidence-quality review.
+        def stable_provenance(source: CapturedSource) -> dict[str, object]:
+            return {
+                key: value for key, value in source.document.provenance.items()
+                if key != "fetched_at"
+            }
+        changed_quality = bool(prior and current and (
+            prior.document.source_score != current.document.source_score
+            or stable_provenance(prior) != stable_provenance(current)
+        ))
         if prior is None:
             category = SourceChange.NEW
         elif current is None:
             category = SourceChange.MISSING
-        elif changed_text or changed_origin or changed_lineage or changed_delivery:
+        elif (changed_text or changed_origin or changed_lineage
+              or changed_delivery or changed_quality):
             category = SourceChange.CHANGED
         else:
             category = SourceChange.UNCHANGED
         delta = SourceRevisionDelta(
             source_id, category, previous_digest, current_digest,
             previous_origin, current_origin,
-            changed_text, changed_origin, changed_lineage, changed_delivery,
+            changed_text, changed_origin, changed_lineage,
+            changed_delivery, changed_quality,
         )
         changes.append(delta)
         status[source_id] = delta
@@ -186,6 +202,9 @@ def compare_crawl_revisions(
             count, candidate = 0, None
         elif delta.delivery_changed:
             disposition = ReadingDisposition.DELIVERY_CHANGED
+            count, candidate = 0, None
+        elif delta.quality_changed:
+            disposition = ReadingDisposition.QUALITY_CHANGED
             count, candidate = 0, None
         elif delta.change is SourceChange.UNCHANGED:
             disposition = ReadingDisposition.REUSABLE
@@ -261,7 +280,8 @@ def revision_report_fingerprint(review: RevisionRevalidation) -> str:
         "sources": [
             (x.source_id, x.change.value, x.previous_digest, x.current_digest,
              x.previous_origin, x.current_origin, x.content_changed,
-             x.origin_changed, x.lineage_changed, x.delivery_changed)
+             x.origin_changed, x.lineage_changed, x.delivery_changed,
+             x.quality_changed)
             for x in review.sources
         ],
         "readings": [
