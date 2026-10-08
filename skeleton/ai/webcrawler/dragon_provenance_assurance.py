@@ -97,6 +97,7 @@ class AssurancePolicy:
     maximum_actions: int = 100
     maximum_holdout_groups: int = 500
     require_attestations: bool = False
+    max_relationships_per_source: int = 64
 
 
 def _verify_policy(policy: AssurancePolicy) -> None:
@@ -112,14 +113,23 @@ def _verify_policy(policy: AssurancePolicy) -> None:
         raise ValueError("invalid source capacity")
     if not 1 <= policy.maximum_actions <= 1000:
         raise ValueError("invalid action capacity")
-    if not 1 <= policy.maximum_holdout_groups <= 1000:
+    if not isinstance(policy.maximum_holdout_groups, int) or not (
+        1 <= policy.maximum_holdout_groups <= 1000
+    ):
         raise ValueError("invalid holdout group capacity")
+    if not isinstance(policy.max_relationships_per_source, int) or not (
+        1 <= policy.max_relationships_per_source <= 1024
+    ):
+        raise ValueError("invalid relationship capacity")
+    if not isinstance(policy.require_attestations, bool):
+        raise ValueError("invalid attestation requirement")
 
 
 def _manifest(
     evidence: tuple[EvidencePass, ...],
     sources: tuple[SourceProvenance, ...],
     max_sources: int,
+    max_relationships: int,
 ) -> dict[str, SourceProvenance]:
     if len(sources) > max_sources:
         raise ValueError("provenance source budget exceeded")
@@ -152,6 +162,12 @@ def _manifest(
             raise ValueError("invalid provenance lineage token")
         if any(not isinstance(pid, str) or not pid for pid in source.parent_source_ids):
             raise ValueError("invalid parent source identity")
+        if (len(source.parent_source_ids) + len(source.lineage_tokens)
+                > max_relationships):
+            raise ValueError("provenance relationship budget exceeded")
+        if (len(set(source.parent_source_ids)) != len(source.parent_source_ids)
+                or len(set(source.lineage_tokens)) != len(source.lineage_tokens)):
+            raise ValueError("duplicate provenance relationship")
         by_id[source.source_id] = source
     if any(item.source_id not in by_id for item in evidence):
         raise ValueError("missing provenance for evidence source")
@@ -333,6 +349,10 @@ def assure_crawler_evidence(
     if not authorized:
         raise PermissionError("provenance analysis requires authorization")
     _verify_policy(assurance_policy)
+    if attestation_registry is not None and not isinstance(
+        attestation_registry, ProvenanceRegistry
+    ):
+        raise TypeError("verified provenance registry required")
     if assurance_policy.require_attestations and (
         attestation_registry is None
         or not attestation_registry.policy.require_attestation
@@ -348,7 +368,10 @@ def assure_crawler_evidence(
         distiller._validate(item)
     if not isinstance(claim_id, str) or not 1 <= len(claim_id) <= 256:
         raise ValueError("invalid claim identity")
-    by_id = _manifest(items, sources, assurance_policy.maximum_sources)
+    by_id = _manifest(
+        items, sources, assurance_policy.maximum_sources,
+        assurance_policy.max_relationships_per_source,
+    )
     clusters, lookup = _assured_groups(
         items, sources, by_id, assurance_policy.maximum_sources,
         attestation_registry,
@@ -420,7 +443,8 @@ def assure_crawler_evidence(
                    assurance_policy.min_supporting_probability,
                    assurance_policy.min_heldout_probability,
                    assurance_policy.maximum_holdout_groups,
-                   assurance_policy.require_attestations],
+                   assurance_policy.require_attestations,
+                   assurance_policy.max_relationships_per_source],
         "sources": sorted([
             [s.source_id, s.content_digest, s.canonical_uri,
              sorted(s.parent_source_ids), sorted(s.lineage_tokens)]
