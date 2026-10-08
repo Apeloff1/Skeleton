@@ -2,6 +2,8 @@
 import React,{useMemo,useState} from 'react';
 import {Pressable,StyleSheet,Text,View} from 'react-native';
 import DragonWatchAlong from './DragonWatchAlong';
+import DragonVideoEvidence from './DragonVideoEvidence';
+import type {WatchCue} from './dragonWatchCues';
 import {EMPTY_WATCH_TIMELINE,ingestPlayerSnapshot,type WatchAlongTimeline} from './dragonWatchTimeline';
 import type {PlayerSnapshot} from './dragonPlayerBridge';
 import type {WatchSignal} from './dragonWatch';
@@ -14,14 +16,14 @@ export function useDragonWatchSession(){
  const latest=timeline.events[timeline.events.length-1]?.signal;
  return {onPlayback,latest,timeline,reset:()=>setTimeline(EMPTY_WATCH_TIMELINE)};
 }
-export default function DragonWatchDock({signal,compact=false}:{signal:WatchSignal;compact?:boolean}){
+export default function DragonWatchDock({signal,compact=false,cues=[]}:{signal:WatchSignal;compact?:boolean;cues?:readonly WatchCue[]}){
  const [visible,setVisible]=useState(true);
  const progress=useMemo(()=>signal.durationMs&&signal.durationMs>0?Math.max(0,Math.min(100,Math.round(signal.positionMs/signal.durationMs*100))):null,[signal.positionMs,signal.durationMs]);
  return <View style={styles.dock}>
   <Pressable accessibilityRole="button" accessibilityState={{expanded:visible}} accessibilityLabel={visible?'Hide dragon watch companion':'Show dragon watch companion'} onPress={()=>setVisible(v=>!v)} style={styles.toggle}>
    <Text style={styles.toggleText}>{visible?'▾':'▸'} 🐉 Watch with me {progress===null?'':`· ${progress}%`}</Text>
   </Pressable>
-  {visible&&<View style={compact?styles.compact:styles.expanded}><DragonWatchAlong signal={signal}/></View>}
+  {visible&&<View style={compact?styles.compact:styles.expanded}><DragonWatchAlong signal={signal}/><DragonVideoEvidence cues={cues}/></View>}
  </View>;
 }
 const styles=StyleSheet.create({
