@@ -213,8 +213,9 @@ class GameKnowledgeIndex:
             rows=self.db.execute("""
               SELECT p.passage_id,p.source_id,p.source_url,p.content_hash,
                      p.text,p.tags,p.start,p.end,p.engine,p.year,p.quality
-              FROM game_knowledge_fts f
-              JOIN game_knowledge_passages p ON p.passage_id=f.passage_id
+              FROM game_knowledge_fts
+              JOIN game_knowledge_passages p
+                ON p.passage_id=game_knowledge_fts.passage_id
               WHERE game_knowledge_fts MATCH ? AND p.active=1
                 AND (?='' OR p.engine=?)
               ORDER BY bm25(game_knowledge_fts),p.passage_id LIMIT ?
