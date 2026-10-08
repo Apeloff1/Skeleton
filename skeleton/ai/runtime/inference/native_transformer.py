@@ -115,6 +115,7 @@ class NativeTransformerModel:
         published_digest = hashlib.sha256(
             json.dumps(
                 {
+                    "request_digest": request.digest,
                     "model_digest": self.model_digest,
                     "runtime_digest": self.runtime_digest,
                     "text": text,
