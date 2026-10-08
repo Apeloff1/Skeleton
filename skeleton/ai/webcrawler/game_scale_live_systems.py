@@ -65,8 +65,8 @@ def integrate_live_progression(html:str)->str:
         'awardCurrency(2);gainExperience(25);',
     )
     html=html.replace(
-        'e.active=false;state.score+=100;',
-        'e.active=false;state.score+=100;awardCurrency(3);gainExperience(30);',
+        'e.active=false; state.score+=100;',
+        'e.active=false; state.score+=100;awardCurrency(3);gainExperience(30);',
     )
     html=html.replace(
         'state.won=true;state.score+=250',
