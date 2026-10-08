@@ -283,7 +283,7 @@ class SQLiteOperationEventStore:
                 parse_constant=_reject_constant,
                 object_pairs_hook=_unique_object,
             )
-        except (json.JSONDecodeError, TypeError, ValueError) as exc:
+        except (json.JSONDecodeError, TypeError, ValueError, RecursionError) as exc:
             raise StreamStoreCorruptionError("persisted stream payload is invalid") from exc
         if not isinstance(value, dict):
             raise StreamStoreCorruptionError("persisted stream payload must be an object")

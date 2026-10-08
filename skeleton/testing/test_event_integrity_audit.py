@@ -308,8 +308,10 @@ def test_integrity_audit_rejects_null_consumer_ack():
         operation_id = seeded(store, length=2)
         instant = datetime(2026, 10, 8, 10, 0, tzinfo=timezone.utc)
         store.register_consumer(operation_id, "reader", now=instant)
+        # SQLite enforces NOT NULL; a text value can still inhabit a
+        # non-STRICT INTEGER affinity column and must fail type validation.
         store._connection.execute(
-            "UPDATE operation_stream_consumer SET acknowledged_through=NULL "
+            "UPDATE operation_stream_consumer SET acknowledged_through='bad' "
             "WHERE operation_id=?", (operation_id,),
         )
         with pytest.raises(StreamStoreCorruptionError, match="acknowledged_through"):
