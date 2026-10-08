@@ -5,6 +5,8 @@ from hashlib import sha256
 import json
 from .temporal_signals import TemporalSignalError
 def _digest(v): return sha256(json.dumps(v,sort_keys=True,separators=(",",":")).encode()).hexdigest()
+def _hex(v,n,*,commit=False):
+ if not isinstance(v,str) or len(v) not in ((40,64) if commit else (64,)) or any(c not in "0123456789abcdef" for c in v): raise TemporalSignalError(f"invalid {n}")
 def _ppm(v,n):
  if not isinstance(v,int) or isinstance(v,bool) or not 0<=v<=1_000_000: raise TemporalSignalError(f"invalid {n}")
 
@@ -22,11 +24,17 @@ class TemporalCompetence:
 @dataclass(frozen=True)
 class TemporalBenchmarkReceipt:
  exact_head_commit:str; suite_digest:str; competence_digest:str; floor_ppm:int; passed:bool
+ def __post_init__(self):
+  _hex(self.exact_head_commit,"exact head",commit=True); _hex(self.suite_digest,"suite"); _hex(self.competence_digest,"competence")
+  _ppm(self.floor_ppm,"competence floor")
+  if not isinstance(self.passed,bool): raise TemporalSignalError("benchmark passed must be boolean")
  @property
  def digest(self): return _digest(self.__dict__)
 
 def evaluate_temporal_competence(*,exact_head_commit,suite_digest,metrics,min_floor_ppm=700_000):
- if len(exact_head_commit)!=64 or len(suite_digest)!=64: raise TemporalSignalError("invalid benchmark identity")
+ _hex(exact_head_commit,"exact head",commit=True); _hex(suite_digest,"suite")
+ _ppm(min_floor_ppm,"minimum competence floor")
+ if not isinstance(metrics,TemporalCompetence): raise TemporalSignalError("TemporalCompetence required")
  floor=metrics.floor_ppm
  return TemporalBenchmarkReceipt(exact_head_commit,suite_digest,metrics.digest,floor,floor>=min_floor_ppm)
 
