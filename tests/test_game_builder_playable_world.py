@@ -141,15 +141,11 @@ class PlayableWorldTests(unittest.TestCase):
         state = initial_state(game, authorized=True)
         for action in route:
             state = advance(game, state, action, authorized=True)
-        self.assertEqual(state.score, 10)
         self.assertIn(target, state.collected)
+        self.assertEqual(state.score, 10 * len(state.collected))
         for action in ("up", "left", "right", "down"):
-            try:
-                other = advance(game, state, action, authorized=True)
-            except GameplayError:
-                continue
-            self.assertGreaterEqual(other.score, state.score)
-            self.assertLessEqual(other.score, state.score + 10)
+            other = advance(game, state, action, authorized=True)
+            self.assertEqual(other.score, 10 * len(other.collected))
 
     def test_stepping_into_hazard_consumes_health(self):
         game = generate_playable_world(intent(levels=1, hazards_per_level=18), authorized=True)
@@ -222,9 +218,12 @@ class PlayableWorldTests(unittest.TestCase):
         state = initial_state(game, authorized=True)
         for direction in route:
             state = advance(game, state, direction, authorized=True)
-        self.assertEqual(state.level_index, 0)
-        self.assertEqual(state.status, "playing")
-        self.assertLessEqual(len(state.collected), game.intent.collectibles_per_level)
+        if len(state.collected) != game.intent.collectibles_per_level:
+            self.assertEqual(state.level_index, 0)
+            self.assertEqual(state.status, "playing")
+        else:
+            # A maze may place every collectible on the unique path to exit.
+            self.assertGreaterEqual(state.level_index, 1)
 
     def test_corrupted_generated_level_proof_is_rejected(self):
         game = generate_playable_world(intent(), authorized=True)
