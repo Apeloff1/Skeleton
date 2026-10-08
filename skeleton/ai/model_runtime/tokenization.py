@@ -65,7 +65,7 @@ class TokenWindow:
             raise TokenizerContractError("invalid token window range")
         if self.stop - self.start != len(self.token_ids):
             raise TokenizerContractError("token window range/content mismatch")
-        if len(self.source_sequence_digest) != 64:
+        if not isinstance(self.source_sequence_digest, str) or len(self.source_sequence_digest) != 64 or any(ch not in "0123456789abcdef" for ch in self.source_sequence_digest):
             raise TokenizerContractError("invalid source sequence digest")
         for token_id in self.token_ids:
             if not _is_int(token_id) or not 0 <= token_id < 2**31:
@@ -92,7 +92,7 @@ class TokenBatch:
         if not self.windows:
             raise TokenizerContractError("empty token batch")
         observed = sum(len(window.token_ids) for window in self.windows)
-        if self.total_tokens != observed:
+        if not _is_int(self.total_tokens) or self.total_tokens != observed:
             raise TokenizerContractError("token batch accounting mismatch")
 
 
@@ -106,10 +106,12 @@ class NativeTokenizer:
             raise TokenizerContractError("TinyTransformer required")
         self.model = model
         self.limits = limits or TokenizerLimits()
-        self._vocab = tuple(str(token) for token in model.itos)
+        if not isinstance(model.itos, (list, tuple)) or any(not isinstance(token, str) for token in model.itos):
+            raise TokenizerContractError("model vocabulary must contain strings")
+        self._vocab = tuple(model.itos)
         if not self._vocab or len(set(self._vocab)) != len(self._vocab):
             raise TokenizerContractError("model vocabulary must be non-empty and unique")
-        if len(model.E) != len(self._vocab):
+        if not isinstance(model.E, (list, tuple)) or len(model.E) != len(self._vocab):
             raise TokenizerContractError("model embedding/vocabulary size mismatch")
         if not _is_int(model.unk) or not 0 <= model.unk < len(self._vocab):
             raise TokenizerContractError("invalid model unknown-token id")
@@ -142,8 +144,7 @@ class NativeTokenizer:
         value = snapshot()
         if not isinstance(value, Mapping):
             raise TokenizerContractError("invalid BPE snapshot")
-        canonical_bytes(value)
-        return dict(value)
+        return json.loads(canonical_bytes(value))
 
     def _identity_digest(self, bpe: Mapping[str, Any] | None) -> str:
         return digest_json(
@@ -176,8 +177,12 @@ class NativeTokenizer:
         return token_id
 
     def assert_unchanged(self) -> None:
-        current_vocab = tuple(str(token) for token in self.model.itos)
-        if current_vocab != self._vocab or int(self.model.unk) != self._manifest.special_tokens["unk"]:
+        if not isinstance(self.model.itos, (list, tuple)) or any(not isinstance(token, str) for token in self.model.itos):
+            raise TokenizerContractError("model vocabulary changed after admission")
+        current_vocab = tuple(self.model.itos)
+        if not isinstance(self.model.E, (list, tuple)) or len(self.model.E) != len(self._vocab):
+            raise TokenizerContractError("model embedding/vocabulary size changed after admission")
+        if current_vocab != self._vocab or not _is_int(self.model.unk) or self.model.unk != self._manifest.special_tokens["unk"]:
             raise TokenizerContractError("model vocabulary changed after admission")
         for name in ("pad", "bos", "eos"):
             admitted = self._manifest.special_tokens.get(name)
@@ -185,12 +190,13 @@ class NativeTokenizer:
             if admitted is None:
                 if current is not None:
                     raise TokenizerContractError("model special-token policy changed after admission")
-            elif current != admitted:
+            elif not _is_int(current) or current != admitted:
                 raise TokenizerContractError("model special-token policy changed after admission")
         if self._identity_digest(self._capture_bpe()) != self._digest:
             raise TokenizerContractError("BPE/tokenizer state changed after admission")
 
     def encode_ids(self, text: str) -> tuple[int, ...]:
+        self.assert_unchanged()
         if not isinstance(text, str):
             raise TokenizerContractError("text must be a string")
         if len(text) > self.limits.max_chars:
@@ -232,7 +238,11 @@ class NativeTokenizer:
         return self._vocab[token_id]
 
     def decode_ids(self, token_ids: Sequence[int]) -> str:
-        ids = tuple(token_ids)
+        self.assert_unchanged()
+        try:
+            ids = tuple(token_ids)
+        except (TypeError, ValueError) as exc:
+            raise TokenizerContractError("invalid decode token container") from exc
         if len(ids) > self.limits.max_tokens:
             raise TokenizerContractError("decode token budget exceeded")
         pieces = tuple(self.token_text(token_id) for token_id in ids)
@@ -257,24 +267,36 @@ class NativeTokenizer:
         return " ".join(pieces)
 
     def checkpoint(self) -> Mapping[str, Any]:
+        self.assert_unchanged()
         return {
             "schema": self.SCHEMA,
             "vocabulary_manifest_digest": self._manifest.digest,
             "vocabulary": list(self._vocab),
             "unknown_token_id": int(self.model.unk),
-            "bpe": self._bpe_snapshot,
+            "bpe": json.loads(canonical_bytes(self._bpe_snapshot)) if self._bpe_snapshot is not None else None,
             "digest": self.digest,
         }
 
     def assert_checkpoint_matches(self, checkpoint: Mapping[str, Any]) -> None:
+        if not isinstance(checkpoint, Mapping):
+            raise TokenizerContractError("tokenizer checkpoint must be a mapping")
+        self.assert_unchanged()
         if checkpoint.get("schema") != self.SCHEMA:
             raise TokenizerContractError("unsupported tokenizer checkpoint")
         if checkpoint.get("digest") != self.digest:
             raise TokenizerContractError("tokenizer checkpoint digest mismatch")
-        if tuple(checkpoint.get("vocabulary") or ()) != self._vocab:
+        vocab = checkpoint.get("vocabulary")
+        if not isinstance(vocab, (list, tuple)) or any(not isinstance(t, str) for t in vocab):
+            raise TokenizerContractError("tokenizer checkpoint vocabulary mismatch")
+        if tuple(vocab) != self._vocab:
             raise TokenizerContractError("tokenizer checkpoint vocabulary mismatch")
         if checkpoint.get("vocabulary_manifest_digest") != self._manifest.digest:
             raise TokenizerContractError("tokenizer manifest mismatch")
+        unknown_id = checkpoint.get("unknown_token_id")
+        if not _is_int(unknown_id) or unknown_id != self._manifest.special_tokens["unk"]:
+            raise TokenizerContractError("tokenizer checkpoint unknown-token mismatch")
+        if checkpoint.get("bpe") != self._bpe_snapshot:
+            raise TokenizerContractError("tokenizer checkpoint BPE mismatch")
 
 
 class StreamingTextFeed:
@@ -322,8 +344,7 @@ class StreamingTextFeed:
             raise TokenizerContractError("text feed already finalized")
         if not isinstance(tokenizer, NativeTokenizer):
             raise TokenizerContractError("NativeTokenizer required")
-        self._closed = True
-        return tokenizer.encode_sequence("".join(self._chunks))
+        return tokenizer.encode_sequence(self.consume_text())
 
 
 def iter_context_windows(
@@ -392,6 +413,8 @@ def serialize_token_sequence(sequence: TokenSequence) -> bytes:
 
 
 def deserialize_token_sequence(payload: bytes, *, require_canonical: bool = False) -> TokenSequence:
+    if type(require_canonical) is not bool:
+        raise TokenizerContractError("require_canonical must be a boolean")
     if not isinstance(payload, bytes) or len(payload) > MAX_SERIALIZED_SEQUENCE_BYTES:
         raise TokenizerContractError("invalid serialized token sequence bytes")
     def reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
