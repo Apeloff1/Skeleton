@@ -88,7 +88,7 @@ class ConversationStore:
 
     def create(self, session_id: str, session: NativeConversationSession, *,
                pinned: bool = False) -> int:
-        if not isinstance(session_id, str) or not 8 <= len(session_id) <= 256:
+        if not isinstance(session_id, str) or not 8 <= len(session_id) <= 256 or any(ord(ch) < 33 or ord(ch) > 126 for ch in session_id):
             raise RuntimeContractError("invalid session identifier")
         if type(pinned) is not bool:
             raise RuntimeContractError("invalid pinned state")
@@ -173,7 +173,7 @@ class ConversationStore:
         return tuple(row[0] for row in rows)
 
     def prune_idle(self, older_than: float) -> int:
-        if not isinstance(older_than, (int, float)) or not 0 <= older_than <= time.time():
+        if isinstance(older_than, bool) or not isinstance(older_than, (int, float)) or not 0 <= older_than <= time.time():
             raise RuntimeContractError("invalid expiration cutoff")
         with self._transaction():
             cursor = self._db.execute(
