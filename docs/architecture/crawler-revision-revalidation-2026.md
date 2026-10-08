@@ -161,3 +161,30 @@ The overall review cannot be declared reusable if *any source inventory
 member* changed, including unobserved parents and dependency sources that
 could influence the independence model. New evidence still goes through the
 separate provenance-attested and calibrated promotion gates.
+
+
+## Quality and policy drift without textual revision
+
+A textual hash is not sufficient to certify that a source is epistemically
+unchanged. The revision comparator now distinguishes `QUALITY_CHANGED` from
+`DELIVERY_CHANGED`, `LINEAGE_CHANGED`, or a content revision. A changed
+source-quality score or changed acquisition policy metadata (including status
+and additional attested fields) requires a renewed assessment even when the
+old quoted text remains byte-for-byte identical.
+
+The normalized acquisition metadata comparison excludes **only**
+`fetched_at`: a timestamp-only recrawl does not by itself change the factual
+meaning of a cited quote. The complete capture receipt nevertheless changes
+its custody hash, allowing an auditor to distinguish separate acquisitions.
+
+Promotion consumers must not interpret a non-invalidated quotation span as a
+blanket claim-approval token. An observed claim is reusable only if every
+source in the dependency inventory remains unchanged, all its cited readings
+still match the same source and custody semantics, and downstream assurance
+and promotion policy separately approve the candidate.
+
+The dedicated regression suite covers changed score, status, metadata,
+internal destinations, boolean-typed metadata, omitted source parents,
+ambiguous citation moves, forged review digests, stale journal sequences and
+head tampering. These are committed tests; they do not count as passed until
+the repository's exact-head CI runner reports success.
