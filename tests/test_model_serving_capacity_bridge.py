@@ -94,5 +94,20 @@ class CapacityBridgeTests(unittest.TestCase):
         self.assertEqual(self.execute(ledger=ledger).backend_result, "output")
 
 
+    def test_deferred_backend_results_cannot_outlive_capacity_lease(self):
+        def generator_backend(plan):
+            yield plan
+
+        async def coroutine_backend(plan):
+            return plan
+
+        for callback in (generator_backend, coroutine_backend):
+            with self.subTest(callback=callback.__name__):
+                with self.assertRaisesRegex(AdmissionDenied, "lifecycle-managed streaming"):
+                    self.execute(invoke=callback)
+                self.assertEqual(self.ledger.snapshot(), (0, 0))
+        self.assertEqual(self.execute().backend_result, "output")
+
+
 if __name__ == "__main__":
     unittest.main()
