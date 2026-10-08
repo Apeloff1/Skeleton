@@ -11,7 +11,10 @@ def _ppm(v,n):
 @dataclass(frozen=True)
 class ResidualObservation:
  observation_id:str; year:int; absolute_error_ppm:int
- def __post_init__(self): _ppm(self.absolute_error_ppm,"absolute error")
+ def __post_init__(self):
+  _ppm(self.absolute_error_ppm,"absolute error")
+  if not isinstance(self.observation_id,str) or not self.observation_id.strip(): raise TemporalSignalError("residual observation identity required")
+  if isinstance(self.year,bool) or not isinstance(self.year,int) or not 1000<=self.year<=9999: raise TemporalSignalError("invalid residual observation year")
  @property
  def digest(self): return _digest(self.__dict__)
 
@@ -19,10 +22,20 @@ class ResidualObservation:
 class TemporalUncertaintyReceipt:
  calibration_digests:tuple[str,...]; target_coverage_ppm:int; radius_ppm:int; calibration_start_year:int
  calibration_end_year:int; sample_count:int
+ def __post_init__(self):
+  _ppm(self.target_coverage_ppm,"target coverage"); _ppm(self.radius_ppm,"radius")
+  for d in self.calibration_digests:
+   if not isinstance(d,str) or len(d)!=64 or any(c not in "0123456789abcdef" for c in d): raise TemporalSignalError("invalid calibration digest")
+  if isinstance(self.sample_count,bool) or not isinstance(self.sample_count,int) or self.sample_count<1 or self.sample_count!=len(self.calibration_digests): raise TemporalSignalError("invalid calibration sample count")
+  for y in (self.calibration_start_year,self.calibration_end_year):
+   if isinstance(y,bool) or not isinstance(y,int) or not 1000<=y<=9999: raise TemporalSignalError("invalid calibration year")
+  if self.calibration_start_year>self.calibration_end_year: raise TemporalSignalError("calibration time reversed")
  @property
  def digest(self): return _digest(self.__dict__)
 
 def rolling_uncertainty_set(observations,*,target_coverage_ppm=900_000,max_window=256):
+ if isinstance(max_window,bool) or not isinstance(max_window,int) or not 1<=max_window<=4096: raise TemporalSignalError("invalid uncertainty calibration window")
+ if any(not isinstance(o,ResidualObservation) for o in observations): raise TemporalSignalError("ResidualObservation required")
  obs=tuple(sorted(observations,key=lambda x:(x.year,x.observation_id)))
  _ppm(target_coverage_ppm,"target coverage")
  if not obs: raise TemporalSignalError("uncertainty calibration required")
