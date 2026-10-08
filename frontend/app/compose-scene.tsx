@@ -4,7 +4,8 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { validProjectId, projectHref } from '../src/product/worldWorkspace';
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../utils/apiController';
 import { lazyDefault, LazyMount } from '../src/utils/lazyMount';
@@ -35,8 +36,12 @@ const RECIPES: { key: string; icon: string; name: string; items: { category: str
 
 export default function ComposeScene() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ build?: string|string[]; game?: string|string[] }>();
+  const linkedProject = validProjectId(Array.isArray(params.build) ? params.build[0] : params.build) ||
+    validProjectId(Array.isArray(params.game) ? params.game[0] : params.game);
   const [cats, setCats] = useState<any[]>([]);
-  const [buildId, setBuildId] = useState('demo_build');
+  const [buildId, setBuildId] = useState(linkedProject);
+  useEffect(() => { if (linkedProject) setBuildId(linkedProject); }, [linkedProject]);
   const [era, setEra] = useState('modern');
   const [picks, setPicks] = useState<{ category: string; label: string; count: number }[]>([]);
   const [q, setQ] = useState('');
@@ -118,9 +123,17 @@ export default function ComposeScene() {
   }, [labelFor]);
 
   const totalAssets = picks.reduce((a, p) => a + p.count, 0);
+  const toWorkbench = () => {
+    const href = projectHref('/world-workbench', buildId.trim());
+    if (href) router.push(href as never);
+    else Alert.alert('Select a game', 'Enter a valid build ID to return to its World Workbench.');
+  };
 
   const compose = useCallback(async () => {
-    if (!picks.length || !buildId.trim()) { Alert.alert('Add items + Build ID', 'Pick at least one category and enter a Build ID.'); return; }
+    if (!picks.length || !validProjectId(buildId.trim())) {
+      Alert.alert('Select a real build', 'Choose a project and add at least one scene item before composing.');
+      return;
+    }
     setBusy(true); setResult(null);
     try {
       const r = await apiFetch(`${API}/api/galaxy-studio/forge/compose`, {
@@ -187,7 +200,7 @@ export default function ComposeScene() {
 
       <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 60 }}>
         <Text style={styles.lbl}>Build ID</Text>
-        <TextInput value={buildId} onChangeText={setBuildId} style={styles.input} placeholder="build id"
+        <TextInput value={buildId} onChangeText={setBuildId} style={styles.input} placeholder="Build ID (no demo default)"
           placeholderTextColor={C.muted} testID="cs-build" autoCapitalize="none" />
 
         <Text style={styles.lbl}>Era</Text>
