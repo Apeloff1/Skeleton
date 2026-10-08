@@ -65,7 +65,7 @@ class TokenWindow:
             raise TokenizerContractError("invalid token window range")
         if self.stop - self.start != len(self.token_ids):
             raise TokenizerContractError("token window range/content mismatch")
-        if len(self.source_sequence_digest) != 64:
+        if not isinstance(self.source_sequence_digest, str) or len(self.source_sequence_digest) != 64 or any(ch not in "0123456789abcdef" for ch in self.source_sequence_digest):
             raise TokenizerContractError("invalid source sequence digest")
         for token_id in self.token_ids:
             if not _is_int(token_id) or not 0 <= token_id < 2**31:
@@ -92,7 +92,7 @@ class TokenBatch:
         if not self.windows:
             raise TokenizerContractError("empty token batch")
         observed = sum(len(window.token_ids) for window in self.windows)
-        if self.total_tokens != observed:
+        if not _is_int(self.total_tokens) or self.total_tokens != observed:
             raise TokenizerContractError("token batch accounting mismatch")
 
 
@@ -111,7 +111,7 @@ class NativeTokenizer:
         self._vocab = tuple(model.itos)
         if not self._vocab or len(set(self._vocab)) != len(self._vocab):
             raise TokenizerContractError("model vocabulary must be non-empty and unique")
-        if len(model.E) != len(self._vocab):
+        if not isinstance(model.E, (list, tuple)) or len(model.E) != len(self._vocab):
             raise TokenizerContractError("model embedding/vocabulary size mismatch")
         if not _is_int(model.unk) or not 0 <= model.unk < len(self._vocab):
             raise TokenizerContractError("invalid model unknown-token id")
@@ -180,6 +180,8 @@ class NativeTokenizer:
         if not isinstance(self.model.itos, (list, tuple)) or any(not isinstance(token, str) for token in self.model.itos):
             raise TokenizerContractError("model vocabulary changed after admission")
         current_vocab = tuple(self.model.itos)
+        if not isinstance(self.model.E, (list, tuple)) or len(self.model.E) != len(self._vocab):
+            raise TokenizerContractError("model embedding/vocabulary size changed after admission")
         if current_vocab != self._vocab or not _is_int(self.model.unk) or self.model.unk != self._manifest.special_tokens["unk"]:
             raise TokenizerContractError("model vocabulary changed after admission")
         for name in ("pad", "bos", "eos"):
