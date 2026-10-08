@@ -39,6 +39,8 @@ from .local import (
 )
 
 __all__ = [
+    "NativeRuntimeBackendError",
+    "NativeRuntimeLocalModel",
     "NativeTransformerModel",
     "build_native_transformer_adapter",
     "LoadedLocalModel",
@@ -83,6 +85,11 @@ _NATIVE_EXPORTS = {
 
 
 def __getattr__(name: str):
+    if name in {"NativeRuntimeBackendError", "NativeRuntimeLocalModel"}:
+        from importlib import import_module
+        result = getattr(import_module(".native_runtime", __name__), name)
+        globals()[name] = result
+        return result
     module = _NATIVE_EXPORTS.get(name)
     if module is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
