@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 import json,math
 
-from .dragon_frame_custody import CapturedFrame,FrameBatch
+from .dragon_frame_custody import CapturedFrame,FrameBatch,bind_extracted_frames
 from .dragon_visual_features import VisualObservation,VisualFeatureBatch,bind_visual_observations
 from .dragon_consent_bound_queue import ConsentBoundAnalysisQueue
 
@@ -45,11 +45,18 @@ def accept_browser_visual(custody:ConsentBoundAnalysisQueue,envelope:BrowserVisu
         raise ValueError("consent substitution")
     expected=canonical_browser_visual_fingerprint(envelope)
     if envelope.payload_fingerprint!=expected: raise ValueError("browser visual payload fingerprint mismatch")
-    # Reconstruct server-side custody fields; the browser cannot choose owner/job/consent bindings per frame.
-    frames=tuple(CapturedFrame(x.frame_id,envelope.owner,envelope.job_id,job.recording_digest,
-      binding.consent_id,binding.scope_digest,x.captured_at_ms,x.frame_digest,
-      envelope.retention_until,x.source_locator) for x in envelope.frames)
-    source=FrameBatch(frames,sha256("\n".join(x.frame_id for x in frames).encode()).hexdigest())
+    # Treat browser frame IDs as transport-local only. Reissue canonical custody IDs from
+    # authoritative job/consent/recording state and immutable frame content metadata.
+    extracted=tuple((x.captured_at_ms,x.frame_digest,x.source_locator) for x in envelope.frames)
+    source=bind_extracted_frames(custody,envelope.owner,envelope.job_id,extracted,
+      retention_until=envelope.retention_until,authorized=True)
+    if len(source.frames)!=len(envelope.frames): raise ValueError("frame rebind cardinality mismatch")
+    id_map={wire.frame_id:canonical.frame_id for wire,canonical in zip(envelope.frames,source.frames)}
+    if len(id_map)!=len(envelope.frames): raise ValueError("duplicate browser frame identity")
+    observations=tuple(VisualObservation(id_map[x.frame_id],x.frame_digest,x.luminance_mean,
+      x.edge_density,x.motion_energy,x.scene_change) for x in envelope.observations
+      if x.frame_id in id_map)
+    if len(observations)!=len(envelope.observations): raise ValueError("observation references unknown browser frame")
     features=bind_visual_observations(custody,envelope.owner,envelope.job_id,source,
-      envelope.observations,now=now,authorized=True)
+      observations,now=now,authorized=True)
     return AcceptedBrowserVisual(expected,features)
