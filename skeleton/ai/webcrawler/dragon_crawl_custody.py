@@ -273,3 +273,48 @@ def bind_crawl_evidence(
     return CrawlCustodyBundle(
         claim_id, ordered_sources, ordered_evidence, fingerprints, receipt,
     )
+
+
+@dataclass(frozen=True)
+class CapturedCrawlReview:
+    """Exact document receipts plus the derived, human-reviewed research proposal."""
+
+    custody: CrawlCustodyBundle
+    assurance: "ProvenanceAssurance"
+
+
+def assure_captured_crawl(
+    claim_id: str,
+    captured_sources: Iterable[CapturedSource],
+    readings: Iterable[LocatedReading],
+    *,
+    authorized: bool,
+    custody_policy: CustodyPolicy = CustodyPolicy(),
+    crawl_policy: CrawlPolicy = CrawlPolicy(),
+    evidence_policy: EvidencePolicy = EvidencePolicy(),
+    assurance_policy: "AssurancePolicy | None" = None,
+    attestation_registry: "ProvenanceRegistry | None" = None,
+) -> CapturedCrawlReview:
+    """End-to-end local audit of real captured text and source dependency.
+
+    This is *not* a background crawling or model execution endpoint. No
+    acquisition or knowledge promotion occurs inside this function.
+    """
+    from .dragon_provenance_assurance import (
+        AssurancePolicy, ProvenanceAssurance, assure_crawler_evidence,
+    )
+    from .dragon_provenance_registry import ProvenanceRegistry
+    bound = bind_crawl_evidence(
+        claim_id, captured_sources, readings, authorized=authorized,
+        policy=custody_policy, crawl_policy=crawl_policy,
+        evidence_policy=evidence_policy,
+    )
+    report = assure_crawler_evidence(
+        claim_id, bound.evidence, bound.sources, authorized=authorized,
+        evidence_policy=evidence_policy,
+        assurance_policy=assurance_policy or AssurancePolicy(),
+        attestation_registry=attestation_registry,
+    )
+    if report.belief.readings != len(bound.evidence):
+        raise RuntimeError("captured evidence and assurance count mismatch")
+    return CapturedCrawlReview(bound, report)
