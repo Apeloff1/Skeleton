@@ -29,6 +29,14 @@ _DOMAINS = {
     "survival": ("crafting", "resource decay", "survival loop", "building", "weather"),
     "general": ("game loop", "input handling", "scene graph", "physics timestep", "save system"),
 }
+_GENRE_ALIASES = {
+    "platformer":"platforming", "platforming":"platforming",
+    "action":"combat", "combat":"combat",
+    "exploration":"general", "adventure":"general",
+    "puzzle":"puzzle", "rpg":"rpg", "strategy":"strategy",
+    "racing":"racing", "survival":"survival", "general":"general",
+}
+
 _ENGINES = {
     "godot": ("GDScript", "CharacterBody2D", "Area2D", "TileMapLayer", "InputMap"),
     "unity": ("C#", "MonoBehaviour", "Rigidbody2D", "FixedUpdate", "ScriptableObject"),
@@ -134,6 +142,7 @@ def plan_game_research(genre: str, engine: str, *, max_queries: int = 12
     if not 1 <= max_queries <= 40:
         raise ValueError("invalid query budget")
     genre, engine = genre.casefold().strip(), engine.casefold().strip()
+    genre = _GENRE_ALIASES.get(genre,genre)
     if genre not in _DOMAINS or engine not in _ENGINES:
         raise ValueError("unsupported genre/engine")
     queries = [
@@ -181,6 +190,7 @@ def prioritize_game_sources(
     sources: Iterable[GameSource], *, genre: str, engine: str,
     max_sources: int = 200,
 ) -> tuple[GameSource, ...]:
+    genre = _GENRE_ALIASES.get(genre.casefold().strip(),genre)
     if genre not in _DOMAINS or engine not in _ENGINES:
         raise ValueError("unsupported genre/engine")
     entries = tuple(sources)
