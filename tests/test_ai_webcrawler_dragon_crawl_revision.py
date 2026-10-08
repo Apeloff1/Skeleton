@@ -205,3 +205,29 @@ def test_revision_comparison_requires_explicit_authorization():
         compare_crawl_revisions(
             "claim", (alpha,), (reading(),), (alpha,), authorized=False,
         )
+
+
+def test_redirect_delivery_identity_change_invalidates_unmodified_text():
+    alpha = capture("alpha")
+    updated_doc = replace(
+        alpha.document, fetched_url="https://cdn.example/article",
+        provenance={
+            **alpha.document.provenance,
+            "fetched_url": "https://cdn.example/article",
+        },
+    )
+    review = check((alpha,), (reading(),),
+                   (replace(alpha, document=updated_doc),))
+    assert review.sources[0].delivery_changed
+    assert review.readings[0].disposition is ReadingDisposition.DELIVERY_CHANGED
+    assert not review.prior_readings_reusable
+
+
+def test_reordered_custody_lineage_is_semantically_equivalent():
+    alpha = capture("alpha")
+    original = replace(alpha, lineage_tokens=("camera", "level"))
+    reordered = replace(alpha, lineage_tokens=("level", "camera"))
+    review = check((original,), (reading(),), (reordered,))
+    assert review.prior_readings_reusable
+    assert not review.sources[0].lineage_changed
+    assert review.original_custody_fingerprint == review.current_custody_fingerprint
