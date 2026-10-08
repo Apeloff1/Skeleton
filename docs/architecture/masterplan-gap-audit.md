@@ -4,6 +4,15 @@ Status: canonical hostile-design review
 Updated: 2026-09-21
 Scope: Skeleton architecture, Tracks Q–AA, training, inference, memory, tools, agents, data, deployment and recovery
 
+## Verified integration delta — 2026-10-08
+
+Current production-path verification has closed one concrete contract-drift class and exposed the next P0 boundary:
+
+- **Retrieval namespace convergence:** canonical AI-tree pipeline, query planner, inverted index, and corpus ingestion now import their sibling `skeleton.ai.runtime.retrieval` contracts instead of legacy `skeleton.retrieval` classes. Regression coverage forbids reintroduction in these core modules.
+- **Context provenance into local generation:** `LocalInferenceRequest` now carries the canonical context digest and includes it in request identity; the provider adapter forwards the compiled digest. Same prompt/model under different compiled context therefore cannot share local request/cache identity.
+- **Still open / not claimed complete:** G001 tokenizer/representation remains P0. The local reference inference/training tokenizer is still separate from the native model-runtime tokenizer contract, so training-serving vocabulary identity is not yet unified.
+- **Validation status:** changes above are implemented with targeted tests; repository CI/exact-head validation must pass before these bullets are treated as fully verified closure.
+
 ## 0. Audit posture
 
 Assume all of the following can happen at once:
