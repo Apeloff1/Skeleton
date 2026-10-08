@@ -119,3 +119,15 @@ def test_new_lease_tokens_are_unpredictable_across_identical_reacquisitions():
  a=leases.acquire("u","r","source_integrity","w","impl","1",now=1,ttl=1,authorized=True)
  b=leases.acquire("u","r","source_integrity","w","impl","1",now=2,ttl=1,authorized=True)
  assert len(a.token)==64 and len(b.token)==64 and a.token!=b.token
+
+
+def test_shared_database_connections_observe_single_active_lease(tmp_path):
+ path=tmp_path/"leases.sqlite3"
+ db1=sqlite3.connect(path); db2=sqlite3.connect(path)
+ first=DragonWorkerLeases(db1); second=DragonWorkerLeases(db2)
+ lease=first.acquire("u","r","source_integrity","w1","impl","1",now=1,ttl=5,authorized=True)
+ with pytest.raises(RuntimeError,match="already leased"):
+  second.acquire("u","r","source_integrity","w2","impl","2",now=2,ttl=5,authorized=True)
+ replacement=second.acquire("u","r","source_integrity","w2","impl","2",now=6,ttl=5,authorized=True)
+ assert replacement.generation==lease.generation+1
+ assert replacement.worker_id=="w2" and replacement.token!=lease.token
