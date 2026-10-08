@@ -4,6 +4,10 @@ No model execution occurs here: the trusted adapter must be supplied by the
 deployment composition root, never from an untrusted request.
 """
 from dataclasses import dataclass
+from hashlib import sha256
+import json
+
+from .capacity import CapacityLedger
 
 from skeleton.ai.model_runtime.serving_policy import (
     PolicyAwareServingPlanner,
@@ -30,6 +34,7 @@ def plan_and_invoke(
     evaluation_bytes: bytes,
     backend: str,
     invoke,
+    ledger: CapacityLedger | None = None,
 ) -> PlannedInvocation:
     """Fail closed before planning and execution; do not retry failures."""
     if not isinstance(planner, PolicyAwareServingPlanner):
@@ -45,9 +50,27 @@ def plan_and_invoke(
     )
 
     def authorized_invoke(_admission_request):
-        plan = planner.plan(request)
-        result = invoke(plan)
-        return PlannedInvocation(plan, result)
+        lease = None
+        if ledger is not None:
+            if not isinstance(ledger, CapacityLedger):
+                raise TypeError("CapacityLedger required")
+            fingerprint = sha256(json.dumps({
+                "model": policy.model_digest,
+                "evaluation": policy.evaluation_digest,
+                "backend": backend,
+                "request": request.request_id,
+                "prompt_tokens": request.prompt_tokens,
+                "output_tokens": request.output_tokens,
+            }, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+            lease = ledger.acquire(request.request_id, fingerprint,
+                                   request.prompt_tokens + request.output_tokens)
+        try:
+            plan = planner.plan(request)
+            result = invoke(plan)
+            return PlannedInvocation(plan, result)
+        finally:
+            if lease is not None:
+                ledger.release(lease)
 
     return verified_invoke(
         policy, admission_request, model_bytes=model_bytes,
