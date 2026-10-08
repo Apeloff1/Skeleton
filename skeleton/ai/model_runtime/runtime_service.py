@@ -16,6 +16,7 @@ from typing import Callable
 from .flgb_model_runtime import LocalModelReceipt, LocalModelRequest, ModelIdentity, digest_json
 from .native_llm_runtime import GenerationResult, NativeLLMRuntime
 from .runtime_contracts import GenerationConfig, RuntimeContractError, RuntimeEvent
+from skeleton.cortex.bpe import TokenizerContractError
 
 
 class NativeServiceError(RuntimeContractError):
@@ -139,7 +140,7 @@ class NativeModelService:
         try:
             prompt_sequence = self.runtime.encode(prompt)
             prompt_tokens = len(prompt_sequence.token_ids)
-        except RuntimeContractError:
+        except (RuntimeContractError, TokenizerContractError):
             prompt_tokens = None
         return digest_json(
             {
