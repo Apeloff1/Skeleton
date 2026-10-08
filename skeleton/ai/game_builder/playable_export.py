@@ -114,11 +114,16 @@ function reset(){
 }
 function takeTurn(direction){
  if(!Object.hasOwn(delta,direction)||state.status!=="playing")return;
+ if(replay.length>=20000){
+  emit("The 20,000-turn replay budget is full. Undo or restart to continue.");
+  return;
+ }
  const lv=currentLevel();
  const [dx,dy]=delta[direction];
  let nx=state.x+dx,ny=state.y+dy;
- if(nx<0||ny<0||nx>=lv.width||ny>=lv.height
-   ||lv.rows[ny][nx]==="#"){nx=state.x;ny=state.y;}
+ const blocked=nx<0||ny<0||nx>=lv.width||ny>=lv.height
+   ||lv.rows[ny][nx]==="#";
+ if(blocked){nx=state.x;ny=state.y;}
  const before=clone(state);
  undoStack.push(before);
  if(undoStack.length>256)undoStack.shift();
@@ -131,7 +136,7 @@ function takeTurn(direction){
  }else if(tile==="H"&&entered){
   state.health--;
   emit("Hazard encountered: 1 health lost.");
- }else if(tile==="#"){
+ }else if(blocked){
   emit("A wall blocks that move.");
  }else{emit("Continue exploring.");}
  if(state.health<=0){
