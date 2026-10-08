@@ -59,7 +59,9 @@ class CapacityLedger:
             if lease.expires_ns <= now:
                 del self._active[key]
 
-    def acquire(self, request_id: str, fingerprint: str, tokens: int) -> Reservation:
+    def acquire(self, request_id: str, fingerprint: str, tokens: int, *, exclusive: bool = False) -> Reservation:
+        if type(exclusive) is not bool:
+            raise CapacityDenied("exclusive must be a boolean")
         if (not isinstance(request_id, str) or not request_id or len(request_id) > 256
                 or not isinstance(fingerprint, str) or not fingerprint or len(fingerprint) > 256
                 or type(tokens) is not int or tokens <= 0):
@@ -71,6 +73,8 @@ class CapacityLedger:
             if previous is not None:
                 if previous.fingerprint != fingerprint or previous.tokens != tokens:
                     raise CapacityDenied("idempotency key conflict")
+                if exclusive:
+                    raise CapacityDenied("request already has an active reservation")
                 return previous
             if len(self._active) >= self.limits.max_active:
                 raise CapacityDenied("active request capacity exhausted")
