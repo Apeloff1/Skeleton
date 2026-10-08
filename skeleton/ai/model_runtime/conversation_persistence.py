@@ -95,7 +95,8 @@ class DurableConversationCoordinator:
                 if current < binding.live_revision:
                     raise RuntimeContractError("live revision regressed")
                 updates.append((sid, binding.durable_revision, self.service._get(sid)))
-            revisions = self.store.save_many(tuple(updates))
+            pinned = {sid: self.service.is_pinned(sid) for sid, _, _ in updates}
+            revisions = self.store.save_many(tuple(updates), pinned=pinned)
             for sid, new_revision in revisions.items():
                 self._bindings[sid] = PersistenceBinding(
                     sid, new_revision, self.service.revision(sid))
@@ -111,7 +112,8 @@ class DurableConversationCoordinator:
                     dirty.append((sid, binding.durable_revision, self.service._get(sid)))
             if not dirty:
                 return {}
-            revisions = self.store.save_many(tuple(dirty))
+            pinned = {sid: self.service.is_pinned(sid) for sid, _, _ in dirty}
+            revisions = self.store.save_many(tuple(dirty), pinned=pinned)
             result = {}
             for sid, durable_revision in revisions.items():
                 binding = PersistenceBinding(
