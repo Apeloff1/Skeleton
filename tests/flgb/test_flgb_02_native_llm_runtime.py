@@ -604,5 +604,27 @@ class TestNativeLLMRuntime(unittest.TestCase):
             runtime.checkpoint_json()
 
 
+    def test_stream_detects_model_mutation_between_tokens(self):
+        runtime = self.runtime()
+        stream = runtime.stream("hello world", GenerationConfig(max_new_tokens=3))
+        self.assertEqual(next(stream).kind, "admitted")
+        self.assertEqual(next(stream).kind, "prompt")
+        first = next(stream)
+        self.assertEqual(first.kind, "token")
+        runtime.model.bout[0] += 1.0
+        with self.assertRaises(RuntimeContractError):
+            list(stream)
+
+    def test_stream_detects_tokenizer_mutation_between_tokens(self):
+        runtime = self.runtime()
+        stream = runtime.stream("hello world", GenerationConfig(max_new_tokens=3))
+        self.assertEqual(next(stream).kind, "admitted")
+        self.assertEqual(next(stream).kind, "prompt")
+        self.assertEqual(next(stream).kind, "token")
+        runtime.tokenizer.digest = "0" * 64
+        with self.assertRaisesRegex(RuntimeContractError, "tokenizer mutated"):
+            list(stream)
+
+
 if __name__ == "__main__":
     unittest.main()
