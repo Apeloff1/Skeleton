@@ -34,9 +34,33 @@ def _level_with_completion(original: str, campaign_id: str,
         raise ValueError("playable runtime does not expose unique goal event")
     # This message fires only inside the actual player's collision with the
     # goal, after puzzle prerequisites pass. The hub checks iframe identity.
-    return original.replace(
+    upgraded=original.replace(
         mark,mark+"window.parent.postMessage("+event+",'*');",1
     )
+    skill_bridge=r"""
+window.addEventListener("message",event=>{
+  if(event.source!==window.parent)return;
+  const info=event.data;
+  if(!info||info.type!=="skeleton.game.campaign.skills.v1"||
+     info.campaign!==__CAMPAIGN_ID__)return;
+  const ranks=info.skills||{};
+  const get=k=>Number.isSafeInteger(ranks[k])?
+    Math.max(0,Math.min(5,ranks[k])):0;
+  scene.physics.max_lives+=get("health");
+  state.lives+=get("health");
+  scene.physics.move_speed+=get("movement")*.45;
+  scene.physics.enemy_speed*=Math.max(.55,1-get("combat")*.07);
+  if(get("energy")>0&&!scene.mechanics.includes("double_jump"))
+    scene.mechanics.push("double_jump");
+  state.player.airJumps+=Math.floor(get("energy")/2);
+  state.player.invincible=Math.max(state.player.invincible,get("recovery")*.4);
+  state.score+=get("loot")*10;
+});
+""".replace("__CAMPAIGN_ID__",_safe_json(campaign_id))
+    marker="requestAnimationFrame(frame);"
+    last=upgraded.rfind(marker)
+    if last<0:raise ValueError("missing game animation start")
+    return upgraded[:last]+skill_bridge+upgraded[last:]
 
 
 def render_campaign_hub(campaign: Campaign) -> str:
@@ -168,6 +192,10 @@ function launch(id){
  active=ch.id;
  document.getElementById("current").textContent=ch.title;
  frame.src=ch.file;
+ frame.onload=()=>frame.contentWindow.postMessage({
+   type:"skeleton.game.campaign.skills.v1",campaign:C.campaign,
+   skills:{...progress.skills}
+ },"*");
  message("Playing "+ch.title+". Reach the exit to unlock the next chapter.");
 }
 function finish(id){
