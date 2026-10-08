@@ -44,9 +44,12 @@ class DragonWorkerLeases:
   if current!=lease: raise PermissionError("stale or replaced worker lease")
   if not math.isfinite(now) or now>=lease.expires_at: raise PermissionError("worker lease expired")
   return current
- def release(self,lease:WorkerLease,*,now:float,authorized:bool)->None:
+ def _release_uncommitted(self,lease:WorkerLease,*,now:float,authorized:bool)->None:
   self.require(lease,now=now,authorized=authorized)
-  with self.db:
-   n=self.db.execute("""DELETE FROM dragon_worker_leases WHERE owner=? AND run_id=? AND layer=? AND token=?""",
-    (lease.owner,lease.run_id,lease.layer,lease.token)).rowcount
+  n=self.db.execute("""DELETE FROM dragon_worker_leases WHERE owner=? AND run_id=? AND layer=? AND token=?""",
+   (lease.owner,lease.run_id,lease.layer,lease.token)).rowcount
   if n!=1: raise RuntimeError("worker lease release conflict")
+ def release(self,lease:WorkerLease,*,now:float,authorized:bool)->None:
+  with self.db:
+   self._release_uncommitted(lease,now=now,authorized=authorized)
+
