@@ -23,6 +23,7 @@ export interface CompanionAcademyInput {
   attempts?:readonly DragonPracticeAttempt[];
   subscription?:DragonPracticeSubscription|null;
   onRunPractice?:()=>void;
+  onStartPractice?:()=>void;
   onOpenDemo?:(attemptId:string)=>void;
   onStopPractice?:()=>void;
   practiceBusy?:boolean;
@@ -35,7 +36,7 @@ export default function DragonCompanionPanel({ draft, lastUserText, telemetry, a
   academy?: CompanionAcademyInput;
 }) {
   const [showResearch, setShowResearch] = useState(false);
-  const [showAcademy,setShowAcademy]=useState(true);
+  const [showAcademy,setShowAcademy]=useState(false);
   const verifiedProgress=validateDragonProgress(academy?.progress);
   const [motion, setMotion] = useState<CompanionMotion>(DEFAULT_COMPANION_PREFERENCES.motion);
   const systemReducedMotion = useReducedMotion();
@@ -71,6 +72,7 @@ export default function DragonCompanionPanel({ draft, lastUserText, telemetry, a
     <Pressable accessibilityRole="button" accessibilityLabel="Toggle Dragon Academy" onPress={()=>setShowAcademy(x=>!x)} style={s.academyButton}><Ionicons name="trophy-outline" color="#fbbf24" size={16}/><Text style={s.academyText}>{showAcademy?"Hide":"Show"} Dragon Academy · capability levels & game practice</Text></Pressable>
     {showAcademy&&<DragonQuestBoard progress={academy?.progress} attempts={academy?.attempts}
       subscription={academy?.subscription} onRunPractice={academy?.onRunPractice}
+      onStartPractice={academy?.onStartPractice}
       onOpenDemo={academy?.onOpenDemo} onStopPractice={academy?.onStopPractice}
       busy={academy?.practiceBusy} />}
     <Text style={s.note}>Petting and animation are just for fun. System reduced-motion settings take priority. These reactions never start research or change memory.</Text>

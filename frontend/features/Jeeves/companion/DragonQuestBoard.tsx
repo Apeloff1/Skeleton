@@ -33,12 +33,13 @@ export interface DragonQuestBoardProps{
  attempts?:readonly DragonPracticeAttempt[];
  subscription?:DragonPracticeSubscription|null;
  onRunPractice?:()=>void;
+ onStartPractice?:()=>void;
  onOpenDemo?:(attemptId:string)=>void;
  onStopPractice?:()=>void;
  busy?:boolean;
 }
 export default function DragonQuestBoard({
- progress,attempts=[],subscription,onRunPractice,onOpenDemo,onStopPractice,busy=false
+ progress,attempts=[],subscription,onRunPractice,onStartPractice,onOpenDemo,onStopPractice,busy=false
 }:DragonQuestBoardProps){
  const [tab,setTab]=useState<'quests'|'workshop'>('quests');
  // No pseudo-XP when the trusted host has not supplied an accepted projection.
@@ -123,6 +124,12 @@ export default function DragonQuestBoard({
     </View>
     {subscription?.enabled&&onStopPractice&&<Pressable accessibilityRole="button" accessibilityLabel="Stop scheduled practice" onPress={onStopPractice} style={s.stop}><Text style={s.stopText}>Stop</Text></Pressable>}
     </View>
+    {!subscription?.enabled&&onStartPractice&&<Pressable disabled={busy} accessibilityRole="button"
+      accessibilityLabel="Enable Dragon practice for one day" onPress={onStartPractice}
+      accessibilityState={{disabled:busy}} style={s.practiceStart}>
+      <Ionicons name="time-outline" size={17} color="#fef3c7"/>
+      <Text style={s.practiceStartText}>Enable 24h hourly practice · up to 2 demos / run</Text>
+    </Pressable>}
     {onRunPractice&&<Pressable disabled={busy} accessibilityRole="button" onPress={onRunPractice}
      accessibilityState={{disabled:busy}} style={[s.run,busy&&{opacity:.5}]}>
      <Ionicons name="hammer-outline" size={17} color="#15271c"/><Text style={s.runText}>{busy?'Preparing attempt…':'Generate a practice demo'}</Text>
@@ -178,6 +185,8 @@ const s=StyleSheet.create({
  statusTitle:{fontSize:11,color:C.fg,fontWeight:'800'},stop:{padding:8,borderWidth:1,borderColor:'#fca5a5',borderRadius:9},
  stopText:{color:'#fca5a5',fontSize:11},run:{backgroundColor:C.mint,padding:12,borderRadius:12,
   flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8},runText:{color:'#15271c',fontWeight:'900'},
+ practiceStart:{flexDirection:'row',gap:7,alignItems:'center',padding:11,backgroundColor:'#4b3c21',borderRadius:11},
+ practiceStartText:{color:'#fef3c7',fontSize:11,fontWeight:'700',flex:1},
  notConnected:{color:'#93c5fd',fontSize:10,lineHeight:16},
  empty:{color:C.muted,fontSize:11,textAlign:'center',paddingVertical:13},
  attempt:{flexDirection:'row',alignItems:'center',gap:10,padding:10,borderRadius:10,backgroundColor:'#1e293b'},

@@ -1,0 +1,159 @@
+"""Authenticated Dragon Academy product adapter.
+
+All identities derive from verified GameForge principals, NEVER request JSON.
+The canonical crawler owns promotion and human-review receipts; there is no
+public endpoint that can mint XP or fabricate ApprovedLesson/PromotionDecision.
+Demo HTML is returned as data only; the client renders in an isolated WebView.
+Requires an operator-configured durable SQLite path; no in-memory fallback.
+"""
+from __future__ import annotations
+
+from contextlib import contextmanager
+from dataclasses import asdict
+from hashlib import sha256
+import os
+from pathlib import Path
+import sqlite3
+import time
+from typing import Iterator
+
+from fastapi import APIRouter, Depends, HTTPException, Path as URLPath, Query
+from pydantic import BaseModel, Field
+
+from routes.gameforge_auth import get_current_user
+from skeleton.ai.webcrawler.dragon_practice_lab import DragonPracticeLab
+from skeleton.ai.webcrawler.dragon_practice_cycles import DragonPracticeCycles
+from skeleton.ai.webcrawler.dragon_session_projection import DragonSessionProjection
+
+router = APIRouter(prefix="/api/dragon-academy", tags=["Dragon Academy"])
+
+class RunPracticeRequest(BaseModel):
+    max_demos: int = Field(default=2, ge=1, le=4)
+
+class SubscribeRequest(BaseModel):
+    hours: int = Field(default=24, ge=1, le=168)
+    interval_seconds: int = Field(default=3600, ge=300, le=86400)
+    max_ticks: int = Field(default=24, ge=1, le=168)
+    demos_per_tick: int = Field(default=2, ge=1, le=4)
+    approved: bool = Field(default=False)
+
+def _principal(user: dict | None = Depends(get_current_user)) -> str:
+    """No anonymous/development bypass, even when the general app has dev auth off."""
+    if not isinstance(user, dict) or user.get("disabled") or user.get("dev_mode"):
+        raise HTTPException(status_code=401, detail="Sign in to use Dragon Academy")
+    email = user.get("email")
+    if not isinstance(email,str) or not 3 <= len(email.strip()) <= 200:
+        raise HTTPException(status_code=403, detail="Account identity unavailable")
+    if user.get("role") not in ("viewer","editor","admin"):
+        raise HTTPException(status_code=403, detail="Account permission unavailable")
+    tenant=user.get("tenant_id") or email
+    if not isinstance(tenant,str) or not 1 <= len(tenant.strip()) <= 128:
+        raise HTTPException(status_code=403, detail="Tenant identity unavailable")
+    # Exactly one opaque owner ID per tenant/principal pair, independent of
+    # user-supplied parameters; avoid exposing the email in SQLite keys.
+    return sha256((tenant.strip()+"\x00"+email.strip().lower()).encode()).hexdigest()
+
+def _database_path() -> Path:
+    raw=os.environ.get("SKL_DRAGON_PRACTICE_DB_PATH","").strip()
+    if not raw:
+        raise HTTPException(status_code=503, detail="Dragon Academy storage not configured")
+    path=Path(raw).expanduser()
+    if not path.is_absolute() or path.name in ("",".","..") or not path.parent.is_dir():
+        raise HTTPException(status_code=503, detail="Dragon Academy durable storage unavailable")
+    return path
+
+@contextmanager
+def _lab() -> Iterator[tuple[DragonPracticeLab,DragonPracticeCycles]]:
+    path=_database_path()
+    try:
+        db=sqlite3.connect(str(path),timeout=5)
+        try:
+            db.execute("PRAGMA busy_timeout=5000")
+            db.execute("PRAGMA journal_mode=WAL")
+            db.execute("PRAGMA foreign_keys=ON")
+            lab=DragonPracticeLab(db)
+            yield lab,DragonPracticeCycles(db,lab)
+        finally:
+            db.close()
+    except (sqlite3.DatabaseError,sqlite3.OperationalError) as exc:
+        raise HTTPException(status_code=503,detail="Dragon Academy storage unavailable") from None
+
+def _snapshot(lab: DragonPracticeLab, cycles: DragonPracticeCycles,
+              owner: str) -> dict:
+    return {
+        "ok": True,
+        "progress": asdict(lab.progress(owner,authorized=True)),
+        "attempts": [asdict(a) for a in lab.attempts(owner,authorized=True,limit=50)],
+        "subscription": asdict(cycles.status(owner,authorized=True)),
+    }
+
+@router.get("/status")
+def academy_status(owner: str = Depends(_principal)) -> dict:
+    with _lab() as (lab,cycles):
+        return _snapshot(lab,cycles,owner)
+
+@router.get("/crawler/feed")
+def crawler_feed(
+    after_sequence: int = Query(default=0,ge=0),
+    limit: int = Query(default=100,ge=1,le=250),
+    owner: str = Depends(_principal),
+) -> dict:
+    with _lab() as (lab,_):
+        try:
+            feed=DragonSessionProjection(lab.db).read(
+                owner,authorized=True,after_sequence=after_sequence,limit=limit)
+        except ValueError:
+            raise HTTPException(status_code=409,detail="Crawler journal replay unavailable") from None
+        return {"ok": True,**asdict(feed)}
+
+@router.post("/practice/run")
+def run_practice(body: RunPracticeRequest, owner: str = Depends(_principal)) -> dict:
+    with _lab() as (lab,cycles):
+        # An authenticated click is *not* permission to mint practice lessons.
+        # The canonical crawler must have deposited review-approved lessons.
+        attempts=lab.run_batch(owner,authorized=True,consent=True,
+                               now=time.time(),max_demos=body.max_demos)
+        result=_snapshot(lab,cycles,owner)
+        result["created"]=[asdict(a) for a in attempts]
+        return result
+
+@router.post("/practice/subscribe")
+def subscribe_practice(body: SubscribeRequest, owner: str = Depends(_principal)) -> dict:
+    if not body.approved:
+        raise HTTPException(status_code=403,detail="Explicit practice approval is required")
+    now=time.time()
+    with _lab() as (lab,cycles):
+        cycles.enable(owner,authorized=True,human_approved=True,now=now,
+                      expires_at=now+body.hours*3600,
+                      interval_seconds=body.interval_seconds,
+                      max_ticks=body.max_ticks,
+                      demos_per_tick=body.demos_per_tick)
+        return _snapshot(lab,cycles,owner)
+
+@router.post("/practice/stop")
+def stop_practice(owner: str = Depends(_principal)) -> dict:
+    with _lab() as (lab,cycles):
+        cycles.disable(owner,authorized=True)
+        # Also close grants on all currently queued lessons; a user must
+        # re-approve new learning before another autonomous practice run.
+        lab.revoke(owner,authorized=True)
+        return _snapshot(lab,cycles,owner)
+
+@router.get("/practice/{attempt_id}/artifact")
+def practice_artifact(
+    attempt_id: str = URLPath(pattern=r"^[a-f0-9]{64}$"),
+    owner: str = Depends(_principal),
+) -> dict:
+    with _lab() as (lab,_):
+        try:
+            html=lab.artifact(owner,attempt_id,authorized=True)
+        except (LookupError,ValueError):
+            raise HTTPException(status_code=404,detail="Demo unavailable") from None
+        # Never serve playable HTML with an application origin/cookie context.
+        return {
+            "ok": True,
+            "attempt_id": attempt_id,
+            "html": html,
+            "sha256": sha256(html.encode("utf-8")).hexdigest(),
+            "sandbox_required": True,
+        }

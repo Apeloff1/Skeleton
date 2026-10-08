@@ -82,26 +82,64 @@ A subscription is only a *permission state*. If a host does not schedule
 calls to `pulse`, no background work occurs. A user can stop future
 generation at once with `cycles.disable` or `lab.revoke`.
 
-## Required production adapter
+## Authenticated host integration
 
-There is deliberately **no unauthenticated REST route** that accepts raw
-`PromotionDecision` records or arbitrary `owner` parameters. The host
-must bind owner identity to the authenticated principal, resolve canonical
-promotion and human-approval records server-side, and never accept XP,
-skill levels or playtest successes from front-end JSON.
+The backend product router at `/api/dragon-academy` is registered by
+`backend/core/routes_registry.py`. It uses the existing GameForge login
+dependency directly, **without** the developer anonymous-admin fallback.
+Every request uses the authenticated user's tenant+email hashed to a stable
+owner identifier. No browser-supplied `owner`, `PromotionDecision`, XP,
+or review verdict is accepted.
 
-A host providing the Jeeves companion screen may pass `CompanionAcademyInput`:
-`progress` is the server-projected `PracticeProgress`, `attempts` comes
-from `lab.attempts`, `subscription` from `cycles.status`, and callbacks
-perform authenticated actions for `onRunPractice`, `onStopPractice`, and
-`onOpenDemo`. Game HTML must be presented in a strongly sandboxed isolated
-origin or isolated WebView. Browsers must not reuse application auth cookies
-when loading a demo. No callback means the UI only shows an honest
-read-only workshop state and does not claim to have run a game.
+Durable storage must be explicitly configured by the operator:
 
-Connect the canonical crawl-event journal to the companion in a separate
-authorized read-only feed; the current Jeeves chat mount supplies conversation
-interests, not a live crawler session ID.
+```bash
+export SKL_DRAGON_PRACTICE_DB_PATH=/var/lib/skeleton/dragon/dragon.sqlite3
+```
+
+The parent folder must exist and be writable; otherwise the endpoint returns
+503 and no in-memory alternate authority is created. Keep the crawler journal
+and practice product adapter pointed at **one canonical owner-scoped database**.
+On startup, the producer must validate migrations/retention against the main
+governance regime.
+
+Current endpoints:
+
+| Method | Path | Meaning |
+|---|---|---|
+| GET | `/api/dragon-academy/status` | Authenticated XP, queue and cycle snapshot |
+| POST | `/api/dragon-academy/practice/run` | Generate 1–4 bounded original demos from approved lessons |
+| POST | `/api/dragon-academy/practice/subscribe` | Enable finite recurring practice with explicit approval |
+| POST | `/api/dragon-academy/practice/stop` | Disable recurring practice and revoke queued lesson grants |
+| GET | `/api/dragon-academy/practice/{attempt_id}/artifact` | Verified HTML as JSON data only |
+| GET | `/api/dragon-academy/crawler/feed` | Owner-scoped crawler journal replay |
+
+**Important:** `DragonSessionProjection.attach(owner,session_id,authorized=True,at=...)`
+is an internal producer method only. A trusted crawler must attach its
+already-authorized session to the same canonical owner before the feed
+shows real progress. Browser clients cannot bind a crawl, approve lessons,
+or create crawler events. The feed checks the journal digest chain before
+emitting replay events. The linked session can be closed by its producer.
+
+The frontend `useDragonAcademy` checks login, attaches bearer headers to
+API calls, validates the authority-owned progress projection, polls real
+crawler events on foreground, and verifies HTML SHA-256 before opening
+`DragonDemoPlayer`. The WebView is incognito, cannot access files or
+cookies, and blocks external navigation; the generated HTML also forbids
+network access via CSP. On-screen touch controls supplement keyboard
+movement and jumping.
+
+**Scheduler caveat:** subscription enables an approved interval and
+remaining-run budget, but **no background worker is created**.
+Your trusted runtime scheduler must invoke `DragonPracticeCycles.pulse()`
+while the authorization remains current. If it does not, the UI honestly
+shows the subscription with no generated attempts. A browser never polls
+a run endpoint in a loop to impersonate a background scheduler.
+
+Playtest review remains producer-only and needs independently checked evidence.
+A running microgame is not, by itself, proof of a passed real-device test.
+The frontend does not have a public success-verdict endpoint and never
+mints mastery points.
 
 ## Quality targets and constraints
 
@@ -121,9 +159,12 @@ interests, not a live crawler session ID.
 
 ## Next implementation slice
 
-- Authoritative crawler-event feed into Jeeves, with owner/session identity.
-- Authenticated artifact streaming into sandboxed playable demo view.
-- True browser/engine smoke and gameplay acceptance receipts, not HTML checks.
+- Connect the canonical crawler producer's authenticated session startup to
+  `DragonSessionProjection.attach` so the prepared feed receives actual events.
+- Connect the existing bounded task scheduler to `DragonPracticeCycles.pulse`,
+  with resource metering and authoritative job receipts.
+- Run true browser/device smoke and gameplay acceptance receipts, not HTML-only
+  validation; add a trusted playtest verifier.
 - Broaden practice to combat, resource management, UI, camera and cooperative
   games through implemented mechanics rather than dishonest "supported" tags.
 - Evidence-driven adaptive challenge selection from actual playtest outcomes,

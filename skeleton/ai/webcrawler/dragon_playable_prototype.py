@@ -59,12 +59,18 @@ content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inlin
 :root{color-scheme:dark;font-family:system-ui,sans-serif}
 body{margin:0;background:#152c28;color:#f0f7ee;display:grid;place-items:center;min-height:100vh}
 main{width:min(95vw,850px)}canvas{display:block;width:100%;border:2px solid #9bd8b3;border-radius:14px;background:#203c37}
-button{margin:8px 6px 8px 0;padding:10px 15px;border:0;border-radius:8px;background:#9bd8b3;color:#17362a}
+button{margin:8px 6px 8px 0;padding:10px 15px;border:0;border-radius:8px;background:#9bd8b3;color:#17362a}\n.controls{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;margin:10px 0}\n.controls button{min-height:58px;min-width:76px;font-size:18px;touch-action:none;user-select:none}\n@media(pointer:fine){.controls{opacity:.85}}
 p{line-height:1.5}small{opacity:.8}
 </style></head><body><main>
 <h1>""" + title + """</h1><p>""" + goal + """</p>
 <p>Move: A/D or arrows. Jump: Space. Restart: R. Explore the original arena. Find all stars if shown, then reach the golden crystal.</p>
 <canvas id="game" width="800" height="450" aria-label="Playable original game prototype"></canvas>
+<div class="controls" aria-label="Game controls">
+<button type="button" data-key="KeyA" aria-label="Move left">◀</button>
+<button type="button" data-key="KeyD" aria-label="Move right">▶</button>
+<button type="button" data-key="Space" aria-label="Jump">⬆ Jump</button>
+<button type="button" id="touchRestart" aria-label="Restart level">↻ Restart</button>
+</div>
 <p id="status" role="status" aria-live="polite">Ready to explore</p>
 <button id="restart" type="button">Restart</button>
 <small>Original geometric assets only. No telemetry or external connections.</small>
@@ -92,6 +98,17 @@ function reset(){
  player.grounded=false;won=false;secrets.clear();status.textContent="Explore the level";
 }
 document.getElementById("restart").addEventListener("click",reset);
+document.getElementById("touchRestart").addEventListener("click",reset);
+document.querySelectorAll("[data-key]").forEach(button=>{
+ const name=button.getAttribute("data-key");
+ const down=event=>{event.preventDefault();keys.add(name);};
+ const up=event=>{event.preventDefault();keys.delete(name);};
+ button.addEventListener("pointerdown",down);
+ button.addEventListener("pointerup",up);
+ button.addEventListener("pointercancel",up);
+ button.addEventListener("lostpointercapture",()=>keys.delete(name));
+ button.addEventListener("pointerleave",()=>keys.delete(name));
+});
 window.addEventListener("keydown",e=>{
  if(["ArrowLeft","ArrowRight","Space","ArrowUp"].includes(e.code))e.preventDefault();
  keys.add(e.code);if(e.code==="KeyR")reset();

@@ -53,7 +53,18 @@ for(const name of ['DragonQuestBoard.tsx','DragonCompanion.tsx','DragonCompanion
  }
  if(name==='DragonCompanion.tsx')assert.ok(result.source.includes('levelBadge'));
 }
+for(const name of ['DragonDemoPlayer.tsx','useDragonAcademy.ts'])load(name);
+const demoPlayer=fs.readFileSync(path.join(dir,'DragonDemoPlayer.tsx'),'utf8');
+const hook=fs.readFileSync(path.join(dir,'useDragonAcademy.ts'),'utf8');
+const workspace=fs.readFileSync(path.resolve(dir,'../ChatWorkspace.tsx'),'utf8');
+assert.ok(hook.includes('checkMe()')&&hook.includes('getAuthToken()'), 'authenticated academy only');
+assert.ok(hook.includes('authHeaders()')&&hook.includes('digestStringAsync'), 'bearer auth and demo hash verification');
+assert.ok(demoPlayer.includes('onShouldStartLoadWithRequest')&&
+ demoPlayer.includes('incognito')&&demoPlayer.includes('allowFileAccess={false}'), 'game must stay isolated');
+assert.ok(workspace.includes('useDragonAcademy()')&&
+ workspace.includes('DragonDemoPlayer'), 'real Jeeves app must mount the practice client');
+assert.ok(!hook.includes('grantXP')&&!hook.includes('incrementXP'), 'client may not mint skill XP');
 const panel=fs.readFileSync(path.join(dir,'DragonCompanionPanel.tsx'),'utf8');
 assert.ok(panel.includes('<DragonQuestBoard'), 'academy must actually render in companion');
 assert.ok(panel.includes('validateDragonProgress'), 'untrusted progress may not drive character costume');
-console.log('Dragon RPG: validated tiers, badges, honest XP, normalized attempt history and UI syntax.');
+console.log('Dragon RPG: progression, authenticated host binding, sandboxed playable UI and syntax checks.');

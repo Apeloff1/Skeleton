@@ -209,6 +209,8 @@ class DragonPracticeLab:
         # One source claim may improve over time, but may not mint infinite XP
         # through rereads, review receipts, or cosmetic mechanic permutations.
         identity = _hash([lesson.owner, decision.claim_id])
+        # Serialize competing offers before the existence check.
+        self.db.execute("BEGIN IMMEDIATE")
         with self.db:
             existing = self.db.execute("""SELECT lesson_id FROM dragon_practice_lessons
                 WHERE owner=? AND claim_id=?""", (lesson.owner, decision.claim_id)).fetchone()
@@ -245,6 +247,9 @@ class DragonPracticeLab:
         results: list[PracticeAttempt] = []
         day_start = int(now // 86400) * 86400
         for _ in range(max_demos):
+            # The budget check and insert are one write-reserved transaction:
+            # concurrent workers cannot both consume the final quota slot.
+            self.db.execute("BEGIN IMMEDIATE")
             with self.db:
                 daily = self.db.execute("""SELECT COUNT(*) FROM dragon_practice_attempts
                     WHERE owner=? AND created_at>=? AND created_at<?""",

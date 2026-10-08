@@ -85,6 +85,9 @@ class DragonPracticeCycles:
         _time(now)
         if not authorized:
             raise PermissionError("practice pulse requires authorization")
+        # Reserve the tick before reading it: prevent two scheduler workers
+        # from starting the same practice slice concurrently.
+        self.db.execute("BEGIN IMMEDIATE")
         with self.db:
             row=self.db.execute("""SELECT enabled,expires_at,next_due,interval_seconds,
                 remaining_ticks,demos_per_tick FROM dragon_practice_cycles
