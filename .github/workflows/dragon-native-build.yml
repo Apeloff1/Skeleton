@@ -5,6 +5,8 @@ on:
     paths:
       - 'skeleton/ai/webcrawler/dragon_native_*.py'
       - 'skeleton/ai/webcrawler/dragon_game_blueprints.py'
+      - 'skeleton/ai/webcrawler/dragon_game_fitness.py'
+      - 'tests/test_ai_webcrawler_dragon_game_fitness.py'
       - 'skeleton/ai/webcrawler/dragon_retro_assets.py'
       - 'tests/test_ai_webcrawler_dragon_game_blueprints.py'
       - 'tests/test_ai_webcrawler_dragon_retro_assets.py'
@@ -96,4 +98,5 @@ jobs:
         run: |
           python -m pytest -q \
             tests/test_ai_webcrawler_dragon_game_blueprints.py \
+            tests/test_ai_webcrawler_dragon_game_fitness.py \
             tests/test_ai_webcrawler_dragon_native_variants.py

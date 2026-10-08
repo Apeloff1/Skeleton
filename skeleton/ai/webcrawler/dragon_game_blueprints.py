@@ -174,8 +174,18 @@ def _decorate(board: list[list[str]], rng: PRNG, *, mode: str, stage_num: int,
               start: tuple[int, int], goal: tuple[int, int]) -> tuple[int, int]:
     pickup_target = 5 + stage_num * 2
     enemy_target = 2 + stage_num
+    # Only decorate positions reachable from the spawn. A connected exit is
+    # insufficient if the game spawns objectives in inaccessible side pockets.
+    reachable = {start}
+    frontier = deque([start])
+    while frontier:
+        cx, cy = frontier.popleft()
+        for nx, ny in ((cx-1,cy),(cx+1,cy),(cx,cy-1),(cx,cy+1)):
+            if (nx,ny) not in reachable and 0<=nx<W and 0<=ny<H                     and board[ny][nx] not in "#^~":
+                reachable.add((nx,ny))
+                frontier.append((nx,ny))
     open_tiles = [(x, y) for y in range(2, H - 2) for x in range(2, W - 2)
-                  if board[y][x] == "." and (x, y) not in (start, goal)
+                  if (x,y) in reachable and board[y][x] == "." and (x, y) not in (start, goal)
                   and abs(x - start[0]) + abs(y - start[1]) > 2
                   and abs(x - goal[0]) + abs(y - goal[1]) > 2]
     picks, enemies = 0, 0

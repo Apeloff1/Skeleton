@@ -181,3 +181,16 @@ Example:
 Remaining: 35 catalog hardware profiles do not have dedicated native
 emitters; full genre depth, emulator traces, original 3D engines, save systems,
 and real-device performance testing are not yet complete.
+
+
+## Adversarial static campaign-selection cohort
+
+For each native PC game generation, the forge does not settle for the first
+random dungeon. It generates eight distinct seeds, reconstructs the tile
+graph, computes shortest routes and enemy-exposure-weighted routes, measures
+collectible access, dead ends, path detours and explorable coverage, and
+chooses the best admissible candidate. Source ZIPs include a machine-readable
+dragon-generator-evaluation.json: all candidates, selected static metrics,
+selection digest and proof boundaries. A game with disconnected objectives is
+rejected rather than granted progress. The builder is not claiming to have
+played, tested on actual hardware, trained a model or earned any XP.

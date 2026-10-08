@@ -524,7 +524,8 @@ def render_native_project(*,title:str,target_id:str,style:str,
             xbox_original_source(seed,style)
         )
     elif target_id in ("pc_linux","pc_windows","pc_macos","steam_deck"):
-        from .dragon_game_blueprints import GENRES, PALETTES, design_campaign, campaign_dict
+        from .dragon_game_blueprints import GENRES, campaign_dict
+        from .dragon_game_fitness import choose_campaign,selection_report
         from .dragon_native_arcade_runtime import render_sdl_campaign
         if style not in GENRES:
             raise ValueError("gameplay genre does not yet have an implemented native mode")
@@ -534,8 +535,11 @@ def render_native_project(*,title:str,target_id:str,style:str,
             "vga_dusk" if style in ("top_down_adventure","educational") else
             "crt_arcade" if style in ("racing","run_and_gun") else "handheld"
         )
-        campaign=design_campaign(style=style,seed=seed,stages=4,palette=palette)
+        selection=choose_campaign(style=style,seed=seed,stages=4,palette=palette,budget=8)
+        campaign=selection.chosen
         files=render_sdl_campaign(campaign)
+        files["dragon-generator-evaluation.json"]=json.dumps(
+            selection_report(selection),sort_keys=True,indent=2)+"\n"
         files["dragon-campaign.json"]=json.dumps(
             campaign_dict(campaign),sort_keys=True,indent=2)+"\n"
     else:
