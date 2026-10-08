@@ -7,7 +7,9 @@ export type DecoderVisualObservation = {
   frameId: string; frameDigest: string; luminanceMean: number;
   edgeDensity: number; motionEnergy: number; sceneChange: number;
 };
+export const DRAGON_VISUAL_DECODER_VERSION="dragon.local-visual.rgb64x36.v1" as const;
 export type LocalVisualAnalysis = {
+  decoderVersion: typeof DRAGON_VISUAL_DECODER_VERSION;
   frames: readonly CustodyFrame[]; observations: readonly DecoderVisualObservation[];
 };
 
@@ -66,6 +68,6 @@ export async function extractLocalVisualObservations(
         motionEnergy:+m.toFixed(9),sceneChange:+Math.min(1,m/.35).toFixed(9)});
       prev=new Uint8ClampedArray(px);
     }
-    return {frames,observations};
+    return {decoderVersion:DRAGON_VISUAL_DECODER_VERSION,frames,observations};
   } finally {video.pause();video.removeAttribute("src");video.load();URL.revokeObjectURL(url);}
 }
