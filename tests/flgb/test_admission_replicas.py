@@ -94,7 +94,7 @@ class TestReplicatedCheckpointRecovery(unittest.TestCase):
             ):
                 self.recover(broken)
 
-    def test_split_brain_equal_term_and_sequence_fails_closed(self):
+    def test_minority_divergence_does_not_override_majority(self):
         first = self.build()
         second = self.build()
         second.submit(BatchRequest("different", 1, 1), kv_bytes=10)

@@ -125,14 +125,19 @@ class TestAdmissionReplicaFileStore(unittest.TestCase):
     def test_same_sequence_conflicting_revision_refused(self):
         state = self.build()
         first = self.blob(state, "a", term=5)
-        second = self.blob(state, "a", term=5)
-        self.assertEqual(first, second)
+        alternate = RuntimeAdmissionScheduler()
+        alternate.submit(BatchRequest("other", 2, 2), kv_bytes=12)
+        alternate.admit()
+        self.assertEqual(state.snapshot()["sequence"], alternate.snapshot()["sequence"])
+        second = self.blob(alternate, "a", term=5)
+        self.assertNotEqual(first, second)
         self.store.save(
             "a", first, secret_key=KEY, minimum_term=5, minimum_sequence=0,
         )
-        self.store.save(
-            "a", second, secret_key=KEY, minimum_term=5, minimum_sequence=0,
-        )
+        with self.assertRaisesRegex(ModelRuntimeError, "conflicting"):
+            self.store.save(
+                "a", second, secret_key=KEY, minimum_term=5, minimum_sequence=0,
+            )
         self.assertEqual(self.store.read("a"), first)
 
     def test_distinct_directories_required(self):
@@ -188,6 +193,51 @@ class TestAdmissionReplicaFileStore(unittest.TestCase):
                 minimum_term=5, minimum_sequence=0,
             )
         self.assertEqual(alternate.read_bytes(), self.blob(state, "a"))
+
+    def test_end_to_end_checkpoint_recovery_and_request_lifecycle(self):
+        state = self.build()
+        state.submit(BatchRequest("queued", 1, 1), kv_bytes=10)
+        issued = self.store.publish(
+            state, leader_term=5, secret_key=KEY,
+            minimum_term=5, minimum_sequence=state.snapshot()["sequence"],
+        )
+        (self.paths["b"] / "admission-checkpoint.json").unlink()
+        resumed = self.quorum(
+            minimum_term=5, minimum_sequence=issued.sequence,
+        )
+        self.assertEqual(resumed.scheduler.snapshot(), state.snapshot())
+        resumed.scheduler.cancel("queued")
+        resumed.scheduler.complete("r1")
+        resumed.scheduler.submit(BatchRequest("next", 1, 1), kv_bytes=10)
+        self.assertEqual(resumed.scheduler.admit().admitted, ("next",))
+        self.assertEqual(
+            resumed.scheduler.capacity()["active_requests"], 1,
+        )
+        committed = self.store.publish(
+            resumed.scheduler, leader_term=6, secret_key=KEY,
+            minimum_term=5, minimum_sequence=issued.sequence,
+            parent_digest=issued.snapshot_digest,
+        )
+        result = self.quorum(
+            minimum_term=6, minimum_sequence=committed.sequence,
+        )
+        self.assertEqual(result.scheduler.snapshot(), resumed.scheduler.snapshot())
+        self.assertEqual(result.parent_digest, issued.snapshot_digest)
+
+    def test_fresh_leadership_floor_blocks_old_majority_until_replication(self):
+        state = self.build()
+        self.write_all(state)
+        stale = state.snapshot()["sequence"]
+        with self.assertRaisesRegex(ModelRuntimeError, "quorum"):
+            self.quorum(minimum_term=6, minimum_sequence=stale)
+        state.submit(BatchRequest("new", 1, 1), kv_bytes=10)
+        self.store.publish(
+            state, leader_term=6, secret_key=KEY,
+            minimum_term=6, minimum_sequence=stale,
+        )
+        self.assertEqual(
+            self.quorum(minimum_term=6, minimum_sequence=stale).leader_term, 6,
+        )
 
     def test_publish_requires_two_confirmed_independent_copies(self):
         state = self.build()
