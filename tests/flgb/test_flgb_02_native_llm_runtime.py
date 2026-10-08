@@ -451,5 +451,36 @@ class TestNativeLLMRuntime(unittest.TestCase):
         )
 
 
+    def test_token_and_text_decoders_match_sampling_stop_and_zero_budget(self):
+        runtime = self.runtime(ctx=8)
+        prompt = "hello world"
+        sequence = runtime.encode(prompt)
+        first = runtime.generate(prompt, GenerationConfig(max_new_tokens=1, temperature=0.0))
+        for config in (
+            GenerationConfig(max_new_tokens=0, temperature=0.0),
+            GenerationConfig(max_new_tokens=5, seed=72, temperature=0.9, top_k=4, top_p=0.85),
+            GenerationConfig(max_new_tokens=5, seed=72, temperature=0.0, stop_token_ids=first.generated_ids),
+            GenerationConfig(max_new_tokens=6, seed=17, temperature=0.0, use_cache=False),
+        ):
+            direct = runtime.generate(prompt, config)
+            tokenized = runtime.generate_sequence(sequence, config)
+            self.assertEqual(direct.generated_ids, tokenized.generated_ids)
+            self.assertEqual(direct.text, tokenized.text)
+            self.assertEqual(direct.finish_reason, tokenized.finish_reason)
+            self.assertEqual(direct.usage, tokenized.usage)
+            self.assertEqual(direct.replay_receipt, tokenized.replay_receipt)
+            self.assertEqual(direct.events, tokenized.events)
+
+    def test_token_sequence_budget_and_model_mutation_fail_closed(self):
+        runtime = self.runtime(ctx=4)
+        oversized = runtime.encode("hello world again small runtime")
+        with self.assertRaises(RuntimeContractError):
+            runtime.generate_sequence(oversized, GenerationConfig(max_new_tokens=1))
+        sequence = runtime.encode("hello")
+        runtime.model.bout[0] += 0.125
+        with self.assertRaises(RuntimeContractError):
+            runtime.generate_sequence(sequence, GenerationConfig(max_new_tokens=1))
+
+
 if __name__ == "__main__":
     unittest.main()
