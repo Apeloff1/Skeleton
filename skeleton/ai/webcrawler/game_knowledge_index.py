@@ -75,6 +75,10 @@ class GameKnowledgeIndex:
           year INTEGER, quality REAL NOT NULL, active INTEGER NOT NULL)""")
         db.execute("CREATE INDEX IF NOT EXISTS game_knowledge_source_idx ON game_knowledge_passages(source_id,active)")
         db.execute("CREATE INDEX IF NOT EXISTS game_knowledge_mechanic_idx ON game_knowledge_passages(engine,active)")
+        db.execute("""CREATE TABLE IF NOT EXISTS game_knowledge_tags(
+          passage_id TEXT NOT NULL, tag TEXT NOT NULL,
+          PRIMARY KEY(passage_id,tag))""")
+        db.execute("CREATE INDEX IF NOT EXISTS game_knowledge_tags_topic_idx ON game_knowledge_tags(tag)")
         db.execute("""CREATE TABLE IF NOT EXISTS game_knowledge_api(
           passage_id TEXT NOT NULL,symbol TEXT NOT NULL,engine TEXT NOT NULL,
           context TEXT NOT NULL, PRIMARY KEY(passage_id,symbol))""")
@@ -170,6 +174,9 @@ class GameKnowledgeIndex:
                   (pid,source_id,p.content_hash,p.source_url,
                    p.start,p.end,p.text,json.dumps(p.tags),engine,year,
                    p.source_score,1))
+                for tag in p.tags:
+                    self.db.execute("""INSERT OR IGNORE INTO game_knowledge_tags
+                      VALUES(?,?)""",(pid,tag))
                 if self.fts_enabled:
                     self.db.execute(
                         "DELETE FROM game_knowledge_fts WHERE passage_id=?", (pid,)
@@ -258,23 +265,32 @@ class GameKnowledgeIndex:
                         ) -> tuple[GameKnowledgeHit, ...]:
         if not isinstance(mechanic,str) or not 1<=len(mechanic)<=64:
             raise ValueError("invalid mechanic")
-        rows=self._rows(limit=15000)
-        found=[self._hit(row,1.0) for row in rows
-               if mechanic.casefold() in json.loads(row[5])]
-        return tuple(sorted(found,key=lambda x:(x.source_id,x.start))[:limit])
+        if not 1<=limit<=200:
+            raise ValueError("invalid mechanic result limit")
+        rows=self.db.execute("""SELECT p.passage_id,p.source_id,p.source_url,
+          p.content_hash,p.text,p.tags,p.start,p.end,p.engine,p.year,p.quality
+          FROM game_knowledge_tags t JOIN game_knowledge_passages p
+            ON p.passage_id=t.passage_id
+          WHERE t.tag=? AND p.active=1
+          ORDER BY p.source_id,p.start LIMIT ?""",
+          (mechanic.casefold(),limit)).fetchall()
+        return tuple(self._hit(row,1.0) for row in rows)
 
     # 15: Query actual extracted game-engine API usage.
     def search_engine_api(self, symbol: str, *, limit: int = 40
                           ) -> tuple[GameKnowledgeHit, ...]:
         if not isinstance(symbol,str) or not 1<=len(symbol)<=128:
             raise ValueError("invalid API symbol")
-        ids=self.db.execute("""SELECT a.passage_id FROM game_knowledge_api a
-            JOIN game_knowledge_passages p ON p.passage_id=a.passage_id
-            WHERE a.symbol=? AND p.active=1 LIMIT ?""",
-            (symbol,limit)).fetchall()
-        wanted={x[0] for x in ids}
-        return tuple(self._hit(r,1.0) for r in self._rows(limit=20000)
-                     if r[0] in wanted)
+        if not 1<=limit<=200:
+            raise ValueError("invalid engine API result limit")
+        rows=self.db.execute("""SELECT p.passage_id,p.source_id,p.source_url,
+          p.content_hash,p.text,p.tags,p.start,p.end,p.engine,p.year,p.quality
+          FROM game_knowledge_api a JOIN game_knowledge_passages p
+            ON p.passage_id=a.passage_id
+          WHERE a.symbol=? AND p.active=1
+          ORDER BY p.source_id,p.start LIMIT ?""",
+          (symbol,limit)).fetchall()
+        return tuple(self._hit(row,1.0) for row in rows)
 
     # 16: Recover stored historical source revisions, including stale ones.
     def source_history(self, source_id: str) -> tuple[tuple[str,str,int], ...]:
