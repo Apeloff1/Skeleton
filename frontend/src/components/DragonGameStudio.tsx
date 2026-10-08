@@ -92,6 +92,10 @@ export default function DragonGameStudio({
 
   const approve = async () => {
     if (busy || !observations.length) return;
+    if (observations.some(item => item.mechanic === "unclassified_visual_change")) {
+      setError("Classify visual events as actual mechanics before storing taste.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
