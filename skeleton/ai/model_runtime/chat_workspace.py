@@ -261,7 +261,11 @@ class NativeChatWorkspace:
 
     def set_tags(self, cid: str, tags: Iterable[str]) -> None:
         values = tuple(tags)
-        if len(values) > 32 or len(set(values)) != len(values):
+        if len(values) > 32:
+            raise RuntimeContractError("invalid conversation tags")
+        if any(type(tag) is not str for tag in values):
+            raise RuntimeContractError("invalid conversation tags")
+        if len(set(values)) != len(values):
             raise RuntimeContractError("invalid conversation tags")
         if any(type(tag) is not str or not 1 <= len(tag) <= 64 for tag in values):
             raise RuntimeContractError("invalid conversation tags")
