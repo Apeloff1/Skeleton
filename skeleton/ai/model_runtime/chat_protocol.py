@@ -28,6 +28,8 @@ class ChatMessage:
     def __post_init__(self) -> None:
         if self.role not in ROLES:
             raise RuntimeContractError("unsupported chat role")
+        if type(self.role) is not str or self.role not in ROLES:
+            raise RuntimeContractError("unsupported chat role")
         if not isinstance(self.content, str):
             raise RuntimeContractError("chat content must be text")
         if len(self.content.encode("utf-8")) > MAX_MESSAGE_BYTES:
