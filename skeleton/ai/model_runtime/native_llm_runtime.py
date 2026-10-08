@@ -615,6 +615,20 @@ class NativeLLMRuntime:
             raise RuntimeContractError("generation terminated without result")
         return stream.result
 
+    def stream_feed(
+        self,
+        feed: StreamingTextFeed,
+        config: GenerationConfig | None = None,
+    ) -> GenerationStream:
+        """Execute a bounded text feed as a stream of real transformer tokens.
+
+        The feed is finalized once; token IDs are forwarded without a lossy
+        text round-trip, and generation uses the canonical decoder.
+        """
+        if not isinstance(feed, StreamingTextFeed):
+            raise RuntimeContractError("StreamingTextFeed required")
+        return self.stream_sequence(feed.finalize(self.tokenizer), config)
+
     def generate_feed(
         self,
         feed: StreamingTextFeed,
