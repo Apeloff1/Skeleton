@@ -12,17 +12,21 @@ from hashlib import sha256
 import json
 import math
 from pathlib import Path
+import threading
 from typing import Any, Iterable, Mapping, Sequence
 
 from skeleton.ai.model_runtime import NativeLLMRuntime
 from skeleton.ai.runtime.inference.artifact import (
     LocalModelArtifactError,
     LocalModelArtifactReceipt,
+    load_local_model_artifact,
     write_local_model_artifact,
 )
+from skeleton.ai.runtime.inference.local import LocalInferenceRequest
 from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
 from skeleton.cortex.bpe import BytePairEncoder
 from skeleton.cortex.transformer import TinyTransformer, UNK as TRANSFORMER_UNK
+from skeleton.ai.model_runtime.runtime_contracts import MAX_CHECKPOINT_BYTES
 
 from .flgb_training_runtime import (
     CandidateWeights,
@@ -279,12 +283,7 @@ class NativeTransformerTrainingConfig:
 
 def _implementation_digest() -> str:
     """Digest the executable trainer and the two numerical/tokenizer owners."""
-    paths = (
-        Path(__file__),
-        Path(TinyTransformer.__module__.replace(".", "/") + ".py"),
-    )
-    # The package path form above is not necessarily relative to cwd. Resolve
-    # through imported module files instead.
+    # Resolve through imported module files so the digest is independent of cwd.
     import skeleton.cortex.bpe as bpe_module
     import skeleton.cortex.transformer as transformer_module
 
@@ -363,6 +362,7 @@ class NativeTrainingReceipt:
     artifact_sha256: str
     artifact_reference: str
     artifact_bytes: int
+    qualification_digest: str
     planned_steps: int
     completed_steps: int
     document_count: int
@@ -386,6 +386,7 @@ class NativeTrainingReceipt:
             "checkpoint_digest",
             "candidate_digest",
             "artifact_sha256",
+            "qualification_digest",
             "config_digest",
             "implementation_digest",
         ):
@@ -393,6 +394,13 @@ class NativeTrainingReceipt:
         _positive_int(self.planned_steps, "planned_steps", MAX_TRAINING_STEPS)
         _positive_int(self.completed_steps, "completed_steps", MAX_TRAINING_STEPS)
         _positive_int(self.document_count, "document_count", MAX_DOCUMENTS)
+        _positive_int(self.artifact_bytes, "artifact_bytes", MAX_CHECKPOINT_BYTES)
+        if (
+            not isinstance(self.artifact_reference, str)
+            or self.artifact_reference
+            != "local-model-artifact:" + self.artifact_sha256
+        ):
+            raise NativeTrainingError("invalid native artifact reference")
         if self.completed_steps != self.planned_steps:
             raise NativeTrainingError("training step accounting mismatch")
         for name in ("initial_perplexity", "final_perplexity"):
@@ -426,6 +434,7 @@ class NativeTrainingReceipt:
             "artifact_sha256": self.artifact_sha256,
             "artifact_reference": self.artifact_reference,
             "artifact_bytes": self.artifact_bytes,
+            "qualification_digest": self.qualification_digest,
             "planned_steps": self.planned_steps,
             "completed_steps": self.completed_steps,
             "document_count": self.document_count,
@@ -533,6 +542,50 @@ def train_native_transformer_candidate(
     if artifact.model_digest != trained_runtime.model_digest:
         raise NativeTrainingError("artifact/model digest mismatch")
 
+    try:
+        loaded = load_local_model_artifact(output_path)
+        if not isinstance(loaded.model, NativeRuntimeLocalModel):
+            raise NativeTrainingError(
+                "written native candidate reloaded as the wrong backend"
+            )
+        if loaded.model.model_digest != trained_runtime.model_digest:
+            raise NativeTrainingError(
+                "reloaded native candidate model identity mismatch"
+            )
+        if loaded.model.tokenizer_digest != trained_runtime.tokenizer.digest:
+            raise NativeTrainingError(
+                "reloaded native candidate tokenizer identity mismatch"
+            )
+        qualification = loaded.model.infer(
+            LocalInferenceRequest(
+                prompt=dataset.documents[0][0],
+                max_output_tokens=1,
+                seed=cfg.seed,
+            ),
+            threading.Event(),
+        )
+    except NativeTrainingError:
+        raise
+    except Exception as exc:
+        raise NativeTrainingError(
+            "native candidate execution qualification failed"
+        ) from exc
+    if not qualification.text or qualification.output_tokens != 1:
+        raise NativeTrainingError(
+            "native candidate execution qualification produced invalid output"
+        )
+    qualification_digest = digest_json(
+        {
+            "model_digest": qualification.model_digest,
+            "input_tokens": qualification.input_tokens,
+            "output_tokens": qualification.output_tokens,
+            "text_digest": sha256(
+                qualification.text.encode("utf-8")
+            ).hexdigest(),
+            "response_id": qualification.response_id,
+        }
+    )
+
     return NativeTrainingReceipt(
         schema=TRAINING_SCHEMA,
         candidate_id=candidate_id,
@@ -547,6 +600,7 @@ def train_native_transformer_candidate(
         artifact_sha256=artifact.artifact_sha256,
         artifact_reference=artifact.reference,
         artifact_bytes=artifact.artifact_bytes,
+        qualification_digest=qualification_digest,
         planned_steps=planned,
         completed_steps=completed,
         document_count=len(dataset.documents),
