@@ -726,3 +726,40 @@ This provides an explicit source -> compiler -> native game -> real move
 replay loop, not merely an LLM claim that a puzzle is solvable. The game
 remains a deliberately compact native terminal title; sound, animations,
 GPU rendering, and human quality reviews require further engineering.
+
+
+## Twelfth generation: compiled native executable release and provenance
+
+The native game builder now has a separate release lane for a real compiled
+puzzle title. It is intended to run on Linux, Windows and macOS GitHub
+Actions runners with the native host C toolchain. For each host, it:
+
+1. Materializes the exact original finite Sokoban source and unique source
+   file hashes in a fresh output directory (no existing file overwrite).
+2. Runs CMake configure/compile under bounded local subprocess timeouts.
+3. Reads the resulting actual native binary and verifies its host-specific
+   magic: ELF for Linux, PE DOS+NT headers for Windows, or Mach-O for macOS.
+4. Executes the compiled binary's --selftest and REQUIRES four individual
+   level-completion success records and the final completed-game message.
+5. Hashes source and binary files, records the native script output SHA256,
+   and produces a deterministic ZIP containing the executable, a separate
+   machine-readable manifest and instructions.
+6. Produces an outer release receipt including the final ZIP hash, bounded
+   size and the precise selftest claim, and uploads the evidence and ZIP to
+   the GitHub Actions run only if earlier steps succeed.
+
+The manifest intentionally does not call a compiled binary gameplay-ready,
+fully playtested, accessible or polished. A passing scripted solver smoke
+proves only that this executable can execute its own legal puzzle solution
+path on its host OS. Later human playtest and UI validation remain distinct.
+
+Operator command for a local native host release:
+
+    python -m skeleton.ai.webcrawler.dragon_native_release \
+      --out /tmp/dragon-native-release
+
+The new GitHub Actions workflow dragon-native-release.yml runs independent
+native executable build/check/artifact jobs on Ubuntu 24.04, Windows 2025
+and macOS 15. It can produce real Windows .exe, Linux and macOS native
+binaries in a downloadable ZIP once CI passes. Source generation does not
+pretend those binaries already exist and a queued workflow is not a pass.
