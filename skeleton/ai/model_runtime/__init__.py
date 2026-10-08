@@ -153,6 +153,10 @@ _LAZY_EXPORTS = {
     "serialize_causal_training_batch": ".text_pipeline",
     "serialize_model_input_batch": ".text_pipeline",
     "normalize_text": ".text_normalization",
+    "RuntimePromotionError": ".training_admission",
+    "AdmissionLedger": ".training_admission",
+    "admit_candidate_model": ".training_admission",
+    "execute_rollback": ".training_admission",
 }
 
 
@@ -169,6 +173,10 @@ def __dir__():
     return sorted(set(globals()) | set(__all__))
 
 __all__ = [
+    "RuntimePromotionError",
+    "AdmissionLedger",
+    "admit_candidate_model",
+    "execute_rollback",
     "CausalTrainingBatch",
     "CorpusTrainingReceipt",
     "DecadeCorpusBucket",
