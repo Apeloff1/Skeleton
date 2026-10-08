@@ -101,7 +101,7 @@ class CapacityLedger:
             raise TypeError("Reservation required")
         with self._lock:
             current = self._active.get(lease.request_id)
-            if current != lease:
+            if current is not lease:
                 return False
             del self._active[lease.request_id]
             return True
@@ -111,7 +111,7 @@ class CapacityLedger:
             return False
         with self._lock:
             self._reap(self._now())
-            return self._active.get(lease.request_id) == lease
+            return self._active.get(lease.request_id) is lease
 
     def snapshot(self) -> tuple[int, int]:
         with self._lock:
