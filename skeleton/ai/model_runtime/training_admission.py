@@ -113,13 +113,13 @@ def admit_candidate_model(runtime:NativeLLMRuntime,candidate:CandidateWeights,pr
     return runtime,admission,RollbackProof(admission.digest,checkpoint["digest"],prior,"native-runtime-restore",True,False)
 
 def execute_rollback(runtime,admission,rollback,checkpoint,*,verifier_id=None):
+    if not isinstance(runtime,NativeLLMRuntime) or not isinstance(admission,RuntimeAdmission) or not isinstance(rollback,RollbackProof): raise RuntimePromotionError("typed runtime and rollback receipts required")
     body=validate_checkpoint(checkpoint)
     if checkpoint.get("digest")!=admission.checkpoint_digest or checkpoint.get("digest")!=rollback.checkpoint_digest: raise RuntimePromotionError("rollback checkpoint identity mismatch")
     if body["model_digest"]!=admission.prior_model_digest: raise RuntimePromotionError("rollback checkpoint model mismatch")
     verifier_id=verifier_id or rollback.verifier_id
     require_id(verifier_id,"rollback_verifier")
     if verifier_id==admission.admission_authority: raise RuntimePromotionError("rollback verifier must differ from admission authority")
-    if not isinstance(runtime,NativeLLMRuntime) or not isinstance(admission,RuntimeAdmission) or not isinstance(rollback,RollbackProof): raise RuntimePromotionError("typed runtime and rollback receipts required")
     if rollback.executed: raise RuntimePromotionError("rollback receipt already executed")
     if runtime.model_digest!=admission.admitted_model_digest or runtime._current_model_digest()!=admission.admitted_model_digest: raise RuntimePromotionError("runtime no longer matches admitted model")
     if rollback.admission_digest!=admission.digest or rollback.checkpoint_digest!=admission.checkpoint_digest or not rollback.verified: raise RuntimePromotionError("rollback authority mismatch")
