@@ -174,6 +174,14 @@ class DurableConversationCoordinator:
             except KeyError as exc:
                 raise RuntimeContractError("session not bound to durable storage") from exc
 
+    def checkpoint_and_detach(self, session_id: str) -> PersistenceBinding:
+        """Atomically checkpoint a live session before removing its binding."""
+        with self._lock, self.service._lock:
+            saved = self.save(session_id)
+            self.service.delete(session_id)
+            del self._bindings[session_id]
+            return saved
+
     def bound_ids(self) -> tuple[str, ...]:
         with self._lock:
             return tuple(sorted(self._bindings))
