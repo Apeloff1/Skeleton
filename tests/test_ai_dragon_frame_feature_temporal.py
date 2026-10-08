@@ -10,8 +10,8 @@ from skeleton.ai.webcrawler.dragon_chunked_temporal import segment_with_consent_
 def setup():
  db=sqlite3.connect(":memory:");q=DragonAnalysisQueue(db);l=DragonConsentLedger(db)
  c=l.issue("u",capture=True,analysis=True,issued_at=1,expires_at=100,policy_version="v1",scope_digest="a"*64,authorized=True)
- cq=ConsentBoundAnalysisQueue(q,l,db);j=cq.submit("u","b"*64,"g",consent_id=c.consent_id,scope_digest="a"*64,now=2,authorized=True)
- b=bind_extracted_frames(cq,"u",j.job_id,tuple((i*16,("%064x"%(i+1))[-64:],f"frame://{i}") for i in range(8)),retention_until=90,authorized=True)
+ cq=ConsentBoundAnalysisQueue(q,l);j=cq.submit("u",recording_digest="b"*64,game_label="g",consent_id=c.consent_id,scope_digest="a"*64,now=2,authorized=True)
+ b=bind_extracted_frames(cq,"u",j.job_id,tuple((i*16,("%064x"%(i+1))[-64:],f"frame://{i}") for i in range(8)),now=3,retention_until=90,authorized=True)
  return l,cq,c,j,b
 
 def test_features_preserve_source_frame_identity():
@@ -31,6 +31,6 @@ def test_chunked_temporal_checks_consent_multiple_times():
 
 def test_revocation_blocks_chunked_temporal():
  l,cq,c,j,b=setup(); f=extract_custodied_features(cq,"u",j.job_id,b,now=3,authorized=True)
- l.revoke("u",c.consent_id,revoked_at=4,authorized=True)
+ l.revoke("u",c.consent_id,now=4,authorized=True)
  with pytest.raises(PermissionError):
   segment_with_consent_checkpoints(cq,"u",j.job_id,f.frames,now=5,authorized=True,chunk_size=2)
