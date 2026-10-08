@@ -174,7 +174,7 @@ def test_duplicate_lens_and_empty_quote_rejected():
     with pytest.raises(ValueError, match="anchored excerpt"):
         bind(
             (captured("alpha", body="  letters " * 20), sources[1]),
-            (reading("alpha", 1, start=0, end=2),),
+            (reading("alpha", 1, start=7, end=8),),
         )
 
 
