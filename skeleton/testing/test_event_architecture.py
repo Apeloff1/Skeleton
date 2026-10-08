@@ -174,3 +174,84 @@ def test_sqlite_retention_compaction_requires_active_consumer_ack(
             event.sequence
             for event in store.replay(ReplayCursor(operation_id))
         ] == [1, 2, 3]
+
+# VOL-039: bounded event-schema inputs must never permit an infinite iterator
+# to block the canonical event compatibility construction gate.
+from itertools import count, repeat
+
+
+def test_vol039_infinite_schema_version_source_is_bounded() -> None:
+    with pytest.raises(EventCompatibilityError, match="version count limit"):
+        EventSchemaContract(
+            event_type="operation.progress",
+            current_version=1,
+            readable_versions=count(1),
+            writable_versions=(1,),
+        )
+
+
+def test_vol039_infinite_upgrade_edge_source_is_bounded() -> None:
+    with pytest.raises(EventCompatibilityError, match="bounded edge limit"):
+        EventSchemaContract(
+            event_type="operation.progress",
+            current_version=2,
+            readable_versions=(1, 2),
+            writable_versions=(2,),
+            upgrade_edges=repeat((1, 2)),
+        )
+
+
+def test_vol039_infinite_registry_declaration_source_is_bounded() -> None:
+    entry = EventSchemaContract(
+        event_type="operation.progress", current_version=1,
+        readable_versions=(1,), writable_versions=(1,),
+    )
+    with pytest.raises(EventCompatibilityError, match="declaration budget"):
+        EventCompatibilityRegistry(repeat(entry))
+
+
+def test_vol039_invalid_event_type_bytes_and_surrogates_fail_closed() -> None:
+    for value in ("x\\x00y", "x\\x7fy", "a\\ud800", "", "a" * 129):
+        with pytest.raises(EventCompatibilityError):
+            EventSchemaContract(
+                event_type=value, current_version=1,
+                readable_versions=(1,), writable_versions=(1,),
+            )
+
+
+def test_vol039_version_bound_and_boolean_rejections() -> None:
+    for invalid in (True, 0, -1, 2**31, 1.2, "1"):
+        with pytest.raises(EventCompatibilityError):
+            EventSchemaContract(
+                event_type="operation.progress",
+                current_version=invalid,
+                readable_versions=(1,), writable_versions=(1,),
+            )
+
+
+def test_vol039_invalid_schema_iterables_fail_closed() -> None:
+    with pytest.raises(EventCompatibilityError, match="must be iterable"):
+        EventSchemaContract(
+            event_type="operation.progress", current_version=1,
+            readable_versions=None, writable_versions=(1,),
+        )
+    with pytest.raises(EventCompatibilityError, match="must be iterable"):
+        EventSchemaContract(
+            event_type="operation.progress", current_version=1,
+            readable_versions=(1,), writable_versions=(1,),
+            upgrade_edges=None,
+        )
+
+
+def test_vol039_exact_limit_admits_a_bounded_schema() -> None:
+    from skeleton.frontier.runtime.event_architecture import MAX_SCHEMA_VERSIONS
+    versions = tuple(range(1, MAX_SCHEMA_VERSIONS + 1))
+    edges = tuple((a, a + 1) for a in versions[:-1])
+    schema = EventSchemaContract(
+        event_type="operation.progress", current_version=MAX_SCHEMA_VERSIONS,
+        readable_versions=versions, writable_versions=(MAX_SCHEMA_VERSIONS,),
+        upgrade_edges=edges,
+    )
+    self_path = schema.upgrade_path(1)
+    assert len(self_path) == MAX_SCHEMA_VERSIONS
+    assert self_path[-1] == MAX_SCHEMA_VERSIONS
