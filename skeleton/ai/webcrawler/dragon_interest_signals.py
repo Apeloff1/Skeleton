@@ -103,7 +103,10 @@ def validate_signal(signal: InterestSignal, now: float, policy: SignalPolicy) ->
         raise ValueError("invalid tag count")
     if len(signal.source_id) > 128:
         raise ValueError("source id too long")
-    return tuple(sorted({normalize_tag(tag) for tag in signal.tags}))
+    try:
+        return tuple(sorted({normalize_tag(tag) for tag in signal.tags}))
+    except (TypeError, AttributeError) as exc:
+        raise ValueError("invalid signal tags") from exc
 
 
 def build_interest_profile(
@@ -144,7 +147,7 @@ def build_interest_profile(
             deduplicated[signal.signal_id] = (signal, tags)
 
     aggregates: dict[str, list[float]] = {}
-    for signal, tags in deduplicated.values():
+    for signal, tags in sorted(deduplicated.values(), key=lambda entry: entry[0].signal_id):
         age_days = max(0.0, now - signal.observed_at) / 86400
         decay = exp(-0.6931471805599453 * age_days / policy.half_life_days)
         contribution = _WEIGHTS[signal.kind] * signal.strength * decay
