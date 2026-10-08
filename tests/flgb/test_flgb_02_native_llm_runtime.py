@@ -626,5 +626,24 @@ class TestNativeLLMRuntime(unittest.TestCase):
             list(stream)
 
 
+    def test_stream_context_manager_supports_early_cancellation(self):
+        runtime = self.runtime()
+        with runtime.stream("hello world", GenerationConfig(max_new_tokens=3)) as stream:
+            self.assertEqual(next(stream).kind, "admitted")
+            self.assertEqual(next(stream).kind, "prompt")
+            self.assertEqual(next(stream).kind, "token")
+        self.assertIsNone(stream.result)
+
+    def test_completed_stream_retains_result_after_close(self):
+        runtime = self.runtime()
+        stream = runtime.stream("hello", GenerationConfig(max_new_tokens=1))
+        events = list(stream)
+        self.assertEqual(events[-1].kind, "completed")
+        self.assertIsNotNone(stream.result)
+        result = stream.result
+        stream.close()
+        self.assertIs(stream.result, result)
+
+
 if __name__ == "__main__":
     unittest.main()
