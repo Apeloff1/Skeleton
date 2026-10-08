@@ -174,9 +174,10 @@ def _carve_race(board: list[list[str]], rng: PRNG, difficulty: int) -> None:
         board[1][x] = board[H - 2][x] = "."
 
 def _decorate(board: list[list[str]], rng: PRNG, *, mode: str, stage_num: int,
-              start: tuple[int, int], goal: tuple[int, int]) -> tuple[int, int]:
+              start: tuple[int, int], goal: tuple[int, int],
+              difficulty:int=4) -> tuple[int, int]:
     pickup_target = 5 + stage_num * 2
-    enemy_target = 2 + stage_num
+    enemy_target = 2 + stage_num + max(0,difficulty-4)//2
     # Only decorate positions reachable from the spawn. A connected exit is
     # insufficient if the game spawns objectives in inaccessible side pockets.
     reachable = {start}
@@ -213,13 +214,15 @@ def _decorate(board: list[list[str]], rng: PRNG, *, mode: str, stage_num: int,
     return picks, enemies
 
 def design_campaign(*, style: str, seed: int, stages: int = 4,
-                    palette: str = "vga_dusk") -> Campaign:
+                    palette: str = "vga_dusk",difficulty:int=4) -> Campaign:
     if style not in GENRES:
         raise ValueError("genre currently has no independently implemented gameplay mode")
     if palette not in PALETTES:
         raise ValueError("unsupported original palette")
     if isinstance(stages, bool) or not isinstance(stages, int) or not 1 <= stages <= MAX_STAGE:
         raise ValueError("campaign stage budget must be 1..8")
+    if isinstance(difficulty,bool) or not isinstance(difficulty,int) or not 1<=difficulty<=10:
+        raise ValueError("native game difficulty must be 1..10")
     rng = PRNG(seed)
     mode = GENRES[style]
     out: list[Stage] = []
@@ -255,7 +258,7 @@ def design_campaign(*, style: str, seed: int, stages: int = 4,
             for y in range(min(sy, gy), max(sy, gy) + 1):
                 board[y][gx] = "."
         pickups, enemies = _decorate(board, rng, mode=mode, stage_num=n,
-                                    start=start, goal=goal)
+                                    start=start, goal=goal,difficulty=difficulty)
         from .dragon_campaign_quests import place_quests,quest_record
         quest=place_quests(board,rng=rng,chapter=n,mode=mode,start=start,goal=goal)
         enemies+=quest.guardians
@@ -264,7 +267,8 @@ def design_campaign(*, style: str, seed: int, stages: int = 4,
             raise RuntimeError("generator emitted invalid tiles")
         if not _reachable(board, start, goal):
             raise RuntimeError("generator could not prove spawn-to-goal path")
-        out.append(Stage(n, W, H, rows, start, goal, pickups, enemies, n + 1,
+        out.append(Stage(n, W, H, rows, start, goal, pickups, enemies,
+                         min(10,difficulty+n),
                          _ascii_hash(rows),quest_record(quest)))
     objectives = {
         "arena": ("Collect crystals", "Dodge patrolling enemies", "Reach the portal"),
@@ -282,7 +286,7 @@ def design_campaign(*, style: str, seed: int, stages: int = 4,
         "tactics": ("grid_movement", "cover", "enemy_patrol", "lifebar"),
         "racer": ("steering", "track", "checkpoint", "lifebar"),
     }
-    ident = sha256(json.dumps([style, seed, palette, [s.checksum for s in out]],
+    ident = sha256(json.dumps([style, seed, palette, difficulty, [s.checksum for s in out]],
                               sort_keys=True).encode()).hexdigest()
     return Campaign(ident, style, mode, seed, palette, tuple(out),
                     mechanics[mode], objectives[mode], True)

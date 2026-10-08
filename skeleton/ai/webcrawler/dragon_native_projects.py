@@ -560,13 +560,23 @@ def render_native_project(*,title:str,target_id:str,style:str,
         selection=choose_campaign(
             style=style,seed=seed,
             stages=design.stages if design is not None else 4,
-            palette=palette,budget=design.candidates if design is not None else 8)
+            palette=palette,budget=design.candidates if design is not None else 8,
+            difficulty=design.difficulty if design is not None else 4)
         campaign=selection.chosen
+        from .dragon_playtest_planner import plan_campaign,agent_report
+        abstract_plan=plan_campaign(campaign)
         if style in ("first_person_shooter","immersive_sim"):
             from .dragon_native_raycaster import render_raycaster
-            files=render_raycaster(campaign)
+            files=render_raycaster(
+                campaign,difficulty=design.difficulty if design is not None else 4,
+                theme=design.quest_theme if design is not None else "ancient_ruins")
         else:
-            files=render_sdl_campaign(campaign)
+            files=render_sdl_campaign(
+                campaign,hero=design.hero if design is not None else "hatchling",
+                theme=design.quest_theme if design is not None else "ancient_ruins",
+                difficulty=design.difficulty if design is not None else 4)
+        files["dragon-playtest-plan.json"]=json.dumps(
+            agent_report(abstract_plan),sort_keys=True,indent=2)+"\n"
         files["dragon-generator-evaluation.json"]=json.dumps(
             selection_report(selection),sort_keys=True,indent=2)+"\n"
         files["dragon-campaign.json"]=json.dumps(

@@ -157,7 +157,8 @@ def evaluate_campaign(campaign:Campaign)->CampaignAnalysis:
                             quality,round(diversity,5),reports,all_issues)
 
 def choose_campaign(*,style:str,seed:int,stages:int=4,
-                    palette:str="vga_dusk",budget:int=8)->SelectionEvidence:
+                    palette:str="vga_dusk",budget:int=8,
+                    difficulty:int=4)->SelectionEvidence:
     if isinstance(budget,bool) or not isinstance(budget,int) or not 1<=budget<=24:
         raise ValueError("native game candidate budget must be 1..24")
     if isinstance(seed,bool) or not isinstance(seed,int) or not 0<=seed<2**32:
@@ -168,7 +169,8 @@ def choose_campaign(*,style:str,seed:int,stages:int=4,
     for i in range(budget):
         current=(seed+i*0x9E3779B9)&0xffffffff
         candidate=design_campaign(style=style,seed=current,
-                                  stages=stages,palette=palette)
+                                  stages=stages,palette=palette,
+                                  difficulty=difficulty)
         metrics=evaluate_campaign(candidate)
         compared.append((candidate.id,metrics.static_quality,
                          ";".join(metrics.issues)))

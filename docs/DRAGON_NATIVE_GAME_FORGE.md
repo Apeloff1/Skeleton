@@ -445,3 +445,45 @@ cycle-accurate VRAM/OAM scans, or actual hardware certifications.
 
 Native compiler outputs, emulator replay, hardware profile instrumentation,
 visual gameplay quality and accessibility remain independent gates.
+
+
+## Sixth-generation AI game-building practice: explicit objective planning
+
+Source-only generation no longer stops at making a procedural dungeon.
+The planner now runs bounded state-space navigation over each original
+chapter. It tracks current position, whether a collectible key was picked
+up, whether a door was opened, and whether abstract boss obligations are
+satisfied. It emits a reproducible action sequence: step east/west/north/
+south, pick up a key, unlock a door, collect arena crystals, abstractly
+resolve a guardian encounter, and reach the portal.
+
+For score-attack arenas, the planner explicitly visits every collectible
+before the final exit. For adventure, dungeon and tactical games, it
+checks a dynamic key-door progression path rather than just treating all
+map cells as free space. Routes are threat-weighted to avoid close enemy
+cells when alternatives exist. Search is capped at 16,000 visited
+states per route and 4,000 actions per stage, and it fails on unsolved
+objectives rather than crediting false AI progress.
+
+Every generated desktop source archive includes dragon-playtest-plan.json
+with a chapter-by-chapter route and reproducible digest, including explicit
+disclaimers: boss victory is assumed in this abstract path planner; native
+controller movement, real physics, moving combat AI and actual player
+success are NOT verified by the plan. No game mastery XP is awarded.
+
+## Actual use of editable difficulty, hero and world theme
+
+The typed design file no longer records all customization as inert notes.
+
+- Difficulty 1..10 changes generated native enemy count and campaign
+  difficulty, plus native 2D and first-person enemy HP and movement speed.
+  It is included in the campaign identity and candidate search.
+- The native 2D renderer now draws six distinguishable original protagonist
+  silhouettes: hatchling, knight, explorer, pilot, astronaut and robot.
+  These are simple procedural pixel shapes, not completed character rigs.
+- All seven original world themes alter the native tile highlight palette
+  and 3D raycast wall colour from compile-time generated constants.
+
+The source remains bounded, reproducible and platform-specific. Runtime
+verification requires native compiler and player tests. Current source
+files are NOT an advanced AI game mastery certificate.

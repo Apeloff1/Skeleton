@@ -60,7 +60,9 @@ static void new_stage(int id){
    else if(t=='K')required_key=1;
    else if(t=='E'||t=='B'){
     for(int n=0;n<MAX_MOBS;n++)if(!mobs[n].active){
-     mobs[n]=(Mob){x+.5f,y+.5f,t=='B'?5+id:2,t=='B',1};
+     mobs[n]=(Mob){x+.5f,y+.5f,
+       t=='B'?5+id+DESIGN_DIFFICULTY/3:
+       1+(DESIGN_DIFFICULTY-1)/3,t=='B',1};
      if(t=='B')guardians++;
      tiles[y][x]='.';break;
     }
@@ -123,7 +125,7 @@ static void step(int ahead,int strafe,int turn,int shoot,int interact){
   Mob*m=&mobs[i];
   float vx=px-m->x,vy=py-m->y,dist=sqrtf(vx*vx+vy*vy);
   if(dist<7.f&&dist>.65f){
-   float speed=m->boss?.011f:.007f;
+   float speed=(m->boss?.009f:.006f)+DESIGN_DIFFICULTY*.0008f;
    float nx=m->x+vx/dist*speed,ny=m->y+vy/dist*speed;
    if(free_point(nx,m->y))m->x=nx;
    if(free_point(m->x,ny))m->y=ny;
@@ -160,7 +162,7 @@ static void render_view(void){
   int top=CLAMP((HEIGHT-tall)/2,0,HEIGHT);
   int bottom=CLAMP((HEIGHT+tall)/2,0,HEIGHT);
   int light=CLAMP((int)(130.f/(1.f+depth*.13f)),20,140);
-  int r=(at(mapx,mapy)=='D'?166:124)*light/110;
+  int r=(at(mapx,mapy)=='D'?166:THEME_ACCENT[0])*light/110;
   int g=(side?92:136)*light/110;
   int b=(side?112:169)*light/110;
   rect(c*2,top,2,bottom-top,r,g,b);
@@ -259,7 +261,15 @@ int main(int argc,char**argv){
  return 0;
 }
 '''
-def render_raycaster(campaign:Campaign)->dict[str,str]:
+def render_raycaster(campaign:Campaign,*,difficulty:int=4,
+                     theme:str="ancient_ruins")->dict[str,str]:
+    themes={"crystals":(110,221,200),"ancient_ruins":(124,140,96),
+            "forest":(81,157,92),"ice":(110,204,232),
+            "space":(125,110,220),"volcano":(229,93,65),
+            "clockwork":(211,162,92)}
+    if theme not in themes or isinstance(difficulty,bool) or not isinstance(
+        difficulty,int) or not 1<=difficulty<=10:
+        raise ValueError("invalid 3D game theme or difficulty")
     if campaign.mode!="dungeon" or not 1<=len(campaign.stages)<=8:
         raise ValueError("3D game requires bounded dungeon campaign")
     if any(len(s.terrain)!=H or any(len(row)!=W for row in s.terrain)
@@ -275,6 +285,9 @@ def render_raycaster(campaign:Campaign)->dict[str,str]:
       f"#define MAP_W {W}\n#define MAP_H {H}\n"
       f"#define STAGE_COUNT {len(campaign.stages)}\n"
       f"#define GAME_SEED {campaign.seed or 1}u\n"
+      f"#define DESIGN_DIFFICULTY {difficulty}\n"
+      "static const unsigned char THEME_ACCENT[3]={"+
+      ",".join(str(x) for x in themes[theme])+"};\n"
       "static const char campaign_stage[STAGE_COUNT][MAP_H][MAP_W+1]={\n"+
       ",\n".join(blocks)+"\n};\n#endif\n"
     )

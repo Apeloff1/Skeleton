@@ -118,7 +118,8 @@ static void begin_stage(int n){
       else if(t=='E'||t=='B'){
         for(int i=0;i<ENEMIES;i++)if(!game.enemies[i].alive){
           game.enemies[i]=(Enemy){x*TILE+4.f,y*TILE+4.f,0,0,
-            1,(t=='B'?4+n:1),(t=='B'?3:i%3),rnd(100)};
+            1,(t=='B'?4+n+DESIGN_DIFFICULTY/3:
+               1+(DESIGN_DIFFICULTY-1)/4),(t=='B'?3:i%3),rnd(100)};
           if(t=='B')game.guardians++;
           game.tiles[y][x]='.';break;
         }
@@ -181,7 +182,7 @@ static void enemies_update(void){
   for(int i=0;i<ENEMIES;i++){
     Enemy*e=&game.enemies[i];if(!e->alive)continue;
     e->phase++;
-    float speed=.4f+game.stage*.09f;
+    float speed=.24f+game.stage*.09f+DESIGN_DIFFICULTY*.035f;
     float dx=game.x-e->x,dy=game.y-e->y;
     float vx=e->mode==0?((e->phase/80)&1?-speed:speed):
                          (fabsf(dx)<145?(dx>0?speed:-speed):0);
@@ -307,7 +308,7 @@ static void draw_tile(int x,int y,char t){
   int px=x*TILE,py=y*TILE;
   if(t=='#'||t=='='){
     rect(px,py,24,24,PALETTE[1][0],PALETTE[1][1],PALETTE[1][2]);
-    rect(px+2,py+2,20,3,PALETTE[2][0],PALETTE[2][1],PALETTE[2][2]);
+    rect(px+2,py+2,20,3,THEME_ACCENT[0],THEME_ACCENT[1],THEME_ACCENT[2]);
   }else if(t=='^'){
     rect(px+2,py+10,20,12,185,57,87);
     for(int n=0;n<3;n++)rect(px+4+n*7,py+4,3,7,235,96,103);
@@ -386,6 +387,23 @@ static void render(void){
     if(game.frame%130>5)rect(game.x+15,game.y+8,2,3,244,244,228);
     rect(game.x+4,game.y+19,4,3+walk,PALETTE[2][0],PALETTE[2][1],PALETTE[2][2]);
     rect(game.x+12,game.y+19,4,3+!walk,PALETTE[2][0],PALETTE[2][1],PALETTE[2][2]);
+    /* Genuine original hero silhouettes selected by the signed JSON spec. */
+    if(HERO_STYLE==1){ /* knight: helmet and sword */
+      rect(game.x+6,game.y,12,4,193,202,218);
+      rect(game.x+19,game.y+6,3,14,228,228,235);
+    }else if(HERO_STYLE==2){ /* explorer: wide hat and backpack */
+      rect(game.x+2,game.y,18,3,183,125,67);
+      rect(game.x,game.y+7,5,12,128,94,64);
+    }else if(HERO_STYLE==3){ /* pilot: aerodynamic wings */
+      rect(game.x-4,game.y+9,9,4,82,178,228);
+      rect(game.x+17,game.y+9,9,4,82,178,228);
+    }else if(HERO_STYLE==4){ /* astronaut: helmet visor */
+      rect(game.x+5,game.y,15,12,222,230,244);
+      rect(game.x+8,game.y+2,9,7,54,142,204);
+    }else if(HERO_STYLE==5){ /* robot: square sensor, antenna */
+      rect(game.x+6,game.y-2,12,10,145,176,191);
+      rect(game.x+11,game.y-5,3,5,213,124,236);
+    }
   }
   SDL_RenderSetViewport(renderer,NULL);
   rect(0,0,SCREEN_W,HUD,17,27,42);
@@ -592,7 +610,19 @@ int main(int argc,char**argv){
 }
 '''
 
-def render_sdl_campaign(campaign: Campaign) -> dict[str,str]:
+def render_sdl_campaign(campaign: Campaign,*,hero:str="hatchling",
+                        theme:str="ancient_ruins",difficulty:int=4)->dict[str,str]:
+    hero_ids={"hatchling":0,"knight":1,"explorer":2,
+              "pilot":3,"astronaut":4,"robot":5}
+    theme_colors={"crystals":(110,221,200),"ancient_ruins":(171,140,96),
+                  "forest":(110,203,133),"ice":(127,208,241),
+                  "space":(147,126,229),"volcano":(241,126,76),
+                  "clockwork":(224,184,101)}
+    if hero not in hero_ids or theme not in theme_colors or (
+        isinstance(difficulty,bool) or not isinstance(difficulty,int)
+        or not 1<=difficulty<=10
+    ):
+        raise ValueError("unrecognized native hero/theme/difficulty")
     if campaign.mode not in MODE_IDS or not 1 <= len(campaign.stages) <= 8:
         raise ValueError("invalid native campaign")
     if campaign.palette not in PALETTES:
@@ -611,6 +641,10 @@ def render_sdl_campaign(campaign: Campaign) -> dict[str,str]:
         f"#define STAGE_COUNT {len(campaign.stages)}\n"
         f"#define GAME_SEED {campaign.seed or 0x9E3779B9}u\n"
         f"#define GAME_MODE {MODE_IDS[campaign.mode]}\n"
+        f"#define HERO_STYLE {hero_ids[hero]}\n"
+        f"#define DESIGN_DIFFICULTY {difficulty}\n"
+        "static const unsigned char THEME_ACCENT[3]={"+
+        ",".join(str(n) for n in theme_colors[theme])+"};\n"
         f"#define CAMPAIGN_SIGNATURE 0x{campaign.id[:8]}u\n"
         "static const unsigned char PALETTE[4][3]={\n"+palette+"\n};\n"
         "static const char campaign_stage[STAGE_COUNT][MAP_H][MAP_W+1]={\n"
