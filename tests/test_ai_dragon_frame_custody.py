@@ -40,3 +40,23 @@ def test_frame_identity_is_deterministic():
     a=bind_extracted_frames(cq,"u",j.job_id,rows,now=3,retention_until=90,authorized=True)
     b=bind_extracted_frames(cq,"u",j.job_id,rows,now=3,retention_until=90,authorized=True)
     assert a.batch_fingerprint==b.batch_fingerprint
+
+
+def test_retention_cannot_outlive_authorizing_consent():
+    _,cq,_,j=setup()
+    with pytest.raises(PermissionError,match="exceeds consent lifetime"):
+        bind_extracted_frames(cq,"u",j.job_id,((0,"c"*64,"frame://0"),),
+          now=3,retention_until=101,authorized=True)
+
+def test_retention_must_be_future_relative_to_binding_time():
+    _,cq,_,j=setup()
+    with pytest.raises(ValueError,match="retention deadline"):
+        bind_extracted_frames(cq,"u",j.job_id,((0,"c"*64,"frame://0"),),
+          now=3,retention_until=3,authorized=True)
+
+def test_retention_policy_changes_batch_fingerprint():
+    _,cq,_,j=setup(); rows=((0,"c"*64,"frame://0"),)
+    a=bind_extracted_frames(cq,"u",j.job_id,rows,now=3,retention_until=90,authorized=True)
+    b=bind_extracted_frames(cq,"u",j.job_id,rows,now=3,retention_until=80,authorized=True)
+    assert a.frames[0].frame_id==b.frames[0].frame_id
+    assert a.batch_fingerprint!=b.batch_fingerprint
