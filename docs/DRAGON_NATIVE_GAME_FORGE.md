@@ -763,3 +763,29 @@ native executable build/check/artifact jobs on Ubuntu 24.04, Windows 2025
 and macOS 15. It can produce real Windows .exe, Linux and macOS native
 binaries in a downloadable ZIP once CI passes. Source generation does not
 pretend those binaries already exist and a queued workflow is not a pass.
+
+
+## Honest hardware/style capability matrix and advanced curriculum
+
+The old practice matrix mistakenly returned the complete 47-platform
+catalog size even for a genre having zero native source implementers. It
+now counts only targets whose native source emitter and specific genre are
+explicitly supported. Each matrix entry contains source-supported IDs,
+source-supported count, total catalog count and the explicit statement
+that these are source capabilities rather than successfully compiled ROMs.
+Unsupported genres have zero, not a falsely claimed 47 platforms.
+
+The authenticated native targets discovery API exposes this exact matrix
+as supported_matrix, alongside per-target supported_styles, so clients
+can filter unsupported hardware/genre combinations before requesting
+a practice source project. No platform or release binary is certified
+by counting a catalog entry.
+
+Dragon's consent-scoped native acquisition curriculum also includes
+new hardware exercise milestones for the Nintendo 64 libdragon analogue
+controller, Nintendo DS ARM9 bitmap/touch input, PSP PSPSDK analogue
+handheld input and the standalone C99 puzzle engine. These are unlocked
+only after the required source-bound structural native ROM evidence, rather
+than by repeatedly generating arbitrary source ZIPs or claiming mastery XP.
+Human gameplay, emulator proof and toolchain certification remain
+independent capabilities not inferred from structural build receipts.

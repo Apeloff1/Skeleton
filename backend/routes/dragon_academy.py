@@ -29,7 +29,7 @@ from skeleton.ai.webcrawler.dragon_build_evidence import DragonBuildEvidence
 from skeleton.ai.webcrawler.dragon_native_curriculum import (
     DragonNativeCurriculum,curriculum_report,
 )
-from skeleton.ai.webcrawler.dragon_native_targets import target_catalog, STYLES
+from skeleton.ai.webcrawler.dragon_native_targets import target_catalog, practice_matrix, STYLES
 
 router = APIRouter(prefix="/api/dragon-academy", tags=["Dragon Academy"])
 
@@ -126,7 +126,8 @@ def crawler_feed(
 @router.get("/native/targets")
 def native_targets(owner: str = Depends(_principal)) -> dict:
     # Catalog metadata does not imply working native compilation.
-    return {"ok":True,"targets":target_catalog(),"styles":STYLES}
+    return {"ok":True,"targets":target_catalog(),"styles":STYLES,
+            "supported_matrix":practice_matrix()}
 
 def _build_signing_key() -> bytes:
     value=os.environ.get("SKL_DRAGON_BUILD_SIGNING_KEY_HEX","")

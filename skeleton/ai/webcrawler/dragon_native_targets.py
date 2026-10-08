@@ -170,7 +170,19 @@ def demand_target(target_id: str) -> ConsoleTarget:
     return CATALOG[target_id]
 
 def practice_matrix() -> tuple[dict, ...]:
-    """Expose style diversity without pretending every combination is implemented."""
-    return tuple({"style":style,"supported_hardware_count":len(TARGETS),
-                  "native_emitters":("game_boy","dos_vga","pc_linux","pc_windows","pc_macos","steam_deck"),
-                  "remaining_adapter_work":True} for style in STYLES)
+    """Truthful per-style SDK source coverage; never count catalog-only targets."""
+    rows=target_catalog()
+    matrix=[]
+    for style in STYLES:
+        available=tuple(r["id"] for r in rows if (
+            r["status"]=="native_source" and style in r["supported_styles"]
+        ))
+        matrix.append({
+            "style":style,
+            "supported_hardware_count":len(available),
+            "native_emitters":available,
+            "catalog_hardware_count":len(TARGETS),
+            "remaining_adapter_work":len(available)<len(TARGETS),
+            "coverage_claim":"source_supported_not_compiled",
+        })
+    return tuple(matrix)

@@ -24,6 +24,7 @@ on:
       - 'tests/test_ai_webcrawler_dragon_game_fitness.py'
       - 'tests/test_ai_webcrawler_dragon_native_3d_design.py'
       - 'tests/test_ai_webcrawler_dragon_native_3d_era.py'
+      - 'tests/test_ai_webcrawler_dragon_platform_matrix.py'
       - 'tests/test_ai_webcrawler_dragon_native_puzzle.py'
       - 'tests/test_ai_webcrawler_dragon_playtest_planner.py'
       - 'tests/test_ai_webcrawler_dragon_build_evidence.py'
@@ -86,6 +87,7 @@ jobs:
             tests/test_ai_webcrawler_dragon_native_cycles.py \
             tests/test_ai_webcrawler_dragon_native_3d_design.py \
             tests/test_ai_webcrawler_dragon_native_3d_era.py \
+            tests/test_ai_webcrawler_dragon_platform_matrix.py \
             tests/test_ai_webcrawler_dragon_native_puzzle.py \
             tests/test_ai_webcrawler_dragon_native_rpg.py \
             tests/test_ai_webcrawler_dragon_native_rhythm.py \
