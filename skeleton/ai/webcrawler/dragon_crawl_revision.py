@@ -30,6 +30,7 @@ class ReadingDisposition(str, Enum):
     MISSING_SOURCE = "missing_source"
     ORIGIN_CHANGED = "origin_changed"
     LINEAGE_CHANGED = "lineage_changed"
+    DELIVERY_CHANGED = "delivery_changed"
     QUOTE_ABSENT = "quote_absent"
     QUOTE_AMBIGUOUS = "quote_ambiguous"
     REASSESS_REVISED_DOCUMENT = "reassess_revised_document"
@@ -46,6 +47,7 @@ class SourceRevisionDelta:
     content_changed: bool
     origin_changed: bool
     lineage_changed: bool
+    delivery_changed: bool
 
 
 @dataclass(frozen=True)
@@ -142,22 +144,26 @@ def compare_crawl_revisions(
         changed_text = bool(prior and current and previous_digest != current_digest)
         changed_origin = bool(prior and current and previous_origin != current_origin)
         changed_lineage = (
-            (prior.parent_source_ids, prior.lineage_tokens) !=
-            (current.parent_source_ids, current.lineage_tokens)
+            (sorted(prior.parent_source_ids), sorted(prior.lineage_tokens)) !=
+            (sorted(current.parent_source_ids), sorted(current.lineage_tokens))
             if prior and current else False
         )
+        changed_delivery = bool(prior and current and (
+            prior.document.fetched_url != current.document.fetched_url
+            or prior.document.content_type != current.document.content_type
+        ))
         if prior is None:
             category = SourceChange.NEW
         elif current is None:
             category = SourceChange.MISSING
-        elif changed_text or changed_origin or changed_lineage:
+        elif changed_text or changed_origin or changed_lineage or changed_delivery:
             category = SourceChange.CHANGED
         else:
             category = SourceChange.UNCHANGED
         delta = SourceRevisionDelta(
             source_id, category, previous_digest, current_digest,
             previous_origin, current_origin,
-            changed_text, changed_origin, changed_lineage,
+            changed_text, changed_origin, changed_lineage, changed_delivery,
         )
         changes.append(delta)
         status[source_id] = delta
@@ -177,6 +183,9 @@ def compare_crawl_revisions(
             count, candidate = 0, None
         elif delta.lineage_changed:
             disposition = ReadingDisposition.LINEAGE_CHANGED
+            count, candidate = 0, None
+        elif delta.delivery_changed:
+            disposition = ReadingDisposition.DELIVERY_CHANGED
             count, candidate = 0, None
         elif delta.change is SourceChange.UNCHANGED:
             disposition = ReadingDisposition.REUSABLE
@@ -209,7 +218,7 @@ def compare_crawl_revisions(
         "sources": [
             (x.source_id, x.change.value, x.previous_digest, x.current_digest,
              x.previous_origin, x.current_origin, x.content_changed,
-             x.origin_changed, x.lineage_changed) for x in changes
+             x.origin_changed, x.lineage_changed, x.delivery_changed) for x in changes
         ],
         "readings": [
             (x.source_id, x.pass_id, x.source_revision, x.original_span,
