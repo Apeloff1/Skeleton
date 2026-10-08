@@ -487,3 +487,46 @@ The typed design file no longer records all customization as inert notes.
 The source remains bounded, reproducible and platform-specific. Runtime
 verification requires native compiler and player tests. Current source
 files are NOT an advanced AI game mastery certificate.
+
+
+## Seventh-generation cryptographic native build evidence custody
+
+A source file, a source code ZIP and a structurally accepted compiled ROM
+are three separate states. The new DragonBuildEvidence ledger exists
+beside the owner-scoped native practice lab, sharing its authoritative
+SQLite database and canonical lesson-to-attempt source digest.
+
+It requires an isolated trusted compiler worker, not a browser request.
+The operator provides a 256-bit+ private signing key in worker memory.
+When that worker submits *actual native binary bytes*, the ledger checks:
+
+1. The owner-scoped attempt exists and its stored source files still match
+   the immutable source fingerprint.
+2. The binary is bounded and its platform/compiled format is recognized
+   (currently GB, GBC and NES).
+3. The cartridge header/size/checksum is structurally consistent, and the
+   compiler identity matches its declared native target.
+4. A new receipt is content-addressed by the binary SHA256 and source digest,
+   signed with HMAC-SHA256, linked to the previous digest, indexed in a
+   per-owner append-only chain and committed transactionally.
+5. Reimporting identical binary bytes for the same attempt returns the
+   earlier receipt without duplicating claimed progress.
+
+The verifier recomputes the chain and HMAC when reading; tampered receipts
+fail closed. Signature rotation and direct database manipulation by an
+operator need separate key lifecycle controls. The current evidence
+claim is ONLY that *ROM bytes and header are structurally checked by the
+configured trusted worker*, not that the source compiled on an actual
+vendor SDK, an emulator has executed it, hardware passed certification,
+or a player accepted the game.
+
+The product route GET /api/dragon-academy/native/evidence requires an
+authenticated owner and the operator's
+SKL_DRAGON_BUILD_SIGNING_KEY_HEX (minimum 64 hex digits).
+It only reads up to the latest 50 verified receipts, after validating the
+full owner chain. There is NO public build-signing POST endpoint, NO
+untrusted direct ROM upload to the signer, and NO automatic gameplay XP.
+
+Future dedicated workers must link exact-head GitHub CI build jobs,
+toolchain digests and independent emulated input/video/audio traces before
+claims can advance beyond structural binary validity.

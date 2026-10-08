@@ -25,6 +25,7 @@ from skeleton.ai.webcrawler.dragon_practice_lab import DragonPracticeLab
 from skeleton.ai.webcrawler.dragon_practice_cycles import DragonPracticeCycles
 from skeleton.ai.webcrawler.dragon_session_projection import DragonSessionProjection
 from skeleton.ai.webcrawler.dragon_native_practice import DragonNativePracticeLab
+from skeleton.ai.webcrawler.dragon_build_evidence import DragonBuildEvidence
 from skeleton.ai.webcrawler.dragon_native_targets import target_catalog, STYLES
 
 router = APIRouter(prefix="/api/dragon-academy", tags=["Dragon Academy"])
@@ -119,6 +120,29 @@ def crawler_feed(
 def native_targets(owner: str = Depends(_principal)) -> dict:
     # Catalog metadata does not imply working native compilation.
     return {"ok":True,"targets":target_catalog(),"styles":STYLES}
+
+def _build_signing_key() -> bytes:
+    value=os.environ.get("SKL_DRAGON_BUILD_SIGNING_KEY_HEX","")
+    try:
+        key=bytes.fromhex(value)
+    except ValueError:
+        key=b""
+    if len(key)<32:
+        raise HTTPException(status_code=503,
+             detail="Dragon native build evidence signer unavailable")
+    return key
+
+@router.get("/native/evidence")
+def native_build_evidence(owner: str = Depends(_principal)) -> dict:
+    # Read-only product endpoint. A browser cannot mint compiler evidence,
+    # submit invented ROM bytes, approve its own game or award progression XP.
+    key=_build_signing_key()
+    with _lab() as (lab,_):
+        native=DragonNativePracticeLab(lab.db,lab)
+        receipts=DragonBuildEvidence(lab.db,native,
+                     private_signing_key=key).history(owner,authorized=True)
+        return {"ok":True,"receipts":[asdict(r) for r in receipts[-50:]],
+                "claim_boundary":"ROM structural proof, not executed gameplay"}
 
 @router.post("/native/generate")
 def generate_native(body: NativeGenerateRequest,

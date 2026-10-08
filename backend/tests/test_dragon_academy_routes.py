@@ -181,3 +181,39 @@ def test_new_subscriptions_produce_native_projects_not_html(
     snapshot=route.academy_status(owner=owner)
     assert snapshot["native_attempts"] and snapshot["attempts"]==[]
     assert snapshot["progress"]["xp"]==30
+
+
+def test_native_build_evidence_route_never_allows_browser_to_mint_builds(
+    tmp_path,monkeypatch,
+):
+    from skeleton.ai.webcrawler.dragon_native_practice import DragonNativePracticeLab
+    from skeleton.ai.webcrawler.dragon_build_evidence import DragonBuildEvidence
+    path=tmp_path/"builds.sqlite"
+    monkeypatch.setenv("SKL_DRAGON_PRACTICE_DB_PATH",str(path))
+    monkeypatch.delenv("SKL_DRAGON_BUILD_SIGNING_KEY_HEX",raising=False)
+    owner=identity()
+    with sqlite3.connect(path) as db:
+        parent=DragonPracticeLab(db)
+        parent.offer(approved(owner),authorized=True,now=1)
+        native=DragonNativePracticeLab(db,parent)
+        attempt=native.generate(owner,target_id="nes",style="arcade_score_attack",
+                                authorized=True,consent=True,now=2)
+        key=bytes.fromhex("ab"*32)
+        signer=DragonBuildEvidence(db,native,private_signing_key=key)
+        fixture=bytearray(16+32768+8192)
+        fixture[:6]=b"NES\x1a\x02\x01"
+        signer.attest_rom(owner,attempt.attempt_id,bytes(fixture),
+                          toolchain="cc65",trusted_worker=True,
+                          authorized=True,now=3)
+    with pytest.raises(HTTPException) as not_ready:
+        route.native_build_evidence(owner=owner)
+    assert not_ready.value.status_code==503
+    monkeypatch.setenv("SKL_DRAGON_BUILD_SIGNING_KEY_HEX","ab"*32)
+    result=route.native_build_evidence(owner=owner)
+    assert result["ok"] and len(result["receipts"])==1
+    assert result["receipts"][0]["source_digest"]==attempt.source_digest
+    assert "not executed gameplay" in result["claim_boundary"]
+    assert route.native_build_evidence(owner=identity("other@example.test"))["receipts"]==[]
+    paths={r.path for r in route.router.routes}
+    assert "/api/dragon-academy/native/evidence" in paths
+    assert not any("attest" in x or "mint-build" in x for x in paths)

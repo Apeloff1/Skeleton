@@ -7,6 +7,7 @@ on:
       - 'skeleton/ai/webcrawler/dragon_game_blueprints.py'
       - 'skeleton/ai/webcrawler/dragon_game_design.py'
       - 'skeleton/ai/webcrawler/dragon_playtest_planner.py'
+      - 'skeleton/ai/webcrawler/dragon_build_evidence.py'
       - 'skeleton/ai/webcrawler/dragon_native_raycaster.py'
       - 'skeleton/ai/webcrawler/dragon_hw_graphics.py'
       - 'skeleton/ai/webcrawler/dragon_hardware_budget.py'
@@ -21,6 +22,7 @@ on:
       - 'tests/test_ai_webcrawler_dragon_game_fitness.py'
       - 'tests/test_ai_webcrawler_dragon_native_3d_design.py'
       - 'tests/test_ai_webcrawler_dragon_playtest_planner.py'
+      - 'tests/test_ai_webcrawler_dragon_build_evidence.py'
       - 'tests/test_ai_webcrawler_dragon_game_design_effects.py'
       - 'tests/test_ai_webcrawler_dragon_hw_graphics.py'
       - 'tests/test_ai_webcrawler_dragon_native_gbc.py'
@@ -77,6 +79,7 @@ jobs:
             tests/test_ai_webcrawler_dragon_native_cycles.py \
             tests/test_ai_webcrawler_dragon_native_3d_design.py \
             tests/test_ai_webcrawler_dragon_playtest_planner.py \
+            tests/test_ai_webcrawler_dragon_build_evidence.py \
             tests/test_ai_webcrawler_dragon_game_design_effects.py \
             tests/test_ai_webcrawler_dragon_hw_graphics.py \
             tests/test_ai_webcrawler_dragon_native_variants.py \
