@@ -6,7 +6,7 @@ from skeleton.ai.webcrawler.dragon_consent_ledger import DragonConsentLedger
 from skeleton.ai.webcrawler.dragon_consent_bound_queue import ConsentBoundAnalysisQueue
 from skeleton.ai.webcrawler.dragon_frame_custody import CapturedFrame
 from skeleton.ai.webcrawler.dragon_visual_features import VisualObservation
-from skeleton.ai.webcrawler.dragon_browser_visual_import import BrowserVisualEnvelope,SCHEMA,canonical_browser_visual_fingerprint,accept_browser_visual
+from skeleton.ai.webcrawler.dragon_browser_visual_import import BrowserVisualEnvelope,SCHEMA,DECODER_VERSION,canonical_browser_visual_fingerprint,accept_browser_visual
 
 def setup():
  db=sqlite3.connect(":memory:");q=DragonAnalysisQueue(db);l=DragonConsentLedger(db)
@@ -14,7 +14,7 @@ def setup():
  cq=ConsentBoundAnalysisQueue(q,l);j=cq.submit("u",recording_digest="b"*64,game_label="g",consent_id=c.consent_id,scope_digest="a"*64,now=2,authorized=True)
  f=CapturedFrame("c"*64,"ignored","ignored","ignored","ignored","ignored",0,"d"*64,90,"local-frame://0")
  o=VisualObservation("c"*64,"d"*64,.2,.3,.4,.1)
- e=BrowserVisualEnvelope(SCHEMA,"u",j.job_id,"b"*64,c.consent_id,"a"*64,90,(f,),(o,),"")
+ e=BrowserVisualEnvelope(SCHEMA,"u",j.job_id,"b"*64,c.consent_id,"a"*64,DECODER_VERSION,90,(f,),(o,),"")
  return cq,j,replace(e,payload_fingerprint=canonical_browser_visual_fingerprint(e))
 
 def test_exact_envelope_imports_and_rebinds_server_custody():
@@ -91,3 +91,9 @@ def test_browser_frame_budget_is_enforced_before_analysis():
  cq,_,e=setup()
  with pytest.raises(ValueError,match="frame budget"):
   accept_browser_visual(cq,e,now=3,authorized=True,max_frames=0)
+
+
+def test_unknown_decoder_version_fails_before_analysis():
+ cq,_,e=setup();bad=replace(e,decoder_version="dragon.local-visual.rgb64x36.v999")
+ with pytest.raises(ValueError,match="decoder version"):
+  accept_browser_visual(cq,bad,now=3,authorized=True)
