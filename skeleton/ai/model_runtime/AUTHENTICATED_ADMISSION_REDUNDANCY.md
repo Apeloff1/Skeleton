@@ -107,3 +107,14 @@ Production readiness still requires two-node outage drills, fencing and
 consensus/lease integration, verified key rotation, independent commit
 witness durability, power-loss injection, alarms, metrics, and end-to-end
 rehydration/regeneration validation. No masterplan volume sign-off is implied.
+
+### Same-term predecessor-chain advancement
+
+To publish the next revision without changing the leadership term, create
+new member adapters with `expected_parent_digest` set to the previously
+majority-acknowledged checkpoint digest. During preflight, a signed record
+is accepted if its stored parent matches the requested parent **or** if the
+stored record itself is that exact predecessor. An unrelated same-term branch
+is refused. The caller must not guess the predecessor digest or derive it
+solely from an uncommitted single member; obtain it from the trusted
+independent commit witness.

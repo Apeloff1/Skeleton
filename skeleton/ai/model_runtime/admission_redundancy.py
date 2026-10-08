@@ -481,7 +481,12 @@ class AuthenticatedFileCheckpointReplica:
         if term < self.leader_term:
             raise ModelRuntimeError("authenticated checkpoint below trusted leadership term")
         if (self.expected_parent_digest is not None and
-                parent != self.expected_parent_digest):
+                parent != self.expected_parent_digest and
+                envelope["snapshot_digest"] != self.expected_parent_digest):
+            # During a new publication, the existing checkpoint is the
+            # *predecessor* of the candidate and naturally has a different
+            # parent. A same-term value is compatible only if it already
+            # belongs to this lineage OR is the exact expected predecessor.
             raise _AuthenticatedFork("authenticated checkpoint parent revision conflict")
         snapshot = envelope["snapshot"]
         if type(snapshot) is not dict:

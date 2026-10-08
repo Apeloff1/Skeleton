@@ -157,6 +157,21 @@ class TestAuthenticatedRedundantCheckpoints(unittest.TestCase):
         with self.assertRaisesRegex(ModelRuntimeError, "parent revision conflict"):
             self.publish(scheduler, stale_branch)
 
+    def test_same_term_checkpoint_chain_advances_across_two_publications(self):
+        scheduler = self.scheduler()
+        first = self.publish(scheduler)
+        scheduler.submit(BatchRequest("new", 1, 1), kv_bytes=10)
+        chained = self.slots(parent=first.digest)
+        second = self.publish(scheduler, chained)
+        self.assertGreater(second.sequence, first.sequence)
+        self.assertNotEqual(second.digest, first.digest)
+        self.assertEqual(
+            self.recover(chained, minimum_sequence=second.sequence).scheduler.snapshot(),
+            scheduler.snapshot(),
+        )
+        for location in self.locations:
+            self.assertEqual(json.loads(location.read_bytes())["parent_digest"], first.digest)
+
     def test_one_signed_wrong_parent_is_not_a_quorum_vote(self):
         scheduler = self.scheduler()
         self.publish(scheduler)
