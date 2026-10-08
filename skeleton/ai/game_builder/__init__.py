@@ -279,6 +279,13 @@ _KNOWLEDGE_EXPORTS = {
     "compile_original_game": ".playable_compiler",
     "compile_game_from_reviewed_research": ".playable_compiler",
     "export_compiled_project": ".playable_compiler",
+    "PlayabilityAnalysisError": ".playability_analysis",
+    "LevelExperience": ".playability_analysis",
+    "PlayabilityFinding": ".playability_analysis",
+    "PlayabilityReport": ".playability_analysis",
+    "CohortExperience": ".playability_analysis",
+    "analyze_replay": ".playability_analysis",
+    "aggregate_playability": ".playability_analysis",
 }
 
 
