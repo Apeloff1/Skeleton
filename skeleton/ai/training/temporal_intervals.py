@@ -6,15 +6,16 @@ from .temporal_signals import TemporalSignalError
 class YearInterval:
  start:int; end:int
  def __post_init__(self):
+  if any(isinstance(v,bool) or not isinstance(v,int) or not 1900<=v<=2200 for v in (self.start,self.end)): raise TemporalSignalError("invalid interval year")
   if self.start>self.end: raise TemporalSignalError("invalid interval")
  def relation(self,other):
   if self.end<other.start:return "before"
   if self.start>other.end:return "after"
   if self.start==other.start and self.end==other.end:return "equal"
-  if self.start<=other.start and self.end>=other.end:return "contains"
-  if other.start<=self.start and other.end>=self.end:return "during"
   if self.end==other.start:return "meets"
   if self.start==other.end:return "met-by"
+  if self.start<=other.start and self.end>=other.end:return "contains"
+  if other.start<=self.start and other.end>=self.end:return "during"
   return "overlaps"
  def intersection(self,other):
   a=max(self.start,other.start); b=min(self.end,other.end)
