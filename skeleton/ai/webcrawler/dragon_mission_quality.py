@@ -258,6 +258,7 @@ def exact_revision_groups(
 def near_duplicate_groups(
     docs: Iterable[CrawlDocument], *, threshold: float = .85,
     max_documents: int = 256, max_words: int = 8000,
+    max_pairs: int = 50000,
 ) -> tuple[DuplicateGroup, ...]:
     items = tuple(docs)
     if not isinstance(threshold,(int,float)) or isinstance(threshold,bool) or not isfinite(threshold) or not 0 < threshold <= 1:
@@ -266,6 +267,10 @@ def near_duplicate_groups(
         raise ValueError("near duplicate budget exceeded")
     if not 1 <= max_words <= 20000:
         raise ValueError("invalid token scan budget")
+    if not isinstance(max_pairs, int) or isinstance(max_pairs,bool) or not 1 <= max_pairs <= 1000000:
+        raise ValueError("invalid similarity pair budget")
+    if len(items)*(len(items)-1)//2 > max_pairs:
+        raise ValueError("near duplicate pair budget exceeded")
     sets = []
     for doc in items:
         if not isinstance(doc, CrawlDocument) or _digest(doc.text) != doc.content_hash:
@@ -307,9 +312,14 @@ def near_duplicate_groups(
 def measure_information_quality(
     text: str, *, min_words: int = 100,
     max_repetition: float = .65,
+    minimum_unique_ratio: float = .05,
 ) -> InformationQuality:
     _verify_text(text)
-    if not 1 <= min_words <= 100000 or not isinstance(max_repetition,(int,float)) or not isfinite(max_repetition) or not 0 <= max_repetition <= 1:
+    if not 1 <= min_words <= 100000 or any(
+        not isinstance(value,(int,float)) or isinstance(value,bool)
+        or not isfinite(value) or not 0 <= value <= 1
+        for value in (max_repetition, minimum_unique_ratio)
+    ):
         raise ValueError("invalid information-quality policy")
     words = _words(text)
     diverse = len(set(words))
@@ -318,7 +328,8 @@ def measure_information_quality(
     ratio = diverse/len(words) if words else 0.0
     return InformationQuality(len(words),diverse,round(ratio,6),
                               round(repeated,6),
-                              len(words)<min_words or repeated>max_repetition)
+                              len(words)<min_words or repeated>max_repetition
+                              or ratio<minimum_unique_ratio)
 
 
 # 09. Surface negation, hedging and refutation as review triggers, not verdicts.
@@ -347,6 +358,9 @@ def extract_citation_candidates(
     for match in _URL.finditer(text):
         raw = match.group(0).rstrip(".,;)")
         try:
+            original = urlsplit(raw)
+            if original.username is not None or original.password is not None:
+                continue
             canonical = canonicalize_url(raw)
         except (ValueError, UnicodeError):
             continue
