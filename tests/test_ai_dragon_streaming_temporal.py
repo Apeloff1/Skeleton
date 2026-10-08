@@ -9,7 +9,7 @@ from skeleton.ai.webcrawler.dragon_streaming_temporal import segment_streaming_w
 def setup():
  db=sqlite3.connect(":memory:");q=DragonAnalysisQueue(db);l=DragonConsentLedger(db)
  c=l.issue("u",capture=True,analysis=True,issued_at=1,expires_at=100,policy_version="v",scope_digest="a"*64,authorized=True)
- cq=ConsentBoundAnalysisQueue(q,l,db);j=cq.submit("u","b"*64,"g",consent_id=c.consent_id,scope_digest="a"*64,now=2,authorized=True)
+ cq=ConsentBoundAnalysisQueue(q,l);j=cq.submit("u",recording_digest="b"*64,game_label="g",consent_id=c.consent_id,scope_digest="a"*64,now=2,authorized=True)
  frames=tuple(FeatureFrame(i*100,(0.05 if i<8 else .8 if i<12 else .06,),str(i)) for i in range(20))
  return cq,j,frames
 
