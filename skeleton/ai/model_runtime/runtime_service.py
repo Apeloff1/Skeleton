@@ -223,7 +223,9 @@ class NativeModelService:
         start_ns = self._now_ns()
         deadline_ns = start_ns + request.deadline_ms * 1_000_000
         self._validate_request(request, prompt, config)
-        token = cancellation or CancellationToken()
+        if cancellation is not None and not isinstance(cancellation, CancellationToken):
+            raise NativeServiceError("CancellationToken required")
+        token = cancellation if cancellation is not None else CancellationToken()
         if not isinstance(token, CancellationToken):
             raise NativeServiceError("CancellationToken required")
 
