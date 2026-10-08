@@ -65,6 +65,7 @@ class CrawlCustodyBundle:
     evidence: tuple[EvidencePass, ...]
     document_fingerprints: tuple[tuple[str, str], ...]
     custody_fingerprint: str
+    acquisition_fingerprints: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -255,6 +256,19 @@ def bind_crawl_evidence(
         bound, key=lambda x: (x.source_id, x.pass_id),
     ))
     fingerprints = tuple((s.source_id, s.content_digest) for s in ordered_sources)
+    # This is the capture *receipt*, not just the normalized content digest.
+    # A re-fetch with identical text but different delivery/timestamp/metadata
+    # must not inherit the same audit identity. Revalidation may nevertheless
+    # decide that its exact text spans remain reusable after checking custody.
+    acquisition_fingerprints = tuple(
+        (source.source_id, _canonical_hash({
+            "fetched_url": docs[source.source_id].fetched_url,
+            "fetched_at": docs[source.source_id].fetched_at,
+            "content_type": docs[source.source_id].content_type,
+            "source_score": docs[source.source_id].source_score,
+            "provenance": dict(docs[source.source_id].provenance),
+        })) for source in ordered_sources
+    )
     receipt = _canonical_hash({
         "schema": "skeleton.crawler.captured_custody.v1",
         "claim_id": claim_id,
@@ -263,6 +277,7 @@ def bind_crawl_evidence(
              sorted(s.parent_source_ids), sorted(s.lineage_tokens))
             for s in ordered_sources
         ],
+        "acquisition": acquisition_fingerprints,
         "readings": [
             (r.source_id, r.source_revision, r.pass_id, r.claim_id,
              r.supports, r.confidence, r.reliability,
@@ -272,6 +287,7 @@ def bind_crawl_evidence(
     })
     return CrawlCustodyBundle(
         claim_id, ordered_sources, ordered_evidence, fingerprints, receipt,
+        acquisition_fingerprints,
     )
 
 
