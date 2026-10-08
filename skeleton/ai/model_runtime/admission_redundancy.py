@@ -503,6 +503,23 @@ class AuthenticatedFileCheckpointReplica:
             snapshot, expected_policy=None, expected_limits=None,
             minimum_sequence=0,
         )
+        # Guard direct adapter callers as well as the quorum coordinator.
+        # A surviving authenticated newer term, same-sequence equivocation,
+        # or predecessor self-cycle must never be silently overwritten.
+        try:
+            old = self.read()
+        except (_NewerAuthenticatedTerm, _AuthenticatedFork):
+            raise
+        except (ModelRuntimeError, OSError):
+            old = None
+        if old is not None:
+            if old["sequence"] > snapshot["sequence"]:
+                raise ModelRuntimeError("refusing authenticated checkpoint regression")
+            if old["sequence"] == snapshot["sequence"] and old["digest"] != snapshot["digest"]:
+                raise ModelRuntimeError("conflicting authenticated checkpoint at same sequence")
+            if (self.expected_parent_digest == old["digest"] and
+                    snapshot["sequence"] <= old["sequence"]):
+                raise ModelRuntimeError("authenticated checkpoint must advance predecessor")
         unsigned = {
             "schema": AUTHENTICATED_REPLICA_SCHEMA,
             "member": self.name,

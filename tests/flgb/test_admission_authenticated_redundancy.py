@@ -207,6 +207,35 @@ class TestAuthenticatedRedundantCheckpoints(unittest.TestCase):
         self.assertNotIn(repr(secret), repr(adapter))
         self.assertNotIn("secret_key=", repr(adapter))
 
+    def test_direct_adapter_write_refuses_newer_term(self):
+        scheduler = self.scheduler()
+        self.publish(scheduler, self.slots(term=6))
+        with self.assertRaisesRegex(ModelRuntimeError, "newer leadership"):
+            self.slots(term=5)[0].write(scheduler.snapshot())
+
+    def test_direct_adapter_write_refuses_conflicting_same_sequence(self):
+        scheduler = self.scheduler()
+        self.publish(scheduler)
+        alternate = self.scheduler()
+        alternate.cancel("queued")
+        alternate.submit(BatchRequest("other", 1, 1), kv_bytes=5)
+        self.assertGreater(alternate.snapshot()["sequence"], scheduler.snapshot()["sequence"])
+        # Construct a different scheduler with the exact original sequence.
+        second = RuntimeAdmissionScheduler(LIMITS, policy=POLICY)
+        second.submit(BatchRequest("other", 3, 2), kv_bytes=15)
+        second.admit()
+        second.submit(BatchRequest("queued", 1, 1), kv_bytes=5)
+        self.assertEqual(second.snapshot()["sequence"], scheduler.snapshot()["sequence"])
+        with self.assertRaisesRegex(ModelRuntimeError, "conflicting authenticated"):
+            self.slots()[0].write(second.snapshot())
+
+    def test_direct_adapter_write_requires_predecessor_progress(self):
+        scheduler = self.scheduler()
+        receipt = self.publish(scheduler)
+        next_generation = self.slots(parent=receipt.digest)
+        with self.assertRaisesRegex(ModelRuntimeError, "advance predecessor"):
+            next_generation[0].write(scheduler.snapshot())
+
     def test_short_key_and_wrong_term_type_rejected_at_construction(self):
         with self.assertRaisesRegex(ModelRuntimeError, "key"):
             self.slots(key=b"bad")
