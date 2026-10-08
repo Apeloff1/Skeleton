@@ -72,11 +72,7 @@ class NativeConversationPersistenceTests(unittest.TestCase):
     def test_restore_rejects_other_model(self):
         sid = self.coordinator.create()
         self.coordinator.save(sid)
-        foreign = runtime()
-        foreign.refresh_model_identity()
-        # A different tokenizer/weights identity must not be accepted.
-        foreign.model.weights = getattr(foreign.model, "weights", None)
-        # Use a deterministic different seed rather than relying on a mutable field.
+        # Use a deterministic different seed to test incompatible model weights.
         different = NativeLLMRuntime(TinyTransformer(
             vocab=("hello", "world", "again", "small", "runtime", "token"),
             dim=8, ctx=16, seed=99, n_heads=2, n_layers=2, d_ff=16))
