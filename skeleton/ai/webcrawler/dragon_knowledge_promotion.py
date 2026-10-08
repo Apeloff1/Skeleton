@@ -11,6 +11,7 @@ from .dragon_analysis_chains import AnalysisLayer, LayerReceipt, validate_chain
 from .dragon_analysis_quality_gates import Measurement, gate_analysis
 from .dragon_probabilistic_distillation import EvidencePass, Belief, ProbabilisticKnowledgeDistiller
 from .dragon_belief_stress import stress_test_belief
+from .dragon_empirical_calibration import CalibrationArtifact, apply_calibrator
 
 
 @dataclass(frozen=True)
@@ -19,6 +20,7 @@ class PromotionPolicy:
     maximum_source_influence: float = 0.2
     minimum_probability: float = 0.9
     require_full_analysis: bool = True
+    require_empirical_calibration: bool = True
 
 
 @dataclass(frozen=True)
@@ -36,6 +38,7 @@ def assess_promotion(
     measurements: tuple[Measurement, ...], *,
     authorized: bool,
     policy: PromotionPolicy = PromotionPolicy(),
+    calibration: CalibrationArtifact | None = None,
 ) -> PromotionDecision:
     if not authorized:
         raise PermissionError("knowledge promotion requires authorization")
@@ -57,7 +60,15 @@ def assess_promotion(
         failures.append("Contradictory evidence remains unresolved")
     if belief.independent_groups < policy.minimum_independent_groups:
         failures.append("Insufficient independent source groups")
-    if belief.probability < policy.minimum_probability:
+    promoted_probability = belief.probability
+    if policy.require_empirical_calibration:
+        if calibration is None:
+            failures.append("Eligible empirical calibration artifact required")
+        elif not calibration.eligible:
+            failures.append("Empirical calibration artifact is ineligible")
+        else:
+            promoted_probability = apply_calibrator(belief.probability, calibration)
+    if promoted_probability < policy.minimum_probability:
         failures.append("Belief below promotion threshold")
     if stress.maximum_probability_shift > policy.maximum_source_influence:
         failures.append("Belief depends too heavily on one source group")
@@ -69,6 +80,6 @@ def assess_promotion(
         if not quality.accepted:
             failures.extend(quality.failures)
     return PromotionDecision(
-        claim_id, not failures, belief.probability,
+        claim_id, not failures, promoted_probability,
         tuple(dict.fromkeys(failures)), belief.evidence_digest,
     )
