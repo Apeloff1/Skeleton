@@ -67,6 +67,12 @@ class TestNativeModelService(unittest.TestCase):
             service.runtime, "encode",
             side_effect=TokenizerContractError("encoding rejected"),
         ):
+            self.assertEqual(
+                len(service._usage_digest(
+                    prompt="alpha", generated_events=0, terminal_reason="model_error"
+                )),
+                64,
+            )
             result = service.execute(request, "alpha", config)
         self.assertEqual(result.receipt.terminal_reason, "model_error")
         self.assertIsNone(result.generation)
