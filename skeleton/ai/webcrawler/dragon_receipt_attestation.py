@@ -22,7 +22,7 @@ class DragonReceiptAttestations:
    committed_revision INTEGER NOT NULL,chain_fingerprint TEXT NOT NULL,
    attestation_fingerprint TEXT NOT NULL,
    PRIMARY KEY(owner,run_id,layer),UNIQUE(owner,run_id,attestation_fingerprint))""");db.commit()
- def record(self,lease:WorkerLease,output_fingerprint:str,*,committed_revision:int,
+ def _record_uncommitted(self,lease:WorkerLease,output_fingerprint:str,*,committed_revision:int,
             chain_fingerprint:str,authorized:bool)->ReceiptAttestation:
   if not authorized: raise PermissionError("receipt attestation requires authorization")
   for d in (output_fingerprint,chain_fingerprint):
@@ -32,21 +32,27 @@ class DragonReceiptAttestations:
    lease.implementation,lease.version,lease.generation,token_digest,committed_revision,chain_fingerprint]
   fp=sha256(json.dumps(body,separators=(",",":")).encode()).hexdigest()
   value=ReceiptAttestation(*body,fp)
-  with self.db:
-   row=self.db.execute("""SELECT output_fingerprint,worker_id,implementation,version,
+  row=self.db.execute("""SELECT output_fingerprint,worker_id,implementation,version,
     lease_generation,lease_token_digest,committed_revision,chain_fingerprint,attestation_fingerprint
     FROM dragon_receipt_attestations WHERE owner=? AND run_id=? AND layer=?""",
     (lease.owner,lease.run_id,lease.layer)).fetchone()
-   if row:
-    if row!=(output_fingerprint,lease.worker_id,lease.implementation,lease.version,
-      lease.generation,token_digest,committed_revision,chain_fingerprint,fp):
-     raise ValueError("receipt attestation replay conflict")
-    return value
-   self.db.execute("INSERT INTO dragon_receipt_attestations VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
-    (lease.owner,lease.run_id,lease.layer,output_fingerprint,lease.worker_id,
-     lease.implementation,lease.version,lease.generation,token_digest,
-     committed_revision,chain_fingerprint,fp))
+  if row:
+   if row!=(output_fingerprint,lease.worker_id,lease.implementation,lease.version,
+     lease.generation,token_digest,committed_revision,chain_fingerprint,fp):
+    raise ValueError("receipt attestation replay conflict")
+   return value
+  self.db.execute("INSERT INTO dragon_receipt_attestations VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+   (lease.owner,lease.run_id,lease.layer,output_fingerprint,lease.worker_id,
+    lease.implementation,lease.version,lease.generation,token_digest,
+    committed_revision,chain_fingerprint,fp))
   return value
+
+ def record(self,lease:WorkerLease,output_fingerprint:str,*,committed_revision:int,
+            chain_fingerprint:str,authorized:bool)->ReceiptAttestation:
+  with self.db:
+   return self._record_uncommitted(lease,output_fingerprint,
+    committed_revision=committed_revision,chain_fingerprint=chain_fingerprint,
+    authorized=authorized)
  def get(self,owner:str,run_id:str,layer:str,*,authorized:bool)->ReceiptAttestation:
   if not authorized:raise PermissionError("receipt attestation read requires authorization")
   row=self.db.execute("SELECT * FROM dragon_receipt_attestations WHERE owner=? AND run_id=? AND layer=?",
