@@ -635,3 +635,40 @@ A structural ROM receipt can unlock later source study. It cannot award
 real playability, human enjoyment, AI capability mastery or commercial
 SDK certification. True compiled, emulator-tested and reviewed outcomes
 require independently traceable tests and human approval.
+
+
+## Tenth-generation native console expansion: N64, DS, PSP
+
+The source generator now supports 19 distinct native hardware/project targets
+out of 47 catalogued platform profiles. The three additions here are
+separate native SDK applications; they are NOT compiled binary artifacts.
+
+NINTENDO 64 / libdragon: The VR4300 source runs a genuine 320x240 libdragon
+display-surface render cycle (display_init, display_get, display_show)
+and hardware joypad poll. An original procedurally drawn hatchling uses the
+analogue joystick or D-pad to collect goals, avoid an escalating pursuer,
+retain health, and restart on defeat. A libdragon Makefile targets a .z64
+ROM. SDK binary compilation and physical N64/emulator frame validation
+remain pending.
+
+NINTENDO DS / libnds: The ARM9 source uses BG Mode 5, VRAM bank A and a
+16-bit 256x192 bitmap for the primary game display. A lower-screen
+console presents the current level, lives and points; touchscreen input
+aims a collection pulse against the virtual target location. D-pad
+movement, scoring, staged challenge and fail/retry are independent DS
+gameplay. The devkitPro/ndstool source build requires separately installed
+libnds, ARM9/ARM7 startup and a real SDK verification. No .nds file is
+manufactured from C text.
+
+SONY PSP / PSPSDK: A distinct handheld Allegrex console program reads the
+PSP controller, analogue nub and directional buttons, synchronizes to
+the LCD VBlank, and draws a 57-column original grid game with a crystal,
+pursuer, escalating speed, health, and game-over/retry using the PSPSDK
+debug-screen. EBOOT.PBP is the toolchain output goal. Proper SDK
+compilation and emulator replay remain unverified.
+
+The hardware budget tables include conservative source-level VRAM/RAM and
+graphics limits for all three additional targets. Native tests verify the
+different rendering/controller APIs, deterministic source output, format
+tags and SDK project recipes. They do not claim a compiled, executable,
+emulator-tested or licensed commercial game.

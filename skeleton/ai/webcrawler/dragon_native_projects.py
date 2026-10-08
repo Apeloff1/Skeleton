@@ -8,7 +8,7 @@ import re
 from .dragon_game_mechanics import Mechanic
 from .dragon_native_targets import demand_target, STYLES
 
-EMITTERS=frozenset({"game_boy","game_boy_color","nes","dos_vga","master_system","game_gear","snes","commodore_64","genesis","game_boy_advance","ps1","xbox_original","pc_linux","pc_windows","pc_macos","steam_deck"})
+EMITTERS=frozenset({"game_boy","game_boy_color","nes","dos_vga","master_system","game_gear","snes","commodore_64","genesis","game_boy_advance","nintendo_64","nintendo_ds","psp","ps1","xbox_original","pc_linux","pc_windows","pc_macos","steam_deck"})
 
 @dataclass(frozen=True)
 class NativeProject:
@@ -531,6 +531,10 @@ def render_native_project(*,title:str,target_id:str,style:str,
     elif target_id=="snes":
         from .dragon_native_snes import snes_source
         files=snes_source(seed)
+    elif target_id in ("nintendo_64","nintendo_ds","psp"):
+        from .dragon_native_3d_era import n64_source,ds_source,psp_source
+        files=(n64_source(seed) if target_id=="nintendo_64" else
+               ds_source(seed) if target_id=="nintendo_ds" else psp_source(seed))
     elif target_id=="commodore_64":
         from .dragon_native_c64 import commodore64_source
         files=commodore64_source(seed)

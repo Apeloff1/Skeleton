@@ -54,6 +54,10 @@ LIMITS={
     "dos_vga":("PC","x86",262144,262144,640000,65536,128,128,8192),
     "ps1":("Sony","MIPS R3000",1048576,131072,2097152,2048,256,256,8192),
     "xbox_original":("Microsoft","x86",67108864,16777216,67108864,65536,1024,1024,1048576),
+    # Developer-facing source budgets, not physical linker map verification.
+    "nintendo_64":("Nintendo","VR4300",4194304,262144,4194304,65536,128,128,8192),
+    "nintendo_ds":("Nintendo","ARM9/ARM7",656384,131072,4194304,16384,128,128,8192),
+    "psp":("Sony","Allegrex",2097152,524288,33554432,65536,1024,1024,8192),
 }
 PC=("pc_linux","pc_windows","pc_macos","steam_deck")
 ATLAS_LAYOUT={

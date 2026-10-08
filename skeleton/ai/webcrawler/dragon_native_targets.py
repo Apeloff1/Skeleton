@@ -85,7 +85,7 @@ TARGETS: tuple[ConsoleTarget,...] = (
     _t("saturn","Sega","32-bit",1994,"dual SH-2","VDP1 + VDP2","SCSP",
        "Saturn pad","Jo Engine / libyaul","iso",colors=16777216,width=320,height=240),
     _t("nintendo_64","Nintendo","64-bit",1996,"MIPS VR4300","RDP / RSP","AI DAC",
-       "analog stick","libdragon","z64",colors=16777216,width=320,height=240),
+       "analog stick","libdragon","z64","native_source",colors=16777216,width=320,height=240),
     _t("dreamcast","Sega","128-bit era",1998,"SH-4","PowerVR2","AICA",
        "Dreamcast controller","KallistiOS","cdi",colors=16777216,width=640,height=480),
     _t("game_boy_advance","Nintendo","handheld 32-bit",2001,"ARM7TDMI","Mode 3/4 sprites","PSG / PCM",
@@ -97,9 +97,9 @@ TARGETS: tuple[ConsoleTarget,...] = (
     _t("xbox_original","Microsoft Xbox","6th generation",2001,"x86","NV2A","MCPX",
        "Xbox controller","nxdk","xbe","native_source",colors=16777216,width=640,height=480),
     _t("nintendo_ds","Nintendo","dual-screen handheld",2004,"ARM9 + ARM7","2D engines + 3D","DS audio",
-       "touch / buttons","devkitARM / libnds","nds",colors=262144,width=256,height=192),
+       "touch / buttons","devkitARM / libnds","nds","native_source",colors=262144,width=256,height=192),
     _t("psp","Sony PlayStation","handheld 3D",2004,"MIPS Allegrex","GU","PSP audio",
-       "PSP buttons","PSPSDK","pbp",colors=16777216,width=480,height=272),
+       "PSP buttons","PSPSDK","pbp","native_source",colors=16777216,width=480,height=272),
     _t("wii","Nintendo","7th generation",2006,"Broadway PPC","Hollywood","DSP",
        "Wii Remote","devkitPPC / libogc","dol",colors=16777216,width=640,height=480),
     _t("ps3","Sony PlayStation","7th generation",2006,"Cell","RSX","SPU audio",
@@ -150,7 +150,7 @@ def target_catalog(*, family: str | None = None) -> tuple[dict, ...]:
     from .dragon_game_blueprints import GENRES
     desktop={"pc_linux","pc_windows","pc_macos","steam_deck"}
     source_ids={"game_boy","game_boy_color","nes","master_system","game_gear","snes","commodore_64","genesis","game_boy_advance","ps1",
-                "xbox_original","dos_vga"}|desktop
+                "xbox_original","dos_vga","nintendo_64","nintendo_ds","psp"}|desktop
     rows=[]
     for t in TARGETS:
         if family is not None and t.family!=family:
