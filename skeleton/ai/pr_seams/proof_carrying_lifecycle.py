@@ -48,9 +48,11 @@ def card(hit: bool, **extra: object) -> dict:
         "citation": CITATION,
         "stored_prose": 0,
     }
-    body.update(extra)
-    if body["stored_prose"] != 0:
+    if "stored_prose" in extra and extra["stored_prose"] != 0:
         raise PermissionError("stored prose is forbidden")
+    if any(name in extra for name in ("kind", "hit", "law", "citation")):
+        raise PermissionError("proof card authority fields are immutable")
+    body.update(extra)
     return body
 
 PHASES = ("propose", "admit", "hold", "promote")
@@ -62,6 +64,17 @@ class Proof:
     phase: str
     claim_id: str
     digest: str
+
+    def __post_init__(self):
+        if self.phase not in PHASES:
+            raise ValueError("unknown lifecycle phase")
+        _id(self.claim_id, "claim_id")
+        _id(self.digest, "digest")
+        expected = _h("proof-sha256:", {
+            "phase": self.phase, "claim_id": self.claim_id, "digest": self.digest,
+        })
+        if self.proof_id != expected:
+            raise PermissionError("proof identity does not bind lifecycle claim")
 
     @classmethod
     def create(cls, phase: str, claim_id: str, digest: str):
@@ -80,11 +93,30 @@ class Lifecycle:
     proof_ids: tuple
     phase: str
 
+    def __post_init__(self):
+        _id(self.claim_id, "claim_id")
+        if self.phase not in PHASES or self.phase == "propose":
+            raise PermissionError("invalid lifecycle terminal phase")
+        if not isinstance(self.proof_ids, tuple) or len(self.proof_ids) < 2:
+            raise PermissionError("lifecycle requires multiple proof identities")
+        if len(set(self.proof_ids)) != len(self.proof_ids):
+            raise PermissionError("duplicate lifecycle proof identity")
+        for proof_id in self.proof_ids:
+            if not isinstance(proof_id, str) or not proof_id.startswith("proof-sha256:") or len(proof_id) != 77:
+                raise PermissionError("invalid lifecycle proof id")
+        expected = _h("life-sha256:", {
+            "claim_id": self.claim_id, "proof_ids": self.proof_ids, "phase": self.phase,
+        })
+        if self.life_id != expected:
+            raise PermissionError("lifecycle identity does not bind proofs")
+
 
 def advance(proofs: Sequence[Proof]) -> Lifecycle:
     by = {}
     claim = None
     for proof in proofs:
+        if not isinstance(proof, Proof):
+            raise TypeError("Proof required")
         if proof.phase in by:
             raise PermissionError("duplicate phase proof")
         if claim is None:
@@ -107,4 +139,6 @@ def advance(proofs: Sequence[Proof]) -> Lifecycle:
 
 
 def exit_card(life: Lifecycle) -> dict:
+    if not isinstance(life, Lifecycle):
+        raise TypeError("Lifecycle required")
     return card(life.phase in {"hold", "promote"}, life_id=life.life_id, phase=life.phase, claim_id=life.claim_id)
