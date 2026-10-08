@@ -9,6 +9,12 @@ def _digest(v): return sha256(json.dumps(v,sort_keys=True,separators=(",",":")).
 @dataclass(frozen=True)
 class TemporalAuthorityEntry:
  sequence:int; authority_digest:str; subject:str; policy_year:int; previous_entry_digest:str|None
+ def __post_init__(self):
+  if isinstance(self.sequence,bool) or not isinstance(self.sequence,int) or self.sequence<1: raise TemporalSignalError("invalid temporal sequence")
+  if not isinstance(self.subject,str) or not self.subject.strip(): raise TemporalSignalError("invalid temporal subject")
+  if isinstance(self.policy_year,bool) or not isinstance(self.policy_year,int) or not 1900<=self.policy_year<=2200: raise TemporalSignalError("invalid temporal policy year")
+  for d in (self.authority_digest,self.previous_entry_digest):
+   if d is not None and (not isinstance(d,str) or len(d)!=64 or any(c not in "0123456789abcdef" for c in d)): raise TemporalSignalError("invalid temporal authority digest")
  @property
  def digest(self): return _digest(self.__dict__)
 
