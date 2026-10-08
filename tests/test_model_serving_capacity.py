@@ -88,5 +88,19 @@ class CapacityTests(unittest.TestCase):
         self.assertEqual(ledger.snapshot(), (3, 30))
 
 
+    def test_exclusive_acquire_blocks_duplicate_live_execution(self):
+        live = self.ledger.acquire("active", "same", 5, exclusive=True)
+        with self.assertRaisesRegex(CapacityDenied, "already has an active"):
+            self.ledger.acquire("active", "same", 5, exclusive=True)
+        self.assertEqual(self.ledger.snapshot(), (1, 5))
+        with self.assertRaisesRegex(CapacityDenied, "exclusive must be"):
+            self.ledger.acquire("other", "same", 1, exclusive=1)
+        self.assertTrue(self.ledger.release(live))
+        successor = self.ledger.acquire("active", "same", 5, exclusive=True)
+        self.assertNotEqual(live, successor)
+        self.assertTrue(self.ledger.release(successor))
+        self.assertEqual(self.ledger.snapshot(), (0, 0))
+
+
 if __name__ == "__main__":
     unittest.main()
