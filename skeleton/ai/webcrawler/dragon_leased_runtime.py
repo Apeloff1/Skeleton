@@ -22,13 +22,18 @@ def commit_leased_receipt(runtime:DragonAnalysisRuntime,leases:DragonWorkerLease
     authorized:bool)->LeasedCommit:
  if not authorized: raise PermissionError("leased receipt commit requires authorization")
  if receipt.layer.value!=lease.layer: raise ValueError("lease layer does not match receipt")
- leases.require(lease,now=now,authorized=True)
- cp=runtime.commit_receipt(lease.owner,lease.run_id,receipt,now=now,
-   expected_revision=expected_revision,authorized=True)
- attestation=DragonReceiptAttestations(runtime.db).record(lease,receipt.output_fingerprint,
-   committed_revision=cp.revision,chain_fingerprint=cp.chain_fingerprint,authorized=True)
- DragonRuntimeEventLedger(runtime.db).append(lease.owner,lease.run_id,event_type="worker_receipt",
-   layer=lease.layer,outcome="accepted",evidence_fingerprint=receipt.output_fingerprint,
-   error_code="",occurred_at=now,authorized=True)
- leases.release(lease,now=now,authorized=True)
+ if leases.db is not runtime.db:
+  raise ValueError("atomic leased commit requires shared runtime database connection")
+ attestations=DragonReceiptAttestations(runtime.db)
+ events=DragonRuntimeEventLedger(runtime.db)
+ with runtime.db:
+  leases.require(lease,now=now,authorized=True)
+  cp=runtime._commit_receipt_uncommitted(lease.owner,lease.run_id,receipt,now=now,
+    expected_revision=expected_revision,authorized=True)
+  attestation=attestations._record_uncommitted(lease,receipt.output_fingerprint,
+    committed_revision=cp.revision,chain_fingerprint=cp.chain_fingerprint,authorized=True)
+  events._append_uncommitted(lease.owner,lease.run_id,event_type="worker_receipt",
+    layer=lease.layer,outcome="accepted",evidence_fingerprint=receipt.output_fingerprint,
+    error_code="",occurred_at=now,authorized=True)
+  leases._release_uncommitted(lease,now=now,authorized=True)
  return LeasedCommit(cp,lease.worker_id,lease.implementation,lease.version,lease.generation,attestation)
