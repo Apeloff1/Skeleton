@@ -197,3 +197,85 @@ def generate_world_region(name: str, *, rooms: int, seed: int,
     rows[start[1]][start[0]]="P";rows[exit[1]][exit[0]]="G"
     return WorldRegion(name,moved,edges,start,exit,
                        tuple("".join(r) for r in rows))
+
+
+def world_region_to_blueprint(
+    region: WorldRegion, *, title: str, seed: int,
+    pickups: int = 12, enemies: int = 5,
+) -> GameBlueprint:
+    """Turn the connected room graph into a fully playable exploration map.
+
+    Unlike the platformer generator this geometry is navigated on both
+    horizontal and vertical axes. Wall tiles block movement; collectibles
+    and enemies are placed only in reachable original rooms/corridors.
+    """
+    from .game_scale_npc_ai import navigation_reachable
+
+    if not isinstance(region,WorldRegion) or not isinstance(title,str) or not title:
+        raise ValueError("invalid explorable world source")
+    if not 0<=pickups<=100 or not 0<=enemies<=40:
+        raise ValueError("invalid world encounter budget")
+    tiles=region.tiles
+    height,width=len(tiles),len(tiles[0]) if tiles else 0
+    if not 16<=width<=128 or not 10<=height<=64 or width*height>4096:
+        raise ValueError("world exceeds playable map renderer capacity")
+    if any(len(row)!=width for row in tiles):
+        raise ValueError("inconsistent world dimensions")
+    if not find_level_route(tiles):
+        raise ValueError("world lacks connected exit")
+    reachable=navigation_reachable(tiles,region.spawn)
+    route=set(find_level_route(tiles))
+    spawn=region.spawn
+    rng=random.Random(seed+149)
+    optional=[
+        (x,y) for x,y in reachable
+        if tiles[y][x]=="." and (x,y) not in route and
+        abs(spawn[0]-x)+abs(spawn[1]-y)>4
+    ]
+    rng.shuffle(optional)
+    if len(optional)<pickups+enemies:
+        # Main corridor can host encounters too, but never overwrite spawn
+        # or goal and never put every pickup behind an inaccessible wall.
+        extra=[
+            (x,y) for x,y in reachable
+            if tiles[y][x]=="." and (x,y) not in optional and
+            abs(spawn[0]-x)+abs(spawn[1]-y)>4
+        ]
+        rng.shuffle(extra)
+        optional.extend(extra)
+    rows=[list(row) for row in tiles]
+    for x,y in optional[:pickups]:
+        rows[y][x]="C"
+    for x,y in optional[pickups:pickups+enemies]:
+        rows[y][x]="E"
+    ready=tuple("".join(row) for row in rows)
+    if not find_level_route(ready):
+        raise RuntimeError("world placement disrupted player route")
+    physics=tuple(sorted({
+        "move_speed":5.0,
+        "jump_speed":15.0,
+        "gravity":25.0,
+        "acceleration":30.0,
+        "friction":28.0,
+        "enemy_speed":1.4,
+        "max_lives":4.0,
+    }.items()))
+    evidence=tuple(
+        f"original-world:{region.name}:room-{i}"
+        for i in range(len(region.rooms))
+    )
+    digest=_digest({
+        "schema":"skeleton.original.exploration_world.v1",
+        "region":region.name,
+        "grid":ready,
+        "physics":physics,
+        "rooms":[(r.left,r.top,r.width,r.height,r.kind) for r in region.rooms],
+        "connections":region.connections,
+        "seed":seed,
+    })
+    return GameBlueprint(
+        title,"exploration","web",
+        ("movement","collision","camera","collectible","enemy_ai",
+         "checkpoint","puzzle"),
+        width,height,ready,physics,evidence,seed,digest,
+    )
