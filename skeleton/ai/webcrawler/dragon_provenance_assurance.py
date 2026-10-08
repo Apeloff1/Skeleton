@@ -263,7 +263,10 @@ def _actions(
             "extend_lens_schedule", claim_id, 3.0,
             "A policy requiring more than twelve readings needs an explicitly reviewed lens schedule.",
         ))
-    else:
+    elif any(code in blockers for code in (
+        "incomplete_reread_coverage", "cross_source_contradiction",
+        "weak_heuristic_support",
+    )):
         for decision in plan_adaptive_rereads(
             belief, evidence, authorized=True, min_passes=reread_min,
             max_passes=reread_max, limit=min(1000, max(limit * 2, 1)),
