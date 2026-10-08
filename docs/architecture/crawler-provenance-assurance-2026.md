@@ -144,3 +144,66 @@ The workflow's checkout SHA must equal the PR head; skipped or cancelled jobs
 are not proof of success. Deployment must separately verify authority,
 provenance custody signatures, provider permissions and model-calibration
 artifacts, none of which this module manufactures.
+
+
+## Captured-document custody (strict entry point)
+
+`dragon_crawl_custody.py` adds the missing connection from the existing
+`CrawlDocument` acquisition contract to evidence records. The caller supplies
+real acquired `CrawlDocument` values through `CapturedSource` wrappers and
+`LocatedReading` span descriptors. Unlike free-form notes, each observation
+must be an exact, nonblank character range in the captured normalized text.
+
+The binder rejects mismatching SHA-256 content digest, acquisition-receipt URL,
+digest, timestamp or response status, unsafe canonical/fetched URLs, oversized
+document text, unsupported content type, duplicate identity, undeclared
+derivation parents, out-of-bounds quotations, and nonfinite evidence scores.
+
+`LocatedReading` contains an analyst's claim polarity and confidence. These
+remain unverified interpretations, even though the quotation locator itself
+is content-addressed. The binder never infers that a statement is true simply
+because the text contains it.
+
+```python
+from skeleton.ai.webcrawler import (
+    CapturedSource, LocatedReading, assure_captured_crawl,
+)
+
+# `document` must be a CrawlDocument obtained by the trusted crawler path.
+review = assure_captured_crawl(
+    "claim-id",
+    (CapturedSource("source-id", document),),
+    (LocatedReading("source-id", "pass-1", "claim-id",
+                    True, 0.7, 0.8, 100, 148),),
+    authorized=True,
+)
+# Review is a research proposal, not approved knowledge.
+assert not review.assurance.promotion_authorized
+```
+
+Callers seeking promotion must carry `review.custody.evidence` and
+`review.custody.sources` into `assess_custodied_promotion`, with a trusted
+attestation registry where required. The acquisition boundary must retain
+authoritative capture receipts and licenses; a SHA-256 digest alone does not
+prove when or by whom a page was retrieved.
+
+For testing, the acquired document text is canonically normalized by the
+existing crawler extraction code before span offsets are chosen. The binder
+does not silently trim or rewrite quoted offsets; downstream consumers can
+therefore reproduce the exact evidence slice.
+
+## Non-goals and unresolved integration work
+
+- Existing call sites using legacy promotion directly are not automatically
+  migrated to the strict captured-source path.
+- The submitted provenance inventory has structural validation, not a
+  transport-level signature. Authenticated ingestion custody is a separate
+  deployment prerequisite.
+- A quoted passage proves the passage occurred in the captured text, not
+  that the real-world claim is true. Causal and human review remain mandatory
+  where configured.
+- Robots permission, source licensing, authenticated publisher identity,
+  recording consent and retention policy are enforced by their upstream
+  respective planes rather than fabricated by this reporting module.
+- Source revisions must be captured and retained as immutable documents for
+  external replay. The local binder does not persist document bytes.
