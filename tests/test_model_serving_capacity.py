@@ -102,5 +102,31 @@ class CapacityTests(unittest.TestCase):
         self.assertEqual(self.ledger.snapshot(), (0, 0))
 
 
+    def test_in_flight_lease_survives_ttl_and_blocks_overbooking(self):
+        lease = self.ledger.acquire("executing", "model-a", 10, exclusive=True, in_flight=True)
+        self.clock.value = 10_000
+        self.assertTrue(self.ledger.is_active(lease))
+        self.assertEqual(self.ledger.snapshot(), (1, 10))
+        with self.assertRaisesRegex(CapacityDenied, "active reservation"):
+            self.ledger.acquire("executing", "model-a", 10, exclusive=True, in_flight=True)
+        with self.assertRaisesRegex(CapacityDenied, "token capacity"):
+            self.ledger.acquire("different", "model-b", 3)
+        self.assertTrue(self.ledger.release(lease))
+        self.assertEqual(self.ledger.snapshot(), (0, 0))
+        successor = self.ledger.acquire("executing", "model-a", 10, exclusive=True, in_flight=True)
+        self.assertNotEqual(lease, successor)
+        self.assertTrue(self.ledger.release(successor))
+
+    def test_regular_expiry_is_preserved_and_in_flight_requires_exclusive(self):
+        transient = self.ledger.acquire("abandoned", "transient", 8)
+        self.clock.value = transient.expires_ns
+        self.assertFalse(self.ledger.is_active(transient))
+        with self.assertRaisesRegex(CapacityDenied, "require exclusive"):
+            self.ledger.acquire("invalid", "model", 1, in_flight=True)
+        with self.assertRaisesRegex(CapacityDenied, "in_flight must be"):
+            self.ledger.acquire("invalid", "model", 1, exclusive=True, in_flight=1)
+        self.assertEqual(self.ledger.snapshot(), (0, 0))
+
+
 if __name__ == "__main__":
     unittest.main()
