@@ -22,7 +22,7 @@ from skeleton.ai.runtime.inference.artifact import (
 )
 from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
 from skeleton.cortex.bpe import BytePairEncoder
-from skeleton.cortex.transformer import TinyTransformer
+from skeleton.cortex.transformer import TinyTransformer, UNK as TRANSFORMER_UNK
 
 from .flgb_training_runtime import (
     CandidateWeights,
@@ -315,6 +315,10 @@ def _build_model(
     bpe.fit(documents)
     if not bpe.itos or len(set(bpe.itos)) != len(bpe.itos):
         raise NativeTrainingError("BPE produced invalid vocabulary")
+    if TRANSFORMER_UNK in bpe.itos:
+        raise NativeTrainingError(
+            "BPE vocabulary collides with transformer reserved unknown token"
+        )
     model = TinyTransformer(
         vocab=tuple(bpe.itos),
         dim=config.dim,
@@ -463,7 +467,7 @@ def train_native_transformer_candidate(
         raise NativeTrainingError("planned training exceeds configured step budget")
 
     manifest = TrainingManifest(
-        run_id="native:" + candidate_id,
+        run_id=candidate_id,
         base_model_digest=base_digest,
         dataset_revision_digests=(dataset.revision.digest,),
         code_digest=code_digest,
