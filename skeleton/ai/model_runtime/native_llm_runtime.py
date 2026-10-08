@@ -245,11 +245,17 @@ class NativeLLMRuntime:
         size = logical_bytes(snapshot)
         if size > self.limits.max_model_bytes:
             raise RuntimeContractError("mutated model exceeds runtime memory budget")
+        tokenizer = NativeTokenizer(self.model)
+        architecture = self._architecture()
+        if self.limits.max_context > self.model.ctx:
+            raise RuntimeContractError("mutated model context below runtime limit")
+        if self.estimate_kv_bytes(self.limits.max_context) > self.limits.max_kv_bytes:
+            raise RuntimeContractError("mutated model exceeds KV memory budget")
         self._model_snapshot = snapshot
         self._model_digest = snapshot_digest(snapshot)
         self._model_bytes = size
-        self.tokenizer = NativeTokenizer(self.model)
-        self.architecture = self._architecture()
+        self.tokenizer = tokenizer
+        self.architecture = architecture
         return self.model_digest
 
     def health_snapshot(self) -> Mapping[str, Any]:
