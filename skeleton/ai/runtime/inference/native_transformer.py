@@ -128,6 +128,9 @@ class NativeTransformerModel:
             ).encode("utf-8")
         ).hexdigest()
         response_id = "local-native:" + published_digest[:32]
+        execution_receipt_digest = hashlib.sha256(
+            (result.replay_receipt.digest + ":" + published_digest).encode("ascii")
+        ).hexdigest()
         return LocalInferenceResult(
             text=text,
             model_id=self.model_id,
@@ -136,6 +139,7 @@ class NativeTransformerModel:
             output_tokens=output_tokens,
             finish_reason=finish_reason,
             response_id=response_id,
+            execution_receipt_digest=execution_receipt_digest,
             latency_ms=(time.perf_counter() - started) * 1000.0,
         )
 
