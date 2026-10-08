@@ -37,6 +37,16 @@ class NativeChatEngineTests(unittest.TestCase):
         self.assertEqual(original.messages, ())
         self.assertEqual(result.transcript.messages[0].role, "user")
 
+    def test_reject_assistant_only_prompt(self):
+        transcript = ChatTranscript((ChatMessage("assistant", "hello"),))
+        with self.assertRaises(RuntimeContractError):
+            self.engine.generate(transcript, self.config)
+
+    def test_latest_user_message_not_discarded(self):
+        oversized = ChatTranscript((ChatMessage("user", "hello " * 300),))
+        with self.assertRaises(RuntimeContractError):
+            self.engine.fit(oversized, self.config)
+
     def test_reject_impossible_reserve(self):
         with self.assertRaises(RuntimeContractError):
             NativeChatEngine(self.runtime, reserve_tokens=256)
