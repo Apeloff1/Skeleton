@@ -232,6 +232,15 @@ _SPINE_EXPORTS.update({
     "HeroProgress": ".game_scale_campaign",
     "decode_campaign_save": ".game_scale_campaign",
     "restore_story_slot": ".game_scale_story",
+    "render_campaign_hub": ".game_scale_campaign_hub",
+    "export_interactive_campaign": ".game_scale_campaign_hub",
+    "GameplayEvent": ".game_scale_feedback",
+    "SessionFeedback": ".game_scale_feedback",
+    "PlayerTuning": ".game_scale_feedback",
+    "decode_play_sessions": ".game_scale_feedback",
+    "analyze_player_feedback": ".game_scale_feedback",
+    "tune_game_from_feedback": ".game_scale_feedback",
+    "instrument_playable_telemetry": ".game_scale_feedback",
 })
 
 def __getattr__(name: str):
