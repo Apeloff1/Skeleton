@@ -218,3 +218,109 @@ def test_integrity_audit_empty_stream_is_valid_and_bounded():
         assert report.latest_sequence == 0
         assert report.compacted_through == 0
         assert store.replay_verified(ReplayCursor(operation_id)) == ()
+
+
+def test_integrity_sha256_is_deterministic_across_reopen(tmp_path: Path):
+    target = tmp_path / "witness.sqlite"
+    with SQLiteOperationEventStore(target) as store:
+        operation_id = seeded(store, length=3)
+        proof = store.audit_operation(operation_id).content_sha256
+        assert len(proof) == 64
+        assert store.audit_operation(operation_id, expected_sha256=proof).content_sha256 == proof
+    with SQLiteOperationEventStore(target) as store:
+        recovered = store.audit_operation(operation_id, expected_sha256=proof)
+        assert recovered.content_sha256 == proof
+        assert [item.sequence for item in store.replay_verified(
+            ReplayCursor(operation_id), expected_sha256=proof
+        )] == [1, 2, 3]
+
+
+def test_integrity_witness_catches_validly_encoded_payload_tampering():
+    with SQLiteOperationEventStore() as store:
+        operation_id = seeded(store, length=2)
+        proof = store.audit_operation(operation_id).content_sha256
+        store._connection.execute(
+            "UPDATE operation_stream_event SET payload_json=? "
+            "WHERE operation_id=? AND sequence=2",
+            ('{"counter":999}', operation_id),
+        )
+        # Internal continuity still passes; only the independently pinned
+        # content witness detects a validly encoded alteration.
+        assert store.audit_operation(operation_id).latest_sequence == 2
+        with pytest.raises(StreamStoreCorruptionError, match="integrity witness"):
+            store.audit_operation(operation_id, expected_sha256=proof)
+        with pytest.raises(StreamStoreCorruptionError, match="integrity witness"):
+            store.replay_verified(ReplayCursor(operation_id), expected_sha256=proof)
+
+
+def test_integrity_witness_detects_missing_tail_without_terminal_marker():
+    with SQLiteOperationEventStore() as store:
+        operation_id = seeded(store, length=3)
+        proof = store.audit_operation(operation_id).content_sha256
+        store._connection.execute(
+            "DELETE FROM operation_stream_event WHERE operation_id=? AND sequence=3",
+            (operation_id,),
+        )
+        assert store.audit_operation(operation_id).latest_sequence == 2
+        with pytest.raises(StreamStoreCorruptionError, match="integrity witness"):
+            store.audit_operation(operation_id, expected_sha256=proof)
+
+
+def test_integrity_witness_rejects_malformed_external_pin():
+    with SQLiteOperationEventStore() as store:
+        operation_id = seeded(store, length=1)
+        for invalid in (True, None, 3, "0" * 63, "Z" * 64, "A" * 64):
+            if invalid is None:
+                continue  # None intentionally means no independent witness.
+            with pytest.raises(Exception, match="integrity digest"):
+                store.audit_operation(operation_id, expected_sha256=invalid)
+            with pytest.raises(Exception, match="integrity digest"):
+                store.replay_verified(
+                    ReplayCursor(operation_id), expected_sha256=invalid,
+                )
+
+
+def test_integrity_audit_detects_rows_left_below_compaction_floor():
+    with SQLiteOperationEventStore() as store:
+        operation_id = seeded(store, length=3)
+        store._connection.execute(
+            "UPDATE operation_stream_head SET compacted_through=1 "
+            "WHERE operation_id=?", (operation_id,),
+        )
+        with pytest.raises(StreamStoreCorruptionError, match="below durable compaction"):
+            store.audit_operation(operation_id)
+
+
+def test_integrity_audit_detects_terminal_without_any_history():
+    operation_id = str(uuid4())
+    with SQLiteOperationEventStore() as store:
+        store.audit_operation(operation_id)
+        store._connection.execute(
+            "UPDATE operation_stream_head SET terminal=1 WHERE operation_id=?",
+            (operation_id,),
+        )
+        with pytest.raises(StreamStoreCorruptionError, match="without any durable history"):
+            store.audit_operation(operation_id)
+
+
+def test_integrity_audit_rejects_null_consumer_ack():
+    with SQLiteOperationEventStore() as store:
+        operation_id = seeded(store, length=2)
+        instant = datetime(2026, 10, 8, 10, 0, tzinfo=timezone.utc)
+        store.register_consumer(operation_id, "reader", now=instant)
+        store._connection.execute(
+            "UPDATE operation_stream_consumer SET acknowledged_through=NULL "
+            "WHERE operation_id=?", (operation_id,),
+        )
+        with pytest.raises(StreamStoreCorruptionError, match="acknowledged_through"):
+            store.audit_operation(operation_id)
+
+
+def test_empty_stream_digest_changes_after_append():
+    operation_id = str(uuid4())
+    with SQLiteOperationEventStore() as store:
+        empty = store.audit_operation(operation_id)
+        assert len(empty.content_sha256) == 64
+        store.append(operation_id, "operation.progress", {"step": 1})
+        full = store.audit_operation(operation_id)
+        assert full.content_sha256 != empty.content_sha256
