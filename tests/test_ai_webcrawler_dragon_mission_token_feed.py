@@ -197,3 +197,35 @@ def test_16_window_fingerprint_changes_with_model_tokenizer():
     wa=pack_token_windows(encoded_a,max_window_tokens=64,overlap_tokens=0)
     wb=pack_token_windows(encoded_b,max_window_tokens=64,overlap_tokens=0)
     assert wa[0].window_id!=wb[0].window_id
+
+
+def test_12_unbounded_encoder_generator_hits_budget_without_exhaustion():
+    fragment=curated()
+    def infinite_encoder(_):
+        while True:
+            yield 1
+    with pytest.raises(ValueError,match="token budget"):
+        encode_verified_tokens(fragment,infinite_encoder,
+            lambda _:fragment.text,tokenizer_id="infinite",max_tokens=8)
+
+
+def test_16_unbounded_manifest_window_generator_is_capped():
+    good=pack_token_windows(encoded(),max_window_tokens=90,overlap_tokens=0)[0]
+    def forever():
+        while True:
+            yield good
+    with pytest.raises(ValueError,match="window budget"):
+        compile_training_manifest(
+            "native-lm",forever(),
+            (DatasetAssignment("alpha","cluster","train"),),
+            authorized=True,max_windows=3,
+        )
+
+
+def test_14_unbounded_provenance_source_iterator_is_capped():
+    item=manifest()[0]
+    def forever():
+        while True:
+            yield item
+    with pytest.raises(ValueError,match="budget"):
+        assign_dependency_splits(forever(),seed="experiment",max_sources=3)
