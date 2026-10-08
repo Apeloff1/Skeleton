@@ -308,6 +308,15 @@ class StreamingTextFeed:
         self._chunks.append(chunk)
         self._chars += len(chunk)
 
+    def consume_text(self) -> str:
+        """Consume validated chunks once; no tokenization before normalization."""
+        if self._closed:
+            raise TokenizerContractError("text feed already finalized")
+        self._closed = True
+        chunks = self._chunks
+        self._chunks = []
+        return "".join(chunks)
+
     def finalize(self, tokenizer: NativeTokenizer) -> TokenSequence:
         if self._closed:
             raise TokenizerContractError("text feed already finalized")
