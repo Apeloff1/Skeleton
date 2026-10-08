@@ -142,8 +142,7 @@ class NativeTokenizer:
         value = snapshot()
         if not isinstance(value, Mapping):
             raise TokenizerContractError("invalid BPE snapshot")
-        canonical_bytes(value)
-        return dict(value)
+        return json.loads(canonical_bytes(value))
 
     def _identity_digest(self, bpe: Mapping[str, Any] | None) -> str:
         return digest_json(
@@ -177,7 +176,7 @@ class NativeTokenizer:
 
     def assert_unchanged(self) -> None:
         current_vocab = tuple(str(token) for token in self.model.itos)
-        if current_vocab != self._vocab or int(self.model.unk) != self._manifest.special_tokens["unk"]:
+        if current_vocab != self._vocab or not _is_int(self.model.unk) or self.model.unk != self._manifest.special_tokens["unk"]:
             raise TokenizerContractError("model vocabulary changed after admission")
         for name in ("pad", "bos", "eos"):
             admitted = self._manifest.special_tokens.get(name)
@@ -257,24 +256,36 @@ class NativeTokenizer:
         return " ".join(pieces)
 
     def checkpoint(self) -> Mapping[str, Any]:
+        self.assert_unchanged()
         return {
             "schema": self.SCHEMA,
             "vocabulary_manifest_digest": self._manifest.digest,
             "vocabulary": list(self._vocab),
             "unknown_token_id": int(self.model.unk),
-            "bpe": self._bpe_snapshot,
+            "bpe": json.loads(canonical_bytes(self._bpe_snapshot)) if self._bpe_snapshot is not None else None,
             "digest": self.digest,
         }
 
     def assert_checkpoint_matches(self, checkpoint: Mapping[str, Any]) -> None:
+        if not isinstance(checkpoint, Mapping):
+            raise TokenizerContractError("tokenizer checkpoint must be a mapping")
+        self.assert_unchanged()
         if checkpoint.get("schema") != self.SCHEMA:
             raise TokenizerContractError("unsupported tokenizer checkpoint")
         if checkpoint.get("digest") != self.digest:
             raise TokenizerContractError("tokenizer checkpoint digest mismatch")
-        if tuple(checkpoint.get("vocabulary") or ()) != self._vocab:
+        vocab = checkpoint.get("vocabulary")
+        if not isinstance(vocab, (list, tuple)) or any(not isinstance(t, str) for t in vocab):
+            raise TokenizerContractError("tokenizer checkpoint vocabulary mismatch")
+        if tuple(vocab) != self._vocab:
             raise TokenizerContractError("tokenizer checkpoint vocabulary mismatch")
         if checkpoint.get("vocabulary_manifest_digest") != self._manifest.digest:
             raise TokenizerContractError("tokenizer manifest mismatch")
+        unknown_id = checkpoint.get("unknown_token_id")
+        if not _is_int(unknown_id) or unknown_id != self._manifest.special_tokens["unk"]:
+            raise TokenizerContractError("tokenizer checkpoint unknown-token mismatch")
+        if checkpoint.get("bpe") != self._bpe_snapshot:
+            raise TokenizerContractError("tokenizer checkpoint BPE mismatch")
 
 
 class StreamingTextFeed:
@@ -322,8 +333,7 @@ class StreamingTextFeed:
             raise TokenizerContractError("text feed already finalized")
         if not isinstance(tokenizer, NativeTokenizer):
             raise TokenizerContractError("NativeTokenizer required")
-        self._closed = True
-        return tokenizer.encode_sequence("".join(self._chunks))
+        return tokenizer.encode_sequence(self.consume_text())
 
 
 def iter_context_windows(
@@ -392,6 +402,8 @@ def serialize_token_sequence(sequence: TokenSequence) -> bytes:
 
 
 def deserialize_token_sequence(payload: bytes, *, require_canonical: bool = False) -> TokenSequence:
+    if type(require_canonical) is not bool:
+        raise TokenizerContractError("require_canonical must be a boolean")
     if not isinstance(payload, bytes) or len(payload) > MAX_SERIALIZED_SEQUENCE_BYTES:
         raise TokenizerContractError("invalid serialized token sequence bytes")
     def reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
