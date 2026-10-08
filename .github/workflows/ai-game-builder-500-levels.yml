@@ -84,7 +84,7 @@ jobs:
           tests/test_ai_game_builder_*.py
 
       - name: Test reviewed gameplay knowledge
-        run: python -m unittest tests.test_game_builder_reviewed_knowledge tests.test_game_builder_knowledge_cli tests.test_game_builder_knowledge_rights_bridge -v
+        run: python -m unittest tests.test_game_builder_reviewed_knowledge tests.test_game_builder_knowledge_cli tests.test_game_builder_knowledge_rights_bridge tests.test_game_builder_playable_world tests.test_game_builder_playable_export tests.test_game_builder_research_to_playable -v
 
       - name: Validate masterplan JSON
         run: python -m json.tool machine/ai_master_plan.json >/dev/null
