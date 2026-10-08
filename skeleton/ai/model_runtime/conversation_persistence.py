@@ -143,6 +143,7 @@ class DurableConversationCoordinator:
             restored = NativeConversationSession.restore(self.store.runtime, record.snapshot)
             self.service._sessions[session_id] = restored
             self.service._meta[session_id]["revision"] = record.revision
+            self.service._meta[session_id]["updated_at"] = record.updated_at
             self.service._meta[session_id]["pinned"] = record.pinned
             new_binding = PersistenceBinding(session_id, record.revision, record.revision)
             self._bindings[session_id] = new_binding
