@@ -135,6 +135,7 @@ func _install_actions():
         "move_left": [KEY_A, KEY_LEFT],
         "move_right": [KEY_D, KEY_RIGHT],
         "jump": [KEY_SPACE, KEY_W, KEY_UP],
+        "attack": [KEY_J, KEY_K],
         "restart": [KEY_R],
         "pause": [KEY_P],
     }
@@ -171,6 +172,10 @@ func _physics_process(delta):
         return
     invincible = maxf(0.0, invincible - delta)
     var player_box = Rect2(player.position - Vector2(11,14), Vector2(22,28))
+    var striking = Input.is_action_just_pressed("attack")
+    var attack_box = Rect2(player.position + Vector2(12,-11), Vector2(27,23))
+    if player.velocity.x < 0:
+        attack_box.position.x = player.position.x - 39
     for item in pickups:
         if item["active"] and player_box.intersects(Rect2(item["pos"], Vector2(16,16))):
             item["active"] = false
@@ -188,6 +193,10 @@ func _physics_process(delta):
         else:
             foe["pos"] = proposal
         var hitbox = Rect2(foe["pos"], Vector2(24,26))
+        if striking and hitbox.intersects(attack_box):
+            foe["active"] = false
+            score += 50
+            continue
         if hitbox.intersects(player_box) and invincible<=0.0:
             if player.velocity.y>0 and player.position.y<foe["pos"].y:
                 foe["active"] = false
@@ -198,8 +207,17 @@ func _physics_process(delta):
     if player.position.y > float(data["height"])*TILE+TILE:
         _damage()
     if player_box.intersects(goal):
-        won = true
-        score += 250
+        var locked = data.get("genre","") == "puzzle"
+        if locked:
+            for item in pickups:
+                if item["active"]:
+                    locked = true
+                    break
+            else:
+                locked = false
+        if not locked:
+            won = true
+            score += 250
     _update_hud()
     queue_redraw()
 
@@ -227,7 +245,12 @@ func _update_hud():
         status = "  |  Game Over! Press R"
     elif paused:
         status = "  |  Paused"
-    hud.text = "Score: %s  Lives: %s%s" % [score, lives, status]
+    var pending = 0
+    for item in pickups:
+        if item["active"]:
+            pending += 1
+    var puzzle_hint = ("  Tokens: %s" % pending) if data.get("genre","") == "puzzle" else ""
+    hud.text = "Score: %s  Lives: %s  J: Attack%s%s" % [score, lives, puzzle_hint, status]
 
 func _draw():
     if data.is_empty():
@@ -261,13 +284,13 @@ def compile_godot_project(blueprint: GameBlueprint) -> GodotProject:
     entities=compile_scene_entities(blueprint)
     scene={
         "schema":"skeleton.original.godot_game.v1",
-        "width":blueprint.width,"height":blueprint.height,
+        "genre":blueprint.genre,"width":blueprint.width,"height":blueprint.height,
         "collision":collision,"entities":entities,
         "physics":blueprint.physics_dict(),
         "blueprint":blueprint.fingerprint,
         "knowledge_refs":blueprint.source_evidence,
     }
-    safe_title=blueprint.title.replace('"', "").replace("\n"," ")
+    safe_title=" ".join(blueprint.title.replace('"', "").replace("\\", "").split())
     project=(
         'config_version=5\n\n'
         '[application]\n'
