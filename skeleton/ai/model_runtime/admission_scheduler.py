@@ -88,7 +88,13 @@ class RuntimeAdmissionScheduler:
         return tuple(sorted(self._active))
 
     def submit(self, request: BatchRequest, *, kv_bytes: int, pinned_kv: bool = False) -> None:
-        if request.request_id in self._queued or request.request_id in self._active:
+        if not isinstance(request, BatchRequest):
+            raise ModelRuntimeError("BatchRequest required")
+        # A completed request may retain KV data. Reusing that identity before
+        # explicit eviction would collide with resident-cache ownership during
+        # admission; reject it at submission rather than dropping queued work.
+        if (request.request_id in self._queued or request.request_id in self._active
+                or request.request_id in self._kv):
             raise ModelRuntimeError("duplicate scheduler request identity")
         if len(self._queued) >= self.limits.max_queued_requests:
             raise ModelRuntimeError("runtime admission queue capacity exceeded")

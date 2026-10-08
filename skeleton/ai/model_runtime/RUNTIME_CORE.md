@@ -33,3 +33,32 @@ python -m unittest tests.flgb.test_flgb_02_tokenization_pipeline -v
 python -m unittest tests.flgb.test_flgb_02_native_llm_runtime -v
 python -m unittest discover -s tests/flgb -p 'test_flgb_02_*.py' -v
 ```
+
+## Canonical scheduler recovery and deployment pins
+
+`restore_admission_scheduler(snapshot)` rejects type coercions, unknown or
+missing fields, contradictory active/KV state, forward-dated sequences,
+duplicate enqueue sequences, invalid token budgets, over-capacity entries,
+noncanonical collection order and mismatched telemetry capacity. It does not
+acquire external authority. Callers restoring persisted state should pass
+`expected_policy`, `expected_limits`, `minimum_sequence` and
+`expected_digest` read from **independent trusted** deployment metadata.
+Sequence floors mitigate accidental stale-state rollback; a checksum alone does
+not prevent replay or certify the checkpoint's publisher.
+
+Retained KV identities are reserved while their cache entries exist. A new
+request cannot silently reuse such an identity: explicitly evict/release
+retained state before reusing it. Active records must retain identical KV
+byte reservations and pinned flags, while queued requests never own KV entries.
+
+`restore_admission_scheduler` currently caps retained KV checkpoint entries
+at 65,536; productions expecting larger pools must set and validate an
+architecture-governed bounded storage policy before changing that limit.
+
+Focused suites:
+
+```bash
+python -m unittest tests.flgb.test_admission_checkpoint -v
+python -m unittest tests.flgb.test_admission_checkpoint_strict -v
+python -m unittest tests.flgb.test_runtime_admission_scheduler -v
+```
