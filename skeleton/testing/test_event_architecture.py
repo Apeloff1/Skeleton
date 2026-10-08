@@ -211,7 +211,7 @@ def test_vol039_infinite_registry_declaration_source_is_bounded() -> None:
 
 
 def test_vol039_invalid_event_type_bytes_and_surrogates_fail_closed() -> None:
-    for value in ("x\\x00y", "x\\x7fy", "a\\ud800", "", "a" * 129):
+    for value in ("x\x00y", "x\x7fy", "a\ud800", "", "a" * 129):
         with pytest.raises(EventCompatibilityError):
             EventSchemaContract(
                 event_type=value, current_version=1,
