@@ -1,4 +1,4 @@
-"""Highest-utility crawler quality operations (mission ranks 01–10).
+"""Highest-utility crawler quality operations (source-quality family).
 
 This is a deterministic pre-ingestion inspection plane. Input strings are
 external data, never instructions. Scanners emit review signals, not proof of
