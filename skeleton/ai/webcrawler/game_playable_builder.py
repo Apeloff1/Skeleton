@@ -90,6 +90,7 @@ document.querySelectorAll("[data-button]").forEach(node=>{
 const left = () => keys.has("ArrowLeft")||keys.has("KeyA")||touch.left;
 const right = () => keys.has("ArrowRight")||keys.has("KeyD")||touch.right;
 const jump = () => keys.has("Space")||keys.has("ArrowUp")||keys.has("KeyW")||touch.jump;
+const attack = () => keys.has("KeyJ")||keys.has("KeyK");
 """
 
 
@@ -157,6 +158,19 @@ function physicsStep(dt){
 def compile_enemy_behaviors_js() -> str:
     return r"""
 function updateEnemies(dt){
+  state.attackCooldown=Math.max(0,state.attackCooldown-dt);
+  if(attack()&&state.attackCooldown===0&&state.player.alive){
+    state.attackCooldown=.28;
+    const p=state.player;
+    const facing=p.vx>=0?1:-1;
+    const hit={
+      x:facing>0?p.x+p.w:p.x-26,
+      y:p.y+4,w:26,h:p.h-8
+    };
+    for(const e of state.enemies) if(e.active && intersects(e,hit)){
+      e.active=false;state.score+=50;
+    }
+  }
   for(const e of state.enemies){
     if(!e.active) continue;
     const next=e.x+e.direction*scene.physics.enemy_speed*TILE*dt;
@@ -195,6 +209,7 @@ function restart(){
                home:e.x+4,direction:1,active:true}));
   state.goal=scene.entities.find(e=>e.type==="goal");
   state.score=0;state.lives=scene.physics.max_lives|0;
+  state.attackCooldown=0;
   state.won=false;state.paused=false;
 }
 function loseLife(){
@@ -213,7 +228,9 @@ function updateGameState(){
     }
   }
   if(state.player.alive&&intersects(state.player,state.goal)){
-    state.won=true;state.score+=250;
+    const locked=scene.genre==="puzzle" &&
+      state.pickups.some(item=>item.active);
+    if(!locked){state.won=true;state.score+=250}
   }
 }
 """
@@ -274,7 +291,11 @@ function draw(){
   ctx.fillStyle="#e8f4ff";ctx.font="bold 18px system-ui";
   ctx.fillText("Score: "+state.score+"    Lives: "+state.lives,20,32);
   ctx.font="14px system-ui";
-  ctx.fillText("A/D or Arrows: move    Space/W: jump    P: pause    R: restart",20,54);
+  ctx.fillText("A/D: move   Space: jump   J: attack   P: pause   R: restart",20,54);
+  if(scene.genre==="puzzle"){
+    const remaining=state.pickups.filter(i=>i.active).length;
+    ctx.fillText("Puzzle: collect all tokens to unlock the goal ("+remaining+" left)",20,76);
+  }
   if(state.won||!state.player.alive||state.paused){
     ctx.fillStyle="rgba(4,12,25,.82)";
     ctx.fillRect(0,H/2-65,W,130);
@@ -295,7 +316,7 @@ def build_playable_web_game(blueprint: GameBlueprint) -> CompiledGame:
     entities=compile_scene_entities(blueprint)
     scene={
         "schema":"skeleton.game.original_playable.v1",
-        "title":blueprint.title,"width":blueprint.width,
+        "title":blueprint.title,"genre":blueprint.genre,"width":blueprint.width,
         "height":blueprint.height,
         "entities":entities,"collision":compile_tile_collision(blueprint),
         "physics":blueprint.physics_dict(),"knowledge_refs":blueprint.source_evidence,
