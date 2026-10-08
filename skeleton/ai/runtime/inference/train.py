@@ -224,8 +224,8 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--model-id", default="skeleton-native-local-v1")
     parser.add_argument("--hidden-size", type=int, default=48)
-    parser.add_argument("--epochs", type=int, default=8)
-    parser.add_argument("--learning-rate", type=float, default=0.05)
+    parser.add_argument("--epochs", type=int)
+    parser.add_argument("--learning-rate", type=float)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--gradient-clip", type=float, default=1.0)
 
@@ -277,8 +277,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             norm=args.norm,
             ffn_kind=args.ffn_kind,
             bpe_merges=args.bpe_merges,
-            epochs=args.epochs,
-            learning_rate=args.learning_rate,
+            epochs=1 if args.epochs is None else args.epochs,
+            learning_rate=(
+                0.02 if args.learning_rate is None else args.learning_rate
+            ),
             schedule=args.schedule,
             seed=args.seed,
             max_steps=args.max_steps,
@@ -290,8 +292,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             output_path=args.output,
             model_id=args.model_id,
             hidden_size=args.hidden_size,
-            epochs=args.epochs,
-            learning_rate=args.learning_rate,
+            epochs=8 if args.epochs is None else args.epochs,
+            learning_rate=(
+                0.05 if args.learning_rate is None else args.learning_rate
+            ),
             seed=args.seed,
             gradient_clip=args.gradient_clip,
         )
