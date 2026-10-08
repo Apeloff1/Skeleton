@@ -138,6 +138,10 @@ _SPINE_EXPORTS = {
     "allocate_host_dispatches": ".dragon_mission_scheduler",
     "plan_adaptive_recrawls": ".dragon_mission_scheduler",
     "decide_mission_stop": ".dragon_mission_scheduler",
+    "MissionCapability": ".dragon_mission_catalog",
+    "CAPABILITY_CATALOG": ".dragon_mission_catalog",
+    "resolve_mission_capability": ".dragon_mission_catalog",
+    "describe_mission_capabilities": ".dragon_mission_catalog",
 }
 
 def __getattr__(name: str):
