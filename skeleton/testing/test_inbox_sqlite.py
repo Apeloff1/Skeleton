@@ -221,7 +221,7 @@ def test_invalid_message_identity_and_surrogate_rejected(tmp_path: Path):
         with pytest.raises(ValueError, match="noncanonical"):
             inbox.commit(corrupted, "write")
         with pytest.raises(ValueError, match="invalid"):
-            inbox.commit(msg(0, producer="bad\\x00name"), "write")
+            inbox.commit(msg(0, producer="bad\x00name"), "write")
 
 
 def test_storage_path_rejects_symlink(tmp_path: Path):
