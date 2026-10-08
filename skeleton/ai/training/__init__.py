@@ -15,3 +15,31 @@ __all__=[
     "TrainingManifest","deduplicate","scan_contamination","PostTrainingCandidate",
     "PostTrainingError","PostTrainingRun","PreferenceDataset",
 ]
+
+from .native_transformer import (
+    GovernedTrainingDataset,
+    NativeTrainingError,
+    NativeTrainingReceipt,
+    NativeTransformerTrainingConfig,
+    TRAINING_SCHEMA as NATIVE_TRANSFORMER_TRAINING_SCHEMA,
+    TRAINING_SCOPE as NATIVE_TRANSFORMER_TRAINING_SCOPE,
+    corpus_digest,
+    governed_dataset,
+    normalization_digest,
+    normalize_documents,
+    train_native_transformer_candidate,
+)
+
+__all__ += [
+    "GovernedTrainingDataset",
+    "NativeTrainingError",
+    "NativeTrainingReceipt",
+    "NativeTransformerTrainingConfig",
+    "NATIVE_TRANSFORMER_TRAINING_SCHEMA",
+    "NATIVE_TRANSFORMER_TRAINING_SCOPE",
+    "corpus_digest",
+    "governed_dataset",
+    "normalization_digest",
+    "normalize_documents",
+    "train_native_transformer_candidate",
+]
