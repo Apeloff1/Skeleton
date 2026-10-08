@@ -108,6 +108,19 @@ class GameKnowledgeIndex:
         except sqlite3.OperationalError as exc:
             if "no such module" not in str(exc).lower():
                 raise
+        # Backfill existing deployments when the indexed facet table is first
+        # introduced. Stream rows instead of materializing the whole corpus.
+        tag_count=db.execute("SELECT COUNT(*) FROM game_knowledge_tags").fetchone()[0]
+        if tag_count == 0:
+            cursor=db.execute("SELECT passage_id,tags FROM game_knowledge_passages")
+            while True:
+                batch=cursor.fetchmany(500)
+                if not batch:
+                    break
+                for pid,encoded in batch:
+                    for tag in json.loads(encoded):
+                        db.execute("INSERT OR IGNORE INTO game_knowledge_tags VALUES(?,?)",
+                                   (pid,tag))
         db.commit()
 
     def _rows(self, *, engine: str = "", limit: int = 10000, active: bool = True):
