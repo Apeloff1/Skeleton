@@ -12,3 +12,12 @@ def test_decimal_wire_vectors(value,expected):
 def test_decimal_wire_rejects_nonfinite():
  for x in (float("nan"),float("inf"),float("-inf")):
   with pytest.raises(ValueError):decimal_wire(x)
+
+
+def test_shared_visual_wire_golden_bytes_and_digest():
+ import json
+ from pathlib import Path
+ fixture=json.loads(Path("tests/fixtures/dragon_visual_wire_v1.json").read_text(encoding="utf-8"))
+ canonical=json.dumps(fixture,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()
+ assert canonical.decode()=="{\"consent_id\":\"consent-1\",\"consent_scope_digest\":\""+("a"*64)+"\",\"frames\":[[\"wire-frame\",\""+("d"*64)+"\",\"125\",\"local-frame://0\"]],\"job_id\":\"job-1\",\"observations\":[[\"wire-frame\",\""+("d"*64)+"\",\"0.125\",\"0\",\"0.0000001\",\"1\"]],\"owner\":\"user-α\",\"recording_digest\":\""+("b"*64)+"\",\"retention_until\":\"1000\",\"schema\":\"dragon.visual-observations.v1\",\"wire\":\"dragon.canonical-decimal.v1\"}"
+ assert __import__("hashlib").sha256(canonical).hexdigest()=="cc8ca97b5e608ae872209ce7fa4f47a49905489f9b42a1d56db90acb9a7d3261"
