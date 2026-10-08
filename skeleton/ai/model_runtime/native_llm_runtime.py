@@ -324,7 +324,10 @@ class NativeLLMRuntime:
         if any(token_id >= self.tokenizer.vocab_size for token_id in sequence.token_ids):
             raise RuntimeContractError("token sequence contains id outside vocabulary")
         self.assert_model_unchanged()
-        self.tokenizer.assert_unchanged()
+        try:
+            self.tokenizer.assert_unchanged()
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("native tokenizer drift during inference") from exc
         if use_cache and self.estimate_kv_bytes(len(sequence.token_ids)) > self.limits.max_kv_bytes:
             raise RuntimeContractError("inference exceeds KV memory budget")
         window = sequence.token_ids[-self.limits.max_context:]
