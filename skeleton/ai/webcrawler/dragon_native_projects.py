@@ -488,7 +488,7 @@ endif()
 
 def render_native_project(*,title:str,target_id:str,style:str,
                           candidate_id:str,mechanics:tuple[Mechanic,...],
-                          authorized:bool)->NativeProject:
+                          authorized:bool,design=None)->NativeProject:
     if not authorized:raise PermissionError("native game build requires authorization")
     target=demand_target(target_id)
     if target_id not in EMITTERS:
@@ -509,9 +509,16 @@ def render_native_project(*,title:str,target_id:str,style:str,
     if not mechanics or len(mechanics)>16 or len(set(mechanics))!=len(mechanics) or not all(
         isinstance(m,Mechanic) for m in mechanics):
         raise ValueError("invalid mechanic inventory")
+    if design is not None:
+        from .dragon_game_design import GameDesign
+        if not isinstance(design,GameDesign) or (
+            design.target!=target_id or design.genre!=style or design.title!=title
+        ):
+            raise ValueError("game design must match title, target and genre")
     # Research titles never become executable source or build script literals.
     clean=" ".join(re.findall("[A-Za-z0-9]+",title)[:8])[:42] or "Dragon Native"
-    seed=int(digest([candidate_id,target_id,style])[:8],16)
+    seed=(design.seed if design is not None else int(
+        digest([candidate_id,target_id,style])[:8],16))
     if target_id=="game_boy" and style=="side_scrolling_platformer":
         from .dragon_gb_platformer import gb_platformer_source
         files=gb_platformer_source(seed)
@@ -549,13 +556,25 @@ def render_native_project(*,title:str,target_id:str,style:str,
             "vga_dusk" if style in ("top_down_adventure","educational") else
             "crt_arcade" if style in ("racing","run_and_gun") else "handheld"
         )
-        selection=choose_campaign(style=style,seed=seed,stages=4,palette=palette,budget=8)
+        if design is not None:palette=design.palette
+        selection=choose_campaign(
+            style=style,seed=seed,
+            stages=design.stages if design is not None else 4,
+            palette=palette,budget=design.candidates if design is not None else 8)
         campaign=selection.chosen
-        files=render_sdl_campaign(campaign)
+        if style in ("first_person_shooter","immersive_sim"):
+            from .dragon_native_raycaster import render_raycaster
+            files=render_raycaster(campaign)
+        else:
+            files=render_sdl_campaign(campaign)
         files["dragon-generator-evaluation.json"]=json.dumps(
             selection_report(selection),sort_keys=True,indent=2)+"\n"
         files["dragon-campaign.json"]=json.dumps(
             campaign_dict(campaign),sort_keys=True,indent=2)+"\n"
+        if design is not None:
+            from .dragon_game_design import design_manifest
+            files["dragon-game-design.json"]=json.dumps(
+                design_manifest(design),sort_keys=True,indent=2)+"\n"
     else:
         files=(_gameboy(seed) if target_id=="game_boy" else
                _nes(seed) if target_id=="nes" else
@@ -577,6 +596,42 @@ def render_native_project(*,title:str,target_id:str,style:str,
             "encoding": "interleaved_2bpp" if target_id in ("game_boy","game_boy_color")
                         else "nes_planar_2bpp",
         },sort_keys=True,indent=2)+"\n"
+    if target_id=="game_boy_advance":
+        from .dragon_hw_graphics import atlas_header,source_manifest
+        files["include/dragon_original_tiles.h"]=atlas_header("gba_nibbles")
+        files["dragon-hardware-art.json"]=json.dumps(
+            source_manifest("gba_nibbles"),sort_keys=True,indent=2)+"\n"
+        source=files["src/main.c"]
+        anchor="#include <stdint.h>"
+        if anchor not in source:raise ValueError("GBA native source include anchor missing")
+        source=source.replace(anchor,anchor+'\n#include "dragon_original_tiles.h"',1)
+        anchor2="int main(void){"
+        drawer="""static void draw_dragon(int x,int y){
+    static const uint16_t ink[4]={RGB(2,5,9),RGB(8,18,10),
+                                   RGB(8,31,18),RGB(31,30,15)};
+    for(int yy=0;yy<8;yy++)for(int xx=0;xx<8;xx++){
+        unsigned char packed=dragon_native_tiles[yy*4+xx/2];
+        unsigned char index=(xx&1)?(packed>>4):(packed&15);
+        int u=x+xx,v=y+yy;
+        if(u>=0&&u<240&&v>=0&&v<160)VRAM[v*240+u]=ink[index&3];
+    }
+}
+"""
+        if anchor2 not in source:raise ValueError("GBA native source main unavailable")
+        source=source.replace(anchor2,drawer+anchor2,1)
+        source=source.replace("square(x,y,RGB(8,31,18));","draw_dragon(x,y);")
+        files["src/main.c"]=source
+        files["Makefile"]=files["Makefile"].replace("-specs=gba.specs","-Iinclude -specs=gba.specs")
+    if target_id in ("snes","genesis"):
+        from .dragon_hw_graphics import atlas_header,source_manifest
+        layout="snes_planar4" if target_id=="snes" else "genesis_nibbles"
+        files["include/dragon_original_tiles.h"]=atlas_header(layout)
+        files["dragon-hardware-art.json"]=json.dumps(
+            source_manifest(layout),sort_keys=True,indent=2)+"\n"
+    if target_id in ("master_system","game_gear"):
+        from .dragon_hw_graphics import source_manifest
+        files["dragon-hardware-art.json"]=json.dumps(
+            source_manifest("sega_vdp_planar4"),sort_keys=True,indent=2)+"\n"
     if target_id in ("game_boy","game_boy_color"):
         from .dragon_gb_sound import enrich_native_gb_sound
         files["src/main.asm"]=enrich_native_gb_sound(
@@ -586,6 +641,11 @@ def render_native_project(*,title:str,target_id:str,style:str,
         raise ValueError("unsafe generated path")
     if any(len(v.encode())>120_000 for v in files.values()):
         raise ValueError("native project source exceeds budget")
+    from .dragon_hardware_budget import analyze_project_budget
+    from dataclasses import asdict as _asdict
+    hardware=_asdict(analyze_project_budget(target_id,files))
+    files["dragon-hardware-budget.json"]=json.dumps(
+        hardware,sort_keys=True,indent=2)+"\n"
     implemented={Mechanic.MOVEMENT,Mechanic.EXPLORATION}
     if target_id in ("pc_linux","pc_windows","pc_macos","steam_deck","xbox_original"):
         implemented|={Mechanic.PLATFORMING,Mechanic.PHYSICS}
@@ -607,11 +667,13 @@ def render_native_project(*,title:str,target_id:str,style:str,
               "output_extension":target.output,"supported_mechanics":supported,
               "deferred_mechanics":deferred,"original_assets":True,
               "runtime_gameplay_mode": (
-                  GENRES[style] if target_id in ("pc_linux","pc_windows","pc_macos","steam_deck")
+                  ("native_dda_first_person" if style in ("first_person_shooter","immersive_sim")
+                   else GENRES[style]) if target_id in ("pc_linux","pc_windows","pc_macos","steam_deck")
                   else "game_boy_scrolling_platformer" if target_id=="game_boy" and style=="side_scrolling_platformer"
                   else "original_collectible_chase"
               ),"campaign_stages": (
-                  4 if target_id in ("pc_linux","pc_windows","pc_macos","steam_deck")
+                  (design.stages if design is not None else 4)
+                  if target_id in ("pc_linux","pc_windows","pc_macos","steam_deck")
                   else 1
               )}
     files["dragon-native-manifest.json"]=json.dumps(manifest,sort_keys=True,indent=2)+"\n"

@@ -11,19 +11,26 @@ from pathlib import Path
 from .dragon_native_projects import render_native_project
 from .dragon_native_targets import STYLES
 from .dragon_game_mechanics import Mechanic
+from .dragon_game_design import GameDesign,load_design
 
 def emit_demo(target:str, output_dir:Path, *, title:str="Dragon Tiny Adventure",
-              style:str="arcade_score_attack", overwrite:bool=False)->dict[str,str]:
+              style:str="arcade_score_attack", overwrite:bool=False,
+              design:GameDesign|None=None)->dict[str,str]:
+    if design is not None:
+        if not isinstance(design,GameDesign):
+            raise ValueError("typed native game design required")
+        target,title,style=design.target,design.title,design.genre
     if style not in STYLES:
         raise ValueError("unknown original game style")
     output_dir=output_dir.expanduser().resolve()
     if output_dir.is_symlink():
         raise ValueError("refusing to write to symlinked project root")
-    identity=sha256((title+"\0"+target+"\0"+style).encode()).hexdigest()
+    identity=sha256((title+"\0"+target+"\0"+style+
+                     ("\0"+design.digest if design is not None else "")).encode()).hexdigest()
     project=render_native_project(
         title=title,target_id=target,style=style,candidate_id=identity,
         mechanics=(Mechanic.MOVEMENT,Mechanic.EXPLORATION),
-        authorized=True,
+        authorized=True,design=design,
     )
     # Prevent accidental replacement of existing user project files.
     if output_dir.exists() and any(output_dir.iterdir()) and not overwrite:
@@ -47,21 +54,25 @@ def main() -> None:
     parser.add_argument("--title",default="Dragon Tiny Adventure")
     parser.add_argument("--out",type=Path,required=True)
     parser.add_argument("--overwrite",action="store_true")
-    parser.add_argument("--compile",action="store_true",help="Run installed native ROM toolchain after writing original source")
+    parser.add_argument("--compile",action="store_true",help="Compile GB/NES/CGB with a local toolchain")
+    parser.add_argument("--spec",type=Path,help="Strict game-design JSON; overrides title/target/style")
     args=parser.parse_args()
-    written=emit_demo(args.target,args.out,title=args.title,style=args.style,
-                      overwrite=args.overwrite)
+    design=load_design(args.spec) if args.spec else None
+    title=design.title if design is not None else args.title
+    target=design.target if design is not None else args.target
+    style=design.genre if design is not None else args.style
+    written=emit_demo(target,args.out,title=title,style=style,
+                      overwrite=args.overwrite,design=design)
     print("Generated native project files:",len(written))
     for name in written:print(" +",name)
     if args.compile:
-        from .dragon_native_projects import render_native_project
         from .dragon_native_compile import compile_local
-        from .dragon_game_mechanics import Mechanic
-        identity=sha256((args.title+"\0"+args.target+"\0"+args.style).encode()).hexdigest()
+        identity=sha256((title+"\0"+target+"\0"+style+
+                         ("\0"+design.digest if design else "")).encode()).hexdigest()
         project=render_native_project(
-            title=args.title,target_id=args.target,style=args.style,
-            candidate_id=identity,mechanics=(Mechanic.MOVEMENT,Mechanic.EXPLORATION),
-            authorized=True,
+            title=title,target_id=target,style=style,candidate_id=identity,
+            mechanics=(Mechanic.MOVEMENT,Mechanic.EXPLORATION),
+            authorized=True,design=design,
         )
         result=compile_local(project,args.out,authorized=True)
         print("Native compiler:",result.state,result.message)

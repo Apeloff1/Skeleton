@@ -379,3 +379,69 @@ hardware sound generation, not an HTML audio element.
 
 These enhancements must also pass RGBDS ROM compilation and emulator sound
 checks before claiming audible output on physical handhelds.
+
+
+## Fifth-generation native game architecture: typed design, 3D, graphics, budgets
+
+### Strict offline user-editable game specifications
+
+The game design compiler accepts canonical JSON with a title, target,
+genre, palette, stages (1-8), selection candidates (1-24), uint32 generation
+seed, difficulty annotation (1-10), named original hero/theme, and bounded
+notes. It rejects missing/extra keys, duplicate JSON keys, invalid field
+types and command-shaped/path-injection text. The design changes the actual
+generated stage count, palette, candidate budget, and deterministic seed.
+The designer currently records the difficulty, hero and theme; it does not
+yet implement unique mechanics for those annotations. No approval, XP or
+owner authority is derived from a design file.
+
+To create the design data, run Python and import starter_design from
+skeleton.ai.webcrawler.dragon_game_design, then save its dictionary as
+/tmp/dragon-spec.json. Edit stages, candidates, seed, genre, palette and
+target within the validated supported options. Run:
+
+    python -m skeleton.ai.webcrawler.dragon_native_cli \
+      --spec /tmp/dragon-spec.json --out /tmp/dragon-fps
+
+The source project includes a canonical designer fingerprint in
+dragon-game-design.json plus the generated campaign and candidate reports.
+
+### Dedicated native software-raycasting engine
+
+For first_person_shooter and immersive_sim, the PC targets now use
+dragon_native_raycaster.py rather than the existing 2D top-down engine.
+It emits real SDL2/C99 with first-person DDA wall stepping, camera rotation,
+perpendicular wall depth, perspective stripe rendering, collision,
+depth-clipped enemy billboards, combat, key-door interaction, health, and
+four or more native chapters. The same renderer currently underlies both
+genre labels; neither genre is a finished commercial FPS or immersive sim.
+This implements early PC-era 2.5D software perspective, NOT a 3D GPU,
+PlayStation or modern Xbox engine. The native CI includes a 480-tick
+headless diagnostic exercising the actual raycaster executable.
+
+### Original 4bpp sprite hardware encoders
+
+The atlas compiler produces and checks four distinct native memory layouts:
+SNES Mode 1 interleaved 4bpp planes, GBA packed low-nibble-first 4bpp,
+Genesis packed high-nibble-first 4bpp, and Sega SMS/Game Gear per-row 4-plane
+VDP graphics. Decoding must reproduce every authored tile without loss.
+The GBA Mode 3 C framebuffer draws the generated original hatchling from
+its packed 4bpp atlas and BGR555 palette rather than a generic solid block.
+
+The SNES and Genesis source archives carry their era-correct encoded
+graphics with a fingerprint, but their present native game loops do not yet
+consume/upload them. They must not be claimed as working on-screen sprite
+renderers. The SMS and Game Gear have VDP sprite loading separately.
+
+### Conservative hardware resource audits
+
+Every emitted native source bundle now carries
+dragon-hardware-budget.json. The auditor checks and reports source bytes,
+declared graphics atlas bytes, target-specific sprite/tile budgets, video
+storage classes, RAM and ROM-bank development constraints across 16
+supported native emitter targets, with explicit warnings and SHA256 evidence.
+These are SOURCE-level constraints and NOT native linker allocations,
+cycle-accurate VRAM/OAM scans, or actual hardware certifications.
+
+Native compiler outputs, emulator replay, hardware profile instrumentation,
+visual gameplay quality and accessibility remain independent gates.

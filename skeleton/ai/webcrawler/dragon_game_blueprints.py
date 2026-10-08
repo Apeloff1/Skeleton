@@ -27,6 +27,8 @@ GENRES = {
     "top_down_adventure": "adventure",
     "roguelike": "dungeon",
     "survival_horror": "dungeon",
+    "first_person_shooter": "dungeon",
+    "immersive_sim": "dungeon",
     "turn_based_rpg": "dungeon",
     "tactical_rpg": "tactics",
     "real_time_strategy": "tactics",
