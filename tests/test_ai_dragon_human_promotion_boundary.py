@@ -71,3 +71,25 @@ def test_recomputed_id_still_cannot_change_approved_record():
     with pytest.raises(PermissionError,match="survivor set changed"):
         execute_memory_promotion(d,(changed,),human_receipt=hr,human_decision=decision,
           surviving_knowledge_ids=(changed.knowledge_id,),authorized=True)
+
+
+def test_current_manifest_bound_review_round_trips_from_ledger():
+ k,_,ledger,decision,_,_=setup()
+ loaded=ledger.get("u",decision.review_id,authorized=True)
+ assert loaded==decision and loaded.survivor_manifest
+
+def test_legacy_review_schema_migrates_but_legacy_approval_stays_untrusted():
+ db=sqlite3.connect(":memory:")
+ db.execute("""CREATE TABLE dragon_human_reviews(
+  owner TEXT NOT NULL,review_id TEXT NOT NULL,reviewer_id TEXT NOT NULL,
+  adversarial_fingerprint TEXT NOT NULL,survivor_digest TEXT NOT NULL,
+  approved INTEGER NOT NULL,reviewed_at REAL NOT NULL,rationale TEXT NOT NULL,
+  PRIMARY KEY(owner,review_id))""")
+ db.execute("INSERT INTO dragon_human_reviews VALUES(?,?,?,?,?,?,?,?)",
+  ("u","r","human","a"*64,"b"*64,1,1.0,"legacy approval"))
+ db.commit()
+ ledger=DragonHumanReviewLedger(db)
+ columns={row[1] for row in db.execute("PRAGMA table_info(dragon_human_reviews)")}
+ assert "survivor_manifest" in columns
+ with pytest.raises(PermissionError,match="legacy human review"):
+  ledger.get("u","r",authorized=True)
