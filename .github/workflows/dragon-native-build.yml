@@ -10,6 +10,7 @@ on:
       - 'skeleton/ai/webcrawler/dragon_build_evidence.py'
       - 'skeleton/ai/webcrawler/dragon_native_raycaster.py'
       - 'skeleton/ai/webcrawler/dragon_native_3d_era.py'
+      - 'skeleton/ai/webcrawler/dragon_native_puzzle.py'
       - 'skeleton/ai/webcrawler/dragon_hw_graphics.py'
       - 'skeleton/ai/webcrawler/dragon_hardware_budget.py'
       - 'skeleton/ai/webcrawler/dragon_game_fitness.py'
@@ -23,6 +24,7 @@ on:
       - 'tests/test_ai_webcrawler_dragon_game_fitness.py'
       - 'tests/test_ai_webcrawler_dragon_native_3d_design.py'
       - 'tests/test_ai_webcrawler_dragon_native_3d_era.py'
+      - 'tests/test_ai_webcrawler_dragon_native_puzzle.py'
       - 'tests/test_ai_webcrawler_dragon_playtest_planner.py'
       - 'tests/test_ai_webcrawler_dragon_build_evidence.py'
       - 'tests/test_ai_webcrawler_dragon_game_design_effects.py'
@@ -84,6 +86,7 @@ jobs:
             tests/test_ai_webcrawler_dragon_native_cycles.py \
             tests/test_ai_webcrawler_dragon_native_3d_design.py \
             tests/test_ai_webcrawler_dragon_native_3d_era.py \
+            tests/test_ai_webcrawler_dragon_native_puzzle.py \
             tests/test_ai_webcrawler_dragon_native_rpg.py \
             tests/test_ai_webcrawler_dragon_native_rhythm.py \
             tests/test_ai_webcrawler_dragon_playtest_planner.py \

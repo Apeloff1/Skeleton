@@ -672,3 +672,57 @@ graphics limits for all three additional targets. Native tests verify the
 different rendering/controller APIs, deterministic source output, format
 tags and SDK project recipes. They do not claim a compiled, executable,
 emulator-tested or licensed commercial game.
+
+
+## Eleventh-generation actually executable PC puzzle engine with exact solver
+
+The new fixed_screen_puzzle style is implemented as a separate, dependency-
+free C99 native Sokoban game for the desktop platform family: Linux,
+Windows, macOS and Steam Deck. It DOES NOT invoke SDL, browser code or
+a runtime interpreted scripting engine. It produces a regular CMake
+project and conventional native Makefile; the host C compiler creates
+the resulting binary (including native .exe via an appropriate Windows
+compiler). An actual local binary still must be compiled by the user or
+CI; source generation alone is not an executable.
+
+The native game implements 12x10 original tile levels, walls, movable
+crates, matching goals, character motion, bounded undo history, reset,
+a hint for the start state, terminal colour highlighting and progression
+only after every crate occupies a goal. It supports keyboard W/A/S/D,
+U/R/H/Q/N commands, plus self-test/list diagnostic modes.
+
+Unlike simply inventing a maze, the Python game design compiler solves
+EVERY proposed level with finite exact breadth-first state-space search
+over both player position and all crate positions before creating the
+native project. It rejects any candidate with no solution, improper
+crate/goal counts, unrecognized characters, excessive solver states
+(120,000 cap), or excessively long solution (400 move cap).
+Original hand-designed challenge templates are transformed in deterministic
+horizontal/vertical orientations. The editable GameDesign file controls
+the level count, generation seed and puzzle difficulty (how quickly the
+two-crate templates appear).
+
+The project includes dragon-puzzle-proof.json, containing a bounded shortest
+walk, per-level input/output fingerprints and exact source-level search
+statistics. Its embedded C puzzle engine then provides --selftest to run
+those same move inputs through the real compiled push/collision rules and
+confirm the victory state on EACH level. CI includes an actual native CMake
+build of the exported game and requires the four-stage self-test to pass.
+
+Run the source forge:
+
+    python -m skeleton.ai.webcrawler.dragon_native_cli \
+      --target pc_linux --style fixed_screen_puzzle \
+      --out /tmp/dragon-puzzle
+
+Compile and play the actual local game:
+
+    cmake -S /tmp/dragon-puzzle -B /tmp/dragon-puzzle/build
+    cmake --build /tmp/dragon-puzzle/build
+    /tmp/dragon-puzzle/build/dragon_game --selftest
+    /tmp/dragon-puzzle/build/dragon_game
+
+This provides an explicit source -> compiler -> native game -> real move
+replay loop, not merely an LLM claim that a puzzle is solvable. The game
+remains a deliberately compact native terminal title; sound, animations,
+GPU rendering, and human quality reviews require further engineering.
