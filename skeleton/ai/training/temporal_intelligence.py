@@ -44,6 +44,13 @@ class TemporalTrend:
 class TemporalAuthorityReceipt:
  subject:str; policy_year:int; consensus_digest:str; trend_digest:str; source_diversity_ppm:int
  support_floor_ppm:int; volatility_ppm:int; regime_shift_count:int; authorized:bool
+ def __post_init__(self):
+  if not isinstance(self.subject,str) or not self.subject.strip(): raise TemporalSignalError("temporal authority subject required")
+  if isinstance(self.policy_year,bool) or not isinstance(self.policy_year,int) or not 1000<=self.policy_year<=9999: raise TemporalSignalError("invalid temporal authority year")
+  _hex(self.consensus_digest,"consensus"); _hex(self.trend_digest,"trend")
+  for n in ("source_diversity_ppm","support_floor_ppm","volatility_ppm"): _ppm(getattr(self,n),n)
+  if isinstance(self.regime_shift_count,bool) or not isinstance(self.regime_shift_count,int) or self.regime_shift_count<0: raise TemporalSignalError("invalid regime shift count")
+  if not isinstance(self.authorized,bool): raise TemporalSignalError("invalid temporal authorization flag")
  @property
  def digest(self): return _digest(self.__dict__)
 
