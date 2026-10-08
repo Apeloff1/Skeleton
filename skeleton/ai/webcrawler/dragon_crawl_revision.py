@@ -139,8 +139,8 @@ def compare_crawl_revisions(
         current_digest = current.document.content_hash if current else None
         previous_origin = prior.document.canonical_url if prior else None
         current_origin = current.document.canonical_url if current else None
-        changed_text = previous_digest != current_digest
-        changed_origin = previous_origin != current_origin
+        changed_text = bool(prior and current and previous_digest != current_digest)
+        changed_origin = bool(prior and current and previous_origin != current_origin)
         changed_lineage = (
             (prior.parent_source_ids, prior.lineage_tokens) !=
             (current.parent_source_ids, current.lineage_tokens)
