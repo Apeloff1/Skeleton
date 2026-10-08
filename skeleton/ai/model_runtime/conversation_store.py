@@ -192,6 +192,113 @@ class ConversationStore:
                 raise RuntimeContractError("conversation missing or revision conflict")
         return expected_revision + 1
 
+    def revisions(self, session_ids: tuple[str, ...]) -> Mapping[str, int]:
+        with self._lock:
+            ids = tuple(session_ids)
+            if len(set(ids)) != len(ids):
+                raise RuntimeContractError("duplicate session identifiers")
+            result = {}
+            for sid in ids:
+                row = self._db.execute(
+                    "SELECT revision FROM conversations WHERE session_id=?", (sid,)).fetchone()
+                if row is None:
+                    raise RuntimeContractError("unknown stored conversation")
+                result[sid] = row[0]
+            return result
+
+    def save_many(self, updates: tuple[tuple[str, int, NativeConversationSession], ...]) -> Mapping[str, int]:
+        """Atomic multi-session compare-and-swap; no partial commits."""
+        items = tuple(updates)
+        ids = [item[0] for item in items]
+        if len(set(ids)) != len(ids):
+            raise RuntimeContractError("duplicate session identifiers")
+        encoded = []
+        for sid, revision, session in items:
+            if type(revision) is not int or revision < 0:
+                raise RuntimeContractError("invalid expected revision")
+            encoded.append((sid, revision, self._encode(session)))
+        now = time.time()
+        with self._transaction():
+            for sid, revision, payload in encoded:
+                cursor = self._db.execute(
+                    "UPDATE conversations SET revision=revision+1, updated_at=?, snapshot_json=? "
+                    "WHERE session_id=? AND revision=?",
+                    (now, payload, sid, revision))
+                if cursor.rowcount != 1:
+                    raise RuntimeContractError("conversation batch revision conflict")
+        return {sid: revision + 1 for sid, revision, _ in encoded}
+
+    def delete_many(self, expected: Mapping[str, int]) -> int:
+        """Atomic conditional cohort deletion."""
+        with self._transaction():
+            for sid, revision in expected.items():
+                if type(revision) is not int or revision < 0:
+                    raise RuntimeContractError("invalid expected revision")
+                cursor = self._db.execute(
+                    "DELETE FROM conversations WHERE session_id=? AND revision=?",
+                    (sid, revision))
+                if cursor.rowcount != 1:
+                    raise RuntimeContractError("conversation batch revision conflict")
+        return len(expected)
+
+    def list_pinned(self, *, limit: int = 100) -> tuple[str, ...]:
+        if type(limit) is not int or not 1 <= limit <= 10000:
+            raise RuntimeContractError("invalid page limit")
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT session_id FROM conversations WHERE pinned=1 "
+                "ORDER BY updated_at, session_id LIMIT ?", (limit,)).fetchall()
+        return tuple(row[0] for row in rows)
+
+    def list_stale(self, older_than: float, *, limit: int = 100) -> tuple[str, ...]:
+        if not isinstance(older_than, (int, float)) or not 0 <= older_than <= time.time():
+            raise RuntimeContractError("invalid expiration cutoff")
+        if type(limit) is not int or not 1 <= limit <= 10000:
+            raise RuntimeContractError("invalid page limit")
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT session_id FROM conversations WHERE pinned=0 AND updated_at < ? "
+                "ORDER BY updated_at, session_id LIMIT ?", (older_than, limit)).fetchall()
+        return tuple(row[0] for row in rows)
+
+    def integrity_check(self) -> bool:
+        with self._lock:
+            rows = self._db.execute("PRAGMA integrity_check").fetchall()
+            if rows != [("ok",)]:
+                raise RuntimeContractError("conversation database integrity failure")
+            return True
+
+    def verify_all(self, *, batch_size: int = 100) -> int:
+        """Validate every stored snapshot against the active native model."""
+        if type(batch_size) is not int or not 1 <= batch_size <= 10000:
+            raise RuntimeContractError("invalid verification batch size")
+        with self._lock:
+            cursor = self._db.execute(
+                "SELECT snapshot_json FROM conversations ORDER BY session_id")
+            count = 0
+            while True:
+                rows = cursor.fetchmany(batch_size)
+                if not rows:
+                    break
+                for (payload,) in rows:
+                    self._decode(payload)
+                    count += 1
+            return count
+
+    def database_size_bytes(self) -> int:
+        with self._lock:
+            pages = self._db.execute("PRAGMA page_count").fetchone()[0]
+            size = self._db.execute("PRAGMA page_size").fetchone()[0]
+            return pages * size
+
+    def checkpoint_wal(self) -> tuple[int, int, int]:
+        with self._lock:
+            return tuple(self._db.execute("PRAGMA wal_checkpoint(PASSIVE)").fetchone())
+
+    def vacuum(self) -> None:
+        with self._lock:
+            self._db.execute("VACUUM")
+
     def close(self) -> None:
         with self._lock:
             self._db.close()
