@@ -143,6 +143,14 @@ def integrate_advanced_gameplay(html: str, *, require_quests: bool = False) -> s
     )
     if any(anchor not in html for anchor in required):
         raise ValueError("gameplay integration requires working Canvas engine")
+    control_marker='<button data-button="attack" aria-label="Attack">Hit</button></div>'
+    if control_marker not in html:
+        raise ValueError("missing touch input controls")
+    html=html.replace(control_marker,
+        '<button data-button="attack" aria-label="Attack">Hit</button>'
+        '<button data-button="shoot" aria-label="Shoot">Fire</button>'
+        '<button data-button="heal" aria-label="Drink potion">Heal</button>'
+        '<button data-button="shop" aria-label="Buy potion">Shop</button></div>',1)
     html=html.replace("function draw(){",_ADVANCED_JS+"function draw(){",1)
     html=html.replace(
         "  for(const item of state.pickups) if(item.active){",
