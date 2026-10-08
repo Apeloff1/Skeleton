@@ -36,6 +36,7 @@ class Reservation:
     tokens: int
     expires_ns: int
     sequence: int
+    in_flight: bool = False
 
 
 class CapacityLedger:
@@ -56,12 +57,19 @@ class CapacityLedger:
 
     def _reap(self, now: int) -> None:
         for key, lease in tuple(self._active.items()):
-            if lease.expires_ns <= now:
+            # A synchronous backend may still be executing beyond its TTL.
+            # Do not resurrect capacity or a request identity mid-execution.
+            if not lease.in_flight and lease.expires_ns <= now:
                 del self._active[key]
 
-    def acquire(self, request_id: str, fingerprint: str, tokens: int, *, exclusive: bool = False) -> Reservation:
-        if type(exclusive) is not bool:
-            raise CapacityDenied("exclusive must be a boolean")
+    def acquire(
+        self, request_id: str, fingerprint: str, tokens: int, *,
+        exclusive: bool = False, in_flight: bool = False,
+    ) -> Reservation:
+        if type(exclusive) is not bool or type(in_flight) is not bool:
+            raise CapacityDenied("exclusive and in_flight must be booleans")
+        if in_flight and not exclusive:
+            raise CapacityDenied("in-flight reservations require exclusive ownership")
         if (not isinstance(request_id, str) or not request_id or len(request_id) > 256
                 or not isinstance(fingerprint, str) or not fingerprint or len(fingerprint) > 256
                 or type(tokens) is not int or tokens <= 0):
@@ -82,7 +90,7 @@ class CapacityLedger:
                 raise CapacityDenied("token capacity exhausted")
             self._sequence += 1
             lease = Reservation(request_id, fingerprint, tokens,
-                                now + self.limits.lease_ns, self._sequence)
+                                now + self.limits.lease_ns, self._sequence, in_flight)
             self._active[request_id] = lease
             return lease
 
