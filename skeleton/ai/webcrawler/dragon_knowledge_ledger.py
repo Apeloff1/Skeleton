@@ -56,21 +56,43 @@ class DragonKnowledgeLedger:
                  policy: EvidencePolicy = EvidencePolicy()):
         self.db = db
         self.distiller = ProbabilisticKnowledgeDistiller(policy)
+        self._ensure_schema()
         db.execute("""
-            CREATE TABLE IF NOT EXISTS dragon_evidence_passes(
+            CREATE INDEX IF NOT EXISTS dragon_evidence_claim_idx
+            ON dragon_evidence_passes(owner,claim_id)
+        """)
+        db.commit()
+
+    def _ensure_schema(self) -> None:
+        self.db.execute("""CREATE TABLE IF NOT EXISTS dragon_evidence_passes(
+            owner TEXT NOT NULL, claim_id TEXT NOT NULL,
+            source_id TEXT NOT NULL,source_revision TEXT NOT NULL,
+            pass_id TEXT NOT NULL,supports INTEGER NOT NULL,
+            confidence REAL NOT NULL,reliability REAL NOT NULL,
+            independence_group TEXT NOT NULL,evidence_locator TEXT NOT NULL,
+            observation TEXT NOT NULL,
+            PRIMARY KEY(owner,claim_id,source_id,source_revision,pass_id))""")
+        info=self.db.execute("PRAGMA table_info(dragon_evidence_passes)").fetchall()
+        pk=[row[1] for row in sorted((r for r in info if r[5]),key=lambda r:r[5])]
+        expected=["owner","claim_id","source_id","source_revision","pass_id"]
+        if pk==expected:return
+        if pk!=["owner","source_id","source_revision","pass_id"]:
+            raise RuntimeError("unsupported dragon evidence ledger schema")
+        with self.db:
+            self.db.execute("""CREATE TABLE dragon_evidence_passes_v2(
                 owner TEXT NOT NULL, claim_id TEXT NOT NULL,
                 source_id TEXT NOT NULL,source_revision TEXT NOT NULL,
                 pass_id TEXT NOT NULL,supports INTEGER NOT NULL,
                 confidence REAL NOT NULL,reliability REAL NOT NULL,
                 independence_group TEXT NOT NULL,evidence_locator TEXT NOT NULL,
                 observation TEXT NOT NULL,
-                PRIMARY KEY(owner,source_id,source_revision,pass_id))
-        """)
-        db.execute("""
-            CREATE INDEX IF NOT EXISTS dragon_evidence_claim_idx
-            ON dragon_evidence_passes(owner,claim_id)
-        """)
-        db.commit()
+                PRIMARY KEY(owner,claim_id,source_id,source_revision,pass_id))""")
+            self.db.execute("""INSERT INTO dragon_evidence_passes_v2
+                SELECT owner,claim_id,source_id,source_revision,pass_id,supports,
+                       confidence,reliability,independence_group,evidence_locator,observation
+                FROM dragon_evidence_passes""")
+            self.db.execute("DROP TABLE dragon_evidence_passes")
+            self.db.execute("ALTER TABLE dragon_evidence_passes_v2 RENAME TO dragon_evidence_passes")
 
     def add(self, owner: str, item: EvidencePass, *,
             authorized: bool) -> None:
@@ -84,8 +106,8 @@ class DragonKnowledgeLedger:
                 SELECT claim_id,supports,confidence,reliability,
                        independence_group,evidence_locator,observation
                 FROM dragon_evidence_passes
-                WHERE owner=? AND source_id=? AND source_revision=? AND pass_id=?
-            """, (owner, item.source_id, item.source_revision,
+                WHERE owner=? AND claim_id=? AND source_id=? AND source_revision=? AND pass_id=?
+            """, (owner, item.claim_id, item.source_id, item.source_revision,
                   item.pass_id)).fetchone()
             current = (
                 item.claim_id, int(item.supports), item.confidence,
@@ -103,13 +125,13 @@ class DragonKnowledgeLedger:
             if count >= self.distiller.policy.max_evidence:
                 raise ValueError("evidence budget exceeded")
             source_count = self.db.execute("""
-                SELECT COUNT(*) FROM dragon_evidence_passes
-                WHERE owner=? AND source_id=? AND source_revision=?
-            """, (owner, item.source_id, item.source_revision)).fetchone()[0]
+                SELECT COUNT(DISTINCT pass_id) FROM dragon_evidence_passes
+                WHERE owner=? AND source_id=? AND source_revision=? AND claim_id=?
+            """, (owner, item.source_id, item.source_revision,item.claim_id)).fetchone()[0]
             if source_count >= self.distiller.policy.max_passes_per_source:
                 raise ValueError("reread budget exceeded")
             self.db.execute("""
-                INSERT INTO dragon_evidence_passes VALUES(?,?,?,?,?,?,?,?,?,?,?)
+                INSERT INTO dragon_evidence_passes(owner,claim_id,source_id,source_revision,pass_id,supports,confidence,reliability,independence_group,evidence_locator,observation) VALUES(?,?,?,?,?,?,?,?,?,?,?)
             """, (owner, item.claim_id, item.source_id, item.source_revision,
                   item.pass_id, int(item.supports), item.confidence,
                   item.reliability, item.independence_group,
