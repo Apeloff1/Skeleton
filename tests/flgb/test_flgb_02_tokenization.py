@@ -31,6 +31,20 @@ class TestTokenization(unittest.TestCase):
         with self.assertRaises(TokenizerContractError):
             deserialize_token_sequence(bad_digest)
 
+    def test_strict_canonical_mode_rejects_whitespace_and_order(self):
+        seq = TokenSequence(D, (1, 2, 3), D)
+        canonical = serialize_token_sequence(seq)
+        self.assertEqual(deserialize_token_sequence(canonical, require_canonical=True), seq)
+        alternate = (
+            b'{"token_ids":[1,2,3],"tokenizer_digest":"' + D.encode() +
+            b'","source_text_digest":"' + D.encode() + b'"}'
+        )
+        self.assertEqual(deserialize_token_sequence(alternate), seq)
+        with self.assertRaisesRegex(TokenizerContractError, "noncanonical"):
+            deserialize_token_sequence(alternate, require_canonical=True)
+        with self.assertRaisesRegex(TokenizerContractError, "noncanonical"):
+            deserialize_token_sequence(canonical + b" ", require_canonical=True)
+
     def test_deserializer_rejects_duplicate_json_fields(self):
         payload = (
             b'{"source_text_digest":"' + D.encode() +
