@@ -28,6 +28,17 @@ class KnowledgeNormalizationOutput:
     records:tuple[NormalizedKnowledge,...]
 
 
+def normalization_records_fingerprint(input_fingerprints:tuple[str,...],
+    records:tuple[NormalizedKnowledge,...])->str:
+    ordered=tuple(sorted(records,key=lambda x:x.knowledge_id))
+    seen=set()
+    for r in ordered:
+        if r.knowledge_id in seen: raise ValueError("duplicate normalized knowledge identity")
+        seen.add(r.knowledge_id)
+    return sha256(json.dumps({"input":input_fingerprints,"records":[vars(x) for x in ordered]},
+        sort_keys=True,separators=(",",":"),allow_nan=False).encode()).hexdigest()
+
+
 def execute_knowledge_normalization(dispatch:LayerDispatch,
     claims:tuple[CalibratedClaim,...],*,calibration_receipt:LayerReceipt,
     authorized:bool,ontology_version:str="dragon.game-knowledge.v1"
@@ -59,11 +70,7 @@ def execute_knowledge_normalization(dispatch:LayerDispatch,
             c.corroboration_verdict,c.calibrated_probability,
             c.probability_semantics,c.calibration_artifact_fingerprint,
             calibration_receipt.output_fingerprint,contradiction))
-    canonical=[vars(x) for x in records]
-    digest=sha256(json.dumps({"input":dispatch.input_fingerprints,
-        "worker":dispatch.worker,"version":dispatch.worker_version,
-        "ontology":ontology_version,"records":canonical},
-        sort_keys=True,separators=(",",":")).encode()).hexdigest()
+    digest=normalization_records_fingerprint(dispatch.input_fingerprints,tuple(records))
     receipt=LayerReceipt(AnalysisLayer.KNOWLEDGE_NORMALIZATION,
         dispatch.input_fingerprints,digest,calibration_receipt.independent_sources,
         bool(records),False)
