@@ -104,6 +104,8 @@ def parser() -> argparse.ArgumentParser:
     solve = commands.add_parser("solve", help="Emit a trusted winning turn-by-turn move trace")
     replay = commands.add_parser("verify-replay", help="Recompute an exported browser action trace")
     replay.add_argument("--input", required=True, help="Browser action trace JSON")
+    analyze = commands.add_parser("analyze-replay", help="Derive verified playability feedback from browser actions")
+    analyze.add_argument("--input", required=True, help="Browser action trace JSON")
     return root
 
 
@@ -135,19 +137,25 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "final_state": compiled.proof.final_state.to_payload(),
                 "replay_digest": compiled.proof.digest,
             }
-        elif args.command == "verify-replay":
+        elif args.command in ("verify-replay", "analyze-replay"):
             log = _read_json(args.input, MAX_REPLAY_BYTES)
             actions = _actions(log, compiled.world.digest, compiled.world.intent.project_id)
             trace = play_actions(compiled.world, actions, authorized=True)
-            output_data = {
-                "schema": "skeleton.game_builder.verified_browser_replay.v1",
-                "world_digest": compiled.world.digest,
-                "action_count": len(actions),
-                "final_state": trace.final_state.to_payload(),
-                "replay_digest": trace.digest,
-                "verified": True,
-                "source_authenticity_verified": False,
-            }
+            if args.command == "analyze-replay":
+                from .playability_analysis import analyze_replay
+                output_data = analyze_replay(
+                    compiled.world, trace, authorized=True,
+                ).to_payload()
+            else:
+                output_data = {
+                    "schema": "skeleton.game_builder.verified_browser_replay.v1",
+                    "world_digest": compiled.world.digest,
+                    "action_count": len(actions),
+                    "final_state": trace.final_state.to_payload(),
+                    "replay_digest": trace.digest,
+                    "verified": True,
+                    "source_authenticity_verified": False,
+                }
         else:
             raise PlayableCompilationError("invalid game CLI command")
     except (PlayableCompilationError, PlayableWorldError, GameplayError, OSError) as exc:
