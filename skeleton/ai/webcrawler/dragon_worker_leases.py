@@ -30,21 +30,26 @@ class DragonWorkerLeases:
   if not all((owner,run_id,layer,worker_id,implementation,version)) or not math.isfinite(now) or not math.isfinite(ttl) or not 1<=ttl<=3600:
    raise ValueError("invalid worker lease")
   token=secrets.token_hex(32)
-  with self.db:
-   cur=self.db.execute("""INSERT INTO dragon_worker_leases(
-    owner,run_id,layer,worker_id,implementation,version,token,leased_at,expires_at,generation)
-    VALUES(?,?,?,?,?,?,?,?,?,1)
-    ON CONFLICT(owner,run_id,layer) DO UPDATE SET
-      worker_id=excluded.worker_id,implementation=excluded.implementation,
-      version=excluded.version,token=excluded.token,leased_at=excluded.leased_at,
-      expires_at=excluded.expires_at,generation=dragon_worker_leases.generation+1
-    WHERE excluded.leased_at>=dragon_worker_leases.expires_at""",
-    (owner,run_id,layer,worker_id,implementation,version,token,now,now+ttl))
-   if cur.rowcount!=1:
-    raise RuntimeError("analysis layer already leased")
-   row=self.db.execute("""SELECT worker_id,implementation,version,token,leased_at,expires_at,generation
+  # Serialize replacement so an expired generation is archived before it is overwritten.
+  if self.db.in_transaction: raise RuntimeError("worker lease acquisition requires transaction boundary")
+  self.db.execute("BEGIN IMMEDIATE")
+  try:
+   old=self.db.execute("""SELECT worker_id,implementation,version,token,leased_at,expires_at,generation
     FROM dragon_worker_leases WHERE owner=? AND run_id=? AND layer=?""",(owner,run_id,layer)).fetchone()
-  return WorkerLease(owner,run_id,layer,*row)
+   if old and now<old[5]: raise RuntimeError("analysis layer already leased")
+   generation=1 if not old else old[6]+1
+   if old:
+    digest=sha256(old[3].encode()).hexdigest()
+    self.db.execute("""INSERT INTO dragon_worker_lease_history VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+     (owner,run_id,layer,old[6],old[0],old[1],old[2],digest,old[4],old[5],now))
+    self.db.execute("DELETE FROM dragon_worker_leases WHERE owner=? AND run_id=? AND layer=?",
+     (owner,run_id,layer))
+   self.db.execute("""INSERT INTO dragon_worker_leases VALUES(?,?,?,?,?,?,?,?,?,?)""",
+    (owner,run_id,layer,worker_id,implementation,version,token,now,now+ttl,generation))
+   self.db.commit()
+  except Exception:
+   self.db.rollback();raise
+  return WorkerLease(owner,run_id,layer,worker_id,implementation,version,token,now,now+ttl,generation)
  def require(self,lease:WorkerLease,*,now:float,authorized:bool)->WorkerLease:
   if not authorized: raise PermissionError("worker lease validation requires authorization")
   row=self.db.execute("""SELECT worker_id,implementation,version,token,leased_at,expires_at,generation
