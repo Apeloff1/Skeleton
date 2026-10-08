@@ -70,7 +70,9 @@ class RuntimeAdmissionScheduler:
     """Stateful, deterministic and fail-closed local inference admission scheduler."""
 
     def __init__(self, limits: AdmissionLimits | None = None, *, policy: RuntimePolicy | None = None) -> None:
-        self.limits = limits or AdmissionLimits()
+        if limits is not None and not isinstance(limits, AdmissionLimits):
+            raise ModelRuntimeError("AdmissionLimits required")
+        self.limits = limits if limits is not None else AdmissionLimits()
         if policy is not None and not isinstance(policy, RuntimePolicy):
             raise ModelRuntimeError("RuntimePolicy required")
         self.policy = policy
@@ -208,10 +210,17 @@ class RuntimeAdmissionScheduler:
         priority = item.request.priority + priority_delta
         if not -1_000_000 <= priority <= 1_000_000:
             raise ModelRuntimeError("retry priority outside supported range")
+        # Preserve the active request and its resident KV on admission failure:
+        # a retry may be attempted while every waiting slot is occupied.
+        if len(self._queued) >= self.limits.max_queued_requests:
+            raise ModelRuntimeError("runtime admission retry queue capacity exceeded")
+        request = BatchRequest(request_id, item.request.prompt_tokens, item.request.max_new_tokens, priority)
+        replacement = ScheduledRequest(
+            request, item.kv_bytes, self._sequence, item.pinned_kv
+        )
         self._active.pop(request_id)
         self._kv.pop(request_id, None)
-        request = BatchRequest(request_id, item.request.prompt_tokens, item.request.max_new_tokens, priority)
-        self._queued[request_id] = ScheduledRequest(request, item.kv_bytes, self._sequence, item.pinned_kv)
+        self._queued[request_id] = replacement
         self._sequence += 1
 
     def set_kv_pinned(self, request_id: str, pinned: bool) -> None:

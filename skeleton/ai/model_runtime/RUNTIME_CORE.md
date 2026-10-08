@@ -62,3 +62,8 @@ python -m unittest tests.flgb.test_admission_checkpoint -v
 python -m unittest tests.flgb.test_admission_checkpoint_strict -v
 python -m unittest tests.flgb.test_runtime_admission_scheduler -v
 ```
+
+Retries also enforce the bounded admission queue before modifying active
+request state. A full queue makes `retry` fail atomically, keeping the
+running request and resident KV available for explicit cancel, completion,
+or a later retry after space becomes available. Constructor limits are typed.

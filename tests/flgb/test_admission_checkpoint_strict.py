@@ -221,6 +221,42 @@ class TestRetainedKVIdentitySafety(unittest.TestCase):
             scheduler.submit(object(), kv_bytes=10)
         self.assertEqual(scheduler.queued_ids, ())
 
+    def test_retry_at_full_queue_preserves_active_kv_and_sequence(self):
+        limits = AdmissionLimits(
+            max_active_requests=2, max_queued_requests=1, max_batch_size=1,
+            max_tokens_per_batch=10, kv_capacity_bytes=100, max_age_boost=10,
+        )
+        scheduler = RuntimeAdmissionScheduler(limits)
+        scheduler.submit(BatchRequest("active", 1, 1), kv_bytes=20)
+        scheduler.admit()
+        scheduler.submit(BatchRequest("queued", 1, 1), kv_bytes=20)
+        before = scheduler.snapshot()
+        with self.assertRaisesRegex(ModelRuntimeError, "retry queue capacity"):
+            scheduler.retry("active")
+        self.assertEqual(before, scheduler.snapshot())
+        self.assertEqual(
+            restore_admission_scheduler(scheduler.snapshot()).snapshot(), before
+        )
+        scheduler.cancel("queued")
+        scheduler.retry("active")
+        self.assertEqual(scheduler.active_ids, ())
+        self.assertEqual(scheduler.queued_ids, ("active",))
+        self.assertEqual(scheduler.capacity()["kv_used_bytes"], 0)
+
+    def test_invalid_retry_delta_is_atomic(self):
+        scheduler = self.build()
+        before = scheduler.snapshot()
+        for delta in (True, 1.5, 1_000_001):
+            with self.subTest(delta=delta), self.assertRaises(ModelRuntimeError):
+                scheduler.retry("active", priority_delta=delta)
+            self.assertEqual(scheduler.snapshot(), before)
+
+    def test_constructor_rejects_invalid_limits(self):
+        with self.assertRaisesRegex(ModelRuntimeError, "AdmissionLimits"):
+            RuntimeAdmissionScheduler(limits={})
+        with self.assertRaisesRegex(ModelRuntimeError, "AdmissionLimits"):
+            RuntimeAdmissionScheduler(limits=False)
+
 
 if __name__ == "__main__":
     unittest.main()
