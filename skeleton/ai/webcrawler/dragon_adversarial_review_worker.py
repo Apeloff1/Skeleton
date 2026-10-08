@@ -7,6 +7,7 @@ import json,math
 from .dragon_analysis_chains import AnalysisLayer,LayerReceipt
 from .dragon_analysis_execution import LayerDispatch
 from .dragon_knowledge_normalization_worker import NormalizedKnowledge
+from .dragon_knowledge_manifest import canonical_knowledge_id
 
 
 @dataclass(frozen=True)
@@ -43,7 +44,7 @@ def execute_adversarial_review(dispatch:LayerDispatch,
     seen_knowledge=set();seen_hypotheses=set()
     for r in sorted(records,key=lambda x:x.knowledge_id):
         checks=[
-            ("identity_integrity","critical",_hex64(r.knowledge_id),"knowledge identity must be canonical digest"),
+            ("identity_integrity","critical",_hex64(r.knowledge_id) and r.knowledge_id==canonical_knowledge_id(r),"knowledge identity/content binding is not canonical"),
             ("evidence_integrity","critical",_hex64(r.evidence_fingerprint),"upstream evidence fingerprint missing or malformed"),
             ("calibration_integrity","critical",_hex64(r.calibration_artifact_fingerprint),"calibration artifact identity missing or malformed"),
             ("probability_semantics","critical",r.probability_semantics=="empirically_calibrated_probability","probability is not empirically calibrated"),
