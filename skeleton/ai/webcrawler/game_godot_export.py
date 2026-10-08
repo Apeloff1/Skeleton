@@ -34,19 +34,34 @@ var friction := 832.0
 var facing := 1
 var jump_buffer := 0.0
 var coyote := 0.0
+var air_jumps := 1
+var can_double_jump := false
+var can_dash := false
+var dash_time := 0.0
+var dash_cooldown := 0.0
 
 func _physics_process(delta):
     var direction = Input.get_axis("move_left", "move_right")
     var target = direction * move_speed
-    velocity.x = move_toward(velocity.x, target, (acceleration if direction else friction) * delta)
+    if dash_time <= 0.0:
+        velocity.x = move_toward(velocity.x, target, (acceleration if direction else friction) * delta)
     if is_on_floor():
         coyote = 0.10
+        air_jumps = 1
     else:
         coyote = maxf(0.0, coyote - delta)
+    dash_time = maxf(0.0, dash_time - delta)
+    dash_cooldown = maxf(0.0, dash_cooldown - delta)
+    if can_dash and Input.is_action_just_pressed("dash") and direction != 0 and dash_cooldown <= 0.0:
+        dash_time = 0.14
+        dash_cooldown = 0.7
+        velocity.x = direction * move_speed * 2.7
     if Input.is_action_just_pressed("jump"):
         jump_buffer = 0.12
     jump_buffer = maxf(0.0, jump_buffer - delta)
-    if jump_buffer > 0.0 and coyote > 0.0:
+    if jump_buffer > 0.0 and (coyote > 0.0 or (can_double_jump and air_jumps > 0)):
+        if coyote <= 0.0:
+            air_jumps -= 1
         velocity.y = -jump_speed
         jump_buffer = 0.0
         coyote = 0.0
@@ -116,6 +131,8 @@ func _ready():
     player.gravity = float(physics["gravity"]) * TILE
     player.acceleration = float(physics["acceleration"]) * TILE
     player.friction = float(physics["friction"]) * TILE
+    player.can_double_jump = "double_jump" in data["mechanics"]
+    player.can_dash = "dash" in data["mechanics"]
     var camera = Camera2D.new()
     camera.enabled = true
     camera.position_smoothing_enabled = true
@@ -135,6 +152,7 @@ func _install_actions():
         "move_left": [KEY_A, KEY_LEFT],
         "move_right": [KEY_D, KEY_RIGHT],
         "jump": [KEY_SPACE, KEY_W, KEY_UP],
+        "dash": [KEY_SHIFT],
         "attack": [KEY_J, KEY_K],
         "restart": [KEY_R],
         "pause": [KEY_P],
@@ -282,7 +300,8 @@ def compile_godot_project(blueprint: GameBlueprint) -> GodotProject:
     entities=compile_scene_entities(blueprint)
     scene={
         "schema":"skeleton.original.godot_game.v1",
-        "genre":blueprint.genre,"width":blueprint.width,"height":blueprint.height,
+        "genre":blueprint.genre,"mechanics":blueprint.mechanics,
+        "width":blueprint.width,"height":blueprint.height,
         "collision":collision,"entities":entities,
         "physics":blueprint.physics_dict(),
         "blueprint":blueprint.fingerprint,
