@@ -190,5 +190,109 @@ class TestFeedbackReplayFence(unittest.TestCase):
             )
 
 
+
+class TestFeedbackCheckpointIntegrity(unittest.TestCase):
+    def make(self):
+        return DeterministicRuntimeEstimator(
+            RuntimeEstimate(100, 10, 5, 8),
+            FeedbackLimits(min_samples=2, max_samples=3, max_observation_ms=500),
+        )
+
+    def observed(self):
+        estimator = self.make()
+        for key, latency in (("a", 200), ("b", 600), ("c", 300), ("d", 100)):
+            estimator.observe(
+                RequestTelemetry(key, latency, 10, latency + 1, 1, 1),
+                kv_bytes_per_token=4,
+            )
+        return estimator
+
+    def test_exact_portable_checkpoint_roundtrip(self):
+        estimator = self.observed()
+        record = estimator.checkpoint()
+        import json
+        portable = json.loads(json.dumps(record))
+        restored = DeterministicRuntimeEstimator.from_checkpoint(portable)
+        self.assertEqual(restored.checkpoint(), record)
+        self.assertEqual(restored.receipt(), estimator.receipt())
+        self.assertEqual(record["recent_request_ids"], ["b", "c", "d"])
+
+    def test_recovered_recent_identity_cannot_retrain(self):
+        restored = DeterministicRuntimeEstimator.from_checkpoint(
+            self.observed().checkpoint()
+        )
+        before = restored.receipt()
+        with self.assertRaisesRegex(ValueError, "duplicate"):
+            restored.observe(
+                RequestTelemetry("c", 100, 10, 101, 1, 1),
+                kv_bytes_per_token=4,
+            )
+        self.assertEqual(before, restored.receipt())
+        restored.observe(
+            RequestTelemetry("new", 100, 10, 101, 1, 1),
+            kv_bytes_per_token=4,
+        )
+        self.assertEqual(restored.receipt().samples, 3)
+
+    def test_checkpoint_does_not_alias_mutable_estimator_state(self):
+        estimator = self.observed()
+        record = estimator.checkpoint()
+        record["recent_request_ids"].clear()
+        record["estimate"]["prefill_ms"] = 0
+        self.assertEqual(estimator.checkpoint()["recent_request_ids"], ["b", "c", "d"])
+        self.assertNotEqual(estimator.checkpoint()["estimate"]["prefill_ms"], 0)
+
+    def test_schema_and_digest_mutations_rejected(self):
+        for field, value in (
+            ("schema", "future-schema"),
+            ("digest", "0" * 64),
+            ("samples", 2),
+            ("clipped_observations", True),
+        ):
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                record = self.observed().checkpoint()
+                record[field] = value
+                DeterministicRuntimeEstimator.from_checkpoint(record)
+
+    def test_duplicate_reordered_and_missing_ids_rejected(self):
+        for modified in (
+            ["b", "b", "d"],
+            ["b", "c"],
+            [123, "c", "d"],
+            ["x" * 257, "c", "d"],
+        ):
+            with self.subTest(modified=modified), self.assertRaises(ValueError):
+                record = self.observed().checkpoint()
+                record["recent_request_ids"] = modified
+                DeterministicRuntimeEstimator.from_checkpoint(record)
+
+    def test_malformed_limit_and_estimate_rejected(self):
+        for field, value in (
+            ("limits", {"min_samples": True}),
+            ("estimate", {"prefill_ms": -1}),
+        ):
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                record = self.observed().checkpoint()
+                record[field].update(value)
+                DeterministicRuntimeEstimator.from_checkpoint(record)
+
+    def test_unknown_and_missing_checkpoint_fields_rejected(self):
+        record = self.observed().checkpoint()
+        with self.assertRaises(ValueError):
+            DeterministicRuntimeEstimator.from_checkpoint(record | {"extra": 1})
+        with self.assertRaises(ValueError):
+            DeterministicRuntimeEstimator.from_checkpoint(
+                {key: value for key, value in record.items() if key != "digest"}
+            )
+
+    def test_checkpoint_restore_has_no_model_or_network_dependency(self):
+        estimator = self.observed()
+        restored = DeterministicRuntimeEstimator.from_checkpoint(
+            estimator.checkpoint()
+        )
+        self.assertTrue(restored.ready)
+        self.assertGreater(restored.receipt().clipped_observations, 0)
+
+
 if __name__ == "__main__":
     unittest.main()

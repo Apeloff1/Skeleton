@@ -60,3 +60,19 @@ python -m unittest tests.flgb.test_slo_planner tests.flgb.test_runtime_feedback 
 ```
 
 This evidence does not independently qualify FLGB-02 or sign a masterplan volume.
+
+## Explicit feedback checkpoint and restart recovery
+
+`DeterministicRuntimeEstimator.checkpoint()` returns an operator-managed JSON
+record with a version tag, estimator configuration, learned estimate, sample
+counts, bounded recent identities, and a deterministic SHA-256 digest.
+`DeterministicRuntimeEstimator.from_checkpoint(record)` rejects unknown fields,
+missing fields, invalid primitive types, negative counts, mismatched identity
+horizons, duplicate identities, incompatible limits, and modified digests.
+Restored controllers retain the previous estimate and recent replay fence.
+
+The digest detects accidental or unsophisticated modification but **does not
+authenticate a publisher**. Production callers must arrange trusted, atomic
+persistence and independent source authentication. A checkpoint does not grant
+serving authority, and this in-process replay fence does not replace a durable
+cross-worker idempotency ledger. Controlled rollback must be explicit.
