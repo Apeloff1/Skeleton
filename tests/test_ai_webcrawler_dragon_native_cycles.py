@@ -27,7 +27,9 @@ def test_native_cycles_create_native_source_not_browser_html():
     assert len(one)==2
     assert one[0].target_id=="game_boy"
     assert one[0].state=="source_generated"
-    assert len({x.style for x in one})==2
+    assert {x.variant for x in one}=={0,1}
+    assert len({x.source_digest for x in one})==2
+    assert {x.style for x in one}=={"arcade_score_attack"}
     assert lab.attempts("alice",authorized=True)==()
     assert len(cycles.pulse("alice",authorized=True,now=302))==2
     assert lab.progress("alice",authorized=True).xp==30

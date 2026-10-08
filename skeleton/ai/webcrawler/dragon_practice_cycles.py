@@ -148,9 +148,9 @@ class DragonPracticeCycles:
             for _ in range(demos):
                 # Every attempt changes the native exercise, never regenerates
                 # an existing lesson/target/style merely to inflate workloads.
-                count=self.db.execute("""SELECT COUNT(*) FROM dragon_native_game_attempts
-                    WHERE owner=?""",(owner,)).fetchone()[0]
-                exercise=STYLES[(STYLES.index(style)+count)%len(STYLES)]
+                # Keep the chosen genre honest; each attempt increments a
+                # separately seeded challenge variant under the same target.
+                exercise=style
                 try:
                     created.append(native.generate(owner,target_id=target,style=exercise,
                                                    now=now,authorized=True,consent=True))

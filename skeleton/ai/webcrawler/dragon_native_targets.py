@@ -43,7 +43,7 @@ TARGETS: tuple[ConsoleTarget,...] = (
     _t("colecovision","Coleco","2nd generation",1982,"Z80","TMS9928A","SN76489",
        "keypad joystick","SDCC / z88dk","rom",colors=16,width=256,height=192),
     _t("commodore_64","Commodore","8-bit home computer",1982,"6510","VIC-II","SID",
-       "keyboard / joystick","cc65","prg",colors=16,width=320,height=200),
+       "keyboard / joystick","cc65","prg","native_source",colors=16,width=320,height=200),
     _t("zx_spectrum","Sinclair","8-bit home computer",1982,"Z80","attribute bitmap","beeper / AY",
        "keyboard","z88dk","tap",colors=15,width=256,height=192),
     _t("apple_ii","Apple","8-bit home computer",1977,"6502","hi-res NTSC","beeper",
@@ -147,7 +147,21 @@ STYLES = (
 )
 
 def target_catalog(*, family: str | None = None) -> tuple[dict, ...]:
-    return tuple(asdict(t) for t in TARGETS if family is None or t.family==family)
+    from .dragon_game_blueprints import GENRES
+    desktop={"pc_linux","pc_windows","pc_macos","steam_deck"}
+    source_ids={"game_boy","nes","commodore_64","genesis","game_boy_advance","ps1",
+                "xbox_original","dos_vga"}|desktop
+    rows=[]
+    for t in TARGETS:
+        if family is not None and t.family!=family:
+            continue
+        row=asdict(t)
+        row["supported_styles"]=(
+            tuple(sorted(GENRES)) if t.id in desktop
+            else ("arcade_score_attack",) if t.id in source_ids else ()
+        )
+        rows.append(row)
+    return tuple(rows)
 
 def demand_target(target_id: str) -> ConsoleTarget:
     if not isinstance(target_id,str) or target_id not in CATALOG:

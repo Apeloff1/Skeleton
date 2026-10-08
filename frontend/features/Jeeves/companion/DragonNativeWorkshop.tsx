@@ -25,8 +25,9 @@ export default function DragonNativeWorkshop({
   return !query||[t.id,t.family,t.generation,t.cpu].some(v=>v.toLowerCase().includes(query));
  }),[targets,all,search]);
  const current=targets.find(t=>t.id===selected);
- const enabled=!!current&&current.status==='native_source'&&styles.includes(style)&&!!onGenerate;
- const choices=styles.length?styles:['arcade_score_attack'];
+ const choices=styles.filter(s=>current?.supported_styles?.includes(s));
+ const selectedStyle=choices.includes(style)?style:choices[0];
+ const enabled=!!current&&current.status==='native_source'&&!!selectedStyle&&!!onGenerate;
  return <View style={s.root}>
   <Text style={s.title}>Native game forge · every era</Text>
   <Text style={s.copy}>Original Game Boy, NES, DOS and desktop source projects. Real ROMs or executables require their actual compilers, emulators and playtests. Console names alone never count as implemented engines.</Text>
@@ -60,22 +61,23 @@ export default function DragonNativeWorkshop({
   <ScrollView horizontal showsHorizontalScrollIndicator={false}
    style={s.styleScroll} contentContainerStyle={s.styleRow}>
    {choices.map(sid=><Pressable key={sid}
-    accessibilityRole="button" accessibilityState={{selected:style===sid}}
-    onPress={()=>setStyle(sid)} style={[s.styleChoice,style===sid&&s.styleActive]}>
+    accessibilityRole="button" accessibilityState={{selected:selectedStyle===sid}}
+    onPress={()=>setStyle(sid)} style={[s.styleChoice,selectedStyle===sid&&s.styleActive]}>
     <Text style={s.styleText}>{titleCaseId(sid)}</Text>
    </Pressable>)}
   </ScrollView>
+  {choices.length===0&&<Text style={s.note}>No supported gameplay engine for this hardware yet.</Text>}
   {current&&<View style={s.selectedInfo}>
     <Ionicons name="hardware-chip-outline" color={C.gold} size={18}/>
     <View style={{flex:1}}>
      <Text style={s.infoTitle}>{current.family} · {current.output.toUpperCase()} target</Text>
      <Text style={s.note}>{current.cpu} · {current.graphics}</Text>
-     <Text style={s.note}>{current.status==='native_source'?'Original source template; build pending verification':current.status==='licensed_sdk'?'Licensed console SDK access required':'Platform-specific emitter is not built yet'}</Text>
+     <Text style={s.note}>{current.status==='native_source'?'Source project implemented; native compilation and gameplay require verification':current.status==='licensed_sdk'?'Licensed console SDK access required':'Platform-specific emitter is not built yet'}</Text>
     </View>
    </View>}
   {onGenerate&&<Pressable accessibilityRole="button"
    accessibilityState={{disabled:!enabled||busy}} disabled={!enabled||busy}
-   onPress={()=>onGenerate(selected,style)}
+   onPress={()=>onGenerate(selected,selectedStyle)}
    style={[s.build,(!enabled||busy)&&s.disabled]}>
    <Ionicons name="construct-outline" size={17} color="#052e16"/>
    <Text style={s.buildText}>{busy?'Generating project…':'Generate native game source ZIP'}</Text>

@@ -28,8 +28,10 @@ class NativeAttempt:
     source_digest:str
     created_at:float
     reviewed:bool=False
+    variant:int=0
 
 class DragonNativePracticeLab:
+    MAX_VARIANTS_PER_LESSON_TARGET_STYLE=8
     def __init__(self, db:sqlite3.Connection, parent:DragonPracticeLab):
         if parent.db is not db:raise ValueError("native practice must share canonical ledger")
         self.db=db
@@ -39,8 +41,29 @@ class DragonNativePracticeLab:
             target_id TEXT NOT NULL,style TEXT NOT NULL,state TEXT NOT NULL,
             source_digest TEXT NOT NULL,project_json TEXT NOT NULL,
             created_at REAL NOT NULL,review_digest TEXT NOT NULL DEFAULT '',
+            variant INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY(owner,attempt_id),
-            UNIQUE(owner,lesson_id,target_id,style))""")
+            UNIQUE(owner,lesson_id,target_id,style,variant))""")
+        # Migrate the branch's first-generation native table without deleting
+        # its source archives, owner bindings or previously earned records.
+        cols={r[1] for r in db.execute("PRAGMA table_info(dragon_native_game_attempts)")}
+        if "variant" not in cols:
+            db.execute("ALTER TABLE dragon_native_game_attempts RENAME TO dragon_native_game_attempts_previous")
+            db.execute("""CREATE TABLE dragon_native_game_attempts(
+                owner TEXT NOT NULL,attempt_id TEXT NOT NULL,lesson_id TEXT NOT NULL,
+                target_id TEXT NOT NULL,style TEXT NOT NULL,state TEXT NOT NULL,
+                source_digest TEXT NOT NULL,project_json TEXT NOT NULL,
+                created_at REAL NOT NULL,review_digest TEXT NOT NULL DEFAULT '',
+                variant INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY(owner,attempt_id),
+                UNIQUE(owner,lesson_id,target_id,style,variant))""")
+            db.execute("""INSERT INTO dragon_native_game_attempts(
+                owner,attempt_id,lesson_id,target_id,style,state,source_digest,
+                project_json,created_at,review_digest,variant)
+                SELECT owner,attempt_id,lesson_id,target_id,style,state,source_digest,
+                       project_json,created_at,review_digest,0
+                FROM dragon_native_game_attempts_previous""")
+            db.execute("DROP TABLE dragon_native_game_attempts_previous")
         db.execute("""CREATE INDEX IF NOT EXISTS dragon_native_attempt_owner
             ON dragon_native_game_attempts(owner,created_at)""")
         db.commit()
@@ -69,13 +92,15 @@ class DragonNativePracticeLab:
             if not lessons:raise PermissionError("no consented and verified lessons")
             choices=[]
             for lesson_id,title,mechanics_json in lessons:
-                present=self.db.execute("""SELECT 1 FROM dragon_native_game_attempts
+                count=self.db.execute("""SELECT COUNT(*) FROM dragon_native_game_attempts
                     WHERE owner=? AND lesson_id=? AND target_id=? AND style=?""",
-                    (owner,lesson_id,target_id,style)).fetchone()
-                if not present:choices.append((lesson_id,title,mechanics_json))
-            if not choices:raise ValueError("no new native exercise combinations for approved lessons")
-            lesson_id,title,mechanics_json=choices[0]
-            canonical=digest([owner,lesson_id,target_id,style])
+                    (owner,lesson_id,target_id,style)).fetchone()[0]
+                if count<self.MAX_VARIANTS_PER_LESSON_TARGET_STYLE:
+                    choices.append((count,lesson_id,title,mechanics_json))
+            if not choices:raise ValueError("native exercise variants exhausted for approved lessons")
+            choices.sort(key=lambda x:(x[0],x[1]))
+            variant,lesson_id,title,mechanics_json=choices[0]
+            canonical=digest([owner,lesson_id,target_id,style,variant])
             project=render_native_project(
                 title=title,target_id=target_id,style=style,candidate_id=canonical,
                 mechanics=tuple(Mechanic(x) for x in json.loads(mechanics_json)),
@@ -88,22 +113,22 @@ class DragonNativePracticeLab:
             attempt_id=digest([owner,lesson_id,project.project_id])
             self.db.execute("""INSERT INTO dragon_native_game_attempts(
                 owner,attempt_id,lesson_id,target_id,style,state,source_digest,
-                project_json,created_at)VALUES(?,?,?,?,?,?,?,?,?)""",
+                project_json,created_at,variant)VALUES(?,?,?,?,?,?,?,?,?,?)""",
                 (owner,attempt_id,lesson_id,target_id,style,
-                 "source_generated",project.digest,project_json,now))
+                 "source_generated",project.digest,project_json,now,variant))
             return NativeAttempt(attempt_id,lesson_id,owner,target_id,style,
-                                 "source_generated",project.digest,now)
+                                 "source_generated",project.digest,now,False,variant)
 
     def list(self,owner:str,*,authorized:bool,limit:int=50)->tuple[NativeAttempt,...]:
         _owner(owner)
         if not authorized:raise PermissionError("native practice list requires authority")
         if not 1<=limit<=100:raise ValueError("invalid native history limit")
         rows=self.db.execute("""SELECT attempt_id,lesson_id,target_id,style,state,
-            source_digest,created_at,review_digest FROM dragon_native_game_attempts
+            source_digest,created_at,review_digest,variant FROM dragon_native_game_attempts
             WHERE owner=? ORDER BY created_at DESC,attempt_id LIMIT ?""",
             (owner,limit)).fetchall()
         return tuple(NativeAttempt(r[0],r[1],owner,r[2],r[3],r[4],r[5],r[6],
-                       bool(r[7])) for r in rows)
+                       bool(r[7]),r[8]) for r in rows)
 
     def project(self,owner:str,attempt_id:str,*,authorized:bool)->dict:
         _owner(owner)

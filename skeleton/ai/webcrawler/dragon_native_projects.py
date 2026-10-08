@@ -8,7 +8,7 @@ import re
 from .dragon_game_mechanics import Mechanic
 from .dragon_native_targets import demand_target, STYLES
 
-EMITTERS=frozenset({"game_boy","nes","dos_vga","genesis","game_boy_advance","ps1","xbox_original","pc_linux","pc_windows","pc_macos","steam_deck"})
+EMITTERS=frozenset({"game_boy","nes","dos_vga","commodore_64","genesis","game_boy_advance","ps1","xbox_original","pc_linux","pc_windows","pc_macos","steam_deck"})
 
 @dataclass(frozen=True)
 class NativeProject:
@@ -496,6 +496,10 @@ def render_native_project(*,title:str,target_id:str,style:str,
             raise PermissionError("licensed console SDK required; no fake export")
         raise ValueError("hardware emitter not implemented")
     if style not in STYLES:raise ValueError("unknown game style")
+    # Console renderers below are real CPU/SDK code, but currently provide
+    # ONLY a collectible chase; do not advertise an unimplemented RPG/RTS.
+    if target_id not in ("pc_linux","pc_windows","pc_macos","steam_deck") and style!="arcade_score_attack":
+        raise ValueError("target has not implemented the requested gameplay style")
     if not isinstance(title,str) or not 2<=len(title.strip())<=80:
         raise ValueError("invalid title")
     if not isinstance(candidate_id,str) or not re.fullmatch("[a-f0-9]{64}",candidate_id):
@@ -506,7 +510,10 @@ def render_native_project(*,title:str,target_id:str,style:str,
     # Research titles never become executable source or build script literals.
     clean=" ".join(re.findall("[A-Za-z0-9]+",title)[:8])[:42] or "Dragon Native"
     seed=int(digest([candidate_id,target_id,style])[:8],16)
-    if target_id in ("genesis","game_boy_advance","ps1","xbox_original"):
+    if target_id=="commodore_64":
+        from .dragon_native_c64 import commodore64_source
+        files=commodore64_source(seed)
+    elif target_id in ("genesis","game_boy_advance","ps1","xbox_original"):
         from .dragon_native_sdk_emitters import (
             genesis_source,gba_source,ps1_source,xbox_original_source,
         )
@@ -516,10 +523,40 @@ def render_native_project(*,title:str,target_id:str,style:str,
             ps1_source(seed) if target_id=="ps1" else
             xbox_original_source(seed,style)
         )
+    elif target_id in ("pc_linux","pc_windows","pc_macos","steam_deck"):
+        from .dragon_game_blueprints import GENRES, PALETTES, design_campaign, campaign_dict
+        from .dragon_native_arcade_runtime import render_sdl_campaign
+        if style not in GENRES:
+            raise ValueError("gameplay genre does not yet have an implemented native mode")
+        palette=(
+            "modern_neon" if style in ("arcade_score_attack","bullet_hell") else
+            "dmg_green" if style in ("roguelike","survival_horror") else
+            "vga_dusk" if style in ("top_down_adventure","educational") else
+            "crt_arcade" if style in ("racing","run_and_gun") else "handheld"
+        )
+        campaign=design_campaign(style=style,seed=seed,stages=4,palette=palette)
+        files=render_sdl_campaign(campaign)
+        files["dragon-campaign.json"]=json.dumps(
+            campaign_dict(campaign),sort_keys=True,indent=2)+"\n"
     else:
         files=(_gameboy(seed) if target_id=="game_boy" else
                _nes(seed) if target_id=="nes" else
                _dos(seed) if target_id=="dos_vga" else _desktop(seed,style))
+    if target_id in ("game_boy","nes"):
+        from .dragon_retro_assets import (
+            asset_tiles,enrich_gb_asm,enrich_nes_asm,
+        )
+        if target_id=="game_boy":
+            files["src/main.asm"]=enrich_gb_asm(files["src/main.asm"])
+        else:
+            files["src/main.s"]=enrich_nes_asm(files["src/main.s"])
+        files["dragon-pixel-art.json"]=json.dumps({
+            "schema":"skeleton.ai.dragon.original_pixel_art.v1",
+            "sprites":[{"id":sprite.name,"fingerprint":sprite.digest}
+                       for sprite in asset_tiles()],
+            "encoding": "interleaved_2bpp" if target_id=="game_boy"
+                        else "nes_planar_2bpp",
+        },sort_keys=True,indent=2)+"\n"
     if any(PurePosixPath(p).is_absolute() or ".." in PurePosixPath(p).parts for p in files):
         raise ValueError("unsafe generated path")
     if any(len(v.encode())>120_000 for v in files.values()):
@@ -543,7 +580,14 @@ def render_native_project(*,title:str,target_id:str,style:str,
               "generation":target.generation,"style":style,"candidate_id":candidate_id,
               "status":"source_generated","toolchain":target.toolchain,
               "output_extension":target.output,"supported_mechanics":supported,
-              "deferred_mechanics":deferred,"original_assets":True}
+              "deferred_mechanics":deferred,"original_assets":True,
+              "runtime_gameplay_mode": (
+                  GENRES[style] if target_id in ("pc_linux","pc_windows","pc_macos","steam_deck")
+                  else "original_collectible_chase"
+              ),"campaign_stages": (
+                  4 if target_id in ("pc_linux","pc_windows","pc_macos","steam_deck")
+                  else 1
+              )}
     files["dragon-native-manifest.json"]=json.dumps(manifest,sort_keys=True,indent=2)+"\n"
     fingerprint=digest(files)
     return NativeProject(digest([candidate_id,target_id,style,fingerprint]),target_id,

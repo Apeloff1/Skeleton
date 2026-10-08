@@ -14,10 +14,11 @@ but **not all hardware × style combinations have unique gameplay yet**.
 Styles without specific native mechanics remain a design direction; do not
 mark them complete merely because the manifest names a genre.
 
-Native source emitters in this delivery (11 IDs):
+Native source emitters in this delivery (12 IDs):
 
 | Target | Project output | Toolchain | Status |
 |---|---|---|---|
+| Commodore 64 | 6510 C source + VIC-II/CIA/SID native PRG | cc65/cl65 | Source emitted, compiler smoke optional |
 | Original Nintendo Game Boy | SM83 assembly → \`.gb\` | RGBDS | Source emitted, ROM validation optional |
 | Nintendo NES | 6502 assembly + NROM linker → \`.nes\` | cc65 ca65/ld65 | Source emitted, ROM validation optional |
 | Sega Genesis / Mega Drive | SGDK C source + Makefile → \`.bin\` | SGDK | Source emitted, SDK build unverified |
@@ -37,7 +38,7 @@ GBA draws to mode 3 VRAM with keypad input; PS1 uses PlayStation graphics
 and pad interfaces; Xbox nxdk adds gamecontroller input to SDL2 visuals.
 
 The 47-target catalog also includes Atari VCS, Intellivision, ColecoVision,
-Commodore 64, ZX Spectrum, Apple II, Master System, Game Gear, Atari Lynx,
+ZX Spectrum, Apple II, Master System, Game Gear, Atari Lynx,
 TurboGrafx-16, SNES, Neo Geo, Amiga, Atari ST, DOS 8086, Windows 95/XP,
 Saturn, Nintendo 64, Dreamcast, GameCube, PS2, Nintendo DS, PSP, Wii, PS3,
 Xbox 360, Nintendo 3DS, Wii U, PS Vita, PS4, Xbox One, Nintendo Switch,
@@ -141,3 +142,42 @@ Frontend:
     cd frontend && yarn test:dragon-companion && yarn typecheck
 
 Build gates must actually pass; skip/missing compilers are not proof.
+
+
+## Second-generation native game engine: real mechanics and eight-bit pixels
+
+Original SDL2/C99 campaign engine has six distinct movement/gameplay kernels:
+score attack, gravity platformer, top-down explorer, connected-room dungeon,
+grid movement tactics, and inertia-based racer. Seventeen intended genres map
+to those six modes. They are NOT seventeen independently complete games.
+
+Each PC campaign creates four deterministic 32x20 tilemap stages with a
+verified route from player spawn to exit, hazards, enemies, pickups, portal,
+HP/energy, score, scene transitions, original sprite animations and
+synthesized arcade sound. Keyboard and gamepad control are supported.
+Cross-compiled platform builds need separate verification.
+
+Eight original sprite tiles now pass through genuine SM83 interleaved and NES
+CHR planar 2bpp encoders. The Game Boy dragon has timed blinking animation.
+
+Native practice is bounded to eight seeded challenge variants per approved
+claim + platform + style (rather than one exercise). All variants have
+different deterministic content; generation never grants extra XP, and
+owner/session consent and the total daily practice budget still apply.
+
+The new CI job installs SDL2 + CMake and compiles/runs all six genres in a
+headless native SDL environment for 360 simulated ticks each. The cartridge
+CI job installs RGBDS and cc65 to compile GB, NES and Commodore 64 programs.
+A native smoke test is NOT an independent user acceptance playtest.
+
+Example:
+    python -m skeleton.ai.webcrawler.dragon_native_cli \
+      --target pc_linux --style roguelike --out /tmp/dragon-rogue
+    cmake -S /tmp/dragon-rogue -B /tmp/dragon-rogue/build
+    cmake --build /tmp/dragon-rogue/build
+    SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
+      /tmp/dragon-rogue/build/dragon_game --smoke
+
+Remaining: 35 catalog hardware profiles do not have dedicated native
+emitters; full genre depth, emulator traces, original 3D engines, save systems,
+and real-device performance testing are not yet complete.

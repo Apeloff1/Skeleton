@@ -168,9 +168,10 @@ def test_canonical_lessons_generate_durable_native_source_zip_and_isolate_owner(
     assert native.archive(owner,one.attempt_id,authorized=True)==(zipped,zipped_hash)
     second=DragonNativePracticeLab(db,parent)
     assert second.project(owner,one.attempt_id,authorized=True)["target_id"]=="game_boy"
-    with pytest.raises(ValueError):
-        native.generate(owner,target_id="game_boy",style="arcade_score_attack",
-                        now=55,authorized=True,consent=True)
+    variant=native.generate(owner,target_id="game_boy",style="arcade_score_attack",
+                            now=55,authorized=True,consent=True)
+    assert variant.variant==1 and variant.attempt_id!=one.attempt_id
+    assert native.project(owner,variant.attempt_id,authorized=True)["digest"]!=one.source_digest
     nes=native.generate(owner,target_id="nes",style="arcade_score_attack",
                         now=55,authorized=True,consent=True)
     assert nes.target_id=="nes"
@@ -186,9 +187,9 @@ def test_native_and_legacy_attempts_share_daily_capacity():
     parent=DragonPracticeLab(db,PracticePolicy(max_demos_per_day=1,max_demos_per_batch=1))
     parent.offer(_approved("alice"),now=0,authorized=True)
     native=DragonNativePracticeLab(db,parent)
-    a=native.generate("alice",target_id="game_boy",style="racing",
+    a=native.generate("alice",target_id="game_boy",style="arcade_score_attack",
                       now=1,authorized=True,consent=True)
     assert a
     with pytest.raises(ValueError,match="budget"):
-        native.generate("alice",target_id="nes",style="racing",
+        native.generate("alice",target_id="nes",style="arcade_score_attack",
                         now=2,authorized=True,consent=True)

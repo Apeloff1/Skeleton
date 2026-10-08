@@ -3,10 +3,12 @@ export interface NativeTarget {
  id:string;family:string;generation:string;year:number;cpu:string;
  graphics:string;sound:string;input:string;toolchain:string;
  output:string;status:'native_source'|'toolchain_adapter'|'licensed_sdk';
+ supported_styles?:string[];
 }
 export interface NativeAttempt {
  attempt_id:string;lesson_id:string;owner:string;target_id:string;
  style:string;state:string;source_digest:string;created_at:number;reviewed:boolean;
+ variant?:number;
 }
 const digest=/^[a-f0-9]{64}$/;
 export function normalizeNativeTargets(input:unknown):NativeTarget[]{
@@ -20,7 +22,10 @@ export function normalizeNativeTargets(input:unknown):NativeTarget[]{
   typeof t.output==='string'&&t.output.length<12&&
   typeof t.cpu==='string'&&typeof t.graphics==='string'&&
   typeof t.sound==='string'&&typeof t.input==='string'&&
-  ['native_source','toolchain_adapter','licensed_sdk'].includes(t.status)).slice(0,100);
+  ['native_source','toolchain_adapter','licensed_sdk'].includes(t.status)&&
+  (!t.supported_styles||(Array.isArray(t.supported_styles)&&
+   t.supported_styles.every(s=>typeof s==='string'&&/^[a-z_]{2,64}$/.test(s))))
+ ).slice(0,100);
 }
 export function normalizeNativeAttempts(input:unknown):NativeAttempt[]{
  if(!Array.isArray(input))return [];
@@ -31,7 +36,8 @@ export function normalizeNativeAttempts(input:unknown):NativeAttempt[]{
   typeof a.target_id==='string'&&/^[a-z0-9_]{2,64}$/.test(a.target_id)&&
   typeof a.style==='string'&&a.style.length<80&&
   a.state==='source_generated'&&Number.isFinite(a.created_at)&&
-  typeof a.reviewed==='boolean').slice(0,50);
+  typeof a.reviewed==='boolean'&&
+  (a.variant===undefined||(Number.isSafeInteger(a.variant)&&a.variant>=0&&a.variant<=7))).slice(0,50);
 }
 export function titleCaseId(key:string):string{
  return key.replace(/_/g,' ').replace(/\b\w/g,m=>m.toUpperCase());
