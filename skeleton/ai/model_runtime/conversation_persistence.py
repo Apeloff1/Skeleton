@@ -182,6 +182,23 @@ class DurableConversationCoordinator:
             del self._bindings[session_id]
             return saved
 
+    def recover_all(self, *, limit: int = 1000) -> tuple[str, ...]:
+        """Restore a bounded cohort of persisted sessions after restart."""
+        if type(limit) is not int or not 1 <= limit <= 1000:
+            raise RuntimeContractError("invalid recovery limit")
+        with self._lock, self.service._lock:
+            available = self.service.capacity_remaining()
+            if available <= 0:
+                return ()
+            ids = self.store.list_ids(limit=min(limit, available))
+            restored = []
+            for sid in ids:
+                if sid in self._bindings or self.service.exists(sid):
+                    continue
+                self.attach(sid)
+                restored.append(sid)
+            return tuple(restored)
+
     def bound_ids(self) -> tuple[str, ...]:
         with self._lock:
             return tuple(sorted(self._bindings))
