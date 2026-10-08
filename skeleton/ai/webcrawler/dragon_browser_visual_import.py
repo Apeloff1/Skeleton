@@ -27,10 +27,50 @@ class AcceptedBrowserVisual:
 def canonical_browser_visual_fingerprint(envelope:BrowserVisualEnvelope)->str:
     return visual_wire_fingerprint(envelope)
 
+def _hex64(value:str)->bool:
+    return isinstance(value,str) and len(value)==64 and all(c in "0123456789abcdef" for c in value)
+
+def _preflight_envelope(envelope:BrowserVisualEnvelope,*,max_frames:int)->None:
+    if not isinstance(max_frames,int) or not 1<=max_frames<=100000:
+        raise ValueError("invalid browser visual frame budget")
+    if not isinstance(envelope.owner,str) or not 1<=len(envelope.owner)<=128:
+        raise ValueError("invalid browser visual owner")
+    if not isinstance(envelope.job_id,str) or not 1<=len(envelope.job_id)<=256:
+        raise ValueError("invalid browser visual job")
+    if not _hex64(envelope.recording_digest) or not _hex64(envelope.consent_id) or not _hex64(envelope.consent_scope_digest):
+        raise ValueError("invalid browser visual identity digest")
+    if not 1<=len(envelope.frames)<=max_frames or len(envelope.observations)!=len(envelope.frames):
+        raise ValueError("invalid browser visual coverage")
+    seen_frames=set();last=-1
+    for frame in envelope.frames:
+        if not isinstance(frame.frame_id,str) or not 1<=len(frame.frame_id)<=256 or frame.frame_id in seen_frames:
+            raise ValueError("invalid or duplicate browser frame id")
+        seen_frames.add(frame.frame_id)
+        if not _hex64(frame.frame_digest):
+            raise ValueError("invalid browser frame digest")
+        if not isinstance(frame.captured_at_ms,int) or frame.captured_at_ms<0 or frame.captured_at_ms<=last:
+            raise ValueError("browser frame timestamps must increase strictly")
+        if not isinstance(frame.source_locator,str) or not 1<=len(frame.source_locator)<=2048:
+            raise ValueError("invalid browser source locator")
+        last=frame.captured_at_ms
+    seen_observations=set()
+    for obs in envelope.observations:
+        if obs.frame_id in seen_observations or obs.frame_id not in seen_frames:
+            raise ValueError("invalid browser observation frame id")
+        seen_observations.add(obs.frame_id)
+        if not _hex64(obs.frame_digest):
+            raise ValueError("invalid browser observation digest")
+        values=(obs.luminance_mean,obs.edge_density,obs.motion_energy,obs.scene_change)
+        if any(isinstance(x,bool) or not isinstance(x,(int,float)) or not math.isfinite(x) or x<0 or x>1 for x in values):
+            raise ValueError("invalid browser visual feature")
+    if seen_observations!=seen_frames:
+        raise ValueError("browser visual observation coverage mismatch")
+
 def accept_browser_visual(custody:ConsentBoundAnalysisQueue,envelope:BrowserVisualEnvelope,*,
-    now:float,authorized:bool)->AcceptedBrowserVisual:
+    now:float,authorized:bool,max_frames:int=1000)->AcceptedBrowserVisual:
     if not authorized: raise PermissionError("browser visual import requires authorization")
     if envelope.schema!=SCHEMA: raise ValueError("unsupported browser visual schema")
+    _preflight_envelope(envelope,max_frames=max_frames)
     if not math.isfinite(envelope.retention_until) or now>=envelope.retention_until:
         raise PermissionError("browser visual retention expired")
     job=custody.require_active(envelope.owner,envelope.job_id,now=now,authorized=True)
