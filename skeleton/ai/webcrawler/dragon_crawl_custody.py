@@ -237,7 +237,7 @@ def bind_crawl_evidence(
             supports=reading.supports,
             confidence=reading.confidence,
             reliability=reading.reliability,
-            independence_group="untrusted:" + reading.source_id,
+            independence_group="untrusted:" + sha256(reading.source_id.encode("utf-8")).hexdigest(),
             evidence_locator=(
                 f"sha256:{doc.content_hash}@{reading.start}:{reading.end}"
             ),
