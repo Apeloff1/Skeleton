@@ -82,6 +82,69 @@ class ChatTranscript:
             raise RuntimeContractError("invalid transcript tail")
         return ChatTranscript(self.messages[-count:] if count else ())
 
+    def count_by_role(self) -> dict[str, int]:
+        counts = {role: 0 for role in ROLES}
+        for message in self.messages:
+            counts[message.role] += 1
+        return counts
+
+    def byte_size(self) -> int:
+        return sum(len(message.content.encode("utf-8")) for message in self.messages)
+
+    def select_roles(self, roles: Iterable[str]) -> "ChatTranscript":
+        selected = frozenset(roles)
+        if not selected.issubset(ROLES):
+            raise RuntimeContractError("unknown chat role filter")
+        return ChatTranscript(tuple(m for m in self.messages if m.role in selected))
+
+    def drop_first(self, count: int) -> "ChatTranscript":
+        if type(count) is not int or count < 0:
+            raise RuntimeContractError("invalid drop count")
+        return ChatTranscript(self.messages[count:])
+
+    def replace_last(self, role: str, content: str) -> "ChatTranscript":
+        if not self.messages:
+            raise RuntimeContractError("cannot replace empty transcript")
+        return ChatTranscript(self.messages[:-1] + (ChatMessage(role, content),))
+
+    def last_role(self) -> str | None:
+        return self.messages[-1].role if self.messages else None
+
+    def last_user_message(self) -> ChatMessage | None:
+        return next((m for m in reversed(self.messages) if m.role == "user"), None)
+
+    def last_assistant_message(self) -> ChatMessage | None:
+        return next((m for m in reversed(self.messages) if m.role == "assistant"), None)
+
+    def merge(self, other: "ChatTranscript") -> "ChatTranscript":
+        if not isinstance(other, ChatTranscript):
+            raise RuntimeContractError("transcript required")
+        return ChatTranscript(self.messages + other.messages)
+
+    def fits_bytes(self, budget: int) -> bool:
+        if type(budget) is not int or budget < 0:
+            raise RuntimeContractError("invalid byte budget")
+        return self.byte_size() <= budget
+
+    def trim_to_bytes(self, budget: int, *, preserve_instructions: bool = True) -> "ChatTranscript":
+        if type(budget) is not int or budget < 0:
+            raise RuntimeContractError("invalid byte budget")
+        instructions = tuple(m for m in self.messages
+                             if m.role in ("system", "developer")) if preserve_instructions else ()
+        remaining = budget - sum(len(m.content.encode("utf-8")) for m in instructions)
+        if remaining < 0:
+            raise RuntimeContractError("instruction messages exceed byte budget")
+        kept = []
+        for m in reversed(self.messages):
+            if preserve_instructions and m.role in ("system", "developer"):
+                continue
+            size = len(m.content.encode("utf-8"))
+            if size > remaining:
+                break
+            kept.append(m)
+            remaining -= size
+        return ChatTranscript(instructions + tuple(reversed(kept)))
+
     def digest(self) -> str:
         payload = json.dumps(self.to_list(), ensure_ascii=False, sort_keys=True,
                              separators=(",", ":")).encode("utf-8")
