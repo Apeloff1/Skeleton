@@ -1699,3 +1699,30 @@ def test_native_tokenizer_rejects_special_id_type_mutation(native_model):
         native_model.unk = original
     with pytest.raises(TokenizerContractError, match="invalid decode token container"):
         tokenizer.decode_ids(None)
+
+
+def test_token_window_digest_and_batch_count_reject_type_confusion():
+    from skeleton.ai.model_runtime.tokenization import TokenWindow, TokenBatch, TokenizerContractError
+    with pytest.raises(TokenizerContractError, match="source sequence digest"):
+        TokenWindow(0, 1, (1,), None)
+    with pytest.raises(TokenizerContractError, match="source sequence digest"):
+        TokenWindow(0, 1, (1,), "A" * 64)
+    window = TokenWindow(0, 1, (1,), "a" * 64)
+    with pytest.raises(TokenizerContractError, match="accounting"):
+        TokenBatch((window,), True)
+    with pytest.raises(TokenizerContractError, match="accounting"):
+        TokenBatch((window,), 1.0)
+
+
+def test_native_tokenizer_detects_embedding_size_mutation(native_model):
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    tokenizer = NativeTokenizer(native_model)
+    original = native_model.E
+    try:
+        native_model.E = original[:-1]
+        with pytest.raises(TokenizerContractError, match="embedding"):
+            tokenizer.encode_ids("test")
+        with pytest.raises(TokenizerContractError, match="embedding"):
+            tokenizer.checkpoint()
+    finally:
+        native_model.E = original
