@@ -139,6 +139,23 @@ class SLOResourcePlanner:
                 "max_prefill_chunks": self.max_prefill_chunks,
                 "overload_reject_pct": self.overload_reject_pct,
             },
+            "request_inputs": {
+                "prompt_tokens": prompt_tokens,
+                "kv_capacity_bytes": kv_capacity_bytes,
+                "kv_used_bytes": kv_used_bytes,
+                "queue_pressure_pct": queue_pressure_pct,
+                "forecast": {
+                    "prefill_ms": estimate.prefill_ms,
+                    "decode_token_ms": estimate.decode_token_ms,
+                    "predicted_output_tokens": estimate.predicted_output_tokens,
+                    "kv_bytes_per_token": estimate.kv_bytes_per_token,
+                },
+                "slo": {
+                    "ttft_ms": slo.ttft_ms,
+                    "inter_token_ms": slo.inter_token_ms,
+                    "end_to_end_ms": slo.end_to_end_ms,
+                },
+            },
             "admitted": admitted,
             "reason": reason,
             "prefill_chunks": chunks,

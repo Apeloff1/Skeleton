@@ -82,6 +82,31 @@ class TestBoundedSLOPlanning(unittest.TestCase):
         self.assertEqual(pressure.reason, "overload_predicted_slo_miss")
 
 
+    def test_plan_receipt_binds_memory_pressure_even_when_outcome_equal(self):
+        planner = SLOResourcePlanner()
+        first = planner.plan(prompt_tokens=3, **self.args)
+        second = planner.plan(
+            prompt_tokens=3, **(self.args | {"kv_capacity_bytes": 200_000})
+        )
+        self.assertTrue(first.admitted and second.admitted)
+        self.assertEqual(first.reserved_kv_bytes, second.reserved_kv_bytes)
+        self.assertNotEqual(first.digest, second.digest)
+
+    def test_plan_receipt_binds_slo_and_queue_inputs(self):
+        planner = SLOResourcePlanner()
+        base = planner.plan(prompt_tokens=3, **self.args)
+        queue = planner.plan(
+            prompt_tokens=3, **(self.args | {"queue_pressure_pct": 1})
+        )
+        slo = planner.plan(
+            prompt_tokens=3, **(
+                self.args | {"slo": SLOTarget(600, 20, 1000)}
+            )
+        )
+        self.assertTrue(base.admitted and queue.admitted and slo.admitted)
+        self.assertEqual(len({base.digest, queue.digest, slo.digest}), 3)
+
+
 class TestBoundedTelemetry(unittest.TestCase):
     def test_reject_invalid_identity_and_metrics_types(self):
         for request_id in (None, 123, "", "x" * 257):
@@ -124,6 +149,26 @@ class TestBoundedTelemetry(unittest.TestCase):
             b.record(r)
         args = dict(ttft_slo_ms=2, inter_token_slo_ms=2, e2e_slo_ms=3)
         self.assertEqual(a.metrics(**args), b.metrics(**args))
+
+
+    def test_observation_digest_distinguishes_equal_aggregates(self):
+        a, b = ServingTelemetryWindow(), ServingTelemetryWindow()
+        a.record(RequestTelemetry("a", 1, 2, 3, 5, 6))
+        b.record(RequestTelemetry("b", 1, 2, 3, 5, 6))
+        args = dict(ttft_slo_ms=3, inter_token_slo_ms=3, e2e_slo_ms=4)
+        left, right = a.metrics(**args), b.metrics(**args)
+        self.assertEqual(left["goodput_pct"], right["goodput_pct"])
+        self.assertNotEqual(left["record_digest"], right["record_digest"])
+        self.assertNotEqual(left["digest"], right["digest"])
+
+    def test_metric_receipt_binds_objective_thresholds(self):
+        window = ServingTelemetryWindow()
+        window.record(RequestTelemetry("a", 1, 1, 1, 2, 2))
+        first = window.metrics(ttft_slo_ms=2, inter_token_slo_ms=2, e2e_slo_ms=2)
+        second = window.metrics(ttft_slo_ms=3, inter_token_slo_ms=2, e2e_slo_ms=2)
+        self.assertEqual(first["goodput_pct"], second["goodput_pct"])
+        self.assertEqual(first["record_digest"], second["record_digest"])
+        self.assertNotEqual(first["digest"], second["digest"])
 
 
 class TestFeedbackReplayFence(unittest.TestCase):

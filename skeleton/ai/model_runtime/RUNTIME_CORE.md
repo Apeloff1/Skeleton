@@ -76,3 +76,16 @@ authenticate a publisher**. Production callers must arrange trusted, atomic
 persistence and independent source authentication. A checkpoint does not grant
 serving authority, and this in-process replay fence does not replace a durable
 cross-worker idempotency ledger. Controlled rollback must be explicit.
+
+## Evidence digest input binding
+
+SLO plan v2 digests cover planner policy **and** the input prompt count,
+forecast, performance objectives, KV capacity/occupancy and queue pressure.
+A successful decision from a stale pressure snapshot cannot be substituted for
+a new decision with matching aggregate output fields. Serving telemetry v2
+binds metric thresholds and a canonical digest of sorted individual
+observations (request identity, latency, tokens and prefix reuse), preventing
+summaries of different cohorts from being treated as identical evidence.
+Raw telemetry identifiers must remain in a governed data store; the exported
+metrics expose only the observation digest. No cryptographic source authenticity
+is implied by hashing.

@@ -63,8 +63,31 @@ class ServingTelemetryWindow:
         prompt = sum(r.prompt_tokens for r in records)
         output = sum(r.output_tokens for r in records)
         reused = sum(r.prefix_reused_tokens for r in records)
+        # Bind metrics to the *actual observations*, not merely equal aggregate
+        # counters; otherwise distinct tail-latency traces can share a receipt.
+        observations = [
+            {
+                "request_id": r.request_id,
+                "ttft_ms": r.ttft_ms,
+                "inter_token_ms": r.inter_token_ms,
+                "e2e_ms": r.e2e_ms,
+                "prompt_tokens": r.prompt_tokens,
+                "output_tokens": r.output_tokens,
+                "prefix_reused_tokens": r.prefix_reused_tokens,
+            }
+            for r in records
+        ]
+        observation_digest = hashlib.sha256(
+            json.dumps(observations, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
         body = {
-            "schema": "skeleton.ai.serving-telemetry.v1",
+            "schema": "skeleton.ai.serving-telemetry.v2",
+            "record_digest": observation_digest,
+            "slo_ms": {
+                "ttft": ttft_slo_ms,
+                "inter_token": inter_token_slo_ms,
+                "end_to_end": e2e_slo_ms,
+            },
             "requests": total,
             "slo_compliant_requests": compliant,
             "goodput_pct": 0 if total == 0 else round(compliant * 10000 / total) / 100,
