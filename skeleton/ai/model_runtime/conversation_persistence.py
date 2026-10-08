@@ -135,6 +135,8 @@ class DurableConversationCoordinator:
             if self.service.revision(session_id) != binding.live_revision:
                 raise RuntimeContractError("refusing to discard unsaved live changes")
             record = self.store.load(session_id)
+            if record.revision < binding.durable_revision:
+                raise RuntimeContractError("durable revision regressed")
             from .native_llm_runtime import NativeConversationSession
             restored = NativeConversationSession.restore(self.store.runtime, record.snapshot)
             self.service._sessions[session_id] = restored
