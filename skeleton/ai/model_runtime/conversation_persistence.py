@@ -101,6 +101,45 @@ class DurableConversationCoordinator:
                     sid, new_revision, self.service.revision(sid))
             return dict(self._bindings)
 
+    def save_dirty(self) -> Mapping[str, PersistenceBinding]:
+        """Persist only sessions modified since their last checkpoint."""
+        with self._lock, self.service._lock:
+            dirty = []
+            for sid, binding in self._bindings.items():
+                current = self.service.revision(sid)
+                if current != binding.live_revision:
+                    dirty.append((sid, binding.durable_revision, self.service._get(sid)))
+            if not dirty:
+                return {}
+            revisions = self.store.save_many(tuple(dirty))
+            result = {}
+            for sid, durable_revision in revisions.items():
+                binding = PersistenceBinding(
+                    sid, durable_revision, self.service.revision(sid))
+                self._bindings[sid] = binding
+                result[sid] = binding
+            return result
+
+    def dirty_ids(self) -> tuple[str, ...]:
+        with self._lock, self.service._lock:
+            return tuple(sorted(sid for sid, binding in self._bindings.items()
+                                if self.service.revision(sid) != binding.live_revision))
+
+    def reload(self, session_id: str) -> PersistenceBinding:
+        """Replace unmodified live state with the latest validated disk state."""
+        with self._lock, self.service._lock:
+            binding = self.binding(session_id)
+            if self.service.revision(session_id) != binding.live_revision:
+                raise RuntimeContractError("refusing to discard unsaved live changes")
+            record = self.store.load(session_id)
+            restored = self.store.restore_session(session_id)
+            self.service._sessions[session_id] = restored
+            self.service._meta[session_id]["revision"] = record.revision
+            self.service._meta[session_id]["pinned"] = record.pinned
+            new_binding = PersistenceBinding(session_id, record.revision, record.revision)
+            self._bindings[session_id] = new_binding
+            return new_binding
+
     def detach(self, session_id: str, *, save: bool = True) -> None:
         with self._lock:
             if session_id not in self._bindings:
