@@ -36,7 +36,7 @@ class DurableConversationCoordinator:
         self._bindings: dict[str, PersistenceBinding] = {}
 
     def create(self, *, pinned: bool = False) -> str:
-        with self._lock:
+        with self._lock, self.service._lock:
             sid = self.service.create()
             try:
                 session = self.service._get(sid)
@@ -143,7 +143,7 @@ class DurableConversationCoordinator:
             return new_binding
 
     def detach(self, session_id: str, *, save: bool = True) -> None:
-        with self._lock:
+        with self._lock, self.service._lock:
             if session_id not in self._bindings:
                 raise RuntimeContractError("session not bound to durable storage")
             if save:
@@ -152,7 +152,7 @@ class DurableConversationCoordinator:
             del self._bindings[session_id]
 
     def delete(self, session_id: str) -> None:
-        with self._lock:
+        with self._lock, self.service._lock:
             binding = self._bindings.get(session_id)
             if binding is None:
                 raise RuntimeContractError("session not bound to durable storage")
