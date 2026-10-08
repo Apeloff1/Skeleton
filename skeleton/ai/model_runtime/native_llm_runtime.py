@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 import hmac
 import random
 from typing import Any, Iterator, Mapping, Sequence
@@ -33,7 +34,7 @@ from .runtime_contracts import (
     RuntimeLimits,
     RuntimeUsage,
 )
-from .tokenization import NativeTokenizer, TokenizerContractError
+from .tokenization import NativeTokenizer, StreamingTextFeed, TokenizerContractError
 
 
 @dataclass(frozen=True)
@@ -68,6 +69,33 @@ class GenerationResult:
             "usage": self.usage.to_dict(),
             "checkpoint_digest": self.checkpoint_digest,
         }
+
+
+@dataclass(frozen=True)
+class InferenceResult:
+    """Deterministic next-token graph output before sampling."""
+
+    prompt_sequence: TokenSequence
+    logits: tuple[float, ...]
+    cache_tokens: int
+    model_digest: str
+    architecture_digest: str
+
+    @property
+    def argmax_token_id(self) -> int:
+        if not self.logits:
+            raise RuntimeContractError("inference result has no logits")
+        return max(range(len(self.logits)), key=self.logits.__getitem__)
+
+    @property
+    def digest(self) -> str:
+        return digest_json({
+            "prompt_sequence_digest": self.prompt_sequence.digest,
+            "logits": list(self.logits),
+            "cache_tokens": self.cache_tokens,
+            "model_digest": self.model_digest,
+            "architecture_digest": self.architecture_digest,
+        })
 
 
 @dataclass(frozen=True)
@@ -262,6 +290,53 @@ class NativeLLMRuntime:
     def decode_ids(self, token_ids: Sequence[int]) -> str:
         return self.tokenizer.decode_ids(token_ids)
 
+    def infer_sequence(
+        self,
+        sequence: TokenSequence,
+        *,
+        use_cache: bool = True,
+    ) -> InferenceResult:
+        """Run embeddings → position/RoPE → transformer blocks → LM head.
+
+        This exposes the executable inference graph independently of decoding so
+        loaders, portability checks, and samplers can validate identical model
+        state against a canonical pre-tokenized input.
+        """
+        if not isinstance(sequence, TokenSequence):
+            raise RuntimeContractError("TokenSequence required")
+        if not isinstance(use_cache, bool):
+            raise RuntimeContractError("use_cache must be boolean")
+        if not hmac.compare_digest(sequence.tokenizer_digest, self.tokenizer.digest):
+            raise RuntimeContractError("token sequence tokenizer identity mismatch")
+        if not sequence.token_ids:
+            raise RuntimeContractError("token sequence must not be empty")
+        if len(sequence.token_ids) > self.limits.max_context:
+            raise RuntimeContractError("prompt exceeds context budget")
+        if any(token_id >= self.tokenizer.vocab_size for token_id in sequence.token_ids):
+            raise RuntimeContractError("token sequence contains id outside vocabulary")
+        self.assert_model_unchanged()
+        self.tokenizer.assert_unchanged()
+        if use_cache and self.estimate_kv_bytes(len(sequence.token_ids)) > self.limits.max_kv_bytes:
+            raise RuntimeContractError("inference exceeds KV memory budget")
+        window = sequence.token_ids[-self.limits.max_context:]
+        cache = KVCache(self.model.n_layers, self.limits.max_context) if use_cache else None
+        logits = tuple(float(value) for value in self.model._logits_window(window, cache))
+        if len(logits) != self.tokenizer.vocab_size:
+            raise RuntimeContractError("inference graph emitted invalid logits shape")
+        if any(value != value or value in (float("inf"), float("-inf")) for value in logits):
+            raise RuntimeContractError("inference graph emitted non-finite logits")
+        return InferenceResult(
+            prompt_sequence=sequence,
+            logits=logits,
+            cache_tokens=len(cache.tokens) if cache is not None else 0,
+            model_digest=self.model_digest,
+            architecture_digest=self.architecture.digest,
+        )
+
+    def infer_text(self, text: str, *, use_cache: bool = True) -> InferenceResult:
+        """Tokenize text and execute one next-token inference graph pass."""
+        return self.infer_sequence(self.encode(text), use_cache=use_cache)
+
     def _config_digest(self, config: GenerationConfig) -> str:
         return digest_json(config.to_dict())
 
@@ -279,11 +354,14 @@ class NativeLLMRuntime:
             }
         )
 
-    def _admit(
+    def _admit_sequence(
         self,
-        prompt: str,
+        sequence: TokenSequence,
         config: GenerationConfig,
-    ) -> tuple[TokenSequence, int]:
+    ) -> int:
+        """Validate a pre-tokenized request using the same admission as text."""
+        if not isinstance(sequence, TokenSequence):
+            raise RuntimeContractError("TokenSequence required")
         if not isinstance(config, GenerationConfig):
             raise RuntimeContractError("GenerationConfig required")
         config.validate(limits=self.limits, vocab_size=self.tokenizer.vocab_size)
@@ -292,24 +370,36 @@ class NativeLLMRuntime:
             self.tokenizer.assert_unchanged()
         except TokenizerContractError as exc:
             raise RuntimeContractError("tokenizer mutated after admission") from exc
-
-        try:
-            sequence = self.encode(prompt)
-        except TokenizerContractError as exc:
-            raise RuntimeContractError("prompt tokenization failed admission") from exc
+        if not hmac.compare_digest(sequence.tokenizer_digest, self.tokenizer.digest):
+            raise RuntimeContractError("token sequence tokenizer identity mismatch")
         prompt_tokens = len(sequence.token_ids)
+        if not prompt_tokens:
+            raise RuntimeContractError("token sequence must not be empty")
+        if any(token_id >= self.tokenizer.vocab_size for token_id in sequence.token_ids):
+            raise RuntimeContractError("token sequence contains id outside vocabulary")
         if prompt_tokens > self.limits.max_context:
             raise RuntimeContractError("prompt exceeds context budget")
         if prompt_tokens + config.max_new_tokens > self.limits.max_total_tokens:
             raise RuntimeContractError("request exceeds total-token budget")
-        projected = min(
-            self.limits.max_context,
-            prompt_tokens + config.max_new_tokens,
-        )
+        projected = min(self.limits.max_context, prompt_tokens + config.max_new_tokens)
         projected_kv = self.estimate_kv_bytes(projected) if config.use_cache else 0
         if projected_kv > self.limits.max_kv_bytes:
             raise RuntimeContractError("request exceeds KV memory budget")
-        return sequence, projected_kv
+        return projected_kv
+
+    def _admit(
+        self,
+        prompt: str,
+        config: GenerationConfig,
+    ) -> tuple[TokenSequence, int]:
+        if not isinstance(config, GenerationConfig):
+            raise RuntimeContractError("GenerationConfig required")
+        config.validate(limits=self.limits, vocab_size=self.tokenizer.vocab_size)
+        try:
+            sequence = self.encode(prompt)
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("prompt tokenization failed admission") from exc
+        return sequence, self._admit_sequence(sequence, config)
 
     def stream(
         self,
@@ -326,7 +416,26 @@ class NativeLLMRuntime:
         prompt: str,
         config: GenerationConfig,
     ) -> Iterator[RuntimeEvent]:
+        if not isinstance(config, GenerationConfig):
+            raise RuntimeContractError("GenerationConfig required")
         prompt_sequence, _projected_kv = self._admit(prompt, config)
+        return (yield from self._stream_sequence_impl(prompt_sequence, config))
+
+    def stream_sequence(
+        self,
+        sequence: TokenSequence,
+        config: GenerationConfig | None = None,
+    ) -> GenerationStream:
+        """Stream pre-tokenized inference through the canonical decoder."""
+        cfg = config or GenerationConfig(max_new_tokens=min(32, self.limits.max_new_tokens))
+        return GenerationStream(self._stream_sequence_impl(sequence, cfg))
+
+    def _stream_sequence_impl(
+        self,
+        prompt_sequence: TokenSequence,
+        config: GenerationConfig,
+    ) -> Iterator[RuntimeEvent]:
+        self._admit_sequence(prompt_sequence, config)
         config_digest = self._config_digest(config)
         request_digest = self._request_digest(prompt_sequence, config)
         events: list[RuntimeEvent] = []
@@ -363,7 +472,11 @@ class NativeLLMRuntime:
             window = output[-self.limits.max_context :]
             before = len(cache.tokens) if cache is not None else 0
             primed = cache.primed_for(window) if cache is not None else False
-            logits = self.model._logits_window(window, cache)
+            logits = tuple(float(value) for value in self.model._logits_window(window, cache))
+            if len(logits) != self.tokenizer.vocab_size:
+                raise RuntimeContractError("generation graph emitted invalid logits shape")
+            if any(not math.isfinite(value) for value in logits):
+                raise RuntimeContractError("generation graph emitted non-finite logits")
             if cache is not None and before and not primed:
                 cache_resets += 1
 
@@ -473,6 +586,29 @@ class NativeLLMRuntime:
             checkpoint_digest=checkpoint["digest"],
         )
 
+    def generate_sequence(
+        self,
+        sequence: TokenSequence,
+        config: GenerationConfig | None = None,
+    ) -> GenerationResult:
+        """Generate from token IDs without lossy decoding and retokenization."""
+        stream = self.stream_sequence(sequence, config)
+        for _event in stream:
+            pass
+        if stream.result is None:
+            raise RuntimeContractError("generation terminated without result")
+        return stream.result
+
+    def generate_feed(
+        self,
+        feed: StreamingTextFeed,
+        config: GenerationConfig | None = None,
+    ) -> GenerationResult:
+        """Finalize a StreamingTextFeed and execute it end-to-end."""
+        if not isinstance(feed, StreamingTextFeed):
+            raise RuntimeContractError("StreamingTextFeed required")
+        return self.generate_sequence(feed.finalize(self.tokenizer), config)
+
     def generate(
         self,
         prompt: str,
@@ -493,6 +629,8 @@ class NativeLLMRuntime:
             return ()
         if len(requests) > self.limits.max_batch_size:
             raise RuntimeContractError("batch size budget exceeded")
+        if any(not isinstance(request, BatchGenerationRequest) for request in requests):
+            raise RuntimeContractError("BatchGenerationRequest required")
         ids = [request.request_id for request in requests]
         if len(set(ids)) != len(ids):
             raise RuntimeContractError("duplicate batch request id")
@@ -596,5 +734,6 @@ __all__ = [
     "BatchGenerationResult",
     "GenerationResult",
     "GenerationStream",
+    "InferenceResult",
     "NativeLLMRuntime",
 ]
