@@ -23,6 +23,27 @@ class TrialObservation:
     evidence_digest:str
 
 
+RANDOMIZATION_VERSION="dragon.hash-randomization.v1"
+
+def expected_randomized_intervention(trial_id:str,seed:str)->bool:
+    if not isinstance(trial_id,str) or not trial_id:
+        raise ValueError("invalid randomized trial id")
+    if len(seed)!=64 or any(c not in "0123456789abcdef" for c in seed):
+        raise ValueError("invalid randomization seed")
+    material=(RANDOMIZATION_VERSION+"\0"+seed+"\0"+trial_id).encode()
+    return bool(sha256(material).digest()[0]&1)
+
+def cryptographic_allocation_evidence(assignments:tuple[TrialAssignment,...],seed:str)->str:
+    canonical=[]
+    for a in assignments:
+        expected=expected_randomized_intervention(a.trial_id,seed)
+        if a.intervention is not expected:
+            raise ValueError("assignment does not match hash-randomization protocol")
+        canonical.append((a.trial_id,a.intervention,a.context_group,a.source_id))
+    return sha256(json.dumps([RANDOMIZATION_VERSION,seed,sorted(canonical)],
+        separators=(",",":")).encode()).hexdigest()
+
+
 class DragonTrialLedger:
     def __init__(self,db:sqlite3.Connection):
         self.db=db
@@ -35,7 +56,14 @@ class DragonTrialLedger:
           owner TEXT NOT NULL,protocol_id TEXT NOT NULL,allocation_method TEXT NOT NULL,
           allocation_evidence_digest TEXT NOT NULL,interference_assessment TEXT NOT NULL,
           interference_evidence_digest TEXT NOT NULL,assessed_at REAL NOT NULL,
+          allocation_verified INTEGER NOT NULL DEFAULT 0,
+          verification_version TEXT NOT NULL DEFAULT '',
           PRIMARY KEY(owner,protocol_id))""")
+        columns={row[1] for row in db.execute("PRAGMA table_info(dragon_trial_design_evidence)")}
+        if "allocation_verified" not in columns:
+            db.execute("ALTER TABLE dragon_trial_design_evidence ADD COLUMN allocation_verified INTEGER NOT NULL DEFAULT 0")
+        if "verification_version" not in columns:
+            db.execute("ALTER TABLE dragon_trial_design_evidence ADD COLUMN verification_version TEXT NOT NULL DEFAULT ''")
         db.execute("""CREATE TABLE IF NOT EXISTS dragon_trial_assignments(
           owner TEXT NOT NULL,protocol_id TEXT NOT NULL,trial_id TEXT NOT NULL,
           intervention INTEGER NOT NULL,context_group TEXT NOT NULL,source_id TEXT NOT NULL,
@@ -73,7 +101,8 @@ class DragonTrialLedger:
 
     def attest_design(self,owner:str,protocol_id:str,*,allocation_method:str,
         allocation_evidence_digest:str,interference_assessment:str,
-        interference_evidence_digest:str,assessed_at:float,authorized:bool)->None:
+        interference_evidence_digest:str,assessed_at:float,authorized:bool,
+        randomization_seed:str|None=None)->None:
         if not authorized: raise PermissionError("trial design attestation requires authorization")
         if allocation_method not in {"cryptographic_randomization","external_randomization"}:
             raise ValueError("unverified allocation method")
@@ -82,11 +111,31 @@ class DragonTrialLedger:
         for d in (allocation_evidence_digest,interference_evidence_digest):
             if len(d)!=64 or any(c not in "0123456789abcdef" for c in d): raise ValueError("invalid design evidence digest")
         if not math.isfinite(assessed_at) or assessed_at<0: raise ValueError("invalid design assessment time")
-        if not self.db.execute("SELECT 1 FROM dragon_trial_protocols WHERE owner=? AND protocol_id=?",(owner,protocol_id)).fetchone(): raise KeyError("trial protocol not found")
-        expected=(allocation_method,allocation_evidence_digest,interference_assessment,interference_evidence_digest,assessed_at)
-        old=self.db.execute("SELECT allocation_method,allocation_evidence_digest,interference_assessment,interference_evidence_digest,assessed_at FROM dragon_trial_design_evidence WHERE owner=? AND protocol_id=?",(owner,protocol_id)).fetchone()
+        if not self.db.execute("SELECT 1 FROM dragon_trial_protocols WHERE owner=? AND protocol_id=?",(owner,protocol_id)).fetchone():
+            raise KeyError("trial protocol not found")
+        allocation_verified=0;verification_version="external.unverified.v1"
+        if allocation_method=="cryptographic_randomization":
+            rows=self.db.execute("""SELECT trial_id,intervention,context_group,source_id
+              FROM dragon_trial_assignments WHERE owner=? AND protocol_id=? ORDER BY trial_id""",
+              (owner,protocol_id)).fetchall()
+            assignments=tuple(TrialAssignment(x[0],bool(x[1]),x[2],x[3]) for x in rows)
+            computed=cryptographic_allocation_evidence(assignments,randomization_seed or "")
+            if allocation_evidence_digest!=computed:
+                raise ValueError("allocation evidence digest mismatch")
+            allocation_verified=1;verification_version=RANDOMIZATION_VERSION
+        expected=(allocation_method,allocation_evidence_digest,interference_assessment,
+            interference_evidence_digest,assessed_at,allocation_verified,verification_version)
+        old=self.db.execute("""SELECT allocation_method,allocation_evidence_digest,
+          interference_assessment,interference_evidence_digest,assessed_at,
+          allocation_verified,verification_version FROM dragon_trial_design_evidence
+          WHERE owner=? AND protocol_id=?""",(owner,protocol_id)).fetchone()
         if old and old!=expected: raise ValueError("immutable trial design evidence conflict")
-        with self.db:self.db.execute("INSERT OR IGNORE INTO dragon_trial_design_evidence VALUES(?,?,?,?,?,?,?)",(owner,protocol_id,*expected))
+        with self.db:
+            self.db.execute("""INSERT OR IGNORE INTO dragon_trial_design_evidence(
+              owner,protocol_id,allocation_method,allocation_evidence_digest,
+              interference_assessment,interference_evidence_digest,assessed_at,
+              allocation_verified,verification_version) VALUES(?,?,?,?,?,?,?,?,?)""",
+              (owner,protocol_id,*expected))
 
     def observe(self,owner:str,protocol_id:str,observation:TrialObservation,*,
                 authorized:bool)->None:
@@ -122,9 +171,11 @@ class DragonTrialLedger:
           o.outcome FROM dragon_trial_assignments a JOIN dragon_trial_observations o
           ON a.owner=o.owner AND a.protocol_id=o.protocol_id AND a.trial_id=o.trial_id
           WHERE a.owner=? AND a.protocol_id=? ORDER BY a.trial_id""",(owner,protocol_id)).fetchall()
-        design=self.db.execute("""SELECT allocation_method,interference_assessment FROM dragon_trial_design_evidence
+        design=self.db.execute("""SELECT allocation_method,interference_assessment,
+          allocation_verified,verification_version FROM dragon_trial_design_evidence
           WHERE owner=? AND protocol_id=?""",(owner,protocol_id)).fetchone()
-        allocation_verified=bool(design and design[0] in ("cryptographic_randomization","external_randomization"))
+        allocation_verified=bool(design and design[0]=="cryptographic_randomization"
+          and design[2] and design[3]==RANDOMIZATION_VERSION)
         interference_assessed=bool(design and design[1] in ("none_detected","modeled"))
         trials=tuple(MechanicTrial(r[0],p[0],bool(r[1]),bool(r[4]),allocation_verified,r[2],r[3]) for r in rows)
         complete=len(rows)==self.db.execute("""SELECT COUNT(*) FROM dragon_trial_assignments
