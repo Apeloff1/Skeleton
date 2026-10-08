@@ -105,6 +105,38 @@ class NativeConversationPersistenceTests(unittest.TestCase):
         finally:
             backup.close()
 
+    def test_atomic_cohort_checkpoint_preserves_pins(self):
+        first, second = self.coordinator.create(), self.coordinator.create()
+        self.service.pin(second)
+        self.service.append_text(first, "hello")
+        self.coordinator.save_all()
+        self.assertTrue(self.store.load(second).pinned)
+        self.assertEqual(self.store.restore_session(first).token_ids,
+                         self.service.tokens(first))
+
+    def test_restart_recovery(self):
+        first, second = self.coordinator.create(), self.coordinator.create()
+        self.service.append_text(first, "hello")
+        self.coordinator.save(first)
+        self.coordinator.detach(first)
+        self.coordinator.detach(second)
+        restored = self.coordinator.recover_all()
+        self.assertEqual(set(restored), {first, second})
+        self.assertEqual(self.service.text(first), "hello")
+
+    def test_foreign_runtime_storage_rejected(self):
+        other = runtime()
+        session = NativeConversationSession(other)
+        with self.assertRaises(RuntimeContractError):
+            self.store.create("foreign-session", session)
+
+    def test_checkpoint_detach(self):
+        sid = self.coordinator.create()
+        self.service.append_text(sid, "hello")
+        self.coordinator.checkpoint_and_detach(sid)
+        self.assertFalse(self.service.exists(sid))
+        self.assertTrue(self.store.exists(sid))
+
     def test_revision_conflict_rejects_stale_mutation(self):
         sid = self.coordinator.create()
         revision = self.service.revision(sid)
