@@ -130,6 +130,18 @@ class NativeChatWorkspaceTests(unittest.TestCase):
             w.delete_many((self.cid, None))
         self.assertTrue(w.exists(self.cid))
 
+    def test_search_rejects_scalar_role_filter(self):
+        w = self.workspace
+        w.append_user(self.cid, "hello")
+        with self.assertRaises(RuntimeContractError):
+            w.search("hello", roles="user")
+
+    def test_tags_reject_unhashable_items(self):
+        w = self.workspace
+        with self.assertRaises(RuntimeContractError):
+            w.set_tags(self.cid, (["invalid"],))
+        self.assertEqual(w.describe(self.cid).tags, ())
+
     def test_capacity_limit(self):
         w = NativeChatWorkspace(max_conversations=1)
         w.create()
