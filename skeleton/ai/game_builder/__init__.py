@@ -250,6 +250,11 @@ _KNOWLEDGE_EXPORTS = {
     "KnowledgeHit": ".reviewed_knowledge",
     "KnowledgeBrief": ".reviewed_knowledge",
     "ReviewedKnowledgeStore": ".reviewed_knowledge",
+    "ResearchHandoffError": ".knowledge_rights_bridge",
+    "ClearedResearchSource": ".knowledge_rights_bridge",
+    "ClearedResearchPacket": ".knowledge_rights_bridge",
+    "clear_research_for_design": ".knowledge_rights_bridge",
+    "require_cleared_research_current": ".knowledge_rights_bridge",
 }
 
 
