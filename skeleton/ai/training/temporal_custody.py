@@ -12,7 +12,7 @@ def _hex(v,n):
 class TemporalCustodyEntry:
  sequence:int; artifact_digest:str; artifact_kind:str; authority_id:str; previous_digest:str
  def __post_init__(self):
-  if not isinstance(self.sequence,int) or self.sequence<0: raise TemporalSignalError("invalid custody sequence")
+  if isinstance(self.sequence,bool) or not isinstance(self.sequence,int) or self.sequence<0: raise TemporalSignalError("invalid custody sequence")
   _hex(self.artifact_digest,"artifact"); _hex(self.previous_digest,"previous")
   if not self.authority_id or not self.artifact_kind: raise TemporalSignalError("custody identity required")
  @property
