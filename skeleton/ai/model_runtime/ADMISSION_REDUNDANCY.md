@@ -102,3 +102,13 @@ python -m unittest tests.flgb.test_runtime_admission_scheduler -v
 The tests use independent test adapters, fault injection and temporary
 directories; temporary directories on one disk do not demonstrate physical
 fault tolerance or production-scale durability.
+
+## Explicit repair (not a background reconciler)
+
+An operator may run `repair_redundant_checkpoint(replicas, expected_policy=...,
+expected_limits=..., minimum_sequence=..., expected_digest=...)` after
+recovery. It first requires a valid two-of-three quorum, then republishes the
+same canonical state and verifies each replica by reading it back. A failed
+third copy leaves a degraded receipt; no valid newer or same-sequence
+conflicting snapshot is overwritten. Repair never invents missing evidence,
+changes running GPU tensors or grants multi-writer authority.

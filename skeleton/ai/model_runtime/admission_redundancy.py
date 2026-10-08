@@ -263,6 +263,37 @@ def recover_redundant_checkpoint(
     )
 
 
+def repair_redundant_checkpoint(
+    replicas: Sequence[CheckpointReplica],
+    *,
+    expected_policy: RuntimePolicy | None = None,
+    expected_limits: AdmissionLimits | None = None,
+    minimum_sequence: int = 0,
+    expected_digest: str | None = None,
+) -> ReplicationReceipt:
+    """Rebuild a degraded third copy from a quorum-validated revision.
+
+    Refuses to repair without a two-copy quorum. Publish preflight also
+    refuses overwriting any *valid* higher or conflicting revision. If a
+    trusted independent commit witness is available, pass expected_digest
+    and minimum_sequence; do not guess which revision should win.
+    """
+    recovered = recover_redundant_checkpoint(
+        replicas,
+        expected_policy=expected_policy,
+        expected_limits=expected_limits,
+        minimum_sequence=minimum_sequence,
+        expected_digest=expected_digest,
+    )
+    return publish_redundant_checkpoint(
+        recovered.scheduler,
+        replicas,
+        expected_policy=expected_policy,
+        expected_limits=expected_limits,
+        minimum_sequence=max(minimum_sequence, recovered.sequence),
+    )
+
+
 def _no_duplicate_keys(items: list[tuple[str, object]]) -> dict[str, object]:
     result: dict[str, object] = {}
     for key, value in items:
@@ -360,6 +391,7 @@ class FileCheckpointReplica:
 __all__ = [
     "CheckpointReplica", "FileCheckpointReplica", "ReplicationReceipt",
     "RedundantRecovery", "publish_redundant_checkpoint",
-    "recover_redundant_checkpoint", "REPLICA_COUNT", "REQUIRED_QUORUM",
+    "recover_redundant_checkpoint", "repair_redundant_checkpoint",
+    "REPLICA_COUNT", "REQUIRED_QUORUM",
     "MAX_CHECKPOINT_BYTES",
 ]

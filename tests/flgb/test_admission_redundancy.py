@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 from skeleton.ai.model_runtime.admission_redundancy import (
     FileCheckpointReplica, publish_redundant_checkpoint,
-    recover_redundant_checkpoint,
+    recover_redundant_checkpoint, repair_redundant_checkpoint,
 )
 from skeleton.ai.model_runtime.admission_scheduler import (
     AdmissionLimits, RuntimeAdmissionScheduler,
@@ -317,6 +317,60 @@ class TestRedundantAdmissionRecovery(unittest.TestCase):
         other = RuntimePolicyCompiler().compile(2023)
         with self.assertRaisesRegex(ModelRuntimeError, "quorum"):
             recover_redundant_checkpoint(replicas, expected_policy=other)
+
+    def test_repair_rebuilds_deleted_copy_from_trusted_quorum(self):
+        replicas = slots()
+        live = scheduler()
+        witness = publish(live, replicas)
+        replicas[2].data = None
+        repaired = repair_redundant_checkpoint(
+            replicas,
+            expected_policy=POLICY, expected_limits=LIMITS,
+            minimum_sequence=witness.sequence,
+            expected_digest=witness.digest,
+        )
+        self.assertFalse(repaired.degraded)
+        self.assertEqual(repaired.acknowledged, ("slot-0", "slot-1", "slot-2"))
+        self.assertEqual(recover(replicas).scheduler.snapshot(), live.snapshot())
+
+    def test_repair_refuses_without_two_valid_copies(self):
+        replicas = slots()
+        witness = publish(scheduler(), replicas)
+        replicas[0].data = None
+        replicas[1].data["digest"] = "0" * 64
+        with self.assertRaisesRegex(ModelRuntimeError, "quorum"):
+            repair_redundant_checkpoint(
+                replicas,
+                expected_policy=POLICY, expected_limits=LIMITS,
+                expected_digest=witness.digest,
+            )
+        self.assertIsNone(replicas[0].data)
+
+    def test_repair_never_overwrites_newer_nonquorum_revision(self):
+        replicas = slots()
+        live = scheduler()
+        publish(live, replicas)
+        live.admit()
+        latest = live.snapshot()
+        replicas[2].data = latest
+        with self.assertRaisesRegex(ModelRuntimeError, "stale"):
+            repair_redundant_checkpoint(
+                replicas, expected_policy=POLICY, expected_limits=LIMITS,
+            )
+        self.assertEqual(replicas[2].data, latest)
+
+    def test_repair_degraded_when_third_storage_is_unavailable(self):
+        replicas = slots()
+        receipt = publish(scheduler(), replicas)
+        replicas[2].data = None
+        replicas[2].write_failed = True
+        result = repair_redundant_checkpoint(
+            replicas, expected_policy=POLICY, expected_limits=LIMITS,
+            expected_digest=receipt.digest,
+        )
+        self.assertTrue(result.degraded)
+        self.assertEqual(result.acknowledged, ("slot-0", "slot-1"))
+        self.assertEqual(result.unavailable, ("slot-2",))
 
     def test_corruption_does_not_trigger_implicit_slot_repair(self):
         replicas = slots()
