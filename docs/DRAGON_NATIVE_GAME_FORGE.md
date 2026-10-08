@@ -530,3 +530,64 @@ untrusted direct ROM upload to the signer, and NO automatic gameplay XP.
 Future dedicated workers must link exact-head GitHub CI build jobs,
 toolchain digests and independent emulated input/video/audio traces before
 claims can advance beyond structural binary validity.
+
+
+## Eighth-generation distinct native genres: turn-based RPG and rhythm game
+
+A genre-name catalogue does not justify pretending the same arcade collector
+is a tactical game, RPG, dance simulator and 3D FPS. These two new native
+C99/SDL2 engines are separate from the six initial 2D gameplay kernels
+and the previously implemented first-person DDA dungeon engine.
+
+### Original turn-based RPG engine
+
+Select target pc_linux, pc_windows, pc_macos or steam_deck and style
+turn_based_rpg. The generated source uses an actual EXPLORE/BATTLE/DEFEAT/
+VICTORY state machine rather than continuous real-time collision damage.
+
+The player character has persistent in-memory RPG stats: HP/max HP,
+MP/max MP, level, XP, attack, defense, money, keys, crystal inventory,
+potions and ether. Battles have separately defined actionable turns:
+
+- Sword strike: compare hero attack with the enemy level and bounded RNG.
+- Magic: spend three MP to bypass armor for greater damage.
+- Guard: reduce the next enemy turn's retaliation.
+- Potion/ether: consume actual limited inventory and restore resources.
+- Failed resource action: cannot silently spend a turn.
+- Victory: XP, level-up rules, richer statistics and money/loot.
+- Guardian defeat: unlock chapter progression and bonus supplies.
+
+Exploration includes native tile maps, discrete grid movement, enemy
+encounter detection, world keys/locked doors, treasure and healer NPC
+interactions, stage transitions and game-over/victory rendering. SDL
+keyboard and gamepad inputs have distinct mappings. The --smoke native
+program synthesizes a real battle and requires the player XP reward path
+to be reachable. This is not yet a commercial turn RPG: combat balancing,
+proper dialogue, animations, inventory menus, tactics, save games and
+user playtests require more work.
+
+### Original native rhythm game
+
+Choose style rhythm_game on the same PC target family. This bypasses
+the dungeon layout optimizer because the layout would NOT be used by
+a music game. It instead compiles actual original song charts, generated
+from the chiptune composer, as bounded static C note tables. Each song
+has 64 timed notes across four input lanes; each note has a frequency,
+lane and target 60Hz simulation frame.
+
+The runtime judges real keyboard/gamepad input against grade windows:
+perfect, good, early, incorrect lane, or automatic missed notes. It tracks
+combo/max combo, score, HP, song transitions and failure/victory. Audio
+plays a short synthesized pitch on an accepted hit through the native
+SDL device. The game design difficulty changes actual judgement windows
+and note spacing, so a harder source project is not just a metadata label.
+
+The native --smoke path advances through every song frame, inputs every
+note at its proper time and verifies the actual hit, miss, combo and
+victory state machine. It does not claim the original music is polished
+or that a human player enjoyed the game.
+
+The user-editable game design sets the count of native rhythm songs (1-8)
+and turn-RPG chapter count (1-8). These engines are compiled from original
+source; native CI status must be checked before claiming that actual
+binaries built or that physical devices played them.

@@ -78,6 +78,8 @@ jobs:
             tests/test_ai_webcrawler_dragon_native_compile.py \
             tests/test_ai_webcrawler_dragon_native_cycles.py \
             tests/test_ai_webcrawler_dragon_native_3d_design.py \
+            tests/test_ai_webcrawler_dragon_native_rpg.py \
+            tests/test_ai_webcrawler_dragon_native_rhythm.py \
             tests/test_ai_webcrawler_dragon_playtest_planner.py \
             tests/test_ai_webcrawler_dragon_build_evidence.py \
             tests/test_ai_webcrawler_dragon_game_design_effects.py \
@@ -120,7 +122,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  native-sdl-six-modes:
+  native-sdl-multi-engine:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:

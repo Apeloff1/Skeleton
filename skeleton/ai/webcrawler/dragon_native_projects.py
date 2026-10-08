@@ -548,43 +548,62 @@ def render_native_project(*,title:str,target_id:str,style:str,
         from .dragon_game_blueprints import GENRES, campaign_dict
         from .dragon_game_fitness import choose_campaign,selection_report
         from .dragon_native_arcade_runtime import render_sdl_campaign
-        if style not in GENRES:
+        if style not in GENRES and style!="rhythm_game":
             raise ValueError("gameplay genre does not yet have an implemented native mode")
-        palette=(
-            "modern_neon" if style in ("arcade_score_attack","bullet_hell") else
-            "dmg_green" if style in ("roguelike","survival_horror") else
-            "vga_dusk" if style in ("top_down_adventure","educational") else
-            "crt_arcade" if style in ("racing","run_and_gun") else "handheld"
-        )
-        if design is not None:palette=design.palette
-        selection=choose_campaign(
-            style=style,seed=seed,
-            stages=design.stages if design is not None else 4,
-            palette=palette,budget=design.candidates if design is not None else 8,
-            difficulty=design.difficulty if design is not None else 4)
-        campaign=selection.chosen
-        from .dragon_playtest_planner import plan_campaign,agent_report
-        abstract_plan=plan_campaign(campaign)
-        if style in ("first_person_shooter","immersive_sim"):
-            from .dragon_native_raycaster import render_raycaster
-            files=render_raycaster(
-                campaign,difficulty=design.difficulty if design is not None else 4,
-                theme=design.quest_theme if design is not None else "ancient_ruins")
+        if style=="rhythm_game":
+            from .dragon_native_rhythm import render_rhythm
+            songs=design.stages if design is not None else 4
+            files=render_rhythm(seed=seed,songs=songs,
+                 difficulty=design.difficulty if design is not None else 4)
+            if design is not None:
+                from .dragon_game_design import design_manifest
+                files["dragon-game-design.json"]=json.dumps(
+                    design_manifest(design),sort_keys=True,indent=2)+"\n"
+            files["dragon-rhythm-production.json"]=json.dumps({
+                "schema":"skeleton.ai.dragon.native_rhythm_production.v1",
+                "songs":songs,"notes_per_song":64,
+                "runtime":"fixed_60hz_native_sdl2",
+                "visual_or_player_verified":False
+            },sort_keys=True,indent=2)+"\n"
         else:
-            files=render_sdl_campaign(
-                campaign,hero=design.hero if design is not None else "hatchling",
-                theme=design.quest_theme if design is not None else "ancient_ruins",
+            palette=(
+                "modern_neon" if style in ("arcade_score_attack","bullet_hell") else
+                "dmg_green" if style in ("roguelike","survival_horror") else
+                "vga_dusk" if style in ("top_down_adventure","educational") else
+                "crt_arcade" if style in ("racing","run_and_gun") else "handheld"
+            )
+            if design is not None:palette=design.palette
+            selection=choose_campaign(
+                style=style,seed=seed,
+                stages=design.stages if design is not None else 4,
+                palette=palette,budget=design.candidates if design is not None else 8,
                 difficulty=design.difficulty if design is not None else 4)
-        files["dragon-playtest-plan.json"]=json.dumps(
-            agent_report(abstract_plan),sort_keys=True,indent=2)+"\n"
-        files["dragon-generator-evaluation.json"]=json.dumps(
-            selection_report(selection),sort_keys=True,indent=2)+"\n"
-        files["dragon-campaign.json"]=json.dumps(
-            campaign_dict(campaign),sort_keys=True,indent=2)+"\n"
-        if design is not None:
-            from .dragon_game_design import design_manifest
-            files["dragon-game-design.json"]=json.dumps(
-                design_manifest(design),sort_keys=True,indent=2)+"\n"
+            campaign=selection.chosen
+            from .dragon_playtest_planner import plan_campaign,agent_report
+            abstract_plan=plan_campaign(campaign)
+            if style in ("first_person_shooter","immersive_sim"):
+                from .dragon_native_raycaster import render_raycaster
+                files=render_raycaster(
+                    campaign,difficulty=design.difficulty if design is not None else 4,
+                    theme=design.quest_theme if design is not None else "ancient_ruins")
+            elif style=="turn_based_rpg":
+                from .dragon_native_turn_rpg import render_rpg
+                files=render_rpg(campaign)
+            else:
+                files=render_sdl_campaign(
+                    campaign,hero=design.hero if design is not None else "hatchling",
+                    theme=design.quest_theme if design is not None else "ancient_ruins",
+                    difficulty=design.difficulty if design is not None else 4)
+            files["dragon-playtest-plan.json"]=json.dumps(
+                agent_report(abstract_plan),sort_keys=True,indent=2)+"\n"
+            files["dragon-generator-evaluation.json"]=json.dumps(
+                selection_report(selection),sort_keys=True,indent=2)+"\n"
+            files["dragon-campaign.json"]=json.dumps(
+                campaign_dict(campaign),sort_keys=True,indent=2)+"\n"
+            if design is not None:
+                from .dragon_game_design import design_manifest
+                files["dragon-game-design.json"]=json.dumps(
+                    design_manifest(design),sort_keys=True,indent=2)+"\n"
     else:
         files=(_gameboy(seed) if target_id=="game_boy" else
                _nes(seed) if target_id=="nes" else
@@ -678,6 +697,8 @@ def render_native_project(*,title:str,target_id:str,style:str,
               "deferred_mechanics":deferred,"original_assets":True,
               "runtime_gameplay_mode": (
                   ("native_dda_first_person" if style in ("first_person_shooter","immersive_sim")
+                   else "native_turn_based_rpg" if style=="turn_based_rpg"
+                   else "native_timing_rhythm" if style=="rhythm_game"
                    else GENRES[style]) if target_id in ("pc_linux","pc_windows","pc_macos","steam_deck")
                   else "game_boy_scrolling_platformer" if target_id=="game_boy" and style=="side_scrolling_platformer"
                   else "original_collectible_chase"

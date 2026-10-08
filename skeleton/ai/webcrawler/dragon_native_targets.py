@@ -157,7 +157,7 @@ def target_catalog(*, family: str | None = None) -> tuple[dict, ...]:
             continue
         row=asdict(t)
         row["supported_styles"]=(
-            tuple(sorted(GENRES)) if t.id in desktop
+            tuple(sorted(set(GENRES)|{"rhythm_game"})) if t.id in desktop
             else ("arcade_score_attack","side_scrolling_platformer") if t.id=="game_boy"
             else ("arcade_score_attack",) if t.id in source_ids else ()
         )
