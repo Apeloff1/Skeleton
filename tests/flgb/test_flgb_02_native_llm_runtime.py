@@ -524,5 +524,26 @@ class TestNativeLLMRuntime(unittest.TestCase):
         self.assertIs(runtime.tokenizer, original_tokenizer)
 
 
+    def test_generation_rejects_nonfinite_transformer_logits(self):
+        runtime = self.runtime()
+        original = runtime.model._logits_window
+        try:
+            runtime.model._logits_window = lambda window, cache: [float("nan")] * runtime.tokenizer.vocab_size
+            with self.assertRaisesRegex(RuntimeContractError, "non-finite logits"):
+                runtime.generate("hello", GenerationConfig(max_new_tokens=1))
+        finally:
+            runtime.model._logits_window = original
+
+    def test_generation_rejects_invalid_transformer_logits_shape(self):
+        runtime = self.runtime()
+        original = runtime.model._logits_window
+        try:
+            runtime.model._logits_window = lambda window, cache: [0.0]
+            with self.assertRaisesRegex(RuntimeContractError, "invalid logits shape"):
+                runtime.generate("hello", GenerationConfig(max_new_tokens=1))
+        finally:
+            runtime.model._logits_window = original
+
+
 if __name__ == "__main__":
     unittest.main()
