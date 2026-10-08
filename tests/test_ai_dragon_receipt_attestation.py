@@ -51,3 +51,33 @@ def test_non_output_receipt_mutation_breaks_historical_chain_replay():
  db.commit()
  v=verify_receipt_attestation(db,"u","r","source_integrity",authorized=True)
  assert not v.valid and "historical chain fingerprint mismatch" in v.reason
+
+
+def test_replay_binds_attestation_to_persisted_worker_lease_history():
+ db,out=build();a=out.attestation
+ row=db.execute("""SELECT worker_id,implementation,version,token_digest,leased_at,expires_at,released_at
+  FROM dragon_worker_lease_history WHERE owner='u' AND run_id='r' AND layer='source_integrity'
+  AND generation=?""",(a.lease_generation,)).fetchone()
+ assert row[:4]==(a.worker_id,a.implementation,a.version,a.lease_token_digest)
+ assert row[4]<=row[6]<row[5]
+
+def test_historical_worker_identity_mutation_breaks_replay():
+ db,_=build()
+ db.execute("""UPDATE dragon_worker_lease_history SET worker_id='other'
+  WHERE owner='u' AND run_id='r' AND layer='source_integrity'""");db.commit()
+ v=verify_receipt_attestation(db,"u","r","source_integrity",authorized=True)
+ assert not v.valid and "lease identity mismatch" in v.reason
+
+def test_historical_lease_validity_mutation_breaks_replay():
+ db,_=build()
+ db.execute("""UPDATE dragon_worker_lease_history SET expires_at=released_at
+  WHERE owner='u' AND run_id='r' AND layer='source_integrity'""");db.commit()
+ v=verify_receipt_attestation(db,"u","r","source_integrity",authorized=True)
+ assert not v.valid and "lease validity mismatch" in v.reason
+
+def test_worker_receipt_audit_time_must_match_lease_release():
+ db,_=build()
+ db.execute("""UPDATE dragon_runtime_events SET occurred_at=occurred_at+0.5
+  WHERE owner='u' AND run_id='r' AND event_type='worker_receipt'""");db.commit()
+ v=verify_receipt_attestation(db,"u","r","source_integrity",authorized=True)
+ assert not v.valid and "release/audit time mismatch" in v.reason
