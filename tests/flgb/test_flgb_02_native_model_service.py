@@ -95,6 +95,19 @@ class TestNativeModelService(unittest.TestCase):
         self.assertIsNone(first.generation)
         self.assertEqual(first.receipt.usage_digest, second.receipt.usage_digest)
 
+    def test_expired_deadline_does_not_run_generation(self):
+        from unittest.mock import patch
+
+        service = NativeModelService(self.runtime(), clock_ns=_Clock((0, 2_000_000)))
+        config = GenerationConfig(max_new_tokens=2)
+        request = service.request("op-deadline-no-generate", "alpha", config, deadline_ms=1)
+        with patch.object(service.runtime, "stream", side_effect=AssertionError("generated")):
+            result = service.execute(request, "alpha", config)
+        self.assertEqual(result.receipt.terminal_reason, "deadline")
+        self.assertIsNone(result.generation)
+        self.assertIsNone(result.receipt.output_digest)
+        self.assertEqual(result.events, ())
+
     def test_service_uses_runtime_canonical_identity(self):
         runtime = self.runtime()
         service = NativeModelService(runtime)
