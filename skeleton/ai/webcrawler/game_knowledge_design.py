@@ -101,7 +101,9 @@ def propose_game_blueprint(
             set(dependencies.get(mechanic,()))|set(required)
         ))
     mechanics=resolve_mechanic_dependencies(candidates,dependencies=dependencies)
-    mechanics=budget_game_mechanics(mechanics,max_mechanics=12)
+    mechanics=budget_game_mechanics(
+        mechanics,max_mechanics=12,dependencies=dependencies,
+    )
     grid=design_level_geometry(width,height,seed=seed,genre=genre)
     physics=design_player_physics(index,genre=genre)
     ids=tuple(sorted({h.passage_id for h in hits}))
@@ -162,12 +164,13 @@ def resolve_mechanic_dependencies(
 # 24: Select coherent subsets without deleting mandatory prerequisites.
 def budget_game_mechanics(
     mechanics: tuple[str,...], *, max_mechanics: int,
+    dependencies: dict[str,tuple[str,...]] | None = None,
 ) -> tuple[str,...]:
     if not 2<=max_mechanics<=64:
         raise ValueError("invalid mechanics budget")
     keep=[]
     for mechanic in mechanics:
-        deps=resolve_mechanic_dependencies((mechanic,))
+        deps=resolve_mechanic_dependencies((mechanic,),dependencies=dependencies)
         if len(set(keep)|set(deps))<=max_mechanics:
             for item in deps:
                 if item not in keep:
