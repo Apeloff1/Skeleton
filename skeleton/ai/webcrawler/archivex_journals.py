@@ -53,6 +53,30 @@ def _text(node: ET.Element, max_chars: int) -> str:
     return value[:max_chars]
 
 
+def _license_from_xml(root: ET.Element) -> str:
+    """Accept only an explicit recognized Creative Commons license URL in JATS."""
+    approved = {
+        "https://creativecommons.org/publicdomain/zero/1.0/": "CC0",
+        "https://creativecommons.org/licenses/by/4.0/": "CC-BY-4.0",
+        "https://creativecommons.org/licenses/by-sa/4.0/": "CC-BY-SA-4.0",
+        "https://creativecommons.org/licenses/by/3.0/": "CC-BY-3.0",
+    }
+    licenses = root.findall("./front/article-meta/permissions/license")
+    if not licenses:
+        raise PermissionError("article has no explicit reuse license")
+    resolved = set()
+    for node in licenses:
+        url = node.get("{http://www.w3.org/1999/xlink}href", "")
+        url = url or node.get("href", "")
+        value = approved.get(url)
+        if value is None:
+            raise PermissionError("article license is unknown or restricted")
+        resolved.add(value)
+    if len(resolved) != 1:
+        raise PermissionError("conflicting article licenses")
+    return resolved.pop()
+
+
 def _parse_article(body: bytes, policy: JournalIngestionPolicy):
     if not 1 <= policy.max_xml_bytes <= 10_000_000:
         raise ValueError("invalid XML budget")
@@ -100,7 +124,7 @@ def _parse_article(body: bytes, policy: JournalIngestionPolicy):
             refs.append(identifier)
     truncated = (len(nodes) > policy.max_sections or
                  len(root.findall("./back/ref-list/ref")) > policy.max_references)
-    return title, tuple(sections), tuple(refs), truncated
+    return title, tuple(sections), tuple(refs), truncated, _license_from_xml(root)
 
 
 def ingest_open_access_journal(
@@ -120,7 +144,9 @@ def ingest_open_access_journal(
         + quote(pmcid, safe="") + "/fullTextXML"
     )
     body = fetch_xml(endpoint)
-    title, sections, references, truncated = _parse_article(body, policy)
+    title, sections, references, truncated, declared_license = _parse_article(body, policy)
+    if declared_license != license_id:
+        raise PermissionError("requested license disagrees with article license")
     snapshot = archive.capture(
         owner, source_url=endpoint, body=body, observed_at=observed_at,
         now=now, media_type="application/xml", license_note=license_id,
