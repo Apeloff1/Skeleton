@@ -4,7 +4,7 @@ import pytest
 from skeleton.ai.webcrawler.dragon_analysis_chains import AnalysisLayer,LayerReceipt
 from skeleton.ai.webcrawler.dragon_analysis_execution import LayerDispatch
 from skeleton.ai.webcrawler.dragon_uncertainty_calibration_worker import CalibratedClaim
-from skeleton.ai.webcrawler.dragon_knowledge_normalization_worker import execute_knowledge_normalization
+from skeleton.ai.webcrawler.dragon_knowledge_normalization_worker import execute_knowledge_normalization,normalization_records_fingerprint
 
 
 def base(verdict="supported"):
@@ -44,3 +44,16 @@ def test_ontology_version_changes_knowledge_identity():
     b=execute_knowledge_normalization(d,(c,),calibration_receipt=r,
         authorized=True,ontology_version="v2").records[0]
     assert a.knowledge_id!=b.knowledge_id
+
+
+def test_receipt_fingerprint_is_exact_record_set_fingerprint():
+ r,d,c=base()
+ out=execute_knowledge_normalization(d,(c,),calibration_receipt=r,authorized=True)
+ assert out.receipt.output_fingerprint==normalization_records_fingerprint(
+  out.receipt.input_fingerprints,out.records)
+
+def test_record_content_change_changes_normalization_fingerprint():
+ r,d,c=base()
+ out=execute_knowledge_normalization(d,(c,),calibration_receipt=r,authorized=True)
+ changed=replace(out.records[0],contradiction_state="unresolved")
+ assert normalization_records_fingerprint(out.receipt.input_fingerprints,(changed,))!=out.receipt.output_fingerprint
