@@ -93,7 +93,7 @@ class NativeChatWorkspace:
 
     def create(self, *, title: str = "New conversation",
                transcript: ChatTranscript | None = None) -> str:
-        if not isinstance(title, str) or not 1 <= len(title) <= 256:
+        if type(title) is not str or not 1 <= len(title) <= 256:
             raise RuntimeContractError("invalid conversation title")
         initial = transcript if transcript is not None else ChatTranscript(())
         if not isinstance(initial, ChatTranscript):
@@ -264,7 +264,7 @@ class NativeChatWorkspace:
         values = tuple(tags)
         if len(values) > 32 or len(set(values)) != len(values):
             raise RuntimeContractError("invalid conversation tags")
-        if any(not isinstance(tag, str) or not 1 <= len(tag) <= 64 for tag in values):
+        if any(type(tag) is not str or not 1 <= len(tag) <= 64 for tag in values):
             raise RuntimeContractError("invalid conversation tags")
         with self._lock:
             self._get(cid)["tags"] = values
