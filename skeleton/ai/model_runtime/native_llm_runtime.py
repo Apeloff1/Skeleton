@@ -679,7 +679,10 @@ class NativeLLMRuntime:
 
     def checkpoint(self) -> Mapping[str, Any]:
         self.assert_model_unchanged()
-        self.tokenizer.assert_unchanged()
+        try:
+            self.tokenizer.assert_unchanged()
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("tokenizer mutated before checkpoint") from exc
         return make_checkpoint(
             model=self.model,
             model_digest=self.model_digest,
