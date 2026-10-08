@@ -345,7 +345,7 @@ class TestNativeModelService(unittest.TestCase):
         request = service.request("midstream-tokenizer", "alpha", config, deadline_ms=1000)
 
         def rejected_stream(*args, **kwargs):
-            yield RuntimeEvent(kind="token", token_id=1, position=0)
+            yield RuntimeEvent(sequence=0, kind="token", token_id=1)
             raise TokenizerContractError("stream tokenizer rejected")
 
         with patch.object(service.runtime, "stream", side_effect=rejected_stream):
