@@ -10,6 +10,9 @@ from skeleton.ai.webcrawler.dragon_probabilistic_distillation import (
     EvidencePass, EvidencePolicy, ProbabilisticKnowledgeDistiller,
 )
 from skeleton.ai.webcrawler.dragon_source_independence import SourceProvenance
+from skeleton.ai.webcrawler.dragon_provenance_registry import (
+    ProvenanceRegistry, SourceAttestation,
+)
 from skeleton.ai.webcrawler.dragon_provenance_assurance import (
     AssurancePolicy, assure_crawler_evidence,
 )
@@ -345,3 +348,78 @@ def test_reading_over_budget_is_rejected_before_manifests_are_clustered():
             readings("alpha", n=13),
             (source("alpha"),),
         )
+
+
+def attested(*, same_owner=False, same_syndication=False, omit_beta=False):
+    entries = [
+        SourceAttestation(
+            "alpha.example", "publisher-a", "feed-1",
+            "auditor", "signed-custody:alpha",
+        ),
+    ]
+    if not omit_beta:
+        entries.append(SourceAttestation(
+            "beta.example", "publisher-a" if same_owner else "publisher-b",
+            "feed-1" if same_syndication else "feed-2",
+            "auditor", "signed-custody:beta",
+        ))
+    return ProvenanceRegistry(tuple(entries))
+
+
+def test_attested_same_owner_merges_even_with_different_feeds():
+    result = assure_crawler_evidence(
+        "claim-7", readings("alpha") + readings("beta"),
+        (source("alpha"), source("beta")),
+        authorized=True, attestation_registry=attested(same_owner=True),
+        assurance_policy=AssurancePolicy(require_attestations=True),
+    )
+    assert result.independent_groups == 1
+    assert "attested_common_control" in result.clusters[0].reasons
+    assert not result.candidate_for_review
+    assert result.attestation_fingerprint
+
+
+def test_shared_syndication_merges_separate_owners():
+    report = assure_crawler_evidence(
+        "claim-7", readings("alpha") + readings("beta"),
+        (source("alpha"), source("beta")), authorized=True,
+        attestation_registry=attested(same_syndication=True),
+    )
+    assert report.independent_groups == 1
+
+
+def test_distinct_attested_ownership_and_feeds_stay_separate():
+    report = assure_crawler_evidence(
+        "claim-7", readings("alpha") + readings("beta"),
+        (source("alpha"), source("beta")), authorized=True,
+        attestation_registry=attested(),
+        assurance_policy=AssurancePolicy(require_attestations=True),
+    )
+    assert report.candidate_for_review
+    assert report.independent_groups == 2
+    assert report.attestation_fingerprint
+
+
+def test_missing_required_attestation_registry_fails_closed():
+    with pytest.raises(ValueError, match="registry required"):
+        evaluated(assurance_policy=AssurancePolicy(require_attestations=True))
+
+
+def test_unattested_source_fails_closed_with_registry():
+    with pytest.raises(ValueError, match="unattested source"):
+        assure_crawler_evidence(
+            "claim-7", readings("alpha") + readings("beta"),
+            (source("alpha"), source("beta")), authorized=True,
+            attestation_registry=attested(omit_beta=True),
+        )
+
+
+def test_registry_revision_changes_canonical_fingerprint():
+    base = evaluated()
+    with_registry = assure_crawler_evidence(
+        "claim-7", readings("alpha") + readings("beta"),
+        (source("alpha"), source("beta")), authorized=True,
+        attestation_registry=attested(),
+    )
+    assert base.fingerprint != with_registry.fingerprint
+    assert with_registry.attestation_fingerprint is not None
