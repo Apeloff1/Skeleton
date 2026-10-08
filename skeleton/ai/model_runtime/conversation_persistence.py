@@ -58,7 +58,8 @@ class DurableConversationCoordinator:
             if not self.service.can_admit():
                 raise RuntimeContractError("session capacity exhausted")
             record = self.store.load(session_id)
-            session = self.store.restore_session(session_id)
+            from .native_llm_runtime import NativeConversationSession
+            session = NativeConversationSession.restore(self.store.runtime, record.snapshot)
             self.service._sessions[session_id] = session
             self.service._meta[session_id] = {
                 "created_at": record.created_at,
@@ -134,7 +135,8 @@ class DurableConversationCoordinator:
             if self.service.revision(session_id) != binding.live_revision:
                 raise RuntimeContractError("refusing to discard unsaved live changes")
             record = self.store.load(session_id)
-            restored = self.store.restore_session(session_id)
+            from .native_llm_runtime import NativeConversationSession
+            restored = NativeConversationSession.restore(self.store.runtime, record.snapshot)
             self.service._sessions[session_id] = restored
             self.service._meta[session_id]["revision"] = record.revision
             self.service._meta[session_id]["pinned"] = record.pinned
