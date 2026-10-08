@@ -90,6 +90,15 @@ def _hash(data: object) -> str:
 
 
 # 17. Rank new information by predicted value, quality and bounded byte costs.
+def _public_host(host: str) -> bool:
+    return (
+        "." in host
+        and not host.rstrip(".").endswith(
+            (".local", ".localhost", ".internal", ".test", ".invalid")
+        )
+    )
+
+
 def rank_acquisition_candidates(
     candidates: Iterable[AcquisitionCandidate], *,
     policy: CrawlPolicy = CrawlPolicy(),
@@ -122,7 +131,7 @@ def rank_acquisition_candidates(
         except (ValueError,UnicodeError):
             raise ValueError("invalid acquisition URL") from None
         host=urlsplit(canonical).hostname or ""
-        admitted=policy.admits(canonical)
+        admitted=policy.admits(canonical) and _public_host(host)
         if not admitted:
             score=0.0
             reason="policy_denied"
@@ -154,7 +163,7 @@ def allocate_host_dispatches(
     ranked: Iterable[PrioritizedAcquisition], *,
     now: float, host_ready_at: dict[str,float] | None = None,
     max_dispatch: int = 100, max_per_host: int = 4,
-    host_delay: float = 1.0,
+    host_delay: float = 1.0, policy: CrawlPolicy = CrawlPolicy(),
 ) -> tuple[HostDispatch, ...]:
     if not isinstance(now,(int,float)) or isinstance(now,bool) or not isfinite(now) or now<0:
         raise ValueError("invalid dispatch time")
@@ -175,8 +184,18 @@ def allocate_host_dispatches(
         if not entry.admitted or entry.url in seen:
             continue
         seen.add(entry.url)
-        if urlsplit(entry.url).hostname != entry.host:
+        try:
+            identity=canonicalize_url(entry.url)
+        except (ValueError,UnicodeError) as exc:
+            raise ValueError("invalid admitted dispatch URL") from exc
+        if identity != entry.url or urlsplit(identity).hostname != entry.host:
             raise ValueError("host identity mismatch")
+        if not policy.admits(identity) or not _public_host(entry.host):
+            raise PermissionError("dispatch candidate violates destination policy")
+        if entry.expected_bytes>policy.max_response_bytes:
+            raise PermissionError("dispatch candidate exceeds response budget")
+        if not isinstance(entry.score,(int,float)) or not isfinite(entry.score) or entry.score < 0:
+            raise ValueError("invalid dispatch score")
         hosts.setdefault(entry.host,[]).append(entry)
     for group in hosts.values():
         group.sort(key=lambda x:(-x.score,x.url))
@@ -230,7 +249,7 @@ def plan_adaptive_recrawls(
             canonical=canonicalize_url(source.canonical_url)
         except (ValueError,UnicodeError) as exc:
             raise ValueError("invalid recrawl target") from exc
-        if not CrawlPolicy().admits(canonical):
+        if not CrawlPolicy().admits(canonical) or not _public_host(urlsplit(canonical).hostname or ""):
             raise ValueError("recrawl target fails egress policy")
         importance=_bound(source.importance,"recrawl importance")
         volatility=_bound(source.volatility,"recrawl volatility")
@@ -297,13 +316,16 @@ def decide_mission_stop(
         reasons.append("assurance_threshold")
     if not adequate and remaining_requests==0:
         reasons.append("budget_exhausted_with_unresolved_goals")
+    if not adequate and remaining_requests>0 and plateau:
+        reasons.append("novelty_plateau_unresolved")
     # A budget failure is a stop for additional *fetches*, not approval to
     # publish the claim. Good evidence is routed to human review; continued
     # uncertainty requires more independent research if budgets permit.
-    stop = adequate or remaining_requests==0 or (plateau and adequate)
+    stop = adequate or remaining_requests==0 or plateau
     actions = (
         ("submit_for_human_review",) if adequate else
         ("increase_authorized_budget_or_escalate",) if remaining_requests==0 else
+        ("escalate_research_strategy",) if plateau else
         ("seek_new_independent_sources",) if assurance.independent_groups<minimum_groups else
         ("target_contradictions",) if assurance.belief.conflicting else
         ("schedule_reread_and_calibration",)
