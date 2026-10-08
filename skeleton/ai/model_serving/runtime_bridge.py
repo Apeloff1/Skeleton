@@ -6,6 +6,7 @@ deployment composition root, never from an untrusted request.
 from dataclasses import dataclass
 from hashlib import sha256
 import json
+from inspect import isasyncgen, isawaitable, iscoroutine, isgenerator
 
 from .capacity import CapacityLedger
 
@@ -70,6 +71,16 @@ def plan_and_invoke(
         try:
             plan = planner.plan(request)
             result = invoke(plan)
+            # This adapter is synchronous. A lazy stream/coroutine could execute
+            # *after* finally releases its in-flight capacity and identity.
+            if isawaitable(result) or isgenerator(result) or isasyncgen(result):
+                if isgenerator(result) or iscoroutine(result):
+                    result.close()
+                elif callable(getattr(result, "cancel", None)):
+                    result.cancel()
+                raise AdmissionDenied(
+                    "deferred backend output requires lifecycle-managed streaming"
+                )
             return PlannedInvocation(plan, result)
         finally:
             if lease is not None:
