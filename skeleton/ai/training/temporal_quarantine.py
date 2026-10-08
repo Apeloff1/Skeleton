@@ -9,12 +9,25 @@ def _digest(v): return sha256(json.dumps(v,sort_keys=True,separators=(",",":")).
 @dataclass(frozen=True)
 class QuarantineItem:
  item_id:str; content_digest:str; reason_code:str; admitted_year:int; source_digest:str
+ def __post_init__(self):
+  if not isinstance(self.item_id,str) or not self.item_id.strip(): raise TemporalSignalError("invalid quarantine item identity")
+  if self.reason_code not in _ALLOWED: raise TemporalSignalError("unsupported quarantine reason")
+  for name in ("content_digest","source_digest"):
+   d=getattr(self,name)
+   if not isinstance(d,str) or len(d)!=64 or any(c not in "0123456789abcdef" for c in d): raise TemporalSignalError("invalid quarantine "+name)
+  if isinstance(self.admitted_year,bool) or not isinstance(self.admitted_year,int) or not 1900<=self.admitted_year<=2200: raise TemporalSignalError("invalid quarantine year")
  @property
  def digest(self): return _digest(self.__dict__)
 
 @dataclass(frozen=True)
 class QuarantineResolution:
  item_digest:str; resolution:str; evidence_digest:str; resolver_id:str
+ def __post_init__(self):
+  for name in ("item_digest","evidence_digest"):
+   d=getattr(self,name)
+   if not isinstance(d,str) or len(d)!=64 or any(c not in "0123456789abcdef" for c in d): raise TemporalSignalError("invalid resolution "+name)
+  if self.resolution not in {"release-retrieval","release-learning","reject"}: raise TemporalSignalError("invalid quarantine resolution")
+  if not isinstance(self.resolver_id,str) or not self.resolver_id.strip(): raise TemporalSignalError("resolver identity required")
  @property
  def digest(self): return _digest(self.__dict__)
 
