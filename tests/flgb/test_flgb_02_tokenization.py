@@ -31,6 +31,14 @@ class TestTokenization(unittest.TestCase):
         with self.assertRaises(TokenizerContractError):
             deserialize_token_sequence(bad_digest)
 
+    def test_deserializer_rejects_duplicate_json_fields(self):
+        payload = (
+            b'{"source_text_digest":"' + D.encode() +
+            b'","token_ids":[1],"token_ids":[2],"tokenizer_digest":"' + D.encode() + b'"}'
+        )
+        with self.assertRaisesRegex(TokenizerContractError, "duplicate serialized JSON key"):
+            deserialize_token_sequence(payload)
+
     def test_deserializer_rejects_unknown_shape(self):
         payload = b'{"source_text_digest":"'+D.encode()+b'","token_ids":[1],"tokenizer_digest":"'+D.encode()+b'","extra":1}'
         with self.assertRaises(TokenizerContractError):
