@@ -9,6 +9,16 @@ export default function DragonWatchAlong({signal}:{signal:WatchSignal}){
  const reducedMotion=useReducedMotion();
  const pose=watchPose(signal);
  const bounce=useRef(new Animated.Value(0)).current;
+ const blink=useRef(new Animated.Value(1)).current;
+ const flutter=useRef(new Animated.Value(0)).current;
+ useEffect(()=>{
+  if(reducedMotion){blink.stopAnimation();flutter.stopAnimation();blink.setValue(1);flutter.setValue(0);return}
+  const blinkAnimation=Animated.sequence([Animated.delay(750),Animated.timing(blink,{toValue:.1,duration:85,useNativeDriver:true}),Animated.timing(blink,{toValue:1,duration:110,useNativeDriver:true})]);
+  const flutterAnimation=Animated.sequence([Animated.timing(flutter,{toValue:1,duration:140,useNativeDriver:true}),Animated.timing(flutter,{toValue:0,duration:200,useNativeDriver:true})]);
+  if(pose.blink)blinkAnimation.start();
+  if(pose.wingWave)flutterAnimation.start();
+  return()=>{blinkAnimation.stop();flutterAnimation.stop()};
+ },[blink,flutter,reducedMotion,pose.blink,pose.wingWave,signal.kind]);
  useEffect(()=>{
   if(reducedMotion){bounce.stopAnimation();bounce.setValue(0);return}
   const animation=Animated.sequence([
@@ -23,11 +33,13 @@ export default function DragonWatchAlong({signal}:{signal:WatchSignal}){
   <Animated.View style={{transform:[{translateY:bounce},{rotate:reducedMotion?'0deg':pose.tilt+'deg'}]}}>
    <DragonCompanion state={state} reducedMotion={reducedMotion}/>
   </Animated.View>
-  <View style={styles.accessories}>
+  <View style={styles.accessories} accessible={false}>
+   {pose.blink&&<Animated.Text style={[styles.accessory,{opacity:blink}]}>✨</Animated.Text>}
+   {pose.wingWave&&<Animated.Text style={[styles.accessory,{transform:[{translateY:flutter.interpolate({inputRange:[0,1],outputRange:[0,-14]})}]}]}>🪽</Animated.Text>}
    {pose.popcorn&&<Text style={styles.accessory} accessibilityLabel="Tiny popcorn bowl">🍿</Text>}
    {pose.notebook&&<Text style={styles.accessory} accessibilityLabel="Taking notes">📓</Text>}
    {pose.heart&&<Text style={styles.accessory} accessibilityLabel="Delighted">💗</Text>}
-   {pose.blink&&<Text style={styles.accessory} accessibilityLabel="Sleepy blink">💤</Text>}
+   {pose.mood==='sleepy'&&<Text style={styles.accessory} accessibilityLabel="Sleepy">💤</Text>}
   </View>
   <Text style={styles.caption}>{pose.mood==='taking-notes'?'OBSERVATION READY · NOT YET SAVED':'WATCHING TOGETHER · NO AUTOMATIC INGESTION'}</Text>
  </View>;
