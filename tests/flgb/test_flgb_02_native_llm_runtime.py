@@ -578,5 +578,22 @@ class TestNativeLLMRuntime(unittest.TestCase):
                     runtime.infer_sequence(sequence, use_cache=invalid)
 
 
+    def test_inference_detects_mutated_model_before_token_identity(self):
+        runtime = self.runtime()
+        sequence = runtime.encode("hello world")
+        runtime.model.bout[0] += 0.5
+        runtime.tokenizer.digest = "0" * 64
+        with self.assertRaises(RuntimeContractError):
+            runtime.infer_sequence(sequence)
+
+    def test_inference_rejects_mutated_tokenizer_even_with_matching_sequence_digest(self):
+        runtime = self.runtime()
+        sequence = runtime.encode("hello world")
+        runtime.tokenizer.digest = "0" * 64
+        forged = TokenSequence("0" * 64, sequence.token_ids, sequence.source_digest)
+        with self.assertRaisesRegex(RuntimeContractError, "tokenizer mutated"):
+            runtime.infer_sequence(forged)
+
+
 if __name__ == "__main__":
     unittest.main()
