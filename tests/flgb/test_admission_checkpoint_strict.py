@@ -257,6 +257,23 @@ class TestRetainedKVIdentitySafety(unittest.TestCase):
         with self.assertRaisesRegex(ModelRuntimeError, "AdmissionLimits"):
             RuntimeAdmissionScheduler(limits=False)
 
+    def test_public_id_boundary_rejects_nonhashable_and_invalid_request_ids(self):
+        scheduler = self.build()
+        before = scheduler.snapshot()
+        operations = (
+            lambda value: scheduler.cancel(value),
+            lambda value: scheduler.retry(value),
+            lambda value: scheduler.set_kv_pinned(value, True),
+            lambda value: scheduler.complete(value),
+        )
+        for bad in (None, [], {}, True, 123, "", "x" * 257):
+            for operation in operations:
+                with self.subTest(bad=repr(bad), operation=operation), self.assertRaisesRegex(
+                    ModelRuntimeError, "invalid scheduler request identity"
+                ):
+                    operation(bad)
+                self.assertEqual(scheduler.snapshot(), before)
+
 
 if __name__ == "__main__":
     unittest.main()

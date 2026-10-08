@@ -16,6 +16,13 @@ def _digest(value: object) -> str:
     ).hexdigest()
 
 
+def _require_request_id(value: object) -> str:
+    """Reject malformed public operation identifiers before state lookup."""
+    if type(value) is not str or not 1 <= len(value) <= 256:
+        raise ModelRuntimeError("invalid scheduler request identity")
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class AdmissionLimits:
     max_active_requests: int = 32
@@ -189,6 +196,7 @@ class RuntimeAdmissionScheduler:
 
     def cancel(self, request_id: str) -> str:
         """Withdraw queued work or terminate active work and release its KV state."""
+        _require_request_id(request_id)
         if request_id in self._queued:
             self._queued.pop(request_id)
             self._sequence += 1
@@ -202,6 +210,7 @@ class RuntimeAdmissionScheduler:
 
     def retry(self, request_id: str, *, priority_delta: int = 0) -> None:
         """Move active work back to the queue with a fresh sequence and no stale KV."""
+        _require_request_id(request_id)
         item = self._active.get(request_id)
         if item is None:
             raise ModelRuntimeError("cannot retry inactive request")
@@ -224,6 +233,7 @@ class RuntimeAdmissionScheduler:
         self._sequence += 1
 
     def set_kv_pinned(self, request_id: str, pinned: bool) -> None:
+        _require_request_id(request_id)
         if not isinstance(pinned, bool):
             raise ModelRuntimeError("pinned must be boolean")
         entry = self._kv.get(request_id)
@@ -250,6 +260,7 @@ class RuntimeAdmissionScheduler:
         }
 
     def complete(self, request_id: str, *, retain_kv: bool = False) -> None:
+        _require_request_id(request_id)
         if request_id not in self._active:
             raise ModelRuntimeError("cannot complete inactive request")
         self._active.pop(request_id)

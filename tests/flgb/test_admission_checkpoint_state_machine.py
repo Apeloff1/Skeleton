@@ -74,9 +74,10 @@ def replay_workload(seed: int, operations: int = 240) -> tuple[str, ...]:
         except ModelRuntimeError:
             # Capacity and policy refusal must not damage a live scheduler.
             if choice in (0, 3):
-                assert scheduler.snapshot() == before, (
-                    f"non-atomic admission refusal at seed {seed}, step {step}"
-                )
+                if scheduler.snapshot() != before:
+                    raise AssertionError(
+                        f"non-atomic admission refusal at seed {seed}, step {step}"
+                    )
             else:
                 raise
 
@@ -87,18 +88,25 @@ def replay_workload(seed: int, operations: int = 240) -> tuple[str, ...]:
             expected_policy=policy,
             minimum_sequence=before["sequence"],
         )
-        assert restored.snapshot() == snap, (
-            f"checkpoint parity mismatch at seed {seed}, step {step}"
-        )
+        if restored.snapshot() != snap:
+            raise AssertionError(
+                f"checkpoint parity mismatch at seed {seed}, step {step}"
+            )
         capacity = scheduler.capacity()
-        assert capacity["queued_requests"] <= LIMITS.max_queued_requests
-        assert capacity["active_requests"] <= LIMITS.max_active_requests
-        assert 0 <= capacity["kv_used_bytes"] <= LIMITS.kv_capacity_bytes
-        assert capacity["kv_free_bytes"] + capacity["kv_used_bytes"] == LIMITS.kv_capacity_bytes
-        assert set(scheduler.active_ids).isdisjoint(scheduler.queued_ids)
-        assert set(scheduler.queued_ids).isdisjoint(
+        if capacity["queued_requests"] > LIMITS.max_queued_requests:
+            raise AssertionError("queued requests exceeded admission capacity")
+        if capacity["active_requests"] > LIMITS.max_active_requests:
+            raise AssertionError("active requests exceeded admission capacity")
+        if not 0 <= capacity["kv_used_bytes"] <= LIMITS.kv_capacity_bytes:
+            raise AssertionError("resident KV bytes exceeded admission capacity")
+        if capacity["kv_free_bytes"] + capacity["kv_used_bytes"] != LIMITS.kv_capacity_bytes:
+            raise AssertionError("KV accounting is inconsistent")
+        if not set(scheduler.active_ids).isdisjoint(scheduler.queued_ids):
+            raise AssertionError("request has two concurrent admission states")
+        if not set(scheduler.queued_ids).isdisjoint(
             item["request_id"] for item in snap["kv"]
-        )
+        ):
+            raise AssertionError("queued request retained a resident KV identity")
         digests.append(snap["digest"])
     return tuple(digests)
 
