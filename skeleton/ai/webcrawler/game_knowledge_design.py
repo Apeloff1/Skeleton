@@ -93,7 +93,14 @@ def propose_game_blueprint(
         raise ValueError("invalid level dimensions")
     hits=index.search(f"{genre} movement collision game design",limit=12)
     candidates=select_game_mechanics(hits,genre=genre)
-    mechanics=resolve_mechanic_dependencies(candidates)
+    dependencies={key:tuple(values) for key,values in _DEPEND.items()}
+    # Promote only repeated, explicitly cited prerequisite statements and
+    # preserve every built-in safety/functional prerequisite.
+    for mechanic,required in index.confirmed_mechanic_dependencies().items():
+        dependencies[mechanic]=tuple(sorted(
+            set(dependencies.get(mechanic,()))|set(required)
+        ))
+    mechanics=resolve_mechanic_dependencies(candidates,dependencies=dependencies)
     mechanics=budget_game_mechanics(mechanics,max_mechanics=12)
     grid=design_level_geometry(width,height,seed=seed,genre=genre)
     physics=design_player_physics(index,genre=genre)
