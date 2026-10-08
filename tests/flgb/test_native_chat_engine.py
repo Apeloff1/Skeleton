@@ -47,6 +47,12 @@ class NativeChatEngineTests(unittest.TestCase):
         with self.assertRaises(RuntimeContractError):
             self.engine.fit(oversized, self.config)
 
+    def test_token_budget_reserves_generation_space(self):
+        budget = self.engine.token_budget(self.config)
+        self.assertEqual(budget, 254)
+        transcript = ChatTranscript((ChatMessage("user", "hello"),))
+        self.assertLessEqual(self.engine.prompt_token_count(transcript), budget)
+
     def test_reject_impossible_reserve(self):
         with self.assertRaises(RuntimeContractError):
             NativeChatEngine(self.runtime, reserve_tokens=256)
