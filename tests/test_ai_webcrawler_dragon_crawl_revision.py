@@ -154,6 +154,9 @@ def test_fingerprints_change_when_source_revision_changes():
     )
     assert before.fingerprint != after.fingerprint
     assert before.current_custody_fingerprint != after.current_custody_fingerprint
+    assert not after.prior_readings_reusable
+    assert after.sources[0].quality_changed
+    assert after.readings[0].disposition is ReadingDisposition.QUALITY_CHANGED
 
 
 def test_permutation_does_not_change_any_revision_receipt():
@@ -273,3 +276,44 @@ def test_acquisition_metadata_changes_custody_digest_but_not_verified_quote():
     before = check((alpha,), (reading(),), (alpha,))
     after = check((alpha,), (reading(),), (updated,))
     assert before.current_custody_fingerprint != after.current_custody_fingerprint
+
+
+def test_status_change_requires_new_acquisition_policy_review():
+    alpha = capture("alpha")
+    updated = replace(
+        alpha.document,
+        provenance={**alpha.document.provenance, "status": 206},
+    )
+    result = check((alpha,), (reading(),),
+                   (replace(alpha, document=updated),))
+    assert result.sources[0].quality_changed
+    assert result.readings[0].disposition is ReadingDisposition.QUALITY_CHANGED
+    assert not result.prior_readings_reusable
+
+
+def test_acquisition_extension_change_requires_quality_review():
+    alpha = capture("alpha")
+    provenance = {**alpha.document.provenance, "retention_class": "restricted"}
+    updated = replace(alpha, document=replace(
+        alpha.document, provenance=provenance,
+    ))
+    result = check((alpha,), (reading(),), (updated,))
+    assert result.sources[0].quality_changed
+    assert result.invalidated_readings == 1
+    assert result.readings[0].disposition is ReadingDisposition.QUALITY_CHANGED
+
+
+def test_capture_time_only_change_is_not_quality_drift():
+    alpha = capture("alpha")
+    updated = replace(alpha, document=replace(
+        alpha.document,
+        fetched_at=alpha.document.fetched_at + 60,
+        provenance={
+            **alpha.document.provenance,
+            "fetched_at": alpha.document.fetched_at + 60,
+        },
+    ))
+    result = check((alpha,), (reading(),), (updated,))
+    assert not result.sources[0].quality_changed
+    assert result.sources[0].change is SourceChange.UNCHANGED
+    assert result.prior_readings_reusable
