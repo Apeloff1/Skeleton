@@ -534,7 +534,22 @@ class LocalInferenceEngine:
         self._cache_lock = asyncio.Lock()
 
     def _key(self, request: LocalInferenceRequest) -> str:
-        return _digest({"model": self.model.model_digest, "request": request.digest})
+        # Native runtime identities include tokenizer, architecture and policy.
+        # Read before cache lookup so model drift invalidates old cached output.
+        runtime_digest = getattr(self.model, "runtime_digest", None)
+        if runtime_digest is not None and (
+            not isinstance(runtime_digest, str)
+            or len(runtime_digest) != 64
+            or any(ch not in "0123456789abcdef" for ch in runtime_digest)
+        ):
+            raise ValueError("local runtime digest must be lowercase sha256")
+        return _digest(
+            {
+                "model": self.model.model_digest,
+                "runtime": runtime_digest,
+                "request": request.digest,
+            }
+        )
 
     async def generate(self, request: LocalInferenceRequest) -> LocalInferenceResult:
         if not isinstance(request, LocalInferenceRequest):
@@ -544,6 +559,8 @@ class LocalInferenceEngine:
             async with self._cache_lock:
                 cached = self._cache.get(key)
                 if cached is not None:
+                    if self._key(request) != key:
+                        raise ValueError("local runtime identity changed before cache hit")
                     self._cache.move_to_end(key)
                     return replace(cached, cached=True)
 
@@ -561,6 +578,8 @@ class LocalInferenceEngine:
 
         if result.model_digest != self.model.model_digest:
             raise ValueError("local inference result model identity drift")
+        if self._key(request) != key:
+            raise ValueError("local runtime identity changed during inference")
 
         declared_tools={
             str(item.get("tool_id","")).strip(): item
@@ -607,6 +626,8 @@ class LocalInferenceEngine:
 
         if self.cache_size:
             async with self._cache_lock:
+                if self._key(request) != key:
+                    raise ValueError("local runtime identity changed before caching")
                 self._cache[key] = result
                 self._cache.move_to_end(key)
                 while len(self._cache) > self.cache_size:
