@@ -136,10 +136,14 @@ class NativeModelService:
         generated_events: int,
         terminal_reason: str,
     ) -> str:
-        prompt_sequence = self.runtime.encode(prompt)
+        try:
+            prompt_sequence = self.runtime.encode(prompt)
+            prompt_tokens = len(prompt_sequence.token_ids)
+        except RuntimeContractError:
+            prompt_tokens = None
         return digest_json(
             {
-                "prompt_tokens": len(prompt_sequence.token_ids),
+                "prompt_tokens": prompt_tokens,
                 "generated_events": generated_events,
                 "terminal_reason": terminal_reason,
                 "model_identity_digest": self.identity_digest,
