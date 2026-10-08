@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 from collections import Counter, OrderedDict
 from dataclasses import dataclass, field, replace
+from datetime import datetime, timezone
 import hashlib
 import json
 import math
@@ -806,7 +807,26 @@ class LocalModelAdapter(ProviderAdapter):
             ),
             context_digest=request.context_digest,
         )
-        result = await self.engine.generate(local_request)
+        if request.deadline is not None:
+            if (
+                not isinstance(request.deadline, datetime)
+                or request.deadline.tzinfo is None
+                or request.deadline.utcoffset() is None
+            ):
+                raise ValueError("local inference deadline must be timezone-aware")
+            remaining = (
+                request.deadline.astimezone(timezone.utc) - datetime.now(timezone.utc)
+            ).total_seconds()
+            if remaining <= 0:
+                raise LocalInferenceCancelled("local inference deadline exceeded")
+            try:
+                result = await asyncio.wait_for(
+                    self.engine.generate(local_request), timeout=remaining
+                )
+            except asyncio.TimeoutError as exc:
+                raise LocalInferenceCancelled("local inference deadline exceeded") from exc
+        else:
+            result = await self.engine.generate(local_request)
         tool_calls = tuple(
             ProviderToolCall(
                 call_id=item.call_id,
