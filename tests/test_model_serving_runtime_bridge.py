@@ -76,5 +76,35 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(ledger.snapshot(), (0, 0))
 
 
+    def test_duplicate_in_flight_request_cannot_reenter_backend(self):
+        from skeleton.ai.model_runtime.serving_policy import PolicyAwareServingPlanner
+        from skeleton.ai.model_serving.capacity import CapacityDenied, CapacityLedger, CapacityLimits
+        planner = object.__new__(PolicyAwareServingPlanner)
+        planner.plan = Mock(return_value="planned")
+        ledger = CapacityLedger(CapacityLimits(1, 100, 10**12))
+        calls = []
+
+        def backend(plan):
+            calls.append(plan)
+            with self.assertRaisesRegex(CapacityDenied, "active reservation"):
+                plan_and_invoke(
+                    policy=self.policy, planner=planner, request=self.request,
+                    model_bytes=self.model, evaluation_bytes=self.evaluation,
+                    backend="local", invoke=backend, ledger=ledger,
+                )
+            self.assertEqual(ledger.snapshot(), (1, 25))
+            return "result"
+
+        result = plan_and_invoke(
+            policy=self.policy, planner=planner, request=self.request,
+            model_bytes=self.model, evaluation_bytes=self.evaluation,
+            backend="local", invoke=backend, ledger=ledger,
+        )
+        self.assertEqual(result.backend_result, "result")
+        self.assertEqual(calls, ["planned"])
+        planner.plan.assert_called_once_with(self.request)
+        self.assertEqual(ledger.snapshot(), (0, 0))
+
+
 if __name__ == "__main__":
     unittest.main()
