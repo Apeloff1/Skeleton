@@ -58,6 +58,7 @@ def test_new_fetched_time_with_same_content_does_not_invalidate_passages():
                    (replace(old, document=new_doc),))
     assert report.prior_readings_reusable
     assert report.invalidated_readings == 0
+    assert report.original_custody_fingerprint != report.current_custody_fingerprint
 
 
 def test_new_content_with_unique_old_quote_requires_new_review():
@@ -239,3 +240,36 @@ def test_public_crawler_namespace_exposes_revision_review():
     assert webcrawler.compare_crawl_revisions is compare_crawl_revisions
     assert webcrawler.SourceChange is SourceChange
     assert webcrawler.ReadingDisposition is ReadingDisposition
+
+
+def test_nonobserved_source_revision_also_revokes_whole_claim_reuse():
+    alpha, beta = capture("alpha"), capture("beta")
+    new_beta = capture("beta", "Entirely new source section without old language.")
+    verdict = check((alpha, beta), (reading("alpha"),), (alpha, new_beta))
+    assert verdict.invalidated_readings == 0
+    assert verdict.readings[0].disposition is ReadingDisposition.REUSABLE
+    assert verdict.sources[-1].change is SourceChange.CHANGED
+    assert not verdict.prior_readings_reusable
+
+
+def test_modified_nonobserved_parent_invalidates_descendant_claim():
+    alpha = capture("alpha")
+    beta = capture("beta")
+    child = replace(alpha, parent_source_ids=("beta",))
+    new_beta = capture("beta", "Modified parent study version.")
+    verdict = check((child, beta), (reading("alpha"),), (child, new_beta))
+    assert not verdict.prior_readings_reusable
+    assert verdict.readings[0].disposition is ReadingDisposition.REUSABLE
+    assert verdict.sources[-1].content_changed
+
+
+def test_acquisition_metadata_changes_custody_digest_but_not_verified_quote():
+    alpha = capture("alpha")
+    new_doc = replace(
+        alpha.document,
+        source_score=alpha.document.source_score - .1,
+    )
+    updated = replace(alpha, document=new_doc)
+    before = check((alpha,), (reading(),), (alpha,))
+    after = check((alpha,), (reading(),), (updated,))
+    assert before.current_custody_fingerprint != after.current_custody_fingerprint
