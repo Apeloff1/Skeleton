@@ -391,7 +391,7 @@ def serialize_token_sequence(sequence: TokenSequence) -> bytes:
     return payload
 
 
-def deserialize_token_sequence(payload: bytes) -> TokenSequence:
+def deserialize_token_sequence(payload: bytes, *, require_canonical: bool = False) -> TokenSequence:
     if not isinstance(payload, bytes) or len(payload) > MAX_SERIALIZED_SEQUENCE_BYTES:
         raise TokenizerContractError("invalid serialized token sequence bytes")
     def reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -423,11 +423,14 @@ def deserialize_token_sequence(payload: bytes) -> TokenSequence:
         digest = value[name]
         if not isinstance(digest, str) or len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
             raise TokenizerContractError(f"serialized {name} is invalid")
-    return TokenSequence(
+    sequence = TokenSequence(
         value["tokenizer_digest"],
         tuple(token_ids),
         value["source_text_digest"],
     )
+    if require_canonical and serialize_token_sequence(sequence) != payload:
+        raise TokenizerContractError("noncanonical serialized token sequence")
+    return sequence
 
 
 __all__ = [
