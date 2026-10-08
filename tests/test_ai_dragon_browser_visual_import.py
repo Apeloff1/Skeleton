@@ -63,3 +63,31 @@ def test_browser_locator_cannot_control_server_canonical_evidence():
  assert accepted.envelope_fingerprint!=original.envelope_fingerprint
  assert accepted.canonical_evidence_fingerprint==original.canonical_evidence_fingerprint
  assert accepted.features.frames[0].source_frame_id==original.features.frames[0].source_frame_id
+
+
+def resign(e):
+ unsigned=replace(e,payload_fingerprint="")
+ return replace(unsigned,payload_fingerprint=canonical_browser_visual_fingerprint(unsigned))
+
+def test_oversized_browser_locator_rejected_before_custody():
+ cq,_,e=setup();bad=resign(replace(e,frames=(replace(e.frames[0],source_locator="x"*2049),)))
+ with pytest.raises(ValueError,match="source locator"):
+  accept_browser_visual(cq,bad,now=3,authorized=True)
+
+def test_nonfinite_browser_feature_rejected_before_hash_trust():
+ cq,_,e=setup();bad=resign(replace(e,observations=(replace(e.observations[0],motion_energy=float("inf")),)))
+ with pytest.raises(ValueError,match="visual feature"):
+  accept_browser_visual(cq,bad,now=3,authorized=True)
+
+def test_duplicate_transport_frame_id_rejected_even_when_payload_is_resigned():
+ cq,_,e=setup()
+ f2=replace(e.frames[0],captured_at_ms=1,frame_digest="e"*64)
+ o2=replace(e.observations[0],frame_digest="e"*64)
+ bad=resign(replace(e,frames=(e.frames[0],f2),observations=(e.observations[0],o2)))
+ with pytest.raises(ValueError,match="duplicate browser frame id"):
+  accept_browser_visual(cq,bad,now=3,authorized=True)
+
+def test_browser_frame_budget_is_enforced_before_analysis():
+ cq,_,e=setup()
+ with pytest.raises(ValueError,match="coverage"):
+  accept_browser_visual(cq,e,now=3,authorized=True,max_frames=0)
