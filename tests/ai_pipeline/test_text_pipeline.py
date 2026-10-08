@@ -1665,3 +1665,37 @@ def test_canonical_mode_requires_boolean():
         with pytest.raises(TokenizerContractError, match="require_canonical must be a boolean"):
             deserialize_token_sequence(payload, require_canonical=flag)
     assert deserialize_token_sequence(payload, require_canonical=True) == seq
+
+
+def test_native_tokenizer_rejects_non_string_vocabulary_and_mutation(native_model):
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    original = native_model.itos
+    try:
+        native_model.itos = [None, *original[1:]]
+        with pytest.raises(TokenizerContractError, match="vocabulary"):
+            NativeTokenizer(native_model)
+    finally:
+        native_model.itos = original
+    tokenizer = NativeTokenizer(native_model)
+    try:
+        native_model.itos = [None, *original[1:]]
+        with pytest.raises(TokenizerContractError, match="vocabulary"):
+            tokenizer.encode_ids("a")
+        with pytest.raises(TokenizerContractError, match="vocabulary"):
+            tokenizer.decode_ids([0])
+    finally:
+        native_model.itos = original
+
+
+def test_native_tokenizer_rejects_special_id_type_mutation(native_model):
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    tokenizer = NativeTokenizer(native_model)
+    original = native_model.unk
+    try:
+        native_model.unk = True
+        with pytest.raises(TokenizerContractError, match="vocabulary changed"):
+            tokenizer.encode_ids("a")
+    finally:
+        native_model.unk = original
+    with pytest.raises(TokenizerContractError, match="invalid decode token container"):
+        tokenizer.decode_ids(None)
