@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from collections import deque
 import hashlib
 import json
 
@@ -52,6 +53,11 @@ class DeterministicRuntimeEstimator:
         self._estimate = initial
         self._samples = 0
         self._clipped = 0
+        # Bounded request identities prevent replays from skewing an EWMA.
+        # This is an in-memory recent-identity fence, not durable exactly-once
+        # accounting; a caller requiring persistence must dedupe upstream.
+        self._recent_ids: deque[str] = deque()
+        self._recent_id_set: set[str] = set()
 
     @property
     def estimate(self) -> RuntimeEstimate:
@@ -77,6 +83,8 @@ class DeterministicRuntimeEstimator:
             raise ValueError("RequestTelemetry required")
         if isinstance(kv_bytes_per_token, bool) or not isinstance(kv_bytes_per_token, int) or kv_bytes_per_token < 0:
             raise ValueError("non-negative kv_bytes_per_token required")
+        if telemetry.request_id in self._recent_id_set:
+            raise ValueError("duplicate runtime feedback request identity")
 
         prefill = self._clip_ms(telemetry.ttft_ms)
         decode = self._clip_ms(telemetry.inter_token_ms)
@@ -90,6 +98,11 @@ class DeterministicRuntimeEstimator:
             self._ewma(self._estimate.kv_bytes_per_token, kv),
         )
         self._samples = min(self._samples + 1, self.limits.max_samples)
+        self._recent_ids.append(telemetry.request_id)
+        self._recent_id_set.add(telemetry.request_id)
+        if len(self._recent_ids) > self.limits.max_samples:
+            evicted = self._recent_ids.popleft()
+            self._recent_id_set.remove(evicted)
         return self.receipt()
 
     def receipt(self) -> FeedbackReceipt:
