@@ -153,3 +153,17 @@ def test_10_citation_candidates_include_doi_and_normalized_urls():
     assert len(found)==2
     with pytest.raises(ValueError,match="capacity"):
         extract_citation_candidates("https://one.example https://two.example",limit=1)
+
+
+def test_01_granted_private_source_still_denied():
+    doc=document("https://metadata.internal/sensitive")
+    with pytest.raises(PermissionError,match="nonpublic"):
+        require_training_grant(doc,grant(doc),
+            purpose="native_model_training",now=1700000000)
+
+
+def test_04_offsets_stable_with_unicode_and_newlines():
+    text=("Påstanden om nærkilder og β-testen.\n"*30).strip()
+    windows=segment_passages(text,max_chars=80,overlap=12)
+    assert all(text[w.start:w.end]==w.text for w in windows)
+    assert windows[-1].end==len(text)
