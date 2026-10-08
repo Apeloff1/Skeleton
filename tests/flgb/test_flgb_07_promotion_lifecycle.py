@@ -13,8 +13,8 @@ def base():
  r=build_project_learning_manifest(ad,run_id="run",base_model_digest=D,code_digest="b"*64,config_digest="c"*64,seed_manifest_digest="d"*64,max_steps=5,scope="project-learning")
  return prove_project_learning("cycle",o,a,ad,r)
 def production():
- p=base(); c=CandidateWeights("candidate","4"*64,"5"*64,D)
- e=MirrorEvaluation("eval",c.digest,"6"*64,900000,800000,True,"mirror-verifier","7"*64)
+ p=base(); c=CandidateWeights("candidate","4"*64,p.stages[-1].subject_digest,D)
+ e=MirrorEvaluation("eval",c.digest,D,900000,800000,True,"mirror-verifier","7"*64)
  pe=PromotionEvidence(c.digest,"8"*64,"9"*64,"a"*64,digest_json(e.__dict__),"b"*64,"mirror-verifier",True,True,True,True)
  ra=RuntimeAdmission(c.digest,D,c.weights_digest,pe.rollback_digest,"runtime-custodian",True)
  rb=RollbackProof(ra.digest,ra.checkpoint_digest,D,"rollback-verifier",True)
@@ -25,6 +25,27 @@ class TestPromotionLifecycle(unittest.TestCase):
   self.assertEqual(x.stages[-1].stage,"rollback-ready")
   self.assertEqual(x.stages[-1].subject_digest,D)
   self.assertEqual(len(x.stages),9)
+ def test_candidate_training_lineage_must_match_proven_run(self):
+  p,c,e,pe,ra,rb=production()
+  detached=replace(c,training_lineage_digest="5"*64)
+  evaluation=replace(e,candidate_digest=detached.digest)
+  promoted=replace(pe,candidate_digest=detached.digest,evaluation_digest=digest_json(evaluation.__dict__))
+  admitted=replace(ra,candidate_digest=detached.digest)
+  rollback=replace(rb,admission_digest=admitted.digest)
+  with self.assertRaisesRegex(LifecycleProofError,"candidate training lineage"):
+   extend_with_promotion(p,detached,evaluation,promoted,admitted,rollback)
+ def test_prior_model_must_match_candidate_base(self):
+  p,c,e,pe,ra,rb=production()
+  detached=replace(ra,prior_model_digest="0"*64)
+  rollback=replace(rb,admission_digest=detached.digest)
+  with self.assertRaisesRegex(LifecycleProofError,"runtime prior model"):
+   extend_with_promotion(p,c,e,pe,detached,rollback)
+ def test_evaluation_champion_must_match_candidate_base(self):
+  p,c,e,pe,ra,rb=production()
+  detached=replace(e,champion_digest="c"*64)
+  promoted=replace(pe,evaluation_digest=digest_json(detached.__dict__))
+  with self.assertRaisesRegex(LifecycleProofError,"evaluation champion"):
+   extend_with_promotion(p,c,detached,promoted,ra,rb)
  def test_losing_candidate_rejected(self):
   p,c,e,pe,ra,rb=production()
   with self.assertRaises(LifecycleProofError): extend_with_promotion(p,c,replace(e,candidate_score_ppm=1),pe,ra,rb)

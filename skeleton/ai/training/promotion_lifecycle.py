@@ -39,6 +39,12 @@ def extend_with_promotion(
     admission:RuntimeAdmission,rollback:RollbackProof,
 )->LifecycleProof:
     if candidate.status not in {"candidate","promoted"}: raise LifecycleProofError("candidate not eligible")
+    if proof.stages[-1].stage != "candidate-training-run" or candidate.training_lineage_digest != proof.stages[-1].subject_digest:
+        raise LifecycleProofError("candidate training lineage does not match proven run")
+    if admission.prior_model_digest != candidate.base_model_digest:
+        raise LifecycleProofError("runtime prior model does not match candidate base model")
+    if evaluation.champion_digest != candidate.base_model_digest:
+        raise LifecycleProofError("evaluation champion does not match candidate base model")
     if evaluation.candidate_digest!=candidate.digest: raise LifecycleProofError("evaluation/candidate mismatch")
     if not evaluation.candidate_wins: raise LifecycleProofError("independent evaluation did not select candidate")
     if promotion.candidate_digest!=candidate.digest or promotion.evaluation_digest!=digest_json(evaluation.__dict__): raise LifecycleProofError("promotion evidence identity mismatch")
