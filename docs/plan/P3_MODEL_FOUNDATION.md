@@ -18,3 +18,8 @@ a small reference n-gram model is the target quality model.
 Run:
 
     python -m unittest -q skeleton.testing.test_p3_model_foundation
+
+
+## FLGB-02 text/token pipeline audit (2026-10-08)
+
+Current gap: `TextTokenPipeline.stream` retains a duplicate raw-chunk list and tokenizes raw text before normalized preparation, while `verify_round_trip` encodes normalized text twice. Proposed bounded single-feed/single-encode repair is pending repository write approval and exact-head regression verification. Do not mark this volume complete until the repair is merged, chunk-partition/Unicode tests pass, and CI verifies the resulting head.
