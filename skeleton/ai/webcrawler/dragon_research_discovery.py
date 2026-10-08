@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from enum import Enum
 from hashlib import sha256
 from typing import Callable, Mapping
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import urlencode, urlsplit, quote
 import json
 import re
 
@@ -109,8 +109,8 @@ def _records(source: ResearchSource, payload: Mapping[str, object]) -> list[Rese
             if not isinstance(page, dict):
                 continue
             item = _hit(source, str(page.get("id", "")), page.get("title"),
-                        page.get("key") and "https://en.wikipedia.org/wiki/" +
-                        str(page["key"]).replace(" ", "_"),
+                        page.get("key") and "https://" + str(payload.get("_wiki_language", "en")) + ".wikipedia.org/wiki/" +
+                        quote(str(page["key"]).replace(" ", "_"), safe=""),
                         page.get("excerpt", ""))
             if item:
                 results.append(item)
@@ -229,6 +229,8 @@ def discover_research(query: DiscoveryQuery, transport: JsonTransport, *,
             payload = transport(_url(source, query))
             if not isinstance(payload, dict):
                 raise ValueError("invalid JSON response")
+            if source is ResearchSource.WIKIPEDIA:
+                payload = dict(payload, _wiki_language=query.language)
             records = _records(source, payload)
             for item in records[:query.limit_per_source]:
                 key = (item.source.value, item.identifier)
