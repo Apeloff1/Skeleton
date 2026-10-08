@@ -71,8 +71,8 @@ def test_streaming_matches_monolithic_when_event_starts_on_final_change():
 
 def test_streaming_matches_monolithic_for_forced_max_event_close():
  cq,j,_=setup()
- frames=tuple(FeatureFrame(i*10,((.1 if i==0 else .9),),f"x{i}") for i in range(9))
- config=SegmentationConfig(baseline_window=3,onset_multiplier=2,release_multiplier=1,
+ frames=tuple(FeatureFrame(i*10,((.1 if i%2==0 else .9),),f"x{i}") for i in range(9))
+ config=SegmentationConfig(baseline_window=3,onset_multiplier=2,release_multiplier=.5,
   noise_floor=.02,min_event_frames=1,max_event_frames=3)
  expected=segment_feature_trace(frames,authorized=True,config=config)
  for size in (2,4,8):
