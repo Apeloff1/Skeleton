@@ -7,8 +7,10 @@ monotonic sequence floor when rollback resistance is required.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import copy
+import hashlib
+import hmac
 import json
 import os
 from pathlib import Path
@@ -25,6 +27,15 @@ from .runtime_policy import RuntimePolicy
 REPLICA_COUNT = 3
 REQUIRED_QUORUM = 2
 MAX_CHECKPOINT_BYTES = 128 * 1024 * 1024
+AUTHENTICATED_REPLICA_SCHEMA = "skeleton.ai.authenticated-admission-replica.v1"
+
+
+class _NewerAuthenticatedTerm(ModelRuntimeError):
+    """Protect a signed future leadership term from an obsolete writer."""
+
+
+class _AuthenticatedFork(ModelRuntimeError):
+    """Protect conflicting lineage with the same signing leadership term."""
 
 
 @runtime_checkable
@@ -68,7 +79,7 @@ def _slots(replicas: Sequence[CheckpointReplica]) -> tuple[CheckpointReplica, ..
         names.add(name)
         domains.add(domain)
         identities.add(id(replica))
-        if isinstance(replica, FileCheckpointReplica):
+        if isinstance(replica, (FileCheckpointReplica, AuthenticatedFileCheckpointReplica)):
             path = replica.path.resolve(strict=False)
             if path in file_paths:
                 raise ModelRuntimeError("duplicate checkpoint storage path")
@@ -159,6 +170,10 @@ def publish_redundant_checkpoint(
                 previous, expected_policy=expected_policy,
                 expected_limits=expected_limits, minimum_sequence=0,
             )
+        except (_NewerAuthenticatedTerm, _AuthenticatedFork):
+            # A validly authenticated higher term or same-term fork is not
+            # accidental damage. Never silently overwrite that evidence.
+            raise
         except Exception:
             # Corrupt and unreachable copies are replaceable, provided at
             # least two other replicas acknowledge the candidate.
@@ -388,7 +403,114 @@ class FileCheckpointReplica:
                     pass
 
 
+def _authenticated_canonical(value: object) -> bytes:
+    try:
+        return json.dumps(
+            value, sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False, allow_nan=False,
+        ).encode("utf-8", errors="strict")
+    except (TypeError, ValueError, UnicodeError) as exc:
+        raise ModelRuntimeError("invalid authenticated checkpoint encoding") from exc
+
+
+def _authenticated_digest(value: object) -> str:
+    if (type(value) is not str or len(value) != 64 or
+            any(char not in "0123456789abcdef" for char in value)):
+        raise ModelRuntimeError("invalid authenticated checkpoint digest")
+    return value
+
+
+@dataclass(frozen=True, slots=True)
+class AuthenticatedFileCheckpointReplica:
+    """HMAC/term-gated adapter around the canonical FileCheckpointReplica.
+
+    This is an adapter for the existing two-of-three publication and recovery
+    methods, not a second quorum implementation. The caller must supply a
+    securely loaded key and independently fenced term to *each* member.
+    """
+
+    name: str
+    failure_domain: str
+    path: Path
+    leader_term: int
+    secret_key: bytes = field(repr=False)
+    expected_parent_digest: str | None = None
+
+    def __post_init__(self) -> None:
+        if type(self.leader_term) is not int or not 0 <= self.leader_term <= 2**63 - 1:
+            raise ModelRuntimeError("invalid authenticated leadership term")
+        if type(self.secret_key) is not bytes or not 32 <= len(self.secret_key) <= 4096:
+            raise ModelRuntimeError("authenticated checkpoint key must be 32-4096 bytes")
+        if self.expected_parent_digest is not None:
+            _authenticated_digest(self.expected_parent_digest)
+        FileCheckpointReplica(self.name, self.failure_domain, self.path)
+
+    def _backend(self) -> FileCheckpointReplica:
+        return FileCheckpointReplica(self.name, self.failure_domain, self.path)
+
+    def _mac(self, unsigned: dict[str, object]) -> str:
+        return hmac.new(
+            self.secret_key, _authenticated_canonical(unsigned), hashlib.sha256,
+        ).hexdigest()
+
+    def read(self) -> dict[str, object] | None:
+        envelope = self._backend().read()
+        if envelope is None:
+            return None
+        keys = {
+            "schema", "member", "leader_term", "parent_digest",
+            "snapshot_digest", "snapshot", "mac",
+        }
+        if type(envelope) is not dict or set(envelope) != keys:
+            raise ModelRuntimeError("invalid authenticated checkpoint fields")
+        if (envelope["schema"] != AUTHENTICATED_REPLICA_SCHEMA or
+                envelope["member"] != self.name):
+            raise ModelRuntimeError("authenticated checkpoint member mismatch")
+        signature = _authenticated_digest(envelope["mac"])
+        unsigned = {key: value for key, value in envelope.items() if key != "mac"}
+        if not hmac.compare_digest(signature, self._mac(unsigned)):
+            raise ModelRuntimeError("authenticated checkpoint HMAC mismatch")
+        term = envelope["leader_term"]
+        if type(term) is not int or not 0 <= term <= 2**63 - 1:
+            raise ModelRuntimeError("invalid authenticated checkpoint term")
+        parent = envelope["parent_digest"]
+        if parent is not None:
+            _authenticated_digest(parent)
+        if term > self.leader_term:
+            raise _NewerAuthenticatedTerm("signed newer leadership term cannot be overwritten")
+        if term < self.leader_term:
+            raise ModelRuntimeError("authenticated checkpoint below trusted leadership term")
+        if (self.expected_parent_digest is not None and
+                parent != self.expected_parent_digest):
+            raise _AuthenticatedFork("authenticated checkpoint parent revision conflict")
+        snapshot = envelope["snapshot"]
+        if type(snapshot) is not dict:
+            raise ModelRuntimeError("invalid authenticated checkpoint snapshot")
+        digest = _authenticated_digest(envelope["snapshot_digest"])
+        if snapshot.get("digest") != digest:
+            raise ModelRuntimeError("authenticated checkpoint snapshot digest mismatch")
+        return copy.deepcopy(snapshot)
+
+    def write(self, snapshot: dict[str, object]) -> None:
+        # Reuse the canonical scheduler checkpoint validator. The publication
+        # coordinator already verifies live state and readback against quorum.
+        _validated(
+            snapshot, expected_policy=None, expected_limits=None,
+            minimum_sequence=0,
+        )
+        unsigned = {
+            "schema": AUTHENTICATED_REPLICA_SCHEMA,
+            "member": self.name,
+            "leader_term": self.leader_term,
+            "parent_digest": self.expected_parent_digest,
+            "snapshot_digest": snapshot["digest"],
+            "snapshot": copy.deepcopy(snapshot),
+        }
+        self._backend().write({**unsigned, "mac": self._mac(unsigned)})
+
+
 __all__ = [
+    "AuthenticatedFileCheckpointReplica", "AUTHENTICATED_REPLICA_SCHEMA",
     "CheckpointReplica", "FileCheckpointReplica", "ReplicationReceipt",
     "RedundantRecovery", "publish_redundant_checkpoint",
     "recover_redundant_checkpoint", "repair_redundant_checkpoint",
