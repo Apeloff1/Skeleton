@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import pytest
 
 from skeleton.contracts.context import (
+    ContextContractError,
     ContextBudget,
     ContextKind,
     ContextSegment,
@@ -1339,3 +1341,69 @@ def test_multiple_canonical_current_turns_fail_closed() -> None:
             segments=(first, second),
             compiled_at=BASE,
         )
+
+
+
+def test_context_identity_rejects_digest_and_context_id_substitution() -> None:
+    envelope = _compile([_segment("bound evidence", source_id="bound")])
+    with pytest.raises(ContextContractError, match="context_digest does not match envelope"):
+        replace(envelope, context_digest="0" * 64)
+    with pytest.raises(ContextContractError, match="context_id does not match context_digest"):
+        replace(envelope, context_id=str(uuid4()))
+
+
+def test_context_source_snapshot_rejects_content_and_identity_rebinding() -> None:
+    envelope = _compile([_segment("original evidence", source_id="source")])
+    segment_id, digest = envelope.source_snapshot[0]
+    with pytest.raises(ContextContractError, match="source_snapshot does not bind selected segments"):
+        replace(envelope, source_snapshot=((segment_id, "f" * 64),))
+    with pytest.raises(ContextContractError, match="segment ids must be unique"):
+        replace(envelope, source_snapshot=envelope.source_snapshot * 2)
+    with pytest.raises(ContextContractError, match="source_snapshot must exactly cover"):
+        replace(envelope, source_snapshot=envelope.source_snapshot + ((str(uuid4()), digest),))
+    with pytest.raises(ContextContractError, match="source_snapshot digest"):
+        replace(envelope, source_snapshot=((segment_id, "G" * 64),))
+
+
+def test_context_snapshot_covers_original_sources_of_compacted_evidence() -> None:
+    original = _segment(
+        "oversized evidence " * 300,
+        kind=ContextKind.ARTIFACT,
+        trust=ContextTrust.UNTRUSTED_EVIDENCE,
+        source_type="artifact",
+        source_id="context-proof-oversized",
+        priority=500,
+        relevance=0.9,
+    )
+    budget = _budget(
+        max_context=140, output=20, tools=0, policy=0,
+        safety=10, segment=32, artifact=32, tool_result=32,
+    )
+    envelope = _compile([original], budget=budget, compaction_max_tokens=24)
+    assert envelope.evidence_segments[0].derived_from == (original.segment_id,)
+    assert envelope.source_snapshot == ((original.segment_id, original.content_digest),)
+    with pytest.raises(ContextContractError, match="derived segment lacks snapshot-backed sources"):
+        replace(envelope, source_snapshot=())
+
+
+def test_context_omissions_require_exact_reason_coverage_and_disjoint_sources() -> None:
+    local = _segment("local", source_id="context-proof-local")
+    foreign = _segment(
+        "foreign", source_id="context-proof-foreign", tenant_id="tenant-b"
+    )
+    envelope = _compile([local, foreign])
+    assert envelope.omitted_segment_ids
+    with pytest.raises(ContextContractError, match="omission_reasons must exactly cover"):
+        replace(envelope, omission_reasons=())
+    with pytest.raises(ContextContractError, match="selected and omitted"):
+        replace(envelope, omitted_segment_ids=(local.segment_id,) + envelope.omitted_segment_ids)
+
+
+def test_context_snapshot_order_is_canonical() -> None:
+    envelope = _compile([
+        _segment("first source", source_id="context-proof-first"),
+        _segment("second source", source_id="context-proof-second"),
+    ])
+    assert len(envelope.source_snapshot) == 2
+    with pytest.raises(ContextContractError, match="canonical order"):
+        replace(envelope, source_snapshot=envelope.source_snapshot[::-1])
