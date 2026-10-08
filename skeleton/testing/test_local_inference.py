@@ -81,6 +81,70 @@ async def test_local_cache_is_model_and_request_identity_bound() -> None:
 
 
 @pytest.mark.asyncio
+async def test_local_cache_key_tracks_runtime_identity_changes() -> None:
+    calls = []
+
+    def run(request, cancel):
+        calls.append(request.digest)
+        return LocalInferenceResult(
+            text=f"answer-{len(calls)}",
+            model_id="test-native",
+            model_digest="a" * 64,
+            input_tokens=1,
+            output_tokens=1,
+        )
+
+    model = CallableLocalModel(
+        model_id="test-native", model_digest="a" * 64, runner=run
+    )
+    model.runtime_digest = "b" * 64
+    engine = LocalInferenceEngine(model, cache_size=3)
+    request = LocalInferenceRequest(prompt="stable request", max_output_tokens=1)
+    first = await engine.generate(request)
+    repeated = await engine.generate(request)
+    assert first.cached is False
+    assert repeated.cached is True
+    assert len(calls) == 1
+
+    model.runtime_digest = "c" * 64
+    updated = await engine.generate(request)
+    assert updated.cached is False
+    assert len(calls) == 2
+    assert updated.text != first.text
+
+    model.runtime_digest = "not-a-digest"
+    with pytest.raises(ValueError, match="runtime digest"):
+        await engine.generate(request)
+
+
+@pytest.mark.asyncio
+async def test_local_cache_does_not_accept_inflight_runtime_identity_drift() -> None:
+    model_holder = {}
+
+    def mutate_during_inference(request, cancel):
+        model_holder["model"].runtime_digest = "d" * 64
+        return LocalInferenceResult(
+            text="untrusted after drift",
+            model_id="test-native",
+            model_digest="a" * 64,
+            input_tokens=1,
+            output_tokens=1,
+        )
+
+    model = CallableLocalModel(
+        model_id="test-native", model_digest="a" * 64,
+        runner=mutate_during_inference,
+    )
+    model.runtime_digest = "b" * 64
+    model_holder["model"] = model
+    engine = LocalInferenceEngine(model, cache_size=3)
+    request = LocalInferenceRequest(prompt="inflight drift", max_output_tokens=1)
+    with pytest.raises(ValueError, match="identity changed during inference"):
+        await engine.generate(request)
+    assert not engine._cache
+
+
+@pytest.mark.asyncio
 async def test_scheduler_batches_multiple_local_requests() -> None:
     scheduler = LocalInferenceScheduler(
         LocalInferenceEngine(_math_model()),
