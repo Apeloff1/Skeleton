@@ -198,3 +198,41 @@ def test_20_reports_are_order_stable_and_digest_binds_budget():
                                 novelty_scores=(.2,.1))
     assert first==same
     assert first.fingerprint != changed.fingerprint
+
+
+def test_18_forged_public_admission_is_rejected_at_dispatch():
+    tampered=PrioritizedAcquisition(
+        "https://metadata.internal/admin", "metadata.internal",
+        100,.9,.9,True,"forged",
+    )
+    with pytest.raises(PermissionError,match="destination policy"):
+        allocate_host_dispatches((tampered,),now=100)
+
+
+def test_18_forged_oversized_body_cannot_bypass_response_budget():
+    tampered=PrioritizedAcquisition(
+        "https://example.org/huge","example.org",
+        1000000000,.9,.9,True,"forged",
+    )
+    with pytest.raises(PermissionError,match="response budget"):
+        allocate_host_dispatches((tampered,),now=100)
+
+
+def test_20_novelty_plateau_escalates_without_approving_weak_claims():
+    report=assurance(conflicting=True)
+    result=decide_mission_stop(
+        report,remaining_requests=500,novelty_scores=(.02,.01,.01,.01,.005),
+        novelty_floor=.03,plateau_window=5,
+    )
+    assert result.should_stop
+    assert result.review_required
+    assert "novelty_plateau_unresolved" in result.unmet_goals
+    assert result.recommended_next==("escalate_research_strategy",)
+
+
+def test_17_rejects_internal_source_candidate_even_with_valid_https():
+    ranked=rank_acquisition_candidates((
+        candidate("foo",host="metadata.internal"),
+    ))
+    assert ranked[0].reason=="policy_denied"
+    assert not ranked[0].admitted
