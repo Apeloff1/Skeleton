@@ -272,6 +272,124 @@ class NativeConversationService:
         with self._lock:
             return self._get(session_id).turns
 
+    # Bulk lifecycle, state transfer and capacity governance
+    def create_many(self, count: int) -> tuple[str, ...]:
+        """Create an all-or-nothing cohort without exceeding session capacity."""
+        with self._lock:
+            if type(count) is not int or count < 0 or count > self.max_sessions:
+                raise RuntimeContractError("invalid cohort size")
+            if len(self._sessions) + count > self.max_sessions:
+                raise RuntimeContractError("session capacity exhausted")
+            return tuple(self.create() for _ in range(count))
+
+    def delete_many(self, session_ids: tuple[str, ...]) -> int:
+        """Delete a cohort after validating every identifier."""
+        with self._lock:
+            ids = tuple(session_ids)
+            if len(set(ids)) != len(ids):
+                raise RuntimeContractError("duplicate session identifiers")
+            for sid in ids:
+                self._get(sid)
+            for sid in ids:
+                self.delete(sid)
+            return len(ids)
+
+    def snapshot_many(self, session_ids: tuple[str, ...]) -> dict[str, Mapping[str, Any]]:
+        with self._lock:
+            ids = tuple(session_ids)
+            if len(set(ids)) != len(ids):
+                raise RuntimeContractError("duplicate session identifiers")
+            return {sid: self.snapshot(sid) for sid in ids}
+
+    def restore_many(self, snapshots: tuple[Mapping[str, Any], ...]) -> tuple[str, ...]:
+        """Validate the entire cohort before allocating any session IDs."""
+        with self._lock:
+            items = tuple(snapshots)
+            if len(self._sessions) + len(items) > self.max_sessions:
+                raise RuntimeContractError("session capacity exhausted")
+            restored = [NativeConversationSession.restore(self.runtime, item) for item in items]
+            ids = self.create_many(len(restored))
+            for sid, session in zip(ids, restored):
+                self._sessions[sid] = session
+                self._event("restore", sid)
+            return ids
+
+    def clear_unpinned(self) -> int:
+        with self._lock:
+            ids = tuple(sid for sid, meta in self._meta.items() if not meta["pinned"])
+            return self.delete_many(ids)
+
+    def capacity_remaining(self) -> int:
+        with self._lock:
+            return self.max_sessions - len(self._sessions)
+
+    def pinned_count(self) -> int:
+        with self._lock:
+            return sum(bool(meta["pinned"]) for meta in self._meta.values())
+
+    def evict_oldest_unpinned(self) -> str | None:
+        with self._lock:
+            candidates = (sid for sid in self._sessions if not self._meta[sid]["pinned"])
+            sid = min(candidates, key=lambda key: self._meta[key]["updated_at"], default=None)
+            if sid is not None:
+                self.delete(sid)
+            return sid
+
+    def enforce_capacity(self, target: int) -> int:
+        with self._lock:
+            if type(target) is not int or not 0 <= target <= self.max_sessions:
+                raise RuntimeContractError("invalid target capacity")
+            excess = len(self._sessions) - target
+            if excess <= 0:
+                return 0
+            candidates = sorted(
+                (sid for sid in self._sessions if not self._meta[sid]["pinned"]),
+                key=lambda sid: self._meta[sid]["updated_at"],
+            )
+            if len(candidates) < excess:
+                raise RuntimeContractError("pinned sessions prevent capacity enforcement")
+            self.delete_many(tuple(candidates[:excess]))
+            return excess
+
+    def session_age_seconds(self, session_id: str) -> float:
+        with self._lock:
+            self._get(session_id)
+            return max(0.0, time.time() - self._meta[session_id]["created_at"])
+
+    def session_idle_seconds(self, session_id: str) -> float:
+        with self._lock:
+            self._get(session_id)
+            return max(0.0, time.time() - self._meta[session_id]["updated_at"])
+
+    def find_by_digest(self, history_digest: str) -> tuple[str, ...]:
+        with self._lock:
+            if not isinstance(history_digest, str) or len(history_digest) != 64:
+                raise RuntimeContractError("invalid history digest")
+            return tuple(sid for sid in self._sessions
+                         if hmac.compare_digest(self.digest(sid), history_digest))
+
+    def context_utilization(self) -> Mapping[str, int]:
+        with self._lock:
+            values = [session.context_used for session in self._sessions.values()]
+            return {"total_tokens": sum(values), "max_tokens": max(values, default=0),
+                    "session_count": len(values),
+                    "context_capacity": self.runtime.limits.max_context * len(values)}
+
+    def export_manifest(self) -> Mapping[str, Any]:
+        with self._lock:
+            return {
+                "runtime_model_digest": self.runtime.model_digest,
+                "session_count": len(self._sessions),
+                "sessions": [self.describe(sid).to_dict() for sid in sorted(self._sessions)],
+                "metrics": dict(self.metrics()),
+            }
+
+    def verify_all_sessions(self) -> int:
+        with self._lock:
+            for session in self._sessions.values():
+                session._assert_identity()
+            return len(self._sessions)
+
     # Portability, governance and observability (31-40)
     def snapshot(self, session_id: str) -> Mapping[str, Any]:
         with self._lock:
