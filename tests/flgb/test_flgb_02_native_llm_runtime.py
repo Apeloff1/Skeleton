@@ -545,5 +545,21 @@ class TestNativeLLMRuntime(unittest.TestCase):
             runtime.model._logits_window = original
 
 
+    def test_mod_inference_cache_falls_back_to_full_graph(self):
+        model = TinyTransformer(
+            vocab=("hello", "world", "again"),
+            dim=8, ctx=8, seed=11, n_heads=2, n_layers=2, d_ff=16,
+            use_mod=True,
+        )
+        ids = model._ids("hello world")
+        from skeleton.cortex.transformer import KVCache
+        cache = KVCache(model.n_layers, model.ctx)
+        expected = model._logits(ids)
+        actual = model._logits_window(ids, cache)
+        self.assertEqual(actual, expected)
+        self.assertEqual(cache.tokens, [])
+        self.assertEqual(model._logits_window(ids, cache), expected)
+
+
 if __name__ == "__main__":
     unittest.main()
