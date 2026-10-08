@@ -106,24 +106,24 @@ def produce_game_portfolio(
             f'difficulty {g.difficulty:.2f}</small></li>'
             for g in produced
         )
-        web=(
-            '<!doctype html><html lang="en"><head><meta charset="utf-8">'
-            '<meta name="viewport" content="width=device-width,initial-scale=1">'
-            '<title>Game Builder Portfolio</title>'
-            '<style>body{background:#102032;color:#eaf4ff;font:16px system-ui;'
-            'max-width:960px;margin:30px auto;padding:20px}a{color:#9cdeff}'
-            'li{background:#233b50;margin:7px 0;padding:14px;border-radius:8px}'
-            'small{float:right}select{padding:8px;background:#304b62;color:#fff}'
-            '</style></head><body><h1>'+escape(title)+'</h1>'
-            '<p>Original offline playable games. Choose a variant to play.</p>'
-            '<label>Genre <select id="genre"><option value="">All</option>'
-            ''.join(f'<option>{g}</option>' for g in _GENRES)+
-            '</select></label><ul id="games">'+links+'</ul>'
-            '<script>document.getElementById("genre").onchange=e=>{'
-            'for(const li of document.querySelectorAll("#games li"))'
-            'li.hidden=!!e.target.value&&li.dataset.genre!==e.target.value;'
-            '};</script></body></html>'
-        )
+        web="".join([
+            '<!doctype html><html lang="en"><head><meta charset="utf-8">',
+            '<meta name="viewport" content="width=device-width,initial-scale=1">',
+            '<title>Game Builder Portfolio</title>',
+            '<style>body{background:#102032;color:#eaf4ff;font:16px system-ui;',
+            'max-width:960px;margin:30px auto;padding:20px}a{color:#9cdeff}',
+            'li{background:#233b50;margin:7px 0;padding:14px;border-radius:8px}',
+            'small{float:right}select{padding:8px;background:#304b62;color:#fff}',
+            '</style></head><body><h1>',escape(title),'</h1>',
+            '<p>Original offline playable games. Choose a variant to play.</p>',
+            '<label>Genre <select id="genre"><option value="">All</option>',
+            "".join(f'<option>{g}</option>' for g in _GENRES),
+            '</select></label><ul id="games">',links,'</ul>',
+            '<script>document.getElementById("genre").onchange=e=>{',
+            'for(const li of document.querySelectorAll("#games li"))',
+            'li.hidden=!!e.target.value&&li.dataset.genre!==e.target.value;',
+            '};</script></body></html>',
+        ])
         zip.writestr("index.html",web.encode())
         zip.writestr("README.md",(
             f"# {title}\nGenerated {count} original playable HTML5 games.\n"
