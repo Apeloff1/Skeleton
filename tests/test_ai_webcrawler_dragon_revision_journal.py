@@ -271,3 +271,71 @@ def test_empty_journal_integrity_is_true_but_unauthorized_is_denied():
     journal = ledger()
     assert journal.verify("unknown-owner", "claim-42", authorized=True)
     assert journal.latest("unknown-owner", "claim-42", authorized=True) is None
+
+
+def test_forged_stale_fingerprint_rejected_even_with_valid_hex():
+    journal = ledger()
+    original = report()
+    # An attacker changes a revision disposition without recomputing the
+    # canonical report digest. A syntactically valid SHA-256 string is not proof.
+    forged = replace(original, prior_readings_reusable=False)
+    with pytest.raises(ValueError, match="fingerprint mismatch"):
+        journal.append(
+            "owner-a", forged, observed_at=1,
+            expected_sequence=0, authorized=True,
+        )
+
+
+def test_modified_nested_reading_disposition_rejected():
+    journal = ledger()
+    original = report()
+    changed_readings = tuple(replace(x, matching_quotes=0) for x in original.readings)
+    tampered = replace(original, readings=changed_readings)
+    with pytest.raises(ValueError, match="fingerprint mismatch"):
+        journal.append(
+            "owner-a", tampered, observed_at=1,
+            expected_sequence=0, authorized=True,
+        )
+
+
+def test_corrupt_persisted_source_list_is_detected_not_raised():
+    journal = ledger()
+    journal.append(
+        "owner-a", report(), observed_at=1,
+        expected_sequence=0, authorized=True,
+    )
+    journal.db.execute("""
+        UPDATE crawler_revision_events
+        SET added_sources='not-json'
+        WHERE owner='owner-a'
+    """)
+    journal.db.commit()
+    assert journal.verify("owner-a", "claim-42", authorized=True) is False
+
+
+def test_corrupt_source_list_preserving_valid_json_is_still_detected():
+    journal = ledger()
+    journal.append(
+        "owner-a", report(), observed_at=1,
+        expected_sequence=0, authorized=True,
+    )
+    journal.db.execute("""
+        UPDATE crawler_revision_events
+        SET missing_sources='["forged"]'
+        WHERE owner='owner-a'
+    """)
+    journal.db.commit()
+    assert journal.verify("owner-a", "claim-42", authorized=True) is False
+
+
+def test_review_digest_is_deterministic_and_checks_source_mutation():
+    from skeleton.ai.webcrawler.dragon_crawl_revision import (
+        revision_report_fingerprint,
+    )
+    review = report()
+    assert revision_report_fingerprint(review) == review.fingerprint
+    corrupted = replace(
+        review,
+        sources=(replace(review.sources[0], lineage_changed=True),),
+    )
+    assert revision_report_fingerprint(corrupted) != review.fingerprint
