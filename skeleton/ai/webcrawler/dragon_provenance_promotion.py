@@ -21,6 +21,7 @@ from .dragon_provenance_assurance import (
     AssurancePolicy, ProvenanceAssurance, assure_crawler_evidence,
 )
 from .dragon_source_independence import SourceProvenance
+from .dragon_provenance_registry import ProvenanceRegistry
 
 
 @dataclass(frozen=True)
@@ -45,6 +46,7 @@ def assess_custodied_promotion(
     policy: PromotionPolicy = PromotionPolicy(),
     assurance_policy: AssurancePolicy = AssurancePolicy(),
     calibration: CalibrationArtifact | None = None,
+    attestation_registry: ProvenanceRegistry | None = None,
 ) -> CustodyPromotionReview:
     """Bind source-lineage assurance to empirical-calibration/promotion gates.
 
@@ -59,6 +61,7 @@ def assess_custodied_promotion(
     assurance = assure_crawler_evidence(
         claim_id, values, manifest, authorized=True,
         assurance_policy=assurance_policy,
+        attestation_registry=attestation_registry,
     )
     by_source: dict[str, str] = {}
     for cluster in assurance.clusters:
