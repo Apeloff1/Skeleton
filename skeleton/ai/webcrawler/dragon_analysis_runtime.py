@@ -77,29 +77,35 @@ class DragonAnalysisRuntime:
             authorized=True,max_dispatch=1)
         return plan.ready[0] if plan.ready else None
 
+    def _commit_receipt_uncommitted(self,owner:str,run_id:str,receipt:LayerReceipt,*,now:float,
+                                    expected_revision:int,authorized:bool)->RunCheckpoint:
+        if not authorized: raise PermissionError("receipt commit requires authorization")
+        row=self.db.execute("""SELECT state,revision,cancelled FROM dragon_analysis_runs
+          WHERE owner=? AND run_id=?""",(owner,run_id)).fetchone()
+        if not row: raise KeyError("analysis run not found")
+        if row[2] or row[0]!="running": raise PermissionError("analysis run is not active")
+        if row[1]!=expected_revision: raise RuntimeError("stale analysis checkpoint")
+        current=self._receipts(owner,run_id)
+        existing=next((x for x in current if x.layer is receipt.layer),None)
+        if existing:
+            if existing!=receipt: raise ValueError("receipt replay conflict")
+            verdict=validate_chain(current,authorized=True)
+            return RunCheckpoint(owner,run_id,row[0],row[1],verdict.fingerprint,bool(row[2]))
+        candidate=current+(receipt,)
+        verdict=validate_chain(candidate,authorized=True)
+        if receipt.layer in verdict.rejected_layers:
+            raise ValueError("receipt violates chain dependencies or acceptance policy")
+        self.db.execute("""INSERT INTO dragon_analysis_run_receipts VALUES(?,?,?,?,?,?,?,?)""",
+            (owner,run_id,receipt.layer.value,json.dumps(receipt.input_fingerprints),
+             receipt.output_fingerprint,receipt.independent_sources,int(receipt.passed),
+             int(receipt.human_approved)))
+        state="complete" if verdict.complete else "running"
+        self.db.execute("""UPDATE dragon_analysis_runs SET state=?,revision=revision+1,
+          updated_at=? WHERE owner=? AND run_id=?""",(state,now,owner,run_id))
+        return RunCheckpoint(owner,run_id,state,row[1]+1,verdict.fingerprint,False)
+
     def commit_receipt(self,owner:str,run_id:str,receipt:LayerReceipt,*,now:float,
                        expected_revision:int,authorized:bool)->RunCheckpoint:
-        if not authorized: raise PermissionError("receipt commit requires authorization")
         with self.db:
-            row=self.db.execute("""SELECT state,revision,cancelled FROM dragon_analysis_runs
-              WHERE owner=? AND run_id=?""",(owner,run_id)).fetchone()
-            if not row: raise KeyError("analysis run not found")
-            if row[2] or row[0]!="running": raise PermissionError("analysis run is not active")
-            if row[1]!=expected_revision: raise RuntimeError("stale analysis checkpoint")
-            current=self._receipts(owner,run_id)
-            existing=next((x for x in current if x.layer is receipt.layer),None)
-            if existing:
-                if existing!=receipt: raise ValueError("receipt replay conflict")
-                return self.checkpoint(owner,run_id,authorized=True)
-            candidate=current+(receipt,)
-            verdict=validate_chain(candidate,authorized=True)
-            if receipt.layer in verdict.rejected_layers:
-                raise ValueError("receipt violates chain dependencies or acceptance policy")
-            self.db.execute("""INSERT INTO dragon_analysis_run_receipts VALUES(?,?,?,?,?,?,?,?)""",
-                (owner,run_id,receipt.layer.value,json.dumps(receipt.input_fingerprints),
-                 receipt.output_fingerprint,receipt.independent_sources,int(receipt.passed),
-                 int(receipt.human_approved)))
-            state="complete" if verdict.complete else "running"
-            self.db.execute("""UPDATE dragon_analysis_runs SET state=?,revision=revision+1,
-              updated_at=? WHERE owner=? AND run_id=?""",(state,now,owner,run_id))
-        return self.checkpoint(owner,run_id,authorized=True)
+            return self._commit_receipt_uncommitted(owner,run_id,receipt,now=now,
+                expected_revision=expected_revision,authorized=authorized)
