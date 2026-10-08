@@ -24,7 +24,8 @@
     "test:product-projection": "node --test scripts/test-product-projection.mjs",
     "test:accessibility": "node --test scripts/test-accessibility-contract.mjs",
     "test:localization": "node --test scripts/test-localization-contract.mjs",
-    "test:dragon-wire": "node scripts/test-dragon-canonical-wire.cjs"
+    "test:dragon-wire": "node scripts/test-dragon-canonical-wire.cjs",
+    "test:product-journeys": "node --test scripts/test-product-journeys.mjs"
   },
   "engines": {
     "node": ">=24"

@@ -262,15 +262,21 @@ export default function JourneysRoute() {
           <Text style={styles.section}>Resume and privacy</Text>
           <Text style={styles.body}>On-device preferences remember your chosen journey and screens opened. No prompts, project contents or build IDs are saved here. Actual build status always comes from the service.</Text>
           {session?.last ? (
-            <TouchableOpacity testID="journey-resume" accessibilityRole="button"
-              style={styles.secondary} onPress={() => {
-                const last = session.last;
-                const journey = journeyById(last.journey);
-                const step = journey?.steps.find(s => s.id === last.step);
-                if (step) openStep(journey!.id, step);
-              }}>
-              <Text style={styles.secondaryText}>Reopen last screen →</Text>
-            </TouchableOpacity>
+            (() => {
+              const last = session.last;
+              const journey = journeyById(last.journey);
+              const step = journey?.steps.find(s => s.id === last.step);
+              const resumeHref = step ? journeyStepHref(step, buildId) : null;
+              return (
+                <TouchableOpacity testID="journey-resume" accessibilityRole="button"
+                  accessibilityState={{ disabled: !resumeHref }}
+                  disabled={!resumeHref}
+                  style={[styles.secondary, !resumeHref && styles.disabled]}
+                  onPress={() => { if (step) openStep(last.journey, step); }}>
+                  <Text style={styles.secondaryText}>{resumeHref ? 'Reopen last screen →' : 'Select a build to reopen the last screen'}</Text>
+                </TouchableOpacity>
+              );
+            })()
           ) : null}
           {confirmReset ? (
             <View style={styles.controls}>
@@ -305,7 +311,7 @@ const styles = StyleSheet.create({
   title: { color: '#F8FAFC', fontSize: 27, fontWeight: '900', marginTop: 9 },
   body: { color: '#AAB5C9', fontSize: 12, lineHeight: 18, marginTop: 5 },
   panel: { backgroundColor: '#101622', borderColor: '#283248', borderWidth: 1, borderRadius: 18, padding: 16, gap: 10 },
-  section: { color: '#F6F8FF', fontSize: 18, fontWeight: '850' },
+  section: { color: '#F6F8FF', fontSize: 18, fontWeight: '800' },
   input: { backgroundColor: '#0B1020', borderColor: '#344058', borderWidth: 1, borderRadius: 12, color: '#FAFCFF', padding: 12, minHeight: 48 },
   grid: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
   choice: { width: '100%', borderColor: '#30394F', borderWidth: 1, borderRadius: 12, backgroundColor: '#161D2C', padding: 14 },
