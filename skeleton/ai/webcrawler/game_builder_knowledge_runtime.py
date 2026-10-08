@@ -82,6 +82,8 @@ class KnowledgeDrivenGameBuilder:
         """
         if not authorized:
             raise PermissionError("game research execution requires authorization")
+        if not 1 <= max_sources <= 250:
+            raise ValueError("invalid acquisition source budget")
         suggestions=discover_game_research(
             genre,engine,transport,authorized=True,
             max_results=max_sources,
@@ -91,11 +93,13 @@ class KnowledgeDrivenGameBuilder:
         # Official primary documentation first, then broader discovery.
         # Both paths use the same policy-bound CrawlEngine, and therefore
         # must pass robots/redirect/DNS/IP protections before fetching.
-        enqueue_official_game_docs(crawler,engine=engine)
+        official=enqueue_official_game_docs(crawler,engine=engine)
         queue_game_sources(crawler,selected,max_enqueues=max_sources)
         docs=acquire_game_documents(crawler,now=now,max_steps=max_steps)
+        # Official seed pages share the acquisition budget with discovered
+        # pages; do not accidentally fail after already fetching them.
         self.ingest_captured_documents(docs,engine=engine,authorized=True,
-                                       max_docs=max_sources)
+                                       max_docs=min(1000,max_sources+len(official)))
         return docs
 
     def build_game(
