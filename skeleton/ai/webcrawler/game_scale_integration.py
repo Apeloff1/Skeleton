@@ -19,6 +19,7 @@ from .game_scale_assets import (
 )
 from .game_scale_balancing import evaluate_game_balance,PlayBalance
 from .game_scale_campaign import Campaign,export_campaign_archive
+from .game_scale_studio import generate_level_studio
 
 @dataclass(frozen=True)
 class EnhancedGame:
@@ -86,7 +87,7 @@ function sprite(kind,x,y,w,h){
          'if(!sprite("hero",state.player.x,state.player.y,state.player.w,state.player.h)){\n'
          '  ctx.fillStyle="#7cc5ff";ctx.fillRect(state.player.x,state.player.y,state.player.w,state.player.h);\n  }'),
         ('item.active=false;state.score+=10;', 'item.active=false;state.score+=10;playAudio("pickup");'),
-        ('state.won=true;state.score+=250;', 'state.won=true;state.score+=250;playAudio("win");'),
+        ('state.won=true;state.score+=250', 'state.won=true;state.score+=250;playAudio("win");'),
         ('p.vy=-scene.physics.jump_speed*TILE;', 'p.vy=-scene.physics.jump_speed*TILE;playAudio("jump");'),
         ('p.dashTimer=.14;p.dashCooldown=.7;', 'p.dashTimer=.14;p.dashCooldown=.7;playAudio("dash");'),
         ('e.active=false;state.score+=50;', 'e.active=false;state.score+=50;playAudio("hit");'),
@@ -105,6 +106,12 @@ def build_enhanced_game(blueprint:GameBlueprint, *,
     assets=_assets(blueprint.seed,theme)
     html=_enhance_html(underlying.html,assets)
     report=evaluate_game_balance(blueprint)
+    studio=generate_level_studio(blueprint,game_html=html)
+    html=html.replace(
+        '<script>',
+        '<p><a href="studio.html" style="color:#86d4ff">Open Level Editor</a></p><script>',
+        1,
+    )
     description={
         "title":blueprint.title,"source_evidence":blueprint.source_evidence,
         "balancing":{"route_tiles":report.route_tiles,
@@ -117,6 +124,7 @@ def build_enhanced_game(blueprint:GameBlueprint, *,
     }
     files=[
         ("index.html",html.encode()),
+        ("studio.html",studio.encode()),
         ("scene.json",json.dumps(underlying.scene,sort_keys=True,indent=2).encode()),
         ("build-report.json",json.dumps(description,sort_keys=True,indent=2).encode()),
         ("README.md",(
