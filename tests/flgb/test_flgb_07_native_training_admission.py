@@ -92,4 +92,44 @@ class TestNativeTrainingAdmission(unittest.TestCase):
   p=PromotionEvidence(c.digest,p.exact_head_commit,p.rights_digest,p.contamination_scan_digest,p.evaluation_digest,p.rollback_digest,p.independent_verifier,True,True,False,True)
   with self.assertRaises(RuntimePromotionError): admit_candidate_model(rt,c,p,apply,admission_authority="runtime")
   self.assertEqual(rt.model_digest,prior)
+ def test_invalid_ledger_snapshot_shape_rejected(self):
+  ledger=AdmissionLedger()
+  snapshot=ledger.snapshot()
+  for invalid in (
+   {**snapshot,"extra":"not-allowed"},
+   {**snapshot,"promotions":["b"*64,"a"*64]},
+   {**snapshot,"admissions":["a"*64,"a"*64]},
+   {**snapshot,"promotions":["not-a-hash"]},
+  ):
+   with self.assertRaises(RuntimePromotionError):
+    AdmissionLedger.restore(invalid)
+
+ def test_failed_checkpoint_preflight_does_not_consume_promotion_receipt(self):
+  from unittest.mock import patch
+  rt,cp,prior,c,p,apply=setup()
+  ledger=AdmissionLedger()
+  with patch.object(rt,"checkpoint",side_effect=RuntimeError("checkpoint unavailable")):
+   with self.assertRaisesRegex(RuntimeError,"checkpoint unavailable"):
+    admit_candidate_model(rt,c,p,apply,admission_authority="runtime",ledger=ledger)
+  self.assertEqual(ledger.snapshot()["promotions"],[])
+  self.assertEqual(rt.model_digest,prior)
+
+ def test_failed_candidate_application_releases_replay_reservation(self):
+  rt,cp,prior,c,p,apply=setup()
+  ledger=AdmissionLedger()
+  def fail(m):
+   m.E[0][0]+=0.25
+   raise RuntimeError("candidate failed")
+  with self.assertRaisesRegex(RuntimeError,"candidate failed"):
+   admit_candidate_model(rt,c,p,fail,admission_authority="runtime",ledger=ledger)
+  self.assertEqual(ledger.snapshot()["promotions"],[])
+  self.assertEqual(ledger.snapshot()["admissions"],[])
+  self.assertEqual(rt.model_digest,prior)
+  self.assertEqual(rt._current_model_digest(),prior)
+
+ def test_rollback_requires_typed_receipts_before_access(self):
+  rt,cp,prior,c,p,apply=setup()
+  with self.assertRaisesRegex(RuntimePromotionError,"typed runtime and rollback"):
+   execute_rollback(rt,None,None,cp)
+
 if __name__=="__main__": unittest.main()
