@@ -1023,7 +1023,7 @@ class NativeConversationSession:
                 not hmac.compare_digest(snapshot["tokenizer_digest"], session._tokenizer_digest) or
                 not hmac.compare_digest(snapshot["digest"], digest_json(payload))):
                 raise ValueError("session identity or digest mismatch")
-        except (KeyError, TypeError, ValueError) as exc:
+        except (KeyError, TypeError, ValueError, OverflowError) as exc:
             raise RuntimeContractError("invalid or incompatible session snapshot") from exc
         session._tokens = tuple(tokens)
         session.turns = turns
