@@ -5,10 +5,12 @@ from skeleton.ai.webcrawler.dragon_analysis_queue import DragonAnalysisQueue
 from skeleton.ai.webcrawler.dragon_consent_ledger import DragonConsentLedger
 from skeleton.ai.webcrawler.dragon_consent_bound_queue import ConsentBoundAnalysisQueue
 from skeleton.ai.webcrawler.dragon_analysis_runtime import DragonAnalysisRuntime
+from skeleton.ai.webcrawler.dragon_analysis_chains import AnalysisLayer,LayerReceipt
+from skeleton.ai.webcrawler.dragon_runtime_events import DragonRuntimeEventLedger
 from skeleton.ai.webcrawler.dragon_frame_custody import CapturedFrame
 from skeleton.ai.webcrawler.dragon_visual_features import VisualObservation
 from skeleton.ai.webcrawler.dragon_browser_visual_import import BrowserVisualEnvelope,SCHEMA,canonical_browser_visual_fingerprint
-from skeleton.ai.webcrawler.dragon_visual_runtime_ingest import ingest_browser_visual
+from skeleton.ai.webcrawler.dragon_visual_runtime_ingest import ingest_browser_visual,_commit_stage
 
 def setup():
  db=sqlite3.connect(":memory:");q=DragonAnalysisQueue(db);l=DragonConsentLedger(db)
@@ -40,3 +42,16 @@ def test_mutated_envelope_cannot_advance_runtime():
  _,cq,_,_,e,rt=setup();bad=replace(e,recording_digest="e"*64)
  with pytest.raises(ValueError):ingest_browser_visual(rt,cq,bad,"run",now=3,authorized=True)
  assert rt.checkpoint("u","run",authorized=True).revision==0
+
+
+def test_stage_receipt_rolls_back_when_forensic_event_cannot_append():
+ _,_,_,_,_,rt=setup()
+ ledger=DragonRuntimeEventLedger(rt.db)
+ ledger.append("u","run",event_type="sentinel",layer="source_integrity",outcome="accepted",
+  evidence_fingerprint="b"*64,occurred_at=5,authorized=True)
+ receipt=LayerReceipt(AnalysisLayer.SOURCE_INTEGRITY,(),"a"*64,1,True)
+ with pytest.raises(ValueError,match="time regression"):
+  _commit_stage(rt,ledger,"u","run",receipt,now=3,expected_revision=0)
+ assert rt.checkpoint("u","run",authorized=True).revision==0
+ events=ledger.events("u","run",authorized=True)
+ assert len(events)==1 and events[0].event_type=="sentinel"
