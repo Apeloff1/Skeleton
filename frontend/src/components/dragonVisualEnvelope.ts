@@ -1,9 +1,10 @@
-import type { LocalVisualAnalysis } from "./dragonVisualObservationPipeline";
+import {DRAGON_VISUAL_DECODER_VERSION,type LocalVisualAnalysis} from "./dragonVisualObservationPipeline";
 
 export const DRAGON_VISUAL_SCHEMA="dragon.visual-observations.v1" as const;
 export type DragonVisualEnvelope = {
  schema:typeof DRAGON_VISUAL_SCHEMA; owner:string; jobId:string; recordingDigest:string;
  consentId:string; consentScopeDigest:string; retentionUntil:number;
+ decoderVersion:typeof DRAGON_VISUAL_DECODER_VERSION;
  frames:LocalVisualAnalysis["frames"]; observations:LocalVisualAnalysis["observations"];
  payloadFingerprint:string;
 };
@@ -20,14 +21,16 @@ export async function buildDragonVisualEnvelope(input:{
  retentionUntil:number;analysis:LocalVisualAnalysis;
 }):Promise<DragonVisualEnvelope>{
  if(!globalThis.crypto?.subtle)throw new Error("SHA-256 unavailable");
+ if(input.analysis.decoderVersion!==DRAGON_VISUAL_DECODER_VERSION)throw new Error("Unsupported Dragon visual decoder version");
  const body={wire:DRAGON_CANONICAL_WIRE,schema:DRAGON_VISUAL_SCHEMA,owner:input.owner,job_id:input.jobId,
   recording_digest:input.recordingDigest,consent_id:input.consentId,
-  consent_scope_digest:input.consentScopeDigest,retention_until:decimalWire(input.retentionUntil),
+  consent_scope_digest:input.consentScopeDigest,decoder_version:input.analysis.decoderVersion,retention_until:decimalWire(input.retentionUntil),
   frames:input.analysis.frames.map(x=>[x.frameId,x.frameDigest,String(x.capturedAtMs),x.sourceLocator]),
   observations:input.analysis.observations.map(x=>[x.frameId,x.frameDigest,decimalWire(x.luminanceMean),decimalWire(x.edgeDensity),decimalWire(x.motionEnergy),decimalWire(x.sceneChange)])};
  const payloadFingerprint=hex(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(stable(body))));
  return {schema:DRAGON_VISUAL_SCHEMA,owner:input.owner,jobId:input.jobId,
   recordingDigest:input.recordingDigest,consentId:input.consentId,
   consentScopeDigest:input.consentScopeDigest,retentionUntil:input.retentionUntil,
-  frames:input.analysis.frames,observations:input.analysis.observations,payloadFingerprint};
+  decoderVersion:input.analysis.decoderVersion,frames:input.analysis.frames,
+  observations:input.analysis.observations,payloadFingerprint};
 }
