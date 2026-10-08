@@ -93,3 +93,71 @@ The preexisting `scripts/check_ai_webcrawler.py` discovers all
 `tests/test_ai_webcrawler_*.py`, so the dedicated crawler GitHub workflow
 also exercises these tests when CI reaches a runner. Treat queued, skipped,
 cancelled, or failed CI as unverified.
+
+
+## Durable revision journal and restart recovery
+
+`dragon_revision_journal.py` provides an owner-scoped SQLite hash chain for
+review dispositions. It is an *audit record* and does not authorize ingestion
+or autonomous knowledge promotion.
+
+A journal entry carries the previous and current custody fingerprints,
+canonical revision-report fingerprint, whether previous observations remain
+reusable, invalidation count, source additions/removals, caller-provided
+observation time, and the previous event's hash. The journal is deliberately
+independent of wall-clock calls and network requests.
+
+A write requires an explicit `authorized=True` boundary and the expected
+sequence number. `BEGIN IMMEDIATE` fences writers; a mismatched sequence,
+changed report, modified chain head, or a backwards timestamp fails closed.
+Retransmitting an *identical* successful write with the original sequence and
+observation time returns its existing receipt instead of appending twice.
+
+Before accepting a review, the journal recomputes the revision report's
+canonical fingerprint, binding all source and reading dispositions, span
+positions, candidate locations, missing/new source sets, invalidation count,
+and claim-reuse outcome. A syntactically valid but stale SHA-256 digest is
+insufficient.
+
+```python
+import sqlite3
+from skeleton.ai.webcrawler import RevisionJournal, compare_crawl_revisions
+
+journal = RevisionJournal(sqlite3.connect("crawler_revision.sqlite3"))
+review = compare_crawl_revisions(
+    "claim-id", previous_captures, previous_located_readings,
+    new_captures, authorized=True,
+)
+latest = journal.latest("owner-id", "claim-id", authorized=True)
+receipt = journal.append(
+    "owner-id", review, observed_at=some_external_timestamp,
+    expected_sequence=latest.sequence if latest else 0,
+    authorized=True,
+)
+if not journal.verify("owner-id", "claim-id", authorized=True):
+    raise RuntimeError("review history integrity check failed")
+```
+
+The caller must pass a stable owner identity and a trusted observation time.
+The journal refuses writes inside an existing caller transaction, to avoid
+interfering with its rollback semantics. `max_per_claim`, read limits, and
+verification limits bound resource use. Owner-scoped `erase` deletes that
+owner's event rows and head pointers without touching other owners.
+
+The hash chain detects modification and accidental divergence *while its
+trusted head remains available*. It does not authenticate the database host,
+provide an externally anchored signature, or prevent a privileged database
+operator from rewriting the full chain and its head. Production deployments
+must externally custody or sign periodic head hashes to resist that threat.
+
+Crawl-acquisition fingerprints now include delivery URL, content type,
+acquisition metadata, source quality score, and capture time in addition to
+the source-text digest. A timestamp-only re-fetch therefore receives a new
+**capture audit identity** while the textual revision-review logic may still
+find the old anchored quotation reusable. This is intentional: acquisition
+identity is not equivalent to semantic evidence continuity.
+
+The overall review cannot be declared reusable if *any source inventory
+member* changed, including unobserved parents and dependency sources that
+could influence the independence model. New evidence still goes through the
+separate provenance-attested and calibrated promotion gates.
