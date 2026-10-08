@@ -44,6 +44,8 @@ class NativeChatEngine:
         """Remove oldest dialogue messages until the complete request fits."""
         if not isinstance(transcript, ChatTranscript):
             raise RuntimeContractError("chat transcript required")
+        if not transcript.messages or transcript.messages[-1].role != "user":
+            raise RuntimeContractError("chat generation requires a final user message")
         if not isinstance(config, GenerationConfig):
             raise RuntimeContractError("generation config required")
         budget = self.runtime.limits.max_context - max(self.reserve_tokens, config.max_new_tokens)
