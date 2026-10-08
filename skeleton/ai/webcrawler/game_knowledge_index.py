@@ -116,6 +116,14 @@ class GameKnowledgeIndex:
         passages=extract_game_sections(document,max_sections=max_sections)
         symbols=extract_engine_symbols(passages)
         params=extract_game_parameters(passages)
+        # Passage identity includes source custody, not just copied text.
+        # Two mirrors retain their own provenance but cannot become two
+        # independent confirmation groups merely because URLs differ.
+        identity = {
+            p.passage_id: sha256(
+                f"{source_id}:{p.passage_id}".encode("utf-8")
+            ).hexdigest() for p in passages
+        }
         with self.db:
             # A previous revision remains for history but no longer counts
             # as current corroboration or search context.
@@ -133,17 +141,17 @@ class GameKnowledgeIndex:
                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
                   ON CONFLICT(passage_id) DO UPDATE SET active=1,
                   engine=excluded.engine,year=excluded.year,quality=excluded.quality""",
-                  (p.passage_id,source_id,p.content_hash,p.source_url,
+                  (identity[p.passage_id],source_id,p.content_hash,p.source_url,
                    p.start,p.end,p.text,json.dumps(p.tags),engine,year,
                    p.source_score,1))
             for symbol in symbols:
                 self.db.execute("""INSERT OR REPLACE INTO game_knowledge_api
                   VALUES(?,?,?,?)""",
-                  (symbol.passage_id,symbol.symbol,symbol.engine,symbol.context))
+                  (identity[symbol.passage_id],symbol.symbol,symbol.engine,symbol.context))
             for param in params:
                 self.db.execute("""INSERT OR IGNORE INTO game_knowledge_parameters
                   VALUES(?,?,?,?)""",
-                  (param.passage_id,param.value,param.unit,param.context))
+                  (identity[param.passage_id],param.value,param.unit,param.context))
         return len(passages)
 
     # 12: Atomically replace a source revision with new fetched evidence.
@@ -151,6 +159,8 @@ class GameKnowledgeIndex:
         self, source_id: str, document: CrawlDocument, *,
         engine: str = "", year: int | None = None, authorized: bool,
     ) -> tuple[str | None, str]:
+        if not authorized:
+            raise PermissionError("source revision replacement requires authorization")
         old=self.db.execute("""SELECT content_hash FROM game_knowledge_sources
           WHERE source_id=? AND active=1 ORDER BY fetched_at DESC LIMIT 1""",
           (source_id,)).fetchone()
@@ -252,7 +262,9 @@ class GameKnowledgeIndex:
         for topic in topics:
             if not isinstance(topic,str) or not topic:
                 raise ValueError("invalid topic")
-            sources={r[1] for r in rows
+            # Unique content families, not URL counts: mirrors do not
+            # satisfy the independent corroboration target.
+            sources={r[3] for r in rows
                      if topic.casefold() in json.loads(r[5]) or
                      _terms(topic).issubset(_terms(r[4]))}
             result.append(KnowledgeGap(topic,len(sources),
