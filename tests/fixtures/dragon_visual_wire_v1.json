@@ -1,12 +1,29 @@
 {
-  "wire":"dragon.canonical-decimal.v1",
-  "schema":"dragon.visual-observations.v1",
-  "owner":"user-α",
-  "job_id":"job-1",
-  "recording_digest":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-  "consent_id":"consent-1",
-  "consent_scope_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  "retention_until":"1000",
-  "frames":[["wire-frame","dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","125","local-frame://0"]],
-  "observations":[["wire-frame","dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","0.125","0","0.0000001","1"]]
+  "wire": "dragon.canonical-decimal.v1",
+  "schema": "dragon.visual-observations.v1",
+  "owner": "user-α",
+  "job_id": "job-1",
+  "recording_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "consent_id": "consent-1",
+  "consent_scope_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "retention_until": "1000",
+  "frames": [
+    [
+      "wire-frame",
+      "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "125",
+      "local-frame://0"
+    ]
+  ],
+  "observations": [
+    [
+      "wire-frame",
+      "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "0.125",
+      "0",
+      "0.0000001",
+      "1"
+    ]
+  ],
+  "decoder_version": "dragon.local-visual.rgb64x36.v1"
 }
