@@ -19,6 +19,16 @@ class TestServingPolicyInputIntegrity(unittest.TestCase):
             with self.subTest(repr=repr(invalid)), self.assertRaises(ValueError):
                 ServingRequest(invalid, 1, 1)
 
+    def test_request_id_rejects_del_c1_format_controls_and_decomposed_unicode(self):
+        # All of these previously survived the shared require_id check.
+        invalid_ids = ("r\\x7f", "r\\x85", "r\\u202e", "r\\u200b", "e\\u0301")
+        for value in invalid_ids:
+            with self.subTest(value=repr(value)), self.assertRaisesRegex(
+                ValueError, "invalid serving request_id"
+            ):
+                ServingRequest(value, 1, 1)
+        self.assertEqual(ServingRequest("é", 1, 1).request_id, "é")
+
     def test_valid_unicode_identity_is_replay_stable(self):
         planner = self.planner()
         req = ServingRequest("plán-élève", 2, 1)
