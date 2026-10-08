@@ -326,6 +326,8 @@ class NativeChatWorkspace:
                limit: int = 100) -> tuple[tuple[str, int, ChatMessage], ...]:
         if not isinstance(query, str) or not query or type(limit) is not int or not 1 <= limit <= 10000:
             raise RuntimeContractError("invalid search request")
+        if isinstance(roles, (str, bytes)):
+            raise RuntimeContractError("invalid role filter")
         selected = set(roles) if roles is not None else None
         if selected is not None and not selected.issubset(("system", "developer", "user", "assistant", "tool")):
             raise RuntimeContractError("invalid role filter")
