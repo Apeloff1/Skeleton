@@ -15,7 +15,7 @@ from typing import Mapping
 import json
 import sqlite3
 
-from .dragon_crawl_revision import RevisionRevalidation
+from .dragon_crawl_revision import RevisionRevalidation, revision_report_fingerprint
 
 
 _ZERO = "0" * 64
@@ -157,6 +157,8 @@ class RevisionJournal:
         ):
             if not _valid_digest(field):
                 raise ValueError("invalid review fingerprint")
+        if review.fingerprint != revision_report_fingerprint(review):
+            raise ValueError("revision review fingerprint mismatch")
         if not isinstance(review.prior_readings_reusable, bool):
             raise ValueError("invalid reuse decision")
         if not isinstance(review.invalidated_readings, int) or isinstance(
@@ -296,12 +298,17 @@ class RevisionJournal:
             raise ValueError("revision verification budget exceeded")
         previous = _ZERO
         for sequence, row in enumerate(rows, 1):
-            entry = self._from_row(owner, claim_id, row)
-            if entry.sequence != sequence or entry.previous_hash != previous:
+            try:
+                entry = self._from_row(owner, claim_id, row)
+                valid = (
+                    entry.sequence == sequence
+                    and entry.previous_hash == previous
+                    and _valid_digest(entry.event_hash)
+                    and entry.event_hash == self._receipt_hash(entry)
+                )
+            except (TypeError, ValueError, OverflowError, KeyError):
                 return False
-            if entry.event_hash != self._receipt_hash(entry):
-                return False
-            if not _valid_digest(entry.event_hash):
+            if not valid:
                 return False
             previous = entry.event_hash
         head = self.db.execute("""
