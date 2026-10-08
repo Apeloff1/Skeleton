@@ -33,3 +33,26 @@ python -m unittest tests.flgb.test_flgb_02_tokenization_pipeline -v
 python -m unittest tests.flgb.test_flgb_02_native_llm_runtime -v
 python -m unittest discover -s tests/flgb -p 'test_flgb_02_*.py' -v
 ```
+
+## Governed serving-policy decision identity
+
+`PolicyAwareServingPlanner` validates a bounded native serving request before
+policy evaluation. Request IDs must be canonical non-control UTF-8 text,
+service class must be typed, token counts must honor the model-runtime token
+budget, and prefix/draft availability flags must be explicit booleans. No
+network/provider/model execution authority is introduced.
+
+Serving plan v2 receipts bind every policy input: request identity, full token
+counts, prefix/cache/draft facts, service class, KV/queue pressure and the
+compiled runtime-policy digest. Two plans that happen to make the same
+routing decision under different inputs have different receipts, so stale
+pressure evidence cannot silently masquerade as a current plan. Operators
+should require a fresh plan at execution admission, not treat the digest as a
+signature or independent verification of reported pressure.
+
+Focused tests:
+
+```bash
+python -m unittest tests.flgb.test_serving_policy_input_integrity -v
+python -m unittest tests.flgb.test_serving_policy_era tests.flgb.test_serving_policy_pressure -v
+```
