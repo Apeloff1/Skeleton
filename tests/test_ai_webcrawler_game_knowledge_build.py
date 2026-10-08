@@ -213,3 +213,41 @@ def test_cli_imports_local_research_without_claiming_real_http_provenance(tmp_pa
     assert result.exists()
     with ZipFile(result) as archive:
         assert "index.html" in archive.namelist()
+
+
+def test_research_dependencies_affect_game_compiler_only_after_two_distinct_sources():
+    index=GameKnowledgeIndex(sqlite3.connect(":memory:"))
+    a=doc("first.example",text=(
+        "The game design explicitly states dash requires combat. "
+        "Platformer movement and collision are essential. "
+    )*12)
+    b=doc("second.example",text=(
+        "In this independent game system guide dash requires combat. "
+        "A platformer dash needs movement and collision. "
+    )*12)
+    index.ingest_document("a",a,engine="web",authorized=True)
+    assert "dash" not in index.confirmed_mechanic_dependencies()
+    index.ingest_document("b",b,engine="web",authorized=True)
+    deps=index.confirmed_mechanic_dependencies()
+    assert "combat" in deps["dash"]
+    blueprint=propose_game_blueprint(
+        index,title="Research-Driven Dash",genre="platformer",
+        engine="web",seed=4,
+    )
+    assert "dash" in blueprint.mechanics
+    assert blueprint.mechanics.index("combat") < blueprint.mechanics.index("dash")
+    html=build_playable_web_game(blueprint).html
+    assert 'scene.mechanics.includes("dash")' in html
+    assert 'scene.mechanics.includes("double_jump")' in html
+
+
+def test_knowledge_index_fts_replays_after_reopening_on_disk(tmp_path):
+    connection=sqlite3.connect(tmp_path/"facts.db")
+    index=GameKnowledgeIndex(connection)
+    index.ingest_document("source",doc(),engine="godot",authorized=True)
+    original=index.search("CharacterBody2D")
+    connection.close()
+    reopened=sqlite3.connect(tmp_path/"facts.db")
+    index2=GameKnowledgeIndex(reopened)
+    assert index2.search("CharacterBody2D")==original
+    reopened.close()
