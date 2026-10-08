@@ -112,6 +112,24 @@ class NativeChatWorkspaceTests(unittest.TestCase):
         self.assertEqual(w.message_count(branch), 2)
         self.assertEqual(w.message_count(self.cid), 1)
 
+    def test_undo_redo_history_is_bounded(self):
+        w = NativeChatWorkspace(max_history=2)
+        cid = w.create()
+        for i in range(8):
+            w.append_user(cid, str(i))
+        self.assertEqual(w.history_depth(cid)[0], 2)
+        w.undo(cid)
+        w.undo(cid)
+        self.assertEqual(w.history_depth(cid)[1], 2)
+        with self.assertRaises(RuntimeContractError):
+            w.undo(cid)
+
+    def test_batch_delete_rejects_invalid_identifiers_atomically(self):
+        w = self.workspace
+        with self.assertRaises(RuntimeContractError):
+            w.delete_many((self.cid, None))
+        self.assertTrue(w.exists(self.cid))
+
     def test_capacity_limit(self):
         w = NativeChatWorkspace(max_conversations=1)
         w.create()
