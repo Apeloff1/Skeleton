@@ -121,6 +121,30 @@ class DragonHypothesisRegistry:
                 INSERT INTO dragon_hypothesis_results VALUES(?,?,?,?,?)
             """, (owner, result.hypothesis_id, *expected))
 
+    def resolve_from_falsification(self, owner: str, outcome, *,
+                                   authorized: bool) -> HypothesisResult:
+        """Persist a terminal state derived from executable falsification evidence."""
+        if not authorized:
+            raise PermissionError("hypothesis resolution requires authorization")
+        # Local import avoids making the registry depend on worker construction.
+        from .dragon_causal_falsification_worker import FalsificationOutcome
+        if not isinstance(outcome, FalsificationOutcome):
+            raise TypeError("falsification outcome required")
+        states = {
+            "supported": HypothesisState.SUPPORTED,
+            "refuted": HypothesisState.REFUTED,
+            "inconclusive": HypothesisState.INCONCLUSIVE,
+        }
+        if outcome.verdict not in states:
+            raise ValueError("unknown falsification verdict")
+        result = HypothesisResult(
+            outcome.hypothesis_id, states[outcome.verdict],
+            outcome.trial_evidence_digest,
+            "Derived from preregistered causal-falsification evidence.",
+        )
+        self.resolve(owner, result, authorized=True)
+        return result
+
     def erase(self, owner: str, *, authorized: bool) -> int:
         if not authorized:
             raise PermissionError("hypothesis erasure requires authorization")
