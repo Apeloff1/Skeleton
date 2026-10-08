@@ -185,6 +185,24 @@ class ChatTranscript:
             chunks.append("[message role=assistant name= bytes=?]\n")
         return "".join(chunks)
 
+    def instruction_prefix(self) -> "ChatTranscript":
+        prefix = []
+        for message in self.messages:
+            if message.role not in ("system", "developer"):
+                break
+            prefix.append(message)
+        return ChatTranscript(tuple(prefix))
+
+    def dialogue_only(self) -> "ChatTranscript":
+        return ChatTranscript(tuple(m for m in self.messages
+                                    if m.role not in ("system", "developer")))
+
+    def last_turn(self) -> "ChatTranscript":
+        index = self.latest_user_index()
+        if index is None:
+            return ChatTranscript(())
+        return ChatTranscript(self.messages[index:])
+
     def latest_user_index(self) -> int | None:
         return next((i for i in range(len(self.messages) - 1, -1, -1)
                      if self.messages[i].role == "user"), None)
