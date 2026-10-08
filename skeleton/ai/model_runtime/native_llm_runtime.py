@@ -405,8 +405,9 @@ class NativeLLMRuntime:
         prompt: str,
         config: GenerationConfig,
     ) -> Iterator[RuntimeEvent]:
-        prompt_sequence, _projected_kv = self._admit(prompt, config)
-        return (yield from self._stream_sequence_impl(prompt_sequence, config))
+        if not isinstance(config, GenerationConfig):
+            raise RuntimeContractError("GenerationConfig required")
+        return (yield from self._stream_sequence_impl(self.encode(prompt), config))
 
     def stream_sequence(
         self,
