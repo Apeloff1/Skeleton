@@ -226,8 +226,6 @@ class NativeModelService:
         if cancellation is not None and not isinstance(cancellation, CancellationToken):
             raise NativeServiceError("CancellationToken required")
         token = cancellation if cancellation is not None else CancellationToken()
-        if not isinstance(token, CancellationToken):
-            raise NativeServiceError("CancellationToken required")
 
         events: list[RuntimeEvent] = []
         if token.cancelled:
