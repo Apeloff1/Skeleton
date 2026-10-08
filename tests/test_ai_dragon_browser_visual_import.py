@@ -36,13 +36,15 @@ def test_retention_expiry_fails_closed():
 
 
 def test_browser_controlled_frame_id_cannot_cross_custody_boundary():
- cq,_,e=setup();wire_id="f"*64
+ cq,_,e=setup();original=accept_browser_visual(cq,e,now=3,authorized=True);wire_id="f"*64
  frame=replace(e.frames[0],frame_id=wire_id)
  obs=replace(e.observations[0],frame_id=wire_id)
  unsigned=replace(e,frames=(frame,),observations=(obs,),payload_fingerprint="")
  changed=replace(unsigned,payload_fingerprint=canonical_browser_visual_fingerprint(unsigned))
  accepted=accept_browser_visual(cq,changed,now=3,authorized=True)
  assert accepted.features.frames[0].source_frame_id not in (wire_id,"c"*64)
+ assert accepted.envelope_fingerprint!=original.envelope_fingerprint
+ assert accepted.canonical_evidence_fingerprint==original.canonical_evidence_fingerprint
 
 def test_unknown_observation_transport_id_is_rejected_even_with_valid_envelope_hash():
  cq,_,e=setup();obs=replace(e.observations[0],frame_id="f"*64)
