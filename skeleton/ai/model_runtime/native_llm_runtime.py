@@ -837,6 +837,132 @@ class NativeConversationSession:
         self.turns += 1
         return result
 
+    @property
+    def context_used(self) -> int:
+        """Number of currently retained context tokens."""
+        return len(self._tokens)
+
+    @property
+    def context_remaining(self) -> int:
+        return self.runtime.limits.max_context - len(self._tokens)
+
+    @property
+    def is_empty(self) -> bool:
+        return not self._tokens
+
+    def history_text(self) -> str:
+        self._assert_identity()
+        return self.runtime.decode_ids(self._tokens)
+
+    def history_digest(self) -> str:
+        self._assert_identity()
+        return digest_json({"tokens": list(self._tokens), "turns": self.turns})
+
+    def preview_tokens(self, text: str) -> tuple[int, ...]:
+        self._assert_identity()
+        return self.runtime.encode(text).token_ids
+
+    def preview_context(self, text: str) -> tuple[int, ...]:
+        incoming = self.preview_tokens(text)
+        if not incoming or len(incoming) > self.runtime.limits.max_context:
+            raise RuntimeContractError("invalid conversation turn length")
+        available = self.runtime.limits.max_context - len(incoming)
+        return (self._tokens[-available:] if available else ()) + incoming
+
+    def preview_kv_bytes(self, text: str) -> int:
+        return self.runtime.estimate_kv_bytes(len(self.preview_context(text)))
+
+    def infer_next(self, text: str, *, use_cache: bool = True) -> InferenceResult:
+        tokens = self.preview_context(text)
+        sequence = TokenSequence(self._tokenizer_digest, tokens,
+                                 digest_json({"preview": list(tokens)}))
+        return self.runtime.infer_sequence(sequence, use_cache=use_cache)
+
+    def append_tokens(self, token_ids: Sequence[int]) -> None:
+        self._assert_identity()
+        ids = tuple(token_ids)
+        if any(type(i) is not int or i < 0 or i >= self.runtime.tokenizer.vocab_size for i in ids):
+            raise RuntimeContractError("invalid appended token")
+        self._tokens = (self._tokens + ids)[-self.runtime.limits.max_context:]
+
+    def append_text(self, text: str) -> None:
+        self.append_tokens(self.preview_tokens(text))
+
+    def truncate(self, keep_last: int) -> None:
+        self._assert_identity()
+        if type(keep_last) is not int or keep_last < 0:
+            raise RuntimeContractError("invalid truncation length")
+        self._tokens = self._tokens[-keep_last:] if keep_last else ()
+
+    def drop_prefix(self, count: int) -> None:
+        self._assert_identity()
+        if type(count) is not int or count < 0:
+            raise RuntimeContractError("invalid prefix count")
+        self._tokens = self._tokens[count:]
+
+    def fork(self) -> "NativeConversationSession":
+        self._assert_identity()
+        child = NativeConversationSession(self.runtime)
+        child._tokens = self._tokens
+        child.turns = self.turns
+        return child
+
+    def replace_history(self, token_ids: Sequence[int]) -> None:
+        self._assert_identity()
+        ids = tuple(token_ids)
+        if len(ids) > self.runtime.limits.max_context or any(
+            type(i) is not int or i < 0 or i >= self.runtime.tokenizer.vocab_size for i in ids
+        ):
+            raise RuntimeContractError("invalid replacement history")
+        self._tokens = ids
+
+    def merge_history(self, other: "NativeConversationSession") -> None:
+        self._assert_identity()
+        if not isinstance(other, NativeConversationSession):
+            raise RuntimeContractError("conversation session required")
+        other._assert_identity()
+        if (self._model_digest != other._model_digest or
+            self._tokenizer_digest != other._tokenizer_digest):
+            raise RuntimeContractError("incompatible conversation histories")
+        self.append_tokens(other.token_ids)
+
+    def stream_turn(
+        self, text: str, config: GenerationConfig | None = None,
+    ) -> GenerationStream:
+        """Stream a conversation turn; caller explicitly commits the result."""
+        self._assert_identity()
+        tokens = self.preview_context(text)
+        sequence = TokenSequence(self._tokenizer_digest, tokens,
+                                 digest_json({"session_turn": self.turns, "token_ids": list(tokens)}))
+        return self.runtime.stream_sequence(sequence, config)
+
+    def commit_stream(self, stream: GenerationStream) -> GenerationResult:
+        self._assert_identity()
+        if not isinstance(stream, GenerationStream) or stream.result is None:
+            raise RuntimeContractError("completed generation stream required")
+        result = stream.result
+        if result.replay_receipt.model_digest != self._model_digest or (
+            result.replay_receipt.tokenizer_digest != self._tokenizer_digest
+        ):
+            raise RuntimeContractError("stream identity mismatch")
+        if result.prompt_sequence.token_ids[:max(0, len(result.prompt_sequence.token_ids) -
+                                                   len(self._tokens))] and self._tokens:
+            prefix_len = min(len(self._tokens), len(result.prompt_sequence.token_ids))
+            if result.prompt_sequence.token_ids[:prefix_len] != self._tokens[-prefix_len:]:
+                raise RuntimeContractError("stream history diverged")
+        self._tokens = (result.prompt_sequence.token_ids + result.generated_ids)[
+            -self.runtime.limits.max_context:]
+        self.turns += 1
+        return result
+
+    def export_token_ids(self) -> list[int]:
+        self._assert_identity()
+        return list(self._tokens)
+
+    def capacity_for(self, text: str) -> int:
+        """Remaining context slots after preparing a prospective prompt."""
+        return self.runtime.limits.max_context - len(self.preview_context(text))
+
     def snapshot(self) -> Mapping[str, Any]:
         self._assert_identity()
         return {
