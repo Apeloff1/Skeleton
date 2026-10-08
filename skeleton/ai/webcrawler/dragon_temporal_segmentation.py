@@ -65,6 +65,7 @@ def segment_feature_trace(
     dimension = len(frames[0].features)
     if not 1 <= dimension <= config.max_features:
         raise ValueError("invalid feature dimension")
+    seen_frame_ids = set()
     for i, frame in enumerate(frames):
         if not isinstance(frame.timestamp_ms, int) or frame.timestamp_ms < 0:
             raise ValueError("invalid timestamp")
@@ -72,6 +73,9 @@ def segment_feature_trace(
             raise ValueError("timestamps must increase strictly")
         if not isinstance(frame.source_frame_id, str) or not 1 <= len(frame.source_frame_id) <= 256:
             raise ValueError("invalid source frame id")
+        if frame.source_frame_id in seen_frame_ids:
+            raise ValueError("duplicate source frame id")
+        seen_frame_ids.add(frame.source_frame_id)
         if len(frame.features) != dimension or any(
             not isfinite(x) or not 0 <= x <= 1 for x in frame.features
         ):
