@@ -11,8 +11,8 @@ from skeleton.ai.webcrawler.dragon_motion_features import derive_motion_features
 def setup():
  db=sqlite3.connect(":memory:");q=DragonAnalysisQueue(db);l=DragonConsentLedger(db)
  c=l.issue("u",capture=True,analysis=True,issued_at=1,expires_at=100,policy_version="v1",scope_digest="a"*64,authorized=True)
- cq=ConsentBoundAnalysisQueue(q,l,db);j=cq.submit("u","b"*64,"g",consent_id=c.consent_id,scope_digest="a"*64,now=2,authorized=True)
- b=bind_extracted_frames(cq,"u",j.job_id,((0,"c"*64,"f0"),(16,"d"*64,"f1")),retention_until=90,authorized=True)
+ cq=ConsentBoundAnalysisQueue(q,l);j=cq.submit("u",recording_digest="b"*64,game_label="g",consent_id=c.consent_id,scope_digest="a"*64,now=2,authorized=True)
+ b=bind_extracted_frames(cq,"u",j.job_id,((0,"c"*64,"f0"),(16,"d"*64,"f1")),now=3,retention_until=90,authorized=True)
  obs=tuple(VisualObservation(f.frame_id,f.frame_digest,.2+i*.1,.3,.4+i*.2,.1) for i,f in enumerate(b.frames))
  return cq,j,b,obs
 
