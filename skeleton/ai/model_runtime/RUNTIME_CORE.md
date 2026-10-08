@@ -67,3 +67,18 @@ Retries also enforce the bounded admission queue before modifying active
 request state. A full queue makes `retry` fail atomically, keeping the
 running request and resident KV available for explicit cancel, completion,
 or a later retry after space becomes available. Constructor limits are typed.
+
+## Deterministic admission state-machine stress tests
+
+`tests/flgb/test_admission_checkpoint_state_machine.py` executes seeded,
+interleaved submit, admit, retry, complete, cancel and KV pin transitions.
+Every state is restored with trusted policy/limits/sequence pins; the test
+requires exact checkpoint parity, bounded KV, queue and active occupancy,
+atomic failed submissions/retries and equal traces for identical seeds.
+The retained KV eviction scenarios exercise both pinned and unpinned state.
+This is finite model-based randomized regression, **not** a claim of exhaustive
+formal verification or production workload qualification.
+
+```bash
+python -m unittest tests.flgb.test_admission_checkpoint_state_machine -v
+```
