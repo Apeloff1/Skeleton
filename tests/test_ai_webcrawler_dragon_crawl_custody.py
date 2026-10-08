@@ -6,12 +6,12 @@ import pytest
 
 from skeleton.ai.webcrawler.core import CrawlDocument, FetchResponse, extract_document
 from skeleton.ai.webcrawler.dragon_crawl_custody import (
-    CapturedSource, CustodyPolicy, LocatedReading, bind_crawl_evidence,
+    CapturedSource, CustodyPolicy, LocatedReading, bind_crawl_evidence,\n    assure_captured_crawl,
 )
 from skeleton.ai.webcrawler.dragon_probabilistic_distillation import (
     EvidencePolicy, ProbabilisticKnowledgeDistiller,
 )
-from skeleton.ai.webcrawler.dragon_provenance_assurance import assure_crawler_evidence
+from skeleton.ai.webcrawler.dragon_provenance_assurance import assure_crawler_evidence\nfrom skeleton.ai.webcrawler.dragon_provenance_registry import ProvenanceRegistry, SourceAttestation
 
 
 def captured(sid, *, body=None):
@@ -240,3 +240,46 @@ def test_reading_requires_authorized_ingestion_boundary():
         bind_crawl_evidence(
             "jump", sources, readings, authorized=False,
         )
+
+
+def test_end_to_end_captured_review_binds_two_receipts():
+    sources, readings = fixture()
+    review = assure_captured_crawl(
+        "jump", sources, readings, authorized=True,
+    )
+    assert review.assurance.candidate_for_review
+    assert review.assurance.belief.readings == len(readings)
+    assert review.custody.claim_id == review.assurance.claim_id
+    assert review.custody.custody_fingerprint != review.assurance.fingerprint
+
+
+def test_end_to_end_captured_review_rejects_poisoned_source():
+    sources, readings = fixture()
+    altered = replace(sources[0].document, text="Poisoned")
+    with pytest.raises(ValueError, match="content hash"):
+        assure_captured_crawl(
+            "jump", (replace(sources[0], document=altered), sources[1]),
+            readings, authorized=True,
+        )
+
+
+def test_captured_review_ownership_attestation_merges_copies():
+    sources, readings = fixture()
+    registry = ProvenanceRegistry((
+        SourceAttestation("alpha.example", "single-owner", "",
+                          "auditor", "receipt-alpha"),
+        SourceAttestation("beta.example", "single-owner", "",
+                          "auditor", "receipt-beta"),
+    ))
+    review = assure_captured_crawl(
+        "jump", sources, readings, authorized=True,
+        attestation_registry=registry,
+    )
+    assert review.assurance.independent_groups == 1
+    assert not review.assurance.candidate_for_review
+
+
+def test_public_crawler_api_exposes_captured_audit_without_eager_model_imports():
+    from skeleton.ai import webcrawler
+    assert webcrawler.bind_crawl_evidence is bind_crawl_evidence
+    assert webcrawler.assure_captured_crawl is assure_captured_crawl
