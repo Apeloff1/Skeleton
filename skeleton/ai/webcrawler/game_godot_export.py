@@ -66,7 +66,7 @@ var data: Dictionary = {}
 var solids: Array = []
 var pickups: Array = []
 var foes: Array = []
-var player: CharacterBody2D
+var player
 var spawn: Vector2
 var goal: Rect2
 var score := 0
@@ -159,6 +159,8 @@ func _solid(pos: Vector2):
 func _unhandled_input(event):
     if event.is_action_pressed("pause"):
         paused = not paused
+        if is_instance_valid(player):
+            player.set_physics_process(not paused)
     if event.is_action_pressed("restart"):
         get_tree().reload_current_scene()
 
@@ -215,6 +217,7 @@ func _damage():
     invincible = 1.5
     if lives<=0:
         paused = true
+        player.set_physics_process(false)
 
 func _update_hud():
     var status = "  |  P: Pause  R: Restart"
