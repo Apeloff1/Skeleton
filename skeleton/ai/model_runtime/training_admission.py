@@ -10,24 +10,70 @@ from .runtime_checkpoint import validate_checkpoint
 class RuntimePromotionError(ValueError): pass
 
 class AdmissionLedger:
-    """Deterministic replay guard that can be persisted by an orchestrator."""
-    def __init__(self,promotions=(),admissions=()):
-        self._promotion_digests=set(promotions); self._admission_digests=set(admissions)
-    def reserve_promotion(self,digest):
-        if digest in self._promotion_digests: raise RuntimePromotionError("promotion receipt already consumed")
-        self._promotion_digests.add(digest)
-    def release_promotion(self,digest): self._promotion_digests.discard(digest)
-    def record_admission(self,digest):
-        if digest in self._admission_digests: raise RuntimePromotionError("admission receipt already recorded")
-        self._admission_digests.add(digest)
+    """Process-local replay guard; persist signed snapshot before cross-process use."""
+
+    def __init__(self, promotions=(), admissions=()):
+        from threading import RLock
+        promotions = tuple(promotions)
+        admissions = tuple(admissions)
+        for name, values in (("promotions", promotions), ("admissions", admissions)):
+            if len(values) != len(set(values)):
+                raise RuntimePromotionError(f"duplicate {name} receipt")
+            for value in values:
+                self._require_digest(value, name)
+        self._lock = RLock()
+        self._promotion_digests = set(promotions)
+        self._admission_digests = set(admissions)
+
+    @staticmethod
+    def _require_digest(value, label):
+        if (not isinstance(value, str) or len(value) != 64
+                or any(ch not in "0123456789abcdef" for ch in value)):
+            raise RuntimePromotionError(f"invalid {label} receipt digest")
+
+    def reserve_promotion(self, digest):
+        self._require_digest(digest, "promotion")
+        with self._lock:
+            if digest in self._promotion_digests:
+                raise RuntimePromotionError("promotion receipt already consumed")
+            self._promotion_digests.add(digest)
+
+    def release_promotion(self, digest):
+        self._require_digest(digest, "promotion")
+        with self._lock:
+            self._promotion_digests.discard(digest)
+
+    def record_admission(self, digest):
+        self._require_digest(digest, "admission")
+        with self._lock:
+            if digest in self._admission_digests:
+                raise RuntimePromotionError("admission receipt already recorded")
+            self._admission_digests.add(digest)
+
     def snapshot(self):
-        body={"schema":"skeleton.ai.admission-ledger.v1","promotions":sorted(self._promotion_digests),"admissions":sorted(self._admission_digests)}
-        return {**body,"digest":digest_json(body)}
+        with self._lock:
+            body = {
+                "schema": "skeleton.ai.admission-ledger.v1",
+                "promotions": sorted(self._promotion_digests),
+                "admissions": sorted(self._admission_digests),
+            }
+        return {**body, "digest": digest_json(body)}
+
     @classmethod
-    def restore(cls,snapshot):
-        body={k:snapshot[k] for k in ("schema","promotions","admissions")}
-        if body["schema"]!="skeleton.ai.admission-ledger.v1" or snapshot.get("digest")!=digest_json(body): raise RuntimePromotionError("invalid admission ledger snapshot")
-        return cls(body["promotions"],body["admissions"])
+    def restore(cls, snapshot):
+        if not isinstance(snapshot, dict) or set(snapshot) != {
+            "schema", "promotions", "admissions", "digest"
+        }:
+            raise RuntimePromotionError("invalid admission ledger snapshot")
+        body = {k: snapshot[k] for k in ("schema", "promotions", "admissions")}
+        if (body["schema"] != "skeleton.ai.admission-ledger.v1"
+                or not isinstance(body["promotions"], list)
+                or not isinstance(body["admissions"], list)
+                or body["promotions"] != sorted(set(body["promotions"]))
+                or body["admissions"] != sorted(set(body["admissions"]))
+                or snapshot.get("digest") != digest_json(body)):
+            raise RuntimePromotionError("invalid admission ledger snapshot")
+        return cls(body["promotions"], body["admissions"])
 
 def _restore_in_place(runtime,checkpoint,prior):
     restored=NativeLLMRuntime.restore(checkpoint,device_policy=runtime.device_policy)
