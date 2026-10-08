@@ -43,7 +43,7 @@ def accept_browser_visual(custody:ConsentBoundAnalysisQueue,envelope:BrowserVisu
     # authoritative job/consent/recording state and immutable frame content metadata.
     extracted=tuple((x.captured_at_ms,x.frame_digest,x.source_locator) for x in envelope.frames)
     source=bind_extracted_frames(custody,envelope.owner,envelope.job_id,extracted,
-      retention_until=envelope.retention_until,authorized=True)
+      now=now,retention_until=envelope.retention_until,authorized=True)
     if len(source.frames)!=len(envelope.frames): raise ValueError("frame rebind cardinality mismatch")
     id_map={wire.frame_id:canonical.frame_id for wire,canonical in zip(envelope.frames,source.frames)}
     if len(id_map)!=len(envelope.frames): raise ValueError("duplicate browser frame identity")
