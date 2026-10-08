@@ -17,6 +17,7 @@ from .core import CrawlDocument, CrawlEngine
 from .game_knowledge_acquisition import (
     GameSource, acquire_game_documents, discover_game_research,
     prioritize_game_sources, queue_game_sources,
+    enqueue_official_game_docs,
 )
 from .game_knowledge_index import GameKnowledgeIndex, KnowledgeGap
 from .game_knowledge_design import (
@@ -85,6 +86,10 @@ class KnowledgeDrivenGameBuilder:
         )
         selected=prioritize_game_sources(suggestions,genre=genre,engine=engine,
                                          max_sources=max_sources)
+        # Official primary documentation first, then broader discovery.
+        # Both paths use the same policy-bound CrawlEngine, and therefore
+        # must pass robots/redirect/DNS/IP protections before fetching.
+        enqueue_official_game_docs(crawler,engine=engine)
         queue_game_sources(crawler,selected,max_enqueues=max_sources)
         docs=acquire_game_documents(crawler,now=now,max_steps=max_steps)
         self.ingest_captured_documents(docs,engine=engine,authorized=True,
