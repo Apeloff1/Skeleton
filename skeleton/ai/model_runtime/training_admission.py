@@ -94,10 +94,12 @@ def admit_candidate_model(runtime:NativeLLMRuntime,candidate:CandidateWeights,pr
         if temporal_admission.dataset_digest!=candidate.training_lineage_digest: raise RuntimePromotionError("temporal admission training lineage mismatch")
     require_id(admission_authority,"admission_authority")
     if promotion.independent_verifier==admission_authority: raise RuntimePromotionError("evaluation and admission authorities must be separate")
-    if ledger is not None: ledger.reserve_promotion(promotion.digest)
+    if not callable(apply_candidate): raise RuntimePromotionError("candidate application callback required")
+    if ledger is not None and not isinstance(ledger,AdmissionLedger): raise RuntimePromotionError("AdmissionLedger required")
     checkpoint=runtime.checkpoint(); prior=runtime.model_digest
+    if checkpoint["model_digest"]!=prior or checkpoint["digest"]!=promotion.rollback_digest: raise RuntimePromotionError("checkpoint not authorized by promotion")
+    if ledger is not None: ledger.reserve_promotion(promotion.digest)
     try:
-        if checkpoint["model_digest"]!=prior or checkpoint["digest"]!=promotion.rollback_digest: raise RuntimePromotionError("checkpoint not authorized by promotion")
         apply_candidate(runtime.model); observed=runtime.refresh_model_identity()
         if observed!=candidate.weights_digest or observed==prior: raise RuntimePromotionError("observed candidate weights do not match declared digest")
         admission=RuntimeAdmission(candidate.digest,prior,observed,checkpoint["digest"],admission_authority,True)
@@ -117,6 +119,7 @@ def execute_rollback(runtime,admission,rollback,checkpoint,*,verifier_id=None):
     verifier_id=verifier_id or rollback.verifier_id
     require_id(verifier_id,"rollback_verifier")
     if verifier_id==admission.admission_authority: raise RuntimePromotionError("rollback verifier must differ from admission authority")
+    if not isinstance(runtime,NativeLLMRuntime) or not isinstance(admission,RuntimeAdmission) or not isinstance(rollback,RollbackProof): raise RuntimePromotionError("typed runtime and rollback receipts required")
     if rollback.executed: raise RuntimePromotionError("rollback receipt already executed")
     if runtime.model_digest!=admission.admitted_model_digest or runtime._current_model_digest()!=admission.admitted_model_digest: raise RuntimePromotionError("runtime no longer matches admitted model")
     if rollback.admission_digest!=admission.digest or rollback.checkpoint_digest!=admission.checkpoint_digest or not rollback.verified: raise RuntimePromotionError("rollback authority mismatch")
