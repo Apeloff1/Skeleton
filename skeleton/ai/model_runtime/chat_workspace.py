@@ -517,6 +517,109 @@ class NativeChatWorkspace:
         with self._lock:
             return self.max_conversations - len(self._data)
 
+    def append_user(self, cid: str, content: str, *,
+                    expected_revision: int | None = None) -> int:
+        return self.append(cid, "user", content, expected_revision=expected_revision)
+
+    def append_assistant(self, cid: str, content: str, *,
+                         expected_revision: int | None = None) -> int:
+        return self.append(cid, "assistant", content, expected_revision=expected_revision)
+
+    def append_tool(self, cid: str, content: str, *, name: str,
+                    expected_revision: int | None = None) -> int:
+        return self.append(cid, "tool", content, name=name, expected_revision=expected_revision)
+
+    def last_user(self, cid: str) -> ChatMessage | None:
+        return self.get(cid).last_user_message()
+
+    def last_assistant(self, cid: str) -> ChatMessage | None:
+        return self.get(cid).last_assistant_message()
+
+    def last_turn(self, cid: str) -> ChatTranscript:
+        return self.get(cid).last_turn()
+
+    def instruction_prefix(self, cid: str) -> ChatTranscript:
+        return self.get(cid).instruction_prefix()
+
+    def dialogue(self, cid: str) -> ChatTranscript:
+        return self.get(cid).dialogue_only()
+
+    def conversation_turns(self, cid: str) -> tuple[ChatTranscript, ...]:
+        return self.get(cid).dialogue_turns()
+
+    def trim_messages(self, cid: str, keep_last: int, *,
+                      expected_revision: int | None = None) -> int:
+        return self.truncate(cid, keep_last, expected_revision=expected_revision)
+
+    def trim_bytes(self, cid: str, budget: int, *,
+                   expected_revision: int | None = None) -> int:
+        with self._lock:
+            transcript = self.get(cid).trim_to_bytes(budget)
+            return self._change(cid, transcript, "trim_bytes", expected_revision)
+
+    def remove_role(self, cid: str, role: str, *,
+                    expected_revision: int | None = None) -> int:
+        if role not in ("system", "developer", "user", "assistant", "tool"):
+            raise RuntimeContractError("invalid role")
+        with self._lock:
+            transcript = self.get(cid)
+            updated = ChatTranscript(tuple(m for m in transcript.messages if m.role != role))
+            return self._change(cid, updated, "remove_role", expected_revision)
+
+    def replace_last(self, cid: str, role: str, content: str, *,
+                     expected_revision: int | None = None) -> int:
+        with self._lock:
+            transcript = self.get(cid).replace_last(role, content)
+            return self._change(cid, transcript, "replace_last", expected_revision)
+
+    def insert_message(self, cid: str, index: int, message: ChatMessage, *,
+                       expected_revision: int | None = None) -> int:
+        if not isinstance(message, ChatMessage):
+            raise RuntimeContractError("invalid chat message")
+        with self._lock:
+            messages = list(self.get(cid).messages)
+            if type(index) is not int or not 0 <= index <= len(messages):
+                raise RuntimeContractError("invalid insert index")
+            messages.insert(index, message)
+            return self._change(cid, ChatTranscript(tuple(messages)), "insert", expected_revision)
+
+    def move_message(self, cid: str, source: int, target: int, *,
+                     expected_revision: int | None = None) -> int:
+        with self._lock:
+            messages = list(self.get(cid).messages)
+            if any(type(i) is not int or not 0 <= i < len(messages) for i in (source, target)):
+                raise RuntimeContractError("invalid move index")
+            message = messages.pop(source)
+            messages.insert(target, message)
+            return self._change(cid, ChatTranscript(tuple(messages)), "move", expected_revision)
+
+    def swap_messages(self, cid: str, first: int, second: int, *,
+                      expected_revision: int | None = None) -> int:
+        with self._lock:
+            messages = list(self.get(cid).messages)
+            if any(type(i) is not int or not 0 <= i < len(messages) for i in (first, second)):
+                raise RuntimeContractError("invalid swap index")
+            messages[first], messages[second] = messages[second], messages[first]
+            return self._change(cid, ChatTranscript(tuple(messages)), "swap", expected_revision)
+
+    def copy_message(self, source_id: str, index: int, target_id: str, *,
+                     expected_revision: int | None = None) -> int:
+        with self._lock:
+            message = self.message_at(source_id, index)
+            return self.append(target_id, message.role, message.content,
+                               name=message.name, expected_revision=expected_revision)
+
+    def move_to_archive(self, cid: str) -> None:
+        self.archive(cid)
+
+    def restore_from_archive(self, cid: str) -> None:
+        self.unarchive(cid)
+
+    def export_all(self, *, include_archived: bool = True) -> tuple[dict[str, Any], ...]:
+        with self._lock:
+            return tuple(self.export(record.conversation_id)
+                         for record in self.list_records(include_archived=include_archived))
+
     def clear_events(self) -> None:
         with self._lock:
             self._events.clear()
