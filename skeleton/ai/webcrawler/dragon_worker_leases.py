@@ -1,6 +1,7 @@
 """Expiring worker leases for Dragon analysis layers."""
 from __future__ import annotations
 from dataclasses import dataclass
+from hashlib import sha256
 import math,sqlite3,secrets
 
 @dataclass(frozen=True)
@@ -15,7 +16,14 @@ class DragonWorkerLeases:
    owner TEXT NOT NULL,run_id TEXT NOT NULL,layer TEXT NOT NULL,worker_id TEXT NOT NULL,
    implementation TEXT NOT NULL,version TEXT NOT NULL,token TEXT NOT NULL,
    leased_at REAL NOT NULL,expires_at REAL NOT NULL,generation INTEGER NOT NULL,
-   PRIMARY KEY(owner,run_id,layer))""");db.commit()
+   PRIMARY KEY(owner,run_id,layer))""")
+  db.execute("""CREATE TABLE IF NOT EXISTS dragon_worker_lease_history(
+   owner TEXT NOT NULL,run_id TEXT NOT NULL,layer TEXT NOT NULL,generation INTEGER NOT NULL,
+   worker_id TEXT NOT NULL,implementation TEXT NOT NULL,version TEXT NOT NULL,
+   token_digest TEXT NOT NULL,leased_at REAL NOT NULL,expires_at REAL NOT NULL,
+   released_at REAL NOT NULL,
+   PRIMARY KEY(owner,run_id,layer,generation),
+   UNIQUE(owner,run_id,layer,token_digest))""");db.commit()
  def acquire(self,owner:str,run_id:str,layer:str,worker_id:str,implementation:str,version:str,*,
              now:float,ttl:float,authorized:bool)->WorkerLease:
   if not authorized: raise PermissionError("worker lease requires authorization")
@@ -62,9 +70,29 @@ class DragonWorkerLeases:
   return renewed
  def _release_uncommitted(self,lease:WorkerLease,*,now:float,authorized:bool)->None:
   self.require(lease,now=now,authorized=authorized)
+  token_digest=sha256(lease.token.encode()).hexdigest()
+  existing=self.db.execute("""SELECT worker_id,implementation,version,token_digest,
+   leased_at,expires_at,released_at FROM dragon_worker_lease_history
+   WHERE owner=? AND run_id=? AND layer=? AND generation=?""",
+   (lease.owner,lease.run_id,lease.layer,lease.generation)).fetchone()
+  expected=(lease.worker_id,lease.implementation,lease.version,token_digest,
+   lease.leased_at,lease.expires_at,now)
+  if existing and existing!=expected: raise ValueError("immutable worker lease history conflict")
+  if not existing:
+   self.db.execute("""INSERT INTO dragon_worker_lease_history VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+    (lease.owner,lease.run_id,lease.layer,lease.generation,lease.worker_id,
+     lease.implementation,lease.version,token_digest,lease.leased_at,lease.expires_at,now))
   n=self.db.execute("""DELETE FROM dragon_worker_leases WHERE owner=? AND run_id=? AND layer=? AND token=?""",
    (lease.owner,lease.run_id,lease.layer,lease.token)).rowcount
   if n!=1: raise RuntimeError("worker lease release conflict")
+ def history(self,owner:str,run_id:str,layer:str,generation:int,*,authorized:bool):
+  if not authorized: raise PermissionError("worker lease history read requires authorization")
+  row=self.db.execute("""SELECT worker_id,implementation,version,token_digest,
+   leased_at,expires_at,released_at FROM dragon_worker_lease_history
+   WHERE owner=? AND run_id=? AND layer=? AND generation=?""",
+   (owner,run_id,layer,generation)).fetchone()
+  if not row: raise KeyError("worker lease history not found")
+  return row
  def release(self,lease:WorkerLease,*,now:float,authorized:bool)->None:
   with self.db:
    self._release_uncommitted(lease,now=now,authorized=authorized)
