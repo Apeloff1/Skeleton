@@ -230,4 +230,5 @@ def test_reordered_custody_lineage_is_semantically_equivalent():
     review = check((original,), (reading(),), (reordered,))
     assert review.prior_readings_reusable
     assert not review.sources[0].lineage_changed
-    assert review.original_custody_fingerprint == review.current_custody_fingerprint
+    assert review.sources[0].change is SourceChange.UNCHANGED
+    # Original custody includes readings; the current inventory deliberately does not.
