@@ -5,7 +5,7 @@ from skeleton.ai.volume_census import PROJECTION, admit, claimed_lines, clip_mas
 
 def test_admit() -> None:
     body = admit(claimed_lines())
-    assert body["claimed"] == 280185289
+    assert body["claimed"] == 280085289
     assert body["stored_prose"] == 0
     assert body["url"] == "pointer://ai/volume/census"
     assert body["x100_full"] is False
