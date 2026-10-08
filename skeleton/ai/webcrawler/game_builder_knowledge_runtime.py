@@ -27,6 +27,7 @@ from .game_knowledge_design import (
 from .game_playable_builder import (
     CompiledGame, build_playable_web_game, export_playable_game_archive,
 )
+from .game_godot_export import export_godot_game_archive
 from .dragon_game_builder_bridge import GameBuilderHandoff
 
 
@@ -104,6 +105,8 @@ class KnowledgeDrivenGameBuilder:
     ) -> GameKnowledgeBuild:
         if not authorized or not human_approved:
             raise PermissionError("playable game generation requires human approval")
+        if engine not in ("web", "godot"):
+            raise ValueError("no playable project exporter for target engine")
         if handoff is not None:
             if not isinstance(handoff,GameBuilderHandoff):
                 raise ValueError("invalid Game Forge handoff")
@@ -117,7 +120,9 @@ class KnowledgeDrivenGameBuilder:
             mapping={"platforming":"platformer","platformer":"platformer",
                      "action":"action","combat":"action","puzzle":"puzzle",
                      "exploration":"exploration","adventure":"exploration"}
-            genre=mapping.get(reviewed_genre,genre)
+            if reviewed_genre not in mapping:
+                raise ValueError("reviewed Forge genre unsupported by playable compiler")
+            genre=mapping[reviewed_genre]
         source_count=self.knowledge.db.execute(
             "SELECT COUNT(*) FROM game_knowledge_sources WHERE active=1"
         ).fetchone()[0]
@@ -130,7 +135,8 @@ class KnowledgeDrivenGameBuilder:
         if not metrics.playable:
             raise RuntimeError("generated game failed route validation")
         playable=build_playable_web_game(blueprint)
-        archive=export_playable_game_archive(blueprint)
+        archive=(export_godot_game_archive(blueprint) if engine=="godot"
+                 else export_playable_game_archive(blueprint))
         gaps=self.knowledge.missing_knowledge(
             tuple(m for m in blueprint.mechanics
                   if m in ("movement","collision","jump","combat",
