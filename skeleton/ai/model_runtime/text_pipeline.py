@@ -1070,6 +1070,12 @@ class ModelInputBatch:
     def __post_init__(self) -> None:
         if not self.input_ids:
             raise TokenizerContractError("empty model input batch")
+        if isinstance(self.pad_token_id, bool) or not isinstance(self.pad_token_id, int) or self.pad_token_id < 0:
+            raise TokenizerContractError("invalid model batch padding token")
+        if any(not isinstance(d, str) or len(d) != 64 or any(c not in "0123456789abcdef" for c in d) for d in self.source_window_digests):
+            raise TokenizerContractError("invalid model batch source digest")
+        if any(isinstance(t, bool) or not isinstance(t, int) or t < 0 for row in self.input_ids for t in row):
+            raise TokenizerContractError("invalid model batch token id")
         width = len(self.input_ids[0])
         if width <= 0 or any(len(row) != width for row in self.input_ids):
             raise TokenizerContractError("ragged model input ids")
@@ -1079,7 +1085,7 @@ class ModelInputBatch:
             raise TokenizerContractError("position ids shape mismatch")
         if len(self.source_window_digests) != len(self.input_ids):
             raise TokenizerContractError("model batch provenance mismatch")
-        if any(bit not in (0, 1) for row in self.attention_mask for bit in row):
+        if any(isinstance(bit, bool) or not isinstance(bit, int) or bit not in (0, 1) for row in self.attention_mask for bit in row):
             raise TokenizerContractError("invalid attention mask")
         for ids, mask, positions in zip(self.input_ids, self.attention_mask, self.position_ids):
             seen_padding = False
@@ -1135,6 +1141,12 @@ class CausalTrainingBatch:
     def __post_init__(self) -> None:
         if not self.input_ids:
             raise TokenizerContractError("empty causal training batch")
+        if isinstance(self.pad_token_id, bool) or not isinstance(self.pad_token_id, int) or self.pad_token_id < 0:
+            raise TokenizerContractError("invalid causal padding token")
+        if isinstance(self.ignore_index, bool) or not isinstance(self.ignore_index, int):
+            raise TokenizerContractError("invalid causal ignore_index")
+        if any(not isinstance(d, str) or len(d) != 64 or any(c not in "0123456789abcdef" for c in d) for d in self.source_window_digests):
+            raise TokenizerContractError("invalid causal source digest")
         width = len(self.input_ids[0])
         if width <= 0 or any(len(row) != width for row in self.input_ids):
             raise TokenizerContractError("ragged causal inputs")
@@ -1144,7 +1156,7 @@ class CausalTrainingBatch:
             raise TokenizerContractError("causal loss-mask shape mismatch")
         if len(self.source_window_digests) != len(self.input_ids):
             raise TokenizerContractError("causal provenance mismatch")
-        if any(bit not in (0, 1) for row in self.loss_mask for bit in row):
+        if any(isinstance(bit, bool) or not isinstance(bit, int) or bit not in (0, 1) for row in self.loss_mask for bit in row):
             raise TokenizerContractError("invalid causal loss mask")
         for inputs, labels, mask in zip(self.input_ids, self.labels, self.loss_mask):
             for token_id in inputs:
@@ -1188,23 +1200,55 @@ def serialize_model_input_batch(batch: ModelInputBatch) -> bytes:
     })
 
 
-def deserialize_model_input_batch(payload: bytes) -> ModelInputBatch:
-    if not isinstance(payload, bytes) or len(payload) > MAX_SERIALIZED_BATCH_BYTES:
-        raise TokenizerContractError("invalid serialized model batch bytes")
+def _parse_canonical_batch_payload(payload: bytes, *, kind: str) -> dict:
+    """Reject JSON ambiguity before admitting a content-addressed training batch."""
+    if not isinstance(payload, bytes) or not 0 < len(payload) <= MAX_SERIALIZED_BATCH_BYTES:
+        raise TokenizerContractError(f"invalid serialized {kind} batch bytes")
+
+    def reject_duplicates(pairs):
+        obj = {}
+        for key, value in pairs:
+            if key in obj:
+                raise TokenizerContractError("duplicate serialized batch JSON key")
+            obj[key] = value
+        return obj
+
+    def reject_nonfinite(value):
+        raise TokenizerContractError("nonfinite serialized batch JSON number")
+
     try:
-        value = json.loads(payload.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise TokenizerContractError("invalid serialized model batch") from exc
+        obj = json.loads(
+            payload.decode("utf-8"),
+            object_pairs_hook=reject_duplicates,
+            parse_constant=reject_nonfinite,
+        )
+    except (UnicodeError, json.JSONDecodeError, RecursionError) as exc:
+        raise TokenizerContractError(f"invalid serialized {kind} batch") from exc
+    if not isinstance(obj, dict):
+        raise TokenizerContractError(f"serialized {kind} batch requires JSON object")
+    try:
+        if _serialize_batch_payload(obj) != payload:
+            raise TokenizerContractError(f"noncanonical serialized {kind} batch")
+    except (TypeError, ValueError, OverflowError, RecursionError) as exc:
+        raise TokenizerContractError(f"invalid serialized {kind} batch") from exc
+    return obj
+
+
+def deserialize_model_input_batch(payload: bytes) -> ModelInputBatch:
+    value = _parse_canonical_batch_payload(payload, kind="model")
     expected = {"schema", "input_ids", "attention_mask", "position_ids", "source_window_digests", "pad_token_id", "digest"}
     if not isinstance(value, dict) or set(value) != expected or value["schema"] != "skeleton.ai.model-input-batch.v1":
         raise TokenizerContractError("serialized model batch has invalid shape")
-    batch = ModelInputBatch(
-        tuple(tuple(row) for row in value["input_ids"]),
-        tuple(tuple(row) for row in value["attention_mask"]),
-        tuple(tuple(row) for row in value["position_ids"]),
-        tuple(value["source_window_digests"]),
-        value["pad_token_id"],
-    )
+    try:
+        batch = ModelInputBatch(
+            tuple(tuple(row) for row in value["input_ids"]),
+            tuple(tuple(row) for row in value["attention_mask"]),
+            tuple(tuple(row) for row in value["position_ids"]),
+            tuple(value["source_window_digests"]),
+            value["pad_token_id"],
+        )
+    except (TypeError, ValueError, KeyError, IndexError) as exc:
+        raise TokenizerContractError("invalid serialized model batch content") from exc
     if value["digest"] != batch.digest:
         raise TokenizerContractError("serialized model batch digest mismatch")
     return batch
@@ -1226,23 +1270,21 @@ def serialize_causal_training_batch(batch: CausalTrainingBatch) -> bytes:
 
 
 def deserialize_causal_training_batch(payload: bytes) -> CausalTrainingBatch:
-    if not isinstance(payload, bytes) or len(payload) > MAX_SERIALIZED_BATCH_BYTES:
-        raise TokenizerContractError("invalid serialized causal batch bytes")
-    try:
-        value = json.loads(payload.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise TokenizerContractError("invalid serialized causal batch") from exc
+    value = _parse_canonical_batch_payload(payload, kind="causal")
     expected = {"schema", "input_ids", "labels", "loss_mask", "source_window_digests", "pad_token_id", "ignore_index", "digest"}
     if not isinstance(value, dict) or set(value) != expected or value["schema"] != "skeleton.ai.causal-training-batch.v1":
         raise TokenizerContractError("serialized causal batch has invalid shape")
-    batch = CausalTrainingBatch(
-        tuple(tuple(row) for row in value["input_ids"]),
-        tuple(tuple(row) for row in value["labels"]),
-        tuple(tuple(row) for row in value["loss_mask"]),
-        tuple(value["source_window_digests"]),
-        value["pad_token_id"],
-        value["ignore_index"],
-    )
+    try:
+        batch = CausalTrainingBatch(
+            tuple(tuple(row) for row in value["input_ids"]),
+            tuple(tuple(row) for row in value["labels"]),
+            tuple(tuple(row) for row in value["loss_mask"]),
+            tuple(value["source_window_digests"]),
+            value["pad_token_id"],
+            value["ignore_index"],
+        )
+    except (TypeError, ValueError, KeyError, IndexError) as exc:
+        raise TokenizerContractError("invalid serialized causal batch content") from exc
     if value["digest"] != batch.digest:
         raise TokenizerContractError("serialized causal batch digest mismatch")
     return batch
