@@ -7,6 +7,7 @@ import json,math
 from .dragon_frame_custody import CapturedFrame,FrameBatch,bind_extracted_frames
 from .dragon_visual_features import VisualObservation,VisualFeatureBatch,bind_visual_observations
 from .dragon_consent_bound_queue import ConsentBoundAnalysisQueue
+from .dragon_canonical_wire import visual_wire_fingerprint
 
 SCHEMA="dragon.visual-observations.v1"
 
@@ -23,14 +24,7 @@ class AcceptedBrowserVisual:
     features:VisualFeatureBatch
 
 def canonical_browser_visual_fingerprint(envelope:BrowserVisualEnvelope)->str:
-    body={"schema":envelope.schema,"owner":envelope.owner,"job_id":envelope.job_id,
-      "recording_digest":envelope.recording_digest,"consent_id":envelope.consent_id,
-      "consent_scope_digest":envelope.consent_scope_digest,
-      "retention_until":envelope.retention_until,
-      "frames":[[x.frame_id,x.frame_digest,x.captured_at_ms,x.source_locator] for x in envelope.frames],
-      "observations":[[x.frame_id,x.frame_digest,x.luminance_mean,x.edge_density,
-        x.motion_energy,x.scene_change] for x in envelope.observations]}
-    return sha256(json.dumps(body,sort_keys=True,separators=(",",":"),allow_nan=False).encode()).hexdigest()
+    return visual_wire_fingerprint(envelope)
 
 def accept_browser_visual(custody:ConsentBoundAnalysisQueue,envelope:BrowserVisualEnvelope,*,
     now:float,authorized:bool)->AcceptedBrowserVisual:
