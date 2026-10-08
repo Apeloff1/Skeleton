@@ -62,6 +62,37 @@ class TestNativeModelService(unittest.TestCase):
         with self.assertRaisesRegex(NativeServiceError, "LocalModelRequest required"):
             service.execute(object(), "alpha", GenerationConfig(max_new_tokens=1))
 
+    def test_terminal_receipt_never_reenters_native_tokenizer(self):
+        from unittest.mock import patch
+        service = NativeModelService(self.runtime())
+        cfg = GenerationConfig(max_new_tokens=1)
+        request = service.request("terminal-no-encode", "alpha", cfg, deadline_ms=1000)
+        token = CancellationToken()
+        token.cancel()
+        with patch.object(service.runtime, "encode",
+                          side_effect=AssertionError("terminal tokenizer reentered")):
+            terminal = service.execute(request, "alpha", cfg, cancellation=token)
+        self.assertEqual(terminal.receipt.terminal_reason, "cancelled")
+        self.assertEqual(len(terminal.receipt.usage_digest), 64)
+
+    def test_failure_usage_identity_binds_prompt_utf8_and_reason(self):
+        from unittest.mock import patch
+        service = NativeModelService(self.runtime())
+        with patch.object(service.runtime, "encode",
+                          side_effect=AssertionError("usage tokenizer reentered")):
+            base = service._usage_digest(prompt="alpha", generated_events=0, terminal_reason="cancelled")
+            again = service._usage_digest(prompt="alpha", generated_events=0, terminal_reason="cancelled")
+            other_prompt = service._usage_digest(prompt="alphá", generated_events=0, terminal_reason="cancelled")
+            other_reason = service._usage_digest(prompt="alpha", generated_events=0, terminal_reason="deadline")
+            more_events = service._usage_digest(prompt="alpha", generated_events=1, terminal_reason="cancelled")
+        self.assertEqual(base, again)
+        self.assertEqual(len({base, other_prompt, other_reason, more_events}), 4)
+
+    def test_failure_usage_rejects_malformed_unicode(self):
+        service = NativeModelService(self.runtime())
+        with self.assertRaisesRegex(NativeServiceError, "valid UTF-8"):
+            service._usage_digest(prompt="\\ud800", generated_events=0, terminal_reason="model_error")
+
     def test_failure_usage_digest_survives_tokenizer_rejection(self):
         from unittest.mock import patch
 
