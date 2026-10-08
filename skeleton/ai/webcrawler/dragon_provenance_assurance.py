@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 from math import isfinite
 from typing import Iterable
+from urllib.parse import urlsplit
 import json
 
 from .core import CrawlPolicy
@@ -92,6 +93,7 @@ class AssurancePolicy:
     min_heldout_probability: float = 0.58
     maximum_sources: int = 10000
     maximum_actions: int = 100
+    maximum_holdout_groups: int = 500
 
 
 def _verify_policy(policy: AssurancePolicy) -> None:
@@ -107,6 +109,8 @@ def _verify_policy(policy: AssurancePolicy) -> None:
         raise ValueError("invalid source capacity")
     if not 1 <= policy.maximum_actions <= 1000:
         raise ValueError("invalid action capacity")
+    if not 1 <= policy.maximum_holdout_groups <= 1000:
+        raise ValueError("invalid holdout group capacity")
 
 
 def _manifest(
@@ -126,6 +130,9 @@ def _manifest(
         if source.source_id in by_id:
             raise ValueError("duplicate provenance source identity")
         if not isinstance(source.canonical_uri, str) or not admit.admits(source.canonical_uri):
+            raise ValueError("untrusted provenance origin")
+        origin = urlsplit(source.canonical_uri)
+        if origin.username is not None or origin.password is not None:
             raise ValueError("untrusted provenance origin")
         if not isinstance(source.content_digest, str) or (
             len(source.content_digest) != 64
@@ -192,6 +199,9 @@ def _assured_groups(
         else:
             labelled[item.independence_group] = item.source_id
 
+    evidence_by_source: dict[str, list[EvidencePass]] = {}
+    for reading in evidence:
+        evidence_by_source.setdefault(reading.source_id, []).append(reading)
     grouped: dict[str, list[str]] = {}
     for sid in sorted(by_id):
         grouped.setdefault(root(sid), []).append(sid)
@@ -200,7 +210,7 @@ def _assured_groups(
     for ids in grouped.values():
         members = tuple(sorted(ids))
         # Include only sampled groups in a claim's effective evidence count.
-        readings = tuple(e for e in evidence if e.source_id in members)
+        readings = tuple(e for sid in members for e in evidence_by_source.get(sid, ()))
         if not readings:
             continue
         identity = _fingerprint(["custody_cluster_v1", members])
@@ -248,17 +258,23 @@ def _actions(
                 "resolve_internal_contradiction", cluster.cluster_id, 4.75,
                 "Trace incompatible observations to their original locators and time scopes.",
             ))
-    for decision in plan_adaptive_rereads(
-        belief, evidence, authorized=True, min_passes=reread_min,
-        max_passes=reread_max, limit=min(1000, max(limit * 2, 1)),
-    ):
-        if decision.next_pass is not None:
-            result.append(ResearchNextAction(
-                "reread_with_lens",
-                f"{decision.source_id}@{decision.revision}#{decision.next_pass.pass_index}",
-                round(decision.priority, 6),
-                decision.next_pass.lens,
-            ))
+    if reread_min > 12:
+        result.append(ResearchNextAction(
+            "extend_lens_schedule", claim_id, 3.0,
+            "A policy requiring more than twelve readings needs an explicitly reviewed lens schedule.",
+        ))
+    else:
+        for decision in plan_adaptive_rereads(
+            belief, evidence, authorized=True, min_passes=reread_min,
+            max_passes=reread_max, limit=min(1000, max(limit * 2, 1)),
+        ):
+            if decision.next_pass is not None:
+                result.append(ResearchNextAction(
+                    "reread_with_lens",
+                    f"{decision.source_id}@{decision.revision}#{decision.next_pass.pass_index}",
+                    round(decision.priority, 6),
+                    decision.next_pass.lens,
+                ))
     if "fragile_to_source_removal" in blockers:
         result.append(ResearchNextAction(
             "replicate_with_new_custody", claim_id, 3.75,
@@ -316,6 +332,8 @@ def assure_crawler_evidence(
         left.independence_group != right.independence_group
         for left, right in zip(items, normalized)
     )
+    if len(clusters) > assurance_policy.maximum_holdout_groups:
+        raise ValueError("holdout group budget exceeded")
 
     holdouts: list[ClusterHoldout] = []
     for cluster in clusters:
@@ -370,7 +388,8 @@ def assure_crawler_evidence(
         "claim": claim_id, "belief": belief.evidence_digest,
         "policy": [assurance_policy.min_independent_groups,
                    assurance_policy.min_supporting_probability,
-                   assurance_policy.min_heldout_probability],
+                   assurance_policy.min_heldout_probability,
+                   assurance_policy.maximum_holdout_groups],
         "sources": sorted([
             [s.source_id, s.content_digest, s.canonical_uri,
              sorted(s.parent_source_ids), sorted(s.lineage_tokens)]
