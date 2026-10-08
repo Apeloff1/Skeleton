@@ -11,6 +11,8 @@ import json
 import math
 import sqlite3
 
+from .dragon_consent_ledger import DragonConsentLedger
+
 
 class JobStatus(str, Enum):
     QUEUED = "queued"
@@ -101,6 +103,26 @@ class DragonAnalysisQueue:
             """, (owner, job_id, recording_digest, game_label,
                   now, now, JobStatus.QUEUED.value, ""))
         return self.get(owner, job_id, authorized=True)
+
+    def submit_with_consent(
+        self, owner: str, *, recording_digest: str, game_label: str,
+        now: float, consent_id: str, consent_scope_digest: str,
+        consent_ledger: DragonConsentLedger, authorized: bool,
+    ) -> AnalysisJob:
+        """Submit only after durable consent is verified at execution time."""
+        if not authorized:
+            raise PermissionError("analysis queue requires authorization")
+        if not isinstance(consent_ledger, DragonConsentLedger):
+            raise TypeError("durable consent ledger required")
+        consent_ledger.require_active(
+            owner, consent_id, now=now, scope_digest=consent_scope_digest,
+            authorized=True,
+        )
+        return self.submit(
+            owner, recording_digest=recording_digest, game_label=game_label,
+            now=now, capture_consent=True, analysis_consent=True,
+            authorized=True,
+        )
 
     def get(self, owner: str, job_id: str, *, authorized: bool) -> AnalysisJob | None:
         if not authorized:
