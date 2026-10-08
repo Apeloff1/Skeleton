@@ -208,6 +208,24 @@ class RuntimeAdmissionScheduler:
             return "active"
         raise ModelRuntimeError("cannot cancel unknown request")
 
+    def release_retained_kv(self, request_id: str) -> None:
+        """Explicitly free completed-request KV without touching active state.
+
+        A pinned retained cache entry can still be deliberately released by
+        the owning control plane. Implicit cancellation does not evict retained
+        state. Authorization belongs to the caller; no provider/model authority
+        is granted by this memory-accounting operation.
+        """
+        _require_request_id(request_id)
+        if request_id in self._active:
+            raise ModelRuntimeError("cannot release active request KV")
+        if request_id in self._queued:
+            raise ModelRuntimeError("cannot release queued request KV")
+        if request_id not in self._kv:
+            raise ModelRuntimeError("retained KV entry not found")
+        self._kv.pop(request_id)
+        self._sequence += 1
+
     def retry(self, request_id: str, *, priority_delta: int = 0) -> None:
         """Move active work back to the queue with a fresh sequence and no stale KV."""
         _require_request_id(request_id)

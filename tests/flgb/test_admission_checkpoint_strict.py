@@ -269,6 +269,47 @@ class TestRetainedKVIdentitySafety(unittest.TestCase):
         with self.assertRaisesRegex(ModelRuntimeError, "AdmissionLimits"):
             RuntimeAdmissionScheduler(limits=False)
 
+    def test_retained_kv_explicit_release_allows_request_identity_reuse(self):
+        scheduler = RuntimeAdmissionScheduler()
+        scheduler.submit(BatchRequest("pinned", 1, 1), kv_bytes=20, pinned_kv=True)
+        scheduler.admit()
+        scheduler.complete("pinned", retain_kv=True)
+        self.assertEqual(scheduler.capacity()["kv_used_bytes"], 20)
+        scheduler.release_retained_kv("pinned")
+        self.assertEqual(scheduler.capacity()["kv_used_bytes"], 0)
+        scheduler.submit(BatchRequest("pinned", 1, 1), kv_bytes=10)
+        self.assertEqual(scheduler.admit().admitted, ("pinned",))
+        self.assertEqual(
+            restore_admission_scheduler(scheduler.snapshot()).snapshot(),
+            scheduler.snapshot(),
+        )
+
+    def test_release_active_kv_fails_without_state_mutation(self):
+        scheduler = self.build()
+        before = scheduler.snapshot()
+        with self.assertRaisesRegex(ModelRuntimeError, "active"):
+            scheduler.release_retained_kv("active")
+        self.assertEqual(scheduler.snapshot(), before)
+
+    def test_release_unknown_or_queued_kv_fails_without_mutation(self):
+        scheduler = self.build()
+        before = scheduler.snapshot()
+        for key in ("queued", "unknown"):
+            with self.subTest(key=key), self.assertRaises(ModelRuntimeError):
+                scheduler.release_retained_kv(key)
+            self.assertEqual(scheduler.snapshot(), before)
+
+    def test_release_idempotency_requires_explicit_absent_state(self):
+        scheduler = RuntimeAdmissionScheduler()
+        scheduler.submit(BatchRequest("r", 1, 1), kv_bytes=20)
+        scheduler.admit()
+        scheduler.complete("r", retain_kv=True)
+        scheduler.release_retained_kv("r")
+        before = scheduler.snapshot()
+        with self.assertRaisesRegex(ModelRuntimeError, "not found"):
+            scheduler.release_retained_kv("r")
+        self.assertEqual(scheduler.snapshot(), before)
+
     def test_public_id_boundary_rejects_nonhashable_and_invalid_request_ids(self):
         scheduler = self.build()
         before = scheduler.snapshot()
@@ -277,6 +318,7 @@ class TestRetainedKVIdentitySafety(unittest.TestCase):
             lambda value: scheduler.retry(value),
             lambda value: scheduler.set_kv_pinned(value, True),
             lambda value: scheduler.complete(value),
+            lambda value: scheduler.release_retained_kv(value),
         )
         for bad in (None, [], {}, True, 123, "", "x" * 257):
             for operation in operations:

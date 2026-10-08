@@ -82,3 +82,14 @@ formal verification or production workload qualification.
 ```bash
 python -m unittest tests.flgb.test_admission_checkpoint_state_machine -v
 ```
+
+### Explicit retained KV release
+
+`RuntimeAdmissionScheduler.release_retained_kv(request_id)` releases only an
+inactive completed request's retained KV entry. It never releases active
+decode state or queued ownership, and rejects missing identities without
+mutating scheduler state. Pinned retained KV may be explicitly freed by a
+authorized operator/control caller; callers must enforce tenant/request
+authority upstream. The release increments the scheduler sequence and is
+covered by checkpoint recovery tests, allowing deliberate later request-ID
+reuse without evicting unrelated caches.
