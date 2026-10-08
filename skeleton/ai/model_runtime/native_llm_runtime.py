@@ -1,5 +1,6 @@
 """Executable native LLM serving boundary over Skeleton's causal transformer."""
 from __future__ import annotations
+import math
 
 from dataclasses import dataclass
 import hmac
@@ -460,7 +461,11 @@ class NativeLLMRuntime:
             window = output[-self.limits.max_context :]
             before = len(cache.tokens) if cache is not None else 0
             primed = cache.primed_for(window) if cache is not None else False
-            logits = self.model._logits_window(window, cache)
+            logits = tuple(float(value) for value in self.model._logits_window(window, cache))
+            if len(logits) != self.tokenizer.vocab_size:
+                raise RuntimeContractError("generation graph emitted invalid logits shape")
+            if any(not math.isfinite(value) for value in logits):
+                raise RuntimeContractError("generation graph emitted non-finite logits")
             if cache is not None and before and not primed:
                 cache_resets += 1
 
