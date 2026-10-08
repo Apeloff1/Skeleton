@@ -16,6 +16,7 @@ from typing import Callable
 from .flgb_model_runtime import LocalModelReceipt, LocalModelRequest, ModelIdentity, digest_json
 from .native_llm_runtime import GenerationResult, NativeLLMRuntime
 from .runtime_contracts import GenerationConfig, RuntimeContractError, RuntimeEvent
+from .tokenization import TokenizerContractError
 
 
 class NativeServiceError(RuntimeContractError):
@@ -136,10 +137,14 @@ class NativeModelService:
         generated_events: int,
         terminal_reason: str,
     ) -> str:
-        prompt_sequence = self.runtime.encode(prompt)
+        try:
+            prompt_sequence = self.runtime.encode(prompt)
+            prompt_tokens = len(prompt_sequence.token_ids)
+        except (RuntimeContractError, TokenizerContractError):
+            prompt_tokens = None
         return digest_json(
             {
-                "prompt_tokens": len(prompt_sequence.token_ids),
+                "prompt_tokens": prompt_tokens,
                 "generated_events": generated_events,
                 "terminal_reason": terminal_reason,
                 "model_identity_digest": self.identity_digest,
