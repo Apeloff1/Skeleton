@@ -120,8 +120,15 @@ def require_training_grant(
         canonical = canonicalize_url(doc.canonical_url)
     except (ValueError, UnicodeError) as error:
         raise ValueError("invalid document source") from error
+    hostname = (urlsplit(canonical).hostname or "").rstrip(".").lower()
+    if ("." not in hostname or hostname.endswith(
+        (".local", ".localhost", ".internal", ".test", ".invalid")
+    )):
+        raise PermissionError("nonpublic source cannot enter training")
     if canonical != doc.canonical_url or grant.canonical_url != canonical:
         raise PermissionError("training grant does not cover this source")
+    if not isinstance(doc.text,str):
+        raise ValueError("invalid captured document text")
     if _digest(doc.text) != doc.content_hash or grant.content_hash != doc.content_hash:
         raise PermissionError("training grant does not cover this revision")
     if grant.purpose != purpose or now > grant.valid_until:
