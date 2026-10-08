@@ -15,7 +15,7 @@ class TemporalRevocation:
   _hex(self.target_digest,"revocation target"); _hex(self.evidence_digest,"revocation evidence")
   if self.target_kind not in {"certificate","training-admission","promotion-binding"}: raise TemporalSignalError("invalid revocation target")
   if self.reason_code not in {"evidence-invalidated","regime-change","provenance-compromised","benchmark-regression","operator-revocation"}: raise TemporalSignalError("invalid revocation reason")
-  if self.epoch<0 or not self.authority_id: raise TemporalSignalError("invalid revocation authority")
+  if isinstance(self.epoch,bool) or not isinstance(self.epoch,int) or self.epoch<0 or not isinstance(self.authority_id,str) or not self.authority_id.strip(): raise TemporalSignalError("invalid revocation authority")
  @property
  def digest(self): return _digest(self.__dict__)
 
