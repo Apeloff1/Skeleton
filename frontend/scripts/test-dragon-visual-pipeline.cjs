@@ -11,4 +11,6 @@ ok(!src.includes('fetch(')&&!src.includes('axios'),'local decoder must not uploa
 ok(src.includes('signal?: AbortSignal'),'decoder must expose cooperative cancellation');
 ok(src.includes('signal?.addEventListener("abort"'),'decoder waits must be abortable');
 ok(src.includes('ensureActive()'),'decoder must check cancellation during frame processing');
+ok(src.includes('DRAGON_VISUAL_DECODER_VERSION'),'decoder evidence must carry an explicit algorithm version');
+ok(src.includes('decoderVersion:DRAGON_VISUAL_DECODER_VERSION'),'decoder output must bind that version');
 console.log('dragon visual pipeline contract ok');
