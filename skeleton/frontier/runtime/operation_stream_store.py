@@ -1172,7 +1172,6 @@ class SQLiteOperationEventStore:
                 expected = compacted + 1
                 count = 0
                 terminal_sequence: int | None = None
-                last_timestamp: datetime | None = None
                 while True:
                     rows = self._connection.execute(
                         """
@@ -1209,10 +1208,6 @@ class SQLiteOperationEventStore:
                             )
                         if event.terminal:
                             terminal_sequence = event.sequence
-                        # Timestamps need not be monotonic: distributed
-                        # producers may skew clocks; reject invalid values
-                        # through StreamEvent, but do not invent clock order.
-                        last_timestamp = event.timestamp
                         count += 1
                         expected += 1
                     if len(rows) < batch_size:
