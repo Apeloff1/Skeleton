@@ -14,9 +14,11 @@ def _hex(v,n):
 class TemporalQuery:
  query_id:str; subject:str; as_of_year:int; mode:str; query_digest:str; max_results:int=32
  def __post_init__(self):
+  if isinstance(self.as_of_year,bool) or not isinstance(self.as_of_year,int) or not 1900<=self.as_of_year<=2200: raise TemporalSignalError("invalid as-of year")
+  if not self.query_id or not self.subject: raise TemporalSignalError("query identity required")
   if self.mode not in {"historical","current","extrapolation"}: raise TemporalSignalError("invalid temporal query mode")
   _hex(self.query_digest,"query")
-  if not isinstance(self.max_results,int) or not 1<=self.max_results<=256: raise TemporalSignalError("invalid result budget")
+  if isinstance(self.max_results,bool) or not isinstance(self.max_results,int) or not 1<=self.max_results<=256: raise TemporalSignalError("invalid result budget")
  @property
  def digest(self): return _digest(self.__dict__)
 
