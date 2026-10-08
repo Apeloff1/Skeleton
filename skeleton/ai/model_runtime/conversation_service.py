@@ -59,7 +59,7 @@ class NativeConversationService:
             raise RuntimeContractError("invalid session capacity")
         if type(max_events) is not int or not 1 <= max_events <= 100000:
             raise RuntimeContractError("invalid event capacity")
-        if not isinstance(idle_seconds, (int, float)) or not 1 <= idle_seconds <= 31536000:
+        if isinstance(idle_seconds, bool) or not isinstance(idle_seconds, (int, float)) or not 1 <= idle_seconds <= 31536000:
             raise RuntimeContractError("invalid idle timeout")
         self.runtime = runtime
         self.max_sessions = max_sessions
@@ -571,7 +571,7 @@ class NativeConversationService:
 
     # Operational controls for bounded serving
     def set_idle_timeout(self, seconds: float) -> None:
-        if not isinstance(seconds, (int, float)) or not 1 <= seconds <= 31536000:
+        if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or not 1 <= seconds <= 31536000:
             raise RuntimeContractError("invalid idle timeout")
         with self._lock:
             self.idle_seconds = float(seconds)
