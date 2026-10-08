@@ -110,7 +110,7 @@ def test_06_exact_duplicate_urls_grouped_by_content_digest():
 
 
 def test_07_near_duplicate_mirrors_flagged_with_distinct_digests():
-    prefix="research measurements repeat across independent labs " * 30
+    prefix=" ".join(f"measurement{i} source{i} datum{i}" for i in range(120))+" "
     a=document("https://one.example/study",prefix+" original appendix A")
     b=document("https://two.example/study",prefix+" alternative appendix B")
     c=document("https://three.example/study","Completely unrelated news about weather and cooking. "*15)
