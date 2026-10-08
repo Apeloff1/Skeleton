@@ -130,7 +130,7 @@ class KnowledgeCliTests(unittest.TestCase):
         self.write(source)
         code, _, errors = self.invoke("import", "--input", str(self.importfile))
         self.assertEqual(code, 2)
-        self.assertIn("review", errors)
+        self.assertIn("invalid document import", errors)
 
     def test_unknown_import_keys_rejected(self):
         source = self.document()
