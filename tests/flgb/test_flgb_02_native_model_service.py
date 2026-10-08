@@ -56,6 +56,23 @@ class TestNativeModelService(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(len(first), 64)
 
+    def test_failure_receipt_survives_raw_tokenizer_contract_error(self):
+        from unittest.mock import patch
+        from skeleton.ai.model_runtime.tokenization import TokenizerContractError
+
+        service = NativeModelService(self.runtime())
+        config = GenerationConfig(max_new_tokens=1)
+        request = service.request("op-tokenizer-error", "alpha", config, deadline_ms=1000)
+        with patch.object(
+            service.runtime, "encode",
+            side_effect=TokenizerContractError("encoding rejected"),
+        ):
+            result = service.execute(request, "alpha", config)
+        self.assertEqual(result.receipt.terminal_reason, "model_error")
+        self.assertIsNone(result.generation)
+        self.assertIsNone(result.receipt.output_digest)
+        self.assertEqual(len(result.receipt.usage_digest), 64)
+
     def test_service_uses_runtime_canonical_identity(self):
         runtime = self.runtime()
         service = NativeModelService(runtime)
