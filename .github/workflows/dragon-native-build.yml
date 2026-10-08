@@ -1,0 +1,67 @@
+name: Dragon Native ROM Build
+
+on:
+  pull_request:
+    paths:
+      - 'skeleton/ai/webcrawler/dragon_native_*.py'
+      - 'skeleton/ai/webcrawler/dragon_practice_lab.py'
+      - 'skeleton/ai/webcrawler/dragon_practice_cycles.py'
+      - 'tests/test_ai_webcrawler_dragon_native_*.py'
+      - '.github/workflows/dragon-native-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dragon-native-rom-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-gb-and-nes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install native ROM toolchain prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cc65 build-essential bison flex libpng-dev pkg-config
+          python -m pip install --disable-pip-version-check pytest
+      - name: Install RGBDS version 1.0.0
+        run: |
+          git clone --depth 1 --branch v1.0.0 https://github.com/gbdev/rgbds.git /tmp/dragon-rgbds
+          make -C /tmp/dragon-rgbds -j 2
+          sudo make -C /tmp/dragon-rgbds install
+          rgbasm --version
+          ca65 --version
+      - name: Execute real native ROM compilation tests
+        run: |
+          python -m pytest -q \
+            tests/test_ai_webcrawler_dragon_native_projects.py \
+            tests/test_ai_webcrawler_dragon_native_compile.py \
+            tests/test_ai_webcrawler_dragon_native_cycles.py
+      - name: Build original Game Boy ROM
+        run: |
+          python -m skeleton.ai.webcrawler.dragon_native_cli \
+            --target game_boy --out /tmp/dragon-gameboy --compile
+          test -s /tmp/dragon-gameboy/build/dragon.gb
+      - name: Build original NES ROM
+        run: |
+          python -m skeleton.ai.webcrawler.dragon_native_cli \
+            --target nes --out /tmp/dragon-nes --compile
+          test -s /tmp/dragon-nes/build/dragon.nes
+      - name: Publish original homebrew ROM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-native-homebrew-roms
+          path: |
+            /tmp/dragon-gameboy/build/dragon.gb
+            /tmp/dragon-nes/build/dragon.nes
+          if-no-files-found: error
+          retention-days: 7
