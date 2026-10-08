@@ -33,8 +33,8 @@ def bind_extracted_frames(custody:ConsentBoundAnalysisQueue,owner:str,job_id:str
         raise PermissionError("frame retention exceeds consent lifetime")
     frames=[];last=-1;seen=set()
     for timestamp,digest,locator in extracted:
-        if not isinstance(timestamp,int) or timestamp<0 or timestamp<last:
-            raise ValueError("frame timestamps must be monotonic non-negative milliseconds")
+        if not isinstance(timestamp,int) or timestamp<0 or timestamp<=last:
+            raise ValueError("frame timestamps must increase strictly in non-negative milliseconds")
         if len(digest)!=64 or any(c not in "0123456789abcdef" for c in digest):
             raise ValueError("invalid frame digest")
         if not locator or len(locator)>2048: raise ValueError("invalid source locator")
