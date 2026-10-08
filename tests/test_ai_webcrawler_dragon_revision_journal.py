@@ -339,3 +339,60 @@ def test_review_digest_is_deterministic_and_checks_source_mutation():
         sources=(replace(review.sources[0], lineage_changed=True),),
     )
     assert revision_report_fingerprint(corrupted) != review.fingerprint
+
+
+def test_head_table_corruption_blocks_new_commits():
+    journal = ledger()
+    journal.append(
+        "owner-a", report(), observed_at=10, expected_sequence=0,
+        authorized=True,
+    )
+    journal.db.execute("""
+        UPDATE crawler_revision_heads SET event_hash=?
+        WHERE owner='owner-a'
+    """, ("f" * 64,))
+    journal.db.commit()
+    assert not journal.verify("owner-a", "claim-42", authorized=True)
+    with pytest.raises(RuntimeError, match="head mismatch"):
+        journal.append(
+            "owner-a", report(), observed_at=20,
+            expected_sequence=1, authorized=True,
+        )
+
+
+def test_missing_head_row_cannot_restart_sequence_and_overwrite_history():
+    journal = ledger()
+    journal.append(
+        "owner-a", report(), observed_at=10, expected_sequence=0,
+        authorized=True,
+    )
+    journal.db.execute(
+        "DELETE FROM crawler_revision_heads WHERE owner='owner-a'"
+    )
+    journal.db.commit()
+    with pytest.raises(RuntimeError, match="head mismatch"):
+        journal.append(
+            "owner-a", report(), observed_at=20,
+            expected_sequence=1, authorized=True,
+        )
+
+
+def test_out_of_order_timestamps_do_not_enter_verified_history():
+    journal = ledger()
+    first = journal.append(
+        "owner-a", report(), observed_at=100, expected_sequence=0,
+        authorized=True,
+    )
+    with pytest.raises(ValueError, match="time cannot move backwards"):
+        journal.append(
+            "owner-a", report(), observed_at=99, expected_sequence=1,
+            authorized=True,
+        )
+    assert journal.latest("owner-a", "claim-42", authorized=True) == first
+    assert journal.verify("owner-a", "claim-42", authorized=True)
+
+
+def test_public_crawler_module_exposes_revision_journal():
+    from skeleton.ai import webcrawler
+    assert webcrawler.RevisionJournal is RevisionJournal
+    assert webcrawler.revision_report_fingerprint(report()) == report().fingerprint
