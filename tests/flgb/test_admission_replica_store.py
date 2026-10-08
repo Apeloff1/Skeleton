@@ -189,6 +189,65 @@ class TestAdmissionReplicaFileStore(unittest.TestCase):
             )
         self.assertEqual(alternate.read_bytes(), self.blob(state, "a"))
 
+    def test_publish_requires_two_confirmed_independent_copies(self):
+        state = self.build()
+        receipt = self.store.publish(
+            state, leader_term=5, secret_key=KEY,
+            minimum_term=5, minimum_sequence=state.snapshot()["sequence"],
+        )
+        self.assertEqual(receipt.committed_members, ("a", "b", "c"))
+        self.assertEqual(receipt.snapshot_digest, state.snapshot()["digest"])
+        self.assertEqual(self.quorum().supporters, ("a", "b", "c"))
+
+    def test_publish_one_write_failure_still_meets_quorum(self):
+        from unittest.mock import patch
+        state = self.build()
+        save = self.store.save
+        def selective(member, blob, **kwargs):
+            if member == "b":
+                raise OSError("simulated b disk outage")
+            return save(member, blob, **kwargs)
+        with patch.object(self.store, "save", side_effect=selective):
+            receipt = self.store.publish(
+                state, leader_term=5, secret_key=KEY,
+                minimum_term=5, minimum_sequence=0,
+            )
+        self.assertEqual(receipt.committed_members, ("a", "c"))
+        self.assertEqual(receipt.failed_members, ("b",))
+
+    def test_publish_two_write_failures_never_acknowledges_commit(self):
+        from unittest.mock import patch
+        state = self.build()
+        save = self.store.save
+        def selective(member, blob, **kwargs):
+            if member != "a":
+                raise OSError("simulated disk outage")
+            return save(member, blob, **kwargs)
+        with patch.object(self.store, "save", side_effect=selective):
+            with self.assertRaisesRegex(ModelRuntimeError, "durable quorum"):
+                self.store.publish(
+                    state, leader_term=5, secret_key=KEY,
+                    minimum_term=5, minimum_sequence=0,
+                )
+        self.assertIsNotNone(self.store.read("a"))
+
+    def test_repair_never_overwrites_valid_newer_term(self):
+        state = self.build()
+        self.write_all(state)
+        state.submit(BatchRequest("r2", 1, 1), kv_bytes=10)
+        newer = self.blob(state, "c", term=6)
+        self.store.save(
+            "c", newer, secret_key=KEY, minimum_term=5, minimum_sequence=0,
+        )
+        old_majority = self.quorum()
+        self.assertEqual(old_majority.repair_targets, ("c",))
+        with self.assertRaisesRegex(ModelRuntimeError, "newer"):
+            self.store.repair(
+                "c", old_majority, secret_key=KEY,
+                minimum_term=5, minimum_sequence=0,
+            )
+        self.assertEqual(self.store.read("c"), newer)
+
     def test_store_does_not_create_missing_directories(self):
         with self.assertRaises(ModelRuntimeError):
             AdmissionReplicaFileStore({

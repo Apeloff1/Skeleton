@@ -98,8 +98,7 @@ class TestReplicatedCheckpointRecovery(unittest.TestCase):
         first = self.build()
         second = self.build()
         second.submit(BatchRequest("different", 1, 1), kv_bytes=10)
-        # Equal sequence is part of the divergence check, not just equal term.
-        second.release_retained_kv("none") if False else None
+        # A minority different revision never substitutes for the quorum.
         same = self.replicas(first)
         rogue = create_admission_replica(
             second, member_id="zone-c", leader_term=4, secret_key=KEY
