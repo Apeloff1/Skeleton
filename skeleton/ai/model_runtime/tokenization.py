@@ -113,11 +113,21 @@ class NativeTokenizer:
             raise TokenizerContractError("model embedding/vocabulary size mismatch")
         if not _is_int(model.unk) or not 0 <= model.unk < len(self._vocab):
             raise TokenizerContractError("invalid model unknown-token id")
+        declared_specials = {"unk": int(model.unk)}
+        for name in ("pad", "bos", "eos"):
+            attr = getattr(model, name, None)
+            if attr is None:
+                continue
+            if not _is_int(attr) or not 0 <= attr < len(self._vocab):
+                raise TokenizerContractError(f"invalid model {name}-token id")
+            declared_specials[name] = int(attr)
+        if len(set(declared_specials.values())) != len(declared_specials):
+            raise TokenizerContractError("special token ids must be distinct")
         self._manifest = VocabularyManifest(
             "native-transformer",
             "v1",
             tuple((token, index) for index, token in enumerate(self._vocab)),
-            {"unk": model.unk},
+            declared_specials,
         )
         self._bpe_snapshot = self._capture_bpe()
         self._digest = self._identity_digest(self._bpe_snapshot)
@@ -157,10 +167,26 @@ class NativeTokenizer:
     def vocabulary_manifest(self) -> VocabularyManifest:
         return self._manifest
 
+    def special_token_id(self, name: str, *, required: bool = False) -> int | None:
+        if not isinstance(name, str) or not name:
+            raise TokenizerContractError("special token name required")
+        token_id = self._manifest.special_tokens.get(name)
+        if token_id is None and required:
+            raise TokenizerContractError(f"tokenizer does not declare {name} token")
+        return token_id
+
     def assert_unchanged(self) -> None:
         current_vocab = tuple(str(token) for token in self.model.itos)
         if current_vocab != self._vocab or int(self.model.unk) != self._manifest.special_tokens["unk"]:
             raise TokenizerContractError("model vocabulary changed after admission")
+        for name in ("pad", "bos", "eos"):
+            admitted = self._manifest.special_tokens.get(name)
+            current = getattr(self.model, name, None)
+            if admitted is None:
+                if current is not None:
+                    raise TokenizerContractError("model special-token policy changed after admission")
+            elif current != admitted:
+                raise TokenizerContractError("model special-token policy changed after admission")
         if self._identity_digest(self._capture_bpe()) != self._digest:
             raise TokenizerContractError("BPE/tokenizer state changed after admission")
 
@@ -173,7 +199,18 @@ class NativeTokenizer:
             text.encode("utf-8", errors="strict")
         except UnicodeEncodeError as exc:
             raise TokenizerContractError("text is not UTF-8 encodable Unicode") from exc
-        ids = tuple(int(value) for value in self.model._ids(text))
+        try:
+            raw_ids = self.model._ids(text)
+        except Exception as exc:
+            raise TokenizerContractError("native tokenizer encode failed") from exc
+        if not isinstance(raw_ids, (list, tuple)):
+            raise TokenizerContractError("native tokenizer emitted invalid token container")
+        ids_list: list[int] = []
+        for value in raw_ids:
+            if not _is_int(value):
+                raise TokenizerContractError("native tokenizer emitted non-integer token id")
+            ids_list.append(int(value))
+        ids = tuple(ids_list)
         if not ids:
             ids = (self.model.unk,)
         if len(ids) > self.limits.max_tokens:
@@ -206,9 +243,17 @@ class NativeTokenizer:
         decode = getattr(bpe, "decode", None)
         if isinstance(bpe_vocab, Mapping) and callable(decode):
             if all(piece != UNK and piece in bpe_vocab for piece in pieces):
-                value = decode(pieces)
-                if isinstance(value, str):
-                    return value
+                try:
+                    value = decode(pieces)
+                except Exception as exc:
+                    raise TokenizerContractError("BPE decode failed") from exc
+                if not isinstance(value, str):
+                    raise TokenizerContractError("BPE decode emitted non-string value")
+                try:
+                    value.encode("utf-8", errors="strict")
+                except UnicodeEncodeError as exc:
+                    raise TokenizerContractError("BPE decode emitted invalid Unicode") from exc
+                return value
         return " ".join(pieces)
 
     def checkpoint(self) -> Mapping[str, Any]:
@@ -262,6 +307,15 @@ class StreamingTextFeed:
             raise TokenizerContractError("text chunk is not UTF-8 encodable Unicode") from exc
         self._chunks.append(chunk)
         self._chars += len(chunk)
+
+    def consume_text(self) -> str:
+        """Consume validated chunks once; no tokenization before normalization."""
+        if self._closed:
+            raise TokenizerContractError("text feed already finalized")
+        self._closed = True
+        chunks = self._chunks
+        self._chunks = []
+        return "".join(chunks)
 
     def finalize(self, tokenizer: NativeTokenizer) -> TokenSequence:
         if self._closed:
@@ -337,11 +391,19 @@ def serialize_token_sequence(sequence: TokenSequence) -> bytes:
     return payload
 
 
-def deserialize_token_sequence(payload: bytes) -> TokenSequence:
+def deserialize_token_sequence(payload: bytes, *, require_canonical: bool = False) -> TokenSequence:
     if not isinstance(payload, bytes) or len(payload) > MAX_SERIALIZED_SEQUENCE_BYTES:
         raise TokenizerContractError("invalid serialized token sequence bytes")
+    def reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, item in pairs:
+            if key in result:
+                raise TokenizerContractError("duplicate serialized JSON key")
+            result[key] = item
+        return result
+
     try:
-        value = json.loads(payload.decode("utf-8"))
+        value = json.loads(payload.decode("utf-8"), object_pairs_hook=reject_duplicate_keys)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise TokenizerContractError("invalid serialized token sequence") from exc
     if not isinstance(value, dict) or set(value) != {
@@ -353,11 +415,22 @@ def deserialize_token_sequence(payload: bytes) -> TokenSequence:
     token_ids = value["token_ids"]
     if not isinstance(token_ids, list):
         raise TokenizerContractError("serialized token_ids must be a list")
-    return TokenSequence(
+    if len(token_ids) > MAX_TOKENS:
+        raise TokenizerContractError("serialized token sequence exceeds token budget")
+    if any(not _is_int(token_id) or token_id < 0 or token_id >= 2**31 for token_id in token_ids):
+        raise TokenizerContractError("serialized token_ids contain invalid id")
+    for name in ("tokenizer_digest", "source_text_digest"):
+        digest = value[name]
+        if not isinstance(digest, str) or len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
+            raise TokenizerContractError(f"serialized {name} is invalid")
+    sequence = TokenSequence(
         value["tokenizer_digest"],
         tuple(token_ids),
         value["source_text_digest"],
     )
+    if require_canonical and serialize_token_sequence(sequence) != payload:
+        raise TokenizerContractError("noncanonical serialized token sequence")
+    return sequence
 
 
 __all__ = [
