@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 from urllib.parse import urlsplit,urlunsplit,parse_qsl,urlencode
-import json,math,sqlite3,time
+import json,math,sqlite3,ipaddress
 
 @dataclass(frozen=True)
 class VideoVisit:
@@ -25,7 +25,14 @@ def canonical_video_url(url:str)->str:
         raise ValueError('video history requires public HTTPS URL')
     if parsed.port not in (None,443):raise ValueError('unsupported video URL port')
     host=parsed.hostname.lower()
-    if host in ('localhost',) or host.endswith(('.local','.internal')):raise ValueError('private hostname')
+    if host in ('localhost',) or host.endswith(('.localhost','.local','.internal','.test','.invalid')) or '.' not in host:
+        raise ValueError('private or unqualified hostname')
+    try:
+        address=ipaddress.ip_address(host)
+    except ValueError:
+        pass
+    else:
+        if not address.is_global:raise ValueError('nonpublic address')
     # Never persist trackers or embedded tokens in watch history.
     safe_query=urlencode(sorted((k,v) for k,v in parse_qsl(parsed.query,keep_blank_values=True)
                               if k in ('v','id','list')))
@@ -49,7 +56,8 @@ class DragonVideoHistory:
         if not title.strip() or len(title)>300 or not math.isfinite(watched_at):
             raise ValueError('invalid video metadata')
         if not 0<=watched_ms<=duration_ms<=86_400_000:raise ValueError('invalid viewing interval')
-        if len(tags)>32 or any(not x or len(x)>64 for x in tags):raise ValueError('invalid tags')
+        if len(tags)>32 or any(not isinstance(x,str) or not x.strip() or len(x)>64 for x in tags):
+            raise ValueError('invalid tags')
         normalized=tuple(sorted(set(x.casefold().strip() for x in tags)))
         video_id=sha256(canonical.encode()).hexdigest()
         with self.db:
@@ -65,6 +73,14 @@ class DragonVideoHistory:
           duration_ms,watched_ms,tags_json FROM dragon_video_history WHERE owner=?
           ORDER BY watched_at DESC,video_id LIMIT ?""",(owner,limit)).fetchall()
         return tuple(VideoVisit(*r[:6],tuple(json.loads(r[6]))) for r in rows)
+    def prune(self,owner:str,*,older_than:float)->int:
+        if not owner or len(owner)>128 or not math.isfinite(older_than):
+            raise ValueError('invalid retention boundary')
+        with self.db:
+            cursor=self.db.execute('DELETE FROM dragon_video_history WHERE owner=? AND watched_at<?',
+                                   (owner,older_than))
+        return cursor.rowcount
+
     def erase(self,owner:str)->int:
         with self.db:
             cursor=self.db.execute('DELETE FROM dragon_video_history WHERE owner=?',(owner,))
