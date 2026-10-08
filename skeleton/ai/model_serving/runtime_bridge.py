@@ -16,7 +16,7 @@ from skeleton.ai.model_runtime.serving_policy import (
 )
 
 from .admission import ServingPolicy
-from .verified import ServingRequest, verified_invoke
+from .verified import AdmissionDenied, ServingRequest, verified_invoke
 
 
 @dataclass(frozen=True)
@@ -41,6 +41,8 @@ def plan_and_invoke(
         raise TypeError("canonical serving planner required")
     if not isinstance(request, RuntimeServingRequest):
         raise TypeError("canonical serving request required")
+    if not callable(invoke):
+        raise AdmissionDenied("trusted backend callback required")
     # Pre-admission binds the raw prompt/output token counts, not cached or
     # degraded planner estimates. Never allow a plan to bypass request limits.
     admission_request = ServingRequest(
