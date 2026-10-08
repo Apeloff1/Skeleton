@@ -35,8 +35,9 @@ class TemporalUncertaintyReceipt:
 
 def rolling_uncertainty_set(observations,*,target_coverage_ppm=900_000,max_window=256):
  if isinstance(max_window,bool) or not isinstance(max_window,int) or not 1<=max_window<=4096: raise TemporalSignalError("invalid uncertainty calibration window")
- if any(not isinstance(o,ResidualObservation) for o in observations): raise TemporalSignalError("ResidualObservation required")
- obs=tuple(sorted(observations,key=lambda x:(x.year,x.observation_id)))
+ obs=tuple(observations)
+ if any(not isinstance(o,ResidualObservation) for o in obs): raise TemporalSignalError("ResidualObservation required")
+ obs=tuple(sorted(obs,key=lambda x:(x.year,x.observation_id)))
  _ppm(target_coverage_ppm,"target coverage")
  if not obs: raise TemporalSignalError("uncertainty calibration required")
  if len({o.observation_id for o in obs})!=len(obs): raise TemporalSignalError("duplicate residual observation")
