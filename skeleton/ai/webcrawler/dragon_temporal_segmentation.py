@@ -123,6 +123,16 @@ def segment_feature_trace(
                 active_start = None
                 peak_index = None
                 peak_change = 0.0
+    if active_start is None and changes:
+        # A transition on the final sample has no following iteration to
+        # close the event. Preserve the terminal observation explicitly.
+        final_index = len(changes) - 1
+        history = changes[max(0, final_index - config.baseline_window):final_index]
+        baseline = median(history) if history else config.noise_floor
+        if changes[final_index] >= max(config.noise_floor, baseline) * config.onset_multiplier:
+            active_start = final_index
+            peak_index = final_index
+            peak_change = changes[final_index]
     if active_start is not None:
         start_frame = active_start
         peak = peak_index + 1
