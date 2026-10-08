@@ -52,7 +52,7 @@ def ingest_browser_visual(runtime:DragonAnalysisRuntime,custody:ConsentBoundAnal
     except Exception as exc:
         ledger.append(envelope.owner,run_id,event_type="attempt",layer="source_integrity",outcome="failed",error_code=type(exc).__name__,occurred_at=now,authorized=True)
         raise
-    source=LayerReceipt(AnalysisLayer.SOURCE_INTEGRITY,(),accepted.envelope_fingerprint,1,True)
+    source=LayerReceipt(AnalysisLayer.SOURCE_INTEGRITY,(),accepted.canonical_evidence_fingerprint,1,True)
     cp=_commit_stage(runtime,ledger,envelope.owner,run_id,source,now=now,
         expected_revision=cp.revision)
     # Consent is checked inside the chunk worker before each bounded slice.
