@@ -63,3 +63,26 @@ def test_promotion_is_deterministic():
         "mechanic", readings(), (), (), authorized=True,
     )
     assert a == b
+
+
+def test_default_promotion_never_labels_heuristic_as_calibrated():
+    decision = assess_promotion(
+        "mechanic", readings(), (), (), authorized=True,
+        policy=PromotionPolicy(require_full_analysis=False),
+    )
+    assert not decision.eligible
+    assert decision.probability_semantics == "heuristic_logistic_score"
+    assert decision.calibration_artifact_fingerprint is None
+    assert any("calibrated probability" in x for x in decision.reasons)
+
+
+def test_legacy_uncalibrated_mode_retains_heuristic_semantics():
+    decision = assess_promotion(
+        "mechanic", readings(), (), (), authorized=True,
+        policy=PromotionPolicy(
+            require_full_analysis=False,
+            require_empirical_calibration=False,
+        ),
+    )
+    assert decision.probability_semantics == "heuristic_logistic_score"
+    assert decision.calibration_artifact_fingerprint is None
