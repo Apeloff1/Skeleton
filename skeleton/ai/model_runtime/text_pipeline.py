@@ -1931,10 +1931,7 @@ class TextTokenPipeline:
             feed.push(chunk)
         # The feed owns validated chunks. Consume them once through prepare,
         # avoiding a second list and redundant pre-normalization tokenization.
-        if feed.closed:
-            raise TokenizerContractError("text feed already finalized")
-        feed._closed = True
-        return self.prepare("".join(feed._chunks))
+        return self.prepare(feed.consume_text())
 
 
 __all__ = ["CausalTrainingBatch", "GovernedTrainingInput", "ModelInputBatch", "PipelineReplayCheckpoint", "PreparedCorpus", "PreparedText", "PromotionAuthorizationRequest", "TextPipelineConfig", "TextTokenPipeline", "TrainingInputReceipt", "materialize_causal_training_batch", "materialize_model_batch"]
