@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from hashlib import sha256
+from itertools import islice
 from typing import Callable, Iterable
 from math import isfinite
 import json
@@ -130,7 +131,9 @@ def encode_verified_tokens(
         raise ValueError("invalid tokenizer ID")
     if not 1 <= max_tokens <= 1000000:
         raise ValueError("invalid tokenizer budget")
-    tokens = tuple(encode(fragment.text))
+    # Never exhaust an untrusted/tokenizer-provided generator without a hard
+    # output ceiling: an eager tuple() could run forever before budget checks.
+    tokens = tuple(islice(encode(fragment.text), max_tokens + 1))
     if len(tokens) > max_tokens or not tokens:
         raise ValueError("token budget exceeded or empty encoding")
     if any(not isinstance(token,int) or isinstance(token,bool)
@@ -197,8 +200,10 @@ def assign_dependency_splits(
     if not (0 < train_share < 1 and 0 < validation_share < 1
             and train_share + validation_share < 1):
         raise ValueError("invalid split fractions")
-    sources=tuple(manifest)
-    if len(sources)>max_sources or not 1 <= max_sources <= 100000:
+    if not 1 <= max_sources <= 100000:
+        raise ValueError("split source budget exceeded")
+    sources=tuple(islice(manifest,max_sources+1))
+    if len(sources)>max_sources:
         raise ValueError("split source budget exceeded")
     clusters=derive_dependency_clusters(sources,authorized=True,max_sources=max_sources)
     mapping=[]
@@ -218,8 +223,10 @@ def balance_decade_windows(
     unknown_limit: int = 10,
     max_inputs: int = 100000,
 ) -> tuple[YearTaggedWindow, ...]:
-    values=tuple(tagged)
-    if len(values)>max_inputs or not 1 <= max_inputs <= 1000000:
+    if not 1 <= max_inputs <= 1000000:
+        raise ValueError("historical sampling input budget exceeded")
+    values=tuple(islice(tagged,max_inputs+1))
+    if len(values)>max_inputs:
         raise ValueError("historical sampling input budget exceeded")
     if not 1 <= per_decade <= 100000 or not 0 <= unknown_limit <= 100000:
         raise ValueError("invalid historical quota")
@@ -254,10 +261,14 @@ def compile_training_manifest(
         raise PermissionError("training manifest requires authorization")
     if not isinstance(task_id,str) or not 1 <= len(task_id) <= 128:
         raise ValueError("invalid training task")
-    chunks=tuple(windows)
-    splits=tuple(assignments)
-    if not 1 <= max_windows <= 1000000 or len(chunks)>max_windows:
+    if not 1 <= max_windows <= 1000000:
         raise ValueError("training manifest window budget exceeded")
+    chunks=tuple(islice(windows,max_windows+1))
+    if len(chunks)>max_windows:
+        raise ValueError("training manifest window budget exceeded")
+    splits=tuple(islice(assignments,100001))
+    if len(splits)>100000:
+        raise ValueError("training manifest assignment budget exceeded")
     by_id={}
     by_group={}
     for assignment in splits:
