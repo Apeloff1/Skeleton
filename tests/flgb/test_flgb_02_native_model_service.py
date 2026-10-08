@@ -39,6 +39,29 @@ class TestNativeModelService(unittest.TestCase):
             )
         )
 
+    def test_request_identity_rejects_non_utf8_surrogates(self):
+        service = NativeModelService(self.runtime())
+        config = GenerationConfig(max_new_tokens=1)
+        with self.assertRaisesRegex(NativeServiceError, "canonically encodable"):
+            service.request("bad-unicode", "\\ud800", config, deadline_ms=1000)
+        with self.assertRaisesRegex(NativeServiceError, "canonically encodable"):
+            service.input_digest("\\udfff", config)
+
+    def test_deadline_budget_includes_request_validation(self):
+        from unittest.mock import patch
+        service = NativeModelService(self.runtime(), clock_ns=_Clock((0, 2_000_000)))
+        config = GenerationConfig(max_new_tokens=1)
+        request = service.request("validation-budget", "alpha", config, deadline_ms=1)
+        with patch.object(service.runtime, "stream", side_effect=AssertionError("generated")):
+            result = service.execute(request, "alpha", config)
+        self.assertEqual(result.receipt.terminal_reason, "deadline")
+        self.assertIsNone(result.generation)
+
+    def test_invalid_request_type_fails_before_deadline_access(self):
+        service = NativeModelService(self.runtime())
+        with self.assertRaisesRegex(NativeServiceError, "LocalModelRequest required"):
+            service.execute(object(), "alpha", GenerationConfig(max_new_tokens=1))
+
     def test_failure_usage_digest_survives_tokenizer_rejection(self):
         from unittest.mock import patch
 
