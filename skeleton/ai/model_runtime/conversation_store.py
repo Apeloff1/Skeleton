@@ -310,6 +310,32 @@ class ConversationStore:
         with self._lock:
             self._db.execute("VACUUM")
 
+    def backup_to(self, destination_path: str) -> None:
+        """Consistent SQLite online backup, including committed WAL pages."""
+        if not isinstance(destination_path, str) or not destination_path or destination_path == ":memory:":
+            raise RuntimeContractError("valid backup destination required")
+        with self._lock:
+            destination = sqlite3.connect(destination_path)
+            try:
+                self._db.backup(destination)
+            finally:
+                destination.close()
+
+    def read_page(self, *, limit: int = 100, offset: int = 0) -> tuple[StoredConversation, ...]:
+        """Return a bounded, identity-validated page of durable sessions."""
+        if type(limit) is not int or not 1 <= limit <= 1000:
+            raise RuntimeContractError("invalid page limit")
+        if type(offset) is not int or offset < 0:
+            raise RuntimeContractError("invalid page offset")
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT session_id, revision, created_at, updated_at, pinned, snapshot_json "
+                "FROM conversations ORDER BY created_at, session_id LIMIT ? OFFSET ?",
+                (limit, offset)).fetchall()
+            return tuple(StoredConversation(sid, rev, created, updated, bool(pinned),
+                                            self._decode(payload))
+                         for sid, rev, created, updated, pinned, payload in rows)
+
     def close(self) -> None:
         with self._lock:
             self._db.close()
