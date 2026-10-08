@@ -9,6 +9,13 @@ def _digest(v): return sha256(json.dumps(v,sort_keys=True,separators=(",",":")).
 @dataclass(frozen=True)
 class FactVersion:
  version_id:str; logical_key:str; fact_digest:str; observed_year:int; valid_from_year:int; valid_through_year:int; source_digest:str
+ def __post_init__(self):
+  if not isinstance(self.version_id,str) or not self.version_id.strip() or not isinstance(self.logical_key,str) or not self.logical_key.strip(): raise TemporalSignalError("invalid fact version identity")
+  for digest in (self.fact_digest,self.source_digest):
+   if not isinstance(digest,str) or len(digest)!=64 or any(c not in "0123456789abcdef" for c in digest): raise TemporalSignalError("invalid fact version digest")
+  for year in (self.observed_year,self.valid_from_year,self.valid_through_year):
+   if isinstance(year,bool) or not isinstance(year,int) or not 1900<=year<=2200: raise TemporalSignalError("invalid fact version year")
+  if self.valid_from_year>self.valid_through_year: raise TemporalSignalError("invalid fact validity window")
  @property
  def digest(self): return _digest(self.__dict__)
 
