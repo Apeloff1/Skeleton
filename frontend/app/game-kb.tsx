@@ -261,8 +261,8 @@ export default function GameKB() {
             <Text style={s.forgeTxt}>Continue this game in Studio →</Text>
           </TouchableOpacity>
           {!!jobStatus && <Text testID="kb-forge-status" accessibilityLiveRegion="polite" style={s.applyStatus}>{jobStatus}</Text>}
-          {!!approveStatus && <Text testID="kb-approve-status" accessibilityLiveRegion="polite" style={s.applyStatus}>{approveStatus}</Text>
-          {!!refineStatus && <Text testID="kb-refine-status" accessibilityLiveRegion="polite" style={s.applyStatus}>{refineStatus}</Text>
+          {!!approveStatus && <Text testID="kb-approve-status" accessibilityLiveRegion="polite" style={s.applyStatus}>{approveStatus}</Text>}
+          {!!refineStatus && <Text testID="kb-refine-status" accessibilityLiveRegion="polite" style={s.applyStatus}>{refineStatus}</Text>}
 
           <TouchableOpacity testID="kb-apply-btn" onPress={applyKB} disabled={applying || !!jobController.current || loadState === 'error' || kb.present_count === 0}
             style={[s.applyKbBtn, (applying || !!jobController.current || loadState === 'error' || kb.present_count === 0) && s.btnDisabled]} activeOpacity={0.9}>
