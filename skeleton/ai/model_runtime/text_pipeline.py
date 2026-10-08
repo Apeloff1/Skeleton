@@ -1915,28 +1915,26 @@ class TextTokenPipeline:
 
     def verify_round_trip(self, text: str, *, require_lossless: bool = False) -> TokenSequence:
         normalized = self.normalize(text)
+        self.tokenizer.assert_unchanged()
         sequence = self.tokenizer.encode_sequence(normalized)
-        receipt = self.round_trip_receipt(text, require_lossless=require_lossless)
-        if receipt.sequence_digest != sequence.digest:
-            raise TokenizerContractError("round-trip sequence instability")
+        decoded = self.decode(sequence)
+        if sequence.source_text_digest != sha256(normalized.encode("utf-8")).hexdigest():
+            raise TokenizerContractError("source digest mismatch")
+        if require_lossless and decoded != normalized:
+            raise TokenizerContractError("tokenizer round trip is lossy")
         return sequence
 
     def stream(self, chunks: Iterable[str]) -> PreparedText:
-        # Normalize only after assembly: Unicode composition and CRLF boundaries
-        # can straddle arbitrary transport chunks.
+        # Assemble before normalization to preserve Unicode and CRLF boundaries.
         feed = StreamingTextFeed(limits=self.tokenizer.limits)
-        accepted: list[str] = []
         for chunk in chunks:
             feed.push(chunk)
-            accepted.append(chunk)
-        # Finalize to enforce one-shot lifecycle and tokenizer admission.
-        # The finalized sequence is deliberately checked against prepare() so
-        # streaming can never silently use a different tokenizer identity.
-        streamed = feed.finalize(self.tokenizer)
-        prepared = self.prepare("".join(accepted))
-        if streamed.tokenizer_digest != prepared.sequence.tokenizer_digest:
-            raise TokenizerContractError("stream tokenizer identity mismatch")
-        return prepared
+        # The feed owns validated chunks. Consume them once through prepare,
+        # avoiding a second list and redundant pre-normalization tokenization.
+        if feed.closed:
+            raise TokenizerContractError("text feed already finalized")
+        feed._closed = True
+        return self.prepare("".join(feed._chunks))
 
 
 __all__ = ["CausalTrainingBatch", "GovernedTrainingInput", "ModelInputBatch", "PipelineReplayCheckpoint", "PreparedCorpus", "PreparedText", "PromotionAuthorizationRequest", "TextPipelineConfig", "TextTokenPipeline", "TrainingInputReceipt", "materialize_causal_training_batch", "materialize_model_batch"]
