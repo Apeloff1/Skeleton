@@ -21,6 +21,11 @@ class ProvenanceNode:
 @dataclass(frozen=True)
 class IndependenceReceipt:
  source_digests:tuple[str,...]; root_digests:tuple[str,...]; independent_root_count:int; echo_count:int
+ def __post_init__(self):
+  for digest in self.source_digests+self.root_digests: _hex(digest,"source provenance")
+  if self.root_digests!=tuple(sorted(set(self.root_digests))): raise TemporalSignalError("invalid provenance root order")
+  if self.independent_root_count!=len(self.root_digests): raise TemporalSignalError("provenance root count mismatch")
+  if isinstance(self.echo_count,bool) or not isinstance(self.echo_count,int) or not 0<=self.echo_count<=len(self.source_digests): raise TemporalSignalError("invalid provenance echo count")
  @property
  def digest(self): return _digest(self.__dict__)
 
