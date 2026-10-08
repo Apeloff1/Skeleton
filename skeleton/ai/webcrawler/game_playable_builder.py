@@ -447,10 +447,7 @@ button:focus-visible{outline:3px solid #ffd373}
         '<button data-button="down" aria-label="Move down">▼</button>'
         '<button data-button="jump" aria-label="Jump">⤒</button>'
         '<button data-button="dash" aria-label="Dash">Dash</button>'
-        '<button data-button="attack" aria-label="Attack">Hit</button>'
-        '<button data-button="shoot" aria-label="Shoot">Fire</button>'
-        '<button data-button="heal" aria-label="Drink potion">Heal</button>'
-        '<button data-button="shop" aria-label="Buy potion">Shop</button></div>'
+        '<button data-button="attack" aria-label="Attack">Hit</button></div>'
         '<p class="note">Keyboard or touch controls. Offline, original art.</p>'
         '<script>'+js+'</script></body></html>'
     )
