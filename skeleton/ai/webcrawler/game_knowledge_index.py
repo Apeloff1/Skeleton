@@ -81,6 +81,21 @@ class GameKnowledgeIndex:
           passage_id TEXT NOT NULL,value REAL NOT NULL,unit TEXT NOT NULL,
           context TEXT NOT NULL,
           PRIMARY KEY(passage_id,value,unit,context))""")
+        # Index actual passage text, not merely source metadata. FTS is
+        # optional on constrained Python builds; the lexical path survives.
+        self.fts_enabled = False
+        try:
+            db.execute("""CREATE VIRTUAL TABLE IF NOT EXISTS
+              game_knowledge_fts USING fts5(passage_id UNINDEXED, text,
+              tokenize='unicode61')""")
+            self.fts_enabled = True
+            indexed = db.execute("SELECT COUNT(*) FROM game_knowledge_fts").fetchone()[0]
+            if indexed == 0:
+                db.execute("""INSERT INTO game_knowledge_fts(passage_id,text)
+                  SELECT passage_id,text FROM game_knowledge_passages""")
+        except sqlite3.OperationalError as exc:
+            if "no such module" not in str(exc).lower():
+                raise
         db.commit()
 
     def _rows(self, *, engine: str = "", limit: int = 10000, active: bool = True):
@@ -137,13 +152,22 @@ class GameKnowledgeIndex:
               (source_id,document.content_hash,document.canonical_url,
                document.title,engine,year,1,document.fetched_at))
             for p in passages:
+                pid = identity[p.passage_id]
                 self.db.execute("""INSERT INTO game_knowledge_passages
                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
                   ON CONFLICT(passage_id) DO UPDATE SET active=1,
                   engine=excluded.engine,year=excluded.year,quality=excluded.quality""",
-                  (identity[p.passage_id],source_id,p.content_hash,p.source_url,
+                  (pid,source_id,p.content_hash,p.source_url,
                    p.start,p.end,p.text,json.dumps(p.tags),engine,year,
                    p.source_score,1))
+                if self.fts_enabled:
+                    self.db.execute(
+                        "DELETE FROM game_knowledge_fts WHERE passage_id=?", (pid,)
+                    )
+                    self.db.execute(
+                        "INSERT INTO game_knowledge_fts(passage_id,text) VALUES(?,?)",
+                        (pid,p.text),
+                    )
             for symbol in symbols:
                 self.db.execute("""INSERT OR REPLACE INTO game_knowledge_api
                   VALUES(?,?,?,?)""",
@@ -178,8 +202,27 @@ class GameKnowledgeIndex:
         query_terms=_terms(query)
         if not query_terms:
             return ()
+        rows = None
+        if self.fts_enabled:
+            # OR retrieves broad topical candidates, while ranking still
+            # rewards coverage of all requested terms. Quote terms before
+            # passing to FTS; input never becomes a SQL expression.
+            fts_query = " OR ".join(
+                '"' + term + '"' for term in sorted(query_terms)
+            )
+            rows=self.db.execute("""
+              SELECT p.passage_id,p.source_id,p.source_url,p.content_hash,
+                     p.text,p.tags,p.start,p.end,p.engine,p.year,p.quality
+              FROM game_knowledge_fts f
+              JOIN game_knowledge_passages p ON p.passage_id=f.passage_id
+              WHERE game_knowledge_fts MATCH ? AND p.active=1
+                AND (?='' OR p.engine=?)
+              ORDER BY bm25(game_knowledge_fts),p.passage_id LIMIT ?
+            """, (fts_query,engine,engine,scan_limit)).fetchall()
+        if rows is None:
+            rows=self._rows(engine=engine,limit=scan_limit)
         found=[]
-        for row in self._rows(engine=engine,limit=scan_limit):
+        for row in rows:
             words=_terms(row[4])
             overlap=query_terms & words
             if not overlap:
