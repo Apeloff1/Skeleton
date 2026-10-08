@@ -5,7 +5,7 @@ from skeleton.ai.project_memory import ProjectMemory
 
 def ev(text,seed):
     return GenerationMemoryEvidence(
-        *(chr(97+i+seed)*64 for i in range(7)),
+        *("0123456789abcdef"[(i + seed + 10) % 16] * 64 for i in range(7)),
         generated_text=text,
     )
 
