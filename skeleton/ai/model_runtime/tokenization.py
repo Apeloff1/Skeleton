@@ -394,8 +394,16 @@ def serialize_token_sequence(sequence: TokenSequence) -> bytes:
 def deserialize_token_sequence(payload: bytes) -> TokenSequence:
     if not isinstance(payload, bytes) or len(payload) > MAX_SERIALIZED_SEQUENCE_BYTES:
         raise TokenizerContractError("invalid serialized token sequence bytes")
+    def reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, item in pairs:
+            if key in result:
+                raise TokenizerContractError("duplicate serialized JSON key")
+            result[key] = item
+        return result
+
     try:
-        value = json.loads(payload.decode("utf-8"))
+        value = json.loads(payload.decode("utf-8"), object_pairs_hook=reject_duplicate_keys)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise TokenizerContractError("invalid serialized token sequence") from exc
     if not isinstance(value, dict) or set(value) != {
