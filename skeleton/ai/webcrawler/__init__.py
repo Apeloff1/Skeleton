@@ -62,3 +62,28 @@ from .dragon_events import DragonCrawlEvent,DragonEventStream
 from .dragon_visual_state import DragonVisualState,visual_state
 from .dragon_observer import DragonCrawlObserver
 from .dragon_graph import CrawlGraphNode,CrawlGraphEdge,CrawlGraphProjection
+
+# Lazy exported crawler-to-generation spine: keep durable crawler imports independent
+# of the native model runtime and the optional external-generation boundary.
+from importlib import import_module as _crawler_import_module
+_SPINE_EXPORTS = {
+    "CrawlRetrievalBridgeError": ".evidence_retrieval_bridge",
+    "CrawlRetrievalRecord": ".evidence_retrieval_bridge",
+    "bridge_crawl_document": ".evidence_retrieval_bridge",
+    "CrawlContextBundle": ".context_bridge",
+    "compile_crawl_context": ".context_bridge",
+    "EvidenceGenerationError": ".generation_bridge",
+    "EvidenceGenerationReceipt": ".generation_bridge",
+    "EvidenceGenerationResult": ".generation_bridge",
+    "generate_from_crawl_context": ".generation_bridge",
+}
+
+def __getattr__(name: str):
+    target = _SPINE_EXPORTS.get(name)
+    if target is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    result = getattr(_crawler_import_module(target, __name__), name)
+    globals()[name] = result
+    return result
+
+__all__ += list(_SPINE_EXPORTS)
