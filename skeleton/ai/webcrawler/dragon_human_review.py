@@ -29,7 +29,20 @@ class DragonHumanReviewLedger:
           owner TEXT NOT NULL,review_id TEXT NOT NULL,reviewer_id TEXT NOT NULL,
           adversarial_fingerprint TEXT NOT NULL,survivor_digest TEXT NOT NULL,
           survivor_manifest TEXT NOT NULL DEFAULT '',approved INTEGER NOT NULL,reviewed_at REAL NOT NULL,rationale TEXT NOT NULL,
-          PRIMARY KEY(owner,review_id))""");db.commit()
+          PRIMARY KEY(owner,review_id))""")
+        columns={row[1] for row in db.execute("PRAGMA table_info(dragon_human_reviews)")}
+        if "survivor_manifest" not in columns:
+            db.execute("ALTER TABLE dragon_human_reviews ADD COLUMN survivor_manifest TEXT NOT NULL DEFAULT ''")
+        db.commit()
+
+    def get(self,owner:str,review_id:str,*,authorized:bool)->HumanReviewDecision:
+        if not authorized: raise PermissionError("human review reading requires authorization")
+        row=self.db.execute("""SELECT reviewer_id,adversarial_fingerprint,survivor_digest,
+          survivor_manifest,approved,reviewed_at,rationale FROM dragon_human_reviews
+          WHERE owner=? AND review_id=?""",(owner,review_id)).fetchone()
+        if not row: raise KeyError("human review not found")
+        if not row[3]: raise PermissionError("legacy human review lacks survivor manifest")
+        return HumanReviewDecision(review_id,row[0],row[1],row[2],row[3],bool(row[4]),row[5],row[6])
 
     def review(self,owner:str,review:AdversarialReviewOutput,*,reviewer_id:str,
                approved:bool,reviewed_at:float,rationale:str,
