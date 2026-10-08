@@ -29,6 +29,8 @@ from .game_scale_feedback import (
     decode_play_sessions,analyze_player_feedback,tune_game_from_feedback,
 )
 from .game_playable_builder import export_playable_game_archive
+from .game_scale_world import generate_world_region,world_region_to_blueprint
+from .game_knowledge_design import find_level_route
 
 
 def import_research_captures(
@@ -97,6 +99,8 @@ def run(args=None) -> int:
                         help="10x production: compile 1-1000 distinct playable games")
     parser.add_argument("--batch-offset", type=int, default=0,
                         help="Resume production with new deterministic game numbers")
+    parser.add_argument("--world-rooms",type=int,default=0,
+                        help="Generate 2-20 connected, playable top-down exploration rooms")
     parser.add_argument("--campaign-levels", type=int, default=1,
                         help="Generate 1-50 connected playable campaign levels")
     parser.add_argument("--approve", action="store_true",
@@ -114,9 +118,32 @@ def run(args=None) -> int:
             )
         if not 1<=opts.campaign_levels<=50:
             parser.error("Campaign length must be between 1 and 50")
-        if opts.feedback and (opts.batch_games or opts.campaign_levels>1 or opts.engine!="web"):
+        if opts.feedback and (opts.batch_games or opts.campaign_levels>1 or opts.world_rooms or opts.engine!="web"):
             parser.error("Player feedback currently tunes one HTML5 game at a time")
-        if opts.batch_games:
+        if opts.world_rooms:
+            if not 2<=opts.world_rooms<=20 or opts.engine!="web" or (
+                opts.batch_games or opts.campaign_levels!=1 or opts.genre!="exploration"
+            ):
+                parser.error("Connected worlds need --genre exploration --engine web, 2-20 rooms, and a single-game build")
+            region=generate_world_region(opts.title,rooms=opts.world_rooms,
+                                         seed=opts.seed,columns=3)
+            blueprint=world_region_to_blueprint(
+                region,title=opts.title,seed=opts.seed,
+            )
+            if opts.enhanced:
+                archive=build_enhanced_game(blueprint,theme=opts.theme).archive
+            else:
+                archive=export_playable_game_archive(blueprint)
+            report={
+                "game_title":opts.title,"target":"web",
+                "world_rooms":len(region.rooms),
+                "world_connections":len(region.connections),
+                "world_start":region.spawn,"world_goal":region.exit,
+                "route_tiles":len(find_level_route(blueprint.grid)),
+                "top_down_playable":True,
+                "interactive_studio":bool(opts.enhanced),
+            }
+        elif opts.batch_games:
             if opts.engine!="web" or opts.campaign_levels!=1:
                 parser.error("Batch production currently requires a web target and a single campaign")
             output=produce_game_portfolio(
