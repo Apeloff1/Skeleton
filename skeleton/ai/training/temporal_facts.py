@@ -17,6 +17,8 @@ class TemporalFact:
   if not self.fact_id or not self.subject or not self.relation: raise TemporalSignalError("temporal fact identity required")
   _hex(self.object_digest,"object"); _hex(self.source_digest,"source")
   if self.supersedes_digest is not None: _hex(self.supersedes_digest,"supersedes")
+  for year in (self.valid_from_year,self.valid_through_year,self.observed_year):
+   if isinstance(year,bool) or not isinstance(year,int) or not 1900<=year<=2200: raise TemporalSignalError("invalid temporal fact year")
   if self.valid_through_year<self.valid_from_year: raise TemporalSignalError("invalid fact validity interval")
   if self.observed_year<self.valid_from_year: raise TemporalSignalError("fact observed before validity")
  @property
@@ -30,6 +32,8 @@ class TemporalSnapshot:
 
 def snapshot_facts(facts,*,as_of_year):
  facts=tuple(facts)
+ if isinstance(as_of_year,bool) or not isinstance(as_of_year,int) or not 1900<=as_of_year<=2200: raise TemporalSignalError("invalid snapshot year")
+ if any(not isinstance(f,TemporalFact) for f in facts): raise TemporalSignalError("TemporalFact required")
  if len({f.fact_id for f in facts})!=len(facts): raise TemporalSignalError("duplicate temporal fact id")
  visible=[]; future=0
  for f in facts:
