@@ -60,3 +60,11 @@ def test_retention_policy_changes_batch_fingerprint():
     b=bind_extracted_frames(cq,"u",j.job_id,rows,now=3,retention_until=80,authorized=True)
     assert a.frames[0].frame_id==b.frames[0].frame_id
     assert a.batch_fingerprint!=b.batch_fingerprint
+
+
+def test_duplicate_capture_timestamp_fails_at_custody_boundary():
+    _,cq,_,j=setup()
+    with pytest.raises(ValueError,match="increase strictly"):
+        bind_extracted_frames(cq,"u",j.job_id,
+          ((16,"c"*64,"frame://0"),(16,"d"*64,"frame://1")),
+          now=3,retention_until=90,authorized=True)
