@@ -119,21 +119,58 @@ def verify(roadmap: dict, master: dict, ladder: dict, index: dict, shas: dict) -
 
 
 def report(roadmap: dict, index: dict) -> dict:
+    """Compute actionable source-evidence gaps, never qualification receipts."""
     signed = index.get("fast_sets", {}).get("fully_complete", [])
+    waiting = index.get("fast_sets", {}).get("gap_free_waiting_verification", [])
+    unsigned = index.get("fast_sets", {}).get("implementation_unsigned", [])
     legal = {f"VOL-{i:03d}" for i in range(421)}
-    if type(signed) is not list or len(set(signed)) != len(signed) or not set(signed) <= legal:
-        raise ValueError("invalid source-signed volume set")
-    statuses = [{
-        "id": m["id"],
-        "signed_source_volumes": sum(v["id"] in signed for v in m["volumes"]),
-        "total_volumes": len(m["volumes"]),
-    } for m in roadmap["milestones"]]
+    for label, values in (
+        ("signed", signed), ("waiting", waiting), ("unsigned", unsigned),
+    ):
+        if (type(values) is not list or len(set(values)) != len(values)
+                or not set(values) <= legal):
+            raise ValueError("invalid source " + label + " volume set")
+    if set(signed) & (set(waiting) | set(unsigned)):
+        raise ValueError("contradictory source evidence sets")
+    statuses = []
+    for m in roadmap["milestones"]:
+        incomplete = [v for v in m["volumes"] if v["id"] not in signed]
+        next_actions = []
+        for volume in incomplete:
+            ref = volume["id"]
+            if ref in unsigned:
+                action = "implementation_and_independent_verification"
+            elif ref in waiting:
+                action = "independent_verification_with_fresh_exact_head_tests"
+            else:
+                action = "reconcile_current_implementation_and_independent_evidence"
+            next_actions.append({
+                "volume": ref,
+                "action": action,
+                "tests": volume["acceptance_tests"],
+                "implementation_paths": volume["contract_targets"],
+            })
+        statuses.append({
+            "id": m["id"], "title": m["title"],
+            "train": m["delivery_train"],
+            "signed_source_volumes": len(m["volumes"]) - len(incomplete),
+            "total_volumes": len(m["volumes"]),
+            "remaining": next_actions,
+        })
+    # Evidence proximity is a discovery aid, never a severity override of
+    # active ESS-1000 or security incidents.
+    near = sorted(statuses, key=lambda x: (
+        -x["signed_source_volumes"], len(x["remaining"]), x["id"],
+    ))
     return {
         "milestones_defined": 100,
         "volumes_covered": 421,
         "source_signed_volumes": len(signed),
-        "all_source_signed_groups": sum(v["signed_source_volumes"] == v["total_volumes"] for v in statuses),
+        "all_source_signed_groups": sum(
+            x["signed_source_volumes"] == x["total_volumes"] for x in statuses
+        ),
         "independently_qualified_milestones": 0,
+        "evidence_proximity_shortlist": [row["id"] for row in near[:10]],
         "milestones": statuses,
     }
 
