@@ -39,7 +39,7 @@ def test_changed_survivor_set_invalidates_approval():
 
 
 def test_failed_adversarial_review_cannot_be_approved():
-    _,review,ledger,_,_,_=setup()
+    k,review,ledger,_,_,_=setup()
     failed=replace(review,receipt=replace(review.receipt,passed=False))
     with pytest.raises(PermissionError,match="cannot be approved"):
         ledger.review("u",failed,reviewer_id="human-1",approved=True,
