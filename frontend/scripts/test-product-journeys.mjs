@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
@@ -16,6 +17,7 @@ test('journeys link to unique, existing product-screen routes with no pseudo act
     assert.equal(new Set(journey.steps.map(s => s.id)).size, journey.steps.length);
     for (const step of journey.steps) {
       assert.match(step.href, /^\/[a-z0-9-]+$/);
+      assert.equal(existsSync(new URL(`../app${step.href}.tsx`, import.meta.url)), true, `Missing screen ${step.href} in ${journey.id}`);
       assert.equal(step.requiresBuild && step.acceptsBuild, undefined);
     }
   }
