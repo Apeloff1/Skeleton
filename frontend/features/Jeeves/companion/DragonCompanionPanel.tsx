@@ -26,6 +26,7 @@ export interface CompanionAcademyInput {
   onStartPractice?:()=>void;
   onOpenDemo?:(attemptId:string)=>void;
   onStopPractice?:()=>void;
+  onRevokePractice?:()=>void;
   practiceBusy?:boolean;
 }
 
@@ -74,6 +75,7 @@ export default function DragonCompanionPanel({ draft, lastUserText, telemetry, a
       subscription={academy?.subscription} onRunPractice={academy?.onRunPractice}
       onStartPractice={academy?.onStartPractice}
       onOpenDemo={academy?.onOpenDemo} onStopPractice={academy?.onStopPractice}
+      onRevokePractice={academy?.onRevokePractice}
       busy={academy?.practiceBusy} />}
     <Text style={s.note}>Petting and animation are just for fun. System reduced-motion settings take priority. These reactions never start research or change memory.</Text>
     <Text style={s.note}>Conversation creates interest signals. Only policy-compliant, provenance-preserved acquisitions may become distilled memory.</Text>

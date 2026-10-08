@@ -134,8 +134,12 @@ def subscribe_practice(body: SubscribeRequest, owner: str = Depends(_principal))
 def stop_practice(owner: str = Depends(_principal)) -> dict:
     with _lab() as (lab,cycles):
         cycles.disable(owner,authorized=True)
-        # Also close grants on all currently queued lessons; a user must
-        # re-approve new learning before another autonomous practice run.
+        return _snapshot(lab,cycles,owner)
+
+@router.post("/practice/revoke")
+def revoke_practice(owner: str = Depends(_principal)) -> dict:
+    with _lab() as (lab,cycles):
+        cycles.disable(owner,authorized=True)
         lab.revoke(owner,authorized=True)
         return _snapshot(lab,cycles,owner)
 

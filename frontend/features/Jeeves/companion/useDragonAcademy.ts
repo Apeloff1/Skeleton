@@ -144,6 +144,7 @@ export function useDragonAcademy(){
   hours:24,interval_seconds:3600,max_ticks:24,demos_per_tick:2,approved:true,
  });},[mutate]);
  const stop=useCallback(()=>{void mutate('/practice/stop');},[mutate]);
+ const revoke=useCallback(()=>{void mutate('/practice/revoke');},[mutate]);
  const openDemo=useCallback(async(attemptId:string)=>{
   const attempt=attempts.find(a=>a.attempt_id===attemptId&&
    (a.state==='built'||a.state==='reviewed')&&HEX.test(a.artifact_digest));
@@ -176,6 +177,7 @@ export function useDragonAcademy(){
   onRunPractice:authenticated?run:undefined,
   onStartPractice:authenticated?subscribe:undefined,
   onStopPractice:authenticated?stop:undefined,
+  onRevokePractice:authenticated?revoke:undefined,
   onOpenDemo:authenticated?openDemo:undefined,
  };
  return{view,error,demo,telemetry,closeDemo,refresh:load,authenticated};

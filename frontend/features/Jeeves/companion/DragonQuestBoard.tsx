@@ -36,12 +36,14 @@ export interface DragonQuestBoardProps{
  onStartPractice?:()=>void;
  onOpenDemo?:(attemptId:string)=>void;
  onStopPractice?:()=>void;
+ onRevokePractice?:()=>void;
  busy?:boolean;
 }
 export default function DragonQuestBoard({
- progress,attempts=[],subscription,onRunPractice,onStartPractice,onOpenDemo,onStopPractice,busy=false
+ progress,attempts=[],subscription,onRunPractice,onStartPractice,onOpenDemo,onStopPractice,onRevokePractice,busy=false
 }:DragonQuestBoardProps){
  const [tab,setTab]=useState<'quests'|'workshop'>('quests');
+ const [confirmRevoke,setConfirmRevoke]=useState(false);
  // No pseudo-XP when the trusted host has not supplied an accepted projection.
  const verified=validateDragonProgress(progress);
  const history=normalizeDragonAttempts(attempts);
@@ -135,6 +137,14 @@ export default function DragonQuestBoard({
      <Ionicons name="hammer-outline" size={17} color="#15271c"/><Text style={s.runText}>{busy?'Preparing attempt…':'Generate a practice demo'}</Text>
     </Pressable>}
     {!onRunPractice&&<Text style={s.notConnected}>Demo creation requires the authenticated practice host. No demo has been started from this screen.</Text>}
+    {onRevokePractice&&<Pressable accessibilityRole="button"
+      accessibilityLabel={confirmRevoke?'Confirm revocation of lesson practice consent':'Revoke lesson practice consent'}
+      onPress={()=>{
+       if(confirmRevoke){onRevokePractice();setConfirmRevoke(false);}
+       else setConfirmRevoke(true);
+      }} style={s.revoke}>
+      <Text style={s.revokeText}>{confirmRevoke?'Confirm: revoke all approved practice grants':'Revoke practice consent for lessons'}</Text>
+    </Pressable>}
     {history.length===0?<Text style={s.empty}>No workshop attempts recorded yet. Your first documented attempt will appear here.</Text>:
      history.slice(0,8).map(a=><View key={a.attempt_id} style={s.attempt}>
       <Ionicons name={a.state==='reviewed'?'trophy-outline':a.state==='failed'?'alert-circle-outline':'game-controller-outline'}
@@ -187,6 +197,8 @@ const s=StyleSheet.create({
   flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8},runText:{color:'#15271c',fontWeight:'900'},
  practiceStart:{flexDirection:'row',gap:7,alignItems:'center',padding:11,backgroundColor:'#4b3c21',borderRadius:11},
  practiceStartText:{color:'#fef3c7',fontSize:11,fontWeight:'700',flex:1},
+ revoke:{padding:10,borderRadius:10,borderWidth:1,borderColor:'#9f5353',alignItems:'center'},
+ revokeText:{color:'#fca5a5',fontSize:10,fontWeight:'700'},
  notConnected:{color:'#93c5fd',fontSize:10,lineHeight:16},
  empty:{color:C.muted,fontSize:11,textAlign:'center',paddingVertical:13},
  attempt:{flexDirection:'row',alignItems:'center',gap:10,padding:10,borderRadius:10,backgroundColor:'#1e293b'},

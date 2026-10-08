@@ -107,6 +107,19 @@ def test_subscription_requires_explicit_confirm_and_stops(tmp_path,monkeypatch):
     stopped=route.stop_practice(owner=owner)
     assert not stopped["subscription"]["enabled"]
     assert stopped["progress"]["xp"]==0
+    with sqlite3.connect(tmp_path/"academy.sqlite") as db:
+        lab=DragonPracticeLab(db)
+        original=lab.offer(approved(owner),authorized=True,now=9)
+    stop_again=route.stop_practice(owner=owner)
+    assert stop_again["progress"]["verified_lessons"]==1
+    revoked=route.revoke_practice(owner=owner)
+    assert not revoked["subscription"]["enabled"]
+    assert route.run_practice(route.RunPracticeRequest(max_demos=2),owner=owner)["created"]==[]
+    with sqlite3.connect(tmp_path/"academy.sqlite") as db:
+        lab=DragonPracticeLab(db)
+        assert lab.offer(approved(owner),authorized=True,now=12)==original
+    # Regranting the same reviewed claim does not double XP.
+    assert route.academy_status(owner=owner)["progress"]["xp"]==30
     with pytest.raises(HTTPException) as not_found:
         route.practice_artifact("b"*64,owner=owner)
     assert not_found.value.status_code==404

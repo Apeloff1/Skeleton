@@ -215,6 +215,15 @@ class DragonPracticeLab:
             existing = self.db.execute("""SELECT lesson_id FROM dragon_practice_lessons
                 WHERE owner=? AND claim_id=?""", (lesson.owner, decision.claim_id)).fetchone()
             if existing:
+                # A new, fully validated approval can re-enable a revoked
+                # lesson without inventing another lesson or granting XP.
+                self.db.execute("""UPDATE dragon_practice_lessons
+                    SET consent=1,title=?,evidence_digest=?,review_digest=?,mechanics_json=?
+                    WHERE owner=? AND claim_id=?""",
+                    (lesson.title.strip(),decision.evidence_digest,
+                     lesson.review_fingerprint,
+                     json.dumps([m.value for m in lesson.observed_mechanics]),
+                     lesson.owner,decision.claim_id))
                 return existing[0]
             count = self.db.execute("SELECT COUNT(*) FROM dragon_practice_lessons WHERE owner=?",
                                     (lesson.owner,)).fetchone()[0]

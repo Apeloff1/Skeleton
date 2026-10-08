@@ -80,7 +80,9 @@ which avoids resource spikes after downtime.
 
 A subscription is only a *permission state*. If a host does not schedule
 calls to `pulse`, no background work occurs. A user can stop future
-generation at once with `cycles.disable` or `lab.revoke`.
+generation at once with `cycles.disable` or `lab.revoke`. A fresh,
+independently validated approved lesson receipt may reactivate a revoked claim
+under its original identity without duplicating XP.
 
 ## Authenticated host integration
 
@@ -110,7 +112,8 @@ Current endpoints:
 | GET | `/api/dragon-academy/status` | Authenticated XP, queue and cycle snapshot |
 | POST | `/api/dragon-academy/practice/run` | Generate 1–4 bounded original demos from approved lessons |
 | POST | `/api/dragon-academy/practice/subscribe` | Enable finite recurring practice with explicit approval |
-| POST | `/api/dragon-academy/practice/stop` | Disable recurring practice and revoke queued lesson grants |
+| POST | `/api/dragon-academy/practice/stop` | Stop scheduled cycles, retaining previously approved lessons |
+| POST | `/api/dragon-academy/practice/revoke` | Stop cycles and revoke outstanding lesson-practice consent |
 | GET | `/api/dragon-academy/practice/{attempt_id}/artifact` | Verified HTML as JSON data only |
 | GET | `/api/dragon-academy/crawler/feed` | Owner-scoped crawler journal replay |
 
