@@ -24,23 +24,23 @@ def setup():
  return l,cq,c,j,e,rt
 
 def test_ingest_commits_source_then_temporal():
- _,cq,_,_,e,rt=setup();out=ingest_browser_visual(rt,cq,e,"run",now=3,authorized=True,chunk_size=2)
+ _,cq,_,_,e,rt=setup();out=ingest_browser_visual(rt,cq,e,"run",now=3,authorized=True,chunk_size=2,clock=lambda:3)
  assert out.checkpoint.revision==2
  cp=rt.checkpoint("u","run",authorized=True)
  assert cp.revision==2
 
 def test_cancelled_runtime_rejects_ingest():
  _,cq,_,_,e,rt=setup();rt.cancel("u","run",now=3,authorized=True)
- with pytest.raises(PermissionError,match="not active"):ingest_browser_visual(rt,cq,e,"run",now=4,authorized=True)
+ with pytest.raises(PermissionError,match="not active"):ingest_browser_visual(rt,cq,e,"run",now=4,authorized=True,clock=lambda:4)
 
 def test_revoked_consent_rejects_before_runtime_receipt():
  l,cq,c,_,e,rt=setup();l.revoke("u",c.consent_id,now=3,authorized=True)
- with pytest.raises(PermissionError):ingest_browser_visual(rt,cq,e,"run",now=4,authorized=True)
+ with pytest.raises(PermissionError):ingest_browser_visual(rt,cq,e,"run",now=4,authorized=True,clock=lambda:4)
  assert rt.checkpoint("u","run",authorized=True).revision==0
 
 def test_mutated_envelope_cannot_advance_runtime():
  _,cq,_,_,e,rt=setup();bad=replace(e,recording_digest="e"*64)
- with pytest.raises(ValueError):ingest_browser_visual(rt,cq,bad,"run",now=3,authorized=True)
+ with pytest.raises(ValueError):ingest_browser_visual(rt,cq,bad,"run",now=3,authorized=True,clock=lambda:3)
  assert rt.checkpoint("u","run",authorized=True).revision==0
 
 
@@ -55,3 +55,20 @@ def test_stage_receipt_rolls_back_when_forensic_event_cannot_append():
  assert rt.checkpoint("u","run",authorized=True).revision==0
  events=ledger.events("u","run",authorized=True)
  assert len(events)==1 and events[0].event_type=="sentinel"
+
+
+def test_consent_expiry_during_temporal_chunks_blocks_temporal_receipt():
+ _,cq,_,_,e,rt=setup()
+ times=iter([3,4,5,101])
+ with pytest.raises(PermissionError):
+  ingest_browser_visual(rt,cq,e,"run",now=3,authorized=True,chunk_size=2,
+   clock=lambda:next(times))
+ cp=rt.checkpoint("u","run",authorized=True)
+ assert cp.revision==1
+ assert cp.receipts[-1].layer is AnalysisLayer.SOURCE_INTEGRITY
+
+def test_invalid_live_clock_fails_before_source_receipt():
+ _,cq,_,_,e,rt=setup()
+ with pytest.raises(ValueError,match="ingestion clock"):
+  ingest_browser_visual(rt,cq,e,"run",now=3,authorized=True,clock=lambda:float("nan"))
+ assert rt.checkpoint("u","run",authorized=True).revision==0
