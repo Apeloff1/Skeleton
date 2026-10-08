@@ -109,6 +109,24 @@ def _internet_blocked():
         yield
 
 
+class TestNativeRuntimeContextReceipt(unittest.TestCase):
+    def test_native_response_id_changes_with_context_identity(self):
+        backend = _backend()
+        first = LocalInferenceRequest(
+            prompt="alpha beta", max_output_tokens=2, seed=41,
+            context_digest="a" * 64,
+        )
+        second = LocalInferenceRequest(
+            prompt="alpha beta", max_output_tokens=2, seed=41,
+            context_digest="b" * 64,
+        )
+        a = backend.infer(first, threading.Event())
+        b = backend.infer(second, threading.Event())
+        self.assertEqual(a.text, b.text)
+        self.assertNotEqual(first.digest, second.digest)
+        self.assertNotEqual(a.response_id, b.response_id)
+
+
 class TestNativeRuntimeLocalArtifact(unittest.TestCase):
     def test_checkpoint_round_trip_preserves_all_runtime_identities(self):
         with tempfile.TemporaryDirectory() as directory:
