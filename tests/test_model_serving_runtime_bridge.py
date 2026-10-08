@@ -1,0 +1,61 @@
+"""Integration tests for the canonical planner/admission seam."""
+import unittest
+from hashlib import sha256
+from unittest.mock import Mock
+
+from skeleton.ai.model_runtime.serving_policy import ServingRequest as RuntimeRequest
+from skeleton.ai.model_serving.admission import ServingPolicy
+from skeleton.ai.model_serving.runtime_bridge import plan_and_invoke
+from skeleton.ai.model_serving.verified import AdmissionDenied
+
+
+def digest(value):
+    return "sha256:" + sha256(value).hexdigest()
+
+
+class BridgeTests(unittest.TestCase):
+    def setUp(self):
+        self.model = b"model"
+        self.evaluation = b"evaluation"
+        self.policy = ServingPolicy(digest(self.model), digest(self.evaluation),
+                                    "local", 128, 32)
+        self.request = RuntimeRequest("r1", 20, 5)
+        self.planner = Mock()
+        self.backend = Mock(return_value="result")
+
+    def call(self, **changes):
+        from skeleton.ai.model_runtime.serving_policy import PolicyAwareServingPlanner
+        # Use a real planner type without needing a configured runtime policy:
+        # denied requests must not call planner.plan.
+        planner = object.__new__(PolicyAwareServingPlanner)
+        planner.plan = Mock(return_value="planned")
+        values = dict(policy=self.policy, planner=planner,
+                      request=self.request, model_bytes=self.model,
+                      evaluation_bytes=self.evaluation, backend="local",
+                      invoke=self.backend)
+        values.update(changes)
+        return plan_and_invoke(**values), planner
+
+    def test_authorized_plan_and_execution(self):
+        outcome, planner = self.call()
+        self.assertEqual(outcome.plan, "planned")
+        self.assertEqual(outcome.backend_result, "result")
+        planner.plan.assert_called_once_with(self.request)
+        self.backend.assert_called_once_with("planned")
+
+    def test_denial_never_executes(self):
+        for change in (
+            {"model_bytes": b"tampered"},
+            {"evaluation_bytes": b"tampered"},
+            {"backend": "remote"},
+            {"request": RuntimeRequest("r2", 129, 5)},
+            {"request": RuntimeRequest("r3", 20, 33)},
+        ):
+            with self.subTest(change=change):
+                with self.assertRaises(AdmissionDenied):
+                    self.call(**change)
+                self.backend.assert_not_called()
+
+
+if __name__ == "__main__":
+    unittest.main()
