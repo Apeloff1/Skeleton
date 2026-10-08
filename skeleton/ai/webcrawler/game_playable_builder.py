@@ -224,6 +224,7 @@ function restart(){
     .map(e=>({...e,x:e.x+4,y:e.y+6,w:24,h:26,
                home:e.x+4,direction:1,active:true}));
   state.goal=scene.entities.find(e=>e.type==="goal");
+  state.hazards=scene.entities.filter(e=>e.type==="hazard");
   state.score=0;state.lives=scene.physics.max_lives|0;
   state.attackCooldown=0;
   state.won=false;state.paused=false;
@@ -238,6 +239,11 @@ function loseLife(){
   p.vx=0;p.vy=0;p.invincible=1.5;
 }
 function updateGameState(){
+  if(state.player.alive&&state.player.invincible<=0){
+    for(const hazard of state.hazards){
+      if(intersects(state.player,hazard)){loseLife();break}
+    }
+  }
   for(const item of state.pickups){
     if(item.active&&intersects(state.player,item)){
       item.active=false;state.score+=10;
@@ -285,6 +291,13 @@ function draw(){
       ctx.fillStyle="#344765";ctx.fillRect(x*TILE,y*TILE,TILE,TILE);
       ctx.fillStyle="#78b1c8";ctx.fillRect(x*TILE,y*TILE,TILE,4);
     }
+  }
+  for(const hazard of state.hazards){
+    ctx.fillStyle="#ce6071";
+    ctx.beginPath();ctx.moveTo(hazard.x,hazard.y+TILE);
+    ctx.lineTo(hazard.x+TILE/2,hazard.y+TILE/5);
+    ctx.lineTo(hazard.x+TILE,hazard.y+TILE);
+    ctx.closePath();ctx.fill();
   }
   for(const item of state.pickups) if(item.active){
     ctx.fillStyle="#f8ca55";ctx.beginPath();
