@@ -189,14 +189,16 @@ def export_campaign_archive(campaign:Campaign)->bytes:
         # Persist locally, never transmit a player completion event.
         # The exact compiled game signals success; opening a level alone
         # cannot mark it complete.
-        completion=(
-            '\\nfunction campaignWin(){\\n'
-            '  try{const key="skeleton-campaign-'+campaign.campaign_id+'";'
-            '  const before=Number(localStorage.getItem(key)||"1");'
-            f'  localStorage.setItem(key,String(Math.max(before,{i+1})));'
-            '}catch(_){}\\n'
-            '}\\n'
-        )
+        completion="".join([
+            "\nfunction campaignWin(){\n",
+            '  try{const key="skeleton-campaign-',
+            campaign.campaign_id,
+            '";',
+            '  const before=Number(localStorage.getItem(key)||"1");',
+            f'  localStorage.setItem(key,String(Math.max(before,{i+1})));',
+            "}catch(_){}\n",
+            "}\n",
+        ])
         original=original.replace(
             "state.won=true;state.score+=250",
             "state.won=true;state.score+=250;campaignWin()",
