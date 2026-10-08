@@ -106,12 +106,11 @@ def build_enhanced_game(blueprint:GameBlueprint, *,
         raise ValueError("enriched Canvas build requires web target")
     underlying=build_playable_web_game(blueprint)
     assets=_assets(blueprint.seed,theme)
-    html=instrument_playable_telemetry(
-        integrate_live_progression(_enhance_html(underlying.html,assets)),
-        blueprint,
-    )
+    html=integrate_live_progression(_enhance_html(underlying.html,assets))
     report=evaluate_game_balance(blueprint)
+    # Studio map edits must not retain the original level's telemetry ID.
     studio=generate_level_studio(blueprint,game_html=html)
+    html=instrument_playable_telemetry(html,blueprint)
     html=html.replace(
         '<script>',
         '<p><a href="studio.html" style="color:#86d4ff">Open Level Editor</a></p><script>',
