@@ -179,7 +179,12 @@ export default function UnifiedStudio() {
           <Ionicons name="arrow-back" size={24} color="#F8FAFC" />
         </TouchableOpacity>
         <Text style={st.hTitle} numberOfLines={1}>🌌 Galaxy Studio</Text>
-        <View style={st.hBtn} />
+        <TouchableOpacity testID="studio-guided-journeys" accessibilityRole="button"
+          accessibilityLabel="Open guided workflows with this build"
+          onPress={() => router.push((game ? `/journeys?game=${encodeURIComponent(game)}&workflow=polish-and-export` : '/journeys?workflow=idea-to-game') as never)}
+          style={st.hBtn}>
+          <Ionicons name="compass-outline" size={22} color="#A78BFA" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>

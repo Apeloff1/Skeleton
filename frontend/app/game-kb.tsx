@@ -153,7 +153,12 @@ export default function GameKB() {
           <Text style={s.backTxt}>‹ Back</Text>
         </TouchableOpacity>
         <Text style={s.title}>🗄️ Knowledge Base</Text>
-        <View style={{ width: 54 }} />
+        <TouchableOpacity testID="kb-guided-journeys" accessibilityRole="button"
+          accessibilityLabel="Continue guided workflow with this game's knowledge"
+          onPress={() => router.push(`/journeys?game=${encodeURIComponent(gameId)}&workflow=knowledge-iteration` as never)}
+          style={s.backBtn}>
+          <Text style={s.backTxt}>Journey ›</Text>
+        </TouchableOpacity>
       </View>
 
       {!kb ? (
