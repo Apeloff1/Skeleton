@@ -207,14 +207,12 @@ func _physics_process(delta):
     if player.position.y > float(data["height"])*TILE+TILE:
         _damage()
     if player_box.intersects(goal):
-        var locked = data.get("genre","") == "puzzle"
-        if locked:
+        var locked = false
+        if data.get("genre","") == "puzzle":
             for item in pickups:
                 if item["active"]:
                     locked = true
                     break
-            else:
-                locked = false
         if not locked:
             won = true
             score += 250
