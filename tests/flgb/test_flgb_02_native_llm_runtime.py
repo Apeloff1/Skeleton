@@ -17,6 +17,10 @@ from skeleton.ai.model_runtime import (
 )
 
 
+
+def runtime_kv_budget(model):
+    return model.ctx * model.n_layers * model.dim * 2 * 8 + model.ctx * 8
+
 class TestNativeLLMRuntime(unittest.TestCase):
     def model(self, *, ctx=8, seed=11):
         return TinyTransformer(
@@ -480,6 +484,44 @@ class TestNativeLLMRuntime(unittest.TestCase):
         runtime.model.bout[0] += 0.125
         with self.assertRaises(RuntimeContractError):
             runtime.generate_sequence(sequence, GenerationConfig(max_new_tokens=1))
+
+
+    def test_refresh_identity_rejects_model_context_shrink_atomically(self):
+        runtime = self.runtime(ctx=8)
+        original_digest = runtime.model_digest
+        original_architecture = runtime.architecture
+        original_tokenizer = runtime.tokenizer
+        runtime.model.ctx = 4
+        with self.assertRaises(RuntimeContractError):
+            runtime.refresh_model_identity()
+        self.assertEqual(runtime.model_digest, original_digest)
+        self.assertIs(runtime.architecture, original_architecture)
+        self.assertIs(runtime.tokenizer, original_tokenizer)
+
+    def test_refresh_identity_rejects_kv_budget_growth_atomically(self):
+        model = self.model(ctx=8)
+        runtime = NativeLLMRuntime(
+            model,
+            limits=RuntimeLimits(
+                max_context=8,
+                max_new_tokens=3,
+                max_total_tokens=12,
+                max_model_bytes=2**30,
+                max_kv_bytes=runtime_kv_budget(model),
+                max_batch_size=4,
+                max_batch_tokens=32,
+                max_checkpoint_bytes=20_000_000,
+            ),
+        )
+        original_digest = runtime.model_digest
+        original_architecture = runtime.architecture
+        original_tokenizer = runtime.tokenizer
+        runtime.model.n_layers += 1
+        with self.assertRaises(RuntimeContractError):
+            runtime.refresh_model_identity()
+        self.assertEqual(runtime.model_digest, original_digest)
+        self.assertIs(runtime.architecture, original_architecture)
+        self.assertIs(runtime.tokenizer, original_tokenizer)
 
 
 if __name__ == "__main__":
