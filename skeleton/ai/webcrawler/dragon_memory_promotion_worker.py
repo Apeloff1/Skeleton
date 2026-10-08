@@ -40,6 +40,9 @@ def execute_memory_promotion(dispatch:LayerDispatch,
         raise ValueError("dispatch evidence mismatch")
     if human_decision.review_id!=human_receipt.output_fingerprint or not human_decision.approved:
         raise ValueError("human decision does not bind approval receipt")
+    principal_fp=human_decision.reviewer_principal_fingerprint
+    if len(principal_fp)!=64 or any(c not in "0123456789abcdef" for c in principal_fp):
+        raise PermissionError("promotion requires verified reviewer principal")
     if not .5<minimum_probability<1: raise ValueError("invalid promotion threshold")
     survivors=tuple(sorted(surviving_knowledge_ids))
     digest=sha256(json.dumps(survivors,separators=(",",":")).encode()).hexdigest()
@@ -62,6 +65,7 @@ def execute_memory_promotion(dispatch:LayerDispatch,
             continue
         fp=sha256(json.dumps([r.knowledge_id,r.evidence_fingerprint,
             r.calibration_artifact_fingerprint,human_decision.review_id,
+            human_decision.reviewer_principal_fingerprint,
             r.ontology_version],separators=(",",":")).encode()).hexdigest()
         promoted.append(PromotedKnowledge(r.knowledge_id,r.hypothesis_id,
             r.probability,r.ontology_version,human_decision.review_id,fp))
