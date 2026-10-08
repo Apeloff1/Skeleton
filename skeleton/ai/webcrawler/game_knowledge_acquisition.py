@@ -338,3 +338,71 @@ def extract_design_guidance(
         if len(matched) >= max_hits:
             break
     return tuple(matched)
+
+
+# Engine documentation sources curated from official publisher documentation.
+# These are *discovery seeds*, NOT a crawler bypass or a training license.
+# Current pages and permissions are rechecked by the existing CrawlEngine.
+_OFFICIAL_ENGINE_DOCS: dict[str, tuple[tuple[str,str],...]] = {
+    "godot": (
+        ("CharacterBody2D movement",
+         "https://docs.godotengine.org/en/stable/tutorials/2d/2d_movement.html"),
+        ("CharacterBody2D physics",
+         "https://docs.godotengine.org/en/stable/tutorials/physics/using_character_body_2d.html"),
+        ("2D platformer tutorial",
+         "https://docs.godotengine.org/en/stable/getting_started/first_2d_game/index.html"),
+    ),
+    "unity": (
+        ("Rigidbody 2D physics",
+         "https://docs.unity.com/en-us/engine/7000.0/manual/unity2d/2d-physics/rigidbody-2d"),
+        ("Rigidbody2D API",
+         "https://docs.unity.com/en-us/engine/7000.0/script-reference/unityengine/rigidbody2d"),
+    ),
+    "unreal": (
+        ("Enhanced Input mapping",
+         "https://dev.epicgames.com/documentation/unreal-engine/enhanced-input-in-unreal-engine"),
+    ),
+    "phaser": (
+        ("Official Phaser 3 examples",
+         "https://phaser.io/examples/v3/"),
+        ("Phaser 3 platformer tutorial",
+         "https://phaser.io/tutorials/making-your-first-phaser-3-game"),
+    ),
+    "web": (
+        ("Canvas API",
+         "https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API"),
+        ("requestAnimationFrame",
+         "https://developer.mozilla.org/en-US/docs/Web/API/Window/requestAnimationFrame"),
+        ("Web Audio API",
+         "https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API"),
+    ),
+}
+
+
+def official_game_documentation(
+    engine: str, *, policy: CrawlPolicy = CrawlPolicy(),
+) -> tuple[GameSource,...]:
+    """Return relevant known primary-documentation seeds, not copied content."""
+    if engine not in _OFFICIAL_ENGINE_DOCS:
+        raise ValueError("unsupported engine documentation family")
+    entries=[]
+    for title,url in _OFFICIAL_ENGINE_DOCS[engine]:
+        canonical=canonicalize_url(url)
+        if not policy.admits(canonical):
+            continue
+        entries.append(GameSource(
+            canonical,title,engine+" original development documentation",
+            "official_vendor_docs",
+            sha256(canonical.encode("utf-8")).hexdigest(),
+        ))
+    return tuple(entries)
+
+
+def enqueue_official_game_docs(
+    crawler: CrawlEngine, *, engine: str,
+) -> tuple[str,...]:
+    """Feed actual official documentation to existing robots-aware frontier."""
+    return queue_game_sources(
+        crawler,official_game_documentation(engine,policy=crawler.policy),
+        max_enqueues=40,
+    )
