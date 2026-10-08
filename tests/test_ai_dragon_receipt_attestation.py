@@ -31,3 +31,23 @@ def test_attestation_mutation_breaks_replay():
  db,_=build();db.execute("UPDATE dragon_receipt_attestations SET version='evil' WHERE owner='u' AND run_id='r'");db.commit()
  v=verify_receipt_attestation(db,"u","r","source_integrity",authorized=True)
  assert not v.valid and "attestation fingerprint" in v.reason
+
+
+def test_earlier_attestation_replays_after_later_valid_receipt():
+ db,out=build()
+ rt=DragonAnalysisRuntime(db);leases=DragonWorkerLeases(db)
+ lease=leases.acquire("u","r","temporal_segmentation","w2","temporal","v2",
+  now=3,ttl=10,authorized=True)
+ temporal=LayerReceipt(AnalysisLayer.TEMPORAL_SEGMENTATION,("a"*64,),"b"*64,1,True)
+ commit_leased_receipt(rt,leases,lease,temporal,now=4,expected_revision=1,authorized=True)
+ v=verify_receipt_attestation(db,"u","r","source_integrity",authorized=True)
+ assert v.valid and v.reason=="verified"
+
+
+def test_non_output_receipt_mutation_breaks_historical_chain_replay():
+ db,_=build()
+ db.execute("""UPDATE dragon_analysis_run_receipts SET independent_sources=7
+  WHERE owner='u' AND run_id='r' AND layer='source_integrity'""")
+ db.commit()
+ v=verify_receipt_attestation(db,"u","r","source_integrity",authorized=True)
+ assert not v.valid and "historical chain fingerprint mismatch" in v.reason
