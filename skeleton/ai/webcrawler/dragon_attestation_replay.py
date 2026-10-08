@@ -5,6 +5,7 @@ from hashlib import sha256
 import json,sqlite3
 
 from .dragon_analysis_runtime import DragonAnalysisRuntime
+from .dragon_analysis_chains import DEFAULT_CHAIN,validate_chain
 from .dragon_receipt_attestation import DragonReceiptAttestations
 
 @dataclass(frozen=True)
@@ -24,6 +25,22 @@ def verify_receipt_attestation(db:sqlite3.Connection,owner:str,run_id:str,layer:
   att.committed_revision,att.chain_fingerprint]
  fp=sha256(json.dumps(body,separators=(",",":")).encode()).hexdigest()
  if fp!=att.attestation_fingerprint:return AttestationReplay(layer,False,"attestation fingerprint mismatch")
- cp=DragonAnalysisRuntime(db).checkpoint(owner,run_id,authorized=True)
+ runtime=DragonAnalysisRuntime(db)
+ cp=runtime.checkpoint(owner,run_id,authorized=True)
  if cp.revision<att.committed_revision:return AttestationReplay(layer,False,"runtime revision precedes attestation")
+ if not 1<=att.committed_revision<=len(DEFAULT_CHAIN):
+  return AttestationReplay(layer,False,"invalid attested revision")
+ expected_layer=DEFAULT_CHAIN[att.committed_revision-1].layer.value
+ if layer!=expected_layer:return AttestationReplay(layer,False,"attested layer/revision mismatch")
+ by_layer={r.layer:r for r in runtime._receipts(owner,run_id)}
+ historical=[]
+ for spec in DEFAULT_CHAIN[:att.committed_revision]:
+  receipt=by_layer.get(spec.layer)
+  if receipt is None:return AttestationReplay(layer,False,"historical receipt prefix incomplete")
+  historical.append(receipt)
+ historical_verdict=validate_chain(tuple(historical),authorized=True)
+ if historical_verdict.rejected_layers:
+  return AttestationReplay(layer,False,"historical receipt prefix invalid")
+ if historical_verdict.fingerprint!=att.chain_fingerprint:
+  return AttestationReplay(layer,False,"historical chain fingerprint mismatch")
  return AttestationReplay(layer,True,"verified")
