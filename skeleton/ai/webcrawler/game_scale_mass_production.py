@@ -67,7 +67,7 @@ def produce_game_portfolio(
         for index_of_game in range(count):
             number=batch_offset+index_of_game+1
             genre=genre_cycle[index_of_game%len(genre_cycle)]
-            game_seed=seed+number*73856093
+            game_seed=(seed+number*73856093)%(2**32)
             label=f"{title} — Game {number:04d}"
             bp=propose_game_blueprint(
                 index,title=label,genre=genre,engine="web",seed=game_seed,
