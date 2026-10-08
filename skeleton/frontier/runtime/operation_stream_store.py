@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+import hashlib
+import hmac
 import json
 from pathlib import Path
 import re
@@ -48,9 +50,17 @@ class StreamIntegrityReport:
     terminal: bool
     terminal_sequence: int | None
     consumer_count: int
+    content_sha256: str
 
 
 _CONSUMER_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+
+
+def _integrity_digest(value: object) -> str:
+    if (type(value) is not str or len(value) != 64 or
+            any(char not in "0123456789abcdef" for char in value)):
+        raise StreamContractError("expected stream integrity digest must be lowercase SHA-256 hex")
+    return value
 
 
 def _consumer_id(value: str) -> str:
@@ -1144,6 +1154,7 @@ class SQLiteOperationEventStore:
         *,
         max_events: int = 100_000,
         batch_size: int = 512,
+        expected_sha256: str | None = None,
     ) -> StreamIntegrityReport:
         """Verify canonical replay from a single SQLite transaction snapshot.
 
@@ -1158,12 +1169,20 @@ class SQLiteOperationEventStore:
             raise ValueError("batch_size must be between 1 and 4096")
         # Validate operation_id at the original stream boundary.
         OperationEventLog(operation_id, capacity=1)
+        if expected_sha256 is not None:
+            _integrity_digest(expected_sha256)
         with self._lock:
             self._connection.execute("BEGIN IMMEDIATE")
             try:
                 result = self._audit_locked(
                     operation_id, max_events=max_events, batch_size=batch_size,
                 )
+                if expected_sha256 is not None and not hmac.compare_digest(
+                    expected_sha256, result.content_sha256
+                ):
+                    raise StreamStoreCorruptionError(
+                        "durable stream differs from trusted integrity witness"
+                    )
                 self._connection.execute("COMMIT")
                 return result
             except Exception:
@@ -1182,6 +1201,20 @@ class SQLiteOperationEventStore:
         if type(raw_terminal) is not int or raw_terminal not in (0, 1):
             raise StreamStoreCorruptionError("invalid persisted terminal flag")
         terminal = bool(raw_terminal)
+        witness = hashlib.sha256()
+        # Domain-separate the evidence so it cannot be confused with other
+        # application receipts and bind the full operation/namespace identity.
+        witness.update(b"skeleton.operation-stream.integrity.v1\n")
+        witness.update(json.dumps(
+            {
+                "namespace": self.namespace,
+                "operation_id": operation_id,
+                "compacted_through": compacted,
+                "terminal": terminal,
+            },
+            sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+        ).encode("utf-8"))
+        witness.update(b"\n")
         # A checkpoint watermark must never leave older rows
         # physically retained. Detect partial/corrupted compaction.
         old_rows = self._connection.execute(
@@ -1234,6 +1267,11 @@ class SQLiteOperationEventStore:
                     )
                 if event.terminal:
                     terminal_sequence = event.sequence
+                witness.update(json.dumps(
+                    event.as_dict(), sort_keys=True, separators=(",", ":"),
+                    ensure_ascii=True, allow_nan=False,
+                ).encode("utf-8"))
+                witness.update(b"\n")
                 count += 1
                 expected += 1
             if len(rows) < batch_size:
@@ -1268,7 +1306,7 @@ class SQLiteOperationEventStore:
                     )
         result = StreamIntegrityReport(
             operation_id, compacted, latest, count, terminal,
-            terminal_sequence, consumer_count,
+            terminal_sequence, consumer_count, witness.hexdigest(),
         )
         return result
 
@@ -1278,6 +1316,7 @@ class SQLiteOperationEventStore:
         *,
         limit: int = 1000,
         max_audit_events: int = 100_000,
+        expected_sha256: str | None = None,
     ) -> tuple[StreamEvent, ...]:
         """Refuse replay if the retained stream fails integrity checks."""
         if not isinstance(cursor, ReplayCursor):
@@ -1286,6 +1325,8 @@ class SQLiteOperationEventStore:
             raise ValueError("verified replay limit must be between 1 and 4096")
         if type(max_audit_events) is not int or not 1 <= max_audit_events <= 1_000_000:
             raise ValueError("max_audit_events must be between 1 and 1000000")
+        if expected_sha256 is not None:
+            _integrity_digest(expected_sha256)
         # One SQLite transaction now witnesses *both* the checked stream
         # state and the selected replay events. A concurrent process cannot
         # compact, append or tamper with the stream between verification and
@@ -1298,6 +1339,12 @@ class SQLiteOperationEventStore:
                     cursor.operation_id, max_events=max_audit_events,
                     batch_size=512,
                 )
+                if expected_sha256 is not None and not hmac.compare_digest(
+                    expected_sha256, report.content_sha256
+                ):
+                    raise StreamStoreCorruptionError(
+                        "durable stream differs from trusted integrity witness"
+                    )
                 if cursor.after_sequence < report.compacted_through:
                     raise StreamReplayGapError(
                         "verified cursor predates durable retained history"
