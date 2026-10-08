@@ -10,6 +10,7 @@ from .dragon_browser_visual_import import BrowserVisualEnvelope,accept_browser_v
 from .dragon_consent_bound_queue import ConsentBoundAnalysisQueue
 from .dragon_motion_features import derive_motion_features
 from .dragon_chunked_temporal import segment_with_consent_checkpoints
+from .dragon_runtime_events import DragonRuntimeEventLedger
 
 @dataclass(frozen=True)
 class VisualRuntimeIngest:
@@ -27,14 +28,26 @@ def ingest_browser_visual(runtime:DragonAnalysisRuntime,custody:ConsentBoundAnal
     if not authorized: raise PermissionError("visual runtime ingestion requires authorization")
     cp=runtime.checkpoint(envelope.owner,run_id,authorized=True)
     if cp.cancelled or cp.state!="running": raise PermissionError("analysis run is not active")
-    accepted=accept_browser_visual(custody,envelope,now=now,authorized=True)
+    ledger=DragonRuntimeEventLedger(runtime.db)
+    ledger.append(envelope.owner,run_id,event_type="attempt",layer="source_integrity",outcome="started",occurred_at=now,authorized=True)
+    try:
+        accepted=accept_browser_visual(custody,envelope,now=now,authorized=True)
+    except Exception as exc:
+        ledger.append(envelope.owner,run_id,event_type="attempt",layer="source_integrity",outcome="failed",error_code=type(exc).__name__,occurred_at=now,authorized=True)
+        raise
     source=LayerReceipt(AnalysisLayer.SOURCE_INTEGRITY,(),accepted.envelope_fingerprint,1,True)
     cp=runtime.commit_receipt(envelope.owner,run_id,source,now=now,
         expected_revision=cp.revision,authorized=True)
+    ledger.append(envelope.owner,run_id,event_type="receipt",layer="source_integrity",outcome="accepted",evidence_fingerprint=source.output_fingerprint,occurred_at=now,authorized=True)
     # Consent is checked inside the chunk worker before each bounded slice.
-    motion=derive_motion_features(accepted.features,authorized=True)
-    trace=segment_with_consent_checkpoints(custody,envelope.owner,envelope.job_id,
-        motion.frames,now=now,authorized=True,chunk_size=chunk_size)
+    ledger.append(envelope.owner,run_id,event_type="attempt",layer="temporal_segmentation",outcome="started",evidence_fingerprint=source.output_fingerprint,occurred_at=now,authorized=True)
+    try:
+        motion=derive_motion_features(accepted.features,authorized=True)
+        trace=segment_with_consent_checkpoints(custody,envelope.owner,envelope.job_id,
+            motion.frames,now=now,authorized=True,chunk_size=chunk_size)
+    except Exception as exc:
+        ledger.append(envelope.owner,run_id,event_type="attempt",layer="temporal_segmentation",outcome="failed",evidence_fingerprint=source.output_fingerprint,error_code=type(exc).__name__,occurred_at=now,authorized=True)
+        raise
     temporal_fp=_digest({"source":source.output_fingerprint,
       "motion":motion.motion_fingerprint,"trace":trace.trace_fingerprint,
       "events":[[e.start_ms,e.peak_ms,e.end_ms,e.source_frame_ids] for e in trace.events]})
@@ -42,4 +55,5 @@ def ingest_browser_visual(runtime:DragonAnalysisRuntime,custody:ConsentBoundAnal
         (source.output_fingerprint,),temporal_fp,1,True)
     cp=runtime.commit_receipt(envelope.owner,run_id,temporal,now=now,
         expected_revision=cp.revision,authorized=True)
+    ledger.append(envelope.owner,run_id,event_type="receipt",layer="temporal_segmentation",outcome="accepted",evidence_fingerprint=temporal.output_fingerprint,occurred_at=now,authorized=True)
     return VisualRuntimeIngest(source,temporal,cp,len(trace.events))
