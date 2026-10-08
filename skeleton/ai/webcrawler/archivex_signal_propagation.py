@@ -74,6 +74,8 @@ class ArchiveXSignalPropagator:
         )
         changed = comparison.kind is not ArchiveSignalKind.UNCHANGED
         kind = SignalKind.REVISION if changed else SignalKind.CORROBORATION
+        if len(comparison.source_url) > 240:
+            raise ValueError("source URL exceeds signal subject budget")
         signal = self.signals.record(
             owner, kind=kind, subject=comparison.source_url,
             source_snapshot_id=later_snapshot_id,
