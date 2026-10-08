@@ -293,7 +293,7 @@ class CohortExperience:
 
 def aggregate_playability(
     world: PlayableWorld,
-    reports: Sequence[PlayabilityReport],
+    replays: Sequence[GameReplay],
     *,
     authorized: bool,
     consent_to_aggregate: bool,
@@ -307,16 +307,17 @@ def aggregate_playability(
         raise PermissionError("playtest cohort analysis requires authorization")
     if type(consent_to_aggregate) is not bool or not consent_to_aggregate:
         raise PlayabilityAnalysisError("explicit playtest aggregation consent required")
-    if not isinstance(world, PlayableWorld) or not isinstance(reports, (tuple, list)):
-        raise PlayabilityAnalysisError("typed world and report collection required")
-    if not 3 <= len(reports) <= MAX_COHORT:
+    if not isinstance(world, PlayableWorld) or not isinstance(replays, (tuple, list)):
+        raise PlayabilityAnalysisError("typed world and replay collection required")
+    if not 3 <= len(replays) <= MAX_COHORT:
         raise PlayabilityAnalysisError("cohort requires 3 to 1000 independent replay records")
-    if any(not isinstance(row, PlayabilityReport) or row.world_digest != world.digest
-           or not row.no_preference_inference for row in reports):
-        raise PlayabilityAnalysisError("untrusted or mismatched cohort report")
-    identifiers = [row.replay_digest for row in reports]
+    if any(not isinstance(replay, GameReplay) for replay in replays):
+        raise PlayabilityAnalysisError("typed gameplay replay records required")
+    identifiers = [replay.digest for replay in replays]
     if len(set(identifiers)) != len(identifiers):
         raise PlayabilityAnalysisError("duplicate action trace in playtest cohort")
+    # Verify every trace from raw actions: never trust caller-supplied metrics.
+    reports = tuple(analyze_replay(world, replay, authorized=True) for replay in replays)
     levels = [level for report in reports for level in report.levels]
     flags = tuple(sorted({
         finding.level_index for report in reports for finding in report.findings
