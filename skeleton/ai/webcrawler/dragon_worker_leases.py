@@ -1,7 +1,6 @@
 """Expiring worker leases for Dragon analysis layers."""
 from __future__ import annotations
 from dataclasses import dataclass
-from hashlib import sha256
 import math,sqlite3,secrets
 
 @dataclass(frozen=True)
