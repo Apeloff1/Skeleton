@@ -56,6 +56,8 @@ jobs:
         run: python -m unittest discover -s tests/flgb -p 'test_flgb_06_*.py' -v
       - name: Run FLGB-07 training-plane regressions
         run: python -m unittest discover -s tests/flgb -p 'test_flgb_07_*.py' -v
+      - name: Run proof-carrying lifecycle pointer integrity regressions
+        run: python -m unittest discover -s tests -p 'test_proof_carrying_lifecycle.py' -v
       - name: Run FLGB support regressions
         run: python -m unittest discover -s tests/flgb -p 'test_flgb_activation_security_timeout.py' -v
       - name: Run FLGB-08 multimodal-plane regressions
