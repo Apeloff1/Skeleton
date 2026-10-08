@@ -423,3 +423,30 @@ def test_registry_revision_changes_canonical_fingerprint():
     )
     assert base.fingerprint != with_registry.fingerprint
     assert with_registry.attestation_fingerprint is not None
+
+
+def test_relation_fanout_budget_rejects_pathological_manifests():
+    manifest = (
+        source("alpha", tokens=("first", "second", "third")),
+    )
+    with pytest.raises(ValueError, match="relationship budget"):
+        evaluated(
+            readings("alpha"), manifest,
+            assurance_policy=AssurancePolicy(max_relationships_per_source=2),
+        )
+
+
+def test_duplicate_relationship_identity_rejected():
+    with pytest.raises(ValueError, match="duplicate provenance relationship"):
+        evaluated(
+            readings("alpha"),
+            (source("alpha", tokens=("copied", "copied")),),
+        )
+
+
+def test_untrusted_registry_implementation_rejected():
+    with pytest.raises(TypeError, match="verified provenance registry"):
+        assure_crawler_evidence(
+            "claim-7", readings("alpha"), (source("alpha"),),
+            authorized=True, attestation_registry=object(),
+        )
