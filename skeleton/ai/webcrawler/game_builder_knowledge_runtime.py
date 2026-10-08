@@ -6,7 +6,7 @@ artifacts. Explicit authorization and human approval remain separate gates.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from hashlib import sha256
 from typing import Callable, Iterable
 from io import BytesIO
@@ -23,6 +23,7 @@ from .game_knowledge_index import GameKnowledgeIndex, KnowledgeGap
 from .game_knowledge_design import (
     GameBlueprint, LevelMetrics, propose_game_blueprint,
     populate_game_level, analyze_level_playability,
+    resolve_mechanic_dependencies,
 )
 from .game_playable_builder import (
     CompiledGame, build_playable_web_game, export_playable_game_archive,
@@ -130,6 +131,37 @@ class KnowledgeDrivenGameBuilder:
             self.knowledge,title=title,genre=genre,engine=engine,
             seed=seed,width=width,height=height,
         )
+        if handoff is not None:
+            supported={
+                "movement":"movement",
+                "camera":"camera",
+                "combat":"combat",
+                "puzzle":"puzzle",
+                "exploration":"collectible",
+                "platforming":"jump",
+                "physics":"collision",
+                "level_design":"platform",
+                "progression":"collectible",
+                "user_interface":"camera",
+            }
+            reviewed=tuple(x.mechanic.value for x in handoff.prototype.mechanics)
+            missing=tuple(x for x in reviewed if x not in supported)
+            if missing:
+                raise ValueError(
+                    "unimplemented reviewed Forge mechanics: " + ", ".join(missing)
+                )
+            actual=resolve_mechanic_dependencies(
+                tuple(blueprint.mechanics)+tuple(supported[x] for x in reviewed)
+            )
+            reference="reviewed-forge:"+handoff.review_fingerprint
+            blueprint=replace(
+                blueprint,mechanics=actual,
+                source_evidence=blueprint.source_evidence+(reference,),
+                fingerprint=sha256(
+                    (blueprint.fingerprint+handoff.review_fingerprint+
+                     ",".join(actual)).encode("utf-8")
+                ).hexdigest(),
+            )
         blueprint=populate_game_level(blueprint)
         metrics=analyze_level_playability(blueprint)
         if not metrics.playable:
