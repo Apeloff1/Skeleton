@@ -285,3 +285,80 @@ def test_public_crawler_api_exposes_captured_audit_without_eager_model_imports()
     from skeleton.ai import webcrawler
     assert webcrawler.bind_crawl_evidence is bind_crawl_evidence
     assert webcrawler.assure_captured_crawl is assure_captured_crawl
+
+
+@pytest.mark.parametrize("bad_host", [
+    "https://metadata.internal/private",
+    "https://host.local/private",
+    "https://top.test/private",
+    "https://unknown.invalid/private",
+    "https://localhost.localhost/admin",
+    "https://singlelabel/private",
+])
+def test_captured_origin_disallows_internal_or_test_hosts(bad_host):
+    sources, readings = fixture()
+    changed = replace(sources[0].document, canonical_url=bad_host)
+    with pytest.raises(ValueError, match="untrusted document URL"):
+        bind((replace(sources[0], document=changed), sources[1]), readings)
+
+
+def test_fetched_redirect_to_internal_host_rejected_even_when_receipt_agrees():
+    sources, readings = fixture()
+    doc = sources[0].document
+    bad = "https://metadata.internal/private"
+    changed = replace(
+        doc, fetched_url=bad,
+        provenance={**doc.provenance, "fetched_url": bad},
+    )
+    with pytest.raises(ValueError, match="untrusted fetched URL"):
+        bind((replace(sources[0], document=changed), sources[1]), readings)
+
+
+@pytest.mark.parametrize("attribute", ["fetched_at", "source_score"])
+def test_boolean_acquisition_numbers_are_rejected(attribute):
+    sources, readings = fixture()
+    bad = replace(sources[0].document, **{attribute: True})
+    if attribute == "fetched_at":
+        bad = replace(
+            bad, provenance={**bad.provenance, "fetched_at": True},
+        )
+    with pytest.raises(ValueError, match="invalid"):
+        bind((replace(sources[0], document=bad), sources[1]), readings)
+
+
+def test_acquisition_receipt_changes_invalidate_custody_digest():
+    sources, readings = fixture()
+    initial = bind(sources, readings)
+    doc = sources[0].document
+    revised = replace(
+        doc, fetched_at=doc.fetched_at + 30.0,
+        provenance={**doc.provenance, "fetched_at": doc.fetched_at + 30.0},
+    )
+    rebind = bind((replace(sources[0], document=revised), sources[1]), readings)
+    assert initial.document_fingerprints == rebind.document_fingerprints
+    assert initial.acquisition_fingerprints != rebind.acquisition_fingerprints
+    assert initial.custody_fingerprint != rebind.custody_fingerprint
+    assert initial.evidence == rebind.evidence
+
+
+def test_fetched_url_change_invalidate_custody_digest():
+    sources, readings = fixture()
+    doc = sources[0].document
+    new_url = "https://cdn.example/updated-copy"
+    new_doc = replace(
+        doc, fetched_url=new_url,
+        provenance={**doc.provenance, "fetched_url": new_url},
+    )
+    changed = bind((replace(sources[0], document=new_doc), sources[1]), readings)
+    initial = bind(sources, readings)
+    assert changed.custody_fingerprint != initial.custody_fingerprint
+
+
+def test_noncanonical_or_non_json_acquisition_receipt_fails_closed():
+    sources, readings = fixture()
+    doc = sources[0].document
+    changed = replace(
+        doc, provenance={**doc.provenance, "unexpected_object": object()},
+    )
+    with pytest.raises((TypeError, ValueError)):
+        bind((replace(sources[0], document=changed), sources[1]), readings)
