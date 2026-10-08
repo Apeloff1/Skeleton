@@ -8,6 +8,7 @@ from .dragon_analysis_chains import AnalysisLayer,LayerReceipt
 from .dragon_analysis_execution import LayerDispatch
 from .dragon_human_review import HumanReviewDecision
 from .dragon_knowledge_normalization_worker import NormalizedKnowledge
+from .dragon_knowledge_manifest import canonical_knowledge_manifest
 
 
 @dataclass(frozen=True)
@@ -47,6 +48,9 @@ def execute_memory_promotion(dispatch:LayerDispatch,
     by_id={r.knowledge_id:r for r in records}
     if len(by_id)!=len(records): raise ValueError("duplicate normalized knowledge identity")
     if set(survivors)-set(by_id): raise ValueError("approved survivor missing normalized record")
+    manifest=canonical_knowledge_manifest(tuple(by_id[x] for x in survivors))
+    if manifest!=human_decision.survivor_manifest:
+        raise PermissionError("approved normalized records changed after human review")
     promoted=[]
     for kid in survivors:
         r=by_id[kid]
