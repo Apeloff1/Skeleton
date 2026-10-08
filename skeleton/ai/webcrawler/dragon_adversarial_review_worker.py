@@ -6,7 +6,7 @@ import json,math
 
 from .dragon_analysis_chains import AnalysisLayer,LayerReceipt
 from .dragon_analysis_execution import LayerDispatch
-from .dragon_knowledge_normalization_worker import NormalizedKnowledge
+from .dragon_knowledge_normalization_worker import NormalizedKnowledge,normalization_records_fingerprint
 from .dragon_knowledge_manifest import canonical_knowledge_id
 
 
@@ -40,6 +40,8 @@ def execute_adversarial_review(dispatch:LayerDispatch,
         raise ValueError("accepted normalization receipt required")
     if dispatch.input_fingerprints!=(normalization_receipt.output_fingerprint,):
         raise ValueError("dispatch evidence mismatch")
+    if normalization_records_fingerprint(normalization_receipt.input_fingerprints,records)!=normalization_receipt.output_fingerprint:
+        raise ValueError("normalized record set does not match normalization receipt")
     findings=[];survivors=[]
     seen_knowledge=set();seen_hypotheses=set()
     for r in sorted(records,key=lambda x:x.knowledge_id):
