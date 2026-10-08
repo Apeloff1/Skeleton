@@ -7,6 +7,7 @@ import { extractConversationInterests, proposeResearchMission } from './conversa
 import { Ionicons } from '@expo/vector-icons';
 import DragonCompanion from './DragonCompanion';
 import DragonQuestBoard from './DragonQuestBoard';
+import type{NativeAttempt,NativeTarget}from './dragonNativeTargets';
 import {type DragonPracticeProgress,type DragonPracticeAttempt,type DragonPracticeSubscription,validateDragonProgress} from './dragonProgression';
 import { companionForConversation, companionFromCrawler, type DragonEventKind } from './dragonCompanion';
 
@@ -21,6 +22,11 @@ export interface CompanionTelemetry {
 export interface CompanionAcademyInput {
   progress?:DragonPracticeProgress|null;
   attempts?:readonly DragonPracticeAttempt[];
+  nativeAttempts?:readonly NativeAttempt[];
+  nativeTargets?:readonly NativeTarget[];
+  nativeStyles?:readonly string[];
+  onGenerateNative?:(target:string,style:string)=>void;
+  onDownloadNative?:(attemptId:string)=>void;
   subscription?:DragonPracticeSubscription|null;
   onRunPractice?:()=>void;
   onStartPractice?:()=>void;
@@ -72,6 +78,9 @@ export default function DragonCompanionPanel({ draft, lastUserText, telemetry, a
     {showResearch && <View style={s.metric}><Text style={s.value}>{proposal ? proposal.query : 'No research interest yet'}</Text><Text style={s.note}>Suggestion only · no web crawl starts without a separate explicit command.</Text></View>}
     <Pressable accessibilityRole="button" accessibilityLabel="Toggle Dragon Academy" onPress={()=>setShowAcademy(x=>!x)} style={s.academyButton}><Ionicons name="trophy-outline" color="#fbbf24" size={16}/><Text style={s.academyText}>{showAcademy?"Hide":"Show"} Dragon Academy · capability levels & game practice</Text></Pressable>
     {showAcademy&&<DragonQuestBoard progress={academy?.progress} attempts={academy?.attempts}
+      nativeAttempts={academy?.nativeAttempts} nativeTargets={academy?.nativeTargets}
+      nativeStyles={academy?.nativeStyles} onGenerateNative={academy?.onGenerateNative}
+      onDownloadNative={academy?.onDownloadNative}
       subscription={academy?.subscription} onRunPractice={academy?.onRunPractice}
       onStartPractice={academy?.onStartPractice}
       onOpenDemo={academy?.onOpenDemo} onStopPractice={academy?.onStopPractice}

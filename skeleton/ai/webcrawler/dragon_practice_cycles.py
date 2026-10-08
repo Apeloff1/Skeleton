@@ -8,6 +8,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 import sqlite3
 from .dragon_practice_lab import DragonPracticeLab, PracticeAttempt, _owner, _time
+from .dragon_native_targets import STYLES
+from .dragon_native_projects import EMITTERS
+from .dragon_native_practice import DragonNativePracticeLab, NativeAttempt
 
 
 @dataclass(frozen=True)
@@ -19,6 +22,9 @@ class PracticeSubscription:
     interval_seconds: int
     remaining_ticks: int
     demos_per_tick: int
+    generation_mode: str = 'html'
+    native_target: str = 'game_boy'
+    native_style: str = 'arcade_score_attack'
 
 
 class DragonPracticeCycles:
@@ -30,12 +36,25 @@ class DragonPracticeCycles:
         db.execute("""CREATE TABLE IF NOT EXISTS dragon_practice_cycles(
             owner TEXT PRIMARY KEY,enabled INTEGER NOT NULL,expires_at REAL NOT NULL,
             next_due REAL NOT NULL,interval_seconds INTEGER NOT NULL,
-            remaining_ticks INTEGER NOT NULL,demos_per_tick INTEGER NOT NULL)""")
+            remaining_ticks INTEGER NOT NULL,demos_per_tick INTEGER NOT NULL,
+            generation_mode TEXT NOT NULL DEFAULT 'html',
+            native_target TEXT NOT NULL DEFAULT 'game_boy',
+            native_style TEXT NOT NULL DEFAULT 'arcade_score_attack')""")
+        columns={r[1] for r in db.execute("PRAGMA table_info(dragon_practice_cycles)")}
+        for column,definition in (
+            ("generation_mode","TEXT NOT NULL DEFAULT 'html'"),
+            ("native_target","TEXT NOT NULL DEFAULT 'game_boy'"),
+            ("native_style","TEXT NOT NULL DEFAULT 'arcade_score_attack'"),
+        ):
+            if column not in columns:
+                db.execute("ALTER TABLE dragon_practice_cycles ADD COLUMN "+column+" "+definition)
         db.commit()
 
     def enable(self, owner: str, *, authorized: bool, human_approved: bool,
                now: float, expires_at: float, interval_seconds: int = 3600,
-               max_ticks: int = 24, demos_per_tick: int = 2) -> PracticeSubscription:
+               max_ticks: int = 24, demos_per_tick: int = 2,
+               generation_mode: str = 'html',native_target: str = 'game_boy',
+               native_style: str = 'arcade_score_attack') -> PracticeSubscription:
         _owner(owner)
         _time(now)
         _time(expires_at)
@@ -50,14 +69,25 @@ class DragonPracticeCycles:
         if (not isinstance(demos_per_tick,int)
                 or not 1 <= demos_per_tick <= self.lab.policy.max_demos_per_batch):
             raise ValueError("practice demo batch out of bounds")
+        if generation_mode not in ('html','native'):
+            raise ValueError("unsupported scheduled generation mode")
+        if generation_mode=='native' and (native_target not in EMITTERS or native_style not in STYLES):
+            raise ValueError("requested native target or style has no source emitter")
         with self.db:
-            self.db.execute("""INSERT INTO dragon_practice_cycles VALUES(?,?,?,?,?,?,?)
+            self.db.execute("""INSERT INTO dragon_practice_cycles
+                (owner,enabled,expires_at,next_due,interval_seconds,remaining_ticks,
+                 demos_per_tick,generation_mode,native_target,native_style)
+                VALUES(?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(owner) DO UPDATE SET enabled=excluded.enabled,
                 expires_at=excluded.expires_at,next_due=excluded.next_due,
                 interval_seconds=excluded.interval_seconds,
                 remaining_ticks=excluded.remaining_ticks,
-                demos_per_tick=excluded.demos_per_tick""",
-                (owner,1,expires_at,now,interval_seconds,max_ticks,demos_per_tick))
+                demos_per_tick=excluded.demos_per_tick,
+                generation_mode=excluded.generation_mode,
+                native_target=excluded.native_target,
+                native_style=excluded.native_style""",
+                (owner,1,expires_at,now,interval_seconds,max_ticks,demos_per_tick,
+                 generation_mode,native_target,native_style))
         return self.status(owner,authorized=True)
 
     def disable(self, owner: str, *, authorized: bool) -> None:
@@ -72,14 +102,14 @@ class DragonPracticeCycles:
         if not authorized:
             raise PermissionError("practice status requires authorization")
         row=self.db.execute("""SELECT enabled,expires_at,next_due,interval_seconds,
-            remaining_ticks,demos_per_tick FROM dragon_practice_cycles
+            remaining_ticks,demos_per_tick,generation_mode,native_target,native_style FROM dragon_practice_cycles
             WHERE owner=?""",(owner,)).fetchone()
         if row is None:
             return PracticeSubscription(owner,False,0,0,3600,0,0)
-        return PracticeSubscription(owner,bool(row[0]),row[1],row[2],row[3],row[4],row[5])
+        return PracticeSubscription(owner,bool(row[0]),row[1],row[2],row[3],row[4],row[5],row[6],row[7],row[8])
 
     def pulse(self, owner: str, *, authorized: bool,
-              now: float) -> tuple[PracticeAttempt,...]:
+              now: float) -> tuple[PracticeAttempt | NativeAttempt,...]:
         """One allowed slice of work. No catch-up loops and no hidden retries."""
         _owner(owner)
         _time(now)
@@ -90,11 +120,12 @@ class DragonPracticeCycles:
         self.db.execute("BEGIN IMMEDIATE")
         with self.db:
             row=self.db.execute("""SELECT enabled,expires_at,next_due,interval_seconds,
-                remaining_ticks,demos_per_tick FROM dragon_practice_cycles
+                remaining_ticks,demos_per_tick,generation_mode,native_target,native_style
+                FROM dragon_practice_cycles
                 WHERE owner=?""",(owner,)).fetchone()
             if row is None:
                 return ()
-            enabled,expires,due,interval,remaining,demos=row
+            enabled,expires,due,interval,remaining,demos,mode,target,style=row
             if now>=expires:
                 self.db.execute("UPDATE dragon_practice_cycles SET enabled=0 WHERE owner=?",
                                 (owner,))
@@ -111,4 +142,19 @@ class DragonPracticeCycles:
                 return ()
         # Current authorized schedule is the consent grant. Lesson-specific
         # consent must also remain active; revocation blocks work immediately.
+        if mode=='native':
+            native=DragonNativePracticeLab(self.db,self.lab)
+            created=[]
+            for _ in range(demos):
+                # Every attempt changes the native exercise, never regenerates
+                # an existing lesson/target/style merely to inflate workloads.
+                count=self.db.execute("""SELECT COUNT(*) FROM dragon_native_game_attempts
+                    WHERE owner=?""",(owner,)).fetchone()[0]
+                exercise=STYLES[(STYLES.index(style)+count)%len(STYLES)]
+                try:
+                    created.append(native.generate(owner,target_id=target,style=exercise,
+                                                   now=now,authorized=True,consent=True))
+                except (PermissionError,ValueError):
+                    break
+            return tuple(created)
         return self.lab.run_batch(owner,authorized=True,consent=True,now=now,max_demos=demos)

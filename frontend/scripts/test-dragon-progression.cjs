@@ -53,7 +53,24 @@ for(const name of ['DragonQuestBoard.tsx','DragonCompanion.tsx','DragonCompanion
  }
  if(name==='DragonCompanion.tsx')assert.ok(result.source.includes('levelBadge'));
 }
-for(const name of ['DragonDemoPlayer.tsx','useDragonAcademy.ts'])load(name);
+for(const name of ['DragonDemoPlayer.tsx','useDragonAcademy.ts','DragonNativeWorkshop.tsx'])load(name);
+const nativeModel=load('dragonNativeTargets.ts');
+const nativeExports={exports:{}};
+vm.runInNewContext(nativeModel.code,{module:nativeExports,exports:nativeExports.exports,
+ Math,Array,Number,Set,Object}, {filename:'dragonNativeTargets.js',timeout:1500});
+const n=nativeExports.exports;
+const gb={id:'game_boy',family:'Nintendo',generation:'8-bit handheld',year:1989,
+ cpu:'SM83',graphics:'OAM tiles',sound:'PSG',input:'D-pad',toolchain:'RGBDS',
+ output:'gb',status:'native_source'};
+assert.equal(n.normalizeNativeTargets([gb]).length,1);
+assert.equal(n.normalizeNativeTargets([{...gb,status:'phantom'}]).length,0);
+assert.equal(n.titleCaseId('game_boy'),'Game Boy');
+const source=fs.readFileSync(path.join(dir,'DragonNativeWorkshop.tsx'),'utf8');
+assert.ok(source.includes('Native game forge')&&source.includes('Generate native game source ZIP'));
+const nativeHook=fs.readFileSync(path.join(dir,'useDragonAcademy.ts'),'utf8');
+assert.ok(nativeHook.includes("'/native/generate'")&&nativeHook.includes("'/archive'"));
+assert.ok(nativeHook.includes('Crypto.digest(')&&nativeHook.includes('Sharing.shareAsync('));
+
 const demoPlayer=fs.readFileSync(path.join(dir,'DragonDemoPlayer.tsx'),'utf8');
 const hook=fs.readFileSync(path.join(dir,'useDragonAcademy.ts'),'utf8');
 const workspace=fs.readFileSync(path.resolve(dir,'../ChatWorkspace.tsx'),'utf8');

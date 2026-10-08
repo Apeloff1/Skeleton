@@ -3,7 +3,10 @@
  * No owner ID is sent by the client. Signed-in account is mandatory even on
  * development deployments where some other routes allow anonymous access.
  */
-import {AppState} from 'react-native';
+import {AppState,Platform} from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import {API_BASE} from '../../../utils/apiBase';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import * as Crypto from 'expo-crypto';
 import api from '../../../src/utils/apiClient';
@@ -13,11 +16,12 @@ import {
  normalizeDragonAttempts,validateDragonProgress,
 } from './dragonProgression';
 import type {CompanionAcademyInput,CompanionTelemetry} from './DragonCompanionPanel';
+import {type NativeAttempt,type NativeTarget,normalizeNativeAttempts,normalizeNativeTargets} from './dragonNativeTargets';
 import {EMPTY_COMPANION_JOURNAL,reduceDragonJournal,type CompanionJournal,type WireDragonEvent} from './dragonJournal';
 
 type Snapshot={
  ok:boolean;progress:DragonPracticeProgress;attempts:DragonPracticeAttempt[];
- subscription:DragonPracticeSubscription;
+ subscription:DragonPracticeSubscription;native_attempts?:NativeAttempt[];
 };
 type HtmlArtifact={ok:boolean;html:string;sha256:string;sandbox_required:boolean;attempt_id:string};
 type CrawlFeed={ok:boolean;session_id:string|null;active:boolean;events:WireDragonEvent[];next_cursor:string|null;has_more:boolean};
@@ -36,6 +40,9 @@ export function useDragonAcademy(){
  const [authenticated,setAuthenticated]=useState(false);
  const [progress,setProgress]=useState<DragonPracticeProgress|null>(null);
  const [attempts,setAttempts]=useState<DragonPracticeAttempt[]>([]);
+ const [nativeAttempts,setNativeAttempts]=useState<NativeAttempt[]>([]);
+ const [nativeTargets,setNativeTargets]=useState<NativeTarget[]>([]);
+ const [nativeStyles,setNativeStyles]=useState<string[]>([]);
  const [subscription,setSubscription]=useState<DragonPracticeSubscription|null>(null);
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState('');
@@ -51,7 +58,7 @@ export function useDragonAcademy(){
    const me=await checkMe();
    if(!alive.current)return;
    if(!me.authenticated||!getAuthToken()){
-    setAuthenticated(false);setProgress(null);setAttempts([]);setSubscription(null);
+    setAuthenticated(false);setProgress(null);setAttempts([]);setNativeAttempts([]);setNativeTargets([]);setSubscription(null);
     setTelemetry(undefined);sessionRef.current=null;journal.current=EMPTY_COMPANION_JOURNAL;
     setError('Sign in through Studio to connect Dragon Academy.');
     return;
@@ -68,10 +75,19 @@ export function useDragonAcademy(){
    if(!valid||!subscriptionValid(snapshot.subscription))throw new Error(
     'Dragon Academy returned an invalid verified progression snapshot.');
    setProgress(valid);setAttempts(normalizeDragonAttempts(snapshot.attempts));
+   setNativeAttempts(normalizeNativeAttempts(snapshot.native_attempts));
+   // Catalog is read-only. If unavailable, remain safely without platform choices.
+   const platforms=await api.get<{ok:boolean;targets:NativeTarget[];styles:string[]}>(
+    PATH+'/native/targets',{headers:authHeaders(),timeoutMs:12000,retries:0});
+   if(alive.current&&platforms.ok&&platforms.data?.ok){
+    setNativeTargets(normalizeNativeTargets(platforms.data.targets));
+    setNativeStyles(Array.isArray(platforms.data.styles)?platforms.data.styles.filter(
+     x=>typeof x==='string'&&/^[a-z_]{2,64}$/.test(x)).slice(0,50):[]);
+   }
    setSubscription(snapshot.subscription);setAuthenticated(true);setError('');
   }catch(e){
    if(alive.current){setAuthenticated(false);setProgress(null);
-    setAttempts([]);setSubscription(null);
+    setAttempts([]);setNativeAttempts([]);setNativeTargets([]);setSubscription(null);
     setError(e instanceof Error?e.message:'Could not connect to Dragon Academy.');}
   }
  },[]);
@@ -132,6 +148,7 @@ export function useDragonAcademy(){
    const p=validateDragonProgress(r.data.progress);
    if(!p||!subscriptionValid(r.data.subscription))throw new Error('Invalid practice result.');
    if(alive.current){setProgress(p);setAttempts(normalizeDragonAttempts(r.data.attempts));
+    setNativeAttempts(normalizeNativeAttempts(r.data.native_attempts));
     setSubscription(r.data.subscription);}
   }catch(e){
    if(alive.current)setError(e instanceof Error?e.message:'Practice command failed.');
@@ -139,7 +156,43 @@ export function useDragonAcademy(){
    inFlight.current=false;if(alive.current)setBusy(false);
   }
  },[authenticated]);
- const run=useCallback(()=>{void mutate('/practice/run',{max_demos:2});},[mutate]);
+ const generateNative=useCallback((target:string,style:string)=>{
+  const valid=nativeTargets.find(t=>t.id===target&&t.status==='native_source');
+  if(!valid||!nativeStyles.includes(style))return;
+  void mutate('/native/generate',{target_id:target,style});
+ },[mutate,nativeTargets,nativeStyles]);
+ const downloadNative=useCallback(async(attemptId:string)=>{
+  const attempt=nativeAttempts.find(a=>a.attempt_id===attemptId);
+  if(!attempt||!authenticated||!getAuthToken()||inFlight.current)return;
+  inFlight.current=true;setBusy(true);setError('');
+  try{
+   const url=API_BASE+PATH+'/native/'+encodeURIComponent(attemptId)+'/archive';
+   const filename='dragon-'+attempt.target_id+'-'+attemptId.slice(0,8)+'.zip';
+   if(Platform.OS==='web'){
+    const response=await fetch(url,{headers:authHeaders()});
+    if(!response.ok)throw new Error('Could not retrieve native project archive.');
+    const buffer=await response.arrayBuffer();
+    if(buffer.byteLength>250000)throw new Error('Native project exceeds download limit.');
+    const expected=response.headers.get('X-Content-SHA256');
+    const hash=await Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256,new Uint8Array(buffer));
+    const actual=Array.from(hash).map(v=>v.toString(16).padStart(2,'0')).join('');
+    if(!expected||expected!==actual)throw new Error('Native project digest mismatch.');
+    const location=URL.createObjectURL(new Blob([buffer],{type:'application/zip'}));
+    const link=document.createElement('a');link.href=location;link.download=filename;
+    document.body.appendChild(link);link.click();link.remove();
+    URL.revokeObjectURL(location);
+   }else{
+    if(!FileSystem.cacheDirectory)throw new Error('Native file cache unavailable.');
+    const downloaded=await FileSystem.downloadAsync(url,
+     FileSystem.cacheDirectory+filename,{headers:authHeaders()});
+    if(downloaded.status!==200)throw new Error('Native source download failed.');
+    if(!await Sharing.isAvailableAsync())throw new Error('Device sharing is unavailable.');
+    await Sharing.shareAsync(downloaded.uri,{mimeType:'application/zip',dialogTitle:'Save native game source'});
+   }
+  }catch(e){if(alive.current)setError(e instanceof Error?e.message:'Native download failed.');}
+  finally{inFlight.current=false;if(alive.current)setBusy(false);}
+ },[nativeAttempts,authenticated]);
+
  const subscribe=useCallback(()=>{void mutate('/practice/subscribe',{
   hours:24,interval_seconds:3600,max_ticks:24,demos_per_tick:2,approved:true,
  });},[mutate]);
@@ -174,7 +227,10 @@ export function useDragonAcademy(){
  const closeDemo=useCallback(()=>setDemo(null),[]);
  const view:CompanionAcademyInput={
   progress,attempts,subscription,practiceBusy:busy,
-  onRunPractice:authenticated?run:undefined,
+  nativeAttempts,nativeTargets,nativeStyles,
+  onGenerateNative:authenticated?generateNative:undefined,
+  onDownloadNative:authenticated?downloadNative:undefined,
+  onRunPractice:undefined, // HTML legacy; native source is the default practice path.
   onStartPractice:authenticated?subscribe:undefined,
   onStopPractice:authenticated?stop:undefined,
   onRevokePractice:authenticated?revoke:undefined,

@@ -263,6 +263,12 @@ class DragonPracticeLab:
                 daily = self.db.execute("""SELECT COUNT(*) FROM dragon_practice_attempts
                     WHERE owner=? AND created_at>=? AND created_at<?""",
                     (owner, day_start, day_start + 86400)).fetchone()[0]
+                has_native=self.db.execute("""SELECT 1 FROM sqlite_master
+                    WHERE type='table' AND name='dragon_native_game_attempts'""").fetchone()
+                if has_native:
+                    daily+=self.db.execute("""SELECT COUNT(*) FROM dragon_native_game_attempts
+                        WHERE owner=? AND created_at>=? AND created_at<?""",
+                        (owner,day_start,day_start + 86400)).fetchone()[0]
                 if daily >= self.policy.max_demos_per_day:
                     break
                 candidates = self.db.execute("""SELECT l.lesson_id,l.title,l.mechanics_json,

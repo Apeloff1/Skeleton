@@ -37,6 +37,8 @@ def test_registered_with_existing_auth_and_no_authority_mint_endpoints():
     assert "/api/dragon-academy/practice/subscribe" in paths
     assert not any("offer" in p or "approve" in p or "xp" in p or "review" in p
                    for p in paths)
+    assert '/api/dragon-academy/native/generate' in paths
+    assert '/api/dragon-academy/native/targets' in paths
 
 
 @pytest.mark.parametrize("user",[
@@ -123,3 +125,59 @@ def test_subscription_requires_explicit_confirm_and_stops(tmp_path,monkeypatch):
     with pytest.raises(HTTPException) as not_found:
         route.practice_artifact("b"*64,owner=owner)
     assert not_found.value.status_code==404
+
+
+def test_native_console_source_is_downloadable_by_authenticated_owner_only(
+    tmp_path,monkeypatch,
+):
+    from zipfile import ZipFile
+    from io import BytesIO
+    monkeypatch.setenv("SKL_DRAGON_PRACTICE_DB_PATH",str(tmp_path/"native.sqlite"))
+    owner=identity("alice@example.test")
+    with sqlite3.connect(tmp_path/"native.sqlite") as db:
+        DragonPracticeLab(db).offer(approved(owner),authorized=True,now=2)
+    targets=route.native_targets(owner=owner)
+    assert len(targets["targets"])>=45
+    assert any(t["id"]=="game_boy" for t in targets["targets"])
+    created=route.generate_native(route.NativeGenerateRequest(
+        target_id="game_boy",style="arcade_score_attack"),owner=owner)
+    item=created["created_native"]
+    assert item["state"]=="source_generated"
+    assert created["progress"]["xp"]==30
+    response=route.native_archive(item["attempt_id"],owner=owner)
+    assert response.media_type=="application/zip"
+    with ZipFile(BytesIO(response.body)) as z:
+        assert "src/main.asm" in z.namelist()
+        assert "Makefile" in z.namelist()
+        assert "dragon-native-manifest.json" in z.namelist()
+        assert "rgbasm" in z.read("Makefile").decode()
+    assert hashlib.sha256(response.body).hexdigest()==response.headers["x-content-sha256"]
+    with pytest.raises(HTTPException) as denied:
+        route.native_archive(item["attempt_id"],owner=identity("bob@example.test"))
+    assert denied.value.status_code==404
+    with pytest.raises(HTTPException) as denied_sdk:
+        route.generate_native(route.NativeGenerateRequest(
+            target_id="xbox_series",style="racing"),owner=owner)
+    assert denied_sdk.value.status_code==403
+
+def test_new_subscriptions_produce_native_projects_not_html(
+    tmp_path,monkeypatch,
+):
+    from skeleton.ai.webcrawler.dragon_practice_cycles import DragonPracticeCycles
+    monkeypatch.setenv("SKL_DRAGON_PRACTICE_DB_PATH",str(tmp_path/"native.sqlite"))
+    owner=identity()
+    with sqlite3.connect(tmp_path/"native.sqlite") as db:
+        parent=DragonPracticeLab(db)
+        parent.offer(approved(owner),authorized=True,now=3)
+    scheduled=route.subscribe_practice(route.SubscribeRequest(
+        approved=True,max_ticks=2,demos_per_tick=2,native_target="game_boy"),
+        owner=owner)
+    assert scheduled["subscription"]["generation_mode"]=="native"
+    with sqlite3.connect(tmp_path/"native.sqlite") as db:
+        parent=DragonPracticeLab(db)
+        cycles=DragonPracticeCycles(db,parent)
+        emitted=cycles.pulse(owner,authorized=True,now=scheduled["subscription"]["next_due"])
+    assert emitted and emitted[0].target_id=="game_boy"
+    snapshot=route.academy_status(owner=owner)
+    assert snapshot["native_attempts"] and snapshot["attempts"]==[]
+    assert snapshot["progress"]["xp"]==30

@@ -17,15 +17,21 @@ import sqlite3
 import time
 from typing import Iterator
 
-from fastapi import APIRouter, Depends, HTTPException, Path as URLPath, Query
+from fastapi import APIRouter, Depends, HTTPException, Path as URLPath, Query, Response
 from pydantic import BaseModel, Field
 
 from routes.gameforge_auth import get_current_user
 from skeleton.ai.webcrawler.dragon_practice_lab import DragonPracticeLab
 from skeleton.ai.webcrawler.dragon_practice_cycles import DragonPracticeCycles
 from skeleton.ai.webcrawler.dragon_session_projection import DragonSessionProjection
+from skeleton.ai.webcrawler.dragon_native_practice import DragonNativePracticeLab
+from skeleton.ai.webcrawler.dragon_native_targets import target_catalog, STYLES
 
 router = APIRouter(prefix="/api/dragon-academy", tags=["Dragon Academy"])
+
+class NativeGenerateRequest(BaseModel):
+    target_id: str = Field(default="game_boy", min_length=2, max_length=64)
+    style: str = Field(default="arcade_score_attack", min_length=2, max_length=64)
 
 class RunPracticeRequest(BaseModel):
     max_demos: int = Field(default=2, ge=1, le=4)
@@ -36,6 +42,8 @@ class SubscribeRequest(BaseModel):
     max_ticks: int = Field(default=24, ge=1, le=168)
     demos_per_tick: int = Field(default=2, ge=1, le=4)
     approved: bool = Field(default=False)
+    native_target: str = Field(default='game_boy', min_length=2, max_length=64)
+    native_style: str = Field(default='arcade_score_attack', min_length=2, max_length=64)
 
 def _principal(user: dict | None = Depends(get_current_user)) -> str:
     """No anonymous/development bypass, even when the general app has dev auth off."""
@@ -84,6 +92,7 @@ def _snapshot(lab: DragonPracticeLab, cycles: DragonPracticeCycles,
         "ok": True,
         "progress": asdict(lab.progress(owner,authorized=True)),
         "attempts": [asdict(a) for a in lab.attempts(owner,authorized=True,limit=50)],
+        "native_attempts": [asdict(a) for a in DragonNativePracticeLab(lab.db,lab).list(owner,authorized=True)],
         "subscription": asdict(cycles.status(owner,authorized=True)),
     }
 
@@ -106,6 +115,45 @@ def crawler_feed(
             raise HTTPException(status_code=409,detail="Crawler journal replay unavailable") from None
         return {"ok": True,**asdict(feed)}
 
+@router.get("/native/targets")
+def native_targets(owner: str = Depends(_principal)) -> dict:
+    # Catalog metadata does not imply working native compilation.
+    return {"ok":True,"targets":target_catalog(),"styles":STYLES}
+
+@router.post("/native/generate")
+def generate_native(body: NativeGenerateRequest,
+                    owner: str = Depends(_principal)) -> dict:
+    with _lab() as (lab,cycles):
+        native=DragonNativePracticeLab(lab.db,lab)
+        try:
+            item=native.generate(owner,target_id=body.target_id,style=body.style,
+                                 now=time.time(),authorized=True,consent=True)
+        except PermissionError:
+            raise HTTPException(status_code=403,detail="Approved lessons or licensed SDK unavailable") from None
+        except ValueError:
+            raise HTTPException(status_code=422,detail="Native target or exercise not available") from None
+        result=_snapshot(lab,cycles,owner)
+        result["created_native"]=asdict(item)
+        return result
+
+@router.get("/native/{attempt_id}/archive")
+def native_archive(
+    attempt_id: str = URLPath(pattern=r"^[a-f0-9]{64}$"),
+    owner: str = Depends(_principal),
+):
+    with _lab() as (lab,_):
+        native=DragonNativePracticeLab(lab.db,lab)
+        try:
+            content,digest=native.archive(owner,attempt_id,authorized=True)
+        except (LookupError,ValueError):
+            raise HTTPException(status_code=404,detail="Native project unavailable") from None
+        return Response(content=content,media_type="application/zip",
+                        headers={"Content-Disposition":
+                          'attachment; filename="dragon-native-'+attempt_id[:12]+'.zip"',
+                          "X-Content-Type-Options":"nosniff",
+                          "Cache-Control":"private, no-store",
+                          "X-Content-SHA256":digest})
+
 @router.post("/practice/run")
 def run_practice(body: RunPracticeRequest, owner: str = Depends(_principal)) -> dict:
     with _lab() as (lab,cycles):
@@ -127,7 +175,9 @@ def subscribe_practice(body: SubscribeRequest, owner: str = Depends(_principal))
                       expires_at=now+body.hours*3600,
                       interval_seconds=body.interval_seconds,
                       max_ticks=body.max_ticks,
-                      demos_per_tick=body.demos_per_tick)
+                      demos_per_tick=body.demos_per_tick,
+                      generation_mode='native',native_target=body.native_target,
+                      native_style=body.native_style)
         return _snapshot(lab,cycles,owner)
 
 @router.post("/practice/stop")

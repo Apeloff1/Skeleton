@@ -1,4 +1,6 @@
 import React,{useState} from 'react';
+import DragonNativeWorkshop from './DragonNativeWorkshop';
+import type{NativeAttempt,NativeTarget}from './dragonNativeTargets';
 import{Pressable,StyleSheet,Text,View}from'react-native';
 import{Ionicons}from'@expo/vector-icons';
 import{
@@ -31,6 +33,11 @@ const trophies=[
 export interface DragonQuestBoardProps{
  progress?:DragonPracticeProgress|null;
  attempts?:readonly DragonPracticeAttempt[];
+ nativeAttempts?:readonly NativeAttempt[];
+ nativeTargets?:readonly NativeTarget[];
+ nativeStyles?:readonly string[];
+ onGenerateNative?:(target:string,style:string)=>void;
+ onDownloadNative?:(attemptId:string)=>void;
  subscription?:DragonPracticeSubscription|null;
  onRunPractice?:()=>void;
  onStartPractice?:()=>void;
@@ -40,7 +47,7 @@ export interface DragonQuestBoardProps{
  busy?:boolean;
 }
 export default function DragonQuestBoard({
- progress,attempts=[],subscription,onRunPractice,onStartPractice,onOpenDemo,onStopPractice,onRevokePractice,busy=false
+ progress,attempts=[],nativeAttempts=[],nativeTargets=[],nativeStyles=[],onGenerateNative,onDownloadNative,subscription,onRunPractice,onStartPractice,onOpenDemo,onStopPractice,onRevokePractice,busy=false
 }:DragonQuestBoardProps){
  const [tab,setTab]=useState<'quests'|'workshop'>('quests');
  const [confirmRevoke,setConfirmRevoke]=useState(false);
@@ -118,8 +125,11 @@ export default function DragonQuestBoard({
      </View>;
     })}
    </View>:<View style={s.workshop}>
-    <Text style={s.workshopTitle}>The little game foundry</Text>
-    <Text style={s.caption}>After reviewed knowledge is promoted, make original offline microgames as experiments. Each build needs a separate playtest before mastery XP is awarded.</Text>
+    <Text style={s.workshopTitle}>The native console game foundry</Text>
+    <DragonNativeWorkshop targets={nativeTargets} styles={nativeStyles} attempts={nativeAttempts}
+      onGenerate={onGenerateNative} onDownload={onDownloadNative} busy={busy}/>
+    <Text style={s.legacyTitle}>Legacy browser practice · not a console game</Text>
+    <Text style={s.caption}>Native projects are the priority. The older HTML exercises below are retained for compatibility, not represented as console ROMs.</Text>
     <View style={s.workshopRow}><View style={{flex:1}}>
      <Text style={s.statusTitle}>{subscription?.enabled?'Practice subscription active':'Practice is opt-in'}</Text>
      <Text style={s.caption}>{subscription?.enabled?`${subscription.remaining_ticks} bounded cycles remaining`:'No autonomous work without approval and a connected scheduler.'}</Text>
@@ -136,7 +146,7 @@ export default function DragonQuestBoard({
      accessibilityState={{disabled:busy}} style={[s.run,busy&&{opacity:.5}]}>
      <Ionicons name="hammer-outline" size={17} color="#15271c"/><Text style={s.runText}>{busy?'Preparing attempt…':'Generate a practice demo'}</Text>
     </Pressable>}
-    {!onRunPractice&&<Text style={s.notConnected}>Demo creation requires the authenticated practice host. No demo has been started from this screen.</Text>}
+    {!onRunPractice&&!onGenerateNative&&<Text style={s.notConnected}>Demo creation requires the authenticated practice host. No demo has been started from this screen.</Text>}
     {onRevokePractice&&<Pressable accessibilityRole="button"
       accessibilityLabel={confirmRevoke?'Confirm revocation of lesson practice consent':'Revoke lesson practice consent'}
       onPress={()=>{
@@ -191,6 +201,7 @@ const s=StyleSheet.create({
  questDone:{backgroundColor:C.mint},questTitle:{color:C.fg,fontSize:12,fontWeight:'800'},
  questReward:{color:C.gold,fontSize:10,fontWeight:'700',marginTop:3},
  workshop:{gap:9},workshopTitle:{fontSize:14,color:C.fg,fontWeight:'900'},
+ legacyTitle:{fontSize:11,color:C.muted,fontWeight:'800',marginTop:6},
  workshopRow:{backgroundColor:'#1e293b',borderRadius:11,padding:10,flexDirection:'row',gap:8,alignItems:'center'},
  statusTitle:{fontSize:11,color:C.fg,fontWeight:'800'},stop:{padding:8,borderWidth:1,borderColor:'#fca5a5',borderRadius:9},
  stopText:{color:'#fca5a5',fontSize:11},run:{backgroundColor:C.mint,padding:12,borderRadius:12,
