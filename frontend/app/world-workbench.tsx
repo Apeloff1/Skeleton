@@ -72,6 +72,13 @@ export default function WorldWorkbench() {
   }, [gameId]);
 
   React.useEffect(() => {
+    // A route reused for another game must never display the previous
+    // game's knowledge or systems, even if the new game's API is offline.
+    setKb(null);
+    setSystems([]);
+    setContextStatus('loading');
+    setJobMessage('');
+    setSelection('world');
     const controller = new AbortController();
     void load(controller.signal);
     return () => {
