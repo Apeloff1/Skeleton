@@ -15,6 +15,9 @@ class BitemporalFact:
  source_digest:str
  def __post_init__(self):
   _hex(self.object_digest,"object"); _hex(self.source_digest,"source")
+  for year in (self.valid_from_year,self.valid_through_year,self.known_from_year,self.known_through_year):
+   if isinstance(year,bool) or not isinstance(year,int) or not 1900<=year<=2200: raise TemporalSignalError("invalid bitemporal year")
+  if not self.fact_id or not self.subject or not self.relation: raise TemporalSignalError("bitemporal fact identity required")
   if self.valid_from_year>self.valid_through_year: raise TemporalSignalError("invalid valid-time interval")
   if self.known_from_year>self.known_through_year: raise TemporalSignalError("invalid knowledge-time interval")
  @property
