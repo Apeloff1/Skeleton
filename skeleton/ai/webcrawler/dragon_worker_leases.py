@@ -21,18 +21,22 @@ class DragonWorkerLeases:
   if not authorized: raise PermissionError("worker lease requires authorization")
   if not all((owner,run_id,layer,worker_id,implementation,version)) or not math.isfinite(now) or not math.isfinite(ttl) or not 1<=ttl<=3600:
    raise ValueError("invalid worker lease")
+  token=secrets.token_hex(32)
   with self.db:
+   cur=self.db.execute("""INSERT INTO dragon_worker_leases(
+    owner,run_id,layer,worker_id,implementation,version,token,leased_at,expires_at,generation)
+    VALUES(?,?,?,?,?,?,?,?,?,1)
+    ON CONFLICT(owner,run_id,layer) DO UPDATE SET
+      worker_id=excluded.worker_id,implementation=excluded.implementation,
+      version=excluded.version,token=excluded.token,leased_at=excluded.leased_at,
+      expires_at=excluded.expires_at,generation=dragon_worker_leases.generation+1
+    WHERE excluded.leased_at>=dragon_worker_leases.expires_at""",
+    (owner,run_id,layer,worker_id,implementation,version,token,now,now+ttl))
+   if cur.rowcount!=1:
+    raise RuntimeError("analysis layer already leased")
    row=self.db.execute("""SELECT worker_id,implementation,version,token,leased_at,expires_at,generation
     FROM dragon_worker_leases WHERE owner=? AND run_id=? AND layer=?""",(owner,run_id,layer)).fetchone()
-   if row and now<row[5]: raise RuntimeError("analysis layer already leased")
-   generation=1 if row is None else row[6]+1
-   token=secrets.token_hex(32)
-   self.db.execute("""INSERT INTO dragon_worker_leases VALUES(?,?,?,?,?,?,?,?,?,?)
-    ON CONFLICT(owner,run_id,layer) DO UPDATE SET worker_id=excluded.worker_id,
-    implementation=excluded.implementation,version=excluded.version,token=excluded.token,
-    leased_at=excluded.leased_at,expires_at=excluded.expires_at,generation=excluded.generation""",
-    (owner,run_id,layer,worker_id,implementation,version,token,now,now+ttl,generation))
-  return WorkerLease(owner,run_id,layer,worker_id,implementation,version,token,now,now+ttl,generation)
+  return WorkerLease(owner,run_id,layer,*row)
  def require(self,lease:WorkerLease,*,now:float,authorized:bool)->WorkerLease:
   if not authorized: raise PermissionError("worker lease validation requires authorization")
   row=self.db.execute("""SELECT worker_id,implementation,version,token,leased_at,expires_at,generation
