@@ -20,6 +20,7 @@ from .game_scale_assets import (
 from .game_scale_balancing import evaluate_game_balance,PlayBalance
 from .game_scale_campaign import Campaign,export_campaign_archive
 from .game_scale_studio import generate_level_studio
+from .game_scale_live_systems import integrate_live_progression
 
 @dataclass(frozen=True)
 class EnhancedGame:
@@ -104,7 +105,7 @@ def build_enhanced_game(blueprint:GameBlueprint, *,
         raise ValueError("enriched Canvas build requires web target")
     underlying=build_playable_web_game(blueprint)
     assets=_assets(blueprint.seed,theme)
-    html=_enhance_html(underlying.html,assets)
+    html=integrate_live_progression(_enhance_html(underlying.html,assets))
     report=evaluate_game_balance(blueprint)
     studio=generate_level_studio(blueprint,game_html=html)
     html=html.replace(
