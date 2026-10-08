@@ -234,6 +234,8 @@ class NativeChatWorkspace:
             if not item["undo"]:
                 raise RuntimeContractError("no undo history")
             item["redo"].append(item["transcript"])
+            if len(item["redo"]) > self.max_history:
+                del item["redo"][0]
             item["transcript"] = item["undo"].pop()
             self._record(cid, "undo")
             return item["revision"]
@@ -245,6 +247,8 @@ class NativeChatWorkspace:
             if not item["redo"]:
                 raise RuntimeContractError("no redo history")
             item["undo"].append(item["transcript"])
+            if len(item["undo"]) > self.max_history:
+                del item["undo"][0]
             item["transcript"] = item["redo"].pop()
             self._record(cid, "redo")
             return item["revision"]
