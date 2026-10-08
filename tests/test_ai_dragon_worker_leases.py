@@ -54,6 +54,8 @@ def test_atomic_commit_rolls_back_receipt_attestation_and_release_on_event_failu
  with pytest.raises(KeyError):
   DragonReceiptAttestations(db).get("u","r","source_integrity",authorized=True)
  assert len(events.events("u","r",authorized=True))==1
+ assert db.execute("""SELECT COUNT(*) FROM dragon_worker_lease_history
+  WHERE owner='u' AND run_id='r' AND layer='source_integrity'""").fetchone()[0]==0
  assert leases.require(lease,now=2.1,authorized=True)==lease
 
 
