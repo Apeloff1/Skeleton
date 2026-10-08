@@ -74,6 +74,44 @@ class NativeChatWorkspaceTests(unittest.TestCase):
         self.assertEqual(w.stats()["messages"], 1)
         self.assertGreaterEqual(len(w.events(conversation_id=self.cid)), 2)
 
+    def test_message_editing_and_navigation(self):
+        w = self.workspace
+        w.append_user(self.cid, "first")
+        w.append_assistant(self.cid, "reply")
+        self.assertEqual(w.last_user(self.cid).content, "first")
+        self.assertEqual(w.last_assistant(self.cid).content, "reply")
+        self.assertEqual(len(w.conversation_turns(self.cid)), 1)
+        w.replace_last(self.cid, "assistant", "revised")
+        self.assertEqual(w.last_assistant(self.cid).content, "revised")
+
+    def test_insert_move_and_swap(self):
+        w = self.workspace
+        w.append_user(self.cid, "one")
+        w.append_user(self.cid, "two")
+        w.insert_message(self.cid, 1, ChatMessage("assistant", "middle"))
+        self.assertEqual(w.message_count(self.cid), 3)
+        w.move_message(self.cid, 1, 2)
+        self.assertEqual(w.message_at(self.cid, 2).content, "middle")
+        w.swap_messages(self.cid, 0, 1)
+        self.assertEqual(w.message_at(self.cid, 0).content, "two")
+
+    def test_metadata_compare_and_swap(self):
+        w = self.workspace
+        revision = w.revision(self.cid)
+        updated = w.compare_and_rename(self.cid, revision, "Updated")
+        self.assertEqual(w.describe(self.cid).title, "Updated")
+        with self.assertRaises(RuntimeContractError):
+            w.compare_and_archive(self.cid, revision)
+        self.assertGreater(updated, revision)
+
+    def test_copy_between_branches(self):
+        w = self.workspace
+        w.append_user(self.cid, "hello")
+        branch = w.fork(self.cid)
+        w.copy_message(self.cid, 0, branch)
+        self.assertEqual(w.message_count(branch), 2)
+        self.assertEqual(w.message_count(self.cid), 1)
+
     def test_capacity_limit(self):
         w = NativeChatWorkspace(max_conversations=1)
         w.create()
