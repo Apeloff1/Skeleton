@@ -167,8 +167,30 @@ class ArchiveX:
             return cursor.rowcount
 
     def erase(self, owner: str) -> int:
+        """Erase archive bytes and known dependent owner-scoped records.
+
+        Legacy installations may not have every downstream table. Query the
+        schema first rather than creating optional stores during erasure.
+        """
         owner = self._owner(owner)
+        dependent = (
+            "archivex_dependencies",
+            "archivex_evidence_anchors",
+            "archivex_knowledge",
+            "archivex_promotions",
+            "archivex_research_signals",
+        )
         with self.db:
+            existing = {
+                row[0] for row in self.db.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                )
+            }
+            for table in dependent:
+                if table in existing:
+                    self.db.execute(
+                        "DELETE FROM " + table + " WHERE owner=?", (owner,)
+                    )
             cursor = self.db.execute(
                 "DELETE FROM archivex_snapshots WHERE owner=?", (owner,))
             return cursor.rowcount
