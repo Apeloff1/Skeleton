@@ -53,6 +53,8 @@ class DurableConversationCoordinator:
     def attach(self, session_id: str) -> PersistenceBinding:
         """Restore an existing durable ID into a live service instance."""
         with self._lock, self.service._lock:
+            if session_id in self._bindings:
+                raise RuntimeContractError("session already bound")
             if self.service.exists(session_id):
                 raise RuntimeContractError("session already loaded")
             if not self.service.can_admit():
