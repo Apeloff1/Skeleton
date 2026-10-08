@@ -56,3 +56,14 @@ Focused tests:
 python -m unittest tests.flgb.test_serving_policy_input_integrity -v
 python -m unittest tests.flgb.test_serving_policy_era tests.flgb.test_serving_policy_pressure -v
 ```
+
+### Explicit serving plan verification
+
+`PolicyAwareServingPlanner.verify(plan, trusted_request, kv_pressure_pct=...,
+queue_pressure_pct=...)` recreates the current plan under the compiled policy,
+compares its digest without timing-dependent short-circuiting and requires
+all typed receipt fields to match. A stale pressure record, changed policy,
+different request or altered receipt is refused. The caller must provide
+trusted fresh inputs; merely comparing to the plan's own claimed inputs would
+not be a meaningful authority boundary. The verifier does **not** contact
+providers, mutate scheduling state or independently authenticate telemetry.

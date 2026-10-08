@@ -167,5 +167,69 @@ class TestServingPolicyInputIntegrity(unittest.TestCase):
         self.assertEqual(fast.policy_digest, limited.policy_digest)
 
 
+    def test_plan_verification_requires_matching_trusted_context(self):
+        planner = self.planner()
+        req = ServingRequest("r", 10, 5, prefix_tokens=4, prefix_cached=True)
+        plan = planner.plan(req, kv_pressure_pct=30, queue_pressure_pct=20)
+        verified = planner.verify(plan, req, kv_pressure_pct=30, queue_pressure_pct=20)
+        self.assertEqual(plan, verified)
+        self.assertEqual(plan.digest, verified.digest)
+
+    def test_plan_verification_rejects_stale_pressure_receipt(self):
+        planner = self.planner()
+        req = ServingRequest("r", 10, 5)
+        plan = planner.plan(req, kv_pressure_pct=30, queue_pressure_pct=20)
+        for pressure in (
+            dict(kv_pressure_pct=31, queue_pressure_pct=20),
+            dict(kv_pressure_pct=30, queue_pressure_pct=21),
+        ):
+            with self.subTest(pressure=pressure), self.assertRaisesRegex(
+                ValueError, "digest mismatch"
+            ):
+                planner.verify(plan, req, **pressure)
+
+    def test_plan_verification_rejects_mutated_digest_and_public_fields(self):
+        from dataclasses import replace
+        planner = self.planner()
+        req = ServingRequest("r", 10, 5)
+        plan = planner.plan(req)
+        forged = (
+            replace(plan, digest="0" * 64),
+            replace(plan, prefill_tokens=999),
+            replace(plan, priority_boost=1000),
+            replace(plan, degradation=("bogus",)),
+        )
+        for item in forged:
+            with self.subTest(item=item), self.assertRaises(ValueError):
+                planner.verify(item, req)
+
+    def test_plan_verification_rejects_cross_policy_substitution(self):
+        old = PolicyAwareServingPlanner(RuntimePolicyCompiler().compile(2023))
+        new = self.planner()
+        req = ServingRequest("r", 10, 5)
+        receipt = old.plan(req)
+        with self.assertRaisesRegex(ValueError, "digest mismatch"):
+            new.verify(receipt, req)
+
+    def test_plan_verification_rejects_cross_request_substitution(self):
+        planner = self.planner()
+        req = ServingRequest("r", 10, 5)
+        receipt = planner.plan(req)
+        with self.assertRaisesRegex(ValueError, "digest mismatch"):
+            planner.verify(receipt, ServingRequest("different", 10, 5))
+        with self.assertRaisesRegex(ValueError, "digest mismatch"):
+            planner.verify(receipt, ServingRequest("r", 9, 6))
+
+    def test_plan_verification_rejects_wrong_type(self):
+        planner = self.planner()
+        req = ServingRequest("r", 10, 5)
+        for obj in (None, {}, "receipt", True):
+            with self.subTest(value=repr(obj)), self.assertRaisesRegex(
+                ValueError, "ServingPlan"
+            ):
+                planner.verify(obj, req)
+
+
+
 if __name__ == "__main__":
     unittest.main()

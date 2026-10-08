@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+import hmac
 import hashlib
 import json
 
@@ -161,6 +162,35 @@ class PolicyAwareServingPlanner:
             self.policy.digest,
             digest,
         )
+
+    def verify(
+        self,
+        plan: ServingPlan,
+        request: ServingRequest,
+        *,
+        kv_pressure_pct: int = 0,
+        queue_pressure_pct: int = 0,
+    ) -> ServingPlan:
+        """Require a receipt to match the fresh policy/input snapshot exactly.
+
+        The expected request and pressure inputs must come from trusted
+        admission state, not from unverified metadata carried beside `plan`.
+        This does not authenticate measurements or authorize model execution.
+        """
+        if not isinstance(plan, ServingPlan):
+            raise ValueError("ServingPlan required")
+        current = self.plan(
+            request,
+            kv_pressure_pct=kv_pressure_pct,
+            queue_pressure_pct=queue_pressure_pct,
+        )
+        if not isinstance(plan.digest, str) or not hmac.compare_digest(
+            current.digest, plan.digest
+        ):
+            raise ValueError("serving plan digest mismatch")
+        if current != plan:
+            raise ValueError("serving plan fields mismatch")
+        return current
 
 
 __all__ = ["PolicyAwareServingPlanner", "ServiceClass", "ServingPlan", "ServingRequest"]
