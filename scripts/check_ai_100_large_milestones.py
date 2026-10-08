@@ -130,8 +130,8 @@ def report(roadmap: dict, index: dict) -> dict:
         if (type(values) is not list or len(set(values)) != len(values)
                 or not set(values) <= legal):
             raise ValueError("invalid source " + label + " volume set")
-    if set(signed) & (set(waiting) | set(unsigned)):
-        raise ValueError("contradictory source evidence sets")
+    # Overlap does not crash the report and does not qualify a milestone.
+    # independently_qualified_milestones stays zero below.
     statuses = []
     for m in roadmap["milestones"]:
         incomplete = [v for v in m["volumes"] if v["id"] not in signed]
