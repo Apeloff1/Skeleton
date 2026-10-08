@@ -128,5 +128,19 @@ class CapacityTests(unittest.TestCase):
         self.assertEqual(self.ledger.snapshot(), (0, 0))
 
 
+    def test_value_equal_copy_cannot_release_or_claim_active_lease(self):
+        from dataclasses import replace
+        original = self.ledger.acquire("owner", "fingerprint", 5, exclusive=True, in_flight=True)
+        forged_copy = replace(original)
+        self.assertEqual(original, forged_copy)
+        self.assertIsNot(original, forged_copy)
+        self.assertFalse(self.ledger.is_active(forged_copy))
+        self.assertFalse(self.ledger.release(forged_copy))
+        self.assertTrue(self.ledger.is_active(original))
+        self.assertEqual(self.ledger.snapshot(), (1, 5))
+        self.assertTrue(self.ledger.release(original))
+        self.assertEqual(self.ledger.snapshot(), (0, 0))
+
+
 if __name__ == "__main__":
     unittest.main()
