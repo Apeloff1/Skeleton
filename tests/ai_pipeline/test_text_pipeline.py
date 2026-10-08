@@ -1517,3 +1517,79 @@ def test_stream_feed_rejects_invalid_chunk_without_closing():
     assert not feed.closed
     feed.push("valid")
     assert feed.consume_text() == "valid"
+
+
+
+def test_serialized_batches_reject_duplicate_json_keys_and_noncanonical_encoding():
+    import json
+    from skeleton.ai.model_runtime.text_pipeline import (
+        deserialize_model_input_batch, deserialize_causal_training_batch,
+        materialize_model_batch, materialize_causal_training_batch,
+        serialize_model_input_batch, serialize_causal_training_batch,
+    )
+    from skeleton.ai.model_runtime.tokenization import TokenWindow
+    model = materialize_model_batch((TokenWindow(0, 3, (1, 2, 3), "a" * 64),), pad_token_id=0)
+    causal = materialize_causal_training_batch(model)
+    for encode, decode, batch in (
+        (serialize_model_input_batch, deserialize_model_input_batch, model),
+        (serialize_causal_training_batch, deserialize_causal_training_batch, causal),
+    ):
+        payload = encode(batch)
+        duplicate = b'{"schema":"duplicate",' + payload[1:]
+        with pytest.raises(TokenizerContractError, match="duplicate"):
+            decode(duplicate)
+        pretty = json.dumps(json.loads(payload), indent=2).encode("utf-8")
+        with pytest.raises(TokenizerContractError, match="noncanonical"):
+            decode(pretty)
+        with pytest.raises(TokenizerContractError, match="invalid serialized"):
+            decode(b"")
+        with pytest.raises(TokenizerContractError, match="nonfinite"):
+            decode(b'{"not_a_number":NaN}')
+
+
+def test_model_batch_decoder_rejects_noninteger_tokens_and_provenance():
+    import json
+    from skeleton.ai.model_runtime.text_pipeline import (
+        deserialize_model_input_batch, materialize_model_batch, serialize_model_input_batch,
+    )
+    from skeleton.ai.model_runtime.tokenization import TokenWindow
+    model = materialize_model_batch((TokenWindow(0, 3, (1, 2, 3), "a" * 64),), pad_token_id=0)
+    original = json.loads(serialize_model_input_batch(model))
+    for name, value, expected in (
+        ("input_ids", [[True, 2, 3]], "invalid model batch token id"),
+        ("attention_mask", [[True, 1, 1]], "invalid attention mask"),
+        ("source_window_digests", ["g" * 64], "invalid model batch source digest"),
+        ("input_ids", [5], "invalid serialized model batch content"),
+        ("pad_token_id", True, "invalid model batch padding token"),
+    ):
+        payload = dict(original)
+        payload[name] = value
+        with pytest.raises(TokenizerContractError, match=expected):
+            deserialize_model_input_batch(
+                json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+            )
+
+
+def test_causal_batch_decoder_rejects_type_confusion_and_invalid_source_ids():
+    import json
+    from skeleton.ai.model_runtime.text_pipeline import (
+        deserialize_causal_training_batch, materialize_model_batch,
+        materialize_causal_training_batch, serialize_causal_training_batch,
+    )
+    from skeleton.ai.model_runtime.tokenization import TokenWindow
+    model = materialize_model_batch((TokenWindow(0, 3, (1, 2, 3), "b" * 64),), pad_token_id=0)
+    causal = materialize_causal_training_batch(model)
+    original = json.loads(serialize_causal_training_batch(causal))
+    for name, value, expected in (
+        ("input_ids", [[True, 2]], "invalid causal input token"),
+        ("loss_mask", [[True, 1]], "invalid causal loss mask"),
+        ("source_window_digests", ["g" * 64], "invalid causal source digest"),
+        ("input_ids", [False], "invalid serialized causal batch content"),
+        ("ignore_index", True, "invalid causal ignore_index"),
+    ):
+        payload = dict(original)
+        payload[name] = value
+        with pytest.raises(TokenizerContractError, match=expected):
+            deserialize_causal_training_batch(
+                json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+            )
