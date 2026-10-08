@@ -308,6 +308,8 @@ class NativeChatWorkspace:
 
     def delete_many(self, ids: Iterable[str]) -> int:
         values = tuple(ids)
+        if any(type(cid) is not str for cid in values):
+            raise RuntimeContractError("invalid conversation IDs")
         if len(set(values)) != len(values):
             raise RuntimeContractError("duplicate conversation IDs")
         with self._lock:
