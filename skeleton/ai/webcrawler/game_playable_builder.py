@@ -90,6 +90,8 @@ document.querySelectorAll("[data-button]").forEach(node=>{
 const left = () => keys.has("ArrowLeft")||keys.has("KeyA")||touch.left;
 const right = () => keys.has("ArrowRight")||keys.has("KeyD")||touch.right;
 const jump = () => keys.has("Space")||keys.has("ArrowUp")||keys.has("KeyW")||touch.jump;
+const up = () => keys.has("ArrowUp")||keys.has("KeyW");
+const down = () => keys.has("ArrowDown")||keys.has("KeyS");
 const attack = () => keys.has("KeyJ")||keys.has("KeyK");
 const dash = () => keys.has("ShiftLeft")||keys.has("ShiftRight");
 """
@@ -132,6 +134,27 @@ function moveAxis(body,axis,amount){
 function physicsStep(dt){
   const p=state.player;
   if(!p.alive||state.won) return;
+  if(scene.genre==="exploration"){
+    // Top-down world mode: keyboard-controlled x/y acceleration, no gravity.
+    // Tile collision and fixed-step deterministic updates remain identical.
+    const horizontal=Number(right())-Number(left());
+    const vertical=Number(down())-Number(up());
+    const magnitude=Math.max(1,Math.hypot(horizontal,vertical));
+    const speed=scene.physics.move_speed*TILE;
+    const accel=scene.physics.acceleration*TILE;
+    const friction=scene.physics.friction*TILE;
+    const targetX=horizontal/magnitude*speed;
+    const targetY=vertical/magnitude*speed;
+    const ax=(horizontal?accel:friction)*dt;
+    const ay=(vertical?accel:friction)*dt;
+    p.vx+=Math.sign(targetX-p.vx)*Math.min(Math.abs(targetX-p.vx),ax);
+    p.vy+=Math.sign(targetY-p.vy)*Math.min(Math.abs(targetY-p.vy),ay);
+    moveAxis(p,"x",p.vx*dt);
+    moveAxis(p,"y",p.vy*dt);
+    p.grounded=true;
+    p.invincible=Math.max(0,p.invincible-dt);
+    return;
+  }
   const direction=Number(right())-Number(left());
   const desired=direction*scene.physics.move_speed*TILE;
   const accel=scene.physics.acceleration*TILE;
