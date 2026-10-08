@@ -23,8 +23,11 @@ It composes with the canonical `skeleton.ai.model_runtime` implementation.
    because expiry while a backend still executes would permit overbooking and
    duplicate request execution. `plan_and_invoke` releases them in `finally`.
    A hung backend can therefore hold capacity until the process is terminated;
-   use a bounded execution deadline and an external supervisor. This is not a
-   durable cross-process heartbeat or cancellation mechanism.
+   use a bounded execution deadline and an external supervisor. The current
+   bridge refuses generator/coroutine/awaitable backend results so deferred work
+   cannot outlive the released lease; streaming requires a separately managed
+   lease-aware lifecycle. This is not a durable cross-process heartbeat or
+   cancellation mechanism.
 
 ## Explicitly missing production guarantees
 
