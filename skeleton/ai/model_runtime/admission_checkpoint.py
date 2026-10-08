@@ -12,6 +12,7 @@ from typing import Any
 
 from .admission_scheduler import (
     AdmissionLimits, RuntimeAdmissionScheduler, ScheduledRequest, _digest,
+    MAX_RESIDENT_KV_ENTRIES,
 )
 from .flgb_model_runtime import BatchRequest, KVCacheEntry, ModelRuntimeError
 from .runtime_policy import RuntimePolicy
@@ -204,7 +205,7 @@ def restore_admission_scheduler(
     raw_kv = raw["kv"]
     # All KV entries hold at least one physical byte. Bound the record count
     # before constructing any instances, including retained completed entries.
-    if type(raw_kv) is not list or len(raw_kv) > min(limits.kv_capacity_bytes, 65_536):
+    if type(raw_kv) is not list or len(raw_kv) > min(limits.kv_capacity_bytes, MAX_RESIDENT_KV_ENTRIES):
         raise ModelRuntimeError("invalid KV scheduler checkpoint size")
     kv: dict[str, KVCacheEntry] = {}
     resident_bytes = 0

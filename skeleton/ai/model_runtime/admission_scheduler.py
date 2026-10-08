@@ -19,6 +19,10 @@ def _digest(value: object) -> str:
     ).hexdigest()
 
 
+# Architecture-bounded count of retained + active KV allocation records.
+MAX_RESIDENT_KV_ENTRIES = 65_536
+
+
 def _require_request_id(value: object) -> str:
     """Reject malformed public operation identifiers before state lookup."""
     if (type(value) is not str or not 1 <= len(value) <= 256
@@ -188,6 +192,12 @@ class RuntimeAdmissionScheduler:
                 deferred.append(rid)
                 continue
             victim_set = set(victims)
+            if len(working_kv) - len(victim_set) >= MAX_RESIDENT_KV_ENTRIES:
+                # A cache may have sufficient free *bytes* yet exhaust its
+                # bookkeeping-entry budget. Do not accumulate unrestoreable
+                # state or evict pinned/active entries to hide this pressure.
+                deferred.append(rid)
+                continue
             if victim_set & set(self._active):
                 deferred.append(rid)
                 continue

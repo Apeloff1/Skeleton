@@ -310,6 +310,37 @@ class TestRetainedKVIdentitySafety(unittest.TestCase):
             scheduler.release_retained_kv("r")
         self.assertEqual(scheduler.snapshot(), before)
 
+    def test_kv_entry_count_preflight_matches_checkpoint_restore_bound(self):
+        from unittest.mock import patch
+        scheduler = RuntimeAdmissionScheduler(
+            AdmissionLimits(
+                max_active_requests=2, max_queued_requests=3,
+                max_batch_size=1, max_tokens_per_batch=10,
+                kv_capacity_bytes=100, max_age_boost=10,
+            )
+        )
+        scheduler.submit(BatchRequest("a", 1, 1), kv_bytes=10)
+        scheduler.admit()
+        scheduler.complete("a", retain_kv=True)
+        scheduler.submit(BatchRequest("b", 1, 1), kv_bytes=10)
+        scheduler.admit()
+        scheduler.complete("b", retain_kv=True)
+        scheduler.submit(BatchRequest("c", 1, 1), kv_bytes=10)
+        before = scheduler.snapshot()
+        with patch("skeleton.ai.model_runtime.admission_scheduler.MAX_RESIDENT_KV_ENTRIES", 2):
+            decision = scheduler.admit()
+            self.assertEqual(decision.admitted, ())
+            self.assertEqual(decision.deferred, ("c",))
+            self.assertEqual(scheduler.queued_ids, ("c",))
+            self.assertEqual(scheduler.capacity()["kv_used_bytes"], 20)
+            scheduler.release_retained_kv("a")
+            self.assertEqual(scheduler.admit().admitted, ("c",))
+        self.assertEqual(
+            restore_admission_scheduler(scheduler.snapshot()).snapshot(),
+            scheduler.snapshot(),
+        )
+        self.assertEqual(before["capacity"]["kv_used_bytes"], 20)
+
     def test_resource_configuration_cannot_exceed_native_architecture_bounds(self):
         overrides = (
             dict(max_active_requests=4097, max_batch_size=1),

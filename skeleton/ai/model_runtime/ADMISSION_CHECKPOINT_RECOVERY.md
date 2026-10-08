@@ -77,3 +77,13 @@ without changing queue, KV or sequence state.
 
 The implementation remains an in-process deterministic scheduler, not a
 multitenant allocator, cryptographic identity service or execution engine.
+
+## Resident KV bookkeeping capacity
+
+The scheduler and checkpoint loader share a 65,536-entry architecture limit
+(`MAX_RESIDENT_KV_ENTRIES`). `admit()` defers requests when admitting would
+exhaust the resident allocation-record budget, even if spare KV bytes remain.
+A caller can release an inactive cached entry explicitly before retrying.
+This avoids serializing an apparently valid live scheduler state that the
+strict recovery parser would later reject on restart. The guard never frees
+active, pinned or completed retained entries implicitly.
