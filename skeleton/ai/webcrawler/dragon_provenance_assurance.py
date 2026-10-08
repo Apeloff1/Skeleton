@@ -25,6 +25,7 @@ from .dragon_probabilistic_distillation import (
 from .dragon_source_independence import (
     SourceProvenance, derive_dependency_clusters,
 )
+from .dragon_provenance_registry import ProvenanceRegistry
 
 
 def _fingerprint(data: object) -> str:
@@ -80,6 +81,7 @@ class ProvenanceAssurance:
     blockers: tuple[str, ...]
     next_actions: tuple[ResearchNextAction, ...]
     fingerprint: str
+    attestation_fingerprint: str | None = None
     probability_semantics: str = "heuristic_logistic_score"
     promotion_authorized: bool = False
 
@@ -94,6 +96,7 @@ class AssurancePolicy:
     maximum_sources: int = 10000
     maximum_actions: int = 100
     maximum_holdout_groups: int = 500
+    require_attestations: bool = False
 
 
 def _verify_policy(policy: AssurancePolicy) -> None:
@@ -132,6 +135,11 @@ def _manifest(
         if not isinstance(source.canonical_uri, str) or not admit.admits(source.canonical_uri):
             raise ValueError("untrusted provenance origin")
         origin = urlsplit(source.canonical_uri)
+        hostname = (origin.hostname or "").lower().rstrip(".")
+        if ("." not in hostname or hostname.endswith(
+            (".localhost", ".local", ".internal", ".test", ".invalid")
+        )):
+            raise ValueError("untrusted provenance origin")
         if origin.username is not None or origin.password is not None:
             raise ValueError("untrusted provenance origin")
         if not isinstance(source.content_digest, str) or (
@@ -160,6 +168,7 @@ def _assured_groups(
     sources: tuple[SourceProvenance, ...],
     by_id: dict[str, SourceProvenance],
     max_sources: int,
+    registry: ProvenanceRegistry | None,
 ) -> tuple[tuple[SourceCluster, ...], dict[str, str]]:
     """Take the transitive closure of *both* custody and asserted dependence.
 
@@ -191,6 +200,17 @@ def _assured_groups(
             reasons[key].update(cluster.reasons)
         for other in ids[1:]:
             union(ids[0], other, "provenance_dependency")
+    if registry is not None:
+        attested_labels: dict[str, str] = {}
+        for sid, source in sorted(by_id.items()):
+            labels = registry.dependency_labels_for(source.canonical_uri)
+            if labels is None:
+                raise ValueError("unattested source origin")
+            for label in labels:
+                if label in attested_labels:
+                    union(sid, attested_labels[label], "attested_common_control")
+                else:
+                    attested_labels[label] = sid
     labelled: dict[str, str] = {}
     for item in evidence:
         if item.independence_group in labelled:
@@ -302,6 +322,7 @@ def assure_crawler_evidence(
     authorized: bool,
     evidence_policy: EvidencePolicy = EvidencePolicy(),
     assurance_policy: AssurancePolicy = AssurancePolicy(),
+    attestation_registry: ProvenanceRegistry | None = None,
 ) -> ProvenanceAssurance:
     """Derive trusted *dependency* boundaries and stress-test the belief.
 
@@ -312,6 +333,11 @@ def assure_crawler_evidence(
     if not authorized:
         raise PermissionError("provenance analysis requires authorization")
     _verify_policy(assurance_policy)
+    if assurance_policy.require_attestations and (
+        attestation_registry is None
+        or not attestation_registry.policy.require_attestation
+    ):
+        raise ValueError("verified source attestation registry required")
     distiller = ProbabilisticKnowledgeDistiller(evidence_policy)
     items = tuple(evidence)
     sources = tuple(provenance)
@@ -325,6 +351,7 @@ def assure_crawler_evidence(
     by_id = _manifest(items, sources, assurance_policy.maximum_sources)
     clusters, lookup = _assured_groups(
         items, sources, by_id, assurance_policy.maximum_sources,
+        attestation_registry,
     )
     from dataclasses import replace
     normalized = tuple(replace(
@@ -392,12 +419,16 @@ def assure_crawler_evidence(
         "policy": [assurance_policy.min_independent_groups,
                    assurance_policy.min_supporting_probability,
                    assurance_policy.min_heldout_probability,
-                   assurance_policy.maximum_holdout_groups],
+                   assurance_policy.maximum_holdout_groups,
+                   assurance_policy.require_attestations],
         "sources": sorted([
             [s.source_id, s.content_digest, s.canonical_uri,
              sorted(s.parent_source_ids), sorted(s.lineage_tokens)]
             for s in sources
         ]),
+        "attestation_registry": (
+            attestation_registry.fingerprint if attestation_registry else None
+        ),
         "clusters": [(c.cluster_id, c.source_ids) for c in clusters],
         "holdouts": [(h.cluster_id, h.heldout_probability) for h in holdouts],
     })
@@ -407,4 +438,5 @@ def assure_crawler_evidence(
         min_probability, belief.independent_groups,
         relabels, coverage, True, candidate,
         blockers_tuple, actions, fingerprint,
+        attestation_registry.fingerprint if attestation_registry else None,
     )
