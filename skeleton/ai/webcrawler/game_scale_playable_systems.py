@@ -10,7 +10,8 @@ _ADVANCED_JS=r"""
 const combatRuntime={
   bullets:[], facing:1, potions:1, ammo:12, shotCooldown:0,
   collected:0, defeated:0, questGoal:0, questKills:0,
-  shopX:0, firstFrame:true
+  shopX:0, firstFrame:true, touchShootHeld:false,
+  touchHealHeld:false, touchShopHeld:false
 };
 function resetExtendedGame(){
  combatRuntime.bullets.length=0;
@@ -60,6 +61,15 @@ addEventListener("keydown",event=>{
 function updateAdvancedCombat(dt){
  const p=state.player;
  if(!p.alive||state.won)return;
+ const shooting=Boolean(touch.shoot);
+ const healing=Boolean(touch.heal);
+ const shopping=Boolean(touch.shop);
+ if(shooting&&!combatRuntime.touchShootHeld)fireGameProjectile();
+ if(healing&&!combatRuntime.touchHealHeld)drinkHealingPotion();
+ if(shopping&&!combatRuntime.touchShopHeld)combatShopPurchase();
+ combatRuntime.touchShootHeld=shooting;
+ combatRuntime.touchHealHeld=healing;
+ combatRuntime.touchShopHeld=shopping;
  combatRuntime.shotCooldown=Math.max(0,combatRuntime.shotCooldown-dt);
  if(Math.abs(p.vx)>10)combatRuntime.facing=Math.sign(p.vx);
  for(let i=combatRuntime.bullets.length-1;i>=0;i--){
