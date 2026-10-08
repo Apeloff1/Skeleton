@@ -772,10 +772,125 @@ class NativeLLMRuntime:
         )
 
 
+class NativeConversationSession:
+    """Stateful, bounded token-native conversation over an admitted runtime.
+
+    A turn is committed only after successful generation. No generated text is
+    decoded and re-encoded, preserving the exact token trajectory.
+    """
+
+    def __init__(self, runtime: NativeLLMRuntime) -> None:
+        if not isinstance(runtime, NativeLLMRuntime):
+            raise RuntimeContractError("NativeLLMRuntime required")
+        self.runtime = runtime
+        self._model_digest = runtime.model_digest
+        self._tokenizer_digest = runtime.tokenizer.digest
+        self._tokens: tuple[int, ...] = ()
+        self.turns = 0
+
+    @property
+    def token_ids(self) -> tuple[int, ...]:
+        return self._tokens
+
+    def reset(self) -> None:
+        self._tokens = ()
+        self.turns = 0
+
+    def _assert_identity(self) -> None:
+        self.runtime.assert_model_unchanged()
+        try:
+            self.runtime.tokenizer.assert_unchanged()
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("session tokenizer mutated") from exc
+        if not hmac.compare_digest(self._model_digest, self.runtime.model_digest):
+            raise RuntimeContractError("session model identity changed")
+        if not hmac.compare_digest(self._tokenizer_digest, self.runtime.tokenizer.digest):
+            raise RuntimeContractError("session tokenizer identity changed")
+
+    def generate(
+        self,
+        text: str,
+        config: GenerationConfig | None = None,
+    ) -> GenerationResult:
+        self._assert_identity()
+        incoming = self.runtime.encode(text).token_ids
+        if not incoming:
+            raise RuntimeContractError("conversation turn must not be empty")
+        if len(incoming) > self.runtime.limits.max_context:
+            raise RuntimeContractError("conversation turn exceeds context budget")
+        cfg = config or GenerationConfig(
+            max_new_tokens=min(32, self.runtime.limits.max_new_tokens)
+        )
+        if not isinstance(cfg, GenerationConfig):
+            raise RuntimeContractError("GenerationConfig required")
+        available = self.runtime.limits.max_context - len(incoming)
+        history = self._tokens[-available:] if available else ()
+        prompt_ids = history + incoming
+        sequence = TokenSequence(
+            self._tokenizer_digest,
+            prompt_ids,
+            digest_json({"session_turn": self.turns, "token_ids": list(prompt_ids)}),
+        )
+        result = self.runtime.generate_sequence(sequence, cfg)
+        self._assert_identity()
+        self._tokens = (prompt_ids + result.generated_ids)[-self.runtime.limits.max_context:]
+        self.turns += 1
+        return result
+
+    def snapshot(self) -> Mapping[str, Any]:
+        self._assert_identity()
+        return {
+            "model_digest": self._model_digest,
+            "tokenizer_digest": self._tokenizer_digest,
+            "token_ids": list(self._tokens),
+            "turns": self.turns,
+            "digest": digest_json({
+                "model_digest": self._model_digest,
+                "tokenizer_digest": self._tokenizer_digest,
+                "token_ids": list(self._tokens),
+                "turns": self.turns,
+            }),
+        }
+
+    @classmethod
+    def restore(
+        cls,
+        runtime: NativeLLMRuntime,
+        snapshot: Mapping[str, Any],
+    ) -> "NativeConversationSession":
+        if not isinstance(snapshot, Mapping):
+            raise RuntimeContractError("session snapshot mapping required")
+        session = cls(runtime)
+        try:
+            tokens = snapshot["token_ids"]
+            turns = snapshot["turns"]
+            if (not isinstance(tokens, list) or
+                any(type(t) is not int or t < 0 or t >= runtime.tokenizer.vocab_size for t in tokens) or
+                len(tokens) > runtime.limits.max_context or
+                type(turns) is not int or turns < 0):
+                raise ValueError("invalid session state")
+            payload = {
+                "model_digest": session._model_digest,
+                "tokenizer_digest": session._tokenizer_digest,
+                "token_ids": tokens,
+                "turns": turns,
+            }
+            if (not hmac.compare_digest(snapshot["model_digest"], session._model_digest) or
+                not hmac.compare_digest(snapshot["tokenizer_digest"], session._tokenizer_digest) or
+                not hmac.compare_digest(snapshot["digest"], digest_json(payload))):
+                raise ValueError("session identity or digest mismatch")
+        except (KeyError, TypeError, ValueError) as exc:
+            raise RuntimeContractError("invalid or incompatible session snapshot") from exc
+        session._tokens = tuple(tokens)
+        session.turns = turns
+        return session
+
+
 __all__ = [
     "BatchGenerationResult",
     "GenerationResult",
     "GenerationStream",
     "InferenceResult",
     "NativeLLMRuntime",
+    "NativeConversationSession",
 ]
