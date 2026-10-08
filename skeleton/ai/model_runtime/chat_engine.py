@@ -58,6 +58,8 @@ class NativeChatEngine:
                                    if m.role not in ("system", "developer")), None)
             if first_dialogue is None:
                 raise RuntimeContractError("system instructions exceed model context")
+            if first_dialogue == len(messages) - 1:
+                raise RuntimeContractError("latest chat message cannot fit model context")
             messages.pop(first_dialogue)
             if not messages:
                 raise RuntimeContractError("chat prompt cannot fit model context")
