@@ -23,19 +23,6 @@ from .flgb_model_runtime import (
     plan_kv_admission,
     route_request,
 )
-from .native_llm_runtime import (
-    BatchGenerationResult,
-    GenerationResult,
-    GenerationStream,
-    NativeLLMRuntime,
-)
-from .runtime_checkpoint import validate_model_snapshot
-from .runtime_service import (
-    CancellationToken,
-    NativeModelService,
-    NativeServiceError,
-    NativeServiceResult,
-)
 from .runtime_contracts import (
     BatchGenerationRequest,
     DevicePolicy,
@@ -49,18 +36,45 @@ from .runtime_contracts import (
     RuntimeLimits,
     RuntimeUsage,
 )
-from .tokenization import (
-    NativeTokenizer,
-    StreamingTextFeed,
-    TokenBatch,
-    TokenWindow,
-    TokenizerContractError,
-    TokenizerLimits,
-    batch_token_windows,
-    deserialize_token_sequence,
-    iter_context_windows,
-    serialize_token_sequence,
-)
+
+# Delay optional native transformer / Cortex imports until explicitly requested.
+# Contract-only modules must load under the standard-library-only CI lane.
+from importlib import import_module
+
+_LAZY_EXPORTS = {
+    "BatchGenerationResult": ".native_llm_runtime",
+    "GenerationResult": ".native_llm_runtime",
+    "GenerationStream": ".native_llm_runtime",
+    "NativeLLMRuntime": ".native_llm_runtime",
+    "CancellationToken": ".runtime_service",
+    "NativeModelService": ".runtime_service",
+    "NativeServiceError": ".runtime_service",
+    "NativeServiceResult": ".runtime_service",
+    "NativeTokenizer": ".tokenization",
+    "StreamingTextFeed": ".tokenization",
+    "TokenBatch": ".tokenization",
+    "TokenWindow": ".tokenization",
+    "TokenizerContractError": ".tokenization",
+    "TokenizerLimits": ".tokenization",
+    "batch_token_windows": ".tokenization",
+    "deserialize_token_sequence": ".tokenization",
+    "iter_context_windows": ".tokenization",
+    "serialize_token_sequence": ".tokenization",
+    "validate_model_snapshot": ".runtime_checkpoint",
+}
+
+
+def __getattr__(name: str):
+    module_name = _LAZY_EXPORTS.get(name)
+    if module_name is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(import_module(module_name, __name__), name)
+    globals()[name] = value
+    return value
+
+
+def __dir__():
+    return sorted(set(globals()) | set(__all__))
 
 __all__ = [
     "ALLOWED_TRANSITIONS",
