@@ -71,5 +71,28 @@ class CapacityBridgeTests(unittest.TestCase):
         self.backend.assert_not_called()
 
 
+    def test_live_backend_retains_capacity_after_lease_deadline(self):
+        clock = [10]
+        ledger = CapacityLedger(
+            CapacityLimits(1, 50, 2), clock_ns=lambda: clock[0],
+        )
+        calls = []
+
+        def long_running_backend(plan):
+            calls.append(plan)
+            clock[0] = 100
+            self.assertEqual(ledger.snapshot(), (1, 30))
+            with self.assertRaisesRegex(CapacityDenied, "active reservation"):
+                self.execute(ledger=ledger, invoke=long_running_backend)
+            self.assertEqual(ledger.snapshot(), (1, 30))
+            return "completed"
+
+        outcome = self.execute(ledger=ledger, invoke=long_running_backend)
+        self.assertEqual(outcome.backend_result, "completed")
+        self.assertEqual(calls, ["plan"])
+        self.assertEqual(ledger.snapshot(), (0, 0))
+        self.assertEqual(self.execute(ledger=ledger).backend_result, "output")
+
+
 if __name__ == "__main__":
     unittest.main()
