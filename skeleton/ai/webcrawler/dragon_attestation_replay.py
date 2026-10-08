@@ -1,0 +1,29 @@
+"""Receipt attestation replay verification."""
+from __future__ import annotations
+from dataclasses import dataclass
+from hashlib import sha256
+import json,sqlite3
+
+from .dragon_analysis_runtime import DragonAnalysisRuntime
+from .dragon_receipt_attestation import DragonReceiptAttestations
+
+@dataclass(frozen=True)
+class AttestationReplay:
+ layer:str;valid:bool;reason:str
+
+def verify_receipt_attestation(db:sqlite3.Connection,owner:str,run_id:str,layer:str,*,
+                               authorized:bool)->AttestationReplay:
+ if not authorized:raise PermissionError("attestation replay requires authorization")
+ att=DragonReceiptAttestations(db).get(owner,run_id,layer,authorized=True)
+ rows=db.execute("""SELECT output_fingerprint FROM dragon_analysis_run_receipts
+  WHERE owner=? AND run_id=? AND layer=?""",(owner,run_id,layer)).fetchall()
+ if len(rows)!=1:return AttestationReplay(layer,False,"accepted receipt missing or ambiguous")
+ if rows[0][0]!=att.output_fingerprint:return AttestationReplay(layer,False,"receipt fingerprint mismatch")
+ body=[att.owner,att.run_id,att.layer,att.output_fingerprint,att.worker_id,
+  att.implementation,att.version,att.lease_generation,att.lease_token_digest,
+  att.committed_revision,att.chain_fingerprint]
+ fp=sha256(json.dumps(body,separators=(",",":")).encode()).hexdigest()
+ if fp!=att.attestation_fingerprint:return AttestationReplay(layer,False,"attestation fingerprint mismatch")
+ cp=DragonAnalysisRuntime(db).checkpoint(owner,run_id,authorized=True)
+ if cp.revision<att.committed_revision:return AttestationReplay(layer,False,"runtime revision precedes attestation")
+ return AttestationReplay(layer,True,"verified")
