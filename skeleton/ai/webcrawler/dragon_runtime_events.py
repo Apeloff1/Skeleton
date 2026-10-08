@@ -19,7 +19,7 @@ class DragonRuntimeEventLedger:
    evidence_fingerprint TEXT NOT NULL,error_code TEXT NOT NULL,
    occurred_at REAL NOT NULL,previous_hash TEXT NOT NULL,event_hash TEXT NOT NULL,
    PRIMARY KEY(owner,run_id,sequence),UNIQUE(owner,run_id,event_hash))""");db.commit()
- def append(self,owner:str,run_id:str,*,event_type:str,layer:str,outcome:str,
+ def _append_uncommitted(self,owner:str,run_id:str,*,event_type:str,layer:str,outcome:str,
             evidence_fingerprint:str="",error_code:str="",occurred_at:float,
             authorized:bool)->RuntimeEvent:
   if not authorized: raise PermissionError("runtime event write requires authorization")
@@ -28,16 +28,23 @@ class DragonRuntimeEventLedger:
   if evidence_fingerprint and (len(evidence_fingerprint)!=64 or any(c not in "0123456789abcdef" for c in evidence_fingerprint)):
    raise ValueError("invalid event evidence fingerprint")
   if len(error_code)>128: raise ValueError("error code too long")
-  with self.db:
-   row=self.db.execute("""SELECT sequence,event_hash,occurred_at FROM dragon_runtime_events
-    WHERE owner=? AND run_id=? ORDER BY sequence DESC LIMIT 1""",(owner,run_id)).fetchone()
-   seq=1 if row is None else row[0]+1;prev="0"*64 if row is None else row[1]
-   if row is not None and occurred_at<row[2]: raise ValueError("runtime event time regression")
-   body=[owner,run_id,seq,event_type,layer,outcome,evidence_fingerprint,error_code,occurred_at,prev]
-   h=sha256(json.dumps(body,separators=(",",":"),allow_nan=False).encode()).hexdigest()
-   self.db.execute("INSERT INTO dragon_runtime_events VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-    (owner,run_id,seq,event_type,layer,outcome,evidence_fingerprint,error_code,occurred_at,prev,h))
+  row=self.db.execute("""SELECT sequence,event_hash,occurred_at FROM dragon_runtime_events
+   WHERE owner=? AND run_id=? ORDER BY sequence DESC LIMIT 1""",(owner,run_id)).fetchone()
+  seq=1 if row is None else row[0]+1;prev="0"*64 if row is None else row[1]
+  if row is not None and occurred_at<row[2]: raise ValueError("runtime event time regression")
+  body=[owner,run_id,seq,event_type,layer,outcome,evidence_fingerprint,error_code,occurred_at,prev]
+  h=sha256(json.dumps(body,separators=(",",":"),allow_nan=False).encode()).hexdigest()
+  self.db.execute("INSERT INTO dragon_runtime_events VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+   (owner,run_id,seq,event_type,layer,outcome,evidence_fingerprint,error_code,occurred_at,prev,h))
   return RuntimeEvent(owner,run_id,seq,event_type,layer,outcome,evidence_fingerprint,error_code,occurred_at,prev,h)
+
+ def append(self,owner:str,run_id:str,*,event_type:str,layer:str,outcome:str,
+            evidence_fingerprint:str="",error_code:str="",occurred_at:float,
+            authorized:bool)->RuntimeEvent:
+  with self.db:
+   return self._append_uncommitted(owner,run_id,event_type=event_type,layer=layer,outcome=outcome,
+    evidence_fingerprint=evidence_fingerprint,error_code=error_code,occurred_at=occurred_at,
+    authorized=authorized)
  def events(self,owner:str,run_id:str,*,authorized:bool)->tuple[RuntimeEvent,...]:
   if not authorized: raise PermissionError("runtime event read requires authorization")
   rows=self.db.execute("""SELECT owner,run_id,sequence,event_type,layer,outcome,evidence_fingerprint,
