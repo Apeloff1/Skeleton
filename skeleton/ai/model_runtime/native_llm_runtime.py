@@ -494,6 +494,13 @@ class NativeLLMRuntime:
             cache_tokens = len(cache.tokens) if cache is not None else 0
             if cache is not None:
                 kv_peak = max(kv_peak, self.estimate_kv_bytes(cache_tokens))
+                if kv_peak > self.limits.max_kv_bytes:
+                    raise RuntimeContractError("generation exceeded KV memory budget")
+            self.assert_model_unchanged()
+            try:
+                self.tokenizer.assert_unchanged()
+            except TokenizerContractError as exc:
+                raise RuntimeContractError("tokenizer mutated during generation") from exc
 
             event = RuntimeEvent(
                 sequence,
