@@ -19,9 +19,9 @@ class TestRuntimeSignals(unittest.TestCase):
             (
                 "iteration_level_scheduling",
                 "paged_kv_memory",
-                "chunked_prefill",
                 "tiered_kv_reuse",
                 "prefix_affinity",
+                "chunked_prefill",
                 "slo_admission",
             ),
         )
