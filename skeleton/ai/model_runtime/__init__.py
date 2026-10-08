@@ -36,6 +36,7 @@ from .flgb_model_runtime import (
     plan_kv_admission,
     route_request,
 )
+from .conversation_store import ConversationStore, StoredConversation
 from .conversation_service import NativeConversationService, SessionRecord, ServingReceipt
 from .native_llm_runtime import (
     BatchGenerationResult,
@@ -119,6 +120,8 @@ __all__ = [
     "NativeLLMRuntime",
     "NativeConversationSession",
     "NativeConversationService",
+    "ConversationStore",
+    "StoredConversation",
     "SessionRecord",
     "ServingReceipt",
     "NativeModelService",
