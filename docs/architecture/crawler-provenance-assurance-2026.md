@@ -42,6 +42,17 @@ a shared content hash or ancestry prevents its readings from becoming new
 independent corroboration. Ghost parent nodes may preserve the dependency
 chain but cannot contribute votes without actual readings.
 
+Publisher attestations strengthen the conservative closure. If the caller
+provides the existing `ProvenanceRegistry`, the assurance plane also joins
+all sources sharing the **same verified ownership** or **same syndication
+network**, even when each URL and content hash differs. These are two
+independent merger criteria: separate feeds owned by the same publisher are
+not artificially separated. The optional
+`AssurancePolicy(require_attestations=True)` fails closed unless a registry
+with strict attestation policy is supplied and every manifest source resolves.
+The registry's fingerprint is included in the analysis fingerprint, so a
+custody-attestation update invalidates old assurance conclusions.
+
 An honest statement of statistical independence often requires more evidence
 than the manifest can prove. A distinct cluster is only a *conservative
 candidate for independence*, never proof that two publications did not
@@ -96,7 +107,11 @@ The bridge:
 
 The legacy entry point remains intact for compatibility. Consumers that
 require custody integrity must use the strict bridge; the presence of this
-adapter alone does **not** migrate existing callers.
+adapter alone does **not** migrate existing callers. For systems demanding
+stronger publisher controls, pass
+`AssurancePolicy(require_attestations=True)` and an authorized
+`ProvenanceRegistry` into the bridge. A missing or unknown publisher cannot
+silently qualify as an independent research source.
 
 ## Resource constraints and auditability
 
