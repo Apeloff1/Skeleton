@@ -28,6 +28,8 @@ class PromotionDecision:
     claim_id: str
     eligible: bool
     belief_probability: float
+    probability_semantics: str
+    calibration_artifact_fingerprint: str | None
     reasons: tuple[str, ...]
     evidence_digest: str
 
@@ -61,14 +63,26 @@ def assess_promotion(
     if belief.independent_groups < policy.minimum_independent_groups:
         failures.append("Insufficient independent source groups")
     promoted_probability = belief.probability
+    probability_semantics = belief.probability_semantics
+    calibration_fingerprint = None
     if policy.require_empirical_calibration:
         if calibration is None:
             failures.append("Eligible empirical calibration artifact required")
         elif not calibration.eligible:
             failures.append("Empirical calibration artifact is ineligible")
         else:
-            promoted_probability = apply_calibrator(belief.probability, calibration)
-    if promoted_probability < policy.minimum_probability:
+            calibrated = apply_calibrator(
+                belief.probability, calibration, authorized=True,
+            )
+            promoted_probability = calibrated.calibrated_probability
+            probability_semantics = "empirically_calibrated_probability"
+            calibration_fingerprint = calibrated.artifact_fingerprint
+    if (
+        policy.require_empirical_calibration
+        and probability_semantics != "empirically_calibrated_probability"
+    ):
+        failures.append("Promotion threshold requires calibrated probability")
+    elif promoted_probability < policy.minimum_probability:
         failures.append("Belief below promotion threshold")
     if stress.maximum_probability_shift > policy.maximum_source_influence:
         failures.append("Belief depends too heavily on one source group")
@@ -81,5 +95,6 @@ def assess_promotion(
             failures.extend(quality.failures)
     return PromotionDecision(
         claim_id, not failures, promoted_probability,
+        probability_semantics, calibration_fingerprint,
         tuple(dict.fromkeys(failures)), belief.evidence_digest,
     )
