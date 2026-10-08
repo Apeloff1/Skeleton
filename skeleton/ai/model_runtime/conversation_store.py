@@ -79,7 +79,7 @@ class ConversationStore:
         return payload
 
     def _decode(self, payload: str) -> Mapping[str, Any]:
-        if len(payload.encode("utf-8")) > self.max_snapshot_bytes:
+        if not isinstance(payload, str) or len(payload.encode("utf-8")) > self.max_snapshot_bytes:
             raise RuntimeContractError("stored conversation exceeds storage budget")
         try:
             obj = json.loads(payload)
