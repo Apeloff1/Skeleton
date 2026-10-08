@@ -84,6 +84,13 @@ _SPINE_EXPORTS = {
     "assure_crawler_evidence": ".dragon_provenance_assurance",
     "CustodyPromotionReview": ".dragon_provenance_promotion",
     "assess_custodied_promotion": ".dragon_provenance_promotion",
+    "CapturedSource": ".dragon_crawl_custody",
+    "LocatedReading": ".dragon_crawl_custody",
+    "CrawlCustodyBundle": ".dragon_crawl_custody",
+    "CustodyPolicy": ".dragon_crawl_custody",
+    "CapturedCrawlReview": ".dragon_crawl_custody",
+    "bind_crawl_evidence": ".dragon_crawl_custody",
+    "assure_captured_crawl": ".dragon_crawl_custody",
 }
 
 def __getattr__(name: str):
