@@ -19,7 +19,7 @@ def decimal_wire(value:float|int)->str:
 def visual_wire_body(envelope)->dict:
  return {"wire":WIRE,"schema":envelope.schema,"owner":envelope.owner,"job_id":envelope.job_id,
   "recording_digest":envelope.recording_digest,"consent_id":envelope.consent_id,
-  "consent_scope_digest":envelope.consent_scope_digest,
+  "consent_scope_digest":envelope.consent_scope_digest,"decoder_version":envelope.decoder_version,
   "retention_until":decimal_wire(envelope.retention_until),
   "frames":[[x.frame_id,x.frame_digest,str(x.captured_at_ms),x.source_locator] for x in envelope.frames],
   "observations":[[x.frame_id,x.frame_digest,decimal_wire(x.luminance_mean),
