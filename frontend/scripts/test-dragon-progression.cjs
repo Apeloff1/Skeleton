@@ -15,10 +15,10 @@ const load=(name)=>{
  return {source,code:result.outputText};
 };
 const model=load('dragonProgression.ts');
-const module={exports:{}};
-vm.runInNewContext(model.code,{module,exports:module.exports,Math,Array,Number,Set,Object},
+const sandboxModule={exports:{}};
+vm.runInNewContext(model.code,{module:sandboxModule,exports:sandboxModule.exports,Math,Array,Number,Set,Object},
  {filename:'dragonProgression.js',timeout:1500});
-const m=module.exports;
+const m=sandboxModule.exports;
 const proof={
  schema:'skeleton.ai.dragon.practice_progress.v1',level:2,xp:85,next_level_xp:225,
  verified_lessons:1,demos_built:4,demos_reviewed:1,demo_attempts:4,
