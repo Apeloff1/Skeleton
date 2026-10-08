@@ -133,3 +133,23 @@ def test_shared_database_connections_observe_single_active_lease(tmp_path):
  replacement=second.acquire("u","r","source_integrity","w2","impl","2",now=6,ttl=5,authorized=True)
  assert replacement.generation==lease.generation+1
  assert replacement.worker_id=="w2" and replacement.token!=lease.token
+
+
+def test_expired_replacement_archives_abandoned_generation():
+ db=sqlite3.connect(":memory:"); leases=DragonWorkerLeases(db)
+ old=leases.acquire("u","r","source_integrity","w1","impl-a","1",now=1,ttl=2,authorized=True)
+ new=leases.acquire("u","r","source_integrity","w2","impl-b","2",now=3,ttl=5,authorized=True)
+ history=leases.history("u","r","source_integrity",old.generation,authorized=True)
+ assert history[0:3]==("w1","impl-a","1")
+ assert history[4:]==(1.0,3.0,3.0)
+ assert history[3]==__import__("hashlib").sha256(old.token.encode()).hexdigest()
+ assert new.generation==old.generation+1
+
+def test_active_lease_rejection_does_not_archive_or_mutate_generation():
+ db=sqlite3.connect(":memory:"); leases=DragonWorkerLeases(db)
+ old=leases.acquire("u","r","source_integrity","w1","impl","1",now=1,ttl=10,authorized=True)
+ with pytest.raises(RuntimeError,match="already leased"):
+  leases.acquire("u","r","source_integrity","w2","impl","2",now=2,ttl=5,authorized=True)
+ assert leases.require(old,now=3,authorized=True)==old
+ with pytest.raises(KeyError):
+  leases.history("u","r","source_integrity",old.generation,authorized=True)
