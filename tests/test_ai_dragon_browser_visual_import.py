@@ -52,3 +52,14 @@ def test_unknown_observation_transport_id_is_rejected_even_with_valid_envelope_h
  changed=replace(unsigned,payload_fingerprint=canonical_browser_visual_fingerprint(unsigned))
  with pytest.raises(ValueError,match="unknown browser frame"):
   accept_browser_visual(cq,changed,now=3,authorized=True)
+
+
+def test_browser_locator_cannot_control_server_canonical_evidence():
+ cq,_,e=setup();original=accept_browser_visual(cq,e,now=3,authorized=True)
+ frame=replace(e.frames[0],source_locator="attacker://arbitrary")
+ unsigned=replace(e,frames=(frame,),payload_fingerprint="")
+ changed=replace(unsigned,payload_fingerprint=canonical_browser_visual_fingerprint(unsigned))
+ accepted=accept_browser_visual(cq,changed,now=3,authorized=True)
+ assert accepted.envelope_fingerprint!=original.envelope_fingerprint
+ assert accepted.canonical_evidence_fingerprint==original.canonical_evidence_fingerprint
+ assert accepted.features.frames[0].source_frame_id==original.features.frames[0].source_frame_id
