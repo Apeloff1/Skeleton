@@ -42,6 +42,7 @@ from .native_llm_runtime import (
     GenerationStream,
     InferenceResult,
     NativeLLMRuntime,
+    NativeConversationSession,
 )
 from .runtime_checkpoint import validate_model_snapshot
 from .runtime_service import (
@@ -115,6 +116,7 @@ __all__ = [
     "ModelRegistry",
     "ModelRuntimeError",
     "NativeLLMRuntime",
+    "NativeConversationSession",
     "NativeModelService",
     "NativeServiceError",
     "NativeServiceResult",
