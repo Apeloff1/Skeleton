@@ -186,9 +186,44 @@ def export_campaign_archive(campaign:Campaign)->bytes:
             raise ValueError("campaign launcher currently supports web targets")
         name=f"levels/level-{i:03d}.html"
         original=build_playable_web_game(chapter.blueprint).html
-        index.append(f'<a href="{name}">Chapter {i}: '
-                     +escape(chapter.blueprint.title)+'</a>')
+        # Persist locally, never transmit a player completion event.
+        # The exact compiled game signals success; opening a level alone
+        # cannot mark it complete.
+        completion=(
+            '\\nfunction campaignWin(){\\n'
+            '  try{const key="skeleton-campaign-'+campaign.campaign_id+'";'
+            '  const before=Number(localStorage.getItem(key)||"1");'
+            f'  localStorage.setItem(key,String(Math.max(before,{i+1})));'
+            '}catch(_){}\\n'
+            '}\\n'
+        )
+        original=original.replace(
+            "state.won=true;state.score+=250",
+            "state.won=true;state.score+=250;campaignWin()",
+        )
+        original=original.replace("</script>",completion+"</script>",1)
+        original=original.replace(
+            "<script>",
+            '<p><a href="../index.html" style="color:#86d4ff">'
+            'Back to Campaign</a></p><script>',1,
+        )
+        index.append(f'<li><a data-chapter="{i}" href="{name}">Chapter {i}: '
+                     +escape(chapter.blueprint.title)+'</a></li>')
         files.append((name,original.encode()))
+    index.append("""<script>
+try{
+  const key="skeleton-campaign-__CAMPAIGN__";
+  const unlocked=Number(localStorage.getItem(key)||"1");
+  for(const chapter of document.querySelectorAll("[data-chapter]")){
+    const locked=Number(chapter.dataset.chapter)>unlocked;
+    if(locked){chapter.setAttribute("aria-disabled","true");
+      chapter.textContent="🔒 "+chapter.textContent+" (locked)";
+      chapter.addEventListener("click",event=>event.preventDefault());
+      chapter.style.opacity=".5";
+    }
+  }
+}catch(error){/* File/localStorage denial: remain independently playable. */}
+</script>""".replace("__CAMPAIGN__",campaign.campaign_id))
     index.append('</body></html>')
     files.insert(0,("index.html","".join(index).encode()))
     files.append(("campaign.json",json.dumps({
