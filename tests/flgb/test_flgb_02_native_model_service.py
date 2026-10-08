@@ -356,6 +356,24 @@ class TestNativeModelService(unittest.TestCase):
         self.assertEqual(result.events, ())
         self.assertEqual(len(result.receipt.usage_digest), 64)
 
+    def test_tokenizer_mutation_rejected_at_service_admission(self):
+        from unittest.mock import patch
+        from skeleton.ai.model_runtime.tokenization import TokenizerContractError
+
+        service = NativeModelService(self.runtime())
+        config = GenerationConfig(max_new_tokens=1)
+        request = service.request("tokenizer-mutation", "alpha", config, deadline_ms=1000)
+        with patch.object(
+            service.runtime.tokenizer,
+            "assert_unchanged",
+            side_effect=TokenizerContractError("vocabulary drift"),
+        ):
+            with self.assertRaisesRegex(
+                NativeServiceError, "tokenizer identity changed after admission"
+            ) as caught:
+                service.execute(request, "alpha", config)
+        self.assertIsInstance(caught.exception.__cause__, TokenizerContractError)
+
     def test_clock_contract_fails_closed(self):
         service = NativeModelService(self.runtime(), clock_ns=lambda: -1)
         config = GenerationConfig(max_new_tokens=1, temperature=0.0)
