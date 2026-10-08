@@ -65,7 +65,8 @@ def test_consent_expiry_during_temporal_chunks_blocks_temporal_receipt():
    clock=lambda:next(times))
  cp=rt.checkpoint("u","run",authorized=True)
  assert cp.revision==1
- assert cp.receipts[-1].layer is AnalysisLayer.SOURCE_INTEGRITY
+ receipts=rt._receipts("u","run")
+ assert len(receipts)==1 and receipts[0].layer is AnalysisLayer.SOURCE_INTEGRITY
 
 def test_invalid_live_clock_fails_before_source_receipt():
  _,cq,_,_,e,rt=setup()
