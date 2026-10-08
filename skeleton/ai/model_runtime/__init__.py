@@ -91,6 +91,16 @@ _LAZY_EXPORTS = {
     "DEFAULT_TEMPORAL_RUNTIME_POLICY_COMPILER": ".temporal_policy",
     "TemporalRuntimePolicy": ".temporal_policy",
     "TemporalRuntimePolicyCompiler": ".temporal_policy",
+    "PolicyAwareServingPlanner": ".serving_policy",
+    "ServiceClass": ".serving_policy",
+    "ServingPlan": ".serving_policy",
+    "ServingRequest": ".serving_policy",
+    "DeterministicRuntimeEstimator": ".runtime_feedback",
+    "FeedbackLimits": ".runtime_feedback",
+    "FeedbackReceipt": ".runtime_feedback",
+    "ClosedLoopServingController": ".closed_loop_serving",
+    "ControlDecision": ".closed_loop_serving",
+    "ExecutionTiming": ".execution_telemetry",
 }
 
 
@@ -107,6 +117,16 @@ def __dir__():
     return sorted(set(globals()) | set(__all__))
 
 __all__ = [
+    "PolicyAwareServingPlanner",
+    "ServiceClass",
+    "ServingPlan",
+    "ServingRequest",
+    "DeterministicRuntimeEstimator",
+    "FeedbackLimits",
+    "FeedbackReceipt",
+    "ClosedLoopServingController",
+    "ControlDecision",
+    "ExecutionTiming",
     "restore_admission_scheduler",
     "AdmissionDecision",
     "AdmissionLimits",
