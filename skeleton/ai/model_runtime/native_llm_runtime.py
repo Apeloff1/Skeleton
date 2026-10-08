@@ -351,6 +351,17 @@ class NativeLLMRuntime:
         """Tokenize text and execute one next-token inference graph pass."""
         return self.infer_sequence(self.encode(text), use_cache=use_cache)
 
+    def infer_feed(
+        self,
+        feed: StreamingTextFeed,
+        *,
+        use_cache: bool = True,
+    ) -> InferenceResult:
+        """Execute next-token inference directly from a bounded text feed."""
+        if not isinstance(feed, StreamingTextFeed):
+            raise RuntimeContractError("StreamingTextFeed required")
+        return self.infer_sequence(feed.finalize(self.tokenizer), use_cache=use_cache)
+
     def _config_digest(self, config: GenerationConfig) -> str:
         return digest_json(config.to_dict())
 
