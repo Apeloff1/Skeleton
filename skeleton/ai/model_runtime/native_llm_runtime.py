@@ -787,6 +787,8 @@ class NativeConversationSession:
         self._tokenizer_digest = runtime.tokenizer.digest
         self._tokens: tuple[int, ...] = ()
         self.turns = 0
+        self._revision = 0
+        self._pending_streams: dict[int, tuple[int, str]] = {}
 
     @property
     def token_ids(self) -> tuple[int, ...]:
@@ -795,6 +797,8 @@ class NativeConversationSession:
     def reset(self) -> None:
         self._tokens = ()
         self.turns = 0
+        self._revision += 1
+        self._pending_streams.clear()
 
     def _assert_identity(self) -> None:
         self.runtime.assert_model_unchanged()
@@ -835,6 +839,8 @@ class NativeConversationSession:
         self._assert_identity()
         self._tokens = (prompt_ids + result.generated_ids)[-self.runtime.limits.max_context:]
         self.turns += 1
+        self._revision += 1
+        self._pending_streams.clear()
         return result
 
     @property
@@ -884,6 +890,7 @@ class NativeConversationSession:
         if any(type(i) is not int or i < 0 or i >= self.runtime.tokenizer.vocab_size for i in ids):
             raise RuntimeContractError("invalid appended token")
         self._tokens = (self._tokens + ids)[-self.runtime.limits.max_context:]
+        self._revision += 1
 
     def append_text(self, text: str) -> None:
         self.append_tokens(self.preview_tokens(text))
@@ -893,18 +900,21 @@ class NativeConversationSession:
         if type(keep_last) is not int or keep_last < 0:
             raise RuntimeContractError("invalid truncation length")
         self._tokens = self._tokens[-keep_last:] if keep_last else ()
+        self._revision += 1
 
     def drop_prefix(self, count: int) -> None:
         self._assert_identity()
         if type(count) is not int or count < 0:
             raise RuntimeContractError("invalid prefix count")
         self._tokens = self._tokens[count:]
+        self._revision += 1
 
     def fork(self) -> "NativeConversationSession":
         self._assert_identity()
         child = NativeConversationSession(self.runtime)
         child._tokens = self._tokens
         child.turns = self.turns
+        child._revision = self._revision
         return child
 
     def replace_history(self, token_ids: Sequence[int]) -> None:
@@ -915,6 +925,7 @@ class NativeConversationSession:
         ):
             raise RuntimeContractError("invalid replacement history")
         self._tokens = ids
+        self._revision += 1
 
     def merge_history(self, other: "NativeConversationSession") -> None:
         self._assert_identity()
@@ -934,13 +945,18 @@ class NativeConversationSession:
         tokens = self.preview_context(text)
         sequence = TokenSequence(self._tokenizer_digest, tokens,
                                  digest_json({"session_turn": self.turns, "token_ids": list(tokens)}))
-        return self.runtime.stream_sequence(sequence, config)
+        stream = self.runtime.stream_sequence(sequence, config)
+        self._pending_streams[id(stream)] = (self._revision, sequence.digest)
+        return stream
 
     def commit_stream(self, stream: GenerationStream) -> GenerationResult:
         self._assert_identity()
         if not isinstance(stream, GenerationStream) or stream.result is None:
             raise RuntimeContractError("completed generation stream required")
         result = stream.result
+        pending = self._pending_streams.pop(id(stream), None)
+        if pending is None or pending != (self._revision, result.prompt_sequence.digest):
+            raise RuntimeContractError("stream is stale or not owned by session")
         if result.replay_receipt.model_digest != self._model_digest or (
             result.replay_receipt.tokenizer_digest != self._tokenizer_digest
         ):
@@ -953,6 +969,8 @@ class NativeConversationSession:
         self._tokens = (result.prompt_sequence.token_ids + result.generated_ids)[
             -self.runtime.limits.max_context:]
         self.turns += 1
+        self._revision += 1
+        self._pending_streams.clear()
         return result
 
     def export_token_ids(self) -> list[int]:
