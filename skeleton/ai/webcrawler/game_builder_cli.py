@@ -126,7 +126,7 @@ def run(args=None) -> int:
             ):
                 parser.error("Connected worlds need --genre exploration --engine web, 2-20 rooms, and a single-game build")
             region=generate_world_region(opts.title,rooms=opts.world_rooms,
-                                         seed=opts.seed,columns=3)
+                                         seed=opts.seed,columns=4)
             blueprint=world_region_to_blueprint(
                 region,title=opts.title,seed=opts.seed,
             )
