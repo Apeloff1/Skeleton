@@ -11,7 +11,7 @@ from skeleton.ai.webcrawler.dragon_browser_visual_import import BrowserVisualEnv
 def setup():
  db=sqlite3.connect(":memory:");q=DragonAnalysisQueue(db);l=DragonConsentLedger(db)
  c=l.issue("u",capture=True,analysis=True,issued_at=1,expires_at=100,policy_version="v1",scope_digest="a"*64,authorized=True)
- cq=ConsentBoundAnalysisQueue(q,l,db);j=cq.submit("u","b"*64,"g",consent_id=c.consent_id,scope_digest="a"*64,now=2,authorized=True)
+ cq=ConsentBoundAnalysisQueue(q,l);j=cq.submit("u",recording_digest="b"*64,game_label="g",consent_id=c.consent_id,scope_digest="a"*64,now=2,authorized=True)
  f=CapturedFrame("c"*64,"ignored","ignored","ignored","ignored","ignored",0,"d"*64,90,"local-frame://0")
  o=VisualObservation("c"*64,"d"*64,.2,.3,.4,.1)
  e=BrowserVisualEnvelope(SCHEMA,"u",j.job_id,"b"*64,c.consent_id,"a"*64,90,(f,),(o,),"")
