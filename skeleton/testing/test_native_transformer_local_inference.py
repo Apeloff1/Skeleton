@@ -36,6 +36,8 @@ class TestNativeTransformerLocalBackend(unittest.TestCase):
         self.assertGreater(result.input_tokens, 0)
         self.assertIsNotNone(result.text)
         self.assertTrue(result.response_id.startswith("local-native:"))
+        self.assertIsInstance(result.execution_receipt_digest, str)
+        self.assertEqual(len(result.execution_receipt_digest), 64)
 
     def test_engine_executes_native_transformer_and_caches_by_identity(self):
         async def scenario():
@@ -58,6 +60,8 @@ class TestNativeTransformerLocalBackend(unittest.TestCase):
         self.assertEqual(a.text, b.text)
         self.assertNotEqual(first.digest, second.digest)
         self.assertNotEqual(a.response_id, b.response_id)
+        self.assertNotEqual(a.execution_receipt_digest, b.execution_receipt_digest)
+        self.assertEqual(len(a.execution_receipt_digest), 64)
 
     def test_precancelled_request_fails_without_decode(self):
         backend = self.backend()
