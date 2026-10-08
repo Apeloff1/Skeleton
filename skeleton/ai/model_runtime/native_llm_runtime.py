@@ -123,6 +123,18 @@ class GenerationStream:
             self.result = exc.value
             raise
 
+    def close(self) -> None:
+        """Cancel a partially consumed stream and release its generator state."""
+        close = getattr(self._iterator, "close", None)
+        if close is not None:
+            close()
+
+    def __enter__(self) -> "GenerationStream":
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        self.close()
+
 
 class NativeLLMRuntime:
     """Bounded deterministic serving runtime for TinyTransformer.
