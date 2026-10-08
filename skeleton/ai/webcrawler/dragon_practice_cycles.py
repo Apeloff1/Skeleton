@@ -69,7 +69,7 @@ class DragonPracticeCycles:
         if (not isinstance(demos_per_tick,int)
                 or not 1 <= demos_per_tick <= self.lab.policy.max_demos_per_batch):
             raise ValueError("practice demo batch out of bounds")
-        if generation_mode not in ('html','native'):
+        if generation_mode not in ('html','native','curriculum'):
             raise ValueError("unsupported scheduled generation mode")
         if generation_mode=='native' and (native_target not in EMITTERS or native_style not in STYLES):
             raise ValueError("requested native target or style has no source emitter")
@@ -142,18 +142,38 @@ class DragonPracticeCycles:
                 return ()
         # Current authorized schedule is the consent grant. Lesson-specific
         # consent must also remain active; revocation blocks work immediately.
-        if mode=='native':
+        if mode in ('native','curriculum'):
             native=DragonNativePracticeLab(self.db,self.lab)
+            course=None
+            if mode=='curriculum':
+                from .dragon_native_curriculum import DragonNativeCurriculum
+                from .dragon_build_evidence import DragonBuildEvidence
+                import os
+                key_str=os.environ.get("SKL_DRAGON_BUILD_SIGNING_KEY_HEX","").strip()
+                evidence=None
+                if key_str:
+                    try:
+                        private_key=bytes.fromhex(key_str)
+                    except ValueError:
+                        raise PermissionError("invalid native evidence signing configuration") from None
+                    evidence=DragonBuildEvidence(
+                        self.db,native,private_signing_key=private_key)
+                course=DragonNativeCurriculum(native,evidence)
             created=[]
             for _ in range(demos):
                 # Every attempt changes the native exercise, never regenerates
                 # an existing lesson/target/style merely to inflate workloads.
                 # Keep the chosen genre honest; each attempt increments a
                 # separately seeded challenge variant under the same target.
-                exercise=style
                 try:
-                    created.append(native.generate(owner,target_id=target,style=exercise,
-                                                   now=now,authorized=True,consent=True))
+                    if course is not None:
+                        _,attempt=course.generate_next(
+                            owner,authorized=True,consent=True,now=now)
+                        created.append(attempt)
+                    else:
+                        created.append(native.generate(
+                            owner,target_id=target,style=style,
+                            now=now,authorized=True,consent=True))
                 except (PermissionError,ValueError):
                     break
             return tuple(created)

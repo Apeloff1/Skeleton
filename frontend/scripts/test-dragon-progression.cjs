@@ -65,10 +65,21 @@ const gb={id:'game_boy',family:'Nintendo',generation:'8-bit handheld',year:1989,
 assert.equal(n.normalizeNativeTargets([gb]).length,1);
 assert.equal(n.normalizeNativeTargets([{...gb,status:'phantom'}]).length,0);
 assert.equal(n.titleCaseId('game_boy'),'Game Boy');
+const curriculum={owner:'a'.repeat(64),curriculum_level:1,
+ native_source_attempts:0,unlocked:[],blocked:[],structural_build_targets:[],
+ next_recommendation:null,proof_scope:'structural ROM only',
+ schema:'skeleton.ai.dragon.native_curriculum.v1'};
+assert.ok(n.normalizeNativeCurriculum(curriculum));
+assert.equal(n.normalizeNativeCurriculum({...curriculum,owner:'bad'}),null);
 const source=fs.readFileSync(path.join(dir,'DragonNativeWorkshop.tsx'),'utf8');
 assert.ok(source.includes('Native game forge')&&source.includes('Generate native game source ZIP'));
+assert.ok(source.includes('Adaptive native acquisition'));
+assert.ok(source.includes('Generate suggested practice game'));
 const nativeHook=fs.readFileSync(path.join(dir,'useDragonAcademy.ts'),'utf8');
 assert.ok(nativeHook.includes("'/native/generate'")&&nativeHook.includes("'/archive'"));
+assert.ok(nativeHook.includes("'/native/curriculum/generate'")&&
+ nativeHook.includes("'/native/curriculum'"));
+assert.ok(nativeHook.includes('adaptive:true'), 'new opt-in practice uses evidence-gated curriculum');
 assert.ok(nativeHook.includes('Crypto.digest(')&&nativeHook.includes('Sharing.shareAsync('));
 
 const demoPlayer=fs.readFileSync(path.join(dir,'DragonDemoPlayer.tsx'),'utf8');

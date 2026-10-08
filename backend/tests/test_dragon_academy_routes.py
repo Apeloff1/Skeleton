@@ -217,3 +217,54 @@ def test_native_build_evidence_route_never_allows_browser_to_mint_builds(
     paths={r.path for r in route.router.routes}
     assert "/api/dragon-academy/native/evidence" in paths
     assert not any("attest" in x or "mint-build" in x for x in paths)
+
+
+def test_native_curriculum_backend_is_consent_bound_and_owner_scoped(
+    tmp_path,monkeypatch,
+):
+    path=tmp_path/"curriculum.sqlite"
+    monkeypatch.setenv("SKL_DRAGON_PRACTICE_DB_PATH",str(path))
+    monkeypatch.delenv("SKL_DRAGON_BUILD_SIGNING_KEY_HEX",raising=False)
+    owner=identity()
+    with sqlite3.connect(path) as db:
+        parent=DragonPracticeLab(db)
+        parent.offer(approved(owner),authorized=True,now=1)
+    before=route.native_curriculum(owner=owner)
+    assert before["ok"] and before["curriculum_level"]==1
+    assert before["next_recommendation"]["target"]=="game_boy"
+    with pytest.raises(HTTPException) as denied:
+        route.native_curriculum_generate(route.CurriculumGenerateRequest(
+            approved=False),owner=owner)
+    assert denied.value.status_code==403
+    accepted=route.native_curriculum_generate(route.CurriculumGenerateRequest(
+        approved=True),owner=owner)
+    assert accepted["created_native"]["target_id"]=="game_boy"
+    assert accepted["curriculum"]["native_source_attempts"]==1
+    assert accepted["progress"]["xp"]==30
+    assert route.native_curriculum(owner=identity("another@example.test"))[
+        "native_source_attempts"]==0
+    paths={item.path for item in route.router.routes}
+    assert "/api/dragon-academy/native/curriculum" in paths
+    assert "/api/dragon-academy/native/curriculum/generate" in paths
+
+
+def test_adaptive_practice_subscriptions_preserve_opt_in_and_finite_ticks(
+    tmp_path,monkeypatch,
+):
+    from skeleton.ai.webcrawler.dragon_practice_cycles import DragonPracticeCycles
+    monkeypatch.setenv("SKL_DRAGON_PRACTICE_DB_PATH",str(tmp_path/"adaptive.sqlite"))
+    monkeypatch.delenv("SKL_DRAGON_BUILD_SIGNING_KEY_HEX",raising=False)
+    owner=identity()
+    with sqlite3.connect(tmp_path/"adaptive.sqlite") as db:
+        DragonPracticeLab(db).offer(approved(owner),authorized=True,now=1)
+    subscription=route.subscribe_practice(route.SubscribeRequest(
+        approved=True,adaptive=True,max_ticks=2,demos_per_tick=1),owner=owner)
+    assert subscription["subscription"]["generation_mode"]=="curriculum"
+    with sqlite3.connect(tmp_path/"adaptive.sqlite") as db:
+        lab=DragonPracticeLab(db)
+        cycles=DragonPracticeCycles(db,lab)
+        created=cycles.pulse(
+            owner,authorized=True,now=subscription["subscription"]["next_due"])
+    assert len(created)==1
+    assert created[0].target_id=="game_boy"
+    assert route.academy_status(owner=owner)["native_attempts"]

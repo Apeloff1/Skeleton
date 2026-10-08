@@ -591,3 +591,47 @@ The user-editable game design sets the count of native rhythm songs (1-8)
 and turn-RPG chapter count (1-8). These engines are compiled from original
 source; native CI status must be checked before claiming that actual
 binaries built or that physical devices played them.
+
+
+## Ninth-generation native acquisition: evidence-gated curriculum
+
+The game builder now includes a finite DragonNativeCurriculum that selects
+game-building exercises by missing capability and trusted binary evidence.
+
+It starts with Game Boy input/2bpp sprite practice. Only after a trusted
+source-bound Game Boy ROM structural receipt exists does it unlock the
+Game Boy platformer, NES 6502 exercise and CGB palette training.
+NES and CGB receipts unlock broader C64, Master System, Game Gear, GBA,
+16-bit VDP, DOS VGA, desktop SDL, first-person, turn RPG and rhythm-game
+projects. Later PS1 and original Xbox source exercises remain SDK-dependent
+and are NOT automatically counted as working games.
+
+The curriculum refuses to equate a source-generated game with mastered
+hardware. It reads the authoritative native attempts from SQLite,
+verifies signed ROM evidence only if the operator key is configured, and
+prioritizes genuinely new target/genre gaps over repeating similar source
+variants. Eight variants per approved lesson/platform/genre are the cap;
+the total daily native/HTML budget is shared and the user controls opt-in.
+
+Authenticated API routes:
+- GET /api/dragon-academy/native/curriculum: recommended target, unlocked
+  tasks, blocked requirements, source attempt history and evidence tier.
+- POST /api/dragon-academy/native/curriculum/generate: requires explicit
+  approved=true, authoritative owner, reviewed knowledge and the existing
+  practice quota. This generates source, NOT a compiler or public XP mint.
+- The React Native/Expo Studio companion displays this evidence tier,
+  next target and genre, prior attempts and an explicit Generate suggested
+  practice game action. Evidence tier is distinct from dragon XP.
+
+The existing finite DragonPracticeCycles controller also supports
+curriculum mode. Companion opt-ins set adaptive=true; manual API
+subscriptions still default to adaptive=false for compatibility.
+A trusted host must invoke pulse() before any scheduled work executes.
+Subscription creation does NOT launch unbounded background workers.
+Expiration, maximum ticks, revocation and shared daily attempt quotas
+remain mandatory.
+
+A structural ROM receipt can unlock later source study. It cannot award
+real playability, human enjoyment, AI capability mastery or commercial
+SDK certification. True compiled, emulator-tested and reviewed outcomes
+require independently traceable tests and human approval.

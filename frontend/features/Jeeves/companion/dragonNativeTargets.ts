@@ -42,3 +42,43 @@ export function normalizeNativeAttempts(input:unknown):NativeAttempt[]{
 export function titleCaseId(key:string):string{
  return key.replace(/_/g,' ').replace(/\b\w/g,m=>m.toUpperCase());
 }
+
+export interface NativeCurriculumRecommendation {
+ target:string;genre:string;milestone_id:string;reason:string;
+ priority:number;previous_attempts:number;build_evidence_count:number;
+ proof_level:string;
+}
+export interface NativeCurriculum {
+ owner:string;curriculum_level:number;
+ structural_build_targets:string[];native_source_attempts:number;
+ unlocked:NativeCurriculumRecommendation[];
+ blocked:{id:string;target:string;requires:string[];missing:string[];reason:string}[];
+ next_recommendation:NativeCurriculumRecommendation|null;
+ proof_scope:string;schema:string;
+}
+export function normalizeNativeCurriculum(value:unknown):NativeCurriculum|null {
+ if(!value||typeof value!=='object')return null;
+ const r=value as NativeCurriculum;
+ if(typeof r.owner!=='string'||!digest.test(r.owner)||
+    !Number.isInteger(r.curriculum_level)||r.curriculum_level<1||r.curriculum_level>8||
+    !Number.isInteger(r.native_source_attempts)||r.native_source_attempts<0||
+    !Array.isArray(r.unlocked)||r.unlocked.length>60||
+    !Array.isArray(r.blocked)||r.blocked.length>60||
+    !Array.isArray(r.structural_build_targets)||r.structural_build_targets.length>50||
+    r.schema!=='skeleton.ai.dragon.native_curriculum.v1')return null;
+ const valid=(c:unknown):c is NativeCurriculumRecommendation=>{
+  if(!c||typeof c!=='object')return false;
+  const x=c as NativeCurriculumRecommendation;
+  return typeof x.milestone_id==='string'&&/^[a-z0-9_]{2,64}$/.test(x.milestone_id)&&
+   typeof x.target==='string'&&/^[a-z0-9_]{2,64}$/.test(x.target)&&
+   typeof x.genre==='string'&&/^[a-z_]{3,64}$/.test(x.genre)&&
+   typeof x.reason==='string'&&x.reason.length<180&&
+   Number.isFinite(x.priority)&&
+   Number.isInteger(x.previous_attempts)&&x.previous_attempts>=0&&
+   Number.isInteger(x.build_evidence_count)&&x.build_evidence_count>=0&&
+   typeof x.proof_level==='string'&&x.proof_level.length<80;
+ };
+ if(!r.unlocked.every(valid)||(r.next_recommendation!==null&&!valid(r.next_recommendation)))return null;
+ if(!r.structural_build_targets.every(x=>typeof x==='string'&&/^[a-z0-9_]{2,64}$/.test(x)))return null;
+ return r;
+}

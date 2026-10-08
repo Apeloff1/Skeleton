@@ -16,12 +16,13 @@ import {
  normalizeDragonAttempts,validateDragonProgress,
 } from './dragonProgression';
 import type {CompanionAcademyInput,CompanionTelemetry} from './DragonCompanionPanel';
-import {type NativeAttempt,type NativeTarget,normalizeNativeAttempts,normalizeNativeTargets} from './dragonNativeTargets';
+import {type NativeAttempt,type NativeTarget,type NativeCurriculum,normalizeNativeAttempts,normalizeNativeTargets,normalizeNativeCurriculum} from './dragonNativeTargets';
 import {EMPTY_COMPANION_JOURNAL,reduceDragonJournal,type CompanionJournal,type WireDragonEvent} from './dragonJournal';
 
 type Snapshot={
  ok:boolean;progress:DragonPracticeProgress;attempts:DragonPracticeAttempt[];
  subscription:DragonPracticeSubscription;native_attempts?:NativeAttempt[];
+ curriculum?:NativeCurriculum;
 };
 type HtmlArtifact={ok:boolean;html:string;sha256:string;sandbox_required:boolean;attempt_id:string};
 type CrawlFeed={ok:boolean;session_id:string|null;active:boolean;events:WireDragonEvent[];next_cursor:string|null;has_more:boolean};
@@ -43,6 +44,7 @@ export function useDragonAcademy(){
  const [nativeAttempts,setNativeAttempts]=useState<NativeAttempt[]>([]);
  const [nativeTargets,setNativeTargets]=useState<NativeTarget[]>([]);
  const [nativeStyles,setNativeStyles]=useState<string[]>([]);
+ const [curriculum,setCurriculum]=useState<NativeCurriculum|null>(null);
  const [subscription,setSubscription]=useState<DragonPracticeSubscription|null>(null);
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState('');
@@ -58,7 +60,7 @@ export function useDragonAcademy(){
    const me=await checkMe();
    if(!alive.current)return;
    if(!me.authenticated||!getAuthToken()){
-    setAuthenticated(false);setProgress(null);setAttempts([]);setNativeAttempts([]);setNativeTargets([]);setSubscription(null);
+    setAuthenticated(false);setProgress(null);setAttempts([]);setNativeAttempts([]);setNativeTargets([]);setCurriculum(null);setSubscription(null);
     setTelemetry(undefined);sessionRef.current=null;journal.current=EMPTY_COMPANION_JOURNAL;
     setError('Sign in through Studio to connect Dragon Academy.');
     return;
@@ -84,10 +86,14 @@ export function useDragonAcademy(){
     setNativeStyles(Array.isArray(platforms.data.styles)?platforms.data.styles.filter(
      x=>typeof x==='string'&&/^[a-z_]{2,64}$/.test(x)).slice(0,50):[]);
    }
+   const course=await api.get<NativeCurriculum&{ok:boolean}>(
+    PATH+'/native/curriculum',{headers:authHeaders(),timeoutMs:12000,retries:0});
+   if(alive.current&&course.ok&&course.data?.ok)
+    setCurriculum(normalizeNativeCurriculum(course.data));
    setSubscription(snapshot.subscription);setAuthenticated(true);setError('');
   }catch(e){
    if(alive.current){setAuthenticated(false);setProgress(null);
-    setAttempts([]);setNativeAttempts([]);setNativeTargets([]);setSubscription(null);
+    setAttempts([]);setNativeAttempts([]);setNativeTargets([]);setCurriculum(null);setSubscription(null);
     setError(e instanceof Error?e.message:'Could not connect to Dragon Academy.');}
   }
  },[]);
@@ -149,13 +155,26 @@ export function useDragonAcademy(){
    if(!p||!subscriptionValid(r.data.subscription))throw new Error('Invalid practice result.');
    if(alive.current){setProgress(p);setAttempts(normalizeDragonAttempts(r.data.attempts));
     setNativeAttempts(normalizeNativeAttempts(r.data.native_attempts));
+    if(r.data.curriculum)
+     setCurriculum(normalizeNativeCurriculum(r.data.curriculum));
     setSubscription(r.data.subscription);}
+   if(!r.data.curriculum){
+    const updated=await api.get<NativeCurriculum&{ok:boolean}>(
+      PATH+'/native/curriculum',
+      {headers:authHeaders(),timeoutMs:12000,retries:0});
+    if(alive.current&&updated.ok&&updated.data?.ok)
+     setCurriculum(normalizeNativeCurriculum(updated.data));
+   }
   }catch(e){
    if(alive.current)setError(e instanceof Error?e.message:'Practice command failed.');
   }finally{
    inFlight.current=false;if(alive.current)setBusy(false);
   }
  },[authenticated]);
+ const generateCurriculum=useCallback(()=>{
+  if(!curriculum?.next_recommendation)return;
+  void mutate('/native/curriculum/generate',{approved:true});
+ },[mutate,curriculum]);
  const generateNative=useCallback((target:string,style:string)=>{
   const valid=nativeTargets.find(t=>t.id===target&&t.status==='native_source');
   if(!valid||!nativeStyles.includes(style))return;
@@ -195,6 +214,7 @@ export function useDragonAcademy(){
 
  const subscribe=useCallback(()=>{void mutate('/practice/subscribe',{
   hours:24,interval_seconds:3600,max_ticks:24,demos_per_tick:2,approved:true,
+  adaptive:true,
  });},[mutate]);
  const stop=useCallback(()=>{void mutate('/practice/stop');},[mutate]);
  const revoke=useCallback(()=>{void mutate('/practice/revoke');},[mutate]);
@@ -227,7 +247,8 @@ export function useDragonAcademy(){
  const closeDemo=useCallback(()=>setDemo(null),[]);
  const view:CompanionAcademyInput={
   progress,attempts,subscription,practiceBusy:busy,
-  nativeAttempts,nativeTargets,nativeStyles,
+  nativeAttempts,nativeTargets,nativeStyles,nativeCurriculum:curriculum,
+  onGenerateCurriculum:authenticated?generateCurriculum:undefined,
   onGenerateNative:authenticated?generateNative:undefined,
   onDownloadNative:authenticated?downloadNative:undefined,
   onRunPractice:undefined, // HTML legacy; native source is the default practice path.

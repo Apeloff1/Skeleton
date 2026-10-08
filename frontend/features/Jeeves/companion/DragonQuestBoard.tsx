@@ -1,6 +1,6 @@
 import React,{useState} from 'react';
 import DragonNativeWorkshop from './DragonNativeWorkshop';
-import type{NativeAttempt,NativeTarget}from './dragonNativeTargets';
+import type{NativeAttempt,NativeTarget,NativeCurriculum}from './dragonNativeTargets';
 import{Pressable,StyleSheet,Text,View}from'react-native';
 import{Ionicons}from'@expo/vector-icons';
 import{
@@ -36,6 +36,8 @@ export interface DragonQuestBoardProps{
  nativeAttempts?:readonly NativeAttempt[];
  nativeTargets?:readonly NativeTarget[];
  nativeStyles?:readonly string[];
+ nativeCurriculum?:NativeCurriculum|null;
+ onGenerateCurriculum?:()=>void;
  onGenerateNative?:(target:string,style:string)=>void;
  onDownloadNative?:(attemptId:string)=>void;
  subscription?:DragonPracticeSubscription|null;
@@ -47,7 +49,7 @@ export interface DragonQuestBoardProps{
  busy?:boolean;
 }
 export default function DragonQuestBoard({
- progress,attempts=[],nativeAttempts=[],nativeTargets=[],nativeStyles=[],onGenerateNative,onDownloadNative,subscription,onRunPractice,onStartPractice,onOpenDemo,onStopPractice,onRevokePractice,busy=false
+ progress,attempts=[],nativeAttempts=[],nativeTargets=[],nativeStyles=[],nativeCurriculum,onGenerateCurriculum,onGenerateNative,onDownloadNative,subscription,onRunPractice,onStartPractice,onOpenDemo,onStopPractice,onRevokePractice,busy=false
 }:DragonQuestBoardProps){
  const [tab,setTab]=useState<'quests'|'workshop'>('quests');
  const [confirmRevoke,setConfirmRevoke]=useState(false);
@@ -127,6 +129,7 @@ export default function DragonQuestBoard({
    </View>:<View style={s.workshop}>
     <Text style={s.workshopTitle}>The native console game foundry</Text>
     <DragonNativeWorkshop targets={nativeTargets} styles={nativeStyles} attempts={nativeAttempts}
+      curriculum={nativeCurriculum} onGenerateCurriculum={onGenerateCurriculum}
       onGenerate={onGenerateNative} onDownload={onDownloadNative} busy={busy}/>
     <Text style={s.legacyTitle}>Legacy browser practice · not a console game</Text>
     <Text style={s.caption}>Native projects are the priority. The older HTML exercises below are retained for compatibility, not represented as console ROMs.</Text>

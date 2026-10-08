@@ -1,19 +1,21 @@
 import React,{useMemo,useState} from 'react';
 import{Pressable,ScrollView,StyleSheet,Text,TextInput,View}from'react-native';
 import{Ionicons}from'@expo/vector-icons';
-import{type NativeAttempt,type NativeTarget,titleCaseId}from'./dragonNativeTargets';
+import{type NativeAttempt,type NativeTarget,type NativeCurriculum,titleCaseId}from'./dragonNativeTargets';
 
 export interface DragonNativeWorkshopProps{
  targets?:readonly NativeTarget[];
  attempts?:readonly NativeAttempt[];
  styles?:readonly string[];
+ curriculum?:NativeCurriculum|null;
+ onGenerateCurriculum?:()=>void;
  onGenerate?:(target:string,style:string)=>void;
  onDownload?:(attemptId:string)=>void;
  busy?:boolean;
 }
 const C={fg:'#f8fafc',muted:'#9ca3af',gold:'#fbbf24',mint:'#86efac'};
 export default function DragonNativeWorkshop({
- targets=[],attempts=[],styles=[],onGenerate,onDownload,busy=false,
+ targets=[],attempts=[],styles=[],curriculum,onGenerateCurriculum,onGenerate,onDownload,busy=false,
 }:DragonNativeWorkshopProps){
  const [selected,setSelected]=useState('game_boy');
  const [style,setStyle]=useState('arcade_score_attack');
@@ -31,6 +33,24 @@ export default function DragonNativeWorkshop({
  return <View style={s.root}>
   <Text style={s.title}>Native game forge · every era</Text>
   <Text style={s.copy}>Original Game Boy, NES, DOS and desktop source projects. Real ROMs or executables require their actual compilers, emulators and playtests. Console names alone never count as implemented engines.</Text>
+  {curriculum&&<View style={s.selectedInfo}>
+    <Ionicons name="school-outline" color={C.gold} size={20}/>
+    <View style={{flex:1,gap:5}}>
+     <Text style={s.infoTitle}>Adaptive native acquisition · evidence tier {curriculum.curriculum_level}</Text>
+     <Text style={s.note}>Structurally evidenced ROM targets: {curriculum.structural_build_targets.length} · Pending unlocked lessons: {curriculum.unlocked.length} · Evidence tier is not a gameplay mastery level</Text>
+     {curriculum.next_recommendation?<View style={{gap:3}}>
+       <Text style={s.platformTitle}>Next: {titleCaseId(curriculum.next_recommendation.target)} · {titleCaseId(curriculum.next_recommendation.genre)}</Text>
+       <Text style={s.note}>{curriculum.next_recommendation.reason} · {curriculum.next_recommendation.previous_attempts} source attempts</Text>
+     </View>:<Text style={s.note}>No further unlocked exercises. Verified compiler receipts or new approved lessons are needed.</Text>}
+     {onGenerateCurriculum&&curriculum.next_recommendation&&
+      <Pressable accessibilityRole="button" accessibilityLabel="Generate suggested native practice project"
+        accessibilityState={{disabled:busy}} disabled={busy} onPress={onGenerateCurriculum}
+        style={[s.build,busy&&s.disabled]}>
+        <Ionicons name="sparkles-outline" size={16} color="#052e16"/>
+        <Text style={s.buildText}>Generate suggested practice game</Text>
+      </Pressable>}
+    </View>
+   </View>}
   <View style={s.chips}>
    <Pressable accessibilityRole="button" onPress={()=>setAll(false)}
     accessibilityState={{selected:!all}} style={[s.pill,!all&&s.chosen]}>

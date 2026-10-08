@@ -26,9 +26,15 @@ from skeleton.ai.webcrawler.dragon_practice_cycles import DragonPracticeCycles
 from skeleton.ai.webcrawler.dragon_session_projection import DragonSessionProjection
 from skeleton.ai.webcrawler.dragon_native_practice import DragonNativePracticeLab
 from skeleton.ai.webcrawler.dragon_build_evidence import DragonBuildEvidence
+from skeleton.ai.webcrawler.dragon_native_curriculum import (
+    DragonNativeCurriculum,curriculum_report,
+)
 from skeleton.ai.webcrawler.dragon_native_targets import target_catalog, STYLES
 
 router = APIRouter(prefix="/api/dragon-academy", tags=["Dragon Academy"])
+
+class CurriculumGenerateRequest(BaseModel):
+    approved: bool = Field(default=False)
 
 class NativeGenerateRequest(BaseModel):
     target_id: str = Field(default="game_boy", min_length=2, max_length=64)
@@ -43,6 +49,7 @@ class SubscribeRequest(BaseModel):
     max_ticks: int = Field(default=24, ge=1, le=168)
     demos_per_tick: int = Field(default=2, ge=1, le=4)
     approved: bool = Field(default=False)
+    adaptive: bool = Field(default=False)
     native_target: str = Field(default='game_boy', min_length=2, max_length=64)
     native_style: str = Field(default='arcade_score_attack', min_length=2, max_length=64)
 
@@ -144,6 +151,41 @@ def native_build_evidence(owner: str = Depends(_principal)) -> dict:
         return {"ok":True,"receipts":[asdict(r) for r in receipts[-50:]],
                 "claim_boundary":"ROM structural proof, not executed gameplay"}
 
+def _curriculum(lab: DragonPracticeLab) -> DragonNativeCurriculum:
+    native=DragonNativePracticeLab(lab.db,lab)
+    configured=os.environ.get("SKL_DRAGON_BUILD_SIGNING_KEY_HEX","").strip()
+    evidence=(DragonBuildEvidence(lab.db,native,
+             private_signing_key=_build_signing_key()) if configured else None)
+    return DragonNativeCurriculum(native,evidence)
+
+@router.get("/native/curriculum")
+def native_curriculum(owner: str = Depends(_principal)) -> dict:
+    with _lab() as (lab,_):
+        result=_curriculum(lab).evaluate(owner,authorized=True)
+        return {"ok":True,**curriculum_report(result)}
+
+@router.post("/native/curriculum/generate")
+def native_curriculum_generate(
+    body: CurriculumGenerateRequest,
+    owner: str = Depends(_principal),
+) -> dict:
+    if not body.approved:
+        raise HTTPException(status_code=403,
+                            detail="Explicit native practice approval required")
+    with _lab() as (lab,cycles):
+        try:
+            next_state,attempt=_curriculum(lab).generate_next(
+                owner,authorized=True,consent=True,now=time.time())
+        except PermissionError:
+            raise HTTPException(status_code=403,
+                                detail="Approved native lesson required") from None
+        except ValueError:
+            raise HTTPException(status_code=422,
+                                detail="No unlocked native exercise or resource budget") from None
+        return {"ok":True,"created_native":asdict(attempt),
+                "curriculum":curriculum_report(next_state),
+                **{k:v for k,v in _snapshot(lab,cycles,owner).items() if k!="ok"}}
+
 @router.post("/native/generate")
 def generate_native(body: NativeGenerateRequest,
                     owner: str = Depends(_principal)) -> dict:
@@ -200,7 +242,8 @@ def subscribe_practice(body: SubscribeRequest, owner: str = Depends(_principal))
                       interval_seconds=body.interval_seconds,
                       max_ticks=body.max_ticks,
                       demos_per_tick=body.demos_per_tick,
-                      generation_mode='native',native_target=body.native_target,
+                      generation_mode='curriculum' if body.adaptive else 'native',
+                      native_target=body.native_target,
                       native_style=body.native_style)
         return _snapshot(lab,cycles,owner)
 
