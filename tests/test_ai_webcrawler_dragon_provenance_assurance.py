@@ -1,5 +1,6 @@
 """Provenance-bound source independence and adversarial holdout regressions."""
 from dataclasses import replace
+from hashlib import sha256
 import sqlite3
 
 import pytest
@@ -16,7 +17,7 @@ from skeleton.ai.webcrawler.dragon_provenance_assurance import (
 
 def source(sid, *, digest=None, uri=None, parents=(), tokens=()):
     return SourceProvenance(
-        sid, digest or (sid[0] * 64),
+        sid, digest or sha256(sid.encode("utf-8")).hexdigest(),
         uri or f"https://{sid}.example/research",
         tuple(parents), tuple(tokens),
     )
