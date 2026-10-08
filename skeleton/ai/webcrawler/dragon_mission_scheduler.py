@@ -1,4 +1,4 @@
-"""Bounded source acquisition economics (mission ranks 17–20).
+"""Bounded source acquisition economics (acquisition economics family).
 
 All functions are offline planners: they never fetch, circumvent robots/terms,
 schedule an OS background task, spend external quotas, or promote knowledge.
