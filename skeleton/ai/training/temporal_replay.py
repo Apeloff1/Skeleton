@@ -33,7 +33,7 @@ class TemporalAuthorityLedger:
   prev=self._entries[-1].digest if self._entries else None
   e=TemporalAuthorityEntry(len(self._entries)+1,authority_digest,subject,policy_year,prev); self._entries.append(e); return e
  def snapshot(self):
-  body={"schema":"temporal-authority-ledger.v1","entries":[e.__dict__ for e in self._entries]}
+  body={"schema":"temporal-authority-ledger.v1","entries":[dict(e.__dict__) for e in self._entries]}
   return {**body,"digest":_digest(body)}
  @classmethod
  def restore(cls,snapshot):
