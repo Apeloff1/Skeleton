@@ -97,6 +97,9 @@ _SPINE_EXPORTS = {
     "ReadingRevalidation": ".dragon_crawl_revision",
     "RevisionRevalidation": ".dragon_crawl_revision",
     "compare_crawl_revisions": ".dragon_crawl_revision",
+    "revision_report_fingerprint": ".dragon_crawl_revision",
+    "RevisionEntry": ".dragon_revision_journal",
+    "RevisionJournal": ".dragon_revision_journal",
 }
 
 def __getattr__(name: str):
