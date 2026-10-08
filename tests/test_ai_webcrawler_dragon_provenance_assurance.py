@@ -306,3 +306,41 @@ def test_probability_is_not_presented_as_empirically_calibrated():
     assert raw.probability_semantics == result.probability_semantics
     assert result.needs_human_review
     assert not result.promotion_authorized
+
+
+def test_credentialed_provenance_url_rejected():
+    with pytest.raises(ValueError, match="untrusted provenance"):
+        evaluated(
+            (read("alpha"),),
+            (source("alpha", uri="https://user:secret@alpha.example/data"),),
+        )
+
+
+def test_holdout_group_budget_fails_closed_before_quadratic_explosion():
+    with pytest.raises(ValueError, match="holdout group budget"):
+        evaluated(
+            readings("alpha") + readings("beta") + readings("gamma"),
+            (source("alpha"), source("beta"), source("gamma")),
+            assurance_policy=AssurancePolicy(maximum_holdout_groups=2),
+        )
+
+
+def test_extended_reread_policy_emits_explicit_planning_gap():
+    items = tuple(read("alpha", i) for i in range(1, 14))
+    result = evaluated(
+        items,
+        (source("alpha"),),
+        evidence_policy=EvidencePolicy(
+            min_passes_per_source=13, max_passes_per_source=13,
+        ),
+    )
+    assert result.source_coverage_complete
+    assert any(x.kind == "extend_lens_schedule" for x in result.next_actions)
+
+
+def test_reading_over_budget_is_rejected_before_manifests_are_clustered():
+    with pytest.raises(ValueError, match="source reread budget"):
+        evaluated(
+            readings("alpha", n=13),
+            (source("alpha"),),
+        )
