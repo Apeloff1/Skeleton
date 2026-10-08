@@ -66,8 +66,10 @@ class CapacityLedger:
         self, request_id: str, fingerprint: str, tokens: int, *,
         exclusive: bool = False, in_flight: bool = False,
     ) -> Reservation:
-        if type(exclusive) is not bool or type(in_flight) is not bool:
-            raise CapacityDenied("exclusive and in_flight must be booleans")
+        if type(exclusive) is not bool:
+            raise CapacityDenied("exclusive must be a boolean")
+        if type(in_flight) is not bool:
+            raise CapacityDenied("in_flight must be a boolean")
         if in_flight and not exclusive:
             raise CapacityDenied("in-flight reservations require exclusive ownership")
         if (not isinstance(request_id, str) or not request_id or len(request_id) > 256
