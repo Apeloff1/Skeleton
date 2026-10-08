@@ -304,6 +304,11 @@ export default function UnifiedStudio() {
                   onPress={() => router.push(`/game-kb?game=${encodeURIComponent(game)}` as never)}>
                   <Text style={{ color: '#C4B5FD', fontWeight: '800', fontSize: 12 }}>Knowledge →</Text>
                 </TouchableOpacity>
+                <TouchableOpacity accessibilityRole="button" testID="studio-world-workbench"
+                  accessibilityLabel="Open World Workbench for this game"
+                  onPress={() => router.push(`/world-workbench?game=${encodeURIComponent(game)}` as never)}>
+                  <Text style={{ color: '#C4B5FD', fontWeight: '800', fontSize: 12 }}>World →</Text>
+                </TouchableOpacity>
               </View>
             ) : null}
             {axesInfo ? (

@@ -61,6 +61,12 @@ test('contextual paths carry only validated build IDs, and gated steps need cont
   assert.equal(journeyStepHref(build, ''), '/studio');
   assert.equal(journeyStepHref(build, 'game_123-abc'), '/studio?game=game_123-abc');
   assert.equal(journeyStepHref(knowledge, 'game_123-abc'), '/game-kb?game=game_123-abc');
+  const worldFlow = journeyById('world-and-systems');
+  const scene = worldFlow?.steps.find(s => s.id === 'scene');
+  const systems = worldFlow?.steps.find(s => s.id === 'mechanics');
+  assert.ok(scene && systems);
+  assert.equal(journeyStepHref(scene,'game_123-abc'),'/compose-scene?build=game_123-abc');
+  assert.equal(journeyStepHref(systems,'game_123-abc'),'/systems-forge?build=game_123-abc');
   assert.equal(validBuildId('../../escape'), '');
   assert.equal(validBuildId('a'.repeat(129)), '');
   assert.equal(journeyStepHref(knowledge, '../../escape'), null);

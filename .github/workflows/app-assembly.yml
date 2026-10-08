@@ -413,6 +413,7 @@ jobs:
           yarn test:product-journeys
           yarn test:build-lifecycle
           yarn test:knowledge-experience
+          yarn test:world-workbench
           yarn export:web
 
       - name: Compile assembly surface

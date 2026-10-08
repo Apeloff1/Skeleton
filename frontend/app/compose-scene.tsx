@@ -196,6 +196,11 @@ export default function ComposeScene() {
           <Text style={styles.title}>🌍 Compose a Scene</Text>
           <Text style={styles.sub}>Populate a build with a themed mix — forged & mounted in one tap</Text>
         </View>
+        <TouchableOpacity testID="scene-world-workbench" accessibilityRole="button"
+          accessibilityLabel="Return to World Workbench for this game"
+          onPress={toWorkbench} style={{ padding: 9, minHeight: 44, justifyContent: 'center' }}>
+          <Text style={{ color: '#C2ADFF', fontWeight: '800', fontSize: 12 }}>World ↗</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 60 }}>

@@ -1,6 +1,6 @@
 # 100 App Milestones — User Journey Delivery
 
-Tracked against the existing `frontend/` product shell. Focus: connected user outcomes, not LOC or standalone scaffolds. Milestones M001–M030 are implementation work in this PR; boxes mark code delivered to the branch, **not** release acceptance. No milestones beyond M030 are claimed complete. All milestones require exact-head build/CI plus live-device and backend integration review before release sign-off.
+Tracked against the existing `frontend/` product shell. Focus: connected user outcomes, not LOC or standalone scaffolds. Milestones M001–M040 are implementation work in this PR; boxes mark code delivered to the branch, **not** release acceptance. No milestones beyond M040 are claimed complete. All milestones require exact-head build/CI plus live-device and backend integration review before release sign-off.
 
 ## Batch 1: Start & navigation
 
@@ -41,18 +41,18 @@ Tracked against the existing `frontend/` product shell. Focus: connected user ou
 - [x] M029 — Track forge jobs with bounded, cancellable client observation (implemented; verification pending CI)
 - [x] M030 — Continue the same game between KB and Studio with contextual navigation (implemented; verification pending CI)
 
-## Batch 4: World & design
+## Batch 4: Project-scoped world-building workbench
 
-- [ ] M031 — Create world graph
-- [ ] M032 — Edit scene hierarchy
-- [ ] M033 — Preview lighting
-- [ ] M034 — Place and inspect entities
-- [ ] M035 — Design quests
-- [ ] M036 — Design economy
-- [ ] M037 — Design NPC behavior
-- [ ] M038 — Tune character progression
-- [ ] M039 — Inspect simulation constraints
-- [ ] M040 — Export portable world data
+- [x] M031 — Open a single, project-scoped world workbench with a real game ID (implemented; verification pending CI)
+- [x] M032 — Inspect server-confirmed world, narrative, mechanics and asset pipeline evidence (implemented; verification pending CI)
+- [x] M033 — Preview grounded artifact content without duplicating backend authority (implemented; verification pending CI)
+- [x] M034 — Forge or re-forge a selected world knowledge stage with actual job monitoring (implemented; verification pending CI)
+- [x] M035 — Inspect actual mounted systems for the selected build (implemented; verification pending CI)
+- [x] M036 — Inspect whether asset-generation context can be read for that game (implemented; verification pending CI)
+- [x] M037 — Open Scene Composer with a real game ID, never the demo project by default (implemented; verification pending CI)
+- [x] M038 — Prioritize current game when selecting Worldforge source (implemented; verification pending CI)
+- [x] M039 — Pass correctly named game/build/pid parameters across seven creative tools (implemented; verification pending CI)
+- [x] M040 — Return from world tools to the same Studio game and browse all saved worlds without false project filtering (implemented; verification pending CI)
 
 ## Batch 5: AI copilot
 

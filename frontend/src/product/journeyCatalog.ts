@@ -4,6 +4,8 @@
  * A step being opened is NOT evidence that an operation ran or a build finished.
  * No model execution, asset or project data is stored by this module.
  */
+import { projectHref } from './worldWorkspace';
+
 export type JourneyStep = {
   id: string;
   title: string;
@@ -92,10 +94,12 @@ export const PRODUCT_JOURNEYS: readonly ProductJourney[] = [
     id: 'world-and-systems', title: 'World → systems',
     purpose: 'Design a world and its systems, then integrate the outcome.',
     steps: [
-      { id: 'world', title: 'Create a world', description: 'Define regions, ecology and world rules.', href: '/worldforge' },
-      { id: 'scene', title: 'Compose a scene', description: 'Lay out world content in a scene.', href: '/compose-scene' },
-      { id: 'assets', title: 'Build assets', description: 'Explore the asset-generation workflow.', href: '/asset-genesis' },
-      { id: 'mechanics', title: 'Engineer mechanics', description: 'Build and inspect game systems.', href: '/systems-forge' },
+      { id: 'choose', title: 'Choose the game', description: 'Select the project whose world you want to improve.', href: '/my-builds' },
+      { id: 'workbench', title: 'Open World Workbench', description: 'Inspect world evidence and forge missing artifacts.', href: '/world-workbench', requiresBuild: true },
+      { id: 'world', title: 'Create a world', description: 'Define regions, ecology and world rules from the game.', href: '/worldforge', acceptsBuild: true },
+      { id: 'scene', title: 'Compose a scene', description: 'Build a scene for this game.', href: '/compose-scene', requiresBuild: true },
+      { id: 'assets', title: 'Build assets', description: 'Generate art grounded in this game's knowledge.', href: '/asset-genesis', requiresBuild: true },
+      { id: 'mechanics', title: 'Engineer mechanics', description: 'Mount and inspect game systems.', href: '/systems-forge', requiresBuild: true },
       { id: 'studio', title: 'Integrate the project', description: 'Continue with the integrated game build.', href: '/studio', acceptsBuild: true },
     ],
   },
@@ -179,7 +183,7 @@ export function journeyStepHref(step: JourneyStep, buildId: unknown): string | n
   const id = validBuildId(buildId);
   if (step.requiresBuild && !id) return null;
   if (id && (step.requiresBuild || step.acceptsBuild)) {
-    return `${step.href}?game=${encodeURIComponent(id)}`;
+    return projectHref(step.href, id);
   }
   return step.href;
 }

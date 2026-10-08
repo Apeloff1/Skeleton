@@ -301,6 +301,7 @@ jobs:
       - run: yarn test:product-journeys
       - run: yarn test:build-lifecycle
       - run: yarn test:knowledge-experience
+      - run: yarn test:world-workbench
       - run: yarn test:skeleton-forge
       - run: yarn test:forge-operator
       - run: yarn export:web

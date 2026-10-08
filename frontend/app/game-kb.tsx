@@ -260,6 +260,12 @@ export default function GameKB() {
             style={s.forgeBtn}>
             <Text style={s.forgeTxt}>Continue this game in Studio →</Text>
           </TouchableOpacity>
+          <TouchableOpacity testID="kb-world-workbench" accessibilityRole="button"
+            accessibilityLabel="Open World Workbench for this game"
+            onPress={() => router.push(`/world-workbench?game=${encodeURIComponent(gameId)}` as never)}
+            style={[s.forgeBtn, s.reforgeBtn]}>
+            <Text style={s.forgeTxt}>Explore world, mechanics and assets →</Text>
+          </TouchableOpacity>
           {!!jobStatus && <Text testID="kb-forge-status" accessibilityLiveRegion="polite" style={s.applyStatus}>{jobStatus}</Text>}
           {!!approveStatus && <Text testID="kb-approve-status" accessibilityLiveRegion="polite" style={s.applyStatus}>{approveStatus}</Text>}
           {!!refineStatus && <Text testID="kb-refine-status" accessibilityLiveRegion="polite" style={s.applyStatus}>{refineStatus}</Text>}
