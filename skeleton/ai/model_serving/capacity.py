@@ -83,7 +83,7 @@ class CapacityLedger:
             if previous is not None:
                 if previous.fingerprint != fingerprint or previous.tokens != tokens:
                     raise CapacityDenied("idempotency key conflict")
-                if exclusive:
+                if exclusive or previous.in_flight:
                     raise CapacityDenied("request already has an active reservation")
                 return previous
             if len(self._active) >= self.limits.max_active:
