@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from volume_forge.gate import gate
+try:
+    from volume_forge.gate import gate
+except ImportError:
+    from gate import gate
 
 
 def card() -> dict[str, object]:
