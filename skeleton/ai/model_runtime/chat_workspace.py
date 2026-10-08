@@ -6,7 +6,6 @@ transcripts and optimistic revisions, while NativeChatEngine handles inference.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from hashlib import sha256
 import json
 import secrets
 import threading
