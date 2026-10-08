@@ -595,5 +595,14 @@ class TestNativeLLMRuntime(unittest.TestCase):
             runtime.infer_sequence(forged)
 
 
+    def test_checkpoint_rejects_mutated_tokenizer_with_runtime_contract(self):
+        runtime = self.runtime()
+        runtime.tokenizer.digest = "0" * 64
+        with self.assertRaisesRegex(RuntimeContractError, "tokenizer mutated before checkpoint"):
+            runtime.checkpoint()
+        with self.assertRaisesRegex(RuntimeContractError, "tokenizer mutated before checkpoint"):
+            runtime.checkpoint_json()
+
+
 if __name__ == "__main__":
     unittest.main()
