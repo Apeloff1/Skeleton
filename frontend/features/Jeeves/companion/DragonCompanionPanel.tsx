@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useReducedMotion } from './useDragonMotion';
 import { DEFAULT_COMPANION_PREFERENCES, type CompanionMotion } from './dragonPreferences';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -23,6 +24,17 @@ export default function DragonCompanionPanel({ draft, lastUserText, telemetry }:
   const [showResearch, setShowResearch] = useState(false);
   const [motion, setMotion] = useState<CompanionMotion>(DEFAULT_COMPANION_PREFERENCES.motion);
   const systemReducedMotion = useReducedMotion();
+  const [motionLoaded, setMotionLoaded] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    AsyncStorage.getItem('skeleton.dragon.motion.v1').then(value => {
+      if (mounted && (value === 'full' || value === 'gentle' || value === 'off')) setMotion(value);
+    }).catch(() => {}).finally(() => { if (mounted) setMotionLoaded(true); });
+    return () => { mounted = false; };
+  }, []);
+  useEffect(() => {
+    if (motionLoaded) void AsyncStorage.setItem('skeleton.dragon.motion.v1', motion).catch(() => {});
+  }, [motion, motionLoaded]);
   const interest = draft.trim() || lastUserText || '';
   const interests = useMemo(() => extractConversationInterests([{ role: 'user', text: interest }]), [interest]);
   const proposal = useMemo(() => proposeResearchMission(interests), [interests]);
@@ -30,8 +42,8 @@ export default function DragonCompanionPanel({ draft, lastUserText, telemetry }:
     ? companionFromCrawler(telemetry.kind, telemetry.payload)
     : companionForConversation(interest);
   return <View style={s.panel}>
-    <DragonCompanion state={state} reducedMotion={systemReducedMotion || motion === 'off'} />
-    <View style={s.motionRow}><Text style={s.label}>Animation</Text>{(['full','gentle','off'] as const).map(choice => <Pressable key={choice} accessibilityRole="button" accessibilityState={{selected:motion===choice}} onPress={() => setMotion(choice)} style={[s.motionButton,motion===choice && s.motionSelected]}><Text style={s.value}>{choice}</Text></Pressable>)}</View>
+    <DragonCompanion state={state} motion={motion} reducedMotion={systemReducedMotion} />
+    <View style={s.motionRow}><Text style={s.label}>Animation · 120 tiny moments</Text>{(['full','gentle','off'] as const).map(choice => <Pressable key={choice} accessibilityRole="button" accessibilityState={{selected:motion===choice}} onPress={() => setMotion(choice)} style={[s.motionButton,motion===choice && s.motionSelected]}><Text style={s.value}>{choice}</Text></Pressable>)}</View>
     <View style={s.stats}>
       <Metric icon="chatbubble-ellipses-outline" label="Interest" value={interest ? interest.split(/\s+/).slice(0, 5).join(' ') : 'Listening'} />
       <Metric icon="globe-outline" label="Pages" value={String(telemetry?.pages ?? 0)} />
@@ -40,6 +52,7 @@ export default function DragonCompanionPanel({ draft, lastUserText, telemetry }:
     </View>
     <Pressable accessibilityRole="button" accessibilityLabel="Inspect suggested research interests" onPress={() => setShowResearch(v => !v)} style={s.metric}><Ionicons name="bulb-outline" size={16} color="#fb923c" /><Text style={s.value}>{showResearch ? 'Hide research interests' : 'Inspect research interests'}</Text></Pressable>
     {showResearch && <View style={s.metric}><Text style={s.value}>{proposal ? proposal.query : 'No research interest yet'}</Text><Text style={s.note}>Suggestion only · no web crawl starts without a separate explicit command.</Text></View>}
+    <Text style={s.note}>Petting and animation are just for fun. System reduced-motion settings take priority. These reactions never start research or change memory.</Text>
     <Text style={s.note}>Conversation creates interest signals. Only policy-compliant, provenance-preserved acquisitions may become distilled memory.</Text>
   </View>;
 }
