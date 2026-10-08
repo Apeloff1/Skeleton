@@ -11,6 +11,8 @@ on:
       - 'skeleton/ai/webcrawler/dragon_native_replay_system.py'
       - 'skeleton/ai/webcrawler/dragon_gb_platformer.py'
       - 'skeleton/ai/webcrawler/dragon_campaign_quests.py'
+      - 'skeleton/ai/webcrawler/dragon_chip_music.py'
+      - 'skeleton/ai/webcrawler/dragon_gb_sound.py'
       - 'tests/test_ai_webcrawler_dragon_game_fitness.py'
       - 'tests/test_ai_webcrawler_dragon_native_gbc.py'
       - 'tests/test_ai_webcrawler_dragon_native_save.py'
@@ -18,6 +20,7 @@ on:
       - 'tests/test_ai_webcrawler_dragon_native_platformer.py'
       - 'tests/test_ai_webcrawler_dragon_campaign_quests.py'
       - 'tests/test_ai_webcrawler_dragon_native_sega_snes.py'
+      - 'tests/test_ai_webcrawler_dragon_chip_music.py'
       - 'skeleton/ai/webcrawler/dragon_retro_assets.py'
       - 'tests/test_ai_webcrawler_dragon_game_blueprints.py'
       - 'tests/test_ai_webcrawler_dragon_retro_assets.py'
@@ -129,4 +132,5 @@ jobs:
             tests/test_ai_webcrawler_dragon_native_replay.py \
             tests/test_ai_webcrawler_dragon_campaign_quests.py \
             tests/test_ai_webcrawler_dragon_native_sega_snes.py \
+            tests/test_ai_webcrawler_dragon_chip_music.py \
             tests/test_ai_webcrawler_dragon_native_variants.py

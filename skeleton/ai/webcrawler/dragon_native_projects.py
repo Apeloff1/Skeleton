@@ -577,6 +577,11 @@ def render_native_project(*,title:str,target_id:str,style:str,
             "encoding": "interleaved_2bpp" if target_id in ("game_boy","game_boy_color")
                         else "nes_planar_2bpp",
         },sort_keys=True,indent=2)+"\n"
+    if target_id in ("game_boy","game_boy_color"):
+        from .dragon_gb_sound import enrich_native_gb_sound
+        files["src/main.asm"]=enrich_native_gb_sound(
+            files["src/main.asm"],
+            scrolling=(target_id=="game_boy" and style=="side_scrolling_platformer"))
     if any(PurePosixPath(p).is_absolute() or ".." in PurePosixPath(p).parts for p in files):
         raise ValueError("unsafe generated path")
     if any(len(v.encode())>120_000 for v in files.values()):

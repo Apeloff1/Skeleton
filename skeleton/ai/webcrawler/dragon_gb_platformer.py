@@ -27,7 +27,7 @@ def gb_platformer_source(seed:int)->dict[str,str]:
     if isinstance(seed,bool) or not isinstance(seed,int) or seed<0:
         raise ValueError("valid deterministic game seed required")
     goal_x=138+(seed%12)
-    source=r"""\
+    source=r"""
 ; Dragon's original scrolling Game Boy platformer. RGBDS SM83. 32x18 tile world.
 ; Native PPU tilemap at 9800h, background camera SCX and OAM 8x8 sprites.
 ; D-pad walks, A jumps. Land on ledges; touch floating star for new goal.

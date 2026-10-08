@@ -6,6 +6,7 @@ service, image downloads or untrusted source interpolation.
 """
 from __future__ import annotations
 from .dragon_game_blueprints import Campaign, PALETTES, MODE_IDS, W, H
+import json
 
 ENGINE = r'''/* Original Dragon Native 2D Game Engine — SDL2/C99.
   Six real rule sets: arena, platform, adventure, dungeon, tactics, racer. */
@@ -18,6 +19,7 @@ ENGINE = r'''/* Original Dragon Native 2D Game Engine — SDL2/C99.
 #include "dragon_campaign.h"
 #include "dragon_save.h"
 #include "dragon_replay.h"
+#include "dragon_chip_score.h"
 #define TILE 24
 #define SCREEN_W (MAP_W*TILE)
 #define SCREEN_H (MAP_H*TILE)
@@ -249,6 +251,13 @@ static void step(Input input){
   if(input.pause&&!game.lost&&!game.won)game.paused=!game.paused;
   if(game.paused||game.lost||game.won)return;
   game.frame++;
+  if(game.frame%DRAGON_SCORE_INTERVAL==0){
+    int beat=(game.frame/DRAGON_SCORE_INTERVAL)%DRAGON_SCORE_STEPS;
+    unsigned short note=DRAGON_MELODY[beat];
+    unsigned short bass=DRAGON_HARMONY[beat];
+    if(note>0)sound((int)note,55);
+    if(bass>0)sound((int)bass,40);
+  }
   if(game.invincible>0)game.invincible--;
   if(game.energy<100&&game.frame%5==0)game.energy++;
   float dx=(float)(input.right-input.left),dy=(float)(input.down-input.up);
@@ -645,6 +654,11 @@ endif()
     files={"src/main.c": ENGINE, "include/dragon_campaign.h": header,
            "CMakeLists.txt": cmake,"README.engine.md":readme}
     from .dragon_native_replay_system import emit_replay_system
+    from .dragon_chip_music import compose, emit_score_header, score_manifest
+    music=compose(campaign.mode,campaign.seed,64)
+    files["include/dragon_chip_score.h"]=emit_score_header(music)
+    files["dragon-original-music.json"]=json.dumps(
+        score_manifest(music),sort_keys=True,indent=2)+"\n"
     files.update(emit_save_system(campaign.id))
     files.update(emit_replay_system())
     return files

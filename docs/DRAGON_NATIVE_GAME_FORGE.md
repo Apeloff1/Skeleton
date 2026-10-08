@@ -350,3 +350,32 @@ off ledges. The new source gives the player a signed -10 jump impulse,
 re-evaluates standing support, widens narrow landing windows and alternates
 gem objectives between platform heights reached by the player. The RGBDS
 CI job will attempt to assemble this corrected real cartridge program.
+
+
+## Original score composition and authentic handheld APU sound
+
+An era-aware music engine now builds deterministic melodic and harmonic step
+sequences for each native PC gameplay kernel. A bounded 64-step tune uses a
+genre-appropriate tempo, scale, repeatable phrase structure and rests; output
+is human-readable frequency data, not MP3, copyright-mimicking audio, or an
+LLM hallucination of a soundtrack.
+
+Each native SDL2 project includes dragon-original-music.json containing the
+exact composition, its SHA256 fingerprint, genre, tempo and phrase sequence,
+plus include/dragon_chip_score.h with real frequency arrays. The native C
+game's fixed-step update drives the SDL audio device with music pitches and
+short square-wave harmonies. The score differs between racer, platformer,
+dungeon, tactical and adventure styles. Music is original and cheap enough
+for prototypes; richer instrument voices, polyrhythm, mixing, frequency
+precision and platform audio ceilings remain to be implemented and profiled.
+
+Original Game Boy DMG, CGB and scrolling platformer programs also include
+native CPU register code controlling the actual Game Boy APU: NR52 ($FF26)
+power, NR50 ($FF24) master level, NR51 ($FF25) routing, NR11 and NR12
+duty/envelope, and NR13/NR14 frequency trigger. A single-screen reward is
+latched to prevent repeated chimes every game loop, whereas a platformer
+collectible produces one chime and moves its goal. This is genuine
+hardware sound generation, not an HTML audio element.
+
+These enhancements must also pass RGBDS ROM compilation and emulator sound
+checks before claiming audible output on physical handhelds.
