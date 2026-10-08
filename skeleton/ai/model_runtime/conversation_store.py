@@ -45,7 +45,8 @@ class ConversationStore:
                                    timeout=10.0)
         self._db.execute("PRAGMA busy_timeout=10000")
         self._db.execute("PRAGMA foreign_keys=ON")
-        self._db.execute("PRAGMA journal_mode=WAL")
+        if path != ":memory:":
+            self._db.execute("PRAGMA journal_mode=WAL")
         self._db.execute("""CREATE TABLE IF NOT EXISTS conversations (
             session_id TEXT PRIMARY KEY,
             revision INTEGER NOT NULL CHECK(revision >= 0),
