@@ -36,7 +36,7 @@ _PRESETS={
 }
 _DESIGN={
     "move_speed": 4.5,
-    "jump_speed": 10.5,
+    "jump_speed": 15.0,
     "gravity": 25.,
     "acceleration": 32.,
     "friction": 26.,
@@ -206,7 +206,8 @@ def design_level_geometry(
         grid[height-1][x]=_WALL
     # Never block the main walkway at y=h-2.
     for x in range(4,width-4,6):
-        ledge_y=height-5-rng.randrange(0,2)
+        # Rise of the default jump controller exceeds this vertical gap.
+        ledge_y=height-4-rng.randrange(0,2)
         span=min(3+rng.randrange(0,2),width-x-2)
         for col in range(x,x+span):
             grid[ledge_y][col]=_WALL
