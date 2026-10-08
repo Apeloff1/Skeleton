@@ -310,6 +310,43 @@ class TestRetainedKVIdentitySafety(unittest.TestCase):
             scheduler.release_retained_kv("r")
         self.assertEqual(scheduler.snapshot(), before)
 
+    def test_resource_configuration_cannot_exceed_native_architecture_bounds(self):
+        overrides = (
+            dict(max_active_requests=4097, max_batch_size=1),
+            dict(max_queued_requests=65_537),
+            dict(max_batch_size=4097, max_active_requests=4097),
+            dict(max_tokens_per_batch=1_000_001),
+            dict(kv_capacity_bytes=1 << 63),
+            dict(max_age_boost=1_000_001),
+        )
+        for change in overrides:
+            with self.subTest(change=change), self.assertRaisesRegex(
+                ModelRuntimeError, "runtime bound"
+            ):
+                AdmissionLimits(**change)
+
+    def test_recomputed_checksum_cannot_widen_restore_capacity(self):
+        snap = self.build().snapshot()
+        snap["limits"]["max_queued_requests"] = 100_000_000
+        with self.assertRaisesRegex(ModelRuntimeError, "runtime bound"):
+            restore_admission_scheduler(self.sign(snap))
+
+    def test_lifecycle_rejects_control_character_and_surrogate_id(self):
+        scheduler = self.build()
+        before = scheduler.snapshot()
+        operations = (
+            scheduler.cancel, scheduler.retry, scheduler.complete,
+            scheduler.release_retained_kv,
+            lambda value: scheduler.set_kv_pinned(value, True),
+        )
+        for bad in ("\x00", "\x7f", "\ud800", "a\nb"):
+            for operation in operations:
+                with self.subTest(value=repr(bad)), self.assertRaisesRegex(
+                    ModelRuntimeError, "invalid scheduler request identity"
+                ):
+                    operation(bad)
+                self.assertEqual(scheduler.snapshot(), before)
+
     def test_public_id_boundary_rejects_nonhashable_and_invalid_request_ids(self):
         scheduler = self.build()
         before = scheduler.snapshot()

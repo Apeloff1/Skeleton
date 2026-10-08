@@ -6,7 +6,10 @@ import hashlib
 import json
 from typing import Iterable
 
-from .flgb_model_runtime import BatchRequest, KVCacheEntry, ModelRuntimeError, plan_kv_admission
+from .flgb_model_runtime import (
+    BatchRequest, KVCacheEntry, ModelRuntimeError, MAX_BATCH_SIZE, MAX_TOKENS,
+    MAX_WEIGHT_BYTES, plan_kv_admission,
+)
 from .runtime_policy import RuntimePolicy
 
 
@@ -18,8 +21,13 @@ def _digest(value: object) -> str:
 
 def _require_request_id(value: object) -> str:
     """Reject malformed public operation identifiers before state lookup."""
-    if type(value) is not str or not 1 <= len(value) <= 256:
+    if (type(value) is not str or not 1 <= len(value) <= 256
+            or any(ord(ch) < 32 or ord(ch) == 127 for ch in value)):
         raise ModelRuntimeError("invalid scheduler request identity")
+    try:
+        value.encode("utf-8", errors="strict")
+    except UnicodeError as exc:
+        raise ModelRuntimeError("invalid scheduler request identity") from exc
     return value
 
 
@@ -38,6 +46,21 @@ class AdmissionLimits:
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
                 raise ModelRuntimeError(f"invalid {name}")
+        # These constants bound both in-memory scheduling and the number of
+        # records accepted by checkpoint restore. A signed/hashed checkpoint
+        # must not create an unbounded allocation policy.
+        if self.max_active_requests > MAX_BATCH_SIZE:
+            raise ModelRuntimeError("active request capacity exceeds runtime bound")
+        if self.max_queued_requests > 65_536:
+            raise ModelRuntimeError("queued request capacity exceeds runtime bound")
+        if self.max_batch_size > MAX_BATCH_SIZE:
+            raise ModelRuntimeError("batch capacity exceeds runtime bound")
+        if self.max_tokens_per_batch > MAX_TOKENS:
+            raise ModelRuntimeError("token capacity exceeds runtime bound")
+        if self.kv_capacity_bytes > MAX_WEIGHT_BYTES:
+            raise ModelRuntimeError("KV capacity exceeds runtime bound")
+        if self.max_age_boost > MAX_TOKENS:
+            raise ModelRuntimeError("age boost exceeds runtime bound")
         if self.max_batch_size > self.max_active_requests:
             raise ModelRuntimeError("batch size cannot exceed active request limit")
 
