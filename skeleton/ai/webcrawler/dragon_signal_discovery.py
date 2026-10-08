@@ -6,6 +6,7 @@ recommendations; they never trigger automatic media acquisition.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isfinite
 from .dragon_interest_signals import InterestProfile
 from .dragon_video_discovery import VideoCandidate, VideoProposal, rank_similar_videos
 from .dragon_video_history import VideoVisit
@@ -31,9 +32,9 @@ def rank_signal_aware_videos(
         raise PermissionError("signal-aware discovery requires consent")
     if not 1 <= policy.max_results <= 100:
         raise ValueError("invalid result budget")
-    if not -10 <= policy.negative_suppression <= 0:
+    if not isfinite(policy.negative_suppression) or not -10 <= policy.negative_suppression <= 0:
         raise ValueError("invalid suppression threshold")
-    if not 0 <= policy.signal_boost <= 10 or not 0 <= policy.min_score <= 100:
+    if not isfinite(policy.signal_boost) or not isfinite(policy.min_score) or not 0 <= policy.signal_boost <= 10 or not 0 <= policy.min_score <= 100:
         raise ValueError("invalid scoring policy")
 
     # Retain canonical URL checks, seen-video exclusions and deterministic ordering.
