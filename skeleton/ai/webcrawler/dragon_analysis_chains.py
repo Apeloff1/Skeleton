@@ -88,6 +88,7 @@ def validate_chain(
     if len(specs) != len(chain):
         raise ValueError("duplicate analysis layer")
     visited = set()
+    topological = []
     def check(layer: AnalysisLayer, active: set[AnalysisLayer]) -> None:
         if layer in active:
             raise ValueError("cyclic analysis chain")
@@ -100,6 +101,7 @@ def validate_chain(
             check(dep, active)
         active.remove(layer)
         visited.add(layer)
+        topological.append(layer)
     for layer in specs:
         check(layer, set())
     by_layer = {}
@@ -117,7 +119,7 @@ def validate_chain(
                 raise ValueError("invalid evidence fingerprint")
         by_layer[receipt.layer] = receipt
     accepted, rejected = set(), set()
-    for layer in visited:
+    for layer in topological:
         spec = specs[layer]
         receipt = by_layer.get(layer)
         if receipt is None:
