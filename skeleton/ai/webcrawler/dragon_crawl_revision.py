@@ -218,25 +218,60 @@ def compare_crawl_revisions(
         and invalid == 0
         and all(delta.change is SourceChange.UNCHANGED for delta in changes)
     )
-    fingerprint = _hash({
-        "schema": "skeleton.crawler.revision_revalidation.v1",
-        "claim_id": claim_id,
-        "previous": old.custody_fingerprint,
-        "current": new.custody_fingerprint,
-        "sources": [
-            (x.source_id, x.change.value, x.previous_digest, x.current_digest,
-             x.previous_origin, x.current_origin, x.content_changed,
-             x.origin_changed, x.lineage_changed, x.delivery_changed) for x in changes
-        ],
-        "readings": [
-            (x.source_id, x.pass_id, x.source_revision, x.original_span,
-             x.disposition.value, x.candidate_span, x.matching_quotes)
-            for x in rechecks
-        ],
-        "reusable": reusable,
-    })
+    fingerprint = revision_report_fingerprint(
+        RevisionRevalidation(
+            claim_id, old.custody_fingerprint, new.custody_fingerprint,
+            tuple(changes), tuple(rechecks), reusable, added, missing,
+            invalid, "",
+        )
+    )
     return RevisionRevalidation(
         claim_id, old.custody_fingerprint, new.custody_fingerprint,
         tuple(changes), tuple(rechecks), reusable, added, missing,
         invalid, fingerprint,
     )
+
+
+
+def revision_report_fingerprint(review: RevisionRevalidation) -> str:
+    """Recompute the complete, canonical typed review identity for custody.
+
+    Used by durable journals to reject mutable/copied review objects whose
+    displayed digest does not match the authoritative field values.
+    """
+    if not isinstance(review, RevisionRevalidation):
+        raise ValueError("revision report required")
+    if not isinstance(review.sources, tuple) or not isinstance(review.readings, tuple):
+        raise ValueError("invalid revision report collections")
+    for source in review.sources:
+        if not isinstance(source, SourceRevisionDelta) or not isinstance(
+            source.change, SourceChange
+        ):
+            raise ValueError("invalid source revision entry")
+    for reading in review.readings:
+        if not isinstance(reading, ReadingRevalidation) or not isinstance(
+            reading.disposition, ReadingDisposition
+        ):
+            raise ValueError("invalid reading revision entry")
+    return _hash({
+        "schema": "skeleton.crawler.revision_revalidation.v2",
+        "claim_id": review.claim_id,
+        "previous": review.original_custody_fingerprint,
+        "current": review.current_custody_fingerprint,
+        "sources": [
+            (x.source_id, x.change.value, x.previous_digest, x.current_digest,
+             x.previous_origin, x.current_origin, x.content_changed,
+             x.origin_changed, x.lineage_changed, x.delivery_changed)
+            for x in review.sources
+        ],
+        "readings": [
+            (x.source_id, x.pass_id, x.source_revision, x.original_span,
+             x.disposition.value, x.candidate_span, x.matching_quotes,
+             x.requires_human_review)
+            for x in review.readings
+        ],
+        "reusable": review.prior_readings_reusable,
+        "added": review.added_sources,
+        "missing": review.missing_sources,
+        "invalidated": review.invalidated_readings,
+    })
