@@ -945,10 +945,10 @@ class NativeConversationSession:
             result.replay_receipt.tokenizer_digest != self._tokenizer_digest
         ):
             raise RuntimeContractError("stream identity mismatch")
-        if result.prompt_sequence.token_ids[:max(0, len(result.prompt_sequence.token_ids) -
-                                                   len(self._tokens))] and self._tokens:
-            prefix_len = min(len(self._tokens), len(result.prompt_sequence.token_ids))
-            if result.prompt_sequence.token_ids[:prefix_len] != self._tokens[-prefix_len:]:
+        if self._tokens:
+            prompt = result.prompt_sequence.token_ids
+            history_len = min(len(self._tokens), len(prompt))
+            if prompt[:history_len] != self._tokens[-history_len:]:
                 raise RuntimeContractError("stream history diverged")
         self._tokens = (result.prompt_sequence.token_ids + result.generated_ids)[
             -self.runtime.limits.max_context:]
