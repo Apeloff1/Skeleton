@@ -74,11 +74,15 @@ class DragonProposalStore:
             if not item.requires_approval or not isfinite(item.score):
                 raise ValueError("unapproved or invalid proposal")
         with self.db:
-            existing = self.db.execute("""
-                SELECT COUNT(*) FROM dragon_video_proposals
+            active = {row[0] for row in self.db.execute("""
+                SELECT proposal_id FROM dragon_video_proposals
                 WHERE owner=? AND state IN ('pending', 'approved', 'leased')
-            """, (owner,)).fetchone()[0]
-            if existing + len({p.proposal_id for p in proposals}) > max_pending:
+            """, (owner,)).fetchall()}
+            existing_ids = {row[0] for row in self.db.execute("""
+                SELECT proposal_id FROM dragon_video_proposals WHERE owner=?
+            """, (owner,)).fetchall()}
+            new_ids = {p.proposal_id for p in proposals} - existing_ids
+            if len(active) + len(new_ids) > max_pending:
                 raise ValueError("proposal queue capacity exceeded")
             before = self.db.total_changes
             self.db.executemany("""
