@@ -17,10 +17,10 @@ class AdmissionLedger:
         promotions = tuple(promotions)
         admissions = tuple(admissions)
         for name, values in (("promotions", promotions), ("admissions", admissions)):
-            if len(values) != len(set(values)):
-                raise RuntimePromotionError(f"duplicate {name} receipt")
             for value in values:
                 self._require_digest(value, name)
+            if len(values) != len(set(values)):
+                raise RuntimePromotionError(f"duplicate {name} receipt")
         self._lock = RLock()
         self._promotion_digests = set(promotions)
         self._admission_digests = set(admissions)
@@ -69,6 +69,7 @@ class AdmissionLedger:
         if (body["schema"] != "skeleton.ai.admission-ledger.v1"
                 or not isinstance(body["promotions"], list)
                 or not isinstance(body["admissions"], list)
+                or any(not isinstance(d, str) or len(d) != 64 or any(c not in "0123456789abcdef" for c in d) for d in body["promotions"] + body["admissions"])
                 or body["promotions"] != sorted(set(body["promotions"]))
                 or body["admissions"] != sorted(set(body["admissions"]))
                 or snapshot.get("digest") != digest_json(body)):
