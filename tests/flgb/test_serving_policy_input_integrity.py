@@ -220,6 +220,15 @@ class TestServingPolicyInputIntegrity(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "digest mismatch"):
             planner.verify(receipt, ServingRequest("r", 9, 6))
 
+    def test_verifier_rejects_nonascii_and_non_string_digest_without_type_error(self):
+        from dataclasses import replace
+        planner = self.planner()
+        req = ServingRequest("r", 10, 5)
+        plan = planner.plan(req)
+        for digest in (None, 42, True, "💡" * 64, "z" * 64, "A" * 64, "0" * 63):
+            with self.subTest(value=repr(digest)), self.assertRaises(ValueError):
+                planner.verify(replace(plan, digest=digest), req)
+
     def test_plan_verification_rejects_wrong_type(self):
         planner = self.planner()
         req = ServingRequest("r", 10, 5)

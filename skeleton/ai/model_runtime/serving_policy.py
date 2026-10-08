@@ -184,9 +184,10 @@ class PolicyAwareServingPlanner:
             kv_pressure_pct=kv_pressure_pct,
             queue_pressure_pct=queue_pressure_pct,
         )
-        if not isinstance(plan.digest, str) or not hmac.compare_digest(
-            current.digest, plan.digest
-        ):
+        if (type(plan.digest) is not str or len(plan.digest) != 64
+                or any(ch not in "0123456789abcdef" for ch in plan.digest)):
+            raise ValueError("invalid serving plan digest")
+        if not hmac.compare_digest(current.digest, plan.digest):
             raise ValueError("serving plan digest mismatch")
         if current != plan:
             raise ValueError("serving plan fields mismatch")
