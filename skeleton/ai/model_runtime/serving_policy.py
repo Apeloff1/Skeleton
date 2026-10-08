@@ -6,6 +6,7 @@ from enum import Enum
 import hmac
 import hashlib
 import json
+from unicodedata import category, normalize
 
 from .runtime_policy import RuntimePolicy
 from .flgb_model_runtime import MAX_TOKENS, require_id
@@ -32,6 +33,10 @@ class ServingRequest:
         try:
             require_id(self.request_id, "serving request_id")
             self.request_id.encode("utf-8", errors="strict")
+            if normalize("NFC", self.request_id) != self.request_id:
+                raise ValueError("serving request_id must be NFC canonical")
+            if any(category(ch) in {"Cc", "Cf", "Cs"} for ch in self.request_id):
+                raise ValueError("serving request_id contains control character")
         except (ValueError, UnicodeError) as exc:
             raise ValueError("invalid serving request_id") from exc
         if not isinstance(self.service_class, ServiceClass):
