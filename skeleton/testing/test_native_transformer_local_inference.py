@@ -49,6 +49,16 @@ class TestNativeTransformerLocalBackend(unittest.TestCase):
             self.assertEqual(first.model_digest, second.model_digest)
         asyncio.run(scenario())
 
+    def test_published_native_receipt_binds_context_identity(self):
+        backend = self.backend()
+        first = LocalInferenceRequest(prompt="hello", max_output_tokens=2, seed=4, context_digest="a" * 64)
+        second = LocalInferenceRequest(prompt="hello", max_output_tokens=2, seed=4, context_digest="b" * 64)
+        a = backend.infer(first, threading.Event())
+        b = backend.infer(second, threading.Event())
+        self.assertEqual(a.text, b.text)
+        self.assertNotEqual(first.digest, second.digest)
+        self.assertNotEqual(a.response_id, b.response_id)
+
     def test_precancelled_request_fails_without_decode(self):
         backend = self.backend()
         cancel = threading.Event()
