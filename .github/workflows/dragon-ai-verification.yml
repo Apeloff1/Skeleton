@@ -9,6 +9,8 @@ on:
       - "frontend/src/components/dragon*.ts"
       - "frontend/src/components/GameplayRecorder.tsx"
       - "frontend/scripts/test-dragon-companion.cjs"
+      - "frontend/scripts/test-dragon-canonical-wire.cjs"
+      - "tests/fixtures/dragon_visual_wire_v1.json"
       - ".github/workflows/dragon-ai-verification.yml"
   pull_request:
     branches: [main]
@@ -71,5 +73,7 @@ jobs:
         run: yarn install --frozen-lockfile --ignore-scripts
       - name: Dragon component contract
         run: yarn test:dragon-companion
+      - name: Cross-language canonical wire parity
+        run: yarn test:dragon-wire
       - name: TypeScript compile
         run: yarn typecheck
