@@ -17,8 +17,14 @@ It composes with the canonical `skeleton.ai.model_runtime` implementation.
    It checks the **original** prompt and output budget, not reduced prefill
    estimates. It does not itself load model weights or execute kernels.
 5. `CapacityLedger` limits process-local concurrent reservations and total
-   reserved tokens. Acquire only after admission. Release on success, failure,
-   cancellation, and shutdown; expire abandoned reservations.
+   reserved tokens. Acquire only after admission. Ordinary unclaimed leases
+   expire by TTL. Live synchronous backend calls acquire exclusive `in_flight`
+   reservations: these are deliberately release-bound, **not TTL-reaped**,
+   because expiry while a backend still executes would permit overbooking and
+   duplicate request execution. `plan_and_invoke` releases them in `finally`.
+   A hung backend can therefore hold capacity until the process is terminated;
+   use a bounded execution deadline and an external supervisor. This is not a
+   durable cross-process heartbeat or cancellation mechanism.
 
 ## Explicitly missing production guarantees
 
