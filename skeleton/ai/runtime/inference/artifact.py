@@ -10,6 +10,7 @@ from pathlib import Path
 import tempfile
 from typing import Any, Mapping
 
+from skeleton.ai.model_runtime.runtime_contracts import RUNTIME_SCHEMA
 from .local import ReferenceNGramModel
 
 
@@ -83,6 +84,16 @@ class LoadedLocalModel:
 
 
 def _payload_model(payload: Mapping[str, Any]) -> tuple[object, str]:
+    runtime_schema = payload.get("schema")
+    if runtime_schema == RUNTIME_SCHEMA:
+        try:
+            from .native_runtime import NativeRuntimeBackendError, NativeRuntimeLocalModel
+            return NativeRuntimeLocalModel.from_checkpoint(payload), runtime_schema
+        except (NativeRuntimeBackendError, TypeError, ValueError, RuntimeError) as exc:
+            raise LocalModelArtifactError(
+                "native runtime artifact failed identity validation"
+            ) from exc
+
     schema = payload.get("schema_version")
     if schema == "skeleton.numpy_recurrent_lm.v1":
         try:
