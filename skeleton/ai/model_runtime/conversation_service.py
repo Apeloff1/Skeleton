@@ -569,6 +569,104 @@ class NativeConversationService:
                 -self._sessions[sid].context_used, sid))
             return tuple(self.describe(sid) for sid in ids[:limit])
 
+    # Operational controls for bounded serving
+    def set_idle_timeout(self, seconds: float) -> None:
+        if not isinstance(seconds, (int, float)) or not 1 <= seconds <= 31536000:
+            raise RuntimeContractError("invalid idle timeout")
+        with self._lock:
+            self.idle_seconds = float(seconds)
+
+    def get_idle_timeout(self) -> float:
+        with self._lock:
+            return self.idle_seconds
+
+    def set_session_capacity(self, capacity: int) -> None:
+        with self._lock:
+            if type(capacity) is not int or not len(self._sessions) <= capacity <= 100000:
+                raise RuntimeContractError("invalid session capacity")
+            self.max_sessions = capacity
+
+    def get_session_capacity(self) -> int:
+        with self._lock:
+            return self.max_sessions
+
+    def is_full(self) -> bool:
+        with self._lock:
+            return len(self._sessions) >= self.max_sessions
+
+    def is_pinned(self, session_id: str) -> bool:
+        with self._lock:
+            self._get(session_id)
+            return bool(self._meta[session_id]["pinned"])
+
+    def touch(self, session_id: str) -> None:
+        with self._lock:
+            self._get(session_id)
+            self._touch(session_id)
+            self._event("touch", session_id)
+
+    def expire_before(self, timestamp: float) -> int:
+        with self._lock:
+            if not isinstance(timestamp, (int, float)) or not 0 <= timestamp <= time.time():
+                raise RuntimeContractError("invalid expiration timestamp")
+            ids = tuple(sid for sid, m in self._meta.items()
+                        if not m["pinned"] and m["updated_at"] < timestamp)
+            return self.delete_many(ids)
+
+    def prune_empty(self) -> int:
+        with self._lock:
+            ids = tuple(sid for sid, session in self._sessions.items()
+                        if not self._meta[sid]["pinned"] and session.is_empty)
+            return self.delete_many(ids)
+
+    def prune_by_context(self, max_tokens: int) -> int:
+        with self._lock:
+            if type(max_tokens) is not int or max_tokens < 0:
+                raise RuntimeContractError("invalid context threshold")
+            ids = tuple(sid for sid, session in self._sessions.items()
+                        if not self._meta[sid]["pinned"] and
+                        session.context_used > max_tokens)
+            return self.delete_many(ids)
+
+    def delete_if_empty(self, session_id: str) -> bool:
+        with self._lock:
+            if not self._get(session_id).is_empty:
+                return False
+            self.delete(session_id)
+            return True
+
+    def delete_if_revision(self, session_id: str, expected_revision: int) -> bool:
+        with self._lock:
+            if type(expected_revision) is not int:
+                raise RuntimeContractError("invalid session revision")
+            if self.revision(session_id) != expected_revision:
+                return False
+            self.delete(session_id)
+            return True
+
+    def snapshot_if_revision(self, session_id: str, expected_revision: int):
+        with self._lock:
+            self.require_revision(session_id, expected_revision)
+            return self.snapshot(session_id)
+
+    def restore_with_pin(self, snapshot: Mapping[str, Any]) -> str:
+        with self._lock:
+            sid = self.restore(snapshot)
+            self.pin(sid)
+            return sid
+
+    def fork_with_pin(self, session_id: str) -> str:
+        with self._lock:
+            sid = self.fork(session_id)
+            self.pin(sid)
+            return sid
+
+    def runtime_identity(self) -> Mapping[str, str]:
+        with self._lock:
+            return {"model_digest": self.runtime.model_digest,
+                    "tokenizer_digest": self.runtime.tokenizer.digest,
+                    "architecture_digest": self.runtime.architecture.digest}
+
     # Portability, governance and observability (31-40)
     def snapshot(self, session_id: str) -> Mapping[str, Any]:
         with self._lock:
