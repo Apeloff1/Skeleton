@@ -1,4 +1,4 @@
-"""Permissioned, token-verifiable native-model data preparation (ranks 11–16).
+"""Permissioned, token-verifiable native-model data preparation (native-model preparation family).
 
 Tokenizer is injected: this module does not substitute byte counting or
 whitespace splitting for a real native LLM tokenizer. Corpus ingestion,
