@@ -30,6 +30,9 @@ class EvidencePass:
 @dataclass(frozen=True)
 class Belief:
     claim_id: str
+    # Heuristic evidence score mapped through a logistic function. This field
+    # is retained for API compatibility and MUST NOT be described as an
+    # empirically calibrated posterior until calibration evidence exists.
     probability: float
     log_odds: float
     independent_groups: int
@@ -39,6 +42,7 @@ class Belief:
     conflicting: bool
     evidence_digest: str
     review_required: bool
+    probability_semantics: str = "heuristic_logistic_score"
 
 
 @dataclass(frozen=True)
