@@ -212,3 +212,22 @@ def test_cli_exports_user_ready_extended_and_batch_builds(tmp_path):
         "--output",str(batch),"--approve","--batch-games","3"])==0
     with ZipFile(batch) as z:
         assert len([x for x in z.namelist() if x.startswith("games/")])==3
+
+
+def test_actual_browser_progression_and_campaign_unlocks_are_shipped():
+    original=blueprint()
+    enriched=build_enhanced_game(original)
+    html=enriched.html
+    assert "function gainExperience" in html
+    assert "function awardCurrency" in html
+    assert "remainingObjectives()" in html
+    assert "state.skillPoints" in html
+    campaign=generate_game_campaign(index(),title="Persistent Odyssey",
+        genre="platformer",chapters=2)
+    with ZipFile(BytesIO(export_campaign_archive(campaign))) as archive:
+        launcher=archive.read("index.html").decode()
+        level=archive.read("levels/level-001.html").decode()
+        assert "localStorage" in launcher
+        assert 'data-chapter="2"' in launcher
+        assert "campaignWin()" in level
+        assert "Back to Campaign" in level
