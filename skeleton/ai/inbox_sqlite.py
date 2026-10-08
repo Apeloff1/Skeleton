@@ -103,6 +103,12 @@ class SQLiteInboxLedger:
         if type(require_causal_receipts) is not bool:
             raise ValueError("require_causal_receipts must be boolean")
         self.require_causal_receipts = require_causal_receipts
+        if type(path) not in (str, Path):
+            raise ValueError("SQLite inbox path must be a string or Path")
+        if str(path) != ":memory:":
+            target = Path(path)
+            if target.is_symlink() or target.parent.is_symlink() or not target.parent.is_dir():
+                raise ValueError("SQLite inbox path requires a preprovisioned safe parent")
         self._lock = threading.RLock()
         self._db = sqlite3.connect(
             str(path), isolation_level=None, check_same_thread=False, timeout=5.0,
@@ -115,6 +121,12 @@ class SQLiteInboxLedger:
                 PRAGMA synchronous=FULL;
                 PRAGMA busy_timeout=5000;
 
+                CREATE TABLE IF NOT EXISTS ai_inbox_config(
+                    id INTEGER PRIMARY KEY CHECK(id=1),
+                    replay_window INTEGER NOT NULL,
+                    max_receipts INTEGER NOT NULL,
+                    require_causal_receipts INTEGER NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS ai_inbox_producer(
                     producer_id TEXT PRIMARY KEY,
                     producer_epoch INTEGER NOT NULL,
@@ -142,6 +154,22 @@ class SQLiteInboxLedger:
                 );
                 """
             )
+            config = self._db.execute("SELECT * FROM ai_inbox_config WHERE id=1").fetchone()
+            expected = (
+                self.replay_window, self.max_receipts,
+                int(self.require_causal_receipts),
+            )
+            if config is None:
+                self._db.execute(
+                    "INSERT INTO ai_inbox_config VALUES (1, ?, ?, ?)", expected,
+                )
+            elif tuple(config[field] for field in (
+                "replay_window", "max_receipts", "require_causal_receipts",
+            )) != expected:
+                self._db.close()
+                raise ValueError(
+                    "persisted inbox policy mismatch; explicit migration required"
+                )
 
     @staticmethod
     def _receipt(row: sqlite3.Row) -> ProcessingReceipt:
@@ -279,6 +307,11 @@ class SQLiteInboxLedger:
                             row["receipt_id"] != result.receipt_id):
                         raise PermissionError("quarantine evidence changed")
                 else:
+                    count = self._db.execute(
+                        "SELECT COUNT(*) FROM ai_inbox_quarantine",
+                    ).fetchone()[0]
+                    if count >= self.max_receipts:
+                        raise PermissionError("durable inbox quarantine capacity exhausted")
                     self._db.execute(
                         "INSERT INTO ai_inbox_quarantine VALUES (?, ?, ?, ?)",
                         (
