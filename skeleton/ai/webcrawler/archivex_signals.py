@@ -7,9 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from hashlib import sha256
 from difflib import SequenceMatcher
-import re
 
 from .archivex import ArchiveX, ArchiveXSnapshot
 
@@ -40,6 +38,7 @@ class ArchiveDriftPolicy:
     max_text_chars: int = 200000
     unchanged_similarity: float = 0.999
     expansion_threshold: float = 0.2
+    max_comparison_units: int = 512
 
 
 def _text(body: bytes, policy: ArchiveDriftPolicy) -> str:
@@ -66,6 +65,8 @@ def compare_snapshots(
         raise ValueError("invalid unchanged threshold")
     if not 0 <= policy.expansion_threshold <= 1:
         raise ValueError("invalid expansion threshold")
+    if not 16 <= policy.max_comparison_units <= 2048:
+        raise ValueError("invalid comparison complexity budget")
     later_meta, later_body = later
     later_text = _text(later_body, policy)
     if earlier is None:
@@ -84,15 +85,22 @@ def compare_snapshots(
         kind, similarity = ArchiveSignalKind.UNCHANGED, 1.0
         added = removed = 0
     else:
-        matcher = SequenceMatcher(None, earlier_text, later_text, autojunk=False)
+        # Bound quadratic matching to at most max_comparison_units units.
+        # Large inputs use fixed-size chunks, not arbitrary-length characters.
+        longest = max(len(earlier_text), len(later_text))
+        chunk = max(1, (longest + policy.max_comparison_units - 1)
+                    // policy.max_comparison_units)
+        a = [earlier_text[i:i + chunk] for i in range(0, len(earlier_text), chunk)]
+        b = [later_text[i:i + chunk] for i in range(0, len(later_text), chunk)]
+        matcher = SequenceMatcher(None, a, b, autojunk=True)
         similarity = round(matcher.ratio(), 6)
         added = removed = 0
         for op, i1, i2, j1, j2 in matcher.get_opcodes():
             if op in ("replace", "delete"):
-                removed += i2 - i1
+                removed += sum(len(unit) for unit in a[i1:i2])
             if op in ("replace", "insert"):
-                added += j2 - j1
-        if similarity >= policy.unchanged_similarity:
+                added += sum(len(unit) for unit in b[j1:j2])
+        if similarity >= policy.unchanged_similarity and earlier_text == later_text:
             kind = ArchiveSignalKind.UNCHANGED
         elif removed > 0 and added == 0:
             kind = ArchiveSignalKind.REMOVED
