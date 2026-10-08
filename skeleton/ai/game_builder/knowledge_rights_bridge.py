@@ -237,9 +237,6 @@ def require_cleared_research_current(
         record = rights.source(hit.source_id)
         if record.rights_binding_digest != source.rights_record_digest:
             raise ResearchHandoffError("research packet rights reference mismatch")
-    query = " ".join(
-        sorted({hit.mechanic for hit in packet.citations})
-    )
     # Not a replacement for matching the original brief query (which may be
     # broader). Independently validate every exact citation via its source's
     # current latest revision, even when its ranking is query-dependent.
