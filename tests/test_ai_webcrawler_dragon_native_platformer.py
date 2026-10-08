@@ -30,10 +30,12 @@ def test_scrolling_platformer_has_real_ppu_camera_timing_collision_and_jump():
     assert "$9800+12*32+5" in src
     assert "VelocityY:" in src
     assert "GravityAndJump:" in src
-    assert "    ld a,$FA ; signed -6" in src
+    assert "    ld a,$F6 ; signed -10" in src
     assert "    inc [hl]" in src
     assert "    cp 144" in src
     assert "CollectStar:" in src
+    assert "HasGroundSupport:" in src
+    assert "    ld a,72 ; first platform, y104" in src
     assert "    ld [OAM+6],a" in src
     assert "PlayerWorldX: ds 1" in src
     assert "PlatformTilesEnd:" in src

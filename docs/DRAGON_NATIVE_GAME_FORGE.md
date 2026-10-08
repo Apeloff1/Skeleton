@@ -14,10 +14,13 @@ but **not all hardware × style combinations have unique gameplay yet**.
 Styles without specific native mechanics remain a design direction; do not
 mark them complete merely because the manifest names a genre.
 
-Native source emitters in this delivery (13 IDs):
+Native source emitters in this delivery (16 IDs):
 
 | Target | Project output | Toolchain | Status |
 |---|---|---|---|
+| Sega Master System | Z80, VDP sprites, native CRAM and controller input | SDCC/devkitSMS | SDK source emitted, not compiled |
+| Sega Game Gear | Z80, 160×144 VDP, handheld palette and controls | SDCC/devkitSMS TARGET_GG | SDK source emitted, not compiled |
+| Super Nintendo (SNES) | 65816, Mode 1 tiled background, native joypad, LoROM | PVSnesLib | SDK source emitted, not compiled |
 | Commodore 64 | 6510 C source + VIC-II/CIA/SID native PRG | cc65/cl65 | Source emitted, compiler smoke optional |
 | Nintendo Game Boy Color | CGB-only RGBDS ROM, true OBJ palette RAM | RGBDS | Source emitted; optional GBC ROM compilation |
 | Original Nintendo Game Boy | SM83 assembly → \`.gb\` | RGBDS | Source emitted, ROM validation optional |
@@ -39,8 +42,8 @@ GBA draws to mode 3 VRAM with keypad input; PS1 uses PlayStation graphics
 and pad interfaces; Xbox nxdk adds gamecontroller input to SDL2 visuals.
 
 The 47-target catalog also includes Atari VCS, Intellivision, ColecoVision,
-ZX Spectrum, Apple II, Master System, Game Gear, Atari Lynx,
-TurboGrafx-16, SNES, Neo Geo, Amiga, Atari ST, DOS 8086, Windows 95/XP,
+ZX Spectrum, Apple II, Atari Lynx,
+TurboGrafx-16, Neo Geo, Amiga, Atari ST, DOS 8086, Windows 95/XP,
 Saturn, Nintendo 64, Dreamcast, GameCube, PS2, Nintendo DS, PSP, Wii, PS3,
 Xbox 360, Nintendo 3DS, Wii U, PS Vita, PS4, Xbox One, Nintendo Switch,
 PS5 and Xbox Series. **Their platform-specific emitters are not complete**
@@ -179,7 +182,7 @@ Example:
     SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
       /tmp/dragon-rogue/build/dragon_game --smoke
 
-Remaining: 34 catalog hardware profiles do not have dedicated native
+Remaining: 31 catalog hardware profiles do not have dedicated native
 emitters; full genre depth, emulator traces, original 3D engines, save systems,
 and real-device performance testing are not yet complete.
 
@@ -296,3 +299,54 @@ together with main.c; no browser WebView is used for these features.
   consoles. SDK credentials must stay out of source archives.
 - Independently verified gameplay/evidence chains that award learning
   promotion only after traceable review, never for build volume.
+
+
+## Fourth-generation chapter design — actual native quest gating
+
+The campaign builder now performs an extra deterministic placement pass:
+early adventure, dungeon and tactics chapters contain a treasure chest;
+subsequent chapters add a reachable key and locked door; advanced chapters
+add guardians with multiple hitpoints and friendly caretaker encounters.
+Each quest placement includes typed coordinates and a SHA-256 evidence digest.
+
+The static compiler checks that a key can be reached from the starting
+position without crossing its own locked door. This protects the generated
+campaign from a specific class of progression softlocks. It is **not** a
+proof that enemy AI can be beaten, that every attack is balanced or that
+real player movement will reach the portal under all collisions.
+
+The native SDL2 C engine recognizes keys, doors, chests, NPCs and bosses;
+doors block movement until a key is acquired, pickup is recorded, and a
+portal does not advance the chapter if a required key was missed or
+a guardian remains alive. Guardians have extra HP, pursuit behaviour,
+feedback pulses and reward. Chests heal and award score, and friendly
+encounters restore energy. All progress is internal to the compiled game,
+not crawler mastery XP.
+
+## More actual native console-family source backends
+
+The Sega Master System and Sega Game Gear use documented devkitSMS and SDCC
+toolchains with original 8x8 graphics packed into Z80 VDP 4bpp tiles.
+The code updates real VRAM and CRAM, reads pad state and synchronizes sprite
+SAT writes with vblank. Game Gear uses TARGET_GG and the handheld's 12-bit
+palette. The generated Makefiles require an independently installed
+devkitSMS, SDCC and makesms; there are no precompiled SDK binaries.
+
+The Super Nintendo source uses native PVSnesLib/65816 with BG mode 1,
+VRAM text tile map, built-in SDK font, auto-read joypad, stage transitions,
+enemy hazard and HP/game-over loop. Its LoROM Makefile uses PVSnesLib
+snes_rules, not a PC CMake target.
+
+These three are source emitters only. Unlike RGBDS and cc65, an actual
+SDK build and console emulator run are not yet in CI. Do not present them
+as certified playable ROMs or assume toolkit compatibility without proof.
+
+## Gameplay constraints learned this pass
+
+A static cartridge renderer is insufficient if the game cannot be solved.
+The original Game Boy scrolling platformer jump arc was too shallow, and
+its first design risked leaving the character suspended when walking
+off ledges. The new source gives the player a signed -10 jump impulse,
+re-evaluates standing support, widens narrow landing windows and alternates
+gem objectives between platform heights reached by the player. The RGBDS
+CI job will attempt to assemble this corrected real cartridge program.

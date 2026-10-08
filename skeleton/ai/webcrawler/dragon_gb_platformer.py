@@ -26,7 +26,7 @@ def _rom_tile_bytes() -> str:
 def gb_platformer_source(seed:int)->dict[str,str]:
     if isinstance(seed,bool) or not isinstance(seed,int) or seed<0:
         raise ValueError("valid deterministic game seed required")
-    goal_x=204+(seed%27)
+    goal_x=138+(seed%12)
     source=r"""\
 ; Dragon's original scrolling Game Boy platformer. RGBDS SM83. 32x18 tile world.
 ; Native PPU tilemap at 9800h, background camera SCX and OAM 8x8 sprites.
@@ -111,7 +111,7 @@ Start:
     ld [Grounded],a
     ld a,GOAL_X
     ld [StarWorldX],a
-    ld a,84
+    ld a,80
     ld [StarScreenY],a
     ld a,$E4
     ldh [rOBP0],a
@@ -175,7 +175,7 @@ Controls:
     jr z,.noJump
     xor a
     ld [Grounded],a
-    ld a,$FA ; signed -6 initial jump impulse
+    ld a,$F6 ; signed -10 initial jump impulse; reaches first and second ledge
     ld [VelocityY],a
 .noJump:
     ld a,$30
@@ -184,7 +184,15 @@ Controls:
 GravityAndJump:
     ld a,[Grounded]
     and a
+    jr z,.airborne
+    call HasGroundSupport
+    and a
     ret nz
+    xor a
+    ld [Grounded],a
+    ld a,1
+    ld [VelocityY],a
+.airborne:
     ld a,[VelocityY]
     bit 7,a
     jr z,.positive
@@ -237,7 +245,7 @@ GravityAndJump:
     ld a,[PlayerScreenY]
     cp 104
     jr c,.second
-    cp 107
+    cp 109
     jr nc,.second
     ld a,104
     ld [PlayerScreenY],a
@@ -252,7 +260,7 @@ GravityAndJump:
     ld a,[PlayerScreenY]
     cp 80
     jr c,.finish
-    cp 83
+    cp 85
     jr nc,.finish
     ld a,80
     ld [PlayerScreenY],a
@@ -264,6 +272,34 @@ GravityAndJump:
     ld [VelocityY],a
     ld a,1
     ld [Grounded],a
+    ret
+HasGroundSupport:
+    ; A grounded player must lose support if walking off a ledge.
+    ld a,[PlayerScreenY]
+    cp 144
+    jr z,.supported ; full-width bottom ground
+    cp 104
+    jr nz,.checkSecond
+    ld a,[PlayerWorldX]
+    cp 40
+    jr c,.unsupported
+    cp 97
+    jr nc,.unsupported
+    jr .supported
+.checkSecond:
+    ld a,[PlayerScreenY]
+    cp 80
+    jr nz,.unsupported
+    ld a,[PlayerWorldX]
+    cp 104
+    jr c,.unsupported
+    cp 161
+    jr nc,.unsupported
+.supported:
+    ld a,1
+    ret
+.unsupported:
+    xor a
     ret
 MoveCamera:
     ld a,[PlayerWorldX]
@@ -338,16 +374,21 @@ CollectStar:
     cp 15
     ret nc
     ; Move next star to another reachable part of the world.
+    ; Alternate prizes between two physically reachable ledges.
     ld a,[StarWorldX]
-    add 67
-    cp 80
-    jr nc,.safeX
-    ld a,100
-.safeX:
+    cp 100
+    jr nc,.nextLow
+    ld a,144 ; second platform, y80
     ld [StarWorldX],a
-    ld a,[StarScreenY]
-    xor $28
+    ld a,80
     ld [StarScreenY],a
+    jr .starDone
+.nextLow:
+    ld a,72 ; first platform, y104
+    ld [StarWorldX],a
+    ld a,104
+    ld [StarScreenY],a
+.starDone:
     ld a,$1B
     ldh [rOBP0],a ; audible/visual reward still needs external review
     ret

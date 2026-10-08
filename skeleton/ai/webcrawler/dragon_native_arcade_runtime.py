@@ -34,6 +34,7 @@ typedef struct {float x,y,dx,dy;int life;} Particle;
 typedef struct {int left,right,up,down,jump,fire,pause,reset;} Input;
 typedef struct {
   int stage,score,health,energy,remaining,frame,combo,won,lost,paused,invincible,turn;
+  int keys,key_collected,quest_requires_key,guardians,caretakers,chests_opened;
   float x,y,dx,dy;int facing;
   char tiles[MAP_H][MAP_W+1];
   Enemy enemies[ENEMIES];
@@ -73,7 +74,9 @@ static char tile(int x,int y){
 static int wall(float x,float y){
   int tx=(int)x/TILE,ty=(int)y/TILE;
   if(x<0||y<0||x>=SCREEN_W||y>=SCREEN_H)return 1;
-  return tile(tx,ty)=='#'||(GAME_MODE!=1&&tile(tx,ty)=='=');
+  char value=tile(tx,ty);
+  return value=='#'||(value=='D'&&game.keys==0)||
+         (GAME_MODE!=1&&value=='=');
 }
 static int collision(float x,float y){
   return wall(x+2,y+2)||wall(x+16,y+2)||wall(x+2,y+17)||wall(x+16,y+17);
@@ -96,6 +99,8 @@ static void hurt(void){
 static void begin_stage(int n){
   if(n>=STAGE_COUNT){game.won=1;sound(880,350);return;}
   game.stage=n;game.remaining=0;game.invincible=0;
+  game.keys=0;game.key_collected=0;game.quest_requires_key=0;
+  game.guardians=0;game.caretakers=0;game.chests_opened=0;
   game.health=CLAMP(game.health+1,1,6);
   game.energy=100;game.dx=game.dy=0;game.facing=1;
   memset(game.enemies,0,sizeof(game.enemies));
@@ -107,9 +112,12 @@ static void begin_stage(int n){
       char t=game.tiles[y][x];
       if(t=='S'){game.x=(float)x*TILE+4;game.y=(float)y*TILE+4;game.tiles[y][x]='.';}
       else if(t=='*')game.remaining++;
-      else if(t=='E'){
+      else if(t=='K')game.quest_requires_key=1;
+      else if(t=='E'||t=='B'){
         for(int i=0;i<ENEMIES;i++)if(!game.enemies[i].alive){
-          game.enemies[i]=(Enemy){x*TILE+4.f,y*TILE+4.f,0,0,1,1,i%3,rnd(100)};
+          game.enemies[i]=(Enemy){x*TILE+4.f,y*TILE+4.f,0,0,
+            1,(t=='B'?4+n:1),(t=='B'?3:i%3),rnd(100)};
+          if(t=='B')game.guardians++;
           game.tiles[y][x]='.';break;
         }
       }
@@ -127,13 +135,15 @@ static void reset_game(void){
   memset(&game,0,sizeof(game));game.health=4;begin_stage(0);
 }
 static uint32_t game_state_hash(void){
-  uint32_t state[9]={
+  uint32_t state[12]={
     (uint32_t)game.stage,(uint32_t)game.score,(uint32_t)game.health,
     (uint32_t)game.remaining,(uint32_t)game.won,(uint32_t)game.lost,
     (uint32_t)(int)(game.x*16),(uint32_t)(int)(game.y*16),
-    (uint32_t)game.energy
+    (uint32_t)game.energy,
+    (uint32_t)game.keys,(uint32_t)game.key_collected,
+    (uint32_t)game.guardians
   };
-  return dragon_replay_digest(state,9);
+  return dragon_replay_digest(state,12);
 }
 static uint16_t pack_input(Input in){
   return (uint16_t)(
@@ -176,7 +186,12 @@ static void enemies_update(void){
     float vy=e->mode==2&&fabsf(dy)<140?(dy>0?speed:-speed):0;
     if(!collision(e->x+vx,e->y))e->x+=vx;
     if(!collision(e->x,e->y+vy))e->y+=vy;
-    if(fabsf(e->x-game.x)<17&&fabsf(e->y-game.y)<17)hurt();
+    if(fabsf(e->x-game.x)<(e->mode==3?23:17)&&
+       fabsf(e->y-game.y)<(e->mode==3?23:17))hurt();
+    /* Guardian has longer pursuit range, larger HP and a visible red pulse. */
+    if(e->mode==3 && e->phase%100==0 &&
+       fabsf(e->x-game.x)<36&&fabsf(e->y-game.y)<36)
+      hurt();
   }
 }
 static void projectile_update(void){
@@ -188,7 +203,14 @@ static void projectile_update(void){
       Enemy*e=&game.enemies[j];if(!e->alive)continue;
       if(fabsf(e->x-b->x)<16&&fabsf(e->y-b->y)<16){
         b->life=0;e->hp--;sparks(e->x,e->y,10);
-        if(e->hp<=0){e->alive=0;game.score+=100;game.combo++;sound(790,75);}
+        if(e->hp<=0){
+          e->alive=0;
+          if(e->mode==3){
+            game.guardians=MAX(0,game.guardians-1);
+            game.score+=450;sound(980,210);sparks(e->x,e->y,30);
+          }else{game.score+=100;sound(790,75);}
+          game.combo++;
+        }
         break;
       }
     }
@@ -202,8 +224,23 @@ static void collect_tiles(void){
     game.combo++;sparks(game.x,game.y,9);sound(880,80);
   }else if(t=='+'){
     game.tiles[cy][cx]='.';game.health=CLAMP(game.health+1,0,6);
+  }else if(t=='K'){
+    game.tiles[cy][cx]='.';game.keys++;
+    game.key_collected=1;game.score+=75;sound(720,160);
+    sparks(game.x,game.y,15);
+  }else if(t=='D'&&game.keys>0){
+    game.tiles[cy][cx]='.';game.keys--;
+    game.score+=50;sound(410,110);
+  }else if(t=='C'){
+    game.tiles[cy][cx]='.';game.chests_opened++;
+    game.score+=80;game.health=CLAMP(game.health+1,0,6);
+    sparks(game.x,game.y,14);sound(960,100);
+  }else if(t=='N'){
+    game.tiles[cy][cx]='.';game.caretakers++;
+    game.score+=25;game.energy=100;sound(540,100);
   }else if(t=='^'||t=='~')hurt();
-  else if(t=='G'&&(GAME_MODE!=0||game.remaining==0)){
+  else if(t=='G'&&(GAME_MODE!=0||game.remaining==0)&&
+          game.guardians==0&&(!game.quest_requires_key||game.key_collected)){
     game.score+=200;sparks(game.x,game.y,24);begin_stage(game.stage+1);
   }
 }
@@ -278,6 +315,23 @@ static void draw_tile(int x,int y,char t){
   }else if(t=='+'){
     rect(px+9,py+3,6,18,85,210,127);
     rect(px+3,py+9,18,6,85,210,127);
+  }else if(t=='K'){
+    rect(px+9,py+3,7,6,248,212,96);
+    rect(px+12,py+9,3,12,248,212,96);
+    rect(px+10,py+17,9,4,248,212,96);
+  }else if(t=='D'){
+    rect(px+1,py+1,22,23,124,82,43);
+    rect(px+5,py+3,14,20,170,122,70);
+    rect(px+15,py+12,4,4,251,225,112);
+  }else if(t=='C'){
+    rect(px+3,py+8,18,13,118,67,52);
+    rect(px+3,py+5,18,6,235,188,105);
+    rect(px+11,py+11,4,6,255,236,122);
+  }else if(t=='N'){
+    rect(px+6,py+4,12,13,163,125,230);
+    rect(px+9,py+8,2,2,28,35,50);
+    rect(px+15,py+8,2,2,28,35,50);
+    rect(px+7,py+17,10,5,105,161,234);
   }
 }
 static void draw_digit(int x,int y,int n,int scale){
@@ -302,7 +356,10 @@ static void render(void){
   for(int y=0;y<MAP_H;y++)for(int x=0;x<MAP_W;x++)draw_tile(x,y,game.tiles[y][x]);
   for(int i=0;i<ENEMIES;i++)if(game.enemies[i].alive){
     Enemy*e=&game.enemies[i];
-    rect(e->x,e->y,17,17,231,94,116);
+    rect(e->x,e->y,e->mode==3?22:17,e->mode==3?22:17,
+         e->mode==3?167:231,e->mode==3?51:94,116);
+    if(e->mode==3)
+      rect(e->x+3,e->y+18,16,3,(e->phase%30)<15?255:100,85,120);
     rect(e->x+3,e->y+4,4,4,28,32,46);
     rect(e->x+11,e->y+4,4,4,28,32,46);
   }
@@ -330,6 +387,10 @@ static void render(void){
   draw_number(155,10,game.score,3);
   draw_number(345,10,game.stage+1,3);
   draw_number(448,10,game.remaining,3);
+  draw_number(530,10,game.keys,3);
+  draw_number(630,10,game.guardians,3);
+  if(game.quest_requires_key&&!game.key_collected)
+    rect(530,40,20,8,249,164,59);
   if(game.paused||game.won||game.lost){
     rect(180,184,SCREEN_W-360,140,15,31,48);
     draw_number(310,222,game.won?888:game.lost?0:555,7);

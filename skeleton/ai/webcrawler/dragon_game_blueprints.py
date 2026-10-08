@@ -16,7 +16,7 @@ W, H = 32, 20
 MAX_STAGE = 8
 # Legend: . open, # solid, ^ hazard, * pickup, G exit, E roaming foe,
 # ~ water, = platform, + healing, D door, S spawn (player).
-TILESET = frozenset(".#^*GE~=+DS")
+TILESET = frozenset(".#^*GE~=+DSKCNB")
 GENRES = {
     "arcade_score_attack": "arena",
     "bullet_hell": "arena",
@@ -59,6 +59,7 @@ class Stage:
     enemies: int
     difficulty: int
     checksum: str
+    quest: dict | None = None
 
 @dataclass(frozen=True)
 class Campaign:
@@ -253,13 +254,16 @@ def design_campaign(*, style: str, seed: int, stages: int = 4,
                 board[y][gx] = "."
         pickups, enemies = _decorate(board, rng, mode=mode, stage_num=n,
                                     start=start, goal=goal)
+        from .dragon_campaign_quests import place_quests,quest_record
+        quest=place_quests(board,rng=rng,chapter=n,mode=mode,start=start,goal=goal)
+        enemies+=quest.guardians
         rows = tuple("".join(row) for row in board)
         if any(len(r) != W or not set(r) <= TILESET for r in rows):
             raise RuntimeError("generator emitted invalid tiles")
         if not _reachable(board, start, goal):
             raise RuntimeError("generator could not prove spawn-to-goal path")
         out.append(Stage(n, W, H, rows, start, goal, pickups, enemies, n + 1,
-                         _ascii_hash(rows)))
+                         _ascii_hash(rows),quest_record(quest)))
     objectives = {
         "arena": ("Collect crystals", "Dodge patrolling enemies", "Reach the portal"),
         "platform": ("Master jumping", "Avoid dangerous platforms", "Reach the exit"),

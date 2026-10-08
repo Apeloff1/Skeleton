@@ -51,13 +51,13 @@ TARGETS: tuple[ConsoleTarget,...] = (
     _t("nes","Nintendo","8-bit",1983,"Ricoh 2A03","PPU tiles","APU",
        "NES controller","cc65 / ca65","nes",colors=54,width=256,height=240),
     _t("master_system","Sega","8-bit",1985,"Z80","VDP tiles","SN76489",
-       "2-button pad","SDCC / devkitSMS","sms",colors=64,width=256,height=192),
+       "2-button pad","SDCC / devkitSMS","sms","native_source",colors=64,width=256,height=192),
     _t("game_boy","Nintendo","handheld 8-bit",1989,"SM83","2bpp tiles / OAM","DMG APU",
        "D-pad A B Start Select","RGBDS","gb","native_source",4,160,144),
     _t("game_boy_color","Nintendo","handheld 8-bit color",1998,"SM83","CGB tile palettes","CGB APU",
        "D-pad A B Start Select","RGBDS","gbc","native_source",colors=32768,width=160,height=144),
     _t("game_gear","Sega","handheld 8-bit",1990,"Z80","SMS-derived LCD","PSG",
-       "D-pad 2-button","SDCC / devkitSMS","gg",colors=4096,width=160,height=144),
+       "D-pad 2-button","SDCC / devkitSMS","gg","native_source",colors=4096,width=160,height=144),
     _t("lynx","Atari","handheld 8/16-bit",1989,"65C02","Suzy blitter","Mikey",
        "D-pad A B","cc65 / Lynx SDK","lnx",colors=4096,width=160,height=102),
     _t("turbografx_16","NEC","16-bit era",1987,"HuC6280","HuC6270 VDC","HuC6280 PSG",
@@ -65,7 +65,7 @@ TARGETS: tuple[ConsoleTarget,...] = (
     _t("genesis","Sega","16-bit",1988,"68000 + Z80","VDP tiles / sprites","YM2612 / PSG",
        "3/6-button pad","SGDK","bin","native_source",colors=512,width=320,height=224),
     _t("snes","Nintendo","16-bit",1990,"65C816","PPU Mode 1-7","SPC700",
-       "SNES pad","WLA-DX / ca65","sfc",colors=32768,width=256,height=224),
+       "SNES pad","PVSnesLib","sfc","native_source",colors=32768,width=256,height=224),
     _t("neo_geo","SNK","arcade 16-bit",1990,"68000 + Z80","sprite hardware","YM2610",
        "arcade stick","NGDEVKIT","neo",colors=65536,width=320,height=224),
     _t("amiga_500","Commodore","16/32-bit computer",1987,"68000","OCS blitter / copper","Paula",
@@ -149,7 +149,7 @@ STYLES = (
 def target_catalog(*, family: str | None = None) -> tuple[dict, ...]:
     from .dragon_game_blueprints import GENRES
     desktop={"pc_linux","pc_windows","pc_macos","steam_deck"}
-    source_ids={"game_boy","game_boy_color","nes","commodore_64","genesis","game_boy_advance","ps1",
+    source_ids={"game_boy","game_boy_color","nes","master_system","game_gear","snes","commodore_64","genesis","game_boy_advance","ps1",
                 "xbox_original","dos_vga"}|desktop
     rows=[]
     for t in TARGETS:
