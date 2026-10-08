@@ -201,6 +201,16 @@ class RevisionJournal:
         try:
             latest = self._latest_unchecked(owner, review.claim_id)
             current = latest.sequence if latest else 0
+            head = self.db.execute("""
+              SELECT sequence,event_hash FROM crawler_revision_heads
+              WHERE owner=? AND claim_id=?
+            """, (owner, review.claim_id)).fetchone()
+            if (head is None) != (latest is None) or (
+                latest is not None and head != (latest.sequence, latest.event_hash)
+            ):
+                raise RuntimeError("revision journal head mismatch")
+            if latest and observed_at < latest.observed_at:
+                raise ValueError("journal time cannot move backwards")
             if latest and latest.sequence == expected_sequence + 1:
                 # Network retry after a successful acknowledged commit.
                 # A replay with different timestamp or report is a conflict.
