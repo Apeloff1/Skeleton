@@ -91,6 +91,7 @@ const left = () => keys.has("ArrowLeft")||keys.has("KeyA")||touch.left;
 const right = () => keys.has("ArrowRight")||keys.has("KeyD")||touch.right;
 const jump = () => keys.has("Space")||keys.has("ArrowUp")||keys.has("KeyW")||touch.jump;
 const attack = () => keys.has("KeyJ")||keys.has("KeyK");
+const dash = () => keys.has("ShiftLeft")||keys.has("ShiftRight");
 """
 
 
@@ -131,16 +132,29 @@ function moveAxis(body,axis,amount){
 function physicsStep(dt){
   const p=state.player;
   if(!p.alive||state.won) return;
-  const desired=(Number(right())-Number(left()))*scene.physics.move_speed*TILE;
+  const direction=Number(right())-Number(left());
+  const desired=direction*scene.physics.move_speed*TILE;
   const accel=scene.physics.acceleration*TILE;
   const friction=scene.physics.friction*TILE;
-  if(desired) p.vx += Math.sign(desired-p.vx)*Math.min(Math.abs(desired-p.vx),accel*dt);
-  else p.vx += -Math.sign(p.vx)*Math.min(Math.abs(p.vx),friction*dt);
+  p.dashCooldown=Math.max(0,p.dashCooldown-dt);
+  p.dashTimer=Math.max(0,p.dashTimer-dt);
+  if(scene.mechanics.includes("dash")&&dash()&&!p.dashHeld&&
+     direction&&p.dashCooldown===0){
+    p.dashTimer=.14;p.dashCooldown=.7;
+    p.vx=direction*scene.physics.move_speed*TILE*2.7;
+  }
+  p.dashHeld=dash();
+  if(!p.dashTimer){
+    if(desired) p.vx += Math.sign(desired-p.vx)*Math.min(Math.abs(desired-p.vx),accel*dt);
+    else p.vx += -Math.sign(p.vx)*Math.min(Math.abs(p.vx),friction*dt);
+  }
   if(jump()&&!p.jumpHeld) p.jumpBuffer=.12;
   p.jumpHeld=jump();
   p.jumpBuffer=Math.max(0,p.jumpBuffer-dt);
   p.coyote=p.grounded?.10:Math.max(0,p.coyote-dt);
-  if(p.jumpBuffer>0&&p.coyote>0){
+  if(p.jumpBuffer>0&&(p.coyote>0 ||
+      (scene.mechanics.includes("double_jump")&&p.airJumps>0))){
+    if(p.coyote<=0) p.airJumps--;
     p.vy=-scene.physics.jump_speed*TILE;
     p.jumpBuffer=0;p.coyote=0;p.grounded=false;
   }
@@ -148,6 +162,7 @@ function physicsStep(dt){
   moveAxis(p,"x",p.vx*dt);
   p.grounded=false;
   moveAxis(p,"y",p.vy*dt);
+  if(p.grounded) p.airJumps=1;
   if(p.y>scene.height*TILE+TILE) loseLife();
   p.invincible=Math.max(0,p.invincible-dt);
 }
@@ -201,7 +216,8 @@ function restart(){
   const original=scene.entities.find(e=>e.type==="player");
   state.player={x:original.x+5,y:original.y+4,w:22,h:28,
                 vx:0,vy:0,grounded:false,coyote:0,jumpBuffer:0,
-                jumpHeld:false,invincible:1,alive:true};
+                jumpHeld:false,airJumps:1,dashTimer:0,dashCooldown:0,
+                dashHeld:false,invincible:1,alive:true};
   state.pickups=scene.entities.filter(e=>e.type==="collectible")
     .map(e=>({...e,w:20,h:20,x:e.x+6,y:e.y+6,active:true}));
   state.enemies=scene.entities.filter(e=>e.type==="enemy")
@@ -291,7 +307,7 @@ function draw(){
   ctx.fillStyle="#e8f4ff";ctx.font="bold 18px system-ui";
   ctx.fillText("Score: "+state.score+"    Lives: "+state.lives,20,32);
   ctx.font="14px system-ui";
-  ctx.fillText("A/D: move   Space: jump   J: attack   P: pause   R: restart",20,54);
+  ctx.fillText("A/D: move   Space: jump   Shift: dash   J: attack   P: pause   R: restart",20,54);
   if(scene.genre==="puzzle"){
     const remaining=state.pickups.filter(i=>i.active).length;
     ctx.fillText("Puzzle: collect all tokens to unlock the goal ("+remaining+" left)",20,76);
@@ -316,7 +332,8 @@ def build_playable_web_game(blueprint: GameBlueprint) -> CompiledGame:
     entities=compile_scene_entities(blueprint)
     scene={
         "schema":"skeleton.game.original_playable.v1",
-        "title":blueprint.title,"genre":blueprint.genre,"width":blueprint.width,
+        "title":blueprint.title,"genre":blueprint.genre,
+        "mechanics":blueprint.mechanics,"width":blueprint.width,
         "height":blueprint.height,
         "entities":entities,"collision":compile_tile_collision(blueprint),
         "physics":blueprint.physics_dict(),"knowledge_refs":blueprint.source_evidence,
