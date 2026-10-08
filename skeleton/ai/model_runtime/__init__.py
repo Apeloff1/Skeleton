@@ -1,3 +1,4 @@
+from .chat_protocol import ChatMessage, ChatTranscript
 """Provider-neutral FLGB-02 model-runtime and native execution contracts."""
 from .admission_scheduler import AdmissionDecision, AdmissionLimits, RuntimeAdmissionScheduler, ScheduledRequest
 from .runtime_signals import DEFAULT_RUNTIME_SIGNALS, RuntimeSignal, RuntimeSignalRegistry, SignalMaturity
@@ -121,6 +122,8 @@ __all__ = [
     "NativeLLMRuntime",
     "NativeConversationSession",
     "NativeConversationService",
+    "ChatMessage",
+    "ChatTranscript",
     "ConversationStore",
     "DurableConversationCoordinator",
     "PersistenceBinding",
