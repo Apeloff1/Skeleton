@@ -219,6 +219,26 @@ class PlayableCliTests(unittest.TestCase):
         self.assertEqual(verified["final_state"]["status"], "won")
         self.assertEqual(verified["replay_digest"], solution["replay_digest"])
 
+    def test_cli_analyzes_verified_trace_into_actionable_experience(self):
+        code, solution, error = self.invoke("solve")
+        self.assertEqual((code, error), (0, ""))
+        record = {
+            "schema": "skeleton.game_builder.browser_actions.v1",
+            "world_digest": solution["world_digest"],
+            "project_id": "offline-quest",
+            "actions": solution["actions"],
+            "note": "Unverified client-side actions; replay via trusted Python engine.",
+        }
+        self.replay.write_text(json.dumps(record), encoding="utf-8")
+        code, analysis, error = self.invoke("analyze-replay", "--input", str(self.replay))
+        self.assertEqual((code, error), (0, ""))
+        self.assertEqual(analysis["schema"], "skeleton.game_builder.playability_report.v1")
+        self.assertTrue(analysis["completed_game"])
+        self.assertEqual(len(analysis["levels"]), 2)
+        self.assertTrue(analysis["no_preference_inference"])
+        self.assertTrue(analysis["requires_human_evaluation"])
+        self.assertEqual(len(analysis["report_digest"]), 64)
+
     def test_cli_rejects_forged_world_digest(self):
         log = {
             "schema": "skeleton.game_builder.browser_actions.v1",
