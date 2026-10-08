@@ -34,18 +34,27 @@ COMMANDS = {
         ("rgblink","-o","build/dragon.gb","build/dragon.o"),
         ("rgbfix","-v","-p","0","-t","DRAGONLAB","build/dragon.gb"),
     ),
+    "game_boy_color":(
+        ("rgbasm","-o","build/dragon.o","src/main.asm"),
+        ("rgblink","-o","build/dragon.gbc","build/dragon.o"),
+        ("rgbfix","-v","-p","0","-C","-t","DRAGONCGB","build/dragon.gbc"),
+    ),
     "nes":(
         ("ca65","-o","build/dragon.o","src/main.s"),
         ("ld65","-C","nes.cfg","-o","build/dragon.nes","build/dragon.o"),
     ),
 }
-OUTPUTS={"game_boy":"build/dragon.gb","nes":"build/dragon.nes"}
+OUTPUTS={"game_boy":"build/dragon.gb","game_boy_color":"build/dragon.gbc","nes":"build/dragon.nes"}
 
 def _verify(target_id:str, blob:bytes)->bool:
-    if target_id=="game_boy":
+    if target_id in ("game_boy","game_boy_color"):
         # Header, valid target ROM size and cartridge checksum. rgbfix inserts
         # the standard header; this checks byte-level structure not gameplay.
         if len(blob)<32768 or len(blob)%16384!=0:
+            return False
+        if target_id=="game_boy_color" and blob[0x143]!=0xC0:
+            return False
+        if target_id=="game_boy" and blob[0x143] not in (0,0x80):
             return False
         if blob[0x147] not in (0,1,2,3):
             return False

@@ -14,11 +14,12 @@ but **not all hardware × style combinations have unique gameplay yet**.
 Styles without specific native mechanics remain a design direction; do not
 mark them complete merely because the manifest names a genre.
 
-Native source emitters in this delivery (12 IDs):
+Native source emitters in this delivery (13 IDs):
 
 | Target | Project output | Toolchain | Status |
 |---|---|---|---|
 | Commodore 64 | 6510 C source + VIC-II/CIA/SID native PRG | cc65/cl65 | Source emitted, compiler smoke optional |
+| Nintendo Game Boy Color | CGB-only RGBDS ROM, true OBJ palette RAM | RGBDS | Source emitted; optional GBC ROM compilation |
 | Original Nintendo Game Boy | SM83 assembly → \`.gb\` | RGBDS | Source emitted, ROM validation optional |
 | Nintendo NES | 6502 assembly + NROM linker → \`.nes\` | cc65 ca65/ld65 | Source emitted, ROM validation optional |
 | Sega Genesis / Mega Drive | SGDK C source + Makefile → \`.bin\` | SGDK | Source emitted, SDK build unverified |
@@ -178,7 +179,7 @@ Example:
     SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
       /tmp/dragon-rogue/build/dragon_game --smoke
 
-Remaining: 35 catalog hardware profiles do not have dedicated native
+Remaining: 34 catalog hardware profiles do not have dedicated native
 emitters; full genre depth, emulator traces, original 3D engines, save systems,
 and real-device performance testing are not yet complete.
 
@@ -194,3 +195,104 @@ dragon-generator-evaluation.json: all candidates, selected static metrics,
 selection digest and proof boundaries. A game with disconnected objectives is
 rejected rather than granted progress. The builder is not claiming to have
 played, tested on actual hardware, trained a model or earned any XP.
+
+
+## Third-generation cartridge and desktop runtime pass — native, not a skin
+
+### True Color Game Boy cartridge (13th source target)
+
+The Game Boy Color emitter is not a renamed DMG ROM. It adds a native CGB
+OBJ palette initialization at FF6A/FF6B (auto-increment in palette RAM),
+several original BGR555 palettes, RGBDS CGB-only cartridge header and a
+.gbc output artifact. RGBDS rgbfix -C is required. Both header flag and
+checksum must be structurally verified by the local native build gate.
+
+For a real local CGB cartridge, install RGBDS:
+
+    python -m skeleton.ai.webcrawler.dragon_native_cli \
+      --target game_boy_color --out /tmp/dragon-cgb --compile
+
+The binary output, if compilation succeeds, is
+/tmp/dragon-cgb/build/dragon.gbc. This is HOME BREW, not a Nintendo ROM
+download and not a PlayStation or modern Xbox game. A structural header
+check does not show that an emulator has rendered the palette correctly.
+
+### Standalone original scrolling Game Boy platform game
+
+This is a second native Game Boy gameplay engine, separate from the earlier
+single-screen score chase. The generated SM83 assembly sets the PPU tile
+data at $8000, BG tilemap at $9800, 32-column level collision geometry,
+world-space X coordinates, camera SCX register updates, a moving player OAM
+sprite, A-button jump impulse, bounded signed falling speed, ledge and
+ground landing, scrolling world gem and a blinking hatchling frame.
+
+    python -m skeleton.ai.webcrawler.dragon_native_cli \
+      --target game_boy --style side_scrolling_platformer \
+      --out /tmp/dragon-platform --compile
+
+The CI gate attempts an actual RGBDS ROM build and validates the .gb header.
+This is native hardware architecture but it has not yet been demonstrated
+on a Game Boy emulator or cartridge. Sprite handling and physics still
+need extended player tests, audio, reset options and performance review.
+
+### Native desktop campaign persistence
+
+Each SDL2 campaign now compiles a two-slot checkpoint service. Saves are
+36-byte versioned binary records in SDL's application preference directory,
+with campaign-signature binding, explicit little-endian fields, per-record
+CRC-32, size checks and bounded stage, health, score and monotonically
+increasing serial. Two alternating files mean a failed save cannot destroy
+both copies at once. Only stage boundaries are autosaved.
+
+The generated native game resumes a valid same-campaign checkpoint on a
+normal launch. Pressing R starts a new campaign; a new game checkpoint is
+saved at the start of the next stage. No cloud access or server identity
+is needed; changing the campaign invalidates stale saves deliberately.
+Developer-level native save verification:
+
+    SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
+      build/dragon_game --checkpoint-test
+
+### Deterministic native gamepad replay
+
+The desktop game can record the input buttons for exactly up to 7,200
+fixed 60-Hz simulation frames and play them again. The versioned binary
+DRPL format includes the exact campaign identity, a strict frame limit,
+CRC-32 of every controller input, and the expected integer gameplay
+state digest. Playback resets game PRNG and world, replays the actual
+native physics ticks, and refuses mismatches. No screen/video/microphone
+is recorded; the player must opt in to saving a local trace.
+
+    build/dragon_game --record-replay /tmp/practice.drpl
+    build/dragon_game --play-replay /tmp/practice.drpl
+
+For CI, a deterministic native 360-tick replay smoke creates a bounded
+original input stream, reloads it and verifies end-state equivalence:
+
+    SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
+      build/dragon_game --replay-selftest /tmp/practice.drpl
+
+Damaging its payload must cause replay loading to fail. This provides
+REPRODUCIBILITY, not a claim of user acceptance, visual quality, correct
+emulator behavior, or verified genre mastery. A source-only practice ZIP
+still earns zero XP by itself.
+
+The game archive's save and replay .c/.h files compile as native source
+together with main.c; no browser WebView is used for these features.
+
+### Next required high-impact steps
+
+- Emulator-based Game Boy and CGB sprite/video frame assertions.
+- Separate NES, GBA, Genesis and C64 genre-specific mechanics rather than
+  cloning the one-room collectible design onto every console family.
+- SNES and N64 2D/3D hardware surfaces and sound toolchain integration.
+- A typed, editable game specification with modular assets, scenes,
+  progression objectives, configurable bosses, save contents and game
+  configuration that compile down to different console constraints.
+- Hardware/CI budget checks for VRAM, RAM, ROM banking, scanline quotas,
+  input timing, audio buffer underruns, controller mapping and CPU ticks.
+- Original Xbox and Sony PlayStation homebrew compilation on legally
+  configured SDK runners, then optional partner SDK targets for modern
+  consoles. SDK credentials must stay out of source archives.
+- Independently verified gameplay/evidence chains that award learning
+  promotion only after traceable review, never for build volume.

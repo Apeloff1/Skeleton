@@ -55,7 +55,7 @@ TARGETS: tuple[ConsoleTarget,...] = (
     _t("game_boy","Nintendo","handheld 8-bit",1989,"SM83","2bpp tiles / OAM","DMG APU",
        "D-pad A B Start Select","RGBDS","gb","native_source",4,160,144),
     _t("game_boy_color","Nintendo","handheld 8-bit color",1998,"SM83","CGB tile palettes","CGB APU",
-       "D-pad A B Start Select","RGBDS","gbc",colors=32768,width=160,height=144),
+       "D-pad A B Start Select","RGBDS","gbc","native_source",colors=32768,width=160,height=144),
     _t("game_gear","Sega","handheld 8-bit",1990,"Z80","SMS-derived LCD","PSG",
        "D-pad 2-button","SDCC / devkitSMS","gg",colors=4096,width=160,height=144),
     _t("lynx","Atari","handheld 8/16-bit",1989,"65C02","Suzy blitter","Mikey",
@@ -149,7 +149,7 @@ STYLES = (
 def target_catalog(*, family: str | None = None) -> tuple[dict, ...]:
     from .dragon_game_blueprints import GENRES
     desktop={"pc_linux","pc_windows","pc_macos","steam_deck"}
-    source_ids={"game_boy","nes","commodore_64","genesis","game_boy_advance","ps1",
+    source_ids={"game_boy","game_boy_color","nes","commodore_64","genesis","game_boy_advance","ps1",
                 "xbox_original","dos_vga"}|desktop
     rows=[]
     for t in TARGETS:
@@ -158,6 +158,7 @@ def target_catalog(*, family: str | None = None) -> tuple[dict, ...]:
         row=asdict(t)
         row["supported_styles"]=(
             tuple(sorted(GENRES)) if t.id in desktop
+            else ("arcade_score_attack","side_scrolling_platformer") if t.id=="game_boy"
             else ("arcade_score_attack",) if t.id in source_ids else ()
         )
         rows.append(row)

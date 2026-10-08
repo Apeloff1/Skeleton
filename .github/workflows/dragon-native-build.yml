@@ -6,7 +6,15 @@ on:
       - 'skeleton/ai/webcrawler/dragon_native_*.py'
       - 'skeleton/ai/webcrawler/dragon_game_blueprints.py'
       - 'skeleton/ai/webcrawler/dragon_game_fitness.py'
+      - 'skeleton/ai/webcrawler/dragon_native_gbc.py'
+      - 'skeleton/ai/webcrawler/dragon_native_save_system.py'
+      - 'skeleton/ai/webcrawler/dragon_native_replay_system.py'
+      - 'skeleton/ai/webcrawler/dragon_gb_platformer.py'
       - 'tests/test_ai_webcrawler_dragon_game_fitness.py'
+      - 'tests/test_ai_webcrawler_dragon_native_gbc.py'
+      - 'tests/test_ai_webcrawler_dragon_native_save.py'
+      - 'tests/test_ai_webcrawler_dragon_native_replay.py'
+      - 'tests/test_ai_webcrawler_dragon_native_platformer.py'
       - 'skeleton/ai/webcrawler/dragon_retro_assets.py'
       - 'tests/test_ai_webcrawler_dragon_game_blueprints.py'
       - 'tests/test_ai_webcrawler_dragon_retro_assets.py'
@@ -54,12 +62,25 @@ jobs:
             tests/test_ai_webcrawler_dragon_native_cycles.py \
             tests/test_ai_webcrawler_dragon_native_variants.py \
             tests/test_ai_webcrawler_dragon_retro_assets.py \
-            tests/test_ai_webcrawler_dragon_native_c64.py
+            tests/test_ai_webcrawler_dragon_native_c64.py \
+            tests/test_ai_webcrawler_dragon_native_gbc.py \
+            tests/test_ai_webcrawler_dragon_native_platformer.py
       - name: Build original Game Boy ROM
         run: |
           python -m skeleton.ai.webcrawler.dragon_native_cli \
             --target game_boy --out /tmp/dragon-gameboy --compile
           test -s /tmp/dragon-gameboy/build/dragon.gb
+      - name: Compile original Game Boy Color cartridge
+        run: |
+          python -m skeleton.ai.webcrawler.dragon_native_cli \
+            --target game_boy_color --out /tmp/dragon-gameboy-color --compile
+          test -s /tmp/dragon-gameboy-color/build/dragon.gbc
+      - name: Compile actual Game Boy scrolling platformer ROM
+        run: |
+          python -m skeleton.ai.webcrawler.dragon_native_cli \
+            --target game_boy --style side_scrolling_platformer \
+            --out /tmp/dragon-gameboy-platform --compile
+          test -s /tmp/dragon-gameboy-platform/build/dragon.gb
       - name: Build original NES ROM
         run: |
           python -m skeleton.ai.webcrawler.dragon_native_cli \
@@ -72,6 +93,8 @@ jobs:
           path: |
             /tmp/dragon-gameboy/build/dragon.gb
             /tmp/dragon-nes/build/dragon.nes
+            /tmp/dragon-gameboy-color/build/dragon.gbc
+            /tmp/dragon-gameboy-platform/build/dragon.gb
           if-no-files-found: error
           retention-days: 7
 
@@ -99,4 +122,6 @@ jobs:
           python -m pytest -q \
             tests/test_ai_webcrawler_dragon_game_blueprints.py \
             tests/test_ai_webcrawler_dragon_game_fitness.py \
+            tests/test_ai_webcrawler_dragon_native_save.py \
+            tests/test_ai_webcrawler_dragon_native_replay.py \
             tests/test_ai_webcrawler_dragon_native_variants.py

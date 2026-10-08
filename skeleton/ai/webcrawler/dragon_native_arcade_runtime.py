@@ -16,6 +16,8 @@ ENGINE = r'''/* Original Dragon Native 2D Game Engine — SDL2/C99.
 #include <string.h>
 #include <stdio.h>
 #include "dragon_campaign.h"
+#include "dragon_save.h"
+#include "dragon_replay.h"
 #define TILE 24
 #define SCREEN_W (MAP_W*TILE)
 #define SCREEN_H (MAP_H*TILE)
@@ -44,6 +46,8 @@ static SDL_Renderer*renderer;
 static SDL_GameController*controller;
 static SDL_AudioDeviceID audioDevice;
 static uint32_t rng=GAME_SEED?GAME_SEED:1;
+static int checkpoints_ready=0;
+static uint32_t save_serial=0;
 static uint32_t random32(void){rng^=rng<<13;rng^=rng>>17;rng^=rng<<5;return rng;}
 static int rnd(int n){return n>0?(int)(random32()%(uint32_t)n):0;}
 static void sound(int freq,int ms){
@@ -111,9 +115,49 @@ static void begin_stage(int n){
       }
     }
   }
+  if(checkpoints_ready && n<STAGE_COUNT){
+    if(save_serial<0xfffffffeu)save_serial++;
+    dragon_save_checkpoint(CAMPAIGN_SIGNATURE,STAGE_COUNT,(uint32_t)n,
+                           game.score,game.health,save_serial);
+  }
   sound(520,90);
 }
-static void reset_game(void){memset(&game,0,sizeof(game));game.health=4;begin_stage(0);}
+static void reset_game(void){
+  rng=GAME_SEED?GAME_SEED:1;
+  memset(&game,0,sizeof(game));game.health=4;begin_stage(0);
+}
+static uint32_t game_state_hash(void){
+  uint32_t state[9]={
+    (uint32_t)game.stage,(uint32_t)game.score,(uint32_t)game.health,
+    (uint32_t)game.remaining,(uint32_t)game.won,(uint32_t)game.lost,
+    (uint32_t)(int)(game.x*16),(uint32_t)(int)(game.y*16),
+    (uint32_t)game.energy
+  };
+  return dragon_replay_digest(state,9);
+}
+static uint16_t pack_input(Input in){
+  return (uint16_t)(
+    (in.left?DRAGON_INPUT_LEFT:0)|
+    (in.right?DRAGON_INPUT_RIGHT:0)|
+    (in.up?DRAGON_INPUT_UP:0)|
+    (in.down?DRAGON_INPUT_DOWN:0)|
+    (in.jump?DRAGON_INPUT_JUMP:0)|
+    (in.fire?DRAGON_INPUT_FIRE:0)|
+    (in.pause?DRAGON_INPUT_PAUSE:0)|
+    (in.reset?DRAGON_INPUT_RESET:0));
+}
+static Input unpack_input(uint16_t mask){
+  Input in={0};
+  in.left=!!(mask&DRAGON_INPUT_LEFT);
+  in.right=!!(mask&DRAGON_INPUT_RIGHT);
+  in.up=!!(mask&DRAGON_INPUT_UP);
+  in.down=!!(mask&DRAGON_INPUT_DOWN);
+  in.jump=!!(mask&DRAGON_INPUT_JUMP);
+  in.fire=!!(mask&DRAGON_INPUT_FIRE);
+  in.pause=!!(mask&DRAGON_INPUT_PAUSE);
+  in.reset=!!(mask&DRAGON_INPUT_RESET);
+  return in;
+}
 static void fire(void){
   if(game.energy<9)return;
   for(int i=0;i<SHOTS;i++)if(game.shots[i].life<=0){
@@ -330,6 +374,85 @@ int main(int argc,char**argv){
     controller=SDL_GameControllerOpen(i);break;
   }
   reset_game();
+  if(argc<=1){
+    uint32_t saved_stage=0;
+    int saved_score=0,saved_health=0;
+    if(dragon_save_load(CAMPAIGN_SIGNATURE,STAGE_COUNT,&saved_stage,
+                        &saved_score,&saved_health,&save_serial)){
+      game.health=saved_health-1;
+      begin_stage((int)saved_stage);
+      game.score=saved_score;
+    }
+    checkpoints_ready=1;
+  }
+  if(argc==3&&strcmp(argv[1],"--replay-selftest")==0){
+    DragonReplay rec={0},loaded={0};
+    if(!dragon_replay_start_record(&rec,CAMPAIGN_SIGNATURE))return 16;
+    for(int f=0;f<360;f++){
+      Input in={0};
+      in.right=(f/30)%2==0;in.left=!in.right;
+      in.up=(f/50)%2==0;in.down=!in.up;
+      in.jump=(f%75)==0;in.fire=(f%11)==0;
+      if(!dragon_replay_add(&rec,pack_input(in)))return 16;
+      step(in);
+    }
+    uint32_t expected=game_state_hash();
+    if(!dragon_replay_save(&rec,argv[2],expected)||!dragon_replay_load(
+        &loaded,argv[2],CAMPAIGN_SIGNATURE))return 16;
+    reset_game();
+    for(uint32_t i=0;i<loaded.total;i++)step(unpack_input(loaded.frames[i]));
+    int ok=game_state_hash()==expected&&loaded.expected_hash==expected;
+    printf("DRAGON_NATIVE_REPLAY_SELFTEST %s frames=%u\n",
+           ok?"PASS":"FAIL",loaded.total);
+    if(controller)SDL_GameControllerClose(controller);
+    if(audioDevice)SDL_CloseAudioDevice(audioDevice);
+    SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();
+    return ok?0:16;
+  }
+  if(argc==3&&strcmp(argv[1],"--play-replay")==0){
+    DragonReplay trace={0};
+    if(!dragon_replay_load(&trace,argv[2],CAMPAIGN_SIGNATURE)){
+      SDL_Log("Replay rejected: bad campaign, length, or CRC");
+      if(controller)SDL_GameControllerClose(controller);
+      if(audioDevice)SDL_CloseAudioDevice(audioDevice);
+      SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();
+      return 13;
+    }
+    for(uint32_t frame=0;frame<trace.total;frame++){
+      step(unpack_input(trace.frames[frame]));
+      if(frame%60==0)render();
+    }
+    uint32_t actual=game_state_hash();
+    int pass=actual==trace.expected_hash;
+    printf("DRAGON_NATIVE_REPLAY %s frames=%u expected=%08x actual=%08x\n",
+           pass?"PASS":"FAIL",trace.total,trace.expected_hash,actual);
+    if(controller)SDL_GameControllerClose(controller);
+    if(audioDevice)SDL_CloseAudioDevice(audioDevice);
+    SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();
+    return pass?0:14;
+  }
+  if(argc>1&&strcmp(argv[1],"--checkpoint-test")==0){
+    uint32_t saved_stage=0,saved_serial=0;
+    int saved_score=0,saved_health=0;
+    int chosen_stage=STAGE_COUNT>1?1:0;
+    /* Test two alternating real SDL save files, checksum and campaign binding. */
+    int first=dragon_save_checkpoint(CAMPAIGN_SIGNATURE,STAGE_COUNT,
+                                     (uint32_t)chosen_stage,123,3,1);
+    int second=dragon_save_checkpoint(CAMPAIGN_SIGNATURE,STAGE_COUNT,
+                                      (uint32_t)chosen_stage,456,4,2);
+    int loaded=dragon_save_load(CAMPAIGN_SIGNATURE,STAGE_COUNT,&saved_stage,
+                                &saved_score,&saved_health,&saved_serial);
+    int foreign=dragon_save_load(CAMPAIGN_SIGNATURE^0xffffffffu,STAGE_COUNT,
+                                 &saved_stage,&saved_score,&saved_health,&saved_serial);
+    int ok=first&&second&&loaded&&!foreign&&
+           saved_stage==(uint32_t)chosen_stage&&
+           saved_score==456&&saved_health==4&&saved_serial==2;
+    printf("DRAGON_NATIVE_SAVE_TEST %s\n",ok?"PASS":"FAIL");
+    if(controller)SDL_GameControllerClose(controller);
+    if(audioDevice)SDL_CloseAudioDevice(audioDevice);
+    SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();
+    return ok?0:12;
+  }
   if(argc>1&&strcmp(argv[1],"--smoke")==0){
     /* Headless native validation exercises each engine's fixed-step paths.
        Zero work is credited as a completed human gameplay playtest. */
@@ -344,13 +467,17 @@ int main(int argc,char**argv){
       step(demo);
       if(f%36==0)render();
     }
-    printf("DRAGON_NATIVE_SMOKE_OK mode=%d stage=%d score=%d health=%d\\n",
+    printf("DRAGON_NATIVE_SMOKE_OK mode=%d stage=%d score=%d health=%d\n",
            GAME_MODE,game.stage,game.score,game.health);
     if(controller)SDL_GameControllerClose(controller);
     if(audioDevice)SDL_CloseAudioDevice(audioDevice);
     SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();
     return game.stage>=STAGE_COUNT?5:0;
   }
+  DragonReplay recording={0};
+  const char *record_path=(argc==3&&strcmp(argv[1],"--record-replay")==0)?argv[2]:NULL;
+  if(record_path && !dragon_replay_start_record(&recording,CAMPAIGN_SIGNATURE))
+    return 15;
   Uint32 then=SDL_GetTicks(),accum=0;
   int running=1;
   while(running){
@@ -373,14 +500,25 @@ int main(int argc,char**argv){
     Input in=read_input(SDL_GetKeyboardState(NULL),pause,reset);
     int count=0;
     while(accum>=16&&count++<6){
+      if(record_path && !dragon_replay_add(&recording,pack_input(in))){
+        running=0;break; /* full bounded recording: no hidden overrun */
+      }
       step(in);in.pause=0;in.reset=0;accum-=16;
     }
     render();SDL_Delay(1);
   }
+  int export_failed=0;
+  if(record_path){
+    uint32_t hash=game_state_hash();
+    if(!dragon_replay_save(&recording,record_path,hash))
+      export_failed=1;
+    printf("DRAGON_NATIVE_REPLAY_RECORD frames=%u state=%08x saved=%d\n",
+           recording.total,hash,!export_failed);
+  }
   if(controller)SDL_GameControllerClose(controller);
   if(audioDevice)SDL_CloseAudioDevice(audioDevice);
   SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();
-  return 0;
+  return export_failed?15:0;
 }
 '''
 
@@ -403,6 +541,7 @@ def render_sdl_campaign(campaign: Campaign) -> dict[str,str]:
         f"#define STAGE_COUNT {len(campaign.stages)}\n"
         f"#define GAME_SEED {campaign.seed or 0x9E3779B9}u\n"
         f"#define GAME_MODE {MODE_IDS[campaign.mode]}\n"
+        f"#define CAMPAIGN_SIGNATURE 0x{campaign.id[:8]}u\n"
         "static const unsigned char PALETTE[4][3]={\n"+palette+"\n};\n"
         "static const char campaign_stage[STAGE_COUNT][MAP_H][MAP_W+1]={\n"
         +",\n".join(stage_blocks)+"\n};\n#endif\n"
@@ -413,7 +552,7 @@ cmake_minimum_required(VERSION 3.16)
 project(DragonNativeCampaign C)
 set(CMAKE_C_STANDARD 99)
 find_package(SDL2 REQUIRED)
-add_executable(dragon_game src/main.c)
+add_executable(dragon_game src/main.c src/dragon_save.c src/dragon_replay.c)
 target_include_directories(dragon_game PRIVATE include)
 if(TARGET SDL2::SDL2)
   target_link_libraries(dragon_game PRIVATE SDL2::SDL2)
@@ -441,5 +580,10 @@ endif()
         "No proprietary ROMs/assets/SDKs. Compilation and real playtesting "
         "are not implied by generating this source.\n"
     )
-    return {"src/main.c": ENGINE, "include/dragon_campaign.h": header,
-            "CMakeLists.txt": cmake,"README.engine.md":readme}
+    from .dragon_native_save_system import emit_save_system
+    files={"src/main.c": ENGINE, "include/dragon_campaign.h": header,
+           "CMakeLists.txt": cmake,"README.engine.md":readme}
+    from .dragon_native_replay_system import emit_replay_system
+    files.update(emit_save_system(campaign.id))
+    files.update(emit_replay_system())
+    return files

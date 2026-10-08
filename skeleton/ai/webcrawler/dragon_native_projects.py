@@ -8,7 +8,7 @@ import re
 from .dragon_game_mechanics import Mechanic
 from .dragon_native_targets import demand_target, STYLES
 
-EMITTERS=frozenset({"game_boy","nes","dos_vga","commodore_64","genesis","game_boy_advance","ps1","xbox_original","pc_linux","pc_windows","pc_macos","steam_deck"})
+EMITTERS=frozenset({"game_boy","game_boy_color","nes","dos_vga","commodore_64","genesis","game_boy_advance","ps1","xbox_original","pc_linux","pc_windows","pc_macos","steam_deck"})
 
 @dataclass(frozen=True)
 class NativeProject:
@@ -498,8 +498,10 @@ def render_native_project(*,title:str,target_id:str,style:str,
     if style not in STYLES:raise ValueError("unknown game style")
     # Console renderers below are real CPU/SDK code, but currently provide
     # ONLY a collectible chase; do not advertise an unimplemented RPG/RTS.
-    if target_id not in ("pc_linux","pc_windows","pc_macos","steam_deck") and style!="arcade_score_attack":
-        raise ValueError("target has not implemented the requested gameplay style")
+    if target_id not in ("pc_linux","pc_windows","pc_macos","steam_deck"):
+        allowed = ("arcade_score_attack","side_scrolling_platformer") if target_id=="game_boy" else ("arcade_score_attack",)
+        if style not in allowed:
+            raise ValueError("target has not implemented the requested gameplay style")
     if not isinstance(title,str) or not 2<=len(title.strip())<=80:
         raise ValueError("invalid title")
     if not isinstance(candidate_id,str) or not re.fullmatch("[a-f0-9]{64}",candidate_id):
@@ -510,7 +512,13 @@ def render_native_project(*,title:str,target_id:str,style:str,
     # Research titles never become executable source or build script literals.
     clean=" ".join(re.findall("[A-Za-z0-9]+",title)[:8])[:42] or "Dragon Native"
     seed=int(digest([candidate_id,target_id,style])[:8],16)
-    if target_id=="commodore_64":
+    if target_id=="game_boy" and style=="side_scrolling_platformer":
+        from .dragon_gb_platformer import gb_platformer_source
+        files=gb_platformer_source(seed)
+    elif target_id=="game_boy_color":
+        from .dragon_native_gbc import color_game_boy
+        files=color_game_boy(_gameboy(seed)["src/main.asm"],_gameboy(seed)["Makefile"],seed)
+    elif target_id=="commodore_64":
         from .dragon_native_c64 import commodore64_source
         files=commodore64_source(seed)
     elif target_id in ("genesis","game_boy_advance","ps1","xbox_original"):
@@ -546,11 +554,13 @@ def render_native_project(*,title:str,target_id:str,style:str,
         files=(_gameboy(seed) if target_id=="game_boy" else
                _nes(seed) if target_id=="nes" else
                _dos(seed) if target_id=="dos_vga" else _desktop(seed,style))
-    if target_id in ("game_boy","nes"):
+    if target_id in ("game_boy","game_boy_color","nes") and not (
+        target_id=="game_boy" and style=="side_scrolling_platformer"
+    ):
         from .dragon_retro_assets import (
             asset_tiles,enrich_gb_asm,enrich_nes_asm,
         )
-        if target_id=="game_boy":
+        if target_id in ("game_boy","game_boy_color"):
             files["src/main.asm"]=enrich_gb_asm(files["src/main.asm"])
         else:
             files["src/main.s"]=enrich_nes_asm(files["src/main.s"])
@@ -558,7 +568,7 @@ def render_native_project(*,title:str,target_id:str,style:str,
             "schema":"skeleton.ai.dragon.original_pixel_art.v1",
             "sprites":[{"id":sprite.name,"fingerprint":sprite.digest}
                        for sprite in asset_tiles()],
-            "encoding": "interleaved_2bpp" if target_id=="game_boy"
+            "encoding": "interleaved_2bpp" if target_id in ("game_boy","game_boy_color")
                         else "nes_planar_2bpp",
         },sort_keys=True,indent=2)+"\n"
     if any(PurePosixPath(p).is_absolute() or ".." in PurePosixPath(p).parts for p in files):
@@ -587,6 +597,7 @@ def render_native_project(*,title:str,target_id:str,style:str,
               "deferred_mechanics":deferred,"original_assets":True,
               "runtime_gameplay_mode": (
                   GENRES[style] if target_id in ("pc_linux","pc_windows","pc_macos","steam_deck")
+                  else "game_boy_scrolling_platformer" if target_id=="game_boy" and style=="side_scrolling_platformer"
                   else "original_collectible_chase"
               ),"campaign_stages": (
                   4 if target_id in ("pc_linux","pc_windows","pc_macos","steam_deck")
