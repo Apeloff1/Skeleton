@@ -107,6 +107,7 @@ export function worldProjectLinks(id: unknown): readonly ProjectLink[] {
     ['systems','Systems Forge','Mount real game systems and tweak gameplay rules.','/systems-forge'],
     ['art','Asset Genesis','Forge art grounded in your game.','/asset-genesis'],
     ['physics','Physics Studio','Compose the game physics configuration.','/physics-studio'],
+    ['review','Design Review','Review a game design with the canonical compiler.','/design-review'],
     ['knowledge','Knowledge Base','Edit, review and approve canonical game artifacts.','/game-kb'],
     ['studio','Galaxy Studio','Rebuild, refine and package the selected game.','/studio'],
   ] as const;

@@ -266,6 +266,11 @@ export default function GameKB() {
             style={[s.forgeBtn, s.reforgeBtn]}>
             <Text style={s.forgeTxt}>Explore world, mechanics and assets →</Text>
           </TouchableOpacity>
+          <TouchableOpacity testID="kb-design-review" accessibilityRole="button"
+            onPress={() => router.push(`/design-review?game=${encodeURIComponent(gameId)}` as never)}
+            style={[s.forgeBtn, s.reforgeBtn]}>
+            <Text style={s.forgeTxt}>Review gameplay and design coherence →</Text>
+          </TouchableOpacity>
           {!!jobStatus && <Text testID="kb-forge-status" accessibilityLiveRegion="polite" style={s.applyStatus}>{jobStatus}</Text>}
           {!!approveStatus && <Text testID="kb-approve-status" accessibilityLiveRegion="polite" style={s.applyStatus}>{approveStatus}</Text>}
           {!!refineStatus && <Text testID="kb-refine-status" accessibilityLiveRegion="polite" style={s.applyStatus}>{refineStatus}</Text>}

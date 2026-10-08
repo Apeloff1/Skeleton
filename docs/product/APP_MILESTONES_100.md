@@ -1,6 +1,6 @@
 # 100 App Milestones — User Journey Delivery
 
-Tracked against the existing `frontend/` product shell. Focus: connected user outcomes, not LOC or standalone scaffolds. Milestones M001–M040 are implementation work in this PR; boxes mark code delivered to the branch, **not** release acceptance. No milestones beyond M040 are claimed complete. All milestones require exact-head build/CI plus live-device and backend integration review before release sign-off.
+Tracked against the existing `frontend/` product shell. Focus: connected user outcomes, not LOC or standalone scaffolds. Milestones M001–M050 are implementation work in this PR; boxes mark code delivered to the branch, **not** release acceptance. No milestones beyond M050 are claimed complete. All milestones require exact-head build/CI plus live-device and backend integration review before release sign-off.
 
 ## Batch 1: Start & navigation
 
@@ -54,18 +54,18 @@ Tracked against the existing `frontend/` product shell. Focus: connected user ou
 - [x] M039 — Pass correctly named game/build/pid parameters across seven creative tools (implemented; verification pending CI)
 - [x] M040 — Return from world tools to the same Studio game and browse all saved worlds without false project filtering (implemented; verification pending CI)
 
-## Batch 5: AI copilot
+## Batch 5: AI-guided design review and human-controlled compilation
 
-- [ ] M041 — Open assistant workspace
-- [ ] M042 — Attach project context
-- [ ] M043 — Request design advice
-- [ ] M044 — Review tool execution proposal
-- [ ] M045 — Approve governed action
-- [ ] M046 — Inspect evidence citations
-- [ ] M047 — Compare candidate responses
-- [ ] M048 — Handle offline AI error
-- [ ] M049 — Resume interrupted AI turn
-- [ ] M050 — Export verified decision
+- [x] M041 — Open a project-scoped design review from Studio or World Workbench (implemented; verification pending CI)
+- [x] M042 — Prepare a game design brief derived from selected real game identity (implemented; verification pending CI)
+- [x] M043 — Switch between gameplay, world, narrative and visual review lenses (implemented; verification pending CI)
+- [x] M044 — Opt in to source summaries, explicitly labelled unverified and bounded (implemented; verification pending CI)
+- [x] M045 — Edit a bounded review brief and restore the generated suggestion (implemented; verification pending CI)
+- [x] M046 — Compile the brief through the existing design-spec backend on explicit button press (implemented; verification pending CI)
+- [x] M047 — Inspect server-reported coherence, readiness and structural gaps (implemented; verification pending CI)
+- [x] M048 — Inspect actual mechanics, systems, scope and implementation risks (implemented; verification pending CI)
+- [x] M049 — Revise a brief and manually recompile to compare review scores (implemented; verification pending CI)
+- [x] M050 — Explicitly copy the brief for Jeeves and return to the same Studio game or KB (implemented; verification pending CI)
 
 ## Batch 6: Editor & collaboration
 

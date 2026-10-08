@@ -235,6 +235,14 @@ export default function WorldWorkbench() {
         </View>
 
         <View style={styles.panel}>
+          <Text style={styles.heading}>Design review with Jeeves and the compiler</Text>
+          <Text style={styles.body}>Create an editable brief from known game evidence. Source summaries are opt-in; the design compiler runs only after an explicit confirmation.</Text>
+          <TouchableOpacity testID="world-design-review" accessibilityRole="button"
+            style={styles.primary} onPress={()=>go(projectHref('/design-review',gameId)!)}>
+            <Text style={styles.primaryText}>Review game design →</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.panel}>
           <Text style={styles.heading}>Mounted systems</Text>
           <Text style={styles.body}>Actual systems returned by Systems Forge for this build. This count is independent of pipeline stage completion.</Text>
           {systems.length ? systems.map(s=><Text key={s.key} style={styles.file}>• {s.label}</Text>):

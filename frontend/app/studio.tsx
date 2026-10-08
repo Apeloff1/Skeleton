@@ -309,6 +309,10 @@ export default function UnifiedStudio() {
                   onPress={() => router.push(`/world-workbench?game=${encodeURIComponent(game)}` as never)}>
                   <Text style={{ color: '#C4B5FD', fontWeight: '800', fontSize: 12 }}>World →</Text>
                 </TouchableOpacity>
+                <TouchableOpacity accessibilityRole="button" testID="studio-design-review"
+                  onPress={() => router.push(`/design-review?game=${encodeURIComponent(game)}` as never)}>
+                  <Text style={{ color: '#C4B5FD', fontWeight: '800', fontSize: 12 }}>Review →</Text>
+                </TouchableOpacity>
               </View>
             ) : null}
             {axesInfo ? (

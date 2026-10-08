@@ -88,6 +88,7 @@ export const PRODUCT_JOURNEYS: readonly ProductJourney[] = [
       { id: 'mission', title: 'Inspect the mission', description: 'Review current work and its execution status.', href: '/mission-control' },
       { id: 'tools', title: 'Open the builder hub', description: 'Choose the tool relevant to your task.', href: '/build-hub' },
       { id: 'studio', title: 'Continue in Studio', description: 'Work on an existing or new game.', href: '/studio', acceptsBuild: true },
+      { id: 'review', title: 'Review the design', description: 'Compile a game-scoped design review with explicit control.', href: '/design-review', requiresBuild: true },
     ],
   },
   {
@@ -100,6 +101,7 @@ export const PRODUCT_JOURNEYS: readonly ProductJourney[] = [
       { id: 'scene', title: 'Compose a scene', description: 'Build a scene for this game.', href: '/compose-scene', requiresBuild: true },
       { id: 'assets', title: 'Build assets', description: 'Generate art grounded in this game's knowledge.', href: '/asset-genesis', requiresBuild: true },
       { id: 'mechanics', title: 'Engineer mechanics', description: 'Mount and inspect game systems.', href: '/systems-forge', requiresBuild: true },
+      { id: 'review', title: 'Review your design', description: 'Compile an evidence-guided design brief.', href: '/design-review', requiresBuild: true },
       { id: 'studio', title: 'Integrate the project', description: 'Continue with the integrated game build.', href: '/studio', acceptsBuild: true },
     ],
   },
