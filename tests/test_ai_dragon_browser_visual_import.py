@@ -75,7 +75,7 @@ def test_oversized_browser_locator_rejected_before_custody():
   accept_browser_visual(cq,bad,now=3,authorized=True)
 
 def test_nonfinite_browser_feature_rejected_before_hash_trust():
- cq,_,e=setup();bad=resign(replace(e,observations=(replace(e.observations[0],motion_energy=float("inf")),)))
+ cq,_,e=setup();bad=replace(e,observations=(replace(e.observations[0],motion_energy=float("inf")),))
  with pytest.raises(ValueError,match="visual feature"):
   accept_browser_visual(cq,bad,now=3,authorized=True)
 
@@ -89,5 +89,5 @@ def test_duplicate_transport_frame_id_rejected_even_when_payload_is_resigned():
 
 def test_browser_frame_budget_is_enforced_before_analysis():
  cq,_,e=setup()
- with pytest.raises(ValueError,match="coverage"):
+ with pytest.raises(ValueError,match="frame budget"):
   accept_browser_visual(cq,e,now=3,authorized=True,max_frames=0)
