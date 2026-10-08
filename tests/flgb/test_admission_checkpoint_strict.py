@@ -205,6 +205,18 @@ class TestStrictSchedulerRestore(unittest.TestCase):
 
 
 class TestRetainedKVIdentitySafety(unittest.TestCase):
+    @staticmethod
+    def build():
+        limits = AdmissionLimits(
+            max_active_requests=2, max_queued_requests=2, max_batch_size=1,
+            max_tokens_per_batch=10, kv_capacity_bytes=100, max_age_boost=10,
+        )
+        scheduler = RuntimeAdmissionScheduler(limits)
+        scheduler.submit(BatchRequest("active", 1, 1), kv_bytes=20)
+        scheduler.admit()
+        scheduler.submit(BatchRequest("queued", 1, 1), kv_bytes=10)
+        return scheduler
+
     def test_resident_identity_cannot_be_resubmitted(self):
         scheduler = RuntimeAdmissionScheduler()
         scheduler.submit(BatchRequest("retained", 1, 1), kv_bytes=20)
