@@ -251,3 +251,31 @@ def test_installed_offline_capability_engine_is_bundled_and_actually_exercised()
     assert "args.capability_file" in cli
     assert "execute_capability_json" in cli
     assert "stat.S_ISREG" in cli
+
+
+def test_installer_contains_dedicated_one_click_offline_game_executable():
+    """Real native .exe, not a browser page or a console-only simulation."""
+    build = Path("scripts/windows/build_installer.ps1").read_text("utf-8")
+    inno = Path("packaging/windows/SkeletonSetup.iss").read_text("utf-8")
+    entry = Path("packaging/windows/game_preview_entry.py").read_text("utf-8")
+    workflow = Path(".github/workflows/windows-installer.yml").read_text("utf-8")
+
+    assert "$GamePreviewEntryPoint" in build
+    assert '"game_preview_entry.py"' in build
+    assert '"--name", "SkeletonGame"' in build
+    assert '"--windowed"' in build
+    assert '"skeleton.app.offline_game_preview"' in build
+    assert '"skeleton.ai.runtime.gameplay_capabilities"' in build
+    assert 'Join-Path $LauncherDist "SkeletonGame.exe"' in build
+    assert 'Join-Path $PayloadDir "SkeletonGame.exe"' in build
+    assert 'Filename: "{app}\\SkeletonGame.exe"' in inno
+    assert "Skeleton Game Preview" in inno
+    assert "from skeleton.app.offline_game_preview import run_game_preview" in entry
+    assert "return run_game_preview()" in entry
+    assert "installed SkeletonGame.exe native game is missing" in workflow
+    assert "installed native SkeletonGame.exe looks truncated" in workflow
+    assert "& $offline --game-preview-check --game-seed 1729 --json" in workflow
+    assert "$headlessGame.terminal_won" in workflow
+    assert "$headlessGame.replay_deterministic" in workflow
+    assert "$headlessGameRepeat.replay_sha256" in workflow
+    assert "$headlessGame.installed_tk_display_verified" in workflow
