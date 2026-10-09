@@ -85,7 +85,7 @@
       "domain_id": "engine-mongo-state",
       "owner_plane": "data-persistence",
       "authority": "authoritative",
-      "status": "declared-partial"
+      "status": "production-bound"
     },
     {
       "domain_id": "backend-rag-local-chroma",
