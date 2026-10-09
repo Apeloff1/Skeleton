@@ -10,11 +10,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
+import os
+from pathlib import Path
+import stat
 from typing import Any
 
 from skeleton.ai.runtime.gameplay_capabilities import (
     GameplayError, compile_level, generate_level, platformer_step,
 )
+from skeleton.ai.runtime.game_playability import check_game_playability
+from skeleton.ai.runtime.game_project_capsule import verify_game_capsule
 
 DEFAULT_SEED = 1729
 TILE_PIXELS = 28
@@ -50,24 +55,40 @@ class PreviewFrame:
 class OfflineGamePreview:
     """A small deterministic game state, independently testable without Tk."""
 
-    def __init__(self, seed: int = DEFAULT_SEED) -> None:
-        generated = generate_level({
+    def __init__(
+        self, seed: int = DEFAULT_SEED, *,
+        project_tiles: list[str] | None = None,
+    ) -> None:
+        if project_tiles is None:
+            generated = generate_level({
             "seed": seed, "width": WIDTH, "height": HEIGHT,
             "wall_percent": 22,
-        })
+            })
         # Procedural overhead platforms vary with seed, but keep an
         # intentional full-height start shaft and clear ground corridor.
         # This permits a real platformer to reach the goal by descending
         # and walking right, rather than conflating grid reachability
         # with actual avatar reachability.
-        world = [list(row) for row in generated["tiles"]]
-        for y in range(1, HEIGHT - 1):
-            world[y][1] = "."
-        for x in range(1, WIDTH - 1):
-            world[HEIGHT - 2][x] = "."
-        world[1][1] = "S"
-        world[HEIGHT - 2][WIDTH - 2] = "G"
-        self.tiles = tuple("".join(row) for row in world)
+        if project_tiles is None:
+            world = [list(row) for row in generated["tiles"]]
+            for y in range(1, HEIGHT - 1):
+                world[y][1] = "."
+            for x in range(1, WIDTH - 1):
+                world[HEIGHT - 2][x] = "."
+            world[1][1] = "S"
+            world[HEIGHT - 2][WIDTH - 2] = "G"
+            self.tiles = tuple("".join(row) for row in world)
+        else:
+            if not isinstance(project_tiles, list):
+                raise GameplayError("preview project must provide an explicit tile map")
+            evidence = check_game_playability({
+                "tiles": project_tiles, "max_frames": 96,
+            })
+            if evidence["status"] != "playable":
+                raise GameplayError(
+                    "imported level cannot be proven controllably playable"
+                )
+            self.tiles = tuple(project_tiles)
         self._compiled = compile_level({"tiles": list(self.tiles)})
         if not self._compiled["goal_reachable"]:
             raise GameplayError("preview generator produced an unreachable goal")
@@ -113,7 +134,44 @@ class OfflineGamePreview:
         return self.snapshot()
 
 
-def verify_game_preview(seed: int = DEFAULT_SEED) -> dict[str, Any]:
+def load_game_project(path: str | Path) -> list[str]:
+    """Read only an explicitly selected, bounded, verified local capsule."""
+    selected = Path(path).expanduser()
+    if selected.is_symlink() or not selected.is_file():
+        raise GameplayError("selected game project must be a local regular file")
+    fd = os.open(selected, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    with os.fdopen(fd, "rb") as stream:
+        info = os.fstat(stream.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_size > 160 * 1024:
+            raise GameplayError("selected game project exceeds read-only limit")
+        raw = stream.read(160 * 1024 + 1)
+    if len(raw) > 160 * 1024:
+        raise GameplayError("selected game project exceeds read-only limit")
+    def _unique(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise GameplayError("duplicate game project JSON field")
+            result[key] = value
+        return result
+    try:
+        project = json.loads(
+            raw.decode("utf-8", "strict"),
+            object_pairs_hook=_unique,
+            parse_constant=lambda _value: (_ for _ in ()).throw(
+                GameplayError("nonfinite game project number")
+            ),
+        )
+        verify_game_capsule(project)
+    except (ValueError, TypeError, UnicodeError, RecursionError) as exc:
+        raise GameplayError("game project failed hash, rights or schema verification") from exc
+    return project["tilemap"]
+
+
+def verify_game_preview(
+    seed: int = DEFAULT_SEED, *,
+    project_tiles: list[str] | None = None,
+) -> dict[str, Any]:
     """Proof of headless replay suitable for an installed EXE CI gate.
 
     Instantiate and simulate two independent native preview states, compare
@@ -122,13 +180,21 @@ def verify_game_preview(seed: int = DEFAULT_SEED) -> dict[str, Any]:
     """
     # Distinct gameplay phases prove a player can descend the safe shaft,
     # walk along the lower corridor and finish a seeded generated map.
-    controls = [
-        {"left": False, "right": i >= 12, "jump": False}
-        for i in range(32)
-    ]
+    if project_tiles is None:
+        controls = [
+            {"left": False, "right": i >= 12, "jump": False}
+            for i in range(32)
+        ]
+    else:
+        evidence = check_game_playability({
+            "tiles": project_tiles, "max_frames": 96,
+        })
+        if evidence["status"] != "playable":
+            raise GameplayError("imported game's controller proof is inconclusive")
+        controls = evidence["controller_actions"]
     trajectories: list[list[dict[str, Any]]] = []
     for _ in range(2):
-        game = OfflineGamePreview(seed=seed)
+        game = OfflineGamePreview(seed=seed, project_tiles=project_tiles)
         frames = [game.snapshot().as_dict()]
         for control in controls:
             frame = game.tick(**control)
@@ -140,8 +206,8 @@ def verify_game_preview(seed: int = DEFAULT_SEED) -> dict[str, Any]:
         for frame in frames:
             avatar = frame["avatar"]
             if not (
-                0 <= avatar["x"] < WIDTH
-                and 0 <= avatar["y"] < HEIGHT
+                0 <= avatar["x"] < len(game.tiles[0])
+                and 0 <= avatar["y"] < len(game.tiles)
                 and game.tiles[avatar["y"]][avatar["x"]] != "#"
             ):
                 raise GameplayError("game preview replay left legal world bounds")
@@ -156,7 +222,8 @@ def verify_game_preview(seed: int = DEFAULT_SEED) -> dict[str, Any]:
     ).encode("ascii")
     return {
         "schema_version": "skeleton.app.offline_game_preview_check.v1",
-        "seed": seed,
+        "seed": seed if project_tiles is None else None,
+        "project_source": "verified_portable_capsule" if project_tiles is not None else "seeded_builtin",
         "frames_verified": len(trajectories[0]) - 1,
         "replay_sha256": hashlib.sha256(raw).hexdigest(),
         "replay_deterministic": True,
@@ -170,9 +237,13 @@ def verify_game_preview(seed: int = DEFAULT_SEED) -> dict[str, Any]:
     }
 
 
-def run_game_preview(seed: int = DEFAULT_SEED) -> int:
+def run_game_preview(
+    seed: int = DEFAULT_SEED, *,
+    project_tiles: list[str] | None = None,
+) -> int:
     """Open a real desktop preview; run only with explicit user request."""
-    game = OfflineGamePreview(seed=seed)
+    game = OfflineGamePreview(seed=seed, project_tiles=project_tiles)
+    columns, rows = len(game.tiles[0]), len(game.tiles)
     # Tk is stdlib, but optional on Linux/headless systems; keep the CLI's
     # non-UI game operations fully usable without display libraries.
     try:
@@ -186,8 +257,8 @@ def run_game_preview(seed: int = DEFAULT_SEED) -> int:
     root.title("Skeleton - Offline Game Preview")
     root.resizable(False, False)
     canvas = tk.Canvas(
-        root, width=WIDTH * TILE_PIXELS,
-        height=HEIGHT * TILE_PIXELS + 36,
+        root, width=columns * TILE_PIXELS,
+        height=rows * TILE_PIXELS + 36,
         highlightthickness=0, background="#131a29",
     )
     canvas.pack()
@@ -249,7 +320,7 @@ def run_game_preview(seed: int = DEFAULT_SEED) -> int:
             else "A/D or arrows to move  |  Space to jump  |  R to reset  |  Esc to exit"
         )
         canvas.create_text(
-            WIDTH * TILE_PIXELS // 2, HEIGHT * TILE_PIXELS + 18,
+            columns * TILE_PIXELS // 2, rows * TILE_PIXELS + 18,
             text=message, fill="#e3ecf4", font=("Arial", 9),
         )
 
@@ -280,5 +351,5 @@ def run_game_preview(seed: int = DEFAULT_SEED) -> int:
 
 __all__ = [
     "DEFAULT_SEED", "PreviewFrame", "OfflineGamePreview",
-    "run_game_preview", "verify_game_preview",
+    "run_game_preview", "verify_game_preview", "load_game_project",
 ]
