@@ -127,7 +127,7 @@ def compile_native_game_boy_color(
     try:
         dmgb = compile_native_game_boy(world, rights, authorized=True)
     except GameBoySourceError as exc:
-        raise GameBoyColorSourceError("original world exceeds base CGB gameplay engine") from exc
+        raise GameBoyColorSourceError("original world exceeds base CGB gameplay engine budget") from exc
     cgb_plan = compile_port(PortRequest((rights,), "nintendo_game_boy_color", PortMode.REVERSE_CONSTRAINED))
     code = dmgb.asm
     code = _exact(code, "DEF rJOYP EQU $FF00\n", _CGB + "DEF rJOYP EQU $FF00\n")
