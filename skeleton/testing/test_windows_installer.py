@@ -281,3 +281,8 @@ def test_installer_contains_dedicated_one_click_offline_game_executable():
     assert "$headlessGame.replay_deterministic" in workflow
     assert "$headlessGameRepeat.replay_sha256" in workflow
     assert "$headlessGame.installed_tk_display_verified" in workflow
+    assert "scripts/windows/create_offline_game_fixture.py" in workflow
+    assert "--game-preview-check --game-project $authoredGame --json" in workflow
+    assert "tampered legal-release flag" in workflow
+    assert "SkeletonGame.exe" in build
+    assert "run_game_preview(project_tiles=load_game_project(args.project))" in entry
