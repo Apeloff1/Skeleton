@@ -156,6 +156,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.output is not None and args.compose is None:
         print("--output is supported only for --compose", file=sys.stderr)
         return 2
+    if args.compose is not None and args.output is None:
+        print("--compose requires --output for a durable new project", file=sys.stderr)
+        return 2
     if args.seed != 1729 and args.demo_project is None:
         print("--seed is only for --demo-project", file=sys.stderr)
         return 2
