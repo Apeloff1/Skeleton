@@ -890,3 +890,53 @@ def test_explicit_compact_kv_policy_never_degrades_after_kernel_failure(monkeypa
     with pytest.raises(RuntimeError, match="forbids silent CPU fallback"):
         model._logits((1, 2))
     assert model._accel is accel
+
+
+def test_strict_accelerator_policy_remains_strict_after_kernel_failure(monkeypatch):
+    pytest.importorskip("torch")
+    model = _model()
+    runtime = NativeLLMRuntime(
+        model, device_policy=DevicePolicy(
+            requested="torch", allow_fallback=False,
+        ),
+    )
+    accel = model._accel
+    assert accel is not None
+    assert model._strict_device_request is True
+
+    def unavailable(*args, **kwargs):
+        raise RuntimeError("injected Torch device failure")
+
+    monkeypatch.setattr(accel, "logits_window_with_cache", unavailable)
+    cache = KVCache(model.n_layers, model.ctx)
+    with pytest.raises(RuntimeError, match="strict accelerator policy"):
+        model._logits_window((1, 2), cache)
+    assert model._accel is accel
+    assert model.resident
+    assert cache.tokens == []
+
+    monkeypatch.setattr(accel, "logits", unavailable)
+    with pytest.raises(RuntimeError, match="strict accelerator policy"):
+        model._logits((1, 2))
+    assert model._accel is accel
+
+
+def test_device_policy_rebind_can_reenable_permitted_reference_fallback(monkeypatch):
+    pytest.importorskip("torch")
+    model = _model()
+    runtime = NativeLLMRuntime(
+        model, device_policy=DevicePolicy(requested="torch", allow_fallback=False),
+    )
+    assert model._strict_device_request
+    runtime.bind_device(DevicePolicy(requested="torch", allow_fallback=True))
+    assert not model._strict_device_request
+    accel = model._accel
+    assert accel is not None
+
+    def unavailable(*args, **kwargs):
+        raise RuntimeError("accelerator unavailable")
+
+    monkeypatch.setattr(accel, "logits", unavailable)
+    expected = TinyTransformer.from_snapshot(model.snapshot())._logits((1, 2))
+    assert model._logits((1, 2)) == pytest.approx(expected, abs=2e-5)
+    assert model._accel is None and not model.resident
