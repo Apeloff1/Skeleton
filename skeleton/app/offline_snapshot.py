@@ -115,6 +115,39 @@ def _online_backup(source: Path, destination: Path, kind: str) -> None:
         raise OfflineSnapshotError("SQLite online backup failed") from exc
 
 
+def _publish_new_snapshot(stage: Path, target: Path) -> None:
+    """Expose a verified snapshot without replacing a competing directory.
+
+    mkdir and hardlinks fail if the destination already exists. The
+    manifest is published *last*: readers may see an incomplete directory
+    during publication, but verify_snapshot must reject it without the
+    final manifest. No existing user path is removed or replaced.
+    """
+    os.mkdir(target, 0o700)
+    written: list[str] = []
+    try:
+        for path in sorted(stage.iterdir(), key=lambda item: item.name):
+            if path.name == "manifest.json":
+                continue
+            os.link(path, target / path.name)
+            written.append(path.name)
+        os.link(stage / "manifest.json", target / "manifest.json")
+        written.append("manifest.json")
+    except BaseException:
+        for name in reversed(written):
+            existing = target / name
+            try:
+                if existing.is_file() and os.path.samefile(existing, stage / name):
+                    existing.unlink()
+            except OSError:
+                pass
+        try:
+            target.rmdir()
+        except OSError:
+            pass
+        raise
+
+
 def create_snapshot(
     destination: str | Path,
     *,
@@ -122,7 +155,7 @@ def create_snapshot(
     library: str | Path | None = None,
     queue: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Publish a complete per-domain SQLite backup atomically as a new folder."""
+    """Publish a verified local backup without clobbering another user path."""
     sources = {
         name: _source(path)
         for name, path in {
@@ -161,7 +194,7 @@ def create_snapshot(
             raise OfflineSnapshotError("snapshot manifest size exceeds limit")
         (stage / "manifest.json").write_bytes(encoded + b"\n")
         verify_snapshot(stage)
-        os.replace(stage, target)
+        _publish_new_snapshot(stage, target)
     return manifest
 
 
@@ -283,7 +316,7 @@ def restore_snapshot(
     if len(set(targets.values())) != len(targets):
         raise OfflineSnapshotError("restore database paths must be distinct")
     staged: list[tuple[Path, Path, str]] = []
-    published: list[Path] = []
+    published: list[tuple[Path, Path]] = []
     try:
         for kind, target in sorted(targets.items()):
             with tempfile.NamedTemporaryFile(
@@ -311,11 +344,14 @@ def restore_snapshot(
             # Hard-link creation fails if target already exists, unlike
             # os.replace which could silently overwrite a user database.
             os.link(temporary, target)
-            published.append(target)
+            published.append((target, temporary))
     except BaseException:
-        for produced in published:
+        for produced, source_copy in published:
             try:
-                produced.unlink()
+                # Only roll back the inode *we* linked. If another process
+                # replaced the destination path, never delete its file.
+                if os.path.samefile(produced, source_copy):
+                    produced.unlink()
             except OSError:
                 pass
         raise
