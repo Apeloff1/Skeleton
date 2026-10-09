@@ -162,9 +162,12 @@ class OfflineAISession:
             not isinstance(result.text, str)
             or not result.text.strip()
             or result.tool_calls
+            or result.finish_reason in {"cancelled", "deadline"}
             or result.model_digest != self.backend.model_digest
         ):
-            raise OfflineAIError("local model did not return a bound, text-only answer")
+            raise OfflineAIError(
+                "local model did not return a completed, bound text-only answer"
+            )
         receipt_digest = result.execution_receipt_digest
         if isinstance(self.backend, LlamaCppModel) and not receipt_digest:
             # llama.cpp returns a concrete request-bound process response ID
