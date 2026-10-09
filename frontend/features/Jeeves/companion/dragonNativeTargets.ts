@@ -13,7 +13,7 @@ export interface NativeAttempt {
 const digest=/^[a-f0-9]{64}$/;
 export function normalizeNativeTargets(input:unknown):NativeTarget[]{
  if(!Array.isArray(input))return [];
- return input.filter((t):t is NativeTarget=>!!t&&typeof t==='object'&&
+ return input.filter((t: unknown):t is NativeTarget=>!!t&&typeof t==='object'&&
   typeof t.id==='string'&&/^[a-z0-9_]{2,64}$/.test(t.id)&&
   typeof t.family==='string'&&t.family.length<80&&
   typeof t.generation==='string'&&t.generation.length<80&&
@@ -24,7 +24,7 @@ export function normalizeNativeTargets(input:unknown):NativeTarget[]{
   typeof t.sound==='string'&&typeof t.input==='string'&&
   ['native_source','toolchain_adapter','licensed_sdk'].includes(t.status)&&
   (!t.supported_styles||(Array.isArray(t.supported_styles)&&
-   t.supported_styles.every(s=>typeof s==='string'&&/^[a-z_]{2,64}$/.test(s))))
+   t.supported_styles.every((s: unknown)=>typeof s==='string'&&/^[a-z_]{2,64}$/.test(s))))
  ).slice(0,100);
 }
 export function normalizeNativeAttempts(input:unknown):NativeAttempt[]{

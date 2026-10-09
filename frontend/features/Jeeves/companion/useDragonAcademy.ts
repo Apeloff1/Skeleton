@@ -194,7 +194,7 @@ export function useDragonAcademy(){
     if(buffer.byteLength>250000)throw new Error('Native project exceeds download limit.');
     const expected=response.headers.get('X-Content-SHA256');
     const hash=await Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256,new Uint8Array(buffer));
-    const actual=Array.from(hash).map(v=>v.toString(16).padStart(2,'0')).join('');
+    const actual=Array.from(new Uint8Array(hash)).map(v=>v.toString(16).padStart(2,'0')).join('');
     if(!expected||expected!==actual)throw new Error('Native project digest mismatch.');
     const location=URL.createObjectURL(new Blob([buffer],{type:'application/zip'}));
     const link=document.createElement('a');link.href=location;link.download=filename;
