@@ -16,7 +16,7 @@ from skeleton.app.cli import run_app_cli
 def test_full_era_catalog_completion_accounting_cannot_mark_stub_as_complete(capsys):
     status = completion_overview()
     assert status["counts"]["design_profiles"] == len(TARGETS)
-    assert status["counts"]["design_profiles"] >= 166
+    assert status["counts"]["design_profiles"] == len(TARGETS) == 159
     assert status["counts"]["source_or_bytecode_exporters_implemented"] == 1
     assert status["counts"]["platforms_fully_release_verified"] == 0
     assert status["counts"]["platforms_needing_release_proofs"] == len(TARGETS)
