@@ -37,6 +37,7 @@ class OfflineWindowsBrowserLifecycleTests(unittest.TestCase):
         self.launcher._browser_app = None
         self.launcher._browser_worker = None
         self.launcher._browser_token_file = None
+        self.launcher._launcher_closed = False
         self.addCleanup(self.launcher._stop_browser_service)
 
     def test_start_authenticate_generate_stop_and_delete_private_token(self):
@@ -92,6 +93,41 @@ class OfflineWindowsBrowserLifecycleTests(unittest.TestCase):
             self.assertFalse(token_path.exists())
             self.assertIsNone(self.launcher._browser_server)
             self.assertIsNone(self.launcher._browser_app)
+
+    def test_launcher_closed_during_model_admission_cannot_start_server(self):
+        database = self.folder / "late.sqlite3"
+        def admission(_path):
+            with self.launcher._browser_lock:
+                self.launcher._launcher_closed = True
+            return self.backend
+        with (
+            patch("skeleton.app.local_ai.load_native_checkpoint",
+                  side_effect=admission),
+            patch("skeleton.app.local_ai.private_desktop_database",
+                  return_value=database),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "closed during model admission"):
+                self.launcher._start_browser_service(
+                    self.folder / "native.json", gguf=False
+                )
+        self.assertIsNone(self.launcher._browser_server)
+        self.assertEqual(list(self.folder.glob("*.secret")), [])
+
+    def test_missing_default_webbrowser_keeps_secure_service_running(self):
+        database = self.folder / "fallback.sqlite3"
+        with (
+            patch("skeleton.app.local_ai.load_native_checkpoint",
+                  return_value=self.backend),
+            patch("skeleton.app.local_ai.private_desktop_database",
+                  return_value=database),
+            patch("webbrowser.open", side_effect=OSError("no browser installed")),
+        ):
+            text = self.launcher._start_browser_service(
+                self.folder / "native.json", gguf=False
+            )
+        self.assertIn("http://127.0.0.1:", text)
+        self.assertTrue(self.launcher._browser_token_file.is_file())
+        self.assertIsNotNone(self.launcher._browser_server)
 
     def test_server_bind_failure_does_not_leave_secret_file(self):
         # A mocked socket bind error must close the SQLite store and must
