@@ -1,6 +1,23 @@
 from __future__ import annotations
 import hashlib,pytest
-from skeleton.ai.research import *
+import importlib.util
+import sys
+from pathlib import Path
+
+# Load the sibling module explicitly: skeleton.ai.research is also a package,
+# so a normal import resolves to the package and hides research.py.
+_contracts_path = Path(__file__).resolve().parents[1] / "ai" / "research.py"
+_contracts_spec = importlib.util.spec_from_file_location(
+    "skeleton_ai_research_contracts", _contracts_path
+)
+if _contracts_spec is None or _contracts_spec.loader is None:
+    raise ImportError(f"cannot load research contracts from {_contracts_path}")
+_contracts = importlib.util.module_from_spec(_contracts_spec)
+sys.modules[_contracts_spec.name] = _contracts
+_contracts_spec.loader.exec_module(_contracts)
+globals().update(
+    {name: value for name, value in vars(_contracts).items() if not name.startswith("_")}
+)
 S=lambda x:hashlib.sha256(x.encode()).hexdigest()
 def node(i="EVID.1",out=Outcome.SUPPORTS): return EvidenceNode(i,"SOURCE.1",S("source"),"controlled benchmark",("CLAIM.1",),out)
 def test_question_requires_scope_and_limitations():
