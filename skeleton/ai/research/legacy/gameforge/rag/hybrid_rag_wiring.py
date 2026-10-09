@@ -11,7 +11,7 @@ class HybridRAGWiring:
     def __init__(self, category_index_path: str, role_graph_path: str):
         self.category_index = self._load_json(category_index_path)
         self.role_graph = self._load_json(role_graph_path)
-        self.vector_index = {}  # Would connect to actual vector DB
+        self.vector_index = {}
         self.graph_index = self.role_graph  # NetworkX or similar
 
     def _load_json(self, path: str) -> Dict:
@@ -39,20 +39,54 @@ class HybridRAGWiring:
         return merged[:top_k]
 
     def _keyword_category_lookup(self, query: str, room_id: str) -> List[Dict]:
-        # Implementation would use the category_index_engine
-        return []
+        terms = {part.lower() for part in query.split() if part}
+        hits = []
+        rooms = self.category_index.get(room_id, self.category_index)
+        if isinstance(rooms, dict):
+            for key, value in rooms.items():
+                blob = f"{key} {value}".lower()
+                overlap = [term for term in terms if term in blob]
+                if overlap:
+                    hits.append({"id": str(key), "lane": "keyword", "score": len(overlap), "room": room_id})
+        return hits
 
     def _vector_similarity(self, query: str, room_id: str) -> List[Dict]:
-        # Would query vector DB
-        return []
+        import hashlib
+        def vec(text: str):
+            buckets = [0.0] * 16
+            for token in text.lower().split():
+                digest = hashlib.sha256(token.encode()).digest()
+                buckets[digest[0] % 16] += 1.0
+            norm = sum(x * x for x in buckets) ** 0.5 or 1.0
+            return [x / norm for x in buckets]
+        q = vec(query)
+        hits = []
+        rooms = self.category_index.get(room_id, self.category_index)
+        if isinstance(rooms, dict):
+            for key, value in rooms.items():
+                score = sum(a * b for a, b in zip(q, vec(f"{key} {value}")))
+                if score > 0:
+                    hits.append({"id": str(key), "lane": "vector", "score": score, "room": room_id})
+        return hits
 
     def _graph_synergy_traversal(self, query: str, room_id: str) -> List[Dict]:
-        # Traverse role_contribution_graph for related roles
-        return []
+        hits = []
+        graph = self.role_graph if isinstance(self.role_graph, dict) else {}
+        for source, targets in graph.items():
+            names = targets if isinstance(targets, list) else [targets]
+            if room_id == source or query.lower() in str(source).lower():
+                for target in names:
+                    hits.append({"id": str(target), "lane": "graph", "score": 1.0, "room": room_id})
+        return hits
 
     def _merge_and_rerank(self, *result_lists) -> List[Dict]:
-        # Combine and score by coherence + relevance
-        return []
+        pooled = {}
+        for bucket in result_lists:
+            for row in bucket:
+                current = pooled.setdefault(row["id"], {"id": row["id"], "score": 0.0, "lanes": [], "room": row.get("room")})
+                current["score"] += float(row.get("score", 0))
+                current["lanes"].append(row.get("lane"))
+        return sorted(pooled.values(), key=lambda item: item["score"], reverse=True)
 
 if __name__ == "__main__":
     rag = HybridRAGWiring(
