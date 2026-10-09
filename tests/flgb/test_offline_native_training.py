@@ -137,6 +137,27 @@ class TestOfflineNativeTraining(unittest.TestCase):
                     "--development", "--offline-command", "local-ai",
                 ]), 2)
 
+    def test_source_mutation_during_sgd_cannot_publish_checkpoint(self) -> None:
+        from skeleton.cortex.transformer import TinyTransformer
+
+        with tempfile.TemporaryDirectory() as directory:
+            corpus = Path(directory) / "training.txt"
+            destination = Path(directory) / "model.json"
+            corpus.write_text("hello world assistant user\n", encoding="utf-8")
+            initial = corpus.read_bytes()
+            real_fit = TinyTransformer.fit
+
+            def fit_then_mutate(model, texts, **kwargs):
+                result = real_fit(model, texts, **kwargs)
+                corpus.write_text("hello world user assistant\n", encoding="utf-8")
+                return result
+
+            with patch.object(TinyTransformer, "fit", new=fit_then_mutate):
+                with self.assertRaisesRegex(OfflineTrainingError, "source changed"):
+                    train_local_text(corpus, destination)
+            self.assertNotEqual(corpus.read_bytes(), initial)
+            self.assertFalse(destination.exists())
+
     def test_training_is_explicit_never_implicit_and_requires_output_path(self) -> None:
         from skeleton.app.cli import run_app_cli
 
