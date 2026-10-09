@@ -330,3 +330,29 @@ def test_windows_game_can_play_original_chip8_rom_in_its_own_native_window():
     assert "$chip8GameCheck.copyrighted_firmware_included" in workflow
     assert "$chip8GameCheck.real_vintage_hardware_verified" in workflow
     assert "$chip8GameCheck.native_window_was_opened" in workflow
+
+
+def test_native_windows_game_port_replays_original_plus_hybrids_legally():
+    """Installed acceptance must not merely rename an existing ROM/title."""
+    from pathlib import Path
+    entry = Path("packaging/windows/game_preview_entry.py").read_text("utf-8")
+    build = Path("scripts/windows/build_installer.ps1").read_text("utf-8")
+    workflow = Path(".github/workflows/windows-installer.yml").read_text("utf-8")
+    offline = Path("skeleton/app/offline_cli.py").read_text("utf-8")
+    ui = Path("skeleton/app/homebrew_editor_ui.py").read_text("utf-8")
+
+    assert 'parser.add_argument("--port-blueprint"' in entry
+    assert "open_native_homebrew_port(args.project, args.port_blueprint)" in entry
+    assert '"skeleton.ai.runtime.homebrew_porting"' in build
+    assert '"skeleton.app.homebrew_port_ui"' in build
+    assert '"scripts.game.port_homebrew"' in build
+    assert "--homebrew-port-check" in offline
+    assert "Windows Port Studio" in ui
+    assert "reduced_motion" in ui and "colorblind" in ui
+    assert "make_homebrew_port" in ui
+    assert "scripts/game/port_homebrew.py" in workflow
+    assert "collectathon,keyquest,speedrun,exploration,combo" in workflow
+    assert "$installedPort.hybrid_gameplay_proven" in workflow
+    assert "$installedPort.original_gameplay_proven" in workflow
+    assert "$installedPort.trace_sha256 -ne $portReceipt.actual_hybrid_gameplay.trace_sha256" in workflow
+    assert "forged commercial-clone permission" in workflow
