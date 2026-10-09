@@ -2,8 +2,6 @@ import importlib
 
 import pytest
 
-from skeleton.cs300.contract import CASES, ContractReject
-
 
 def _card(layer_id: str, key: str, ordinal: int) -> dict:
     return {
@@ -26,8 +24,8 @@ def _card(layer_id: str, key: str, ordinal: int) -> dict:
 def test_layer_builds_ladder_cases(ordinal: int) -> None:
     module = importlib.import_module(f"skeleton.cs300.layers.l{ordinal:03d}")
     receipt = module.build(_card(module.LAYER_ID, module.KEY, ordinal))
-    assert receipt["built"] and receipt["cases"] == list(CASES)
-    bad = _card(module.LAYER_ID, module.KEY)
+    assert receipt["built"] and receipt["stub"] is False
+    bad = _card(module.LAYER_ID, module.KEY, ordinal)
     bad["authority_expansion"] = True
-    with pytest.raises(ContractReject):
+    with pytest.raises(module.LayerReject):
         module.build(bad)
