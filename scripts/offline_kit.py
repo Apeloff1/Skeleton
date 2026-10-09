@@ -261,6 +261,12 @@ def verify(root: str | Path) -> dict[str, object]:
 
 
 def install(root: str | Path, destination: str | Path) -> Path:
+    """Install into a new venv, rolling back incomplete local installations.
+
+    A virtualenv is not relocatable, so the target path must remain stable
+    from venv creation to first use. On failure, delete only that newly
+    created target, never an existing operator installation or its parents.
+    """
     kit = Path(root).expanduser().resolve(strict=True)
     manifest = verify(kit)
     if manifest["environment"] != _environment():
@@ -270,29 +276,54 @@ def install(root: str | Path, destination: str | Path) -> Path:
         raise OfflineKitError("installation destination already exists")
     if not target.parent.is_dir() or target == kit or kit in target.parents:
         raise OfflineKitError("install outside the verified bundle into an existing parent")
-    # The wheel resolver is completely offline; missing dependencies fail
-    # instead of being downloaded. Build on a matching Python/platform target.
-    venv.EnvBuilder(with_pip=True, clear=False).create(target)
-    python = target / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+
     command = [
-        str(python), "-m", "pip", "--isolated", "install",
-        "--no-index", "--only-binary=:all:",
+        "-m", "pip", "--isolated", "install",
+        "--no-index", "--no-input", "--no-cache-dir",
+        "--disable-pip-version-check", "--only-binary=:all:",
         "--find-links", str(kit / "wheelhouse"),
         f"skeleton[local-inference]=={manifest['version']}",
     ]
+    # Isolation is enforced at the package resolver, not claimed as an OS
+    # egress sandbox for arbitrary executable wheel-install hooks.
     env = dict(os.environ)
     env.update({
         "PIP_NO_INDEX": "1",
         "PIP_DISABLE_PIP_VERSION_CHECK": "1",
         "PYTHONNOUSERSITE": "1",
     })
-    subprocess.run(command, check=True, env=env, shell=False)
-    if manifest["gguf_included"]:
-        assets = target / "offline_model"
-        assets.mkdir()
-        shutil.copytree(kit / "model", assets / "model")
-        shutil.copytree(kit / "runtime", assets / "runtime")
-        # The deployment retains correct ../runtime relative references.
+    try:
+        venv.EnvBuilder(with_pip=True, clear=False).create(target)
+        python = target / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+        subprocess.run([str(python), *command], check=True, env=env, shell=False)
+
+        # The verified source bundle must remain byte-identical while pip
+        # resolves it. An altered wheel or model invalidates the installation.
+        if verify(kit) != manifest:
+            raise OfflineKitError("offline kit changed during installation")
+        if manifest["gguf_included"]:
+            assets = target / "offline_model"
+            assets.mkdir()
+            shutil.copytree(kit / "model", assets / "model", symlinks=False)
+            shutil.copytree(kit / "runtime", assets / "runtime", symlinks=False)
+            # Verify copied identities, not merely the source kit hashes.
+            local = json.loads((assets / "model" / "deployment.json").read_text("utf-8"))
+            runtime_name = (
+                "llama-cli.exe" if manifest["environment"]["sys_platform"] == "win32"
+                else "llama-cli"
+            )
+            if (
+                _hash(assets / "model" / "model.gguf") != local["model_sha256"]
+                or _hash(assets / "runtime" / runtime_name) != local["executable_sha256"]
+            ):
+                raise OfflineKitError("copied model or local runtime digest differs")
+        # Validate the actual install, not only subprocess exit code.
+        if not python.is_file():
+            raise OfflineKitError("offline installation created no Python runtime")
+    except BaseException:
+        if target.is_dir() and not target.is_symlink():
+            shutil.rmtree(target)
+        raise
     return target
 
 
