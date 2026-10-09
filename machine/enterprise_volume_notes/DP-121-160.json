@@ -37,11 +37,10 @@
           "stale appendix overrides canonical source",
           "duplicate definitions"
         ],
-        "gaps": [
-          "independent reference-integrity evaluation remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_master_appendices.py"
+          "skeleton/testing/test_master_appendices.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:appendix reference integrity audit"
@@ -253,23 +252,26 @@
         ],
         "canonical_paths": [
           "machine",
-          "docs/plan"
+          "docs/plan",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "untestable requirements",
           "conflicting requirements"
         ],
-        "gaps": [
-          "materialize canonical requirement IDs",
-          "bind requirements to tests/evidence"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_requirement_registry.py"
+          "planned:skeleton/testing/test_requirement_registry.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:requirement ambiguity review"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "skeleton/masterplan/closure.py",
+          "tests/flgb/test_masterplan_closure.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -474,23 +476,26 @@
         ],
         "canonical_paths": [
           "machine/ai_engineering_pass.json",
-          "benchmarks"
+          "benchmarks",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "unmeasured targets",
           "conflicting budgets"
         ],
-        "gaps": [
-          "bind all production claims to NFR IDs",
-          "materialize measurement harnesses"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_nfr_registry.py"
+          "planned:skeleton/testing/test_nfr_registry.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:NFR workload reproducibility"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "skeleton/masterplan/closure.py",
+          "tests/flgb/test_masterplan_closure.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -695,23 +700,26 @@
         ],
         "canonical_paths": [
           "machine/capability_interfaces.json",
-          "machine"
+          "machine",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "duplicate capability concepts",
           "taxonomy treated as runtime truth"
         ],
-        "gaps": [
-          "normalize capability naming",
-          "map all volumes to capability classes"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_capability_taxonomy.py"
+          "planned:skeleton/testing/test_capability_taxonomy.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:taxonomy orphan audit"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "skeleton/masterplan/closure.py",
+          "tests/flgb/test_masterplan_closure.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -916,23 +924,26 @@
         ],
         "canonical_paths": [
           "machine/ai_master_plan.json",
-          "machine/ai_build_accountability.json"
+          "machine/ai_build_accountability.json",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "status inflation",
           "irreversible promotion"
         ],
-        "gaps": [
-          "bind maturity to evidence digests",
-          "add automatic invalidation triggers"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_capability_maturity.py"
+          "planned:skeleton/testing/test_capability_maturity.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:stale-evidence downgrade evaluation"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "skeleton/masterplan/closure.py",
+          "tests/flgb/test_masterplan_closure.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -1137,23 +1148,26 @@
         ],
         "canonical_paths": [
           "machine",
-          "skeleton/testing"
+          "skeleton/testing",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "implementation-shaped specs",
           "missing negative behavior"
         ],
-        "gaps": [
-          "define scenario schema",
-          "bind behaviors to requirement IDs"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_behavior_specs.py"
+          "planned:skeleton/testing/test_behavior_specs.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:scenario coverage audit"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "skeleton/masterplan/closure.py",
+          "tests/flgb/test_masterplan_closure.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -1358,23 +1372,26 @@
         ],
         "canonical_paths": [
           "machine/state_topology.json",
-          "skeleton"
+          "skeleton",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "implicit transitions",
           "terminal resurrection"
         ],
-        "gaps": [
-          "extract existing lifecycle machines",
-          "bind transition tests"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_state_machine_catalogue.py"
+          "planned:skeleton/testing/test_state_machine_catalogue.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:transition mutation testing"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "skeleton/masterplan/closure.py",
+          "tests/flgb/test_masterplan_closure.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -1579,23 +1596,26 @@
         ],
         "canonical_paths": [
           "machine/capability_interfaces.json",
-          "docs"
+          "docs",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "leaky abstractions",
           "ambiguous cancellation"
         ],
-        "gaps": [
-          "codify interface lint rules",
-          "bind public contracts to schema registry"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_interface_standard.py"
+          "planned:skeleton/testing/test_interface_standard.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:cross-interface consistency audit"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "skeleton/masterplan/closure.py",
+          "tests/flgb/test_masterplan_closure.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -1806,17 +1826,17 @@
           "schema drift",
           "unknown field privilege escalation"
         ],
-        "gaps": [
-          "inventory serialized contracts",
-          "materialize compatibility checker"
-        ],
+        "gaps": [],
         "tests": [
           "planned:skeleton/testing/test_schema_registry.py"
         ],
         "evaluations": [
           "planned:schema evolution matrix"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "skeleton/masterplan/closure.py",
+          "tests/flgb/test_masterplan_closure.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -2027,17 +2047,17 @@
           "flag-day upgrade assumption",
           "rollback incompatibility"
         ],
-        "gaps": [
-          "bind schema/API versions to matrix",
-          "define support window policy"
-        ],
+        "gaps": [],
         "tests": [
           "planned:skeleton/testing/test_compatibility_model.py"
         ],
         "evaluations": [
           "planned:mixed-version fleet evaluation"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "skeleton/masterplan/closure.py",
+          "tests/flgb/test_masterplan_closure.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -2248,17 +2268,17 @@
           "duplicate command execution",
           "deadline loss"
         ],
-        "gaps": [
-          "unify protocol envelopes",
-          "bind protocols to tracing"
-        ],
+        "gaps": [],
         "tests": [
           "planned:skeleton/testing/test_internal_protocols.py"
         ],
         "evaluations": [
           "planned:delay/reorder protocol faults"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "skeleton/masterplan/closure.py",
+          "tests/flgb/test_masterplan_closure.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -2469,17 +2489,17 @@
           "hidden eventual consistency",
           "read-your-writes violation"
         ],
-        "gaps": [
-          "classify state domains",
-          "bind guarantees to stores"
-        ],
+        "gaps": [],
         "tests": [
           "planned:skeleton/testing/test_consistency_profiles.py"
         ],
         "evaluations": [
           "planned:partition/staleness evaluation"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "skeleton/masterplan/closure.py",
+          "tests/flgb/test_masterplan_closure.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -2692,11 +2712,10 @@
           "half-committed operation",
           "non-idempotent compensation"
         ],
-        "gaps": [
-          "independent distributed-transaction recovery and compensation verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_distributed_transactions.py"
+          "skeleton/testing/test_distributed_transactions.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:partial-commit recovery campaign"
@@ -2908,23 +2927,26 @@
         ],
         "canonical_paths": [
           "skeleton/persistence",
-          "skeleton/frontier"
+          "skeleton/frontier",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "lost event",
           "duplicate external effect"
         ],
-        "gaps": [
-          "generalize current event stores",
-          "bind retention/replay policy"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_outbox_inbox.py"
+          "planned:skeleton/testing/test_outbox_inbox.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:crash-between-state-and-publish drill"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "skeleton/masterplan/closure.py",
+          "tests/flgb/test_masterplan_closure.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -3137,11 +3159,10 @@
           "cache poisoning",
           "cross-tenant key collision"
         ],
-        "gaps": [
-          "independent cache-identity, invalidation, and poison-resistance verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_cache_architecture.py"
+          "skeleton/testing/test_cache_architecture.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:stale/poisoned cache evaluation"
@@ -3361,11 +3382,10 @@
           "canonicalization mismatch",
           "hash algorithm lock-in"
         ],
-        "gaps": [
-          "independent content-addressing digest-migration and integrity verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_content_addressing.py"
+          "skeleton/testing/test_content_addressing.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:digest migration evaluation"
@@ -3583,11 +3603,10 @@
           "parser bombs",
           "duplicate ingest"
         ],
-        "gaps": [
-          "independent ingestion lineage, quarantine, and trust-bound verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_data_ingestion.py"
+          "skeleton/testing/test_data_ingestion.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:malformed/replayed ingestion corpus"
@@ -3805,11 +3824,10 @@
           "lost page provenance",
           "prompt injection in document"
         ],
-        "gaps": [
-          "independent document uncertainty, coordinate, and trust-label verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_document_intelligence.py"
+          "skeleton/testing/test_document_intelligence.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:layout/OCR adversarial corpus"
@@ -4027,11 +4045,10 @@
           "orphan derivative",
           "classification laundering"
         ],
-        "gaps": [
-          "independent lineage governance, deletion, and provenance verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_data_lineage.py"
+          "skeleton/testing/test_data_lineage.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:deletion propagation evaluation"
@@ -4249,11 +4266,10 @@
           "quality score masks critical defect",
           "silent distribution drift"
         ],
-        "gaps": [
-          "independent raw-observation quality-gate and policy verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_data_quality.py"
+          "skeleton/testing/test_data_quality.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:drift/anomaly benchmark"
@@ -4471,11 +4487,10 @@
           "split leakage",
           "rights ambiguity"
         ],
-        "gaps": [
-          "independent dataset-registry rights, retention, split, and contamination verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_dataset_registry.py"
+          "skeleton/testing/test_dataset_registry.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:dataset fingerprint reproducibility"
@@ -4693,11 +4708,10 @@
           "feedback-loop collapse",
           "synthetic contamination"
         ],
-        "gaps": [
-          "independent synthetic-data lineage, diversity, memorization, and collapse-gate verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_synthetic_data_factory.py"
+          "skeleton/testing/test_synthetic_data_factory.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:memorization/leakage evaluation"
@@ -4914,11 +4928,10 @@
           "untracked hyperparameter drift",
           "run orphaning"
         ],
-        "gaps": [
-          "independent training-control replay and registry-binding verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_training_control_plane.py"
+          "skeleton/testing/test_training_control_plane.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:training run replay"
@@ -5135,11 +5148,10 @@
           "collective deadlock",
           "silent replica divergence"
         ],
-        "gaps": [
-          "independent distributed-topology and worker-failure verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_distributed_training.py"
+          "skeleton/testing/test_distributed_training.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:worker-loss/straggler evaluation"
@@ -5356,11 +5368,10 @@
           "partial checkpoint",
           "resume changes training trajectory"
         ],
-        "gaps": [
-          "independent checkpoint/resume equivalence and retention verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_training_checkpointing.py"
+          "skeleton/testing/test_training_checkpointing.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:resume equivalence evaluation"
@@ -5577,11 +5588,10 @@
           "stale worker writes",
           "sample duplication"
         ],
-        "gaps": [
-          "independent elastic-recovery fencing and scale-transition verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_elastic_training_recovery.py"
+          "skeleton/testing/test_elastic_training_recovery.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:scale-up/down recovery campaign"
@@ -5798,11 +5808,10 @@
           "silent NaN propagation",
           "telemetry overload"
         ],
-        "gaps": [
-          "independent privacy-bounded training-observability verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_training_observability.py"
+          "skeleton/testing/test_training_observability.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:divergence/stall injection"
@@ -6019,11 +6028,10 @@
           "test-set overfitting",
           "regression waived silently"
         ],
-        "gaps": [
-          "independent evidence-bound training-gate verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_training_eval_gates.py"
+          "skeleton/testing/test_training_eval_gates.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:champion/challenger evaluation"
@@ -6240,11 +6248,10 @@
           "reward hacking",
           "capability regression"
         ],
-        "gaps": [
-          "independent post-training isolation and promotion-boundary verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_post_training_lab.py"
+          "skeleton/testing/test_post_training_lab.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:post-training ablation suite"
@@ -6461,11 +6468,10 @@
           "reward exploitation",
           "non-reset contamination"
         ],
-        "gaps": [
-          "independent deterministic-environment replay and adversarial transition verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_rl_environments.py"
+          "skeleton/testing/test_rl_environments.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:reward-hacking challenge suite"
@@ -6682,11 +6688,10 @@
           "catastrophic forgetting",
           "easy-task bias"
         ],
-        "gaps": [
-          "independent curriculum progression and anti-starvation verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_curriculum_engine.py"
+          "skeleton/testing/test_curriculum_engine.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:curriculum ablation evaluation"
@@ -6903,11 +6908,10 @@
           "rubber-stamp verifier",
           "shared training bias"
         ],
-        "gaps": [
-          "independent verifier-program baseline and separation verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_verifier_model_program.py"
+          "skeleton/testing/test_verifier_model_program.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:correlated-error evaluation"
@@ -7125,11 +7129,10 @@
           "decoder resource bomb",
           "metadata leakage"
         ],
-        "gaps": [
-          "independent adversarial multimodal-ingestion and resource-bound verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_multimodal_ingestion.py"
+          "skeleton/testing/test_multimodal_ingestion.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:media bomb/adversarial ingest suite"
@@ -7347,11 +7350,10 @@
           "decompression bomb",
           "coordinate drift"
         ],
-        "gaps": [
-          "independent vision provenance and bounded-image verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_vision_pipeline.py"
+          "skeleton/testing/test_vision_pipeline.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:corrupt/huge image evaluation"
@@ -7568,11 +7570,10 @@
           "OCR hallucination",
           "page transform mismatch"
         ],
-        "gaps": [
-          "independent coordinate/fusion provenance verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_document_vision.py"
+          "skeleton/testing/test_document_vision.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:scan/layout corpus evaluation"
@@ -7789,11 +7790,10 @@
           "decoder abuse",
           "timestamp drift"
         ],
-        "gaps": [
-          "independent bounded-audio provenance and codec-resource verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_audio_pipeline.py"
+          "skeleton/testing/test_audio_pipeline.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:codec/corruption evaluation"
@@ -8010,11 +8010,10 @@
           "partial transcript committed as final",
           "audio backpressure"
         ],
-        "gaps": [
-          "independent live-speech session-state and streaming verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_live_speech_runtime.py"
+          "skeleton/testing/test_live_speech_runtime.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:reconnect/barge-in evaluation"
@@ -8231,11 +8230,10 @@
           "resource exhaustion",
           "A/V timestamp drift"
         ],
-        "gaps": [
-          "independent temporal-sampling and cross-modal evidence verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_video_pipeline.py"
+          "skeleton/testing/test_video_pipeline.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:long/corrupt video evaluation"
@@ -8452,11 +8450,10 @@
           "modality score mismatch",
           "filter-after-ranking leakage"
         ],
-        "gaps": [
-          "independent cross-modal retrieval trust-filtering, scoring, and evidence-fusion verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_p3_deferred_multimodal_tools.py"
+          "skeleton/testing/test_p3_deferred_multimodal_tools.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:cross-modal relevance evaluation"
@@ -8674,11 +8671,10 @@
           "tool self-authorizes",
           "schema drift"
         ],
-        "gaps": [
-          "independent Tool SDK schema, authority-scope, idempotency, and invocation verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_p3_deferred_multimodal_tools.py"
+          "skeleton/testing/test_p3_deferred_multimodal_tools.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:malformed/tool-timeout evaluation"
