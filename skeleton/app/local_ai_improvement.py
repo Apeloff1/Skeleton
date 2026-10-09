@@ -196,3 +196,70 @@ def improve_local_model(
         total_training_steps=step_count,
         validation_tokens=heldout_count,
     )
+
+
+@dataclass(frozen=True, slots=True)
+class OfflineComparisonReceipt:
+    """Independent held-out comparison without training or model promotion."""
+    baseline_model_digest: str
+    candidate_model_digest: str
+    tokenizer_digest: str
+    validation_source_sha256: str
+    validation_tokens: int
+    baseline_perplexity: float
+    candidate_perplexity: float
+    improves: bool
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "schema_version": 1,
+            "baseline_model_digest": self.baseline_model_digest,
+            "candidate_model_digest": self.candidate_model_digest,
+            "tokenizer_digest": self.tokenizer_digest,
+            "validation_source_sha256": self.validation_source_sha256,
+            "validation_tokens": self.validation_tokens,
+            "baseline_perplexity": self.baseline_perplexity,
+            "candidate_perplexity": self.candidate_perplexity,
+            "improves": self.improves,
+            "candidate_promoted": False,
+            "independent_quality_certification": False,
+        }
+
+
+def compare_local_models(
+    baseline: str | Path,
+    candidate: str | Path,
+    validation_text: str | Path,
+) -> OfflineComparisonReceipt:
+    """Read-only, same-tokenizer checkpoint comparison on explicit local text.
+
+    Unlike a signed promotion certificate, this proves only bounded corpus
+    perplexity for two immutable local model artifacts. Distinct checkpoint
+    identities are required; neither file is modified.
+    """
+    parent = load_native_checkpoint(baseline)
+    improved = load_native_checkpoint(candidate)
+    if parent.model_digest == improved.model_digest:
+        raise OfflineImprovementError("comparison requires distinct model weights")
+    if parent.tokenizer_digest != improved.tokenizer_digest:
+        raise OfflineImprovementError("comparison requires identical tokenizer identity")
+    if parent.runtime.model.itos != improved.runtime.model.itos:
+        raise OfflineImprovementError("comparison models have different vocabulary ordering")
+    raw, lines, count = _read_lines(
+        validation_text, label="validation",
+        vocabulary=set(parent.runtime.model.stoi), minimum_tokens=MIN_HELDOUT_TOKENS,
+    )
+    baseline_ppl = parent.runtime.model.perplexity(lines)
+    candidate_ppl = improved.runtime.model.perplexity(lines)
+    if any(not math.isfinite(v) or v <= 0 for v in (baseline_ppl, candidate_ppl)):
+        raise OfflineImprovementError("held-out comparison yielded invalid perplexity")
+    return OfflineComparisonReceipt(
+        baseline_model_digest=parent.model_digest,
+        candidate_model_digest=improved.model_digest,
+        tokenizer_digest=parent.tokenizer_digest,
+        validation_source_sha256=hashlib.sha256(raw).hexdigest(),
+        validation_tokens=count,
+        baseline_perplexity=baseline_ppl,
+        candidate_perplexity=candidate_ppl,
+        improves=candidate_ppl < baseline_ppl - MIN_VALIDATION_IMPROVEMENT,
+    )
