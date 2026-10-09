@@ -100,6 +100,25 @@ Skeleton.exe --offline-command local-ai --train-corpus .\curated-v1\train.txt \
   --output-model .\native-curated.json --epochs 1 --json
 ```
 
+Verify the published dataset independently before training or replaying a
+checkpoint. With `--verify-sources` the tool re-reads **all original documents**
+and recomputes the seeded document-level split; without source access it only
+verifies the three published files, their line/token counts and hashes.
+
+```bash
+python -m skeleton app local-ai --verify-dataset ./curated-v1 \
+  --verify-sources ./notes --json
+
+Skeleton.exe --offline-command local-ai --verify-dataset .\curated-v1 \
+  --verify-sources .\notes --json
+```
+
+The verifier rejects duplicate JSON keys, noncanonical/forged manifests,
+altered training text, wrong source assignments, symlinks and changed source
+bytes. Its success is a **local integrity check**, not a guarantee that
+original data is unbiased, that historical model training is disjoint, or
+that the model is production quality.
+
 The output directory must not already exist and contains exactly
 `train.txt`, `validation.txt` and `dataset.json`. The last file is a
 commit marker recording document filenames, original content digests, split
