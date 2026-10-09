@@ -11,6 +11,7 @@ import hashlib
 import json
 import math
 import os
+from .offline_sqlite_safety import check_sqlite_companion_paths, UnsafeOfflineSqlitePath
 from pathlib import Path
 import shutil
 import sqlite3
@@ -37,6 +38,10 @@ def _source(path: str | Path) -> Path:
     source = Path(os.path.abspath(Path(path).expanduser()))
     if source.is_symlink() or not source.is_file():
         raise OfflineSnapshotError("snapshot input must be a regular local SQLite database")
+    try:
+        check_sqlite_companion_paths(source)
+    except UnsafeOfflineSqlitePath as exc:
+        raise OfflineSnapshotError(str(exc)) from exc
     if source.stat().st_size > MAX_DATABASE_BYTES:
         raise OfflineSnapshotError("offline SQLite database exceeds portable snapshot limit")
     return source
