@@ -55,6 +55,7 @@ Source: "{#PayloadDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 [Icons]
 Name: "{group}\Skeleton"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"
 Name: "{group}\Skeleton Offline Help"; Filename: "{app}\SkeletonOffline.exe"; Parameters: "--help"; WorkingDir: "{app}"
+Name: "{group}\Skeleton Game Preview"; Filename: "{app}\SkeletonGame.exe"; WorkingDir: "{app}"
 Name: "{group}\Repair Skeleton"; Filename: "{app}\{#AppExeName}"; Parameters: "--repair"; WorkingDir: "{app}"
 Name: "{userdesktop}\Skeleton"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 
