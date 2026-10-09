@@ -22,6 +22,9 @@ SCHEMA = "skeleton.app.offline_library.v1"
 MAX_FILES = 2000
 MAX_DOCUMENT_BYTES = 128 * 1024
 MAX_TOTAL_BYTES = 32 * 1024 * 1024
+# Aggregate storage bounds also apply across separately imported directories.
+MAX_LIBRARY_FILES = 10000
+MAX_LIBRARY_BYTES = 128 * 1024 * 1024
 EXTENSIONS = frozenset({".txt", ".md", ".markdown", ".rst", ".py", ".json", ".jsonl", ".csv", ".toml", ".yaml", ".yml"})
 SKIP_DIRS = frozenset({".git", ".svn", ".hg", ".venv", "venv", "node_modules", "__pycache__", ".mypy_cache", ".pytest_cache"})
 
@@ -262,6 +265,17 @@ class OfflineDocumentLibrary:
                     self._db.execute(
                         "DELETE FROM offline_document_fts WHERE rowid=?",
                         (orphan_id,),
+                    )
+                total = self._db.execute(
+                    "SELECT COUNT(*), COALESCE(SUM(size_bytes),0) "
+                    "FROM offline_documents"
+                ).fetchone()
+                if (
+                    total[0] > MAX_LIBRARY_FILES
+                    or total[1] > MAX_LIBRARY_BYTES
+                ):
+                    raise OfflineLibraryError(
+                        "aggregate local knowledge library exceeds admitted size limits"
                     )
                 if before_commit is not None:
                     before_commit()
