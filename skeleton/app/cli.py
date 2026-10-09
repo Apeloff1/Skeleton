@@ -65,6 +65,7 @@ def _parser() -> argparse.ArgumentParser:
     up.add_argument("--verify-attempts", type=int, default=12)
     up.add_argument("--verify-delay", type=float, default=1.0)
 
+    sub.add_parser("local-ai", help="run native AI locally, without Docker or provider credentials")
     sub.add_parser("down", help="stop the assembled application")
     sub.add_parser("ps", help="show assembled service state")
 
@@ -204,6 +205,11 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 print(f"layer {index}: " + ", ".join(layer))
             print("startup order: " + " -> ".join(plan.services))
         return 0
+
+    if command == "local-ai":
+        from skeleton.app.local_ai import run_offline_ai
+
+        return run_offline_ai()
 
     if command in {"preload", "setup", "install"}:
         from skeleton.app.installer import run_setup_command
