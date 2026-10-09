@@ -50,6 +50,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--qualify-model", action="store_true", help="perform two local inference turns with persisted context recovery")
     capabilities = parser.add_mutually_exclusive_group()
     capabilities.add_argument("--capability-file", help="selected JSON task for offline deterministic execution")
+    capabilities.add_argument("--capability-graph-file", help="execute a bounded local graph of deterministic capability operations")
     capabilities.add_argument("--capability-list", action="store_true", help="list available model-free deterministic operations")
     parser.add_argument("--library", help="user-owned local SQLite document search index")
     parser.add_argument("--index-dir", help="index an explicitly selected local text directory")
@@ -96,7 +97,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.enqueue_dir or args.run_queue or args.queue_status
         or args.cancel_queue_job or args.retry_queue_job
     )
-    if args.capability_file is not None or args.capability_list:
+    if args.capability_file is not None or args.capability_graph_file is not None or args.capability_list:
         # Model-free deterministic engine is strictly separate from all state,
         # network, training, inference and OS-permission controls.
         if (
@@ -114,6 +115,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             CapabilityTaskError, MAX_INPUT_BYTES, OPERATIONS,
             execute_capability_json,
         )
+        from skeleton.ai.runtime.capability_graph import (
+            MAX_GRAPH_BYTES, execute_capability_graph_json,
+        )
         try:
             if args.capability_list:
                 report = {
@@ -124,24 +128,30 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "executor_authority_granted": False,
                 }
             else:
-                selected = Path(args.capability_file).expanduser()
+                selected = Path(
+                    args.capability_graph_file or args.capability_file
+                ).expanduser()
                 if selected.is_symlink() or not selected.is_file():
                     raise CapabilityTaskError("selected task must be a regular local file")
+                limit = MAX_GRAPH_BYTES if args.capability_graph_file else MAX_INPUT_BYTES
                 flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
                 fd = os.open(selected, flags)
                 with os.fdopen(fd, "rb") as handle:
                     meta = os.fstat(handle.fileno())
-                    if not stat.S_ISREG(meta.st_mode) or meta.st_size > MAX_INPUT_BYTES:
+                    if not stat.S_ISREG(meta.st_mode) or meta.st_size > limit:
                         raise CapabilityTaskError("selected task is not a bounded regular file")
-                    raw = handle.read(MAX_INPUT_BYTES + 1)
-                report = execute_capability_json(raw)
+                    raw = handle.read(limit + 1)
+                report = (
+                    execute_capability_graph_json(raw)
+                    if args.capability_graph_file else execute_capability_json(raw)
+                )
         except (ValueError, RuntimeError, OSError, TypeError) as exc:
             print(f"deterministic capability rejected: {type(exc).__name__}: {exc}", file=sys.stderr)
             return 1
         if args.json_output or args.capability_list:
             print(json.dumps(report, sort_keys=True, ensure_ascii=False))
         else:
-            print(json.dumps(report["result"], sort_keys=True, ensure_ascii=False))
+            print(json.dumps(report.get("result", report.get("outputs")), sort_keys=True, ensure_ascii=False))
         return 0
 
     if not queue_mode and (args.queue_db or args.queue_library):
