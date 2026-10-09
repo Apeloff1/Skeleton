@@ -138,8 +138,14 @@ def improve_local_model(
     )
     if hashlib.sha256(train_raw).digest() == hashlib.sha256(heldout_raw).digest():
         raise OfflineImprovementError("training and validation inputs are identical")
-    if set(train_lines) & set(heldout_lines):
-        raise OfflineImprovementError("held-out evaluation overlaps a training line")
+    # Raw-line comparison misses capitalization, punctuation and whitespace
+    # aliases that become identical through the *actual* canonical tokenizer.
+    # Prevent the same token sequence from acting as both training and
+    # supposed held-out validation evidence.
+    if {tuple(tokens(line)) for line in train_lines} & {
+        tuple(tokens(line)) for line in heldout_lines
+    }:
+        raise OfflineImprovementError("held-out evaluation overlaps normalized training tokens")
 
     baseline = model.perplexity(heldout_lines)
     if not math.isfinite(baseline) or baseline <= 0:
