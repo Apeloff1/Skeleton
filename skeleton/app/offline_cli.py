@@ -55,6 +55,7 @@ def _parser() -> argparse.ArgumentParser:
     capabilities.add_argument("--game-preview", action="store_true", help="open native Tk offline playable game preview")
     capabilities.add_argument("--game-preview-check", action="store_true", help="verify 32 frames of native game logic without opening desktop")
     parser.add_argument("--game-seed", type=int, help="deterministic seed for explicit native game preview")
+    parser.add_argument("--game-project", help="user-selected, verified portable game project for native preview")
     parser.add_argument("--library", help="user-owned local SQLite document search index")
     parser.add_argument("--index-dir", help="index an explicitly selected local text directory")
     parser.add_argument("--search", help="search indexed local documents without any model")
@@ -100,6 +101,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.enqueue_dir or args.run_queue or args.queue_status
         or args.cancel_queue_job or args.retry_queue_job
     )
+    if args.game_project is not None and not (args.game_preview or args.game_preview_check):
+        print("--game-project requires --game-preview or --game-preview-check", file=sys.stderr)
+        return 2
+    if args.game_project is not None and args.game_seed is not None:
+        print("--game-project and --game-seed are mutually exclusive", file=sys.stderr)
+        return 2
     if args.game_seed is not None and not (args.game_preview or args.game_preview_check):
         print("--game-seed requires --game-preview or --game-preview-check", file=sys.stderr)
         return 2
@@ -116,10 +123,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("headless game check cannot combine with model or state actions",
                   file=sys.stderr)
             return 2
-        from .offline_game_preview import DEFAULT_SEED, verify_game_preview
+        from .offline_game_preview import DEFAULT_SEED, verify_game_preview, load_game_project
         try:
+            tiles = load_game_project(args.game_project) if args.game_project else None
             report = verify_game_preview(
-                seed=DEFAULT_SEED if args.game_seed is None else args.game_seed
+                seed=DEFAULT_SEED if args.game_seed is None else args.game_seed,
+                **({"project_tiles": tiles} if tiles is not None else {}),
             )
         except (ValueError, RuntimeError, OSError, TypeError) as exc:
             print(
@@ -151,10 +160,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("native game preview must run without model, state or JSON modes",
                   file=sys.stderr)
             return 2
-        from .offline_game_preview import DEFAULT_SEED, run_game_preview
+        from .offline_game_preview import DEFAULT_SEED, run_game_preview, load_game_project
         try:
+            tiles = load_game_project(args.game_project) if args.game_project else None
             return run_game_preview(
-                seed=DEFAULT_SEED if args.game_seed is None else args.game_seed
+                seed=DEFAULT_SEED if args.game_seed is None else args.game_seed,
+                **({"project_tiles": tiles} if tiles is not None else {}),
             )
         except (ValueError, RuntimeError, OSError, ImportError) as exc:
             print(
