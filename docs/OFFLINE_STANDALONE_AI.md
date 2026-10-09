@@ -258,7 +258,7 @@ use an independent OS policy or physically isolated test machine.
 
 ## Cross-era game authoring, legal modification and portable C
 
-The game-development system now has **165 explicit hardware-era design
+The game-development system now has **166 explicit hardware-era design
 profiles** covering eight decades, plus a rights-aware project compiler.
 It can create an original game, apply licensed/authorized tile edits,
 recompute physics/controller playability, and reopen the modified
