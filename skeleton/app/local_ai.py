@@ -332,6 +332,7 @@ class OfflineAIWindow:
         self.worker_loop: asyncio.AbstractEventLoop | None = None
         self.worker_task: asyncio.Task[OfflineAnswer] | None = None
         self.worker_lock = threading.Lock()
+        self.pending_prompt: str | None = None
 
         frame = ttk.Frame(self.window, padding=14)
         frame.pack(fill="both", expand=True)
@@ -544,8 +545,10 @@ class OfflineAIWindow:
         prompt = self.composer.get("1.0", "end-1c").strip()
         if not prompt:
             return
+        # A submitted prompt is only shown as an accepted conversation turn
+        # *after* native execution AND durable SQLite commit succeed.
         self.composer.delete("1.0", "end")
-        self._append("You", prompt)
+        self.pending_prompt = prompt
         self.active = True
         self.status.set("Generating locally…")
         self._refresh()
@@ -599,14 +602,25 @@ class OfflineAIWindow:
                     )
                 elif kind == "answer":
                     answer = value
-                    self._append("Skeleton · Local", answer.text)  # type: ignore[attr-defined]
+                    self.pending_prompt = None
+                    self._display_history()
                     self._update_sessions()
                     self.status.set(
                         "Completed · " + str(answer.input_tokens) + " input / " + str(answer.output_tokens) + " output tokens · receipt " + answer.execution_receipt_digest[:12]  # type: ignore[attr-defined]
                     )
                 else:
-                    self._append("Local runtime", "Request rejected: " + str(value))
-                    self.status.set("Local model unavailable or request rejected.")
+                    # An inference or persistence failure did not commit the
+                    # turn. Restore the unsaved prompt to the composer instead
+                    # of presenting it as durable conversational history.
+                    if self.pending_prompt:
+                        previous_draft = self.composer.get("1.0", "end-1c")
+                        self.composer.delete("1.0", "end")
+                        self.composer.insert(
+                            "1.0", self.pending_prompt +
+                            ("\n" + previous_draft if previous_draft.strip() else "")
+                        )
+                        self.pending_prompt = None
+                    self.status.set("Local turn not committed: " + str(value))
                 self._refresh()
         except Empty:
             pass
