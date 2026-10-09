@@ -23,7 +23,7 @@ def test_machine_conformance_vectors_are_unique_and_fail_closed():
  vectors=conformance["vectors"]
  ids=[v["id"] for v in vectors]
  assert len(ids)==len(set(ids))
- assert {"JSON-DUPLICATE-KEY","JSON-NAN","JSON-INFINITY","JSON-NEG-INFINITY","JSON-UNICODE-ROUNDTRIP","JSON-SAFE-MAX-INTEGER","JSON-UNSAFE-POSITIVE-INTEGER","JSON-UNSAFE-NEGATIVE-INTEGER","JSON-POSITIVE-ZERO","JSON-NEGATIVE-ZERO","SCHEMA-ABSENT-REQUIRED","SCHEMA-NULL-NONNULLABLE","SCHEMA-UNKNOWN-ENUM","SCHEMA-NULL-NULLABLE"}<=set(ids)
+ assert {"JSON-DUPLICATE-KEY","JSON-NAN","JSON-INFINITY","JSON-NEG-INFINITY","JSON-UNICODE-ROUNDTRIP","JSON-SAFE-MAX-INTEGER","JSON-UNSAFE-POSITIVE-INTEGER","JSON-UNSAFE-NEGATIVE-INTEGER","JSON-POSITIVE-ZERO","JSON-NEGATIVE-ZERO","SCHEMA-ABSENT-REQUIRED","SCHEMA-NULL-NONNULLABLE","SCHEMA-UNKNOWN-ENUM","SCHEMA-NULL-NULLABLE","JSON-LONE-HIGH-SURROGATE","JSON-LONE-LOW-SURROGATE-KEY","JSON-VALID-SURROGATE-PAIR","JSON-EXCESSIVE-NESTING"}<=set(ids)
  assert all(v["expected"] in {"accept","reject"} for v in vectors)
 
 def test_machine_validator_executes_complete_inventory_and_vectors():
@@ -33,7 +33,7 @@ def test_machine_validator_executes_complete_inventory_and_vectors():
  module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
  result=module.validate(ROOT)
  assert result["status"]=="valid"
- assert result["contract_count"]==36
+ assert result["contract_count"]==40
  assert result["executed_vector_count"]==result["vector_count"]
  assert result["authority_scope"]=="contract-conformance-only"
  assert len(result["qualification_digest"])==64

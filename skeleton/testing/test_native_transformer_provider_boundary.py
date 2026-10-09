@@ -1,0 +1,158 @@
+import asyncio
+from datetime import datetime, timedelta, timezone
+import unittest
+
+from skeleton.cortex.transformer import TinyTransformer
+from skeleton.ai.model_runtime import DevicePolicy, NativeLLMRuntime
+from skeleton.ai.runtime.inference import (
+    LocalInferenceCancelled,
+    LocalInferenceEngine,
+    LocalModelAdapter,
+    NativeTransformerModel,
+    build_native_transformer_adapter,
+)
+from skeleton.provider_runtime import ProviderRequest
+from skeleton.providers.contract import FinishReason
+
+
+class TestNativeTransformerProviderBoundary(unittest.TestCase):
+    def adapter(self):
+        runtime = NativeLLMRuntime(
+            TinyTransformer(
+                vocab=("system", "user", "assistant", "hello", "world", "native", "runtime", "text"),
+                dim=16,
+                ctx=32,
+                seed=811,
+                n_heads=4,
+                n_layers=2,
+                d_ff=32,
+            ),
+            device_policy=DevicePolicy("cpu"),
+        )
+        backend = NativeTransformerModel(runtime)
+        return LocalModelAdapter(LocalInferenceEngine(backend, cache_size=4)), backend
+
+    def test_provider_neutral_request_executes_native_transformer(self):
+        async def scenario():
+            adapter, backend = self.adapter()
+            response = await adapter.generate(
+                ProviderRequest(
+                    instructions="answer locally",
+                    prompt="hello world",
+                    max_output_tokens=3,
+                    operation_id="op-native-1",
+                    execution_id="exec-native-1",
+                    turn_id="turn-native-1",
+                    context_id="ctx-native-1",
+                    context_digest="a" * 64,
+                    context_source_snapshot=(("source", "b" * 64),),
+                    context_compiler_version="native-test-v1",
+                )
+            )
+            self.assertEqual(response.provider, "local")
+            self.assertEqual(response.model, backend.model_id)
+            self.assertEqual(response.finish_reason, FinishReason.LENGTH)
+            self.assertEqual(response.usage.output_tokens, 3)
+            self.assertEqual(response.usage.total_tokens, response.usage.input_tokens + 3)
+            self.assertEqual(response.usage.estimated_cost, "0")
+            self.assertEqual(response.context_id, "ctx-native-1")
+            self.assertEqual(response.context_digest, "a" * 64)
+            self.assertEqual(adapter.runtime_digest, backend.runtime_digest)
+            self.assertEqual(adapter.status()["model_digest"], backend.model_digest)
+            self.assertEqual(adapter.status()["runtime_digest"], backend.runtime_digest)
+        asyncio.run(scenario())
+
+    def test_same_provider_request_is_deterministic(self):
+        async def scenario():
+            adapter, _ = self.adapter()
+            request = ProviderRequest(
+                instructions="answer locally",
+                prompt="hello",
+                max_output_tokens=4,
+                operation_id="op-replay",
+                execution_id="exec-replay",
+                turn_id="turn-replay",
+            )
+            first = await adapter.generate(request)
+            second = await adapter.generate(request)
+            self.assertEqual(first.text, second.text)
+            self.assertEqual(first.response_id, second.response_id)
+            self.assertEqual(first.usage.output_tokens, second.usage.output_tokens)
+        asyncio.run(scenario())
+
+    def test_expired_deadline_fails_before_native_decode(self):
+        async def scenario():
+            adapter, _ = self.adapter()
+            request = ProviderRequest(
+                instructions="answer locally",
+                prompt="hello",
+                max_output_tokens=4,
+                deadline=datetime.now(timezone.utc) - timedelta(seconds=1),
+            )
+            with self.assertRaisesRegex(LocalInferenceCancelled, "deadline exceeded"):
+                await adapter.generate(request)
+        asyncio.run(scenario())
+
+    def test_naive_deadline_is_rejected(self):
+        async def scenario():
+            adapter, _ = self.adapter()
+            request = ProviderRequest(
+                instructions="answer locally",
+                prompt="hello",
+                deadline=datetime(2026, 10, 7, 21, 0, 0),
+            )
+            with self.assertRaisesRegex(ValueError, "timezone-aware"):
+                await adapter.generate(request)
+        asyncio.run(scenario())
+
+    def test_live_deadline_preserves_deterministic_response(self):
+        async def scenario():
+            adapter, _ = self.adapter()
+            request = ProviderRequest(
+                instructions="answer locally",
+                prompt="hello world",
+                max_output_tokens=2,
+                operation_id="op-deadline-live",
+                execution_id="exec-deadline-live",
+                turn_id="turn-deadline-live",
+                deadline=datetime.now(timezone.utc) + timedelta(seconds=30),
+            )
+            response = await adapter.generate(request)
+            self.assertEqual(response.provider, "local")
+            self.assertEqual(response.usage.output_tokens, 2)
+        asyncio.run(scenario())
+
+    def test_factory_publishes_bound_runtime_artifact_identity(self):
+        runtime = NativeLLMRuntime(
+            TinyTransformer(
+                vocab=("system", "user", "assistant", "hello", "world"),
+                dim=16,
+                ctx=16,
+                seed=912,
+                n_heads=4,
+                n_layers=2,
+                d_ff=32,
+            ),
+            device_policy=DevicePolicy("cpu"),
+        )
+        adapter = build_native_transformer_adapter(
+            runtime,
+            model_id="native-factory-test",
+            cache_size=3,
+            default_seed=17,
+        )
+        status = adapter.status()
+        artifact = status["artifact"]
+        self.assertEqual(adapter.model, "native-factory-test")
+        self.assertEqual(adapter.engine.cache_size, 3)
+        self.assertEqual(adapter.default_seed, 17)
+        self.assertEqual(artifact["kind"], "native_transformer")
+        self.assertEqual(artifact["model_digest"], runtime.model_digest)
+        self.assertEqual(artifact["tokenizer_digest"], runtime.tokenizer.digest)
+        self.assertEqual(artifact["architecture_digest"], runtime.architecture.digest)
+        self.assertEqual(artifact["runtime_digest"], adapter.runtime_digest)
+        self.assertEqual(artifact["device"]["actual"], "cpu")
+
+
+if __name__ == "__main__":
+    unittest.main()

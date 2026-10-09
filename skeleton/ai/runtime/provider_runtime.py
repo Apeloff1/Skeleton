@@ -263,6 +263,15 @@ class ProviderResponse:
     context_digest: str | None = None
     context_source_snapshot: tuple[tuple[str, str], ...] = field(default_factory=tuple)
     context_compiler_version: str | None = None
+    execution_receipt_digest: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.execution_receipt_digest is not None and (
+            not isinstance(self.execution_receipt_digest, str)
+            or len(self.execution_receipt_digest) != 64
+            or any(ch not in "0123456789abcdef" for ch in self.execution_receipt_digest)
+        ):
+            raise ValueError("execution_receipt_digest must be lowercase sha256")
 
 
 @dataclass(frozen=True, slots=True)

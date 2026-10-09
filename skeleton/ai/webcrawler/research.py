@@ -11,6 +11,7 @@ from urllib.parse import urlsplit
 from .core import CrawlDocument
 
 _WORD = re.compile(r"[a-z0-9]{2,}", re.I)
+_YEAR = re.compile(r"(?<!\\d)((?:19|20)\\d{2})(?!\\d)")
 _NEG = re.compile(r"\b(?:not|never|no|false|denies?|rejects?|without)\b", re.I)
 
 def tokens(text: str) -> frozenset[str]:
@@ -52,6 +53,7 @@ class EvidenceObservation:
     relevance: float
     source_score: float
     polarity: int
+    signal_years: tuple[int, ...] = ()
 
     @classmethod
     def from_document(cls, doc: CrawlDocument, query: str) -> "EvidenceObservation":
@@ -70,6 +72,7 @@ class EvidenceObservation:
             relevance=lexical_relevance(query, doc.title+" "+excerpt),
             source_score=doc.source_score,
             polarity=-1 if _NEG.search(excerpt) else 1,
+            signal_years=tuple(sorted({int(y) for y in _YEAR.findall(doc.title+" "+excerpt)})),
         )
 
 @dataclass(frozen=True)
@@ -91,6 +94,18 @@ class EvidenceSet:
 
     def qualified(self) -> list[EvidenceObservation]:
         return [o for o in self.observations.values() if o.relevance >= self.query.min_relevance and o.source_score >= self.query.min_source_score]
+
+    def source_dependence(self):
+        from .source_dependence import source_dependence,merge_citation_dependence
+        from .citation_lineage import extract_citation_edges,citation_dependence
+        vals=self.qualified();edges=source_dependence(vals);citations=extract_citation_edges(vals)
+        return merge_citation_dependence(vals,edges,citation_dependence(vals,citations))
+
+    @property
+    def independent_evidence_clusters(self) -> int:
+        from .source_dependence import independent_host_count
+        vals=self.qualified()
+        return independent_host_count(vals,self.source_dependence()) if vals else 0
 
     @property
     def distinct_hosts(self) -> int:
@@ -134,6 +149,60 @@ class EvidenceSet:
                     key=lambda o:(-score(o),o.canonical_url))
         return leaders+rest
 
+    def signals_by_year(self) -> dict[int, Mapping[str, object]]:
+        """Aggregate qualified evidence by the years explicitly mentioned in evidence."""
+        buckets: dict[int,list[EvidenceObservation]]={}
+        for obs in self.qualified():
+            for year in obs.signal_years:buckets.setdefault(year,[]).append(obs)
+        out={}
+        for year,items in sorted(buckets.items()):
+            hosts={x.host for x in items}
+            positive=sum(1 for x in items if x.polarity>0);negative=len(items)-positive
+            out[year]={"observations":len(items),"distinct_hosts":len(hosts),
+                       "mean_relevance":sum(x.relevance for x in items)/len(items),
+                       "mean_source_score":sum(x.source_score for x in items)/len(items),
+                       "positive":positive,"negative":negative}
+        return out
+
+    def undercovered_years(self,start_year:int,end_year:int,*,minimum_hosts:int=1) -> tuple[int,...]:
+        if start_year>end_year or minimum_hosts<1:raise ValueError("invalid year coverage request")
+        signals=self.signals_by_year()
+        return tuple(y for y in range(start_year,end_year+1) if int(signals.get(y,{}).get("distinct_hosts",0))<minimum_hosts)
+
+    def signals_by_decade(self) -> dict[int, Mapping[str, object]]:
+        from .decade_signals import DecadeSignalSeries
+        return DecadeSignalSeries(self.signals_by_year()).aggregate()
+
+    def undercovered_decades(self,start_decade:int,end_decade:int,*,minimum_coverage:float=.5) -> tuple[int,...]:
+        from .decade_signals import DecadeSignalSeries
+        return DecadeSignalSeries(self.signals_by_year()).undercovered_decades(start_decade,end_decade,minimum_coverage=minimum_coverage)
+
+    def learned_regimes(self,*,threshold:float=.45):
+        from .regimes import RegimeDetector
+        return RegimeDetector(self.signals_by_year()).regimes(threshold=threshold)
+
+    def historical_bias(self,*,bucket_size:int=10):
+        from .historical_bias import HistoricalBiasAnalyzer
+        return HistoricalBiasAnalyzer().analyze(self.signals_by_year(),bucket_size=bucket_size)
+
+    def regime_trajectory(self,*,threshold:float=.45):
+        from .regime_trajectory import classify_regime_transitions
+        return classify_regime_transitions(self.learned_regimes(threshold=threshold))
+
+    def contradiction_history(self,*,threshold:float=.45):
+        from .contradiction_history import contradiction_persistence,persistent_contestation
+        rows=contradiction_persistence(self.qualified(),self.learned_regimes(threshold=threshold))
+        return {"regimes":rows,**persistent_contestation(rows)}
+
+    def counterfactual_influence(self,*,now:float):
+        from .counterfactual import leave_one_out_influence
+        return leave_one_out_influence(self,now=now)
+
+    def citation_lineage(self):
+        from .citation_lineage import extract_citation_edges,citation_dependence
+        vals=self.qualified();edges=extract_citation_edges(vals)
+        return {"edges":edges,"known_dependencies":citation_dependence(vals,edges)}
+
     def assurance(self, *, now: float) -> Mapping[str, object]:
         ranked=self.ranked(now=now)
         relevant=[o for o in ranked if o.relevance >= self.query.min_relevance and o.source_score >= self.query.min_source_score]
@@ -149,13 +218,19 @@ class EvidenceSet:
             "query":self.query.text,
             "score":score,
             "distinct_hosts":self.distinct_hosts,
+            "independent_evidence_clusters":self.independent_evidence_clusters,
             "required_sources":self.query.required_sources,
             "contradictions":len(contradictions),
-            "sufficient":self.distinct_hosts >= self.query.required_sources and score >= .45,
+            "sufficient":self.independent_evidence_clusters >= self.query.required_sources and score >= .45,
         }
 
-def frontier_priority(query: str, candidate_url: str, anchor_text: str="", *, same_host: bool=False) -> float:
+def frontier_priority(query: str, candidate_url: str, anchor_text: str="", *, same_host: bool=False, target_years: Iterable[int]=(), target_decades: Iterable[int]=()) -> float:
     """Cheap query-directed priority usable before a candidate has been fetched."""
     relevance=lexical_relevance(query, candidate_url.replace("/"," ")+" "+anchor_text)
     exploration=0.0 if same_host else 0.15
-    return relevance+exploration
+    years={int(x) for x in _YEAR.findall(candidate_url+" "+anchor_text)}
+    target={int(y) for y in target_years}
+    temporal=0.20 if target and years & target else 0.0
+    decades={(y//10)*10 for y in years};wanted={int(d) for d in target_decades}
+    regime=0.15 if wanted and decades & wanted else 0.0
+    return relevance+exploration+temporal+regime

@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 from collections import Counter, OrderedDict
 from dataclasses import dataclass, field, replace
+from datetime import datetime, timezone
 import hashlib
 import json
 import math
@@ -91,6 +92,7 @@ class LocalInferenceRequest:
     stop: tuple[str, ...] = ()
     tools: tuple[Mapping[str, Any], ...] = ()
     structured_output_schema: Mapping[str, Any] | None = None
+    context_digest: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.prompt, str) or not self.prompt.strip():
@@ -127,6 +129,8 @@ class LocalInferenceRequest:
             if len(encoded.encode("utf-8")) > 512 * 1024:
                 raise ValueError("structured_output_schema exceeds size limit")
             object.__setattr__(self, "structured_output_schema", schema)
+        if self.context_digest is not None and (len(self.context_digest) != 64 or any(ch not in "0123456789abcdef" for ch in self.context_digest)):
+            raise ValueError("context_digest must be lowercase sha256")
 
     @property
     def rendered_input(self) -> str:
@@ -150,6 +154,7 @@ class LocalInferenceRequest:
                 "stop": self.stop,
                 "tools": self.tools,
                 "structured_output_schema": self.structured_output_schema,
+                "context_digest": self.context_digest,
             }
         )
 
@@ -167,10 +172,18 @@ class LocalInferenceResult:
     structured_output: Mapping[str, Any] | None = None
     latency_ms: float | None = None
     cached: bool = False
+    execution_receipt_digest: str | None = None
 
     def __post_init__(self) -> None:
         if not self.model_id.strip():
             raise ValueError("model_id must be non-empty")
+        if self.execution_receipt_digest is not None and (
+            not isinstance(self.execution_receipt_digest, str)
+            or len(self.execution_receipt_digest) != 64
+            or any(ch not in "0123456789abcdef" for ch in self.execution_receipt_digest)
+        ):
+            raise ValueError("execution_receipt_digest must be lowercase sha256")
+
         if (
             len(self.model_digest) != 64
             or any(ch not in "0123456789abcdef" for ch in self.model_digest)
@@ -529,7 +542,22 @@ class LocalInferenceEngine:
         self._cache_lock = asyncio.Lock()
 
     def _key(self, request: LocalInferenceRequest) -> str:
-        return _digest({"model": self.model.model_digest, "request": request.digest})
+        # Native runtime identities include tokenizer, architecture and policy.
+        # Read before cache lookup so model drift invalidates old cached output.
+        runtime_digest = getattr(self.model, "runtime_digest", None)
+        if runtime_digest is not None and (
+            not isinstance(runtime_digest, str)
+            or len(runtime_digest) != 64
+            or any(ch not in "0123456789abcdef" for ch in runtime_digest)
+        ):
+            raise ValueError("local runtime digest must be lowercase sha256")
+        return _digest(
+            {
+                "model": self.model.model_digest,
+                "runtime": runtime_digest,
+                "request": request.digest,
+            }
+        )
 
     async def generate(self, request: LocalInferenceRequest) -> LocalInferenceResult:
         if not isinstance(request, LocalInferenceRequest):
@@ -539,6 +567,8 @@ class LocalInferenceEngine:
             async with self._cache_lock:
                 cached = self._cache.get(key)
                 if cached is not None:
+                    if self._key(request) != key:
+                        raise ValueError("local runtime identity changed before cache hit")
                     self._cache.move_to_end(key)
                     return replace(cached, cached=True)
 
@@ -556,6 +586,8 @@ class LocalInferenceEngine:
 
         if result.model_digest != self.model.model_digest:
             raise ValueError("local inference result model identity drift")
+        if self._key(request) != key:
+            raise ValueError("local runtime identity changed during inference")
 
         declared_tools={
             str(item.get("tool_id","")).strip(): item
@@ -602,6 +634,8 @@ class LocalInferenceEngine:
 
         if self.cache_size:
             async with self._cache_lock:
+                if self._key(request) != key:
+                    raise ValueError("local runtime identity changed before caching")
                 self._cache[key] = result
                 self._cache.move_to_end(key)
                 while len(self._cache) > self.cache_size:
@@ -800,8 +834,28 @@ class LocalModelAdapter(ProviderAdapter):
                 if request.structured_output_schema is None
                 else dict(request.structured_output_schema)
             ),
+            context_digest=request.context_digest,
         )
-        result = await self.engine.generate(local_request)
+        if request.deadline is not None:
+            if (
+                not isinstance(request.deadline, datetime)
+                or request.deadline.tzinfo is None
+                or request.deadline.utcoffset() is None
+            ):
+                raise ValueError("local inference deadline must be timezone-aware")
+            remaining = (
+                request.deadline.astimezone(timezone.utc) - datetime.now(timezone.utc)
+            ).total_seconds()
+            if remaining <= 0:
+                raise LocalInferenceCancelled("local inference deadline exceeded")
+            try:
+                result = await asyncio.wait_for(
+                    self.engine.generate(local_request), timeout=remaining
+                )
+            except asyncio.TimeoutError as exc:
+                raise LocalInferenceCancelled("local inference deadline exceeded") from exc
+        else:
+            result = await self.engine.generate(local_request)
         tool_calls = tuple(
             ProviderToolCall(
                 call_id=item.call_id,
@@ -817,6 +871,7 @@ class LocalModelAdapter(ProviderAdapter):
             model=result.model_id,
             request_id="local-request:" + local_request.digest[:24],
             response_id=result.response_id,
+            execution_receipt_digest=result.execution_receipt_digest,
             structured_output=(
                 dict(result.structured_output)
                 if result.structured_output is not None

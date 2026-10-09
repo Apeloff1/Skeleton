@@ -39,6 +39,21 @@ class TestNativeLLMRuntime(unittest.TestCase):
             device_policy=DevicePolicy("cpu"),
         )
 
+    def test_tokenizer_admission_failure_is_runtime_contract_error(self):
+        from unittest.mock import patch
+        from skeleton.ai.model_runtime.native_llm_runtime import TokenizerContractError
+
+        runtime = self.runtime()
+        with patch.object(
+            runtime, "encode",
+            side_effect=TokenizerContractError("invalid prompt encoding"),
+        ):
+            with self.assertRaisesRegex(
+                RuntimeContractError, "prompt tokenization failed admission"
+            ) as caught:
+                runtime.generate("hello", GenerationConfig(max_new_tokens=1))
+        self.assertIsInstance(caught.exception.__cause__, TokenizerContractError)
+
     def test_architecture_is_real_transformer_shape(self):
         runtime = self.runtime()
         architecture = runtime.architecture

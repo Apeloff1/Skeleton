@@ -1,0 +1,99 @@
+"""Browser visual envelope boundary regressions."""
+import sqlite3,pytest
+from dataclasses import replace
+from skeleton.ai.webcrawler.dragon_analysis_queue import DragonAnalysisQueue
+from skeleton.ai.webcrawler.dragon_consent_ledger import DragonConsentLedger
+from skeleton.ai.webcrawler.dragon_consent_bound_queue import ConsentBoundAnalysisQueue
+from skeleton.ai.webcrawler.dragon_frame_custody import CapturedFrame
+from skeleton.ai.webcrawler.dragon_visual_features import VisualObservation
+from skeleton.ai.webcrawler.dragon_browser_visual_import import BrowserVisualEnvelope,SCHEMA,DECODER_VERSION,canonical_browser_visual_fingerprint,accept_browser_visual
+
+def setup():
+ db=sqlite3.connect(":memory:");q=DragonAnalysisQueue(db);l=DragonConsentLedger(db)
+ c=l.issue("u",capture=True,analysis=True,issued_at=1,expires_at=100,policy_version="v1",scope_digest="a"*64,authorized=True)
+ cq=ConsentBoundAnalysisQueue(q,l);j=cq.submit("u",recording_digest="b"*64,game_label="g",consent_id=c.consent_id,scope_digest="a"*64,now=2,authorized=True)
+ f=CapturedFrame("c"*64,"ignored","ignored","ignored","ignored","ignored",0,"d"*64,90,"local-frame://0")
+ o=VisualObservation("c"*64,"d"*64,.2,.3,.4,.1)
+ e=BrowserVisualEnvelope(SCHEMA,"u",j.job_id,"b"*64,c.consent_id,"a"*64,DECODER_VERSION,90,(f,),(o,),"")
+ return cq,j,replace(e,payload_fingerprint=canonical_browser_visual_fingerprint(e))
+
+def test_exact_envelope_imports_and_rebinds_server_custody():
+ cq,j,e=setup();a=accept_browser_visual(cq,e,now=3,authorized=True)
+ assert a.features.frames[0].source_frame_id!="c"*64
+ assert len(a.features.frames[0].source_frame_id)==64
+
+def test_mutated_observation_breaks_envelope_fingerprint():
+ cq,_,e=setup();bad=replace(e,observations=(replace(e.observations[0],motion_energy=.9),))
+ with pytest.raises(ValueError,match="fingerprint mismatch"):accept_browser_visual(cq,bad,now=3,authorized=True)
+
+def test_recording_substitution_fails_before_analysis():
+ cq,_,e=setup();bad=replace(e,recording_digest="e"*64)
+ with pytest.raises(ValueError,match="recording substitution"):accept_browser_visual(cq,bad,now=3,authorized=True)
+
+def test_retention_expiry_fails_closed():
+ cq,_,e=setup()
+ with pytest.raises(PermissionError,match="retention expired"):accept_browser_visual(cq,e,now=91,authorized=True)
+
+
+def test_browser_controlled_frame_id_cannot_cross_custody_boundary():
+ cq,_,e=setup();original=accept_browser_visual(cq,e,now=3,authorized=True);wire_id="f"*64
+ frame=replace(e.frames[0],frame_id=wire_id)
+ obs=replace(e.observations[0],frame_id=wire_id)
+ unsigned=replace(e,frames=(frame,),observations=(obs,),payload_fingerprint="")
+ changed=replace(unsigned,payload_fingerprint=canonical_browser_visual_fingerprint(unsigned))
+ accepted=accept_browser_visual(cq,changed,now=3,authorized=True)
+ assert accepted.features.frames[0].source_frame_id not in (wire_id,"c"*64)
+ assert accepted.envelope_fingerprint!=original.envelope_fingerprint
+ assert accepted.canonical_evidence_fingerprint==original.canonical_evidence_fingerprint
+
+def test_unknown_observation_transport_id_is_rejected_even_with_valid_envelope_hash():
+ cq,_,e=setup();obs=replace(e.observations[0],frame_id="f"*64)
+ unsigned=replace(e,observations=(obs,),payload_fingerprint="")
+ changed=replace(unsigned,payload_fingerprint=canonical_browser_visual_fingerprint(unsigned))
+ with pytest.raises(ValueError,match="unknown browser frame"):
+  accept_browser_visual(cq,changed,now=3,authorized=True)
+
+
+def test_browser_locator_cannot_control_server_canonical_evidence():
+ cq,_,e=setup();original=accept_browser_visual(cq,e,now=3,authorized=True)
+ frame=replace(e.frames[0],source_locator="attacker://arbitrary")
+ unsigned=replace(e,frames=(frame,),payload_fingerprint="")
+ changed=replace(unsigned,payload_fingerprint=canonical_browser_visual_fingerprint(unsigned))
+ accepted=accept_browser_visual(cq,changed,now=3,authorized=True)
+ assert accepted.envelope_fingerprint!=original.envelope_fingerprint
+ assert accepted.canonical_evidence_fingerprint==original.canonical_evidence_fingerprint
+ assert accepted.features.frames[0].source_frame_id==original.features.frames[0].source_frame_id
+
+
+def resign(e):
+ unsigned=replace(e,payload_fingerprint="")
+ return replace(unsigned,payload_fingerprint=canonical_browser_visual_fingerprint(unsigned))
+
+def test_oversized_browser_locator_rejected_before_custody():
+ cq,_,e=setup();bad=resign(replace(e,frames=(replace(e.frames[0],source_locator="x"*2049),)))
+ with pytest.raises(ValueError,match="source locator"):
+  accept_browser_visual(cq,bad,now=3,authorized=True)
+
+def test_nonfinite_browser_feature_rejected_before_hash_trust():
+ cq,_,e=setup();bad=replace(e,observations=(replace(e.observations[0],motion_energy=float("inf")),))
+ with pytest.raises(ValueError,match="visual feature"):
+  accept_browser_visual(cq,bad,now=3,authorized=True)
+
+def test_duplicate_transport_frame_id_rejected_even_when_payload_is_resigned():
+ cq,_,e=setup()
+ f2=replace(e.frames[0],captured_at_ms=1,frame_digest="e"*64)
+ o2=replace(e.observations[0],frame_digest="e"*64)
+ bad=resign(replace(e,frames=(e.frames[0],f2),observations=(e.observations[0],o2)))
+ with pytest.raises(ValueError,match="duplicate browser frame id"):
+  accept_browser_visual(cq,bad,now=3,authorized=True)
+
+def test_browser_frame_budget_is_enforced_before_analysis():
+ cq,_,e=setup()
+ with pytest.raises(ValueError,match="frame budget"):
+  accept_browser_visual(cq,e,now=3,authorized=True,max_frames=0)
+
+
+def test_unknown_decoder_version_fails_before_analysis():
+ cq,_,e=setup();bad=replace(e,decoder_version="dragon.local-visual.rgb64x36.v999")
+ with pytest.raises(ValueError,match="decoder version"):
+  accept_browser_visual(cq,bad,now=3,authorized=True)

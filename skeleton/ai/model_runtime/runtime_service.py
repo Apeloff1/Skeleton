@@ -9,6 +9,7 @@ cancellation state, and deadline.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import sha256
 from threading import Event
 import time
 from typing import Callable
@@ -105,12 +106,18 @@ class NativeModelService:
             raise NativeServiceError("prompt must be a string")
         if not isinstance(config, GenerationConfig):
             raise NativeServiceError("GenerationConfig required")
-        return digest_json(
-            {
-                "prompt": prompt,
-                "generation_config": config.to_dict(),
-            }
-        )
+        try:
+            if any(0xD800 <= ord(char) <= 0xDFFF for char in prompt):
+                raise UnicodeEncodeError("utf-8", prompt, 0, len(prompt), "surrogate code point")
+            prompt.encode("utf-8", errors="strict")
+            return digest_json(
+                {
+                    "prompt": prompt,
+                    "generation_config": config.to_dict(),
+                }
+            )
+        except (TypeError, ValueError, UnicodeError) as exc:
+            raise NativeServiceError("request input is not canonically encodable") from exc
 
     def request(
         self,
@@ -136,10 +143,21 @@ class NativeModelService:
         generated_events: int,
         terminal_reason: str,
     ) -> str:
-        prompt_sequence = self.runtime.encode(prompt)
+        # Terminal accounting must not call model or tokenizer code again:
+        # the original request may have failed because those contracts drifted.
+        if not isinstance(prompt, str):
+            raise NativeServiceError("prompt is not valid UTF-8 text")
+        if any(0xD800 <= ord(char) <= 0xDFFF for char in prompt):
+            raise NativeServiceError("prompt is not valid UTF-8 text")
+        try:
+            prompt_bytes = prompt.encode("utf-8", errors="strict")
+        except UnicodeEncodeError as exc:
+            raise NativeServiceError("prompt is not valid UTF-8 text") from exc
         return digest_json(
             {
-                "prompt_tokens": len(prompt_sequence.token_ids),
+                "schema": "skeleton.ai.native-failure-usage.v2",
+                "prompt_bytes": len(prompt_bytes),
+                "prompt_digest": sha256(prompt_bytes).hexdigest(),
                 "generated_events": generated_events,
                 "terminal_reason": terminal_reason,
                 "model_identity_digest": self.identity_digest,
@@ -186,7 +204,10 @@ class NativeModelService:
         if config.max_new_tokens > request.max_output_tokens:
             raise NativeServiceError("generation exceeds local request output-token budget")
         self.runtime.assert_model_unchanged()
-        self.runtime.tokenizer.assert_unchanged()
+        try:
+            self.runtime.tokenizer.assert_unchanged()
+        except TokenizerContractError as exc:
+            raise NativeServiceError("tokenizer identity changed after admission") from exc
         self._validate_identity(self.identity)
 
     def execute(
@@ -203,10 +224,14 @@ class NativeModelService:
         runtime events. A transformer kernel invocation remains one bounded
         atomic step; this service does not attempt unsafe thread interruption.
         """
+        if not isinstance(request, LocalModelRequest):
+            raise NativeServiceError("LocalModelRequest required")
+        start_ns = self._now_ns()
+        deadline_ns = start_ns + request.deadline_ms * 1_000_000
         self._validate_request(request, prompt, config)
-        token = cancellation or CancellationToken()
-        if not isinstance(token, CancellationToken):
+        if cancellation is not None and not isinstance(cancellation, CancellationToken):
             raise NativeServiceError("CancellationToken required")
+        token = cancellation if cancellation is not None else CancellationToken()
 
         events: list[RuntimeEvent] = []
         if token.cancelled:
@@ -217,8 +242,6 @@ class NativeModelService:
                 events=events,
             )
 
-        start_ns = self._now_ns()
-        deadline_ns = start_ns + request.deadline_ms * 1_000_000
         if self._now_ns() >= deadline_ns:
             return self._terminal(
                 request,
@@ -248,7 +271,7 @@ class NativeModelService:
             generation = stream.result
             if generation is None:
                 raise NativeServiceError("native runtime completed without generation result")
-        except RuntimeContractError:
+        except (RuntimeContractError, TokenizerContractError):
             return self._terminal(
                 request,
                 prompt=prompt,

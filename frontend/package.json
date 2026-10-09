@@ -18,11 +18,18 @@
     "audit:policy:test": "node ./scripts/test-enforce-yarn-audit.js",
     "test:operation-stream": "node --test scripts/test-operation-stream-reducer.mjs scripts/test-operation-stream-session.mjs",
     "test:conversation": "node --test scripts/test-conversation-projection.mjs",
+    "test:dragon-companion": "node scripts/test-dragon-companion.cjs && node scripts/test-dragon-living-motion.cjs && node scripts/test-dragon-progression.cjs",
     "test:skeleton-forge": "node --test scripts/skeleton-forge/*.test.cjs",
     "test:forge-operator": "node --test scripts/forge-operator/*.test.cjs",
     "test:product-projection": "node --test scripts/test-product-projection.mjs",
     "test:accessibility": "node --test scripts/test-accessibility-contract.mjs",
-    "test:localization": "node --test scripts/test-localization-contract.mjs"
+    "test:localization": "node --test scripts/test-localization-contract.mjs",
+    "test:dragon-wire": "node scripts/test-dragon-canonical-wire.cjs",
+    "test:product-journeys": "node --test scripts/test-product-journeys.mjs",
+    "test:build-lifecycle": "node --test scripts/test-build-job-lifecycle.mjs",
+    "test:knowledge-experience": "node --test scripts/test-knowledge-experience.mjs",
+    "test:world-workbench": "node --test scripts/test-world-workbench.mjs",
+    "test:design-review": "node --test scripts/test-design-review.mjs"
   },
   "engines": {
     "node": ">=24"

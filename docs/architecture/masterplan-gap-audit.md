@@ -4,6 +4,15 @@ Status: canonical hostile-design review
 Updated: 2026-09-21
 Scope: Skeleton architecture, Tracks Q–AA, training, inference, memory, tools, agents, data, deployment and recovery
 
+## Verified integration delta — 2026-10-08
+
+Current production-path verification has closed one concrete contract-drift class and exposed the next P0 boundary:
+
+- **Retrieval namespace convergence:** canonical AI-tree pipeline, query planner, inverted index, and corpus ingestion now import their sibling `skeleton.ai.runtime.retrieval` contracts instead of legacy `skeleton.retrieval` classes. Regression coverage forbids reintroduction in these core modules.
+- **Context provenance into local generation:** `LocalInferenceRequest` now carries the canonical context digest and includes it in request identity; the provider adapter forwards the compiled digest. Same prompt/model under different compiled context therefore cannot share local request/cache identity.
+- **Still open / not claimed complete:** G001 tokenizer/representation remains P0. The local reference inference/training tokenizer is still separate from the native model-runtime tokenizer contract, so training-serving vocabulary identity is not yet unified.
+- **Validation status:** changes above are implemented with targeted tests; repository CI/exact-head validation must pass before these bullets are treated as fully verified closure.
+
 ## 0. Audit posture
 
 Assume all of the following can happen at once:
@@ -1555,3 +1564,177 @@ Robots policy retrieval now shares crawler-controlled redirect safety instead of
 - regressions cover redirected robots accounting, original-origin policy installation and destination-host pacing.
 
 This closes the previously documented robots redirect inconsistency. Further adversarial work should inspect robots cache freshness/revalidation and canonical URL input bounds before final signing.
+
+
+### 2026-10-07 advanced admission and robots freshness tranche
+
+Crawler admission and robots policy handling now include operational bounds and cache revalidation:
+- CrawlPolicy bounds canonical URL length, query-pair cardinality and path-segment depth before frontier admission;
+- robots cache state records fetched_at, ETag and Last-Modified validators with deterministic TTL freshness checks;
+- stale robots policies are conditionally revalidated through crawler-controlled redirect traversal;
+- 304 refreshes policy freshness without reparsing while 200/404/410 replace cached policy metadata appropriately;
+- conditional headers flow through the DNS/socket-bound transport; connection-critical header overrides are rejected;
+- regressions cover pathological URL dimensions, fresh-cache reuse, stale ETag revalidation and 304 freshness renewal.
+
+Advanced follow-up: integrate TrapGuard directly into CrawlEngine admission, validate CrawlPolicy numeric configuration at construction, and persist robots metadata across crawler checkpoints so restart does not force unconditional robots refetch.
+
+
+### 2026-10-07 year-indexed signal intelligence tranche
+
+Research evidence now models signals by the year the evidence explicitly discusses rather than conflating subject year with fetch/publication recency:
+- EvidenceObservation records deterministic explicit 19xx/20xx signal years extracted from title/excerpt;
+- EvidenceSet.signals_by_year aggregates qualified evidence into yearly observation volume, independent-host diversity, mean relevance, mean source quality and positive/negative polarity;
+- undercovered_years identifies historical coverage holes against a requested range/minimum independent-source threshold;
+- frontier_priority accepts target years and rewards candidates that explicitly match missing years, enabling active temporal gap filling;
+- YearSignalSeries computes deterministic year-over-year deltas for host diversity, observation volume, relevance, source quality and net polarity while preserving gaps between observed years;
+- strongest-year ranking prioritizes independent evidence diversity before raw page volume;
+- regressions cover year extraction/bucketing, temporal coverage gaps, year-directed frontier priority, gap-preserving deltas and diversity-first ranking.
+
+Advanced follow-up: separate explicit subject-year extraction from stronger date semantics (published_at/event_at/valid_from), add decade/regime segmentation, and use year-coverage objectives inside federated provider discovery rather than only frontier scoring.
+
+
+### 2026-10-07 decade/regime signal intelligence tranche
+
+The year-signal plane now composes into decade-scale regime intelligence without discarding annual resolution:
+- DecadeSignalSeries aggregates year signals into years-observed coverage density, observation volume, host-year corroboration, observation-weighted relevance/source quality, positive/negative counts and net polarity;
+- decade-over-decade deltas measure coverage, corroboration, volume, relevance, quality and polarity shifts while preserving missing regimes;
+- undercovered_decades exposes absent/sparse historical regimes against a configurable coverage threshold;
+- EvidenceSet exposes decade signals and coverage gaps directly;
+- frontier priority can target missing decades in addition to exact missing years;
+- FederatedDiscovery.discover_temporal promotes candidates whose URL/title/snippet explicitly match target decades, allowing historical coverage objectives to influence source acquisition before crawling;
+- regressions cover decade aggregation, weighted metrics, absent regimes, decade frontier targeting and provider-level temporal prioritization.
+
+Advanced follow-up: infer regime boundaries from change points rather than fixed calendar decades, separate event-year/publication-year semantics, quantify source survival/archive bias by decade, and build cross-decade contradiction persistence so claims can be tracked as stable, reversed or cyclic across historical regimes.
+
+
+### 2026-10-07 learned historical regime intelligence tranche
+
+Temporal research now extends substantially beyond fixed calendar decades:
+- RegimeDetector derives structural change points from adjacent-year shifts in polarity, source quality, relevance and independent-source coverage;
+- missing-year gaps split regimes without fabricating a measured change point;
+- learned regimes preserve their explicit year membership, mean polarity, quality/relevance and internal coverage strength;
+- regime trajectories classify emerging, stable, strengthening, weakening, transitioning, reversed and rediscovered signal behavior;
+- HistoricalBiasAnalyzer scores sparse-year coverage, source concentration and low-quality evidence to expose archive/survivorship-sensitive historical buckets;
+- cross-regime contradiction history measures independent positive/negative host participation, contestation balance and whether disagreement persists across multiple learned regimes;
+- EvidenceSet exposes learned regimes, trajectory, historical bias and contradiction persistence as first-class research outputs;
+- focused regressions cover structural splits, gap segmentation, reversal classification and high-risk historical evidence.
+
+This transforms decade signals from descriptive calendar summaries into a regime-aware historical reasoning plane. Advanced next work: richer event/publication/valid-time extraction, statistically calibrated change-point thresholds, bootstrap uncertainty around regime boundaries, and active acquisition policies that prioritize high-bias or persistently contested historical regimes.
+
+
+### 2026-10-07 deep temporal research and active acquisition tranche
+
+The historical signal plane now includes deeper temporal semantics and research feedback:
+- TemporalSemantics separates observation time from inferred publication time and explicit event-year span, retaining confidence and extraction basis instead of collapsing all dates into one timestamp;
+- deterministic bootstrap intervals provide reproducible uncertainty estimates for evidence-derived signal statistics;
+- lag_scan compares annual signal series across bounded positive/negative offsets and reports correlation/overlap as precursor-lag evidence without asserting causality;
+- active acquisition planning combines learned-regime sparsity, historical/archive bias, persistent contradiction and uncertainty into bounded, explainable historical research priorities;
+- these acquisition targets can be translated into existing year/decade-directed frontier and federated-provider searches, closing analysis-to-acquisition feedback;
+- regressions cover multi-time separation, deterministic uncertainty, shifted annual signals and biased/contested regime acquisition priority.
+
+Research grounding reviewed during this tranche includes recent temporal GraphRAG, temporal-validity/decay, entity-event temporal-causal RAG, dynamic temporal GraphRAG, and agentic event-forecasting work. The implementation deliberately keeps deterministic evidence/provenance contracts and does not equate lag correlation with causation.
+
+Advanced next work: attach TemporalSemantics to EvidenceObservation directly; calibrate event/publication extraction using structured page metadata; propagate uncertainty into regime boundary acceptance; generate acquisition queries from AcquisitionTarget; and add temporal retrieval filters over the canonical knowledge/retrieval bridge.
+
+
+### 2026-10-07 deep research methodology tranche
+
+Temporal research now includes methodology-level controls beyond calendar/regime aggregation:
+- BitemporalFact separates valid/event time from knowledge/transaction time, supporting questions of both "when was this true?" and "what was known as of this point?";
+- TemporalScope provides explicit event-range and as-of filtering for evidence selection;
+- source-dependence analysis clusters identical-content, same-host and high-overlap evidence so mirrors/syndication cannot inflate corroboration merely by appearing on distinct hosts;
+- EvidenceSet assurance now exposes and requires dependence-adjusted independent evidence clusters for source sufficiency;
+- regime change points can be assurance-gated using independent-host support and uncertainty, preventing high-variance historical shifts from becoming accepted boundaries solely on point estimates;
+- active historical acquisition targets can be compiled into bounded deterministic search queries with explicit year spans and reasons;
+- regression coverage exercises bitemporal visibility, temporal scope, mirror collapse, bounded query synthesis and uncertainty-aware regime rejection.
+
+Research grounding for this tranche reviewed current work on temporal GraphRAG/time-consistent retrieval, temporal knowledge-store planning, evidence-retroactive RAG, and change-point inference. The implementation retains explicit deterministic contracts and avoids interpreting lag/correlation as causal evidence.
+
+Next research depth: provenance lineage beyond textual similarity (citation/reference relationships), structured date metadata extraction into EvidenceObservation, temporal scope propagation through canonical retrieval indexes, counterfactual evidence tests, calibration metrics (Brier/ECE) for historical confidence, and evidence-revision receipts so retroactive research changes are auditable.
+
+
+### 2026-10-07 evidence integrity and research calibration tranche
+
+The research plane now evaluates evidence integrity, confidence quality and revision sensitivity:
+- explicit URL citations in evidence excerpts produce deterministic CitationEdge lineage; known cited observations are surfaced as direct dependencies rather than independent corroborators;
+- counterfactual leave-one-out analysis recomputes assurance without each observation and ranks evidence by absolute conclusion influence, exposing single-source brittleness;
+- calibration_report computes Brier score and expected calibration error over evaluated probabilistic research outputs;
+- RevisionReceipt records deterministic before/after evidence-set digests, exact additions/removals, reason and timestamp so retroactive evidence revision is auditable;
+- EvidenceSet exposes citation lineage and counterfactual influence directly;
+- regression coverage validates known citation dependency detection, zero-error perfect calibration, deterministic revision receipts and state-safe counterfactual evaluation.
+
+Research grounding for this tranche includes evidence-retroactive RAG, temporal consistency/retrieval, calibration methodology, and provenance-aware retrieval. The implementation uses these as design signals while retaining Skeleton's deterministic evidence/provenance contracts.
+
+Next depth: fold citation lineage into independence clustering (not just diagnostics), propagate temporal scope into the canonical retrieval bridge/index metadata, persist revision receipts in the provenance ledger/outbox, add source-level Shapley approximations for multi-source interactions, and build calibration datasets from resolved historical claims.
+
+
+### 2026-10-07 SOTA research assurance tranche
+
+Research assurance now closes several gaps between descriptive evidence analysis and robust autonomous research:
+- explicit citation dependencies are merged into the same dependence graph used by assurance, preventing cross-domain direct citations from masquerading as independent corroboration;
+- durable retrieval ingestion no longer defaults lease time to epoch zero when no explicit deterministic clock is supplied;
+- canonical provenance snapshot restore now reconstructs parent-before-child lineage and rejects unreachable/cyclic state instead of relying on opaque entry-ID order;
+- deterministic Shapley-style permutation sampling estimates marginal evidence contribution across multi-source interactions rather than only leave-one-out sensitivity;
+- ResearchStopDecision requires assurance score, dependence-adjusted evidence clusters, bounded uncertainty and bounded maximum single-source influence before autonomous research may stop;
+- TemporalRetrievalCatalog binds canonical fragment IDs to source URL, observation time, event years and content hash, allowing event-range/as-of filtering without contaminating BM25 lexical scoring;
+- CanonicalRetrievalBridge can populate this temporal sidecar during promoted chunk ingestion;
+- focused regressions cover citation-collapse of cross-host independence, robust stop/continue decisions and temporal fragment filtering.
+
+This moves the plane toward research assurance rather than feature accumulation: acquisition, stopping, retrieval and confidence are all conditioned on evidence independence and temporal validity. Remaining SOTA work includes durable persistence for temporal metadata/revision receipts, calibrated empirical outcome datasets, structured metadata extraction for publication/event dates, interaction-aware acquisition value, and exact-head executable validation.
+
+
+### 2026-10-07 decision-theoretic autonomous research tranche
+
+The research plane now reasons about the value and sufficiency of future evidence rather than only ranking existing evidence:
+- ResearchAction/ActionValue rank candidate research actions by bounded expected information gain times success probability minus configurable cost and latency penalties;
+- sequential_bernoulli implements a bounded sequential likelihood-ratio decision with accept-high, accept-low and continue states, avoiding a fixed evidence sample count;
+- SourcePosterior updates source reliability from resolved correct/incorrect outcomes using a Beta posterior, with conservative shrinkage for operational scoring;
+- schema v6 durably persists temporal retrieval metadata, deterministic evidence-revision receipts and learned source-quality posterior state;
+- ResearchStateStore round-trips these assurance artifacts and rejects deterministic revision-ID collisions;
+- regressions cover information-value ranking, sequential evidence continuation/acceptance, posterior source learning and durable assurance-state restart.
+
+This enables a future orchestrator to choose the next research action based on expected uncertainty reduction per cost, update source priors when claims resolve, and preserve learned assurance state across restarts. Remaining work: derive information gain from current posterior entropy instead of accepting it as an action input; combine dependence clusters with source posteriors; persist calibrated outcomes; and integrate the action ranker with acquisition targets/provider budgets.
+
+
+### 2026-10-08 SOTA self-measuring research controller tranche
+
+The research plane now closes the loop between uncertainty, action selection and empirical performance:
+- expected_binary_information_gain derives action value from expected posterior entropy reduction using candidate sensitivity/specificity rather than accepting an arbitrary information-gain scalar;
+- dependence_adjusted_trust combines learned source-quality posteriors with the evidence-dependence graph and caps a correlated component at its strongest calibrated member, preventing copied/cited evidence from multiplying trust;
+- ActionEconomics incrementally learns empirical action success probability, mean cost and mean latency;
+- schema v7 persists action economics and resolved calibration outcomes;
+- ResearchLearningStore exposes deterministic empirical learning state for calibration and action planning;
+- choose_next_action is a budget-bound controller that selects feasible research actions by entropy reduction after explicit cost/latency penalties;
+- regressions cover uninformative tests, high-information tests, hard budget exclusion, dependence-adjusted trust, durable action economics and empirical Brier calibration.
+
+This creates a self-measuring research controller: it can estimate uncertainty, choose an information-seeking action, observe its cost/outcome, update action/source models, measure calibration, and improve future action choice. Remaining frontier work is model uncertainty around action sensitivity/specificity themselves, contextual/bandit action learning, multi-hypothesis entropy instead of binary claims, calibration drift detection, and exact-head executable validation.
+
+
+### 2026-10-08 visual crawler / baby-dragon acquisition tranche
+
+The crawler now has a truthful visual-observability protocol designed around a baby dragon rather than a generic graph dashboard:
+- DragonCrawlEvent is a deterministic, content-addressed UI event envelope for frontier discovery, travel, optional visual probing, robots checks, acquisition, rejection, retries and indexing;
+- DragonVisualState maps real crawler events to dragon poses/effects. Fire is reserved for admitted data transformation: accepted payload -> burn_started -> burn_chunk ember stream -> burn_complete/indexed. Rejected/policy-blocked content visibly fizzles and is never represented as ingested;
+- DragonCrawlObserver keeps the crawler headless and exposes an optional instrumentation adapter rather than coupling correctness to animation/UI;
+- CrawlGraphProjection turns frontier/link topology into the dragon's navigable terrain while retaining URL, depth, parent/child and state truth;
+- deterministic regressions verify event IDs, graph state and the accepted-before-burn sequence.
+
+Current 2026 design signals reviewed for this tranche: active DOM/pixel probing in browser agents, live browser-agent views for trust/control, screenshot/action trace interfaces, vision-grounded browser agents, global-view navigation with adaptive budget allocation, and conventional force-directed crawl topology. The intended UI combines those signals without making the mascot authoritative: the event/provenance stream remains the source of truth.
+
+Next: wire observer hooks into CrawlEngine/CanonicalRetrievalBridge; define a frontend event transport/replay contract; add reduced-motion and non-visual accessibility modes; add multi-dragon workers for concurrent leases; visualize policy/robots/budget boundaries; and render provenance embers flowing into temporal/retrieval knowledge stores.
+
+
+### 2026-10-08 user-companion dragon implementation tranche
+
+The approved Nerdy Dragon Crawler concept is now implemented as a reusable companion in the canonical Jeeves conversation workspace:
+- the dragon permanently lives inside the lower half of his hatched egg and wears a broken eggshell cap;
+- conversation text produces an immediate interest/listening state that can seed future crawler-interest extraction;
+- crawler phases map to launch, visual crawl, acquisition, burn-to-memory, distillation, celebration and snuggle states;
+- burn remains semantically tied to accepted acquisition; rejected material never receives the successful burn-to-memory representation;
+- distillation is visually unique: oversized geek glasses plus a white bandage over the glasses bridge appear only for the distillation state;
+- snuggle/rest states place the dragon under a blanket in his egg; flight states expose wings; burn states expose fire and ember effects;
+- the companion is procedurally rendered in React Native so Android/iOS/web work without an external art asset and the renderer can later be upgraded behind the same state contract;
+- DragonCompanionPanel exposes conversation interest, page, knowledge and quality telemetry slots and is mounted responsively in ChatWorkspace;
+- a frontend contract test enforces the eggshell identity, snuggle treatment, accessibility summary, workspace mounting and distillation-only nerd-glasses invariant.
+
+Remaining integration: connect the frontend panel to live DragonCrawlEvent transport/replay from the crawler backend, promote distilled conversation interests into bounded acquisition queries with explicit user control, add reduced-motion preference detection, and replace/augment procedural primitives with production sprite/vector animation assets while retaining deterministic state semantics.

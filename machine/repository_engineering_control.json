@@ -270,10 +270,10 @@
   ],
   "backlog": {
     "summary": {
-      "item_count": 1644,
-      "gap_count": 664,
+      "item_count": 1638,
+      "gap_count": 658,
       "risk_count": 980,
-      "open_count": 1639,
+      "open_count": 1638,
       "closed_count": 0
     },
     "items": [
@@ -342,22 +342,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-007:gap:001",
         "volume_ref": "VOL-007",
-        "statement": "continuous batching and local serving optimization remain future performance work",
-        "accountability_id": "ACC-VOL-007",
-        "requirement_refs": [
-          "REQ:VOL-007:001",
-          "REQ:VOL-007:002",
-          "REQ:VOL-007:003"
-        ],
-        "state": "open",
-        "closure_evidence_refs": []
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-007-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-007:gap:002",
-        "volume_ref": "VOL-007",
-        "statement": "speculative decoding requires measured correctness gates",
+        "statement": "independent exact-head VOL-007 Inference Engine Closure qualification remains pending",
         "accountability_id": "ACC-VOL-007",
         "requirement_refs": [
           "REQ:VOL-007:001",
@@ -372,7 +357,7 @@
         "source_kind": "gap",
         "source_ref": "VOL-008:gap:001",
         "volume_ref": "VOL-008",
-        "statement": "bind evidence-qualified canonical router decisions into every live model-routing entrypoint",
+        "statement": "bind governed route execution permits into remaining product/backend provider-routing entrypoints",
         "accountability_id": "ACC-VOL-008",
         "requirement_refs": [
           "REQ:VOL-008:001",
@@ -32524,7 +32509,7 @@
       ],
       "interest_metric": {
         "name": "requirements_without_evidence",
-        "value": 688,
+        "value": 432,
         "unit": "requirements"
       },
       "status": "open"
@@ -32821,11 +32806,7 @@
         ],
         "volume_refs": [
           "VOL-026",
-          "VOL-027",
-          "VOL-167",
-          "VOL-169",
-          "VOL-172",
-          "VOL-175"
+          "VOL-027"
         ],
         "completion_authority": "signed evidence/accountability; roadmap state alone has no authority"
       },

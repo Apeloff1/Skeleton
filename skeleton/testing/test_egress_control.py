@@ -101,3 +101,45 @@ def test_allow_by_default_egress_policy_is_forbidden() -> None:
             ("provider-api",),
             default_action="allow",
         )
+
+
+def test_unapproved_host_is_rejected_without_any_dns_lookup() -> None:
+    queries = []
+
+    def resolver(host, port, *args):
+        queries.append((host, port))
+        raise AssertionError("disallowed host must never be resolved")
+
+    decision = evaluate_egress(
+        policy(), request(url="https://untrusted.example.org/crawl"), resolver=resolver
+    )
+    assert decision.allowed is False
+    assert decision.reason_code == "host_denied"
+    assert decision.destination is None
+    assert queries == []
+
+
+def test_invalid_internal_url_is_rejected_without_dns_lookup() -> None:
+    def resolver(*args):
+        raise AssertionError("internal hosts must never be resolved")
+
+    decision = evaluate_egress(
+        policy(), request(url="https://metadata.google.internal/latest"), resolver=resolver
+    )
+    assert decision.allowed is False
+    assert decision.reason_code == "destination_invalid"
+    assert decision.destination is None
+
+
+def test_allowed_host_still_requires_verified_public_resolution() -> None:
+    seen = []
+
+    def resolver(host, port, *args):
+        seen.append((host, port))
+        return resolver_for("127.0.0.1")(host, port, *args)
+
+    decision = evaluate_egress(policy(), request(), resolver=resolver)
+    assert seen == [("example.com", 443)]
+    assert decision.allowed is False
+    assert decision.reason_code == "destination_invalid"
+    assert decision.destination is None

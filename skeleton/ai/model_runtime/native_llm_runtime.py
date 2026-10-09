@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 
 from dataclasses import dataclass
+import math
 import hmac
 import random
 from typing import Any, Iterator, Mapping, Sequence
@@ -167,7 +168,10 @@ class NativeLLMRuntime:
         if self._model_bytes > self.limits.max_model_bytes:
             raise RuntimeContractError("model exceeds runtime memory budget")
 
-        self.tokenizer = NativeTokenizer(model)
+        try:
+            self.tokenizer = NativeTokenizer(model)
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("native tokenizer admission failed") from exc
         self.architecture = self._architecture()
         if self.estimate_kv_bytes(self.limits.max_context) > self.limits.max_kv_bytes:
             raise RuntimeContractError("configured context exceeds KV memory budget")
@@ -237,9 +241,10 @@ class NativeLLMRuntime:
     def bind_device(self, policy: DevicePolicy) -> DeviceReceipt:
         if not isinstance(policy, DevicePolicy):
             raise RuntimeContractError("DevicePolicy required")
+        receipt = self._bind_device(policy)
         self.device_policy = policy
-        self.device = self._bind_device(policy)
-        return self.device
+        self.device = receipt
+        return receipt
 
     def _current_model_digest(self) -> str:
         snapshot = portable_model_snapshot(self.model)
@@ -265,7 +270,7 @@ class NativeLLMRuntime:
         if self.estimate_kv_bytes(self.limits.max_context) > self.limits.max_kv_bytes:
             raise RuntimeContractError("mutated model exceeds KV memory budget")
         self._model_snapshot = snapshot
-        self._model_digest = snapshot_digest(snapshot)
+        self._model_digest = digest
         self._model_bytes = size
         self.tokenizer = tokenizer
         self.architecture = architecture
@@ -291,10 +296,66 @@ class NativeLLMRuntime:
         }
 
     def encode(self, text: str) -> TokenSequence:
-        return self.tokenizer.encode_sequence(text)
+        try:
+            return self.tokenizer.encode_sequence(text)
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("native tokenizer encode failed") from exc
 
     def decode_ids(self, token_ids: Sequence[int]) -> str:
-        return self.tokenizer.decode_ids(token_ids)
+        try:
+            return self.tokenizer.decode_ids(token_ids)
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("native tokenizer decode failed") from exc
+
+    def infer_sequence(
+        self,
+        sequence: TokenSequence,
+        *,
+        use_cache: bool = True,
+    ) -> InferenceResult:
+        """Run embeddings → position/RoPE → transformer blocks → LM head.
+
+        This exposes the executable inference graph independently of decoding so
+        loaders, portability checks, and samplers can validate identical model
+        state against a canonical pre-tokenized input.
+        """
+        if not isinstance(sequence, TokenSequence):
+            raise RuntimeContractError("TokenSequence required")
+        if not isinstance(use_cache, bool):
+            raise RuntimeContractError("use_cache must be boolean")
+        if not hmac.compare_digest(sequence.tokenizer_digest, self.tokenizer.digest):
+            raise RuntimeContractError("token sequence tokenizer identity mismatch")
+        if not sequence.token_ids:
+            raise RuntimeContractError("token sequence must not be empty")
+        if len(sequence.token_ids) > self.limits.max_context:
+            raise RuntimeContractError("prompt exceeds context budget")
+        if any(token_id >= self.tokenizer.vocab_size for token_id in sequence.token_ids):
+            raise RuntimeContractError("token sequence contains id outside vocabulary")
+        self.assert_model_unchanged()
+        try:
+            self.tokenizer.assert_unchanged()
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("native tokenizer drift during inference") from exc
+        if use_cache and self.estimate_kv_bytes(len(sequence.token_ids)) > self.limits.max_kv_bytes:
+            raise RuntimeContractError("inference exceeds KV memory budget")
+        window = sequence.token_ids[-self.limits.max_context:]
+        cache = KVCache(self.model.n_layers, self.limits.max_context) if use_cache else None
+        logits = tuple(float(value) for value in self.model._logits_window(window, cache))
+        if len(logits) != self.tokenizer.vocab_size:
+            raise RuntimeContractError("inference graph emitted invalid logits shape")
+        if any(value != value or value in (float("inf"), float("-inf")) for value in logits):
+            raise RuntimeContractError("inference graph emitted non-finite logits")
+        return InferenceResult(
+            prompt_sequence=sequence,
+            logits=logits,
+            cache_tokens=len(cache.tokens) if cache is not None else 0,
+            model_digest=self.model_digest,
+            architecture_digest=self.architecture.digest,
+        )
+
+    def infer_text(self, text: str, *, use_cache: bool = True) -> InferenceResult:
+        """Tokenize text and execute one next-token inference graph pass."""
+        return self.infer_sequence(self.encode(text), use_cache=use_cache)
 
     def infer_sequence(
         self,
@@ -754,7 +815,10 @@ class NativeLLMRuntime:
             device_policy=device_policy,
         )
         runtime = cls(model, limits=limits, device_policy=policy)
-        runtime.tokenizer.assert_checkpoint_matches(tokenizer_checkpoint)
+        try:
+            runtime.tokenizer.assert_checkpoint_matches(tokenizer_checkpoint)
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("native tokenizer checkpoint identity mismatch") from exc
         if runtime.architecture.to_dict() != dict(architecture):
             raise RuntimeContractError("runtime checkpoint architecture mismatch")
         return runtime

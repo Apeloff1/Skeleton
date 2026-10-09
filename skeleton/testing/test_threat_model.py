@@ -46,3 +46,22 @@ def test_duplicate_threat_identity_is_rejected() -> None:
 def test_impact_trigger_rejects_unknown_domain() -> None:
     with pytest.raises(SecurityContractError,match="unknown threat impact domains"):
         ThreatImpactTrigger("TR-X",("unknown",),"bad")
+
+
+def test_empty_impact_triggers_cannot_bypass_security_review() -> None:
+    model = canonical_vol026_threat_model()
+    with pytest.raises(SecurityContractError, match="missing threat impact trigger coverage"):
+        ThreatModel(model.threats, impact_triggers=())
+
+
+def test_partial_impact_trigger_cannot_silence_uncovered_domain() -> None:
+    model = canonical_vol026_threat_model()
+    only_network = ThreatImpactTrigger("TR-ONLY-NET", ("network",), "network impact")
+    with pytest.raises(SecurityContractError, match="missing threat impact trigger coverage"):
+        ThreatModel(model.threats, impact_triggers=(only_network,))
+
+
+def test_all_declared_change_domains_require_review() -> None:
+    model = canonical_vol026_threat_model()
+    for domain in ("authority", "data", "network", "identity", "storage", "supply-chain"):
+        assert model.review_required((domain,)) is True

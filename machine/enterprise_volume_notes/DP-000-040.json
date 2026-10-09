@@ -236,7 +236,17 @@
         "Bind workload/dataset, model/provider where applicable, environment/hardware, policy/contracts, scorer, cost/resource budget, raw-result digest, and verifier verdict.",
         "Evidence expires when governed source, contract, policy, evaluator, or operating envelope changes."
       ],
-      "completion_rule": "Do not sign enterprise qualification from prose, file existence, LOC, happy-path tests, or legacy implementation status. Sign only after exact-head dossier requirements and enterprise gates pass."
+      "completion_rule": "Do not sign enterprise qualification from prose, file existence, LOC, happy-path tests, or legacy implementation status. Sign only after exact-head dossier requirements and enterprise gates pass.",
+      "existing_evidence": [
+        ".github/workflows/p1-evidence-identity.yml",
+        ".github/workflows/p1-maturity-reconciliation.yml",
+        ".github/workflows/p1-reproducibility-bundle.yml",
+        ".github/workflows/p1-required-gate-authority.yml",
+        ".github/workflows/p1-scope-freeze.yml",
+        "P1-GAP-VOL-000:gap:b36092e326-24ebc0533750f407",
+        "P1-GAP-VOL-000:gap:bb3ee1d93b-655ba4e4944c9780",
+        "git-head:1a66b2212c438cdc8d77ba912160d46682775a94"
+      ]
     },
     {
       "volume_ref": "VOL-001",
