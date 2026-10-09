@@ -157,3 +157,33 @@ def test_readonly_semantic_audit_never_creates_missing_database(tmp_path: Path) 
     with pytest.raises(OfflineAuditError, match="real local SQLite"):
         audit_database(absent, "workspace")
     assert not absent.exists()
+
+def test_explicit_incremental_scan_repairs_mismatched_fts_and_source_body(
+    tmp_path: Path,
+) -> None:
+    _, library, _ = _fixtures(tmp_path)
+    original = (tmp_path / "docs" / "facts.md").read_text("utf-8")
+    _change(library, "UPDATE offline_document_fts SET body='corrupt'"
+            " WHERE rowid=(SELECT id FROM offline_documents LIMIT 1)")
+    with pytest.raises(OfflineAuditError, match="FTS5|document"):
+        audit_database(library, "library")
+    with OfflineDocumentLibrary(library) as index:
+        outcome = index.index_directory(tmp_path / "docs")
+        assert outcome["updated_files"] == 1
+        assert index.search("physics")
+    assert audit_database(library, "library")["documents"] == 1
+    with sqlite3.connect(library) as conn:
+        assert conn.execute("SELECT body FROM offline_document_fts").fetchone()[0] == original
+
+
+def test_explicit_scan_removes_orphan_fts_rows(tmp_path: Path) -> None:
+    _, library, _ = _fixtures(tmp_path)
+    _change(library, "INSERT INTO offline_document_fts(rowid, body)"
+            " VALUES (9999, 'orphan search terms')")
+    with pytest.raises(OfflineAuditError, match="FTS5"):
+        audit_database(library, "library")
+    with OfflineDocumentLibrary(library) as index:
+        outcome = index.index_directory(tmp_path / "docs")
+        assert outcome["repaired_orphan_fts_rows"] == 1
+        assert index.search("orphan") == ()
+    assert audit_database(library, "library")["documents"] == 1
