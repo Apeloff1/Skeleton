@@ -53,11 +53,21 @@ class OfflineGamePreview:
     def __init__(self, seed: int = DEFAULT_SEED) -> None:
         generated = generate_level({
             "seed": seed, "width": WIDTH, "height": HEIGHT,
-            # Open test-world by default: obstacle routing is exercised by
-            # the separate seeded generator and collision tests.
-            "wall_percent": 0,
+            "wall_percent": 22,
         })
-        self.tiles = tuple(generated["tiles"])
+        # Procedural overhead platforms vary with seed, but keep an
+        # intentional full-height start shaft and clear ground corridor.
+        # This permits a real platformer to reach the goal by descending
+        # and walking right, rather than conflating grid reachability
+        # with actual avatar reachability.
+        world = [list(row) for row in generated["tiles"]]
+        for y in range(1, HEIGHT - 1):
+            world[y][1] = "."
+        for x in range(1, WIDTH - 1):
+            world[HEIGHT - 2][x] = "."
+        world[1][1] = "S"
+        world[HEIGHT - 2][WIDTH - 2] = "G"
+        self.tiles = tuple("".join(row) for row in world)
         self._compiled = compile_level({"tiles": list(self.tiles)})
         if not self._compiled["goal_reachable"]:
             raise GameplayError("preview generator produced an unreachable goal")
