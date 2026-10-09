@@ -68,3 +68,32 @@ def test_packaged_binary_is_real_local_executable_and_attached_to_its_source(tmp
         assert receipt["selftest_stage_lines"]==4
     with pytest.raises(ValueError,match="empty"):
         build_native_release(out)
+
+
+def test_sparse_isolated_native_release_has_no_monorepo_imports(tmp_path):
+    """The real build must work with only two source files, as on Windows CI."""
+    import subprocess,sys
+    from skeleton.ai.webcrawler import dragon_native_puzzle,dragon_native_release
+    isolated=tmp_path/"minimal-release"
+    isolated.mkdir()
+    shutil.copyfile(dragon_native_puzzle.__file__,
+                    isolated/"dragon_native_puzzle.py")
+    shutil.copyfile(dragon_native_release.__file__,
+                    isolated/"dragon_native_release.py")
+    cli=subprocess.run(
+        [sys.executable,str(isolated/"dragon_native_release.py"),"--help"],
+        cwd=isolated,capture_output=True,text=True,timeout=10)
+    assert cli.returncode==0,(cli.stdout,cli.stderr)
+    assert "--out" in cli.stdout
+    if not shutil.which("cmake") or not (shutil.which("cc") or shutil.which("cl")):
+        pytest.skip("host C compiler or CMake missing")
+    release=subprocess.run(
+        [sys.executable,str(isolated/"dragon_native_release.py"),
+         "--out",str(tmp_path/"isolated-build")],
+        cwd=isolated,capture_output=True,text=True,timeout=180)
+    assert release.returncode==0,(release.stdout,release.stderr)
+    assert "DRAGON_NATIVE_RELEASE_PASS" in release.stdout
+    receipt=json.loads((tmp_path/"isolated-build"/"dragon-native-release.json").read_text())
+    assert receipt["selftest_state"]=="native_selftest_passed"
+    assert receipt["source_file_count"]==6
+    assert receipt["selftest_stage_lines"]==4

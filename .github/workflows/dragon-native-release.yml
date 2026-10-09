@@ -30,16 +30,14 @@ jobs:
         host: [ubuntu-24.04, windows-2025, macos-15]
     steps:
       # The monorepo contains unrelated legacy Windows paths longer than
-      # MAX_PATH.  Checkout only the original game's local Python sources;
-      # other hardware/AI trees are not dependencies of this release lane.
+      # MAX_PATH. Only two pure-Python native puzzle files are required;
+      # no monorepo package initializer or heavy AI dependencies are loaded.
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
           sparse-checkout: |
-            /skeleton/__init__.py
-            /skeleton/ai/__init__.py
-            /skeleton/ai/webcrawler/__init__.py
-            /skeleton/ai/webcrawler/dragon_*.py
+            /skeleton/ai/webcrawler/dragon_native_release.py
+            /skeleton/ai/webcrawler/dragon_native_puzzle.py
           sparse-checkout-cone-mode: false
       - uses: actions/setup-python@v5
         with:
@@ -48,7 +46,7 @@ jobs:
         run: cmake --version
       - name: Build native executable and replay all original puzzle stages
         run: >
-          python -m skeleton.ai.webcrawler.dragon_native_release
+          python skeleton/ai/webcrawler/dragon_native_release.py
           --out _generated/dragon-puzzle
           --title "Original Dragon Puzzle Quest"
       - name: Verify release ZIP SHA and native executable evidence

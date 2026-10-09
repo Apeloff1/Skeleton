@@ -86,3 +86,25 @@ def test_hardware_game_boy_reward_uses_real_nrxx_audio_registers(target,style):
         assert "    call PlayRewardOnce" in asm
     assert "ROM0[$100]" in asm
     assert "src/main.asm" in cartridge.files
+
+
+def test_native_apu_enrichment_accepts_both_rgbds_spacing_forms_and_rejects_missing_rewards():
+    bare='''SECTION "Game", ROM0[$150]
+Start:
+    ld sp, $FFFE
+    ld a,$1B
+    ldh [rOBP0],a
+SECTION "Variables", WRAM0
+Hero: ds 1
+'''
+    padded=bare.replace("    ld a,$1B","    ld a, $1B").replace(
+        "    ldh [rOBP0],a","    ldh [rOBP0], a")
+    for src in (bare,padded):
+        output=enrich_native_gb_sound(src,scrolling=False)
+        assert output.count("    call PlayRewardOnce")==1
+        assert output.count("    call SetupSound")==1
+        assert "SetupSound:" in output
+    with pytest.raises(ValueError,match="reward"):
+        enrich_native_gb_sound(
+            bare.replace("ldh [rOBP0],a","ldh [rOBP1],a"),
+            scrolling=False)
