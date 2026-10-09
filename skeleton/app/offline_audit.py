@@ -22,6 +22,7 @@ from .offline_snapshot import KINDS, MAX_DATABASE_BYTES
 
 AUDIT_SCHEMA = "skeleton.app.offline_state_audit.v1"
 MAX_ROWS = 50000
+MAX_AUDIT_BYTES = 192 * 1024 * 1024
 _HEX = re.compile(r"^[0-9a-f]{64}$")
 _JOB = re.compile(r"^[0-9a-f]{32}$")
 
@@ -40,10 +41,23 @@ def _admit(source: str | Path) -> Path:
 
 
 def _rows(conn: sqlite3.Connection, query: str) -> list[tuple[Any, ...]]:
-    data = conn.execute(query + " LIMIT ?", (MAX_ROWS + 1,)).fetchall()
-    if len(data) > MAX_ROWS:
-        raise OfflineAuditError("local database exceeds audit row budget")
-    return data
+    # Fetch incrementally. Malicious but structurally valid SQLite databases
+    # must not allocate an unbounded table of large text/blob values in RAM.
+    records: list[tuple[Any, ...]] = []
+    total_bytes = 0
+    cursor = conn.execute(query + " LIMIT ?", (MAX_ROWS + 1,))
+    for row in cursor:
+        if len(records) >= MAX_ROWS:
+            raise OfflineAuditError("local database exceeds audit row budget")
+        for cell in row:
+            if isinstance(cell, str):
+                total_bytes += len(cell.encode("utf-8", errors="surrogatepass"))
+            elif isinstance(cell, bytes):
+                total_bytes += len(cell)
+        if total_bytes > MAX_AUDIT_BYTES:
+            raise OfflineAuditError("local database exceeds semantic audit memory budget")
+        records.append(row)
+    return records
 
 
 def _workspace(conn: sqlite3.Connection) -> dict[str, int]:
@@ -90,7 +104,7 @@ def _library(conn: sqlite3.Connection) -> dict[str, int]:
             type(docid) is not int or docid not in by_id
             or not isinstance(root, str) or not root
             or not isinstance(relative, str) or not relative
-            or relative.startswith("/") or "\\x00" in relative
+            or relative.startswith("/") or "\x00" in relative
             or ".." in Path(relative).parts
             or not isinstance(digest, str) or not _HEX.fullmatch(digest)
             or not isinstance(body, str)
