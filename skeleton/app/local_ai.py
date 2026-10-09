@@ -20,7 +20,7 @@ from skeleton.ai.runtime.inference.local import LocalInferenceRequest, LocalInfe
 from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
 from skeleton.app.offline_history import backup_history, restore_history
 from skeleton.app.offline_workspace import DurableOfflineSession
-from skeleton.app.offline_library import OfflineDocumentLibrary
+from skeleton.app.offline_library import OfflineDocumentLibrary, render_local_context
 
 
 MAX_USER_CHARS = 4096
@@ -125,8 +125,16 @@ class OfflineAISession(_PortableOfflineHistory):
                 raise OfflineAIError("message exceeds native model context; shorten it or reduce the output budget")
             history = history[2:]
 
-    async def ask(self, prompt: str, *, max_output_tokens: int = 32) -> OfflineAnswer:
-        request, retained_history = self._request(prompt, max_output_tokens)
+    async def ask(
+        self, prompt: str, *, max_output_tokens: int = 32,
+        inference_prompt: str | None = None,
+    ) -> OfflineAnswer:
+        if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > MAX_USER_CHARS:
+            raise OfflineAIError("message must contain 1-4096 characters")
+        # Retrieved excerpts are transient inference input, never trusted
+        # durable conversation content. Store the original user question.
+
+        request, retained_history = self._request(inference_prompt or prompt, max_output_tokens)
         result: LocalInferenceResult = await self.engine.generate(request)
         if (
             not isinstance(result.text, str)
@@ -139,7 +147,7 @@ class OfflineAISession(_PortableOfflineHistory):
         # Only commit a complete, verified local inference result.
         self.history = (
             retained_history
-            + (("user", request.prompt), ("assistant", result.text))
+            + (("user", prompt.strip()), ("assistant", result.text))
         )[-MAX_HISTORY_MESSAGES:]
         return OfflineAnswer(
             text=result.text,
@@ -209,8 +217,16 @@ class OfflineGGUFSession(_PortableOfflineHistory):
             max_output_tokens=max_output_tokens,
         ), history
 
-    async def ask(self, prompt: str, *, max_output_tokens: int = 32) -> OfflineAnswer:
-        request, retained = self._request(prompt, max_output_tokens)
+    async def ask(
+        self, prompt: str, *, max_output_tokens: int = 32,
+        inference_prompt: str | None = None,
+    ) -> OfflineAnswer:
+        if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > MAX_USER_CHARS:
+            raise OfflineAIError("message must contain 1-4096 characters")
+        # Retrieved excerpts are transient inference input, never trusted
+        # durable conversation content. Store the original user question.
+
+        request, retained = self._request(inference_prompt or prompt, max_output_tokens)
         result = await self.engine.generate(request)
         if (
             not isinstance(result.text, str)
@@ -222,7 +238,7 @@ class OfflineGGUFSession(_PortableOfflineHistory):
         ):
             raise OfflineAIError("local GGUF model did not return a bound, text-only answer")
         self.history = (
-            retained + (("user", request.prompt), ("assistant", result.text))
+            retained + (("user", prompt.strip()), ("assistant", result.text))
         )[-MAX_HISTORY_MESSAGES:]
         return OfflineAnswer(
             text=result.text,
@@ -250,6 +266,7 @@ class OfflineAIWindow:
         self.window.protocol("WM_DELETE_WINDOW", self.close)
         self.session: OfflineAISession | OfflineGGUFSession | DurableOfflineSession | None = None
         self.library: OfflineDocumentLibrary | None = None
+        self.library_context_enabled = tk.BooleanVar(value=False)
         self.events: Queue[tuple[str, object]] = Queue()
         self.active = False
         self.closed = False
@@ -303,6 +320,12 @@ class OfflineAIWindow:
             library_toolbar, text="Search local library", command=self.search_library
         )
         self.search_library_button.pack(side="left")
+        self.use_library_check = ttk.Checkbutton(
+            library_toolbar,
+            text="Use local references in AI replies",
+            variable=self.library_context_enabled,
+        )
+        self.use_library_check.pack(side="left", padx=8)
         self.status = tk.StringVar(value="Choose a local native model checkpoint to begin.")
         ttk.Label(frame, textvariable=self.status, wraplength=790).pack(anchor="w", pady=8)
         self.transcript = scrolledtext.ScrolledText(frame, state="disabled", wrap="word", height=18, font=("Segoe UI", 10))
@@ -336,6 +359,11 @@ class OfflineAIWindow:
         )
         self.search_library_button.configure(
             state="normal" if self.library is not None and not self.active else "disabled"
+        )
+        self.use_library_check.configure(
+            state="normal"
+            if self.library is not None and self.session is not None and not self.active
+            else "disabled"
         )
         self.send_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
         self.clear_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
@@ -564,18 +592,28 @@ class OfflineAIWindow:
         self.status.set("Generating locally…")
         self._refresh()
         session = self.session
+        selected_library = self.library if self.library_context_enabled.get() else None
 
         def work() -> None:
-            async def generate() -> OfflineAnswer:
-                task = asyncio.create_task(session.ask(prompt, max_output_tokens=session.max_interactive_tokens))
+            async def generate() -> tuple[OfflineAnswer, tuple[Any, ...]]:
+                sources = ()
+                inference_prompt = None
+                if selected_library is not None:
+                    # Local SQLite retrieval stays on the background worker.
+                    sources = selected_library.search(prompt, limit=3)
+                    inference_prompt = render_local_context(prompt, sources)
+                task = asyncio.create_task(session.ask(
+                    prompt, max_output_tokens=session.max_interactive_tokens,
+                    inference_prompt=inference_prompt,
+                ))
                 with self.worker_lock:
                     self.worker_loop = asyncio.get_running_loop()
                     self.worker_task = task
-                return await task
+                return await task, sources
 
             try:
-                answer = asyncio.run(generate())
-                self.events.put(("answer", answer))
+                answer, sources = asyncio.run(generate())
+                self.events.put(("answer", (answer, sources)))
             except asyncio.CancelledError:
                 self.events.put(("error", "Generation cancelled; no conversation state committed."))
             except Exception as exc:
@@ -630,8 +668,13 @@ class OfflineAIWindow:
                 elif kind == "library_error":
                     self.status.set("Offline library rejected: " + str(value))
                 elif kind == "answer":
-                    answer = value
-                    self._append("Skeleton · Local", answer.text)  # type: ignore[attr-defined]
+                    answer, sources = value
+                    self._append("Skeleton · Local", answer.text)
+                    if sources:
+                        self._append(
+                            "Local references supplied (not proof of answer accuracy)",
+                            ", ".join(hit.relative_path for hit in sources),
+                        )
                     self.status.set(
                         "Completed · " + str(answer.input_tokens) + " input / " + str(answer.output_tokens) + " output tokens · receipt " + answer.execution_receipt_digest[:12]  # type: ignore[attr-defined]
                     )
