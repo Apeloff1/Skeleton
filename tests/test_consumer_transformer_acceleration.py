@@ -382,3 +382,62 @@ def test_hidden_sequence_avoids_duplicate_gpu_forward(monkeypatch):
     )
     output = model.hidden_seq("alpha beta")
     assert len(output) == 2 and all(len(row) == model.dim for row in output)
+
+
+def test_resident_kv_decode_reuses_buffer_without_per_token_concat(monkeypatch):
+    torch = pytest.importorskip("torch")
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = TinyTransformer(
+        vocab=("alpha", "beta", "gamma"), dim=8, ctx=40,
+        n_heads=2, n_layers=2, d_ff=12, seed=71,
+        norm="rms", ffn_kind="swiglu",
+    )
+    reference = TinyTransformer.from_snapshot(model.snapshot())
+    accel = TorchAccel(model, device="cpu").pin()
+    assert accel.logits_window((1, 2)) == pytest.approx(
+        reference._logits((1, 2)), abs=2e-5
+    )
+    first_pointer = accel._key_buffers[0].data_ptr()
+    first_capacity = accel._key_buffers[0].shape[-2]
+    assert 2 <= first_capacity < model.ctx
+    for length in range(3, first_capacity + 1):
+        ids = tuple((i % 3) + 1 for i in range(length))
+        # A prefix must match the existing cache for true decode progression.
+        if length == 3:
+            ids = (1, 2, 3)
+        assert accel.logits_window(ids) == pytest.approx(
+            reference._logits(ids), abs=2e-5
+        )
+        assert accel._key_buffers[0].data_ptr() == first_pointer
+        assert accel._key_buffers[0].shape[-2] == first_capacity
+        assert accel.cached_tokens == ids
+    next_ids = tuple((i % 3) + 1 for i in range(first_capacity + 1))
+    assert accel.logits_window(next_ids) == pytest.approx(
+        reference._logits(next_ids), abs=2e-5
+    )
+    assert accel._key_buffers[0].shape[-2] > first_capacity
+    assert accel._key_buffers[0].shape[-2] <= model.ctx
+    assert all(buf.shape[-2] <= model.ctx for buf in accel._key_buffers)
+
+
+def test_rotary_single_layer_eviction_reuses_gpu_buffers():
+    pytest.importorskip("torch")
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = TinyTransformer(
+        vocab=("alpha", "beta"), dim=8, ctx=4,
+        seed=37, n_heads=2, n_layers=1, d_ff=8,
+        norm="rms", ffn_kind="swiglu", position_mode="rope",
+    )
+    accel = TorchAccel(model, device="cpu").pin()
+    windows = ((1, 2, 1, 2), (2, 1, 2, 1), (1, 2, 1, 2))
+    pointer = None
+    for window in windows:
+        result = accel.logits_window(window)
+        assert result == pytest.approx(model._logits(window), rel=2e-5, abs=2e-5)
+        if pointer is None:
+            pointer = accel._key_buffers[0].data_ptr()
+        assert accel._key_buffers[0].data_ptr() == pointer
+        assert accel.cached_tokens == window
+    assert accel._cached_next_position == 6
