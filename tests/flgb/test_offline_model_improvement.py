@@ -343,6 +343,76 @@ class TestEvaluatedOfflineImprovement(unittest.TestCase):
                 "local-ai", "--protect-suite", "bench.json",
             ]), 2)
 
+    def test_changed_training_data_after_sgd_prevents_publication(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            source, train, heldout, dest = self._fixture(d)
+            parent = source.read_bytes()
+            real_fit = TinyTransformer.fit
+
+            def fit_and_edit_text(model, texts, **kwargs):
+                steps = real_fit(model, texts, **kwargs)
+                train.write_text(
+                    "user hello assistant beta alpha\n", encoding="utf-8",
+                )
+                return steps
+
+            with patch.object(TinyTransformer, "fit", new=fit_and_edit_text):
+                with patch(
+                    "skeleton.app.local_ai_improvement._token_weighted_perplexity",
+                    side_effect=[4.0, 3.0, 3.0],
+                ):
+                    with self.assertRaisesRegex(
+                        OfflineImprovementError, "source changed",
+                    ):
+                        improve_local_model(source, train, heldout, dest)
+            self.assertFalse(dest.exists())
+            self.assertEqual(source.read_bytes(), parent)
+
+    def test_changed_parent_checkpoint_during_sgd_blocks_new_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            source, train, heldout, dest = self._fixture(d)
+            real_fit = TinyTransformer.fit
+
+            def fit_and_change_source_artifact(model, texts, **kwargs):
+                steps = real_fit(model, texts, **kwargs)
+                with source.open("ab") as stream:
+                    stream.write(b"\n")
+                return steps
+
+            with patch.object(TinyTransformer, "fit", new=fit_and_change_source_artifact):
+                with patch(
+                    "skeleton.app.local_ai_improvement._token_weighted_perplexity",
+                    side_effect=[4.0, 3.0, 3.0],
+                ):
+                    with self.assertRaisesRegex(
+                        OfflineImprovementError, "checkpoint changed",
+                    ):
+                        improve_local_model(source, train, heldout, dest)
+            self.assertFalse(dest.exists())
+
+    def test_changed_heldout_data_during_sgd_prevents_publication(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            source, train, heldout, dest = self._fixture(d)
+            real_fit = TinyTransformer.fit
+
+            def fit_and_edit_heldout(model, texts, **kwargs):
+                steps = real_fit(model, texts, **kwargs)
+                heldout.write_text(
+                    "user hello assistant world alpha beta\n", encoding="utf-8",
+                )
+                return steps
+
+            with patch.object(TinyTransformer, "fit", new=fit_and_edit_heldout):
+                with patch(
+                    "skeleton.app.local_ai_improvement._token_weighted_perplexity",
+                    side_effect=[4.0, 3.0, 3.0],
+                ):
+                    with self.assertRaisesRegex(
+                        OfflineImprovementError, "source changed",
+                    ):
+                        improve_local_model(source, train, heldout, dest)
+            self.assertFalse(dest.exists())
+
     def test_cli_cannot_skip_independent_evaluation(self) -> None:
         from skeleton.app.cli import run_app_cli
 
