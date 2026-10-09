@@ -11,7 +11,6 @@ from skeleton.ai.training.capability_ledger import (
     MAX_REPORTS, CapabilityLedgerError, OfflineCapabilityLedger,
     make_capability_receipt,
 )
-from skeleton.ai.training.offline_foundations import validate_curriculum
 
 
 SOURCE = Path(__file__).resolve().parents[2] / (
