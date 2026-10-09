@@ -237,11 +237,21 @@ class OfflineIndexQueue:
         with self._lock:
             self._db.execute("BEGIN IMMEDIATE")
             try:
+                # An abandoned worker at its attempt budget is terminal.
+                # Never increment attempts past the table's CHECK bound.
+                self._db.execute(
+                    "UPDATE offline_index_jobs SET state='failed', updated_at=?, "
+                    "last_error='expired worker lease after maximum attempts', "
+                    "lease_token=NULL, lease_until=NULL "
+                    "WHERE state='running' AND lease_until<=? AND attempts>=?",
+                    (now, now, MAX_ATTEMPTS),
+                )
                 row = self._db.execute(
                     f"SELECT {_COLUMNS} FROM offline_index_jobs "
                     "WHERE (state='queued' AND next_due_at<=?) "
-                    "OR (state='running' AND lease_until<=?) "
-                    "ORDER BY created_at, job_id LIMIT 1", (now, now),
+                    "OR (state='running' AND lease_until<=? AND attempts<?) "
+                    "ORDER BY created_at, job_id LIMIT 1",
+                    (now, now, MAX_ATTEMPTS),
                 ).fetchone()
                 if row is None:
                     self._db.execute("COMMIT")
