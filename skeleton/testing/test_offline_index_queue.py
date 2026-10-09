@@ -202,3 +202,62 @@ def test_cli_refuses_model_or_missing_library_in_queue_mode(
         "--run-queue", "--drain-limit", "100",
     ]) == 2
     assert capsys.readouterr().out == ""
+
+
+def test_stale_worker_cannot_commit_index_data_after_lease_reclaimed(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    source = _root(tmp_path)
+    index_path = tmp_path / "indexed.sqlite"
+    with OfflineIndexQueue(tmp_path / "queue.sqlite") as queue:
+        job = queue.enqueue(source, index_path)
+        original = OfflineDocumentLibrary.index_directory
+
+        def simulate_reclaimed_lease(library, directory, *, before_commit=None):
+            assert before_commit is not None
+            # Adversarial interleaving: worker B owns the lease while worker
+            # A is about to publish its staged FTS documents.
+            queue._db.execute(
+                "UPDATE offline_index_jobs "
+                "SET lease_token=?, lease_until=? WHERE job_id=?",
+                ("f" * 32, 9999999999.0, job.job_id),
+            )
+            return original(library, directory, before_commit=before_commit)
+
+        monkeypatch.setattr(
+            OfflineDocumentLibrary, "index_directory",
+            simulate_reclaimed_lease,
+        )
+        with pytest.raises(OfflineQueueError, match="ownership lost"):
+            queue.run_one()
+        monkeypatch.setattr(OfflineDocumentLibrary, "index_directory", original)
+        with OfflineDocumentLibrary(index_path) as documents:
+            assert documents.count() == 0
+        assert queue.get(job.job_id).state == "running"
+
+
+def test_expired_unreclaimed_worker_does_not_publish_document_index(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    source = _root(tmp_path)
+    index_path = tmp_path / "indexed.sqlite"
+    with OfflineIndexQueue(tmp_path / "queue.sqlite") as queue:
+        job = queue.enqueue(source, index_path)
+        original = OfflineDocumentLibrary.index_directory
+
+        def simulate_expiration(library, directory, *, before_commit=None):
+            queue._db.execute(
+                "UPDATE offline_index_jobs SET lease_until=0 WHERE job_id=?",
+                (job.job_id,),
+            )
+            return original(library, directory, before_commit=before_commit)
+
+        monkeypatch.setattr(
+            OfflineDocumentLibrary, "index_directory", simulate_expiration,
+        )
+        completed = queue.run_one()
+        assert completed is not None
+        assert completed.state == "queued"
+        assert completed.result is None
+        with OfflineDocumentLibrary(index_path) as documents:
+            assert documents.count() == 0
