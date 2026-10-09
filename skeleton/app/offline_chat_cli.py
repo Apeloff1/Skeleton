@@ -16,7 +16,7 @@ from skeleton.ai.model_runtime.offline_chat import (
 )
 from skeleton.ai.model_runtime.runtime_contracts import GenerationConfig, RuntimeContractError
 from skeleton.app.offline_grounding import (
-    grounded_request_digest, prepare_evidence,
+    audit_answer_citations, grounded_request_digest, prepare_evidence,
 )
 from skeleton.app.offline_knowledge import (
     OfflineKnowledgeLibrary, MAX_DOCUMENT_BYTES,
@@ -62,6 +62,7 @@ def _result(answer, session_id: str, *, as_json: bool,
         }
         if evidence is not None:
             body["evidence"] = evidence
+            body["citation_audit"] = audit_answer_citations(answer.text, evidence)
         print(json.dumps(body, sort_keys=True, ensure_ascii=False))
     else:
         print("Local AI>", answer.text)
@@ -69,6 +70,9 @@ def _result(answer, session_id: str, *, as_json: bool,
             print("Sources supplied to model (accuracy not verified):")
             for source in evidence["citations"]:
                 print(" ", source["title"], source["citation"])
+            print("Citation IDs:",
+                  audit_answer_citations(answer.text, evidence)["status"],
+                  "(not factual verification)")
 
 
 def _grounded_turn(chat: DurableOfflineAISession, message: str, *,
