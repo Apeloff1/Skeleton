@@ -74,8 +74,8 @@
           "title": "System Architecture",
           "depth_pass": "DP-000-040",
           "accountability_id": "ACC-VOL-002",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "ArchitectureNode",
@@ -88,17 +88,14 @@
             "transitional roots becoming accidental owners",
             "cyclic dependency growth"
           ],
-          "gaps": [
-            "expand architecture fitness checks to all generated/runtime components",
-            "automate owner lookup for newly created paths"
-          ]
+          "gaps": []
         },
         {
           "volume_ref": "VOL-003",
           "title": "Canonical Contract System",
           "depth_pass": "DP-000-040",
           "accountability_id": "ACC-VOL-003",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -113,8 +110,7 @@
             "cross-language round-trip divergence"
           ],
           "gaps": [
-            "materialize shared conformance vectors",
-            "complete producer/consumer inventory for every canonical contract"
+            "independent exact-head VOL-003 Contract Conformance Closure qualification remains pending"
           ]
         },
         {
@@ -122,7 +118,7 @@
           "title": "Kernel & Execution Foundation",
           "depth_pass": "DP-000-040",
           "accountability_id": "ACC-VOL-004",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -137,8 +133,7 @@
             "shutdown ordering data loss"
           ],
           "gaps": [
-            "unify service supervision semantics across backend and engine",
-            "expand cancellation propagation coverage into all connectors"
+            "independent exact-head VOL-004 Runtime Supervision Closure qualification remains pending"
           ]
         },
         {
@@ -215,7 +210,7 @@
           "title": "Machine Architecture Manifests",
           "depth_pass": "DP-041-080",
           "accountability_id": "ACC-VOL-054",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -229,8 +224,7 @@
             "schema downgrade"
           ],
           "gaps": [
-            "unify manifest reference validation",
-            "bind generated docs to manifest digests"
+            "independent manifest-reference drift, schema-downgrade, and doc-digest verification remains pending"
           ]
         },
         {
@@ -284,7 +278,7 @@
           "title": "Architecture Fitness Functions",
           "depth_pass": "DP-081-120",
           "accountability_id": "ACC-VOL-116",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -298,8 +292,7 @@
             "false green"
           ],
           "gaps": [
-            "unify architecture check registry",
-            "bind rules to ADR/ownership"
+            "independent architecture-rule and waiver verification remains pending"
           ]
         }
       ]
@@ -351,7 +344,7 @@
           "title": "Master Traceability Matrix",
           "depth_pass": "DP-081-120",
           "accountability_id": "ACC-VOL-112",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -365,8 +358,8 @@
             "false completeness"
           ],
           "gaps": [
-            "materialize canonical trace graph",
-            "bind PR impact checks to trace edges"
+            "repository-wide trace population remains separate",
+            "independent completeness audit remains pending"
           ]
         },
         {
@@ -374,7 +367,7 @@
           "title": "Capability Map",
           "depth_pass": "DP-081-120",
           "accountability_id": "ACC-VOL-113",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -388,8 +381,8 @@
             "silent degraded fallback"
           ],
           "gaps": [
-            "unify capability descriptors",
-            "bind runtime discovery to registry"
+            "repository-wide capability descriptor/evidence population remains separate",
+            "independent capability maturity verification remains pending"
           ]
         },
         {
@@ -661,7 +654,7 @@
           "title": "Code Intelligence",
           "depth_pass": "DP-000-040",
           "accountability_id": "ACC-VOL-021",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -676,8 +669,7 @@
             "generated/vendor code pollution"
           ],
           "gaps": [
-            "complete cross-language graph extraction",
-            "connect ownership/test mapping to change planner"
+            "independent cross-language repository-graph, ownership/test impact, and change-planner verification remains pending"
           ]
         },
         {
@@ -685,7 +677,7 @@
           "title": "Autonomous Repository Engineering",
           "depth_pass": "DP-000-040",
           "accountability_id": "ACC-VOL-022",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -700,40 +692,37 @@
             "merge races",
             "self-review bias"
           ],
-          "gaps": [
-            "transactional workspace layer incomplete",
-            "independent reviewer/verifier routing needs full integration"
-          ]
+          "gaps": []
         },
         {
           "volume_ref": "VOL-092",
           "title": "Repository Maintenance",
           "depth_pass": "DP-081-120",
           "accountability_id": "ACC-VOL-092",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
             "MaintenanceTask",
             "RepositoryOwnership",
-            "MaintenanceReceipt"
+            "ResourceEvidence",
+            "MaintenanceReceipt",
+            "MaintenancePlan",
+            "MaintenanceRegistry"
           ],
           "risks": [
             "destructive cleanup",
             "bot churn",
             "orphan ownership"
           ],
-          "gaps": [
-            "define maintenance ownership registry",
-            "bind deletion to reachability/retention checks"
-          ]
+          "gaps": []
         },
         {
           "volume_ref": "VOL-093",
           "title": "Backlog Control",
           "depth_pass": "DP-081-120",
           "accountability_id": "ACC-VOL-093",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -747,8 +736,7 @@
             "status inflation"
           ],
           "gaps": [
-            "establish canonical backlog IDs",
-            "bind backlog to gap/risk closure"
+            "independent backlog coverage, deduplication, and stale-state verification remains pending"
           ]
         },
         {
@@ -756,7 +744,7 @@
           "title": "Priority Engine",
           "depth_pass": "DP-081-120",
           "accountability_id": "ACC-VOL-094",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -769,17 +757,14 @@
             "metric gaming",
             "oscillating priorities"
           ],
-          "gaps": [
-            "define priority factor schema",
-            "add anti-starvation constraints"
-          ]
+          "gaps": []
         },
         {
           "volume_ref": "VOL-095",
           "title": "Build Work Packages",
           "depth_pass": "DP-081-120",
           "accountability_id": "ACC-VOL-095",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -792,17 +777,14 @@
             "hidden dependency",
             "manual completion claim"
           ],
-          "gaps": [
-            "bind all packages to exact requirements",
-            "materialize package evidence rollup"
-          ]
+          "gaps": []
         },
         {
           "volume_ref": "VOL-108",
           "title": "Anti-Patterns",
           "depth_pass": "DP-081-120",
           "accountability_id": "ACC-VOL-108",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -816,8 +798,7 @@
             "false-positive detector fatigue"
           ],
           "gaps": [
-            "seed registry from historical failures",
-            "bind detectable patterns to CI"
+            "independent anti-pattern detector and exception-expiry verification remains pending"
           ]
         },
         {
@@ -825,7 +806,7 @@
           "title": "Build Order",
           "depth_pass": "DP-081-120",
           "accountability_id": "ACC-VOL-109",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -839,8 +820,7 @@
             "stale sequence"
           ],
           "gaps": [
-            "bind every AIQ task into construction DAG",
-            "materialize cycle/blocked-state reporting"
+            "independent construction-DAG cycle and blocked-state verification remains pending"
           ]
         },
         {
@@ -848,30 +828,31 @@
           "title": "Definition of Done",
           "depth_pass": "DP-081-120",
           "accountability_id": "ACC-VOL-110",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
             "DefinitionOfDone",
             "DoDRequirement",
-            "CompletionEvidence"
+            "ChangeImpactProfile",
+            "CompletionEvidence",
+            "CompletionSignoff",
+            "CompletionEvaluation",
+            "DefinitionOfDoneEvaluator"
           ],
           "risks": [
             "checkbox completion",
             "evidence omission",
             "scope-dependent requirement lost"
           ],
-          "gaps": [
-            "unify maturity and DoD rules",
-            "bind change-impact triggers to DoD"
-          ]
+          "gaps": []
         },
         {
           "volume_ref": "VOL-115",
           "title": "Technical Debt Ledger",
           "depth_pass": "DP-081-120",
           "accountability_id": "ACC-VOL-115",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -885,8 +866,7 @@
             "unsafe cleanup"
           ],
           "gaps": [
-            "establish debt IDs and ownership",
-            "bind debt to risk/backlog/ADR"
+            "independent cleanup-compatibility evaluation remains pending"
           ]
         },
         {
@@ -894,7 +874,7 @@
           "title": "Roadmap Control",
           "depth_pass": "DP-081-120",
           "accountability_id": "ACC-VOL-118",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -908,8 +888,7 @@
             "lost revision rationale"
           ],
           "gaps": [
-            "bind roadmap to build DAG",
-            "materialize revision lineage"
+            "independent roadmap-control verification remains pending"
           ]
         },
         {
@@ -917,7 +896,7 @@
           "title": "Completion Model",
           "depth_pass": "DP-081-120",
           "accountability_id": "ACC-VOL-119",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -931,8 +910,8 @@
             "double counting"
           ],
           "gaps": [
-            "implement canonical rollup function",
-            "bind UI progress to derived completion only"
+            "independent stale-signoff evaluation remains pending",
+            "independent critical-blocker evaluation remains pending"
           ]
         }
       ]
@@ -975,7 +954,7 @@
           "title": "Quality Vector",
           "depth_pass": "DP-041-080",
           "accountability_id": "ACC-VOL-070",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -989,8 +968,7 @@
             "threshold drift"
           ],
           "gaps": [
-            "bind dimensions to eval suites",
-            "define non-compensable failure rules"
+            "independent quality-vector threshold and non-compensable-failure verification remains pending"
           ]
         },
         {
@@ -998,30 +976,36 @@
           "title": "Formal Methods",
           "depth_pass": "DP-081-120",
           "accountability_id": "ACC-VOL-081",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
             "FormalSpecification",
+            "FormalAssumption",
+            "ImplementationBinding",
+            "StateVariable",
+            "FormalState",
             "ProofObligation",
-            "Counterexample"
+            "ProofResult",
+            "Counterexample",
+            "FormalRunReport",
+            "FormalSpecificationRegistry",
+            "ModelSemantics",
+            "BoundedModelChecker"
           ],
           "risks": [
             "spec/code drift",
             "state explosion",
             "proof overclaim"
           ],
-          "gaps": [
-            "select P0 formal targets",
-            "establish model-to-code traceability"
-          ]
+          "gaps": []
         },
         {
           "volume_ref": "VOL-117",
           "title": "Project Metrics",
           "depth_pass": "DP-081-120",
           "accountability_id": "ACC-VOL-117",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -1035,8 +1019,7 @@
             "stale denominator"
           ],
           "gaps": [
-            "define metric registry",
-            "bind progress percentages to traceable state"
+            "independent metric-provenance verification remains pending"
           ]
         },
         {
@@ -1044,7 +1027,7 @@
           "title": "Final Assembly Test",
           "depth_pass": "DP-081-120",
           "accountability_id": "ACC-VOL-120",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -1058,8 +1041,8 @@
             "incomplete release evidence"
           ],
           "gaps": [
-            "materialize final assembly harness",
-            "bind release promotion to final evidence digest"
+            "independent final-assembly verification remains pending",
+            "P2-QUAL-01 release-qualification dependencies remain external to this bounded implementation"
           ]
         }
       ]
@@ -1100,7 +1083,7 @@
           "title": "Documentation Engine",
           "depth_pass": "DP-081-120",
           "accountability_id": "ACC-VOL-089",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -1113,17 +1096,14 @@
             "generated overwrite",
             "broken references"
           ],
-          "gaps": [
-            "define generated-doc boundaries",
-            "materialize doc drift gate"
-          ]
+          "gaps": []
         },
         {
           "volume_ref": "VOL-090",
           "title": "Generated Documentation",
           "depth_pass": "DP-081-120",
           "accountability_id": "ACC-VOL-090",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -1136,10 +1116,7 @@
             "review noise",
             "manual derived edits"
           ],
-          "gaps": [
-            "define generated artifact manifest",
-            "add regeneration cleanliness gate"
-          ]
+          "gaps": []
         }
       ]
     },
@@ -1180,7 +1157,7 @@
           "title": "High-Performance Native Core",
           "depth_pass": "DP-000-040",
           "accountability_id": "ACC-VOL-032",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -1194,10 +1171,7 @@
             "native crash corrupts process",
             "silent numerical divergence"
           ],
-          "gaps": [
-            "select acceleration targets by profiling evidence",
-            "expand isolation strategy for crash-prone native code"
-          ]
+          "gaps": []
         },
         {
           "volume_ref": "VOL-033",
@@ -1209,9 +1183,12 @@
           "signing_required": true,
           "contracts": [
             "JvmCapability",
+            "JvmRuntimeDescriptor",
+            "JvmBenchmarkEvidence",
+            "JvmQualificationPolicy",
+            "JvmQualificationDecision",
             "JvmRequest",
-            "JvmResult",
-            "JvmRuntimeDescriptor"
+            "JvmCallResult"
           ],
           "risks": [
             "classpath drift",
@@ -1220,8 +1197,7 @@
             "duplicate runtime authority"
           ],
           "gaps": [
-            "identify workloads where JVM is actually beneficial",
-            "standardize protocol/version negotiation"
+            "exact-head VOL-033 gate and independent accountability verification pending"
           ]
         }
       ]
@@ -1264,7 +1240,7 @@
           "title": "Data & Persistence",
           "depth_pass": "DP-000-040",
           "accountability_id": "ACC-VOL-005",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -1280,23 +1256,32 @@
             "backup that cannot restore"
           ],
           "gaps": [
-            "converge remaining legacy state owners",
-            "add migration compatibility rehearsal to release qualification"
+            "independent exact-head VOL-005 Data & Persistence Closure qualification remains pending"
           ],
           "implementation_paths": [
             "machine/state_topology.json",
             "skeleton/persistence",
             "backend/services/database.py",
-            "scripts/state_recovery_drill.py"
+            "scripts/state_recovery_drill.py",
+            "machine/state_backup_policy.json",
+            "scripts/state_migration_compatibility.py",
+            "scripts/verify_state_authority_closure.py",
+            ".github/workflows/state-recovery-drill.yml",
+            ".github/workflows/p1-migration-rollback-compatibility.yml"
           ],
           "tests": [
             "skeleton/testing/test_state_recovery_drill.py",
             "skeleton/testing/test_operation_store.py",
-            "backend/tests/test_rag_state_authority.py"
+            "backend/tests/test_rag_state_authority.py",
+            "skeleton/testing/test_state_migration_compatibility.py",
+            "tests/test_state_authority_independent_verifier.py"
           ],
           "evaluations": [
-            "planned:partial-commit fault matrix",
-            "planned:restore consistency evaluation"
+            "scripts/check_state_topology.py --json",
+            "scripts/state_migration_compatibility.py",
+            "scripts/verify_state_authority_closure.py",
+            ".github/workflows/state-recovery-drill.yml",
+            ".github/workflows/p1-migration-rollback-compatibility.yml"
           ]
         },
         {
@@ -1304,37 +1289,41 @@
           "title": "Event Architecture",
           "depth_pass": "DP-000-040",
           "accountability_id": "ACC-VOL-039",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
             "EventEnvelope",
             "EventCursor",
             "OutboxRecord",
-            "InboxRecord"
+            "InboxRecord",
+            "EventSchemaContract",
+            "EventCompatibilityRegistry",
+            "EventRetentionPolicy",
+            "RetentionDecision"
           ],
           "risks": [
             "duplicate/out-of-order events",
             "consumer side effect before inbox marker",
             "schema drift"
           ],
-          "gaps": [
-            "formalize event compatibility registry",
-            "add compaction/replay retention contracts"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/frontier/operation_stream.py",
             "skeleton/frontier/operation_stream_store.py",
-            "skeleton/persistence"
+            "skeleton/persistence",
+            "skeleton/frontier/runtime/event_architecture.py",
+            "skeleton/frontier/event_architecture.py",
+            "skeleton/frontier/runtime/operation_stream_store.py"
           ],
           "tests": [
             "skeleton/testing/test_operation_stream.py",
             "skeleton/testing/test_operation_stream_store.py",
-            "planned:skeleton/testing/test_event_replay.py"
+            "skeleton/testing/test_event_architecture.py"
           ],
           "evaluations": [
-            "planned:duplicate/out-of-order fault suite",
-            "planned:event replay determinism evaluation"
+            "skeleton/testing/test_event_architecture.py",
+            "skeleton/testing/test_operation_stream_store.py"
           ]
         },
         {
@@ -1413,7 +1402,11 @@
       ],
       "primary_volume_refs": [
         "VOL-026",
-        "VOL-027"
+        "VOL-027",
+        "VOL-167",
+        "VOL-169",
+        "VOL-172",
+        "VOL-175"
       ],
       "objective": "Bind threat identities, trust-boundary crossings, egress canonicalization, tenant isolation and deletion/privacy semantics to executable controls.",
       "acceptance": [
@@ -1439,7 +1432,7 @@
           "title": "Cybersecurity",
           "depth_pass": "DP-000-040",
           "accountability_id": "ACC-VOL-026",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -1456,18 +1449,18 @@
             "dependency compromise"
           ],
           "gaps": [
-            "complete unified threat model",
-            "bind runtime tool permissions to capability-security primitives"
+            "independent capability-security, threat-model, and tool-authorization verification remains pending"
           ],
           "implementation_paths": [
-            "skeleton/security",
-            "backend/scripts",
-            "scripts/check_repository_python_sast.py"
+            "skeleton/security/capability_contracts.py",
+            "skeleton/security/capability_security.py",
+            "skeleton/security/contracts.py",
+            "skeleton/security/threat_model.py",
+            "skeleton/security/tool_authorization.py"
           ],
           "tests": [
-            "skeleton/testing/test_security_rooted_fs.py",
-            "skeleton/testing/test_security_archive_sandbox.py",
-            "skeleton/testing/test_security_outbound_http.py"
+            "skeleton/testing/test_vol026_capability_security.py",
+            "skeleton/testing/test_vol026_threat_model.py"
           ],
           "evaluations": [
             "planned:threat-model coverage review",
@@ -1479,7 +1472,7 @@
           "title": "Privacy & Data Protection",
           "depth_pass": "DP-000-040",
           "accountability_id": "ACC-VOL-027",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -1494,19 +1487,19 @@
             "cross-tenant leakage",
             "residency drift"
           ],
-          "gaps": [
-            "regional policy mapping remains incomplete",
-            "prove deletion through all future derived stores"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/vault",
             "backend/routes/governance.py",
-            "machine/state_topology.json"
+            "machine/state_topology.json",
+            "skeleton/vault/deletion_proof.py",
+            "skeleton/vault/regional_privacy.py"
           ],
           "tests": [
             "skeleton/testing/test_data_governance.py",
             "skeleton/testing/test_data_lifecycle.py",
-            "skeleton/testing/test_lifecycle_adapters.py"
+            "skeleton/testing/test_lifecycle_adapters.py",
+            "skeleton/testing/test_vol027_privacy_completion.py"
           ],
           "evaluations": [
             "planned:deletion completeness drill",
@@ -1531,15 +1524,14 @@
             "unowned mitigation"
           ],
           "gaps": [
-            "materialize threat IDs",
-            "bind PR impact triggers"
+            "independent exact-head threat-model impact-trigger verification remains pending"
           ],
           "implementation_paths": [
-            "docs/security",
-            "machine"
+            "skeleton/security/threat_model.py",
+            "skeleton/ai/runtime/security/threat_model.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_threat_model.py"
+            "skeleton/testing/test_threat_model.py"
           ],
           "evaluations": [
             "planned:threat-control coverage audit"
@@ -1563,15 +1555,14 @@
             "fallback privilege widening"
           ],
           "gaps": [
-            "map all trust boundaries",
-            "bind crossings to trace model"
+            "independent exact-head boundary-crossing verification remains pending"
           ],
           "implementation_paths": [
-            "skeleton/security",
-            "machine"
+            "skeleton/security/boundaries.py",
+            "skeleton/ai/runtime/security/boundaries.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_security_boundaries.py"
+            "skeleton/testing/test_security_boundaries.py"
           ],
           "evaluations": [
             "planned:boundary-bypass evaluation"
@@ -1595,15 +1586,18 @@
             "policy bypass via redirects"
           ],
           "gaps": [
-            "implement destination canonicalization",
-            "bind network tools to egress policy"
+            "independent exact-head egress-policy and connected-peer verification remains pending"
           ],
           "implementation_paths": [
-            "skeleton/security",
-            "skeleton/network"
+            "skeleton/security/egress_control.py",
+            "skeleton/ai/runtime/security/egress_control.py",
+            "skeleton/security/outbound_url.py",
+            "skeleton/security/outbound_http.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_egress_control.py"
+            "skeleton/testing/test_egress_control.py",
+            "skeleton/testing/test_outbound_url_resolution_security.py",
+            "skeleton/testing/test_security_outbound_http.py"
           ],
           "evaluations": [
             "planned:SSRF/DNS-rebinding campaign"
@@ -1627,15 +1621,14 @@
             "shared cache leak"
           ],
           "gaps": [
-            "propagate tenant identity universally",
-            "bind isolation to trace/evidence"
+            "independent exact-head cross-tenant negative-path verification remains pending"
           ],
           "implementation_paths": [
-            "skeleton/security",
-            "skeleton/persistence"
+            "skeleton/security/tenant_isolation.py",
+            "skeleton/ai/runtime/security/tenant_isolation.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_tenant_isolation_deep.py"
+            "skeleton/testing/test_tenant_isolation_deep.py"
           ],
           "evaluations": [
             "planned:cross-tenant red-team campaign"
@@ -1680,14 +1673,16 @@
           "title": "Inference Engine",
           "depth_pass": "DP-000-040",
           "accountability_id": "ACC-VOL-007",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
             "ModelRequest",
             "ModelResult",
             "ModelStreamEvent",
-            "InferenceUsage"
+            "InferenceUsage",
+            "BatchPlan",
+            "SpeculationDecision"
           ],
           "risks": [
             "duplicate provider effects during retry",
@@ -1695,23 +1690,39 @@
             "uncancelled expensive work"
           ],
           "gaps": [
-            "continuous batching and local serving need dedicated implementation",
-            "speculative decoding requires measured correctness gates"
+            "independent exact-head VOL-007 Inference Engine Closure qualification remains pending"
           ],
           "implementation_paths": [
             "skeleton/provider_runtime.py",
             "skeleton/provider_contract.py",
-            "backend/services/ai_service.py",
-            "planned:skeleton/inference"
+            "backend/core/engine_text.py",
+            "skeleton/inference/__init__.py",
+            "skeleton/inference/session.py",
+            "skeleton/inference/provider_bridge.py",
+            "skeleton/inference/replay.py",
+            "skeleton/inference/async_runtime.py",
+            "skeleton/inference/batching.py",
+            "skeleton/inference/speculation.py",
+            "scripts/verify_vol007_inference.py",
+            ".github/workflows/vol007-inference.yml"
           ],
           "tests": [
             "tests/test_model_runtime.py",
             "backend/tests/test_ai_provider_reliability.py",
-            "skeleton/testing/test_provider_stream_reliability_profiles.py"
+            "skeleton/testing/test_provider_stream_reliability_profiles.py",
+            "skeleton/testing/test_vol007_inference_session.py",
+            "skeleton/testing/test_vol007_provider_bridge.py",
+            "skeleton/testing/test_vol007_inference_replay.py",
+            "skeleton/testing/test_vol007_async_runtime.py",
+            "skeleton/testing/test_vol007_batching.py",
+            "skeleton/testing/test_vol007_speculation.py",
+            "tests/test_vol007_inference_independent.py"
           ],
           "evaluations": [
             "planned:stream/cancel/failover matrix",
-            "planned:latency-cost-quality characterization"
+            "planned:latency-cost-quality characterization",
+            ".github/workflows/vol007-inference.yml",
+            "scripts/verify_vol007_inference.py"
           ]
         }
       ]
@@ -1753,35 +1764,37 @@
           "title": "Operations Manual",
           "depth_pass": "DP-081-120",
           "accountability_id": "ACC-VOL-091",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
             "Runbook",
             "RunbookStep",
-            "RunbookValidation"
+            "RunbookValidation",
+            "RunbookRegistry",
+            "StepKind",
+            "ValidationStatus"
           ],
           "risks": [
             "stale commands",
             "missing escalation",
             "circular recovery dependency"
           ],
-          "gaps": [
-            "establish runbook registry",
-            "bind drills to runbook versions"
-          ],
+          "gaps": [],
           "implementation_paths": [
-            "docs",
-            "scripts",
-            "skeleton/observability"
+            "skeleton/observability/runbooks.py",
+            "skeleton/observability/__init__.py",
+            "skeleton/ai/runtime/observability/runbooks.py",
+            "skeleton/ai/runtime/observability/__init__.py",
+            "scripts/validate_runbook.py",
+            "machine/ai_file_tree.json"
           ],
           "tests": [
-            "planned:skeleton/testing/test_runbook_references.py",
-            "planned:runbook command validation tests"
+            "skeleton/testing/test_vol091_runbooks.py"
           ],
           "evaluations": [
-            "planned:operator recovery drill",
-            "planned:runbook dependency-loss evaluation"
+            "skeleton/testing/test_vol091_runbooks.py",
+            "scripts/validate_runbook.py"
           ]
         },
         {
@@ -1789,7 +1802,7 @@
           "title": "VS-000 Foundation Recovery Slice",
           "depth_pass": "DP-081-120",
           "accountability_id": "ACC-VOL-096",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -1802,22 +1815,15 @@
             "duplicate event replay",
             "derived-state authority"
           ],
-          "gaps": [
-            "materialize end-to-end VS-000 harness",
-            "bind recovery evidence to release gates"
-          ],
+          "gaps": [],
           "implementation_paths": [
-            "skeleton/app",
-            "skeleton/persistence",
-            "skeleton/frontier"
+            "skeleton/persistence/foundation_recovery.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_vs000_foundation_recovery.py",
-            "planned:state recovery drill integration"
+            "skeleton/testing/test_vs000_foundation_recovery.py"
           ],
           "evaluations": [
-            "planned:power-loss/restart campaign",
-            "planned:projection rebuild evaluation"
+            "skeleton/testing/test_vs000_foundation_recovery.py"
           ]
         }
       ]
@@ -1863,7 +1869,7 @@
           "title": "VS-001 Functional AI",
           "depth_pass": "DP-081-120",
           "accountability_id": "ACC-VOL-097",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
@@ -1883,11 +1889,11 @@
           "implementation_paths": [
             "skeleton/ai",
             "backend",
-            "frontend"
+            "frontend",
+            "skeleton/ai/functional_transaction.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_vs001_functional_ai.py",
-            "planned:frontend VS-001 reconnect E2E"
+            "skeleton/testing/test_vs001_transaction_contract.py"
           ],
           "evaluations": [
             "planned:full functional AI acceptance",
@@ -1899,35 +1905,34 @@
           "title": "Acceptance: Functional AI",
           "depth_pass": "DP-081-120",
           "accountability_id": "ACC-VOL-104",
-          "implementation_status": "unverified",
+          "implementation_status": "implemented",
           "completion_checkbox": false,
           "signing_required": true,
           "contracts": [
             "FunctionalAIAcceptance",
             "AcceptanceCriterion",
-            "AcceptanceEvidence"
+            "AcceptanceEvidence",
+            "AcceptanceSignoff",
+            "Criterion"
           ],
           "risks": [
             "demo-only acceptance",
             "missing negative evidence",
             "stale signoff"
           ],
-          "gaps": [
-            "define exact acceptance matrix",
-            "bind signoff to immutable evidence bundle"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "machine",
             "docs/plan",
-            "skeleton/eval"
+            "skeleton/eval",
+            "skeleton/eval/functional_acceptance.py",
+            "skeleton/testing/test_functional_ai_acceptance.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_functional_ai_acceptance.py",
-            "planned:acceptance evidence integrity tests"
+            "skeleton/testing/test_functional_ai_acceptance.py"
           ],
           "evaluations": [
-            "planned:acceptance replay evaluation",
-            "planned:failure-mode coverage audit"
+            "skeleton/testing/test_functional_ai_acceptance.py"
           ]
         }
       ]
@@ -1939,8 +1944,8 @@
     "ready_count": 0,
     "blocked_count": 0,
     "landed_unpromoted_count": 12,
-    "scheduled_volume_count": 53,
-    "queued_volume_count": 261,
+    "scheduled_volume_count": 57,
+    "queued_volume_count": 257,
     "source_volume_count": 314
   }
 }
