@@ -28,6 +28,49 @@ class ProcessingReceipt:
 class QuarantineReceipt:
     receipt_id:str; message_id:str; reason:str; evidence_id:str
 
+
+def processing_receipt(message, write_receipt_id, effect_record_ids=()):
+    """Canonical processing evidence shared by volatile and durable ledgers."""
+    if not isinstance(message, InboundMessage):
+        raise TypeError("invalid inbound message")
+    _id(write_receipt_id, "write_receipt_id")
+    effects = tuple(sorted(effect_record_ids))
+    if len(effects) != len(set(effects)) or any(
+        not isinstance(x, str) or not x.strip() for x in effects
+    ):
+        raise ValueError("invalid effect identities")
+    record = {
+        "message_id": message.message_id,
+        "producer_id": message.producer_id,
+        "producer_epoch": message.producer_epoch,
+        "sequence": message.sequence,
+        "write_receipt_id": write_receipt_id,
+        "effect_record_ids": effects,
+        "outcome": "committed",
+    }
+    return ProcessingReceipt(
+        _h("processing-sha256:", record),
+        message.message_id, message.producer_id, message.producer_epoch,
+        message.sequence, write_receipt_id, effects, "committed",
+    )
+
+
+def quarantine_receipt(message, reason, evidence_id):
+    """Canonical quarantine evidence, never a permission to execute effects."""
+    if not isinstance(message, InboundMessage):
+        raise TypeError("invalid inbound message")
+    _id(reason, "reason")
+    _id(evidence_id, "evidence_id")
+    record = {
+        "message_id": message.message_id,
+        "reason": reason,
+        "evidence_id": evidence_id,
+    }
+    return QuarantineReceipt(
+        _h("inbox-quarantine-sha256:", record),
+        message.message_id, reason, evidence_id,
+    )
+
 class InboxLedger:
     def __init__(self,replay_window=1024):
         _u(replay_window,"replay_window")
@@ -59,14 +102,12 @@ class InboxLedger:
         self.admit(message)
         highest=self._highest.get(message.producer_id,-1)
         if message.sequence<=highest: raise PermissionError("sequence already consumed by different message")
-        x={"message_id":message.message_id,"producer_id":message.producer_id,"producer_epoch":message.producer_epoch,"sequence":message.sequence,"write_receipt_id":write_receipt_id,"effect_record_ids":effects,"outcome":"committed"}
-        r=ProcessingReceipt(_h("processing-sha256:",x),message.message_id,message.producer_id,message.producer_epoch,message.sequence,write_receipt_id,effects,"committed")
+        r = processing_receipt(message, write_receipt_id, effects)
         self._processed[message.message_id]=r;self._highest[message.producer_id]=message.sequence;return r
 
     def quarantine(self,message,reason,evidence_id):
         _id(reason,"reason");_id(evidence_id,"evidence_id")
         old=self._quarantine.get(message.message_id)
-        x={"message_id":message.message_id,"reason":reason,"evidence_id":evidence_id}
-        r=QuarantineReceipt(_h("inbox-quarantine-sha256:",x),message.message_id,reason,evidence_id)
+        r = quarantine_receipt(message, reason, evidence_id)
         if old and old!=r: raise PermissionError("quarantine evidence changed")
         self._quarantine[message.message_id]=r;return r

@@ -129,12 +129,17 @@ def load_local_model_artifact(path: str | os.PathLike[str]) -> LoadedLocalModel:
     try:
         resolved = source.resolve(strict=True)
         stat = resolved.stat()
-        raw = resolved.read_bytes()
+        if not resolved.is_file():
+            raise LocalModelArtifactError("local model artifact must be a regular file")
+        if stat.st_size < 1 or stat.st_size > _MAX_ARTIFACT_BYTES:
+            raise LocalModelArtifactError("local model artifact violates byte bounds")
+        # Reject excessive input *before* allocating, then enforce the cap
+        # during read to guard against a file growing after stat().
+        with resolved.open("rb") as stream:
+            raw = stream.read(_MAX_ARTIFACT_BYTES + 1)
     except OSError as exc:
         raise LocalModelArtifactError("local model artifact is unavailable") from exc
-    if not resolved.is_file():
-        raise LocalModelArtifactError("local model artifact must be a regular file")
-    if stat.st_size < 1 or stat.st_size > _MAX_ARTIFACT_BYTES:
+    if len(raw) > _MAX_ARTIFACT_BYTES:
         raise LocalModelArtifactError("local model artifact violates byte bounds")
     if len(raw) != stat.st_size:
         raise LocalModelArtifactError("local model artifact changed while reading")

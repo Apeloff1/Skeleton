@@ -33,3 +33,54 @@ def test_canonical_json_rejects_negative_zero_but_accepts_positive_zero():
  assert canonical_json_bytes({"n":0.0})==b'{"n":0.0}'
  with pytest.raises(CanonicalContractError,match="negative zero"):
   canonical_json_bytes({"n":-0.0})
+
+
+def test_canonical_envelope_rejects_schema_booleans_and_numeric_aliases():
+ for ambiguous in (True,1.0):
+  with pytest.raises(CanonicalContractError,match="unsupported schema version"):
+   CanonicalEnvelope(ambiguous,"vol003.contract",Identity("repo","a"*40),(),(),{}).canonical_payload()
+
+
+def test_canonical_envelope_requires_typed_identity_and_structural_fields():
+ cases=(
+  {"kind":123},
+  {"identity":{"repository":"repo","commit_sha":"a"*40}},
+  {"evidence":({"source":"repo","digest":"b"*64},)},
+  {"constraints":("ok",42)},
+  {"payload":["not-an-object"]},
+ )
+ for override in cases:
+  fields={
+   "schema_version":1,
+   "kind":"vol003.contract",
+   "identity":Identity("repo","a"*40),
+   "evidence":(EvidenceRef("repo","b"*64),),
+   "constraints":("safe",),
+   "payload":{},
+  }
+  fields.update(override)
+  with pytest.raises(CanonicalContractError):
+   CanonicalEnvelope(**fields).canonical_payload()
+
+
+
+def test_canonical_envelope_rejects_malformed_metadata_fields():
+    base = {
+        "schema_version": 1,
+        "kind": "vol003.contract",
+        "identity": Identity("repo", "a" * 40),
+        "evidence": (EvidenceRef("repo", "b" * 64),),
+        "constraints": ("safe",),
+        "payload": {},
+    }
+    invalid_cases = (
+        {"identity": Identity(123, "a" * 40)},
+        {"identity": Identity("repo", chr(0xD800))},
+        {"evidence": (EvidenceRef("", "b" * 64),)},
+        {"evidence": (EvidenceRef("repo", chr(0xDFFF)),)},
+        {"constraints": (chr(0xD800),)},
+    )
+    for override in invalid_cases:
+        fields = {**base, **override}
+        with pytest.raises(CanonicalContractError):
+            CanonicalEnvelope(**fields).canonical_payload()

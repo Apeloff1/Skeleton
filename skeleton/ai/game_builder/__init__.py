@@ -235,3 +235,67 @@ __all__ = [
     "TelemetryFeedbackGate",
     "TransformReceipt",
 ]
+
+
+# The persistent knowledge library is loaded only when requested. It never
+# implicitly creates a database, crawls a URL, or promotes a game design.
+from importlib import import_module as _game_builder_import_module
+
+_KNOWLEDGE_EXPORTS = {
+    "KnowledgeError": ".reviewed_knowledge",
+    "KnowledgePolicy": ".reviewed_knowledge",
+    "ReviewedNote": ".reviewed_knowledge",
+    "ReviewedDocument": ".reviewed_knowledge",
+    "RevisionReceipt": ".reviewed_knowledge",
+    "KnowledgeHit": ".reviewed_knowledge",
+    "KnowledgeBrief": ".reviewed_knowledge",
+    "ReviewedKnowledgeStore": ".reviewed_knowledge",
+    "ResearchHandoffError": ".knowledge_rights_bridge",
+    "ClearedResearchSource": ".knowledge_rights_bridge",
+    "ClearedResearchPacket": ".knowledge_rights_bridge",
+    "clear_research_for_design": ".knowledge_rights_bridge",
+    "require_cleared_research_current": ".knowledge_rights_bridge",
+    "GameBuildIntent": ".playable_world",
+    "TileLevel": ".playable_world",
+    "PlayableWorld": ".playable_world",
+    "PlayableWorldError": ".playable_world",
+    "generate_playable_world": ".playable_world",
+    "solve_safe_path": ".playable_world",
+    "GameplayError": ".playable_simulation",
+    "PlayState": ".playable_simulation",
+    "ActionReceipt": ".playable_simulation",
+    "GameReplay": ".playable_simulation",
+    "initial_state": ".playable_simulation",
+    "advance": ".playable_simulation",
+    "play_actions": ".playable_simulation",
+    "verify_replay": ".playable_simulation",
+    "demonstrate_solvable": ".playable_simulation",
+    "PlayableHTML": ".playable_export",
+    "PlayableExportError": ".playable_export",
+    "render_playable_world": ".playable_export",
+    "write_playable_html": ".playable_export",
+    "PlayableCompilationError": ".playable_compiler",
+    "CompiledPlayableProject": ".playable_compiler",
+    "compile_original_game": ".playable_compiler",
+    "compile_game_from_reviewed_research": ".playable_compiler",
+    "export_compiled_project": ".playable_compiler",
+    "PlayabilityAnalysisError": ".playability_analysis",
+    "LevelExperience": ".playability_analysis",
+    "PlayabilityFinding": ".playability_analysis",
+    "PlayabilityReport": ".playability_analysis",
+    "CohortExperience": ".playability_analysis",
+    "analyze_replay": ".playability_analysis",
+    "aggregate_playability": ".playability_analysis",
+}
+
+
+def __getattr__(name: str):
+    module = _KNOWLEDGE_EXPORTS.get(name)
+    if module is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(_game_builder_import_module(module, __name__), name)
+    globals()[name] = value
+    return value
+
+
+__all__ += list(_KNOWLEDGE_EXPORTS)

@@ -32509,7 +32509,7 @@
       ],
       "interest_metric": {
         "name": "requirements_without_evidence",
-        "value": 688,
+        "value": 432,
         "unit": "requirements"
       },
       "status": "open"
@@ -32806,11 +32806,7 @@
         ],
         "volume_refs": [
           "VOL-026",
-          "VOL-027",
-          "VOL-167",
-          "VOL-169",
-          "VOL-172",
-          "VOL-175"
+          "VOL-027"
         ],
         "completion_authority": "signed evidence/accountability; roadmap state alone has no authority"
       },

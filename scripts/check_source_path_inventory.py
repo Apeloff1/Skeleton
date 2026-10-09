@@ -50,6 +50,7 @@ VENDOR_PARTS = frozenset({"node_modules", "vendor", "third_party", "third-party"
 GENERATED_PREFIXES = (
     "memory/mongo_backup/",
     "backend/data/",
+    "reports/",
 )
 GENERATED_PARTS = frozenset(
     {
@@ -104,6 +105,7 @@ FIRST_PARTY_PREFIXES = (
     ".machine/",
     "machine/",
     "packaging/",
+    "volume_forge/",  # repository-owned volume assembly tooling, not canonical runtime
     "complete/",
     "apps/",
 )

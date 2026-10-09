@@ -97,6 +97,23 @@ class ProvenanceRegistry:
             return "syndication:" + entry.syndication_group.casefold().strip()
         return "owner:" + entry.ownership_group.casefold().strip()
 
+    def dependency_labels_for(self, url: str) -> tuple[str, ...] | None:
+        """Return *all* attested dependence ties for a source origin.
+
+        The historical group_for() API chooses syndication over ownership for
+        voting. Source-cluster construction must instead merge on both:
+        siblings with distinct syndication channels can share one owner.
+        Unknown publishers fail closed when attestations are required.
+        """
+        host = _hostname(url)
+        entry = self._entries.get(host)
+        if entry is None:
+            return None if self.policy.require_attestation else ("unknown-publisher",)
+        labels = ("owner:" + entry.ownership_group.casefold().strip(),)
+        if entry.syndication_group:
+            labels += ("syndication:" + entry.syndication_group.casefold().strip(),)
+        return labels
+
     def verify(
         self, claim: Claim, evidence: tuple[Evidence, ...], *,
         now: float, verification_policy: VerificationPolicy = VerificationPolicy(),

@@ -410,6 +410,11 @@ jobs:
           yarn typecheck
           yarn test:operation-stream
           yarn test:conversation
+          yarn test:product-journeys
+          yarn test:build-lifecycle
+          yarn test:knowledge-experience
+          yarn test:world-workbench
+          yarn test:design-review
           yarn export:web
 
       - name: Compile assembly surface

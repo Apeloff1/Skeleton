@@ -1,6 +1,6 @@
 {
   "schema_version": "skeleton.architecture.contract_conformance.v1",
-  "catalog_version": "0.2.0",
+  "catalog_version": "0.3.0",
   "status": "active",
   "purpose": "Complete producer/consumer plane inventory for canonical runtime records plus shared fail-closed JSON/schema conformance vectors.",
   "masterplan_binding": {
@@ -615,6 +615,34 @@
       "payload": "{\"a\":-0.0}",
       "expected": "reject",
       "reason": "negative zero has divergent cross-runtime canonicalization"
+    },
+    {
+      "id": "JSON-LONE-HIGH-SURROGATE",
+      "kind": "raw_json",
+      "payload": "{\"text\":\"\\ud800\"}",
+      "expected": "reject",
+      "reason": "an unpaired high surrogate cannot be represented as interoperable UTF-8"
+    },
+    {
+      "id": "JSON-LONE-LOW-SURROGATE-KEY",
+      "kind": "raw_json",
+      "payload": "{\"\\udc00\":0}",
+      "expected": "reject",
+      "reason": "property names must also contain valid Unicode scalar values"
+    },
+    {
+      "id": "JSON-VALID-SURROGATE-PAIR",
+      "kind": "raw_json",
+      "payload": "{\"text\":\"\\ud83d\\ude00\"}",
+      "expected": "accept",
+      "reason": "a valid escaped surrogate pair reconstructs one Unicode scalar"
+    },
+    {
+      "id": "JSON-EXCESSIVE-NESTING",
+      "kind": "raw_json",
+      "payload": "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]",
+      "expected": "reject",
+      "reason": "nested contract data must remain within the bounded parse depth"
     }
   ]
 }

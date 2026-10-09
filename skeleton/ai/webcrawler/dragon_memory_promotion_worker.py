@@ -6,7 +6,7 @@ import json
 
 from .dragon_analysis_chains import AnalysisLayer,LayerReceipt
 from .dragon_analysis_execution import LayerDispatch
-from .dragon_human_review import HumanReviewDecision
+from .dragon_human_review import HumanReviewDecision,DragonHumanReviewLedger
 from .dragon_knowledge_normalization_worker import NormalizedKnowledge
 from .dragon_knowledge_manifest import canonical_knowledge_manifest
 
@@ -75,3 +75,20 @@ def execute_memory_promotion(dispatch:LayerDispatch,
         dispatch.input_fingerprints,output_digest,human_receipt.independent_sources,
         bool(promoted),False)
     return MemoryPromotionOutput(receipt,tuple(promoted))
+
+
+def execute_memory_promotion_from_ledger(dispatch:LayerDispatch,
+    records:tuple[NormalizedKnowledge,...],*,human_receipt:LayerReceipt,
+    review_ledger:DragonHumanReviewLedger,owner:str,
+    surviving_knowledge_ids:tuple[str,...],authorized:bool,
+    minimum_probability:float=.9)->MemoryPromotionOutput:
+    """Durable promotion boundary: approval must be reloadable from the review ledger."""
+    if not authorized: raise PermissionError("memory promotion requires authorization")
+    if human_receipt.layer is not AnalysisLayer.HUMAN_APPROVAL:
+        raise PermissionError("human approval receipt required")
+    decision=review_ledger.get(owner,human_receipt.output_fingerprint,authorized=True)
+    if decision.review_id!=human_receipt.output_fingerprint:
+        raise ValueError("persisted human decision does not bind approval receipt")
+    return execute_memory_promotion(dispatch,records,human_receipt=human_receipt,
+        human_decision=decision,surviving_knowledge_ids=surviving_knowledge_ids,
+        authorized=True,minimum_probability=minimum_probability)

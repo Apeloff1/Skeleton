@@ -89,6 +89,12 @@ class SourcePathInventoryTests(unittest.TestCase):
         self.assertEqual(policy.classify_path("skeleton/vendor/third.py"), "vendor")
         self.assertEqual(policy.classify_path("backend/third_party/lib.py"), "vendor")
 
+    def test_volume_forge_is_first_party_not_canonical(self) -> None:
+        self.assertEqual(policy.classify_path("volume_forge/__init__.py"), "first-party")
+        self.assertEqual(policy.classify_path("volume_forge/assembly.py"), "first-party")
+        self.assertEqual(policy.classify_path("volume_forge/subdir/manifest.json"), "first-party")
+        self.assertEqual(policy.classify_path("volume_forge_not_owned/x.py"), "unknown")
+
     def test_skeleton_build_package_is_canonical_not_generated(self) -> None:
         self.assertEqual(
             policy.classify_path("skeleton/build/incremental_graph.py"),

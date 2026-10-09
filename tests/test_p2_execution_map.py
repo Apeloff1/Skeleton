@@ -172,5 +172,74 @@ class P2ExecutionMapTests(unittest.TestCase):
             MODULE.validate(root)
 
 
+    def test_security_tranche_owns_every_scheduled_security_volume(self) -> None:
+        master = json.loads((ROOT / "machine/ai_master_plan.json").read_text(encoding="utf-8"))
+        backlog = json.loads((ROOT / "machine/ai_p2_task_backlog.json").read_text(encoding="utf-8"))
+        task = next(t for t in backlog["tasks"] if t["task_id"] == "P2-T1-SEC-01")
+        refs = ["VOL-026", "VOL-027", "VOL-167", "VOL-169", "VOL-172", "VOL-175"]
+        self.assertEqual(task["primary_volume_refs"], refs)
+        self.assertEqual([o["volume_ref"] for o in task["masterplan_obligations"]], refs)
+        canonical = {v["key"]: v for v in master["volumes"]}
+        for obligation in task["masterplan_obligations"]:
+            with self.subTest(volume=obligation["volume_ref"]):
+                source = canonical[obligation["volume_ref"]]
+                for field in (
+                    "gaps", "risks", "contracts", "implementation_status",
+                    "completion_checkbox", "implementation_paths", "tests", "evaluations",
+                ):
+                    self.assertEqual(obligation[field], source[field])
+        for ref in refs[-4:]:
+            self.assertEqual(canonical[ref]["implementation_status"], "unverified")
+            self.assertFalse(canonical[ref]["completion_checkbox"])
+            self.assertTrue(canonical[ref]["gaps"])
+        self.assertFalse(task["completion_checkbox"])
+        self.assertFalse(task["implementation_signed"])
+        self.assertFalse(task["verification_signed"])
+
+    def test_rejects_unowned_security_volume(self) -> None:
+        root = self._fixture()
+        path = root / "machine/ai_p2_task_backlog.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        security = next(t for t in data["tasks"] if t["task_id"] == "P2-T1-SEC-01")
+        security["primary_volume_refs"].remove("VOL-172")
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with self.assertRaisesRegex(MODULE.P2ValidationError, "task ownership must equal scheduled set"):
+            MODULE.validate(root)
+
+    def test_rejects_narrowed_security_egress_tests(self) -> None:
+        root = self._fixture()
+        path = root / "machine/ai_p2_task_backlog.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        security = next(t for t in data["tasks"] if t["task_id"] == "P2-T1-SEC-01")
+        obligation = next(o for o in security["masterplan_obligations"] if o["volume_ref"] == "VOL-172")
+        obligation["tests"] = []
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with self.assertRaisesRegex(MODULE.P2ValidationError, r"narrows/drifts masterplan VOL-172.tests"):
+            MODULE.validate(root)
+
+    def test_verified_volume_does_not_promote_unsigned_task(self) -> None:
+        master = json.loads((ROOT / "machine/ai_master_plan.json").read_text(encoding="utf-8"))
+        backlog = json.loads((ROOT / "machine/ai_p2_task_backlog.json").read_text(encoding="utf-8"))
+        architecture = next(v for v in master["volumes"] if v["key"] == "VOL-002")
+        self.assertTrue(architecture["completion_checkbox"])
+        self.assertEqual(architecture["implementation_status"], "verified")
+        self.assertTrue(architecture["evidence"])
+        task = next(t for t in backlog["tasks"] if t["task_id"] == "P2-ARCH-01")
+        obligation = next(o for o in task["masterplan_obligations"] if o["volume_ref"] == "VOL-002")
+        self.assertTrue(obligation["completion_checkbox"])
+        self.assertFalse(task["completion_checkbox"])
+        self.assertFalse(task["verification_signed"])
+
+    def test_rejects_verified_volume_without_canonical_evidence(self) -> None:
+        root = self._fixture()
+        plan_path = root / "machine/ai_master_plan.json"
+        data = json.loads(plan_path.read_text(encoding="utf-8"))
+        architecture = next(v for v in data["volumes"] if v["key"] == "VOL-002")
+        architecture["evidence"] = []
+        plan_path.write_text(json.dumps(data), encoding="utf-8")
+        with self.assertRaisesRegex(MODULE.P2ValidationError, "claims completion without verified implementation and evidence"):
+            MODULE.validate(root)
+
+
 if __name__ == "__main__":
     unittest.main()
