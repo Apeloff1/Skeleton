@@ -9199,7 +9199,7 @@
   "runtime_schema_catalog": {
     "schema_version": 1,
     "status": "active",
-    "catalog_version": "1.0.0",
+    "catalog_version": "1.1.0",
     "path": "machine/ai_runtime_schemas.json",
     "policy": "typed schema catalog refines canonical envelopes; field/enum/type changes require contract-version compatibility review",
     "envelope_record_map": {
