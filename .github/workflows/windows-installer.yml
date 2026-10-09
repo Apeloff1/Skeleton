@@ -85,6 +85,21 @@ jobs:
           python -m pip install --disable-pip-version-check "pytest>=8,<9" "pydantic==2.13.5" "pydantic-settings==2.15.0"
           python -m pytest -q skeleton/testing/test_windows_installer.py
 
+      - name: Validate offline Windows network policy syntax
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            "scripts/windows/offline_network_policy.ps1",
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Format-List | Out-String | Write-Host
+            throw "Offline Windows firewall policy script did not parse"
+          }
+
       - name: Build installer
         shell: pwsh
         run: ./scripts/windows/build_installer.ps1 -SourceRef HEAD
