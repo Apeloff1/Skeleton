@@ -17,6 +17,7 @@ from skeleton.ai.runtime.inference.artifact import load_local_model_artifact
 from skeleton.ai.runtime.inference.local import LocalInferenceRequest, LocalInferenceResult, LocalInferenceEngine
 from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
 from skeleton.app.local_ai_transcript import load_transcript, save_transcript
+from skeleton.app.local_ai_gguf import OfflineGGUFSession
 
 
 MAX_USER_CHARS = 4096
@@ -88,6 +89,11 @@ class OfflineAISession:
 
     def clear(self) -> None:
         self.history = ()
+
+    @property
+    def ui_output_budget(self) -> int:
+        limits = self.backend.runtime.limits
+        return min(32, limits.max_new_tokens, max(1, limits.max_context // 4))
 
     @property
     def model_digest(self) -> str:
@@ -179,12 +185,12 @@ class OfflineAIWindow:
         self.window.geometry("850x660")
         self.window.minsize(600, 440)
         self.window.protocol("WM_DELETE_WINDOW", self.close)
-        self.session: OfflineAISession | None = None
+        self.session: OfflineAISession | OfflineGGUFSession | None = None
         self.events: Queue[tuple[str, object]] = Queue()
         self.active = False
         self.closed = False
         self.worker_loop: asyncio.AbstractEventLoop | None = None
-        self.worker_task: asyncio.Task[OfflineAnswer] | None = None
+        self.worker_task: asyncio.Task[OfflineAnswer | object] | None = None
         self.worker_lock = threading.Lock()
 
         frame = ttk.Frame(self.window, padding=14)
@@ -192,18 +198,22 @@ class OfflineAIWindow:
         ttk.Label(frame, text="Local AI · no Docker / no hosted provider", font=("Segoe UI", 13, "bold")).pack(anchor="w")
         ttk.Label(
             frame,
-            text="Runs an explicitly selected native checkpoint offline. No trained model is supplied; quality depends on your checkpoint.",
+            text="Select a native checkpoint or an operator-owned GGUF plus local llama.cpp executable. Neither model weights nor llama.cpp are bundled.",
             wraplength=790,
         ).pack(anchor="w", pady=(4, 10))
         toolbar = ttk.Frame(frame)
         toolbar.pack(fill="x")
         self.load_button = ttk.Button(toolbar, text="Load checkpoint…", command=self.choose_model)
         self.load_button.pack(side="left")
-        self.train_button = ttk.Button(toolbar, text="Train small local model…", command=self.train_model)
+        self.gguf_button = ttk.Button(toolbar, text="Load GGUF…", command=self.choose_gguf)
+        self.gguf_button.pack(side="left", padx=4)
+        tools_row = ttk.Frame(frame)
+        tools_row.pack(fill="x", pady=(3, 3))
+        self.train_button = ttk.Button(tools_row, text="Train small local model…", command=self.train_model)
         self.train_button.pack(side="left", padx=4)
-        self.improve_button = ttk.Button(toolbar, text="Improve model…", command=self.improve_model)
+        self.improve_button = ttk.Button(tools_row, text="Improve model…", command=self.improve_model)
         self.improve_button.pack(side="left", padx=4)
-        self.benchmark_button = ttk.Button(toolbar, text="Evaluate…", command=self.benchmark_model)
+        self.benchmark_button = ttk.Button(tools_row, text="Evaluate…", command=self.benchmark_model)
         self.benchmark_button.pack(side="left", padx=4)
         self.clear_button = ttk.Button(toolbar, text="New conversation", command=self.clear)
         self.clear_button.pack(side="left", padx=8)
@@ -227,18 +237,19 @@ class OfflineAIWindow:
 
     def _refresh(self) -> None:
         self.load_button.configure(state="disabled" if self.active else "normal")
+        self.gguf_button.configure(state="disabled" if self.active else "normal")
         self.train_button.configure(state="disabled" if self.active else "normal")
         self.improve_button.configure(
-            state="normal" if self.session is not None and not self.active else "disabled"
+            state="normal" if isinstance(self.session, OfflineAISession) and not self.active else "disabled"
         )
         self.benchmark_button.configure(
-            state="normal" if self.session is not None and not self.active else "disabled"
+            state="normal" if isinstance(self.session, OfflineAISession) and not self.active else "disabled"
         )
         self.send_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
         self.clear_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
         self.cancel_button.configure(state="normal" if self.active else "disabled")
-        self.open_history_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
-        self.save_history_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
+        self.open_history_button.configure(state="normal" if isinstance(self.session, OfflineAISession) and not self.active else "disabled")
+        self.save_history_button.configure(state="normal" if isinstance(self.session, OfflineAISession) and not self.active else "disabled")
 
     def _append(self, speaker: str, text: str) -> None:
         self.transcript.configure(state="normal")
@@ -268,6 +279,49 @@ class OfflineAIWindow:
                 self.events.put(("error", str(exc)))
 
         threading.Thread(target=work, name="skeleton-local-model-load", daemon=True).start()
+
+    def choose_gguf(self) -> None:
+        """Explicitly select both existing artifacts; no installation/download."""
+        if self.active:
+            return
+        from tkinter import messagebox
+
+        executable = self.filedialog.askopenfilename(
+            parent=self.window,
+            title="Select EXISTING local llama.cpp executable",
+            filetypes=[("Executable", "*.exe"), ("All files", "*.*")],
+        )
+        if not executable:
+            return
+        model = self.filedialog.askopenfilename(
+            parent=self.window,
+            title="Select operator-owned GGUF model weights",
+            filetypes=[("GGUF open weights", "*.gguf"), ("All files", "*.*")],
+        )
+        if not model:
+            return
+        if not messagebox.askyesno(
+            "Run local llama.cpp executable",
+            "This starts the explicitly selected LOCAL executable to run the "
+            "selected GGUF weights. Nothing is downloaded, and hosted API "
+            "credentials are excluded from its process environment. Continue?",
+            parent=self.window,
+        ):
+            return
+        self.active = True
+        self.status.set("Validating local GGUF and llama.cpp executable identities…")
+        self._refresh()
+
+        def work() -> None:
+            try:
+                session = OfflineGGUFSession(executable, model)
+                self.events.put(("loaded_gguf", session))
+            except Exception as exc:
+                self.events.put(("error", str(exc)))
+
+        threading.Thread(
+            target=work, name="skeleton-operator-gguf-load", daemon=True,
+        ).start()
 
     def train_model(self) -> None:
         """Bootstrap one genuine, tiny CPU checkpoint from user-chosen text.
@@ -528,7 +582,7 @@ class OfflineAIWindow:
 
         def work() -> None:
             async def generate() -> OfflineAnswer:
-                task = asyncio.create_task(session.ask(prompt, max_output_tokens=min(32, session.backend.runtime.limits.max_new_tokens, max(1, session.backend.runtime.limits.max_context // 4))))
+                task = asyncio.create_task(session.ask(prompt, max_output_tokens=session.ui_output_budget))
                 with self.worker_lock:
                     self.worker_loop = asyncio.get_running_loop()
                     self.worker_task = task
@@ -608,6 +662,17 @@ class OfflineAIWindow:
                         + f"corpus perplexity {receipt.initial_perplexity:.2f} → "
                         + f"{receipt.final_perplexity:.2f} · not quality certified"
                     )
+                elif kind == "loaded_gguf":
+                    self.session = value  # type: ignore[assignment]
+                    self.clear()
+                    backend = self.session.backend
+                    self.status.set(
+                        "Operator-owned GGUF ready · "
+                        + str(backend.model_artifact.size_bytes)
+                        + " bytes · "
+                        + self.session.model_digest[:12]
+                        + "… · tokenizer counts estimated; no transcript persistence"
+                    )
                 elif kind == "loaded":
                     self.session = value  # type: ignore[assignment]
                     self.clear()
@@ -623,7 +688,12 @@ class OfflineAIWindow:
                     answer = value
                     self._append("Skeleton · Local", answer.text)  # type: ignore[attr-defined]
                     self.status.set(
-                        "Completed · " + str(answer.input_tokens) + " input / " + str(answer.output_tokens) + " output tokens · receipt " + answer.execution_receipt_digest[:12]  # type: ignore[attr-defined]
+                        "Completed · " + str(answer.input_tokens) + " input / " + str(answer.output_tokens)
+                        + " output tokens · " + (
+                            "receipt " + answer.execution_receipt_digest[:12]
+                            if answer.execution_receipt_digest else
+                            "no execution receipt from this backend; GGUF token counts estimated"
+                        )
                     )
                 else:
                     self._append("Local runtime", "Request rejected: " + str(value))
