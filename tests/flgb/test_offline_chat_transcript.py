@@ -168,6 +168,39 @@ class TestLocalTranscript(unittest.TestCase):
         with self.assertRaises(LocalTranscriptError):
             decode_transcript(invalid, model_digest=MODEL, tokenizer_digest=TOKENIZER)
 
+    def test_offline_checkpoint_inspection_is_concrete_and_credential_free(self) -> None:
+        from skeleton.app.cli import run_app_cli
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "model.json"
+            trained = backend()
+            write_local_model_artifact(trained, path)
+            out = StringIO()
+            with patch.dict("os.environ", {"OPENAI_API_KEY": "", "ANTHROPIC_API_KEY": ""}):
+                with redirect_stdout(out):
+                    code = run_app_cli(["local-ai", "--model", str(path), "--inspect-model", "--json"])
+            self.assertEqual(code, 0, out.getvalue())
+            info = json.loads(out.getvalue())
+            self.assertEqual(info["model_digest"], trained.model_digest)
+            self.assertEqual(info["tokenizer_digest"], trained.tokenizer_digest)
+            self.assertGreater(info["model_bytes"], 0)
+            self.assertGreater(info["max_context_tokens"], 0)
+            self.assertFalse(info["model_quality_certified"])
+            self.assertFalse(info["network_required"])
+
+    def test_model_inspection_rejects_prompt_or_missing_checkpoint(self) -> None:
+        from skeleton.app.cli import run_app_cli
+
+        for arguments in (
+            ["local-ai", "--inspect-model"],
+            ["local-ai", "--model", "/nonexistent.json", "--inspect-model", "--prompt", "hello"],
+        ):
+            with self.subTest(args=arguments):
+                out = StringIO()
+                with redirect_stdout(out):
+                    code = run_app_cli(arguments)
+                self.assertEqual(code, 2)
+
     def test_cli_refuses_unbound_chat_options(self) -> None:
         from skeleton.app.cli import run_app_cli
         for option in ("--load-chat", "--save-chat"):
