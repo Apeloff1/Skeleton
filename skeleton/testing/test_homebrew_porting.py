@@ -258,3 +258,87 @@ def test_editor_changes_affect_destination_but_never_suggest_third_party_assets(
     assert result["source"]["source_capsule_sha256"] == revised["capsule_sha256"]
     assert verify_port_gameplay(revised, result)["hybrid_gameplay_proven"]
     assert result["third_party_asset_import_allowed"] is False
+
+
+def test_headless_frozen_console_rechecks_real_destination_hybrid_win(
+    tmp_path: Path, capsys,
+):
+    from skeleton.app.offline_cli import main as offline
+    from skeleton.app.cli import run_app_cli
+    source = original()
+    blueprint = make_homebrew_port(
+        source, creative_mode="hybrid_original",
+        art_direction="neon_noir", quality="cinematic",
+        hybrids=["collectathon", "keyquest", "speedrun", "exploration", "combo"],
+    )
+    original_path = tmp_path / "original.json"
+    port_path = tmp_path / "enhanced.json"
+    original_path.write_text(json.dumps(source), encoding="utf-8")
+    port_path.write_text(json.dumps(blueprint), encoding="utf-8")
+    command = [
+        "--homebrew-port-check", "--homebrew-port-project", str(original_path),
+        "--homebrew-port-blueprint", str(port_path), "--json",
+    ]
+    assert offline(command) == 0
+    receipt = json.loads(capsys.readouterr().out)
+    assert receipt["hybrid_gameplay_proven"] is True
+    assert receipt["original_gameplay_proven"] is True
+    assert receipt["remaining_collectibles"] == 0
+    assert receipt["legal_release_authorized"] is False
+    assert receipt["training_examples_added"] == 0
+    assert run_app_cli(["local-ai", *command]) == 0
+    assert json.loads(capsys.readouterr().out) == receipt
+    assert offline(["--homebrew-port-check", "--json"]) == 2
+    assert offline(["--homebrew-port-project", str(original_path)]) == 2
+    tampered = copy.deepcopy(blueprint)
+    tampered["third_party_asset_import_allowed"] = True
+    port_path.write_text(json.dumps(tampered), encoding="utf-8")
+    assert offline(command) == 1
+    assert "rejected" in capsys.readouterr().err
+
+
+def test_native_game_executable_selects_enhanced_homebrew_and_refuses_mixed_modes(
+    monkeypatch,
+):
+    import importlib.util
+    from pathlib import Path
+    entrypoint = Path("packaging/windows/game_preview_entry.py").resolve()
+    spec = importlib.util.spec_from_file_location("homebrew_ported_game_entry", entrypoint)
+    assert spec is not None and spec.loader is not None
+    entry = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(entry)
+    calls = []
+    monkeypatch.setattr(entry, "open_native_homebrew_port",
+                        lambda project, blueprint: calls.append((project, blueprint)) or 0)
+    assert entry.main(["--project", "authored.json", "--port-blueprint", "port.json"]) == 0
+    assert calls == [("authored.json", "port.json")]
+    with pytest.raises(SystemExit) as failure:
+        entry.main(["--port-blueprint", "port.json"])
+    assert failure.value.code == 2
+    with pytest.raises(SystemExit) as failure:
+        entry.main(["--chip8-demo", "--port-blueprint", "port.json"])
+    assert failure.value.code == 2
+
+
+def test_native_port_ui_treats_unavailable_window_as_nonfatal_to_headless_acceptance(
+    tmp_path: Path, monkeypatch,
+):
+    import sys
+    from types import SimpleNamespace
+    from skeleton.app.homebrew_port_ui import open_native_homebrew_port
+    source = original()
+    port = make_homebrew_port(source, hybrids=["collectathon", "exploration"])
+    original_path = tmp_path / "original.json"
+    port_path = tmp_path / "windows-port.json"
+    original_path.write_text(json.dumps(source), encoding="utf-8")
+    port_path.write_text(json.dumps(port), encoding="utf-8")
+    class NoDisplay(Exception):
+        pass
+    def fail_root():
+        raise NoDisplay()
+    monkeypatch.setitem(sys.modules, "tkinter", SimpleNamespace(
+        Tk=fail_root, TclError=NoDisplay,
+    ))
+    with pytest.raises(HomebrewPortError, match="display"):
+        open_native_homebrew_port(str(original_path), str(port_path))
+    assert verify_port_gameplay(source, port)["hybrid_gameplay_proven"]
