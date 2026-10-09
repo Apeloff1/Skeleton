@@ -192,10 +192,27 @@ def improve_local_model(
     # aliases that become identical through the *actual* canonical tokenizer.
     # Prevent the same token sequence from acting as both training and
     # supposed held-out validation evidence.
-    if {tuple(tokens(line)) for line in train_lines} & {
-        tuple(tokens(line)) for line in heldout_lines
-    }:
-        raise OfflineImprovementError("held-out evaluation overlaps normalized training tokens")
+    train_sequences = [tuple(tokens(line)) for line in train_lines]
+    eval_sequences = [tuple(tokens(line)) for line in heldout_lines]
+
+    def contains_sequence(haystack: tuple[str, ...], needle: tuple[str, ...]) -> bool:
+        if len(needle) < 3 or len(haystack) < len(needle):
+            return False
+        return any(
+            haystack[offset:offset + len(needle)] == needle
+            for offset in range(len(haystack) - len(needle) + 1)
+        )
+
+    for train_sequence in train_sequences:
+        for heldout_sequence in eval_sequences:
+            if (
+                train_sequence == heldout_sequence
+                or contains_sequence(train_sequence, heldout_sequence)
+                or contains_sequence(heldout_sequence, train_sequence)
+            ):
+                raise OfflineImprovementError(
+                    "held-out evaluation overlaps normalized training tokens"
+                )
 
     protected_evidence = None
     protected_baseline = None
