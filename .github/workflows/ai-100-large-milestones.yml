@@ -16,6 +16,12 @@ on:
 permissions:
   contents: read
 
+# Bound parallel authority checks to their own PR/ref; unrelated PRs must
+# never cancel one another, while obsolete exact-head runs can be replaced.
+concurrency:
+  group: ai-100-large-milestones-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     name: Verify 100 milestones and canonical source pins
