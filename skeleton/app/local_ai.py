@@ -17,7 +17,8 @@ import threading
 from typing import Any
 
 from skeleton.ai.model_runtime.offline_chat import (
-    OfflineChatStore, load_private_bundle, save_private_bundle,
+    OfflineChatStore, _digest_request, _identifier,
+    load_private_bundle, save_private_bundle,
 )
 from skeleton.ai.model_runtime.runtime_contracts import GenerationConfig
 from skeleton.ai.runtime.inference.artifact import load_local_model_artifact
@@ -310,7 +311,10 @@ class DurableOfflineAISession(OfflineAISession):
         if session_id == self.session_id:
             self.create_conversation()
 
-    async def ask(self, prompt: str, *, max_output_tokens: int = 32) -> OfflineAnswer:
+    async def ask(self, prompt: str, *, max_output_tokens: int = 32,
+                  request_id: str | None = None) -> OfflineAnswer:
+        rid = (_identifier("request id", request_id)
+               if request_id is not None else secrets.token_urlsafe(18))
         with self._busy_lock:
             if self._busy:
                 raise OfflineAIError("a local generation is already running")
@@ -345,10 +349,9 @@ class DurableOfflineAISession(OfflineAISession):
             # GenerationConfig matches the actual local request's seed and
             # bounded output budget; random IDs avoid accidental replay.
             config = GenerationConfig(max_new_tokens=max_output_tokens)
-            from skeleton.ai.model_runtime.offline_chat import _digest_request
             self.store.commit(
                 session=saved,
-                request_id=secrets.token_urlsafe(18),
+                request_id=rid,
                 request_digest=_digest_request(prompt.strip(), config),
                 transcript=transcript,
                 text=answer.text,
