@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import os
 from pathlib import Path
+import secrets
 import subprocess
 import sys
 import threading
@@ -176,6 +177,11 @@ class WindowsLauncher:
 
         self.status = tk.StringVar(value="Checking system…")
         self._buttons: list[ttk.Button] = []
+        self._browser_lock = threading.RLock()
+        self._browser_server = None
+        self._browser_app = None
+        self._browser_worker = None
+        self._browser_token_file: Path | None = None
 
         outer = ttk.Frame(self.window, padding=20)
         outer.pack(fill="both", expand=True)
@@ -205,6 +211,15 @@ class WindowsLauncher:
         self._add_button(buttons, "Open App", self.open_app)
         self._add_button(buttons, "Local AI (offline)", self.local_ai)
         self._add_button(buttons, "Stop", self.stop)
+
+        offline_buttons = ttk.Frame(outer)
+        offline_buttons.pack(fill="x", pady=(0, 12))
+        self._add_button(
+            offline_buttons, "Launch Offline Browser AI", self.browser_ai
+        )
+        self._add_button(
+            offline_buttons, "Stop Offline Browser", self.stop_browser_ai
+        )
 
         helper = ttk.Frame(outer)
         helper.pack(fill="x", pady=(0, 10))
@@ -326,12 +341,141 @@ class WindowsLauncher:
         self._local_ai_window = open_offline_ai(self.window)
         self.status.set("Local AI window opened")
 
+    def _start_browser_service(self, selected: Path, *, gguf: bool) -> str:
+        """Start one authenticated loopback service owned by this launcher.
+
+        Admission happens without Docker or any remote-model fallback. The
+        file contains the only browser credential and is created mode 0600.
+        """
+        from skeleton.app.local_ai import (
+            load_gguf_deployment, load_native_checkpoint,
+            private_desktop_database,
+        )
+        from skeleton.app.offline_http import (
+            LocalOnlyHTTPServer, OfflineHTTPApplication, create_token_file,
+        )
+
+        with self._browser_lock:
+            if self._browser_server is not None:
+                url = "http://127.0.0.1:" + str(
+                    self._browser_server.server_port
+                ) + "/"
+                return "Offline browser already running at " + url
+
+        backend = (
+            load_gguf_deployment(selected) if gguf
+            else load_native_checkpoint(selected)
+        )
+        db = private_desktop_database(backend.model_digest)
+        token = secrets.token_urlsafe(48)
+        app = OfflineHTTPApplication(backend, db, token=token)
+        server = None
+        credential_file = (
+            db.parent / ("browser-" + secrets.token_hex(12) + ".secret")
+        )
+        try:
+            server = LocalOnlyHTTPServer(app, port=0)
+            # Do not write a credential until the socket is definitely bound.
+            create_token_file(credential_file, token=token)
+            thread = threading.Thread(
+                target=server.serve_forever,
+                kwargs={"poll_interval": 0.1},
+                name="skeleton-offline-browser-service",
+                daemon=True,
+            )
+            thread.start()
+            with self._browser_lock:
+                self._browser_server = server
+                self._browser_app = app
+                self._browser_worker = thread
+                self._browser_token_file = credential_file
+            url = "http://127.0.0.1:" + str(server.server_port) + "/"
+            webbrowser.open(url)
+            return (
+                "Offline AI browser: " + url + "\n"
+                "Paste the local bearer token from this owner-only file:\n"
+                + str(credential_file) + "\n"
+                "The server stops when Skeleton closes. No hosted provider."
+            )
+        except BaseException:
+            if server is not None:
+                server.server_close()
+            app.close()
+            credential_file.unlink(missing_ok=True)
+            raise
+
+    def browser_ai(self) -> None:
+        from tkinter import filedialog, messagebox
+
+        with self._browser_lock:
+            if self._browser_server is not None:
+                url = "http://127.0.0.1:" + str(
+                    self._browser_server.server_port
+                ) + "/"
+                webbrowser.open(url)
+                self.status.set("Opened existing offline browser.")
+                return
+        gguf = messagebox.askyesno(
+            "Choose local AI model",
+            "Use an installed GGUF/llama.cpp deployment manifest?\n\n"
+            "Yes: select GGUF manifest. No: select native checkpoint.",
+            parent=self.window,
+        )
+        chosen = filedialog.askopenfilename(
+            parent=self.window,
+            title=("Select local GGUF deployment manifest"
+                   if gguf else "Select local native model checkpoint"),
+            filetypes=[("JSON model manifest", "*.json"), ("All files", "*.*")],
+        )
+        if not chosen:
+            return
+        path = Path(chosen)
+        self._run_worker(
+            "Admitting local model and starting offline browser…",
+            lambda: self._start_browser_service(path, gguf=gguf),
+            lambda text: text,
+        )
+
+    def _stop_browser_service(self) -> str:
+        with self._browser_lock:
+            server, app, thread, token_path = (
+                self._browser_server, self._browser_app,
+                self._browser_worker, self._browser_token_file,
+            )
+            self._browser_server = None
+            self._browser_app = None
+            self._browser_worker = None
+            self._browser_token_file = None
+        if server is None:
+            return "Offline browser service is not running."
+        try:
+            server.shutdown()
+            server.server_close()
+            if thread is not None:
+                thread.join(timeout=10)
+        finally:
+            if app is not None:
+                app.close()
+            if token_path is not None:
+                token_path.unlink(missing_ok=True)
+        return "Offline browser stopped. Ephemeral bearer-token file deleted."
+
+    def stop_browser_ai(self) -> None:
+        self._run_worker(
+            "Stopping offline browser…",
+            self._stop_browser_service,
+            lambda outcome: outcome,
+        )
+
     def open_docker(self) -> None:
         webbrowser.open(DOCKER_DESKTOP_URL)
 
     def run(self) -> int:
-        self.window.mainloop()
-        return 0
+        try:
+            self.window.mainloop()
+            return 0
+        finally:
+            self._stop_browser_service()
 
 
 def _headless(args: argparse.Namespace, root: Path) -> int:
