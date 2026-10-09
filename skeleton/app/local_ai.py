@@ -21,6 +21,7 @@ from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
 from skeleton.app.offline_history import backup_history, restore_history
 from skeleton.app.offline_workspace import DurableOfflineSession
 from skeleton.app.offline_library import OfflineDocumentLibrary, render_local_context
+from skeleton.app.offline_audit import audit_database
 
 
 MAX_USER_CHARS = 4096
@@ -326,6 +327,10 @@ class OfflineAIWindow:
             variable=self.library_context_enabled,
         )
         self.use_library_check.pack(side="left", padx=8)
+        self.audit_button = ttk.Button(
+            library_toolbar, text="Audit local state", command=self.audit_local_state
+        )
+        self.audit_button.pack(side="right")
         self.status = tk.StringVar(value="Choose a local native model checkpoint to begin.")
         ttk.Label(frame, textvariable=self.status, wraplength=790).pack(anchor="w", pady=8)
         self.transcript = scrolledtext.ScrolledText(frame, state="disabled", wrap="word", height=18, font=("Segoe UI", 10))
@@ -364,6 +369,12 @@ class OfflineAIWindow:
             state="normal"
             if self.library is not None and self.session is not None and not self.active
             else "disabled"
+        )
+        self.audit_button.configure(
+            state="normal"
+            if not self.active and (
+                self.library is not None or isinstance(self.session, DurableOfflineSession)
+            ) else "disabled"
         )
         self.send_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
         self.clear_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
@@ -495,6 +506,30 @@ class OfflineAIWindow:
                 self.events.put(("library_error", str(exc)))
 
         threading.Thread(target=work, name="skeleton-offline-indexer", daemon=True).start()
+
+    def audit_local_state(self) -> None:
+        """Read-only semantic verification; never silently rewrite user data."""
+        if self.active:
+            return
+        targets: list[tuple[str, Path]] = []
+        if self.library is not None:
+            targets.append(("library", self.library.path))
+        if isinstance(self.session, DurableOfflineSession):
+            targets.append(("workspace", self.session.store.path))
+        if not targets:
+            return
+        self.active = True
+        self.status.set("Auditing local SQLite state and source integrity…")
+        self._refresh()
+
+        def work() -> None:
+            try:
+                results = [audit_database(path, kind) for kind, path in targets]
+                self.events.put(("audited", results))
+            except Exception as exc:
+                self.events.put(("library_error", str(exc)))
+
+        threading.Thread(target=work, name="skeleton-offline-data-audit", daemon=True).start()
 
     def search_library(self) -> None:
         if self.active or self.library is None:
@@ -652,6 +687,12 @@ class OfflineAIWindow:
                         "Indexed " + str(summary["indexed_files"]) + " local files · "
                         + str(summary["updated_files"]) + " updated · "
                         + str(summary["removed_files"]) + " removed"
+                    )
+                elif kind == "audited":
+                    findings = value
+                    self.status.set(
+                        "Local semantic integrity PASS · " +
+                        ", ".join(str(item["kind"]) for item in findings)
                     )
                 elif kind == "library_hits":
                     matches = value
