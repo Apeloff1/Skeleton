@@ -249,8 +249,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         report = verify_regeneration(source)
         if args.output is not None:
             target = args.output.expanduser()
-            if target.exists() or target.is_symlink() or not target.parent.is_dir():
-                raise SyntheticCurriculumError("dataset generator requires a new output directory")
+            if (
+                target.exists() or target.is_symlink() or not target.parent.is_dir()
+                or target.absolute().is_relative_to(source.resolve())
+            ):
+                raise SyntheticCurriculumError(
+                    "dataset generator requires a new directory outside the source dataset"
+                )
             target.mkdir(mode=0o700)
             files = expected_files()
             files["manifest.json"] = (source / "manifest.json").read_bytes()
