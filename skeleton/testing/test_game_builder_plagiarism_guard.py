@@ -256,3 +256,76 @@ def test_small_self_similar_generic_code_is_not_an_automatic_copyright_violation
     code = ExpressionSample("own", "source_code", "score += 1; health -= 1")
     reference = ExpressionSample("public", "source_code", "score += 1; health -= 1")
     assert find_expression_overlap(code, reference) is None
+
+
+def test_originality_report_attaches_to_exact_playable_game_digest(tmp_path):
+    from skeleton.ai.game_builder.playable_world import GameBuildIntent, generate_playable_world
+    from skeleton.ai.game_builder.port_planner import HomebrewSource
+    from skeleton.ai.game_builder.legal_paths import (
+        CreativeMode, HardwareAccessFacts, HomebrewLegalRequest,
+        Jurisdiction, MaterialKind, MaterialRecord,
+    )
+    from skeleton.ai.game_builder.legal_native_export import (
+        ClearedSourceExportError, compile_originality_gated_desktop,
+        export_rights_aware_desktop,
+    )
+
+    project = "lawful-evolution-game"
+    world = generate_playable_world(
+        GameBuildIntent(
+            project_id=project, title="Fresh orbit game", subtitle="New worlds",
+            seed=8461, width=11, height=11, levels=1,
+            collectibles_per_level=1, hazards_per_level=0,
+        ),
+        authorized=True,
+    )
+    evidence = "a" * 64
+    source = HomebrewSource(
+        project, "sega_dreamcast", "project_owned", evidence,
+        ("new authored characters", "new tile puzzle", "new soundtrack"),
+    )
+    facts = HomebrewLegalRequest(
+        project_id=project, source_platform_id="sega_dreamcast",
+        target_platform_id="windows_modern", mode=CreativeMode.ORIGINAL,
+        jurisdictions=(Jurisdiction.NO, Jurisdiction.EU_EEA),
+        materials=(
+            MaterialRecord("story", "story_dialogue", MaterialKind.ORIGINAL_EXPRESSION, PROOF),
+        ), hardware=HardwareAccessFacts(), rights_packet_sha256=evidence,
+    )
+    audit = audit_game_originality(
+        project, assets=make_assets(), candidate_samples=(sample(),),
+        references=(external(SYNTHETIC_OTHER),), artifact_sha256=world.digest,
+    )
+    package = compile_originality_gated_desktop(
+        world, source, facts, originality=audit, authorized=True,
+    )
+    receipt = package.legal_receipt()
+    assert receipt["plagiarism_screened"] is True
+    assert receipt["originality_artifact_bound"] is True
+    assert receipt["originality_screen_digest"] == audit.screen_digest
+    assert receipt["false_claim_of_plagiarism_free"] is False
+    assert receipt["release_authorized"] is False
+    exported = export_rights_aware_desktop(package, tmp_path / "original", authorized=True)
+    assert (exported / "legal_review.json").is_file()
+    assert __import__("json").loads(
+        (exported / "legal_review.json").read_text(),
+    )["originality_screen_digest"] == audit.screen_digest
+    wrong_audit = replace(audit, artifact_sha256="f" * 64)
+    with pytest.raises(ClearedSourceExportError):
+        compile_originality_gated_desktop(world, source, facts,
+                                         originality=wrong_audit, authorized=True)
+    with pytest.raises(ClearedSourceExportError):
+        compile_originality_gated_desktop(world, source, facts,
+                                         originality=run(references=(external(SYNTHETIC_TEXT),)),
+                                         authorized=True)
+    with pytest.raises(ClearedSourceExportError):
+        compile_originality_gated_desktop(world, source, facts,
+                                         originality=None, authorized=True)
+
+
+def test_unverified_plagiarism_input_cannot_self_certify_complete_source_search():
+    baseline = run()
+    assert baseline.design_admissible
+    assert baseline.public_receipt()["external_sources_exhaustively_searched"] is False
+    with pytest.raises(OriginalityError):
+        run(candidates=(ExpressionSample("bad", "story_dialogue", "", PROOF),))
