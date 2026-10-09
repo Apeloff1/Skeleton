@@ -379,3 +379,51 @@ def test_extra_manifest_authority_and_duplicate_json_fields_fail_closed(
     path.write_text(raw, encoding="utf-8")
     with pytest.raises(SyntheticCurriculumError, match="duplicate"):
         validate_curriculum(root)
+
+
+def test_operator_reference_bank_requires_explicit_full_training_selection(
+    tmp_path: Path, capsys,
+) -> None:
+    from scripts.training.verify_offline_foundations import main
+
+    # Default export is tiny; full training bank needs a deliberately
+    # different flag and is *never* selected by default.
+    sparse = tmp_path / "default.txt"
+    full = tmp_path / "reference.txt"
+    assert main(["--dataset", str(SOURCE), "--export-train", str(sparse)]) == 0
+    capsys.readouterr()
+    assert sparse.read_bytes().count(b"<user>\n") == 36
+
+    assert main([
+        "--dataset", str(SOURCE), "--export-reference-bank", str(full),
+    ]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["exported_training_rows"] == 504
+    assert result["full_bank_explicitly_selected"] is True
+    assert full.read_bytes() == (SOURCE / "train_corpus.txt").read_bytes()
+    assert full.read_bytes().count(b"<user>\n") == 504
+    assert main([
+        "--dataset", str(SOURCE), "--export-reference-bank", str(full),
+    ]) == 1
+    assert full.read_bytes().count(b"<user>\n") == 504
+
+
+def test_operator_heldout_score_defaults_to_validation_split(
+    tmp_path: Path, capsys,
+) -> None:
+    from scripts.training.verify_offline_foundations import main
+
+    rows = _rows(SOURCE, "validation")
+    file = tmp_path / "predictions.jsonl"
+    file.write_text(
+        "".join(
+            json.dumps({"id": item["id"], "prediction": item["response"]}) + "\n"
+            for item in rows
+        ), encoding="utf-8",
+    )
+    assert main(["--dataset", str(SOURCE), "--evaluate", str(file)]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["split"] == "validation"
+    assert report["correct"] == 108
+    assert report["total"] == 108
+    assert report["trained_weights_promoted"] is False
