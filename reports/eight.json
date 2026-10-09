@@ -1,0 +1,11 @@
+{
+  "files": 8,
+  "lines_each": 12600009,
+  "lines": 100800072,
+  "bytes_each": 497289093,
+  "funcs_each": 1400000,
+  "census": "wc -l emit8/f*.py",
+  "stored_prose": 0,
+  "clip": 1.1,
+  "tree_in_git": false
+}

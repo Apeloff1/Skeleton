@@ -2,6 +2,8 @@
 
 Machine authority: `machine/runtime_supervision.json`
 
+<!-- machine-git-blob: machine/runtime_supervision.json@4937096ee0ddfe9d5697cbe42dccbd40cfefae8e -->
+
 ## Purpose
 
 VOL-004 defines one runtime-supervision model for the application backend,

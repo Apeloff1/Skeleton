@@ -4814,7 +4814,7 @@
       "volume_ref": "VOL-241",
       "title": "Prompt / Instruction Registry",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -4823,7 +4823,7 @@
       "volume_ref": "VOL-242",
       "title": "Prompt Regression Testing",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -4868,7 +4868,7 @@
       "volume_ref": "VOL-247",
       "title": "Temporal Knowledge",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -4886,7 +4886,7 @@
       "volume_ref": "VOL-249",
       "title": "Hypothesis Engine",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -4895,7 +4895,7 @@
       "volume_ref": "VOL-250",
       "title": "Causal Knowledge",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -4985,7 +4985,7 @@
       "volume_ref": "VOL-260",
       "title": "Migration Engine",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -4994,7 +4994,7 @@
       "volume_ref": "VOL-261",
       "title": "Legacy Compatibility",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -5003,7 +5003,7 @@
       "volume_ref": "VOL-262",
       "title": "Deprecation Process",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -5012,7 +5012,7 @@
       "volume_ref": "VOL-263",
       "title": "Architecture Archaeology",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -5021,7 +5021,7 @@
       "volume_ref": "VOL-264",
       "title": "Repository Consolidation Engine",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -5030,7 +5030,7 @@
       "volume_ref": "VOL-265",
       "title": "Code Provenance",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -5039,7 +5039,7 @@
       "volume_ref": "VOL-266",
       "title": "Duplication Detector",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -5048,7 +5048,7 @@
       "volume_ref": "VOL-267",
       "title": "Module Ownership",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -5057,7 +5057,7 @@
       "volume_ref": "VOL-268",
       "title": "CODEOWNERS Generation",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -5066,7 +5066,7 @@
       "volume_ref": "VOL-269",
       "title": "Documentation as Code",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -5075,7 +5075,7 @@
       "volume_ref": "VOL-270",
       "title": "Diagram as Code",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -5084,7 +5084,7 @@
       "volume_ref": "VOL-271",
       "title": "Architecture Snapshots",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -5093,7 +5093,7 @@
       "volume_ref": "VOL-272",
       "title": "Release Reproducibility",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -5102,7 +5102,7 @@
       "volume_ref": "VOL-273",
       "title": "Build Hermeticity",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -5111,7 +5111,7 @@
       "volume_ref": "VOL-274",
       "title": "Build Cache",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -5120,7 +5120,7 @@
       "volume_ref": "VOL-275",
       "title": "Binary Provenance",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -5129,7 +5129,7 @@
       "volume_ref": "VOL-276",
       "title": "Installer Security",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -5138,7 +5138,7 @@
       "volume_ref": "VOL-277",
       "title": "Update Security",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -5147,7 +5147,7 @@
       "volume_ref": "VOL-278",
       "title": "Bootstrap Recovery",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -5156,7 +5156,7 @@
       "volume_ref": "VOL-279",
       "title": "Crash Diagnostics",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -5165,7 +5165,7 @@
       "volume_ref": "VOL-280",
       "title": "Support Bundle",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     }
   ],

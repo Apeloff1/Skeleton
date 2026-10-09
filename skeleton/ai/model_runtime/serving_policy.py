@@ -3,10 +3,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+import hmac
 import hashlib
 import json
+from unicodedata import category, normalize
 
 from .runtime_policy import RuntimePolicy
+from .flgb_model_runtime import MAX_TOKENS, require_id
 
 
 class ServiceClass(str, Enum):
@@ -27,16 +30,28 @@ class ServingRequest:
     draft_model_available: bool = False
 
     def __post_init__(self) -> None:
-        if not self.request_id:
-            raise ValueError("request_id required")
+        try:
+            require_id(self.request_id, "serving request_id")
+            self.request_id.encode("utf-8", errors="strict")
+            if normalize("NFC", self.request_id) != self.request_id:
+                raise ValueError("serving request_id must be NFC canonical")
+            if any(category(ch) in {"Cc", "Cf", "Cs"} for ch in self.request_id):
+                raise ValueError("serving request_id contains control character")
+        except (ValueError, UnicodeError) as exc:
+            raise ValueError("invalid serving request_id") from exc
+        if not isinstance(self.service_class, ServiceClass):
+            raise ValueError("ServiceClass required")
         for name in ("prompt_tokens", "output_tokens", "prefix_tokens"):
             value = getattr(self, name)
-            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            if type(value) is not int or not 0 <= value <= MAX_TOKENS:
                 raise ValueError(f"invalid {name}")
-        if self.prompt_tokens + self.output_tokens <= 0:
-            raise ValueError("empty serving request")
+        if not 0 < self.prompt_tokens + self.output_tokens <= MAX_TOKENS:
+            raise ValueError("serving request token budget out of bounds")
         if self.prefix_tokens > self.prompt_tokens:
             raise ValueError("prefix exceeds prompt")
+        for name in ("prefix_cached", "draft_model_available"):
+            if type(getattr(self, name)) is not bool:
+                raise ValueError(f"boolean {name} required")
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,6 +82,8 @@ class PolicyAwareServingPlanner:
         kv_pressure_pct: int = 0,
         queue_pressure_pct: int = 0,
     ) -> ServingPlan:
+        if not isinstance(request, ServingRequest):
+            raise ValueError("ServingRequest required")
         for name, value in (("kv_pressure_pct", kv_pressure_pct), ("queue_pressure_pct", queue_pressure_pct)):
             if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 100:
                 raise ValueError(f"{name} must be integer percentage")
@@ -113,9 +130,18 @@ class PolicyAwareServingPlanner:
             degradation.append("protect_interactive_latency")
 
         body = {
-            "schema": "skeleton.ai.serving-plan.v1",
+            "schema": "skeleton.ai.serving-plan.v2",
             "request_id": request.request_id,
             "service_class": request.service_class.value,
+            "inputs": {
+                "prompt_tokens": request.prompt_tokens,
+                "output_tokens": request.output_tokens,
+                "prefix_tokens": request.prefix_tokens,
+                "prefix_cached": request.prefix_cached,
+                "draft_model_available": request.draft_model_available,
+                "kv_pressure_pct": kv_pressure_pct,
+                "queue_pressure_pct": queue_pressure_pct,
+            },
             "prefill_tokens": prefill,
             "decode_tokens": request.output_tokens,
             "prefix_reused_tokens": reused,
@@ -141,6 +167,36 @@ class PolicyAwareServingPlanner:
             self.policy.digest,
             digest,
         )
+
+    def verify(
+        self,
+        plan: ServingPlan,
+        request: ServingRequest,
+        *,
+        kv_pressure_pct: int = 0,
+        queue_pressure_pct: int = 0,
+    ) -> ServingPlan:
+        """Require a receipt to match the fresh policy/input snapshot exactly.
+
+        The expected request and pressure inputs must come from trusted
+        admission state, not from unverified metadata carried beside `plan`.
+        This does not authenticate measurements or authorize model execution.
+        """
+        if not isinstance(plan, ServingPlan):
+            raise ValueError("ServingPlan required")
+        current = self.plan(
+            request,
+            kv_pressure_pct=kv_pressure_pct,
+            queue_pressure_pct=queue_pressure_pct,
+        )
+        if (type(plan.digest) is not str or len(plan.digest) != 64
+                or any(ch not in "0123456789abcdef" for ch in plan.digest)):
+            raise ValueError("invalid serving plan digest")
+        if not hmac.compare_digest(current.digest, plan.digest):
+            raise ValueError("serving plan digest mismatch")
+        if current != plan:
+            raise ValueError("serving plan fields mismatch")
+        return current
 
 
 __all__ = ["PolicyAwareServingPlanner", "ServiceClass", "ServingPlan", "ServingRequest"]

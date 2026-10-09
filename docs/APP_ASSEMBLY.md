@@ -30,6 +30,58 @@ URL scheme, bundle identifier, Android package identifier, iOS build number,
 and Android versionCode remain stable in this pass so identity convergence does
 not silently break installed-client upgrade compatibility.
 
+## Native desktop AI without Docker
+
+The installed desktop launcher now has a **Local AI (offline)** action.
+It opens a dedicated, native Tk conversation window using the existing
+`NativeRuntimeLocalModel`, `LocalInferenceEngine` and content-addressed
+local artifact loader. This path performs real CPU inference, not a scripted
+or HTML demonstration. The model must come from a previously created native
+Skeleton checkpoint: the installer does **not** include trained weights and
+does not download them.
+
+```bash
+# On a machine with Python + Tk, without Docker/Mongo/hosted-provider tokens:
+python -m skeleton app local-ai
+
+# Headless model inference with a bound JSON receipt, for scripts/automation:
+python -m skeleton app local-ai --model ./native-runtime.json \\
+  --prompt "hello" --max-output-tokens 8 --json
+
+# From the Windows installer (no system Python required):
+Skeleton.exe --local-ai
+```
+
+Use **Load checkpoint…** to open a `write_local_model_artifact`-compatible
+native transformer JSON artifact. File size, duplicate keys, SHA-based model
+identity, runtime/tokenizer graph, and all checkpoint fields are validated by
+the canonical artifact and native runtime owners before inference. The
+window carries conversational context within the model's finite token budget,
+drops only oldest *full* turns when required, offers generation cancellation,
+and only commits a turn to its session history after the local inference
+receipt is complete. No tools, providers or network transport are granted by
+this window. The local transcript is ephemeral and discarded on close; the
+canonical governed assistant/workspace remains the durable product authority.
+
+**Scope:** this is an independently usable local desktop execution surface,
+not a claim that the complete product shell, all 421 masterplan volumes, advanced
+model quality, multimodal inference, autonomous learning, native weights,
+security qualification or installation acceptance are finished. Docker is
+still required by the existing full frontend/backend/Mongo service profile.
+Windows `Skeleton.exe`/Inno Setup must still be built and smoke-tested on a
+Windows runner before this mode can be described as shipped.
+
+Targeted source validation:
+
+```bash
+python -m unittest tests.flgb.test_desktop_offline_ai -v
+python -m unittest tests.flgb.test_flgb_02_native_local_provider -v
+python scripts/check_ai_app_construction.py
+python scripts/check_architecture_map.py
+python scripts/check_capability_interfaces.py
+python scripts/check_provider_bootstrap.py
+```
+
 ## Setup and installer plane
 
 The canonical first-run path is split into three bounded layers:
