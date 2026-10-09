@@ -1336,12 +1336,6 @@
       "id": "GAP:VOL-408:001",
       "type": "gap",
       "volume_ref": "VOL-408",
-      "value": "define rights schema"
-    },
-    {
-      "id": "GAP:VOL-408:002",
-      "type": "gap",
-      "volume_ref": "VOL-408",
       "value": "bind lineage/training/exports"
     },
     {
@@ -1372,12 +1366,6 @@
       "id": "GAP:VOL-411:001",
       "type": "gap",
       "volume_ref": "VOL-411",
-      "value": "define lifecycle state machine"
-    },
-    {
-      "id": "GAP:VOL-411:002",
-      "type": "gap",
-      "volume_ref": "VOL-411",
       "value": "bind model ops/MBOM"
     },
     {
@@ -1394,12 +1382,6 @@
     },
     {
       "id": "GAP:VOL-413:001",
-      "type": "gap",
-      "volume_ref": "VOL-413",
-      "value": "define parity matrix"
-    },
-    {
-      "id": "GAP:VOL-413:002",
       "type": "gap",
       "volume_ref": "VOL-413",
       "value": "bind shadow traffic"
@@ -1430,12 +1412,6 @@
     },
     {
       "id": "GAP:VOL-416:001",
-      "type": "gap",
-      "volume_ref": "VOL-416",
-      "value": "define sandbox lifecycle"
-    },
-    {
-      "id": "GAP:VOL-416:002",
       "type": "gap",
       "volume_ref": "VOL-416",
       "value": "bind feature flags/technology radar"
@@ -1624,7 +1600,7 @@
       "id": "PATH:VOL-407:002",
       "type": "implementation_path",
       "volume_ref": "VOL-407",
-      "value": "planned:skeleton/artifacts"
+      "value": "skeleton/ai/runtime/deferred/lifecycle_governance.py"
     },
     {
       "id": "PATH:VOL-408:001",
@@ -1637,6 +1613,12 @@
       "type": "implementation_path",
       "volume_ref": "VOL-408",
       "value": "skeleton/security"
+    },
+    {
+      "id": "PATH:VOL-408:003",
+      "type": "implementation_path",
+      "volume_ref": "VOL-408",
+      "value": "skeleton/ai/runtime/deferred/lifecycle_governance.py"
     },
     {
       "id": "PATH:VOL-409:001",
@@ -1681,6 +1663,12 @@
       "value": "docs"
     },
     {
+      "id": "PATH:VOL-410:003",
+      "type": "implementation_path",
+      "volume_ref": "VOL-410",
+      "value": "skeleton/ai/runtime/deferred/lifecycle_governance.py"
+    },
+    {
       "id": "PATH:VOL-411:001",
       "type": "implementation_path",
       "volume_ref": "VOL-411",
@@ -1691,6 +1679,12 @@
       "type": "implementation_path",
       "volume_ref": "VOL-411",
       "value": "skeleton/ai/providers"
+    },
+    {
+      "id": "PATH:VOL-411:003",
+      "type": "implementation_path",
+      "volume_ref": "VOL-411",
+      "value": "skeleton/ai/runtime/deferred/lifecycle_governance.py"
     },
     {
       "id": "PATH:VOL-412:001",
@@ -1705,6 +1699,12 @@
       "value": "machine"
     },
     {
+      "id": "PATH:VOL-412:003",
+      "type": "implementation_path",
+      "volume_ref": "VOL-412",
+      "value": "skeleton/ai/runtime/deferred/lifecycle_governance.py"
+    },
+    {
       "id": "PATH:VOL-413:001",
       "type": "implementation_path",
       "volume_ref": "VOL-413",
@@ -1715,6 +1715,12 @@
       "type": "implementation_path",
       "volume_ref": "VOL-413",
       "value": "skeleton/eval"
+    },
+    {
+      "id": "PATH:VOL-413:003",
+      "type": "implementation_path",
+      "volume_ref": "VOL-413",
+      "value": "skeleton/ai/runtime/deferred/lifecycle_governance.py"
     },
     {
       "id": "PATH:VOL-414:001",
@@ -1801,6 +1807,12 @@
       "value": "skeleton/security"
     },
     {
+      "id": "PATH:VOL-416:003",
+      "type": "implementation_path",
+      "volume_ref": "VOL-416",
+      "value": "skeleton/ai/runtime/deferred/lifecycle_governance.py"
+    },
+    {
       "id": "PATH:VOL-417:001",
       "type": "implementation_path",
       "volume_ref": "VOL-417",
@@ -1813,6 +1825,12 @@
       "value": "docs/plan"
     },
     {
+      "id": "PATH:VOL-417:003",
+      "type": "implementation_path",
+      "volume_ref": "VOL-417",
+      "value": "skeleton/ai/runtime/deferred/lifecycle_governance.py"
+    },
+    {
       "id": "PATH:VOL-418:001",
       "type": "implementation_path",
       "volume_ref": "VOL-418",
@@ -1823,6 +1841,12 @@
       "type": "implementation_path",
       "volume_ref": "VOL-418",
       "value": "docs"
+    },
+    {
+      "id": "PATH:VOL-418:003",
+      "type": "implementation_path",
+      "volume_ref": "VOL-418",
+      "value": "skeleton/ai/runtime/deferred/lifecycle_governance.py"
     },
     {
       "id": "PATH:VOL-419:001",
@@ -2446,13 +2470,13 @@
       "id": "TEST:VOL-407:001",
       "type": "test",
       "volume_ref": "VOL-407",
-      "value": "planned:skeleton/testing/test_license_intelligence.py"
+      "value": "skeleton/testing/test_lifecycle_governance.py"
     },
     {
       "id": "TEST:VOL-408:001",
       "type": "test",
       "volume_ref": "VOL-408",
-      "value": "planned:skeleton/testing/test_data_usage_rights.py"
+      "value": "skeleton/testing/test_lifecycle_governance.py"
     },
     {
       "id": "TEST:VOL-409:001",
@@ -2470,25 +2494,25 @@
       "id": "TEST:VOL-410:001",
       "type": "test",
       "volume_ref": "VOL-410",
-      "value": "planned:skeleton/testing/test_research_ethics_review.py"
+      "value": "skeleton/testing/test_lifecycle_governance.py"
     },
     {
       "id": "TEST:VOL-411:001",
       "type": "test",
       "volume_ref": "VOL-411",
-      "value": "planned:skeleton/testing/test_model_lifecycle_governance.py"
+      "value": "skeleton/testing/test_lifecycle_governance.py"
     },
     {
       "id": "TEST:VOL-412:001",
       "type": "test",
       "volume_ref": "VOL-412",
-      "value": "planned:skeleton/testing/test_model_deprecation.py"
+      "value": "skeleton/testing/test_lifecycle_governance.py"
     },
     {
       "id": "TEST:VOL-413:001",
       "type": "test",
       "volume_ref": "VOL-413",
-      "value": "planned:skeleton/testing/test_provider_migration.py"
+      "value": "skeleton/testing/test_lifecycle_governance.py"
     },
     {
       "id": "TEST:VOL-414:001",
@@ -2512,19 +2536,19 @@
       "id": "TEST:VOL-416:001",
       "type": "test",
       "volume_ref": "VOL-416",
-      "value": "planned:skeleton/testing/test_experimental_feature_sandbox.py"
+      "value": "skeleton/testing/test_lifecycle_governance.py"
     },
     {
       "id": "TEST:VOL-417:001",
       "type": "test",
       "volume_ref": "VOL-417",
-      "value": "planned:skeleton/testing/test_research_branching_model.py"
+      "value": "skeleton/testing/test_lifecycle_governance.py"
     },
     {
       "id": "TEST:VOL-418:001",
       "type": "test",
       "volume_ref": "VOL-418",
-      "value": "planned:skeleton/testing/test_technique_retirement.py"
+      "value": "skeleton/testing/test_lifecycle_governance.py"
     },
     {
       "id": "TEST:VOL-419:001",
@@ -4024,6 +4048,11 @@
       "type": "contract_materialized_at"
     },
     {
+      "from": "CON:VOL-408:001",
+      "to": "PATH:VOL-408:003",
+      "type": "contract_materialized_at"
+    },
+    {
       "from": "CON:VOL-408:002",
       "to": "PATH:VOL-408:001",
       "type": "contract_materialized_at"
@@ -4034,6 +4063,11 @@
       "type": "contract_materialized_at"
     },
     {
+      "from": "CON:VOL-408:002",
+      "to": "PATH:VOL-408:003",
+      "type": "contract_materialized_at"
+    },
+    {
       "from": "CON:VOL-408:003",
       "to": "PATH:VOL-408:001",
       "type": "contract_materialized_at"
@@ -4041,6 +4075,11 @@
     {
       "from": "CON:VOL-408:003",
       "to": "PATH:VOL-408:002",
+      "type": "contract_materialized_at"
+    },
+    {
+      "from": "CON:VOL-408:003",
+      "to": "PATH:VOL-408:003",
       "type": "contract_materialized_at"
     },
     {
@@ -4129,6 +4168,11 @@
       "type": "contract_materialized_at"
     },
     {
+      "from": "CON:VOL-410:001",
+      "to": "PATH:VOL-410:003",
+      "type": "contract_materialized_at"
+    },
+    {
       "from": "CON:VOL-410:002",
       "to": "PATH:VOL-410:001",
       "type": "contract_materialized_at"
@@ -4136,6 +4180,11 @@
     {
       "from": "CON:VOL-410:002",
       "to": "PATH:VOL-410:002",
+      "type": "contract_materialized_at"
+    },
+    {
+      "from": "CON:VOL-410:002",
+      "to": "PATH:VOL-410:003",
       "type": "contract_materialized_at"
     },
     {
@@ -4149,6 +4198,11 @@
       "type": "contract_materialized_at"
     },
     {
+      "from": "CON:VOL-410:003",
+      "to": "PATH:VOL-410:003",
+      "type": "contract_materialized_at"
+    },
+    {
       "from": "CON:VOL-411:001",
       "to": "PATH:VOL-411:001",
       "type": "contract_materialized_at"
@@ -4156,6 +4210,11 @@
     {
       "from": "CON:VOL-411:001",
       "to": "PATH:VOL-411:002",
+      "type": "contract_materialized_at"
+    },
+    {
+      "from": "CON:VOL-411:001",
+      "to": "PATH:VOL-411:003",
       "type": "contract_materialized_at"
     },
     {
@@ -4169,6 +4228,11 @@
       "type": "contract_materialized_at"
     },
     {
+      "from": "CON:VOL-411:002",
+      "to": "PATH:VOL-411:003",
+      "type": "contract_materialized_at"
+    },
+    {
       "from": "CON:VOL-411:003",
       "to": "PATH:VOL-411:001",
       "type": "contract_materialized_at"
@@ -4179,6 +4243,11 @@
       "type": "contract_materialized_at"
     },
     {
+      "from": "CON:VOL-411:003",
+      "to": "PATH:VOL-411:003",
+      "type": "contract_materialized_at"
+    },
+    {
       "from": "CON:VOL-412:001",
       "to": "PATH:VOL-412:001",
       "type": "contract_materialized_at"
@@ -4186,6 +4255,11 @@
     {
       "from": "CON:VOL-412:001",
       "to": "PATH:VOL-412:002",
+      "type": "contract_materialized_at"
+    },
+    {
+      "from": "CON:VOL-412:001",
+      "to": "PATH:VOL-412:003",
       "type": "contract_materialized_at"
     },
     {
@@ -4199,6 +4273,11 @@
       "type": "contract_materialized_at"
     },
     {
+      "from": "CON:VOL-412:002",
+      "to": "PATH:VOL-412:003",
+      "type": "contract_materialized_at"
+    },
+    {
       "from": "CON:VOL-412:003",
       "to": "PATH:VOL-412:001",
       "type": "contract_materialized_at"
@@ -4209,6 +4288,11 @@
       "type": "contract_materialized_at"
     },
     {
+      "from": "CON:VOL-412:003",
+      "to": "PATH:VOL-412:003",
+      "type": "contract_materialized_at"
+    },
+    {
       "from": "CON:VOL-413:001",
       "to": "PATH:VOL-413:001",
       "type": "contract_materialized_at"
@@ -4216,6 +4300,11 @@
     {
       "from": "CON:VOL-413:001",
       "to": "PATH:VOL-413:002",
+      "type": "contract_materialized_at"
+    },
+    {
+      "from": "CON:VOL-413:001",
+      "to": "PATH:VOL-413:003",
       "type": "contract_materialized_at"
     },
     {
@@ -4229,6 +4318,11 @@
       "type": "contract_materialized_at"
     },
     {
+      "from": "CON:VOL-413:002",
+      "to": "PATH:VOL-413:003",
+      "type": "contract_materialized_at"
+    },
+    {
       "from": "CON:VOL-413:003",
       "to": "PATH:VOL-413:001",
       "type": "contract_materialized_at"
@@ -4236,6 +4330,11 @@
     {
       "from": "CON:VOL-413:003",
       "to": "PATH:VOL-413:002",
+      "type": "contract_materialized_at"
+    },
+    {
+      "from": "CON:VOL-413:003",
+      "to": "PATH:VOL-413:003",
       "type": "contract_materialized_at"
     },
     {
@@ -4429,6 +4528,11 @@
       "type": "contract_materialized_at"
     },
     {
+      "from": "CON:VOL-416:001",
+      "to": "PATH:VOL-416:003",
+      "type": "contract_materialized_at"
+    },
+    {
       "from": "CON:VOL-416:002",
       "to": "PATH:VOL-416:001",
       "type": "contract_materialized_at"
@@ -4436,6 +4540,11 @@
     {
       "from": "CON:VOL-416:002",
       "to": "PATH:VOL-416:002",
+      "type": "contract_materialized_at"
+    },
+    {
+      "from": "CON:VOL-416:002",
+      "to": "PATH:VOL-416:003",
       "type": "contract_materialized_at"
     },
     {
@@ -4449,6 +4558,11 @@
       "type": "contract_materialized_at"
     },
     {
+      "from": "CON:VOL-416:003",
+      "to": "PATH:VOL-416:003",
+      "type": "contract_materialized_at"
+    },
+    {
       "from": "CON:VOL-417:001",
       "to": "PATH:VOL-417:001",
       "type": "contract_materialized_at"
@@ -4456,6 +4570,11 @@
     {
       "from": "CON:VOL-417:001",
       "to": "PATH:VOL-417:002",
+      "type": "contract_materialized_at"
+    },
+    {
+      "from": "CON:VOL-417:001",
+      "to": "PATH:VOL-417:003",
       "type": "contract_materialized_at"
     },
     {
@@ -4469,6 +4588,11 @@
       "type": "contract_materialized_at"
     },
     {
+      "from": "CON:VOL-417:002",
+      "to": "PATH:VOL-417:003",
+      "type": "contract_materialized_at"
+    },
+    {
       "from": "CON:VOL-417:003",
       "to": "PATH:VOL-417:001",
       "type": "contract_materialized_at"
@@ -4479,6 +4603,11 @@
       "type": "contract_materialized_at"
     },
     {
+      "from": "CON:VOL-417:003",
+      "to": "PATH:VOL-417:003",
+      "type": "contract_materialized_at"
+    },
+    {
       "from": "CON:VOL-418:001",
       "to": "PATH:VOL-418:001",
       "type": "contract_materialized_at"
@@ -4486,6 +4615,11 @@
     {
       "from": "CON:VOL-418:001",
       "to": "PATH:VOL-418:002",
+      "type": "contract_materialized_at"
+    },
+    {
+      "from": "CON:VOL-418:001",
+      "to": "PATH:VOL-418:003",
       "type": "contract_materialized_at"
     },
     {
@@ -4499,6 +4633,11 @@
       "type": "contract_materialized_at"
     },
     {
+      "from": "CON:VOL-418:002",
+      "to": "PATH:VOL-418:003",
+      "type": "contract_materialized_at"
+    },
+    {
       "from": "CON:VOL-418:003",
       "to": "PATH:VOL-418:001",
       "type": "contract_materialized_at"
@@ -4506,6 +4645,11 @@
     {
       "from": "CON:VOL-418:003",
       "to": "PATH:VOL-418:002",
+      "type": "contract_materialized_at"
+    },
+    {
+      "from": "CON:VOL-418:003",
+      "to": "PATH:VOL-418:003",
       "type": "contract_materialized_at"
     },
     {
@@ -4919,6 +5063,11 @@
       "type": "implementation_validated_by_test"
     },
     {
+      "from": "PATH:VOL-408:003",
+      "to": "TEST:VOL-408:001",
+      "type": "implementation_validated_by_test"
+    },
+    {
       "from": "PATH:VOL-409:001",
       "to": "TEST:VOL-409:001",
       "type": "implementation_validated_by_test"
@@ -4979,12 +5128,22 @@
       "type": "implementation_validated_by_test"
     },
     {
+      "from": "PATH:VOL-410:003",
+      "to": "TEST:VOL-410:001",
+      "type": "implementation_validated_by_test"
+    },
+    {
       "from": "PATH:VOL-411:001",
       "to": "TEST:VOL-411:001",
       "type": "implementation_validated_by_test"
     },
     {
       "from": "PATH:VOL-411:002",
+      "to": "TEST:VOL-411:001",
+      "type": "implementation_validated_by_test"
+    },
+    {
+      "from": "PATH:VOL-411:003",
       "to": "TEST:VOL-411:001",
       "type": "implementation_validated_by_test"
     },
@@ -4999,12 +5158,22 @@
       "type": "implementation_validated_by_test"
     },
     {
+      "from": "PATH:VOL-412:003",
+      "to": "TEST:VOL-412:001",
+      "type": "implementation_validated_by_test"
+    },
+    {
       "from": "PATH:VOL-413:001",
       "to": "TEST:VOL-413:001",
       "type": "implementation_validated_by_test"
     },
     {
       "from": "PATH:VOL-413:002",
+      "to": "TEST:VOL-413:001",
+      "type": "implementation_validated_by_test"
+    },
+    {
+      "from": "PATH:VOL-413:003",
       "to": "TEST:VOL-413:001",
       "type": "implementation_validated_by_test"
     },
@@ -5114,6 +5283,11 @@
       "type": "implementation_validated_by_test"
     },
     {
+      "from": "PATH:VOL-416:003",
+      "to": "TEST:VOL-416:001",
+      "type": "implementation_validated_by_test"
+    },
+    {
       "from": "PATH:VOL-417:001",
       "to": "TEST:VOL-417:001",
       "type": "implementation_validated_by_test"
@@ -5124,12 +5298,22 @@
       "type": "implementation_validated_by_test"
     },
     {
+      "from": "PATH:VOL-417:003",
+      "to": "TEST:VOL-417:001",
+      "type": "implementation_validated_by_test"
+    },
+    {
       "from": "PATH:VOL-418:001",
       "to": "TEST:VOL-418:001",
       "type": "implementation_validated_by_test"
     },
     {
       "from": "PATH:VOL-418:002",
+      "to": "TEST:VOL-418:001",
+      "type": "implementation_validated_by_test"
+    },
+    {
+      "from": "PATH:VOL-418:003",
       "to": "TEST:VOL-418:001",
       "type": "implementation_validated_by_test"
     },
@@ -6980,17 +7164,17 @@
     },
     {
       "from": "VOL:VOL-408",
-      "to": "GAP:VOL-408:002",
-      "type": "volume_gap"
-    },
-    {
-      "from": "VOL:VOL-408",
       "to": "PATH:VOL-408:001",
       "type": "volume_implementation_path"
     },
     {
       "from": "VOL:VOL-408",
       "to": "PATH:VOL-408:002",
+      "type": "volume_implementation_path"
+    },
+    {
+      "from": "VOL:VOL-408",
+      "to": "PATH:VOL-408:003",
       "type": "volume_implementation_path"
     },
     {
@@ -7195,6 +7379,11 @@
     },
     {
       "from": "VOL:VOL-410",
+      "to": "PATH:VOL-410:003",
+      "type": "volume_implementation_path"
+    },
+    {
+      "from": "VOL:VOL-410",
       "to": "REQ:VOL-410:001",
       "type": "volume_requirement"
     },
@@ -7260,17 +7449,17 @@
     },
     {
       "from": "VOL:VOL-411",
-      "to": "GAP:VOL-411:002",
-      "type": "volume_gap"
-    },
-    {
-      "from": "VOL:VOL-411",
       "to": "PATH:VOL-411:001",
       "type": "volume_implementation_path"
     },
     {
       "from": "VOL:VOL-411",
       "to": "PATH:VOL-411:002",
+      "type": "volume_implementation_path"
+    },
+    {
+      "from": "VOL:VOL-411",
+      "to": "PATH:VOL-411:003",
       "type": "volume_implementation_path"
     },
     {
@@ -7355,6 +7544,11 @@
     },
     {
       "from": "VOL:VOL-412",
+      "to": "PATH:VOL-412:003",
+      "type": "volume_implementation_path"
+    },
+    {
+      "from": "VOL:VOL-412",
       "to": "REQ:VOL-412:001",
       "type": "volume_requirement"
     },
@@ -7420,17 +7614,17 @@
     },
     {
       "from": "VOL:VOL-413",
-      "to": "GAP:VOL-413:002",
-      "type": "volume_gap"
-    },
-    {
-      "from": "VOL:VOL-413",
       "to": "PATH:VOL-413:001",
       "type": "volume_implementation_path"
     },
     {
       "from": "VOL:VOL-413",
       "to": "PATH:VOL-413:002",
+      "type": "volume_implementation_path"
+    },
+    {
+      "from": "VOL:VOL-413",
+      "to": "PATH:VOL-413:003",
       "type": "volume_implementation_path"
     },
     {
@@ -7745,17 +7939,17 @@
     },
     {
       "from": "VOL:VOL-416",
-      "to": "GAP:VOL-416:002",
-      "type": "volume_gap"
-    },
-    {
-      "from": "VOL:VOL-416",
       "to": "PATH:VOL-416:001",
       "type": "volume_implementation_path"
     },
     {
       "from": "VOL:VOL-416",
       "to": "PATH:VOL-416:002",
+      "type": "volume_implementation_path"
+    },
+    {
+      "from": "VOL:VOL-416",
+      "to": "PATH:VOL-416:003",
       "type": "volume_implementation_path"
     },
     {
@@ -7840,6 +8034,11 @@
     },
     {
       "from": "VOL:VOL-417",
+      "to": "PATH:VOL-417:003",
+      "type": "volume_implementation_path"
+    },
+    {
+      "from": "VOL:VOL-417",
       "to": "REQ:VOL-417:001",
       "type": "volume_requirement"
     },
@@ -7916,6 +8115,11 @@
     {
       "from": "VOL:VOL-418",
       "to": "PATH:VOL-418:002",
+      "type": "volume_implementation_path"
+    },
+    {
+      "from": "VOL:VOL-418",
+      "to": "PATH:VOL-418:003",
       "type": "volume_implementation_path"
     },
     {
