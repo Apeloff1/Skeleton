@@ -281,3 +281,41 @@ def test_queue_enforces_global_job_limit_without_losing_existing_jobs(
             queue.enqueue(source, library)
         assert len(queue.list_jobs()) == 1
         assert queue.get(original.job_id).state == "cancelled"
+
+
+def test_normal_queue_read_rejects_forged_completed_receipt(
+    tmp_path: Path,
+) -> None:
+    import sqlite3
+
+    source = _root(tmp_path)
+    store_file = tmp_path / "queue.sqlite"
+    with OfflineIndexQueue(store_file) as queue:
+        job = queue.enqueue(source, tmp_path / "library.sqlite")
+        queue._db.execute(
+            "UPDATE offline_index_jobs SET state='completed', attempts=1, "
+            "result_json=? WHERE job_id=?",
+            ('{"indexed_files": 1, "updated_files": -1, '
+             '"removed_files": 0, "indexed_bytes": 100}', job.job_id),
+        )
+        with pytest.raises(OfflineQueueError, match="invalid indexing result"):
+            queue.get(job.job_id)
+        with pytest.raises(OfflineQueueError, match="invalid indexing result"):
+            queue.list_jobs()
+
+
+def test_normal_queue_rejects_fake_success_on_unfinished_job(
+    tmp_path: Path,
+) -> None:
+    source = _root(tmp_path)
+    with OfflineIndexQueue(tmp_path / "queue.sqlite") as queue:
+        job = queue.enqueue(source, tmp_path / "library.sqlite")
+        queue._db.execute(
+            "UPDATE offline_index_jobs SET result_json=? WHERE job_id=?",
+            ('{"indexed_files":0,"updated_files":0,'
+             '"removed_files":0,"indexed_bytes":0}', job.job_id),
+        )
+        with pytest.raises(OfflineQueueError, match="forged result"):
+            queue.get(job.job_id)
+        with pytest.raises(OfflineQueueError, match="forged result"):
+            queue.run_one()
