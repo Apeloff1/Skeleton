@@ -98,7 +98,7 @@ def parse_registry(document: str | bytes) -> PlatformRegistry:
         data = json.loads(document)
     except (TypeError, ValueError) as exc:
         raise PlatformRegistryError("invalid platform registry JSON") from exc
-    if not isinstance(data, dict) or data.get("schema_version") != REGISTRY_SCHEMA:
+    if not isinstance(data, dict) or type(data.get("schema_version")) is not int or data["schema_version"] != REGISTRY_SCHEMA:
         raise PlatformRegistryError("unsupported registry schema")
     presets = data.get("presets")
     records = data.get("platforms")
