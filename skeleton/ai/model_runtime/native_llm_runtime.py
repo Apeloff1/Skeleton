@@ -490,7 +490,10 @@ class NativeLLMRuntime:
     ) -> tuple[TokenSequence, int]:
         if not isinstance(config, GenerationConfig):
             raise RuntimeContractError("GenerationConfig required")
-        sequence = self.encode(prompt)
+        try:
+            sequence = self.encode(prompt)
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("prompt tokenization failed admission") from exc
         return sequence, self._admit_sequence(sequence, config)
 
     def stream(
@@ -510,7 +513,11 @@ class NativeLLMRuntime:
     ) -> Iterator[RuntimeEvent]:
         if not isinstance(config, GenerationConfig):
             raise RuntimeContractError("GenerationConfig required")
-        return (yield from self._stream_sequence_impl(self.encode(prompt), config))
+        try:
+            sequence = self.encode(prompt)
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("prompt tokenization failed admission") from exc
+        return (yield from self._stream_sequence_impl(sequence, config))
 
     def stream_sequence(
         self,
