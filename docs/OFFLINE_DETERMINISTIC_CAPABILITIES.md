@@ -1,6 +1,6 @@
 # Standalone deterministic capabilities — October 2026
 
-**Scope:** 24 built-in, typed, bounded local computations plus a
+**Scope:** 29 built-in, typed, bounded local computations plus a
 32-node deterministic dependency graph. This extends the functional
 abilities of Skeleton's standalone AI without collecting new training
 examples, training a transformer, trusting internet content or granting
