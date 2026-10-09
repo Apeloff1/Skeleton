@@ -277,7 +277,10 @@ def _evaluate_backend(
         agg["sum_log_probability"] += weighted
         top1: bool | None = None
         if case.expected_next is not None:
-            raw_scores = model._logits(model._ids(case.text))
+            # Predict the token after the sequence using only the model's
+            # actual finite context window, matching the normal inference
+            # boundary even for longer evaluation passages.
+            raw_scores = model._logits(model._ids(case.text)[-model.ctx:])
             if len(raw_scores) != len(model.itos) or any(not math.isfinite(x) for x in raw_scores):
                 raise OfflineBenchmarkError("model returned invalid next-token logits")
             winner = max(range(len(raw_scores)), key=raw_scores.__getitem__)
