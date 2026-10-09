@@ -9,6 +9,9 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
+from pathlib import Path
+import stat
 import sys
 from typing import Sequence
 
@@ -45,6 +48,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--json", action="store_true", dest="json_output")
     parser.add_argument("--doctor", action="store_true", help="verify local artifacts without generating text")
     parser.add_argument("--qualify-model", action="store_true", help="perform two local inference turns with persisted context recovery")
+    capabilities = parser.add_mutually_exclusive_group()
+    capabilities.add_argument("--capability-file", help="selected JSON task for offline deterministic execution")
+    capabilities.add_argument("--capability-list", action="store_true", help="list available model-free deterministic operations")
     parser.add_argument("--library", help="user-owned local SQLite document search index")
     parser.add_argument("--index-dir", help="index an explicitly selected local text directory")
     parser.add_argument("--search", help="search indexed local documents without any model")
@@ -90,6 +96,54 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.enqueue_dir or args.run_queue or args.queue_status
         or args.cancel_queue_job or args.retry_queue_job
     )
+    if args.capability_file is not None or args.capability_list:
+        # Model-free deterministic engine is strictly separate from all state,
+        # network, training, inference and OS-permission controls.
+        if (
+            args.model or args.deployment or args.prompt or args.backup_in
+            or args.backup_out or args.workspace or args.native_smoke
+            or args.doctor or args.qualify_model or args.library
+            or args.use_library or library_mode or queue_mode
+            or snapshot_mode or audit_mode or args.queue_db
+            or args.queue_library or args.snapshot_workspace
+            or args.snapshot_library or args.snapshot_queue
+        ):
+            print("deterministic capabilities cannot be combined with model or state actions", file=sys.stderr)
+            return 2
+        from skeleton.ai.runtime.deterministic_capabilities import (
+            CapabilityTaskError, MAX_INPUT_BYTES, OPERATIONS,
+            execute_capability_json,
+        )
+        try:
+            if args.capability_list:
+                report = {
+                    "schema_version": "skeleton.offline_deterministic_capabilities.catalog.v1",
+                    "operations": sorted(OPERATIONS),
+                    "model_inference_required": False,
+                    "training_examples_required": 0,
+                    "executor_authority_granted": False,
+                }
+            else:
+                selected = Path(args.capability_file).expanduser()
+                if selected.is_symlink() or not selected.is_file():
+                    raise CapabilityTaskError("selected task must be a regular local file")
+                flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+                fd = os.open(selected, flags)
+                with os.fdopen(fd, "rb") as handle:
+                    meta = os.fstat(handle.fileno())
+                    if not stat.S_ISREG(meta.st_mode) or meta.st_size > MAX_INPUT_BYTES:
+                        raise CapabilityTaskError("selected task is not a bounded regular file")
+                    raw = handle.read(MAX_INPUT_BYTES + 1)
+                report = execute_capability_json(raw)
+        except (ValueError, RuntimeError, OSError, TypeError) as exc:
+            print(f"deterministic capability rejected: {type(exc).__name__}: {exc}", file=sys.stderr)
+            return 1
+        if args.json_output or args.capability_list:
+            print(json.dumps(report, sort_keys=True, ensure_ascii=False))
+        else:
+            print(json.dumps(report["result"], sort_keys=True, ensure_ascii=False))
+        return 0
+
     if not queue_mode and (args.queue_db or args.queue_library):
         print("queue database paths require a queue operation", file=sys.stderr)
         return 2
