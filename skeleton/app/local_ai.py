@@ -299,7 +299,7 @@ class OfflineAIWindow:
 
                 receipt = train_local_text(source, destination)
                 session = OfflineAISession(load_native_checkpoint(destination))
-                self.events.put(("trained", (session, receipt.training_steps)))
+                self.events.put(("trained", (session, receipt)))
             except Exception as exc:
                 self.events.put(("error", str(exc)))
 
@@ -405,11 +405,13 @@ class OfflineAIWindow:
                 kind, value = self.events.get_nowait()
                 self.active = False
                 if kind == "trained":
-                    self.session, steps = value  # type: ignore[misc]
+                    self.session, receipt = value  # type: ignore[misc]
                     self.clear()
                     self.status.set(
                         "Experimental CPU checkpoint ready · "
-                        + str(steps) + " training steps · not quality certified"
+                        + str(receipt.training_steps) + " SGD steps · "
+                        + f"corpus perplexity {receipt.initial_perplexity:.2f} → "
+                        + f"{receipt.final_perplexity:.2f} · not quality certified"
                     )
                 elif kind == "loaded":
                     self.session = value  # type: ignore[assignment]
