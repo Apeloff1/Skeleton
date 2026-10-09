@@ -70,6 +70,8 @@ def _parser() -> argparse.ArgumentParser:
     local_ai.add_argument("--inspect-model", action="store_true", help="validate model weights and report offline runtime limits")
     local_ai.add_argument("--prepare-dataset", help="flat folder of explicit UTF-8 .txt documents")
     local_ai.add_argument("--dataset-output", help="new directory for disjoint train/validation and identity manifest")
+    local_ai.add_argument("--verify-dataset", help="check published dataset hashes, split contract and canonical manifest")
+    local_ai.add_argument("--verify-sources", help="optional original source folder for strict source-to-dataset verification")
     local_ai.add_argument("--validation-percent", type=int, default=25, help="source-document validation split percent (10–50)")
     local_ai.add_argument("--split-seed", type=int, default=41, help="reproducible source-document split seed")
     local_ai.add_argument("--train-corpus", help="train a bounded CPU native checkpoint from a local UTF-8 text file")
@@ -234,6 +236,39 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
 
     if command == "local-ai":
         from skeleton.app.local_ai import OfflineAISession, inspect_local_model, load_native_checkpoint, run_offline_ai
+
+        if args.verify_dataset or args.verify_sources:
+            if (
+                not args.verify_dataset or args.prepare_dataset or args.dataset_output
+                or args.model or args.prompt or args.inspect_model
+                or args.train_corpus or args.output_model or args.improve_model
+                or args.compare_model or args.candidate_model or args.eval_corpus
+                or args.benchmark_suite or args.exclude_train_corpus
+                or args.protect_suite or args.replay_improvement
+                or args.load_chat or args.save_chat
+                or args.epochs != 1 or args.max_output_tokens != 8
+                or args.validation_percent != 25 or args.split_seed != 41
+            ):
+                print("dataset verification requires --verify-dataset and optional --verify-sources only")
+                return 2
+            from skeleton.app.local_ai_dataset import verify_native_dataset
+
+            try:
+                verification = verify_native_dataset(
+                    args.verify_dataset, original_sources=args.verify_sources,
+                )
+            except (ValueError, RuntimeError, OSError) as exc:
+                print("native dataset verification failed: "
+                      + type(exc).__name__ + ": " + str(exc))
+                return 1
+            if args.as_json:
+                print(json.dumps(verification, sort_keys=True, ensure_ascii=False))
+            else:
+                print("Verified prepared native dataset: " + verification["dataset_id"])
+                print("Original sources checked: "
+                      + ("yes" if verification["original_sources_verified"] else "no"))
+                print("No model quality certification")
+            return 0
 
         if args.prepare_dataset or args.dataset_output:
             if (
