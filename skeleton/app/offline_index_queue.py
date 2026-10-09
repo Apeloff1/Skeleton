@@ -19,8 +19,8 @@ import threading
 import time
 from typing import Any
 
-from .offline_sqlite_safety import check_sqlite_companion_paths, UnsafeOfflineSqlitePath
 from .offline_library import OfflineDocumentLibrary, _root
+from .offline_sqlite_safety import check_sqlite_companion_paths, UnsafeOfflineSqlitePath
 
 
 SCHEMA = "skeleton.app.offline_index_queue.v1"
