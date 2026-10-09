@@ -87,6 +87,7 @@ class TorchAccel:
         self._key_buffers: List[Any] = []
         self._value_buffers: List[Any] = []
         self._cached_next_position = 0
+        self._cached_logits: tuple[float, ...] | None = None
 
     @property
     def kv_reserved_bytes(self) -> int:
@@ -450,8 +451,22 @@ class TorchAccel:
         # Inference mode avoids autograd view/version bookkeeping on the
         # hot prefill/decode path; SGD remains in regular grad-enabled mode.
         with self.torch.inference_mode():
+            if self._cached_ids == window and self._cached_logits is not None:
+                # Avoid a second full prefill for the same immutable prompt.
+                return list(self._cached_logits)
             if self._cached_ids == window[:-1]:
                 result = self._cached_step(window[-1])
+            elif (
+                self._cached_ids
+                and len(self._cached_ids) < len(window)
+                and len(window) - len(self._cached_ids) <= 4
+                and window[:len(self._cached_ids)] == self._cached_ids
+            ):
+                # Short continuations can consume resident K/V without
+                # discarding a warm prefix. Longer prompts use fused SDPA
+                # prefill rather than many tiny device launches.
+                for suffix_id in window[len(self._cached_ids):]:
+                    result = self._cached_step(suffix_id)
             elif (
                 getattr(lm, "position_mode", "learned_rope") == "rope"
                 and lm.n_layers == 1
@@ -475,7 +490,9 @@ class TorchAccel:
                 # Batched fused causal prefill; one-token loops are only used
                 # for decode. Avoid O(context) Python/GPU launches on prompts.
                 result, _ = self._forward_ids(window, fill_cache=True)
-            return result.detach().cpu().tolist()
+            values = tuple(float(value) for value in result.detach().cpu().tolist())
+            self._cached_logits = values
+            return list(values)
 
     def logits(self, ids: Sequence[int]) -> List[float]:
         with self._state_lock, self.torch.inference_mode():
