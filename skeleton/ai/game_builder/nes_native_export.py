@@ -64,18 +64,18 @@ Reset:
     stx $2000
     stx $2001
     stx $4010
-.wait1:
+@wait1:
     bit $2002
-    bpl .wait1
+    bpl @wait1
     ldx #0
     lda #$FF
-.clearSprites:
+@clearSprites:
     sta $0200,x
     inx
-    bne .clearSprites
-.wait2:
+    bne @clearSprites
+@wait2:
     bit $2002
-    bpl .wait2
+    bpl @wait2
     lda #0
     sta Level
     sta GameWon
@@ -102,12 +102,12 @@ MainLoop:
     jmp MainLoop
 
 WaitFrame:
-.off:
+@off:
     bit $2002
-    bmi .off
-.on:
+    bmi @off
+@on:
     bit $2002
-    bpl .on
+    bpl @on
     rts
 
 UploadPalette:
@@ -117,12 +117,12 @@ UploadPalette:
     lda #0
     sta $2006
     ldx #0
-.loop:
+@loop:
     lda Colors,x
     sta $2007
     inx
     cpx #32
-    bne .loop
+    bne @loop
     rts
 
 LoadLevel:
@@ -147,24 +147,24 @@ LoadLevel:
     lda #>MAP_RAM
     sta WorkPtr+1
     ldx #3
-.copyPages:
+@copyPages:
     ldy #0
-.copyFull:
+@copyFull:
     lda (MapPtr),y
     sta (WorkPtr),y
     iny
-    bne .copyFull
+    bne @copyFull
     inc MapPtr+1
     inc WorkPtr+1
     dex
-    bne .copyPages
+    bne @copyPages
     ldy #0
-.copyTail:
+@copyTail:
     lda (MapPtr),y
     sta (WorkPtr),y
     iny
     cpy #192
-    bne .copyTail
+    bne @copyTail
     ; Copy the independent RAM map into PPU background name table.
     lda $2002
     lda #$20
@@ -176,29 +176,29 @@ LoadLevel:
     lda #>MAP_RAM
     sta WorkPtr+1
     ldx #3
-.ppuPages:
+@ppuPages:
     ldy #0
-.ppuFull:
+@ppuFull:
     lda (WorkPtr),y
     sta $2007
     iny
-    bne .ppuFull
+    bne @ppuFull
     inc WorkPtr+1
     dex
-    bne .ppuPages
+    bne @ppuPages
     ldy #0
-.ppuTail:
+@ppuTail:
     lda (WorkPtr),y
     sta $2007
     iny
     cpy #192
-    bne .ppuTail
+    bne @ppuTail
     ldx #64
     lda #0
-.attr:
+@attr:
     sta $2007
     dex
-    bne .attr
+    bne @attr
     lda #0
     sta $2005
     sta $2005
@@ -223,13 +223,13 @@ UpdateSprite:
     sta $0202
     lda #5
     ldx GameWon
-    beq .notWon
+    beq @notWon
     lda #4
-.notWon:
+@notWon:
     ldx GameLost
-    beq .notLost
+    beq @notLost
     lda #3
-.notLost:
+@notLost:
     sta $0201
     rts
 
@@ -239,10 +239,10 @@ PollPad:
     lda #0
     sta $4016
     ldx #4
-.skipButtons:
+@skipButtons:
     lda $4016
     dex
-    bne .skipButtons
+    bne @skipButtons
     lda $4016
     and #1
     sta PadUp
@@ -257,28 +257,28 @@ PollPad:
     sta PadRight
     lda GameWon
     ora GameLost
-    bne .done
+    bne @done
     lda Cooldown
-    beq .ready
+    beq @ready
     dec Cooldown
     rts
-.ready:
+@ready:
     lda PadUp
-    beq .down
+    beq @down
     jmp MoveUp
-.down:
+@down:
     lda PadDown
-    beq .left
+    beq @left
     jmp MoveDown
-.left:
+@left:
     lda PadLeft
-    beq .right
+    beq @right
     jmp MoveLeft
-.right:
+@right:
     lda PadRight
-    beq .done
+    beq @done
     jmp MoveRight
-.done:
+@done:
     rts
 
 MoveUp:
@@ -318,24 +318,24 @@ TryMove:
     sta Cooldown
     lda NextX
     cmp #MAZE_WIDTH
-    bcc .xInside
+    bcc @xInside
     rts
-.xInside:
+@xInside:
     lda NextY
     cmp #MAZE_HEIGHT
-    bcc .yInside
+    bcc @yInside
     rts
-.yInside:
+@yInside:
     lda NextY
     sta CalcPtr
     lda #0
     sta CalcPtr+1
     ldx #5
-.shift:
+@shift:
     asl CalcPtr
     rol CalcPtr+1
     dex
-    bne .shift
+    bne @shift
     clc
     lda CalcPtr
     adc NextX
@@ -346,7 +346,7 @@ TryMove:
     ldy #0
     lda (CalcPtr),y
     cmp #1
-    beq .blocked
+    beq @blocked
     sta PadUp
     lda NextX
     sta PlayerX
@@ -354,36 +354,36 @@ TryMove:
     sta PlayerY
     lda PadUp
     cmp #2
-    bne .hazard
+    bne @hazard
     lda #0
     sta (CalcPtr),y
     jsr EraseGemTile
     dec GemsRemaining
     inc Score
     rts
-.hazard:
+@hazard:
     cmp #3
-    bne .goal
+    bne @goal
     dec Health
-    bne .blocked
+    bne @blocked
     lda #1
     sta GameLost
     rts
-.goal:
+@goal:
     cmp #4
-    bne .blocked
+    bne @blocked
     lda GemsRemaining
-    bne .blocked
+    bne @blocked
     inc Level
     lda Level
     cmp #LEVEL_COUNT
-    bcc .next
+    bcc @next
     lda #1
     sta GameWon
     rts
-.next:
+@next:
     jsr LoadLevel
-.blocked:
+@blocked:
     rts
 
 EraseGemTile:
