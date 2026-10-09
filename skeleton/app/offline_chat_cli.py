@@ -14,6 +14,10 @@ import sys
 from skeleton.ai.model_runtime.offline_chat import (
     OfflineChatStore, load_private_bundle, save_private_bundle,
 )
+from skeleton.ai.model_runtime.runtime_contracts import RuntimeContractError
+from skeleton.app.offline_knowledge import (
+    OfflineKnowledgeLibrary, MAX_DOCUMENT_BYTES,
+)
 from skeleton.app.local_ai import (
     DurableOfflineAISession,
     load_gguf_deployment,
@@ -21,6 +25,25 @@ from skeleton.app.local_ai import (
     private_desktop_database,
     _model_tokenizer_digest,
 )
+
+
+def _read_reference_file(path: Path) -> str:
+    """Admit only bounded operator-selected local UTF-8 text, never a URL."""
+    if path.is_symlink() or not path.is_file():
+        raise RuntimeContractError("reference path must be a local regular non-symlink file")
+    if not 1 <= path.stat().st_size <= MAX_DOCUMENT_BYTES:
+        raise RuntimeContractError("reference file exceeds the 64 KiB limit")
+    with path.open("rb") as source:
+        payload = source.read(MAX_DOCUMENT_BYTES + 1)
+    if not 1 <= len(payload) <= MAX_DOCUMENT_BYTES:
+        raise RuntimeContractError("reference changed or exceeded size budget")
+    try:
+        text = payload.decode("utf-8", errors="strict")
+    except UnicodeError as exc:
+        raise RuntimeContractError("reference must be UTF-8 text") from exc
+    if "\x00" in text:
+        raise RuntimeContractError("binary reference content is prohibited")
+    return text
 
 
 def _result(answer, session_id: str, *, as_json: bool) -> None:
@@ -96,10 +119,20 @@ def build_parser() -> argparse.ArgumentParser:
                        help="create a private portable backup of one conversation")
     modes.add_argument("--import-bundle", metavar="PATH", type=Path,
                        help="import a valid same-model portable conversation backup")
+    modes.add_argument("--add-reference", metavar="FILE", type=Path,
+                       help="index a local text/code/Markdown reference into model-scoped SQLite")
+    modes.add_argument("--list-references", action="store_true",
+                       help="list local reference titles, identifiers and SHA-256 hashes")
+    modes.add_argument("--search-reference", metavar="QUERY",
+                       help="search verified local passages without calling the model")
+    modes.add_argument("--delete-reference", metavar="DOCUMENT_ID",
+                       help="remove one local model-bound reference and all its chunks")
     parser.add_argument("--output", type=Path,
                         help="new backup destination; required for --export-session")
     parser.add_argument("--fork-after-turn", type=int,
                         help="with --fork-session, copy history only through this turn")
+    parser.add_argument("--search-limit", type=int, default=6,
+                        help="with --search-reference, return 1–12 ranked source passages")
     parser.add_argument("--max-output-tokens", type=int,
                         help="per-turn model completion-token budget")
     parser.add_argument("--json", action="store_true",
@@ -111,7 +144,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     manage = bool(args.list or args.delete_session or args.export_session
-                  or args.import_bundle or args.fork_session)
+                  or args.import_bundle or args.fork_session
+                  or args.add_reference or args.list_references
+                  or args.search_reference or args.delete_reference)
     if args.output is not None and args.export_session is None:
         parser.error("--output is valid only with --export-session")
     if args.export_session and args.output is None:
@@ -120,6 +155,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--session only applies to --message or --interactive")
     if args.fork_after_turn is not None and not args.fork_session:
         parser.error("--fork-after-turn requires --fork-session")
+    if args.search_limit != 6 and not args.search_reference:
+        parser.error("--search-limit requires --search-reference")
     if args.max_output_tokens is not None and (
         type(args.max_output_tokens) is not int or args.max_output_tokens < 1
     ):
@@ -135,6 +172,31 @@ def main(argv: list[str] | None = None) -> int:
             with OfflineChatStore(database) as store:
                 model_digest = backend.model_digest
                 token_digest = _model_tokenizer_digest(backend)
+                if (args.add_reference or args.list_references
+                        or args.search_reference or args.delete_reference):
+                    knowledge = OfflineKnowledgeLibrary(
+                        store, model_digest, token_digest
+                    )
+                    if args.add_reference:
+                        content = _read_reference_file(args.add_reference)
+                        print(json.dumps(knowledge.add_text(
+                            args.add_reference.name, content
+                        ), sort_keys=True))
+                        return 0
+                    if args.list_references:
+                        print(json.dumps(knowledge.list_documents(), sort_keys=True))
+                        return 0
+                    if args.search_reference:
+                        print(json.dumps(knowledge.search(
+                            args.search_reference, limit=args.search_limit
+                        ), sort_keys=True, ensure_ascii=False))
+                        return 0
+                    if args.delete_reference:
+                        knowledge.delete(args.delete_reference)
+                        print(json.dumps({
+                            "deleted_document_id": args.delete_reference
+                        }))
+                        return 0
                 if args.list:
                     records = [
                         {"session_id": sid, "revision": revision}
