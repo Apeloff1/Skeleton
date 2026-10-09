@@ -55,7 +55,7 @@ class LegalNativeDesktopSource:
             "plagiarism_screened": self.originality is not None,
             "originality_screen_digest": self.originality.screen_digest if self.originality else None,
             "originality_artifact_bound": (
-                self.originality.artifact_sha256 == self.project.world_digest
+                self.originality.artifact_sha256 == json.loads(self.project.manifest_json)["world_digest"]
                 if self.originality is not None else False
             ),
             "false_claim_of_plagiarism_free": False,
