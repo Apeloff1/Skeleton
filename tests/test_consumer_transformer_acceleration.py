@@ -312,3 +312,41 @@ def test_torch_prefill_is_batched_before_incremental_decode(monkeypatch):
         accel.logits((1, 2, 3, 1)), abs=2e-5
     )
     assert calls == [1]  # one resident decoder step
+
+
+def test_float32_accelerator_binding_never_mutates_canonical_weight_identity():
+    pytest.importorskip("torch")
+    from skeleton.ai.model_runtime.runtime_checkpoint import (
+        portable_model_snapshot, snapshot_digest,
+    )
+
+    model = _model(norm="rms", ffn_kind="swiglu", tied=True)
+    before = snapshot_digest(portable_model_snapshot(model))
+    runtime = NativeLLMRuntime(
+        model, device_policy=DevicePolicy(requested="torch", allow_fallback=False)
+    )
+    assert runtime.model_digest == before
+    assert runtime.assert_model_unchanged() is None
+    assert snapshot_digest(portable_model_snapshot(model)) == before
+    _ = runtime.infer_text("alpha beta")
+    assert snapshot_digest(portable_model_snapshot(model)) == before
+    assert model._accel is not None and not model._accel._weights_modified
+
+
+def test_torch_training_sync_marks_real_weight_mutations():
+    pytest.importorskip("torch")
+    from skeleton.ai.model_runtime.runtime_checkpoint import (
+        portable_model_snapshot, snapshot_digest,
+    )
+
+    model = _model(norm="rms", ffn_kind="swiglu")
+    model.to("torch")
+    accel = model._accel
+    assert accel is not None
+    before = snapshot_digest(portable_model_snapshot(model))
+    accel.sgd((1, 2, 3), target=2, lr=0.04)
+    assert accel._weights_modified
+    after = snapshot_digest(portable_model_snapshot(model))
+    assert after != before
+    assert accel._weights_modified is False
+    assert snapshot_digest(portable_model_snapshot(model)) == after
