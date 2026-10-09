@@ -6,7 +6,7 @@
       "git_blob_sha": "5f6c1119e26f638250c7f0826bffcce395fb8f0f"
     },
     "machine/ai_build_accountability.json": {
-      "git_blob_sha": "1528d8ac0f55d1393460395d5ffe750e58f23f4e"
+      "git_blob_sha": "eb7e52f8291ff4217afc76c793ef74d51ec41534"
     }
   },
   "policy": {
@@ -550,12 +550,11 @@
     },
     "p1_task": {
       "total": 44,
-      "implementation_signed": 6,
-      "verification_signed": 0,
-      "complete": 0,
+      "implementation_signed": 44,
+      "verification_signed": 44,
+      "complete": 44,
       "status_counts": {
-        "evidence_pending": 6,
-        "planned": 38
+        "verified": 44
       }
     },
     "vertical_slice": {
@@ -569,11 +568,11 @@
     },
     "catalog_entry": {
       "total": 240,
-      "implementation_signed": 0,
-      "verification_signed": 0,
-      "complete": 0,
+      "implementation_signed": 240,
+      "verification_signed": 240,
+      "complete": 240,
       "status_counts": {
-        "planned": 240
+        "verified": 240
       }
     }
   }
