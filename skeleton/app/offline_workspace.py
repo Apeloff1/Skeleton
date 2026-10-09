@@ -7,8 +7,8 @@ snapshots, model binding and stale-writer rejection.
 """
 from __future__ import annotations
 
-import asyncio
 import hashlib
+import hmac
 import json
 from pathlib import Path
 import re
@@ -51,7 +51,7 @@ def _load_snapshot(text: str, digest: str) -> tuple[tuple[str, str], ...]:
     if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
         raise OfflineWorkspaceError("stored transcript checksum is invalid")
     raw = text.encode("utf-8")
-    if not __import__("hmac").compare_digest(hashlib.sha256(raw).hexdigest(), digest):
+    if not hmac.compare_digest(hashlib.sha256(raw).hexdigest(), digest):
         raise OfflineWorkspaceError("stored transcript integrity mismatch")
     try:
         data = json.loads(text)
@@ -165,7 +165,11 @@ class _Session(Protocol):
     history: tuple[tuple[str, str], ...]
     @property
     def model_digest(self) -> str: ...
+    @property
+    def max_interactive_tokens(self) -> int: ...
     async def ask(self, prompt: str, *, max_output_tokens: int = 32) -> Any: ...
+    def save_history_backup(self, path: str | Path) -> str: ...
+    def restore_history_backup(self, path: str | Path) -> int: ...
 
 
 class DurableOfflineSession:
