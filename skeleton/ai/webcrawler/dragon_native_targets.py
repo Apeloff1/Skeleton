@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Literal
 
-Status = Literal["native_source", "toolchain_adapter", "licensed_sdk"]
+Status = Literal["native_source", "toolchain_adapter", "licensed_sdk", "historical_reference"]
 @dataclass(frozen=True)
 class ConsoleTarget:
     id: str
@@ -37,7 +37,7 @@ def _t(id, family, generation, year, cpu, graphics, sound, input, toolchain,
 
 TARGETS: tuple[ConsoleTarget,...] = (
     _t("atari_2600","Atari","2nd generation",1977,"6507","TIA scanline","TIA",
-       "joystick","DASM / cc65","bin",colors=128,width=160,height=192),
+       "joystick","DASM / cc65","bin","native_source",colors=128,width=160,height=192),
     _t("intellivision","Mattel","2nd generation",1979,"CP1610","STIC","AY-3-8914",
        "disc controller","as1600","bin",colors=16,width=160,height=96),
     _t("colecovision","Coleco","2nd generation",1982,"Z80","TMS9928A","SN76489",
@@ -45,11 +45,12 @@ TARGETS: tuple[ConsoleTarget,...] = (
     _t("commodore_64","Commodore","8-bit home computer",1982,"6510","VIC-II","SID",
        "keyboard / joystick","cc65","prg","native_source",colors=16,width=320,height=200),
     _t("zx_spectrum","Sinclair","8-bit home computer",1982,"Z80","attribute bitmap","beeper / AY",
-       "keyboard","z88dk","tap",colors=15,width=256,height=192),
+       "keyboard","z88dk","tap","native_source",colors=15,width=256,height=192),
     _t("apple_ii","Apple","8-bit home computer",1977,"6502","hi-res NTSC","beeper",
-       "keyboard / paddle","cc65","dsk",colors=6,width=280,height=192),
+       "keyboard / paddle","cc65","bin","native_source",colors=6,width=280,height=192,
+       notes="Native ProDOS-loadable cc65 file; disk image packaging is separate"),
     _t("nes","Nintendo","8-bit",1983,"Ricoh 2A03","PPU tiles","APU",
-       "NES controller","cc65 / ca65","nes","native_source",colors=54,width=256,height=240),
+       "NES controller","cc65 / ca65","nes",colors=54,width=256,height=240),
     _t("master_system","Sega","8-bit",1985,"Z80","VDP tiles","SN76489",
        "2-button pad","SDCC / devkitSMS","sms","native_source",colors=64,width=256,height=192),
     _t("game_boy","Nintendo","handheld 8-bit",1989,"SM83","2bpp tiles / OAM","DMG APU",
@@ -73,11 +74,11 @@ TARGETS: tuple[ConsoleTarget,...] = (
     _t("atari_st","Atari","16/32-bit computer",1985,"68000","Shifter","YM2149",
        "mouse joystick","vasm / GCC m68k","st",colors=512,width=320,height=200),
     _t("dos_8086","IBM PC compatible","DOS early",1981,"8086","CGA / text","PC speaker",
-       "keyboard","OpenWatcom","exe",colors=16,width=320,height=200),
+       "keyboard","OpenWatcom","exe","native_source",colors=16,width=320,height=200),
     _t("dos_vga","IBM PC compatible","DOS VGA era",1990,"386","VGA mode 13h","AdLib / SB",
        "keyboard","DJGPP","exe","native_source",256,320,200),
     _t("windows_95","Microsoft","Win9x 2D",1995,"x86","DirectDraw / Win32 GDI","DirectSound",
-       "keyboard/gamepad","OpenWatcom / MinGW","exe",colors=16777216,width=640,height=480),
+       "keyboard/gamepad","OpenWatcom / MinGW","exe","native_source",colors=16777216,width=640,height=480),
     _t("windows_xp","Microsoft","Win32 DirectX era",2001,"x86","Direct3D 9","DirectSound",
        "DirectInput","MSVC / DirectX SDK","exe",colors=16777216,width=800,height=600),
     _t("ps1","Sony PlayStation","32-bit",1994,"MIPS R3000A","GPU polygons / TIM","SPU",
@@ -132,6 +133,15 @@ TARGETS: tuple[ConsoleTarget,...] = (
     _t("steam_deck","Valve","portable PC",2022,"Zen 2","RDNA 2","PipeWire",
        "Steam Input","CMake + SDL2 / Proton","elf","native_source",16777216,1280,800),
 )
+# Discover all catalogued systems, even when the producer lacks a port.
+# Canonical base identities stay unchanged; supplemental IDs cannot collide.
+from .dragon_platform_expansion import SUPPLEMENTAL_TARGETS
+BASE_TARGETS=TARGETS
+TARGETS=TARGETS+tuple(ConsoleTarget(
+    e.id,e.family,e.generation,e.year,e.cpu,e.graphics,e.sound,e.input,
+    e.toolchain,e.output,e.status,0,0,0,
+    "Hardware identity only. Native build adapter not implemented."
+) for e in SUPPLEMENTAL_TARGETS)
 CATALOG = {target.id: target for target in TARGETS}
 assert len(CATALOG)==len(TARGETS), "duplicate platform identity"
 
@@ -150,7 +160,8 @@ def target_catalog(*, family: str | None = None) -> tuple[dict, ...]:
     from .dragon_game_blueprints import GENRES
     desktop={"pc_linux","pc_windows","pc_macos","steam_deck"}
     source_ids={"game_boy","game_boy_color","nes","master_system","game_gear","snes","commodore_64","genesis","game_boy_advance","ps1",
-                "xbox_original","dos_vga","nintendo_64","nintendo_ds","psp"}|desktop
+                "xbox_original","dos_vga","nintendo_64","nintendo_ds","psp",
+                "apple_ii","zx_spectrum","dos_8086","windows_95","atari_2600"}|desktop
     rows=[]
     for t in TARGETS:
         if family is not None and t.family!=family:

@@ -2,7 +2,7 @@
 export interface NativeTarget {
  id:string;family:string;generation:string;year:number;cpu:string;
  graphics:string;sound:string;input:string;toolchain:string;
- output:string;status:'native_source'|'toolchain_adapter'|'licensed_sdk';
+ output:string;status:'native_source'|'toolchain_adapter'|'licensed_sdk'|'historical_reference';
  supported_styles?:string[];
 }
 export interface NativeAttempt {
@@ -24,11 +24,11 @@ export function normalizeNativeTargets(input:unknown):NativeTarget[]{
    typeof t.output==='string'&&t.output.length<12&&
    typeof t.cpu==='string'&&typeof t.graphics==='string'&&
    typeof t.sound==='string'&&typeof t.input==='string'&&
-   (t.status==='native_source'||t.status==='toolchain_adapter'||t.status==='licensed_sdk')&&
+   (t.status==='native_source'||t.status==='toolchain_adapter'||t.status==='licensed_sdk'||t.status==='historical_reference')&&
    (t.supported_styles===undefined||(Array.isArray(t.supported_styles)&&
     t.supported_styles.every((s:unknown)=>typeof s==='string'&&/^[a-z_]{2,64}$/.test(s))));
  };
- return input.filter(isTarget).slice(0,100);
+ return input.filter(isTarget).slice(0,256);
 }
 export function normalizeNativeAttempts(input:unknown):NativeAttempt[]{
  if(!Array.isArray(input))return [];

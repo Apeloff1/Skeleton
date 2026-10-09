@@ -33,7 +33,7 @@ def test_platform_matrix_covers_actual_console_and_computer_history():
               "xbox_series","dos_8086","dos_vga","pc_linux","pc_windows",
               "pc_macos","steam_deck")
     assert all(target in CATALOG for target in required)
-    assert all(t.status in ("native_source","toolchain_adapter","licensed_sdk")
+    assert all(t.status in ("native_source","toolchain_adapter","licensed_sdk","historical_reference")
                for t in TARGETS)
     assert CATALOG["xbox_series"].status=="licensed_sdk"
     assert CATALOG["ps5"].status=="licensed_sdk"
@@ -43,7 +43,7 @@ def test_platform_matrix_covers_actual_console_and_computer_history():
 def test_native_emitters_make_platform_specific_source_not_html(target):
     p=make(target)
     assert p.status=="source_generated" and p.output in (
-        "gb","gbc","nes","prg","sms","gg","sfc","z64","nds","pbp","exe","elf","app","bin","gba","xbe")
+        "gb","gbc","nes","tap","prg","sms","gg","sfc","z64","nds","pbp","exe","elf","app","bin","gba","xbe")
     assert len(p.files)>=3 and p.target_id==target
     assert p.digest==sha(p.files)
     assert p==make(target)

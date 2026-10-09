@@ -8,7 +8,7 @@ import re
 from .dragon_game_mechanics import Mechanic
 from .dragon_native_targets import demand_target, STYLES
 
-EMITTERS=frozenset({"game_boy","game_boy_color","nes","dos_vga","master_system","game_gear","snes","commodore_64","genesis","game_boy_advance","nintendo_64","nintendo_ds","psp","ps1","xbox_original","pc_linux","pc_windows","pc_macos","steam_deck"})
+EMITTERS=frozenset({"game_boy","game_boy_color","nes","dos_vga","master_system","game_gear","snes","commodore_64","genesis","game_boy_advance","nintendo_64","nintendo_ds","psp","ps1","xbox_original","atari_2600","apple_ii","zx_spectrum","dos_8086","windows_95","pc_linux","pc_windows","pc_macos","steam_deck"})
 
 @dataclass(frozen=True)
 class NativeProject:
@@ -538,6 +538,9 @@ def render_native_project(*,title:str,target_id:str,style:str,
     elif target_id=="commodore_64":
         from .dragon_native_c64 import commodore64_source
         files=commodore64_source(seed)
+    elif target_id in ("atari_2600","apple_ii","zx_spectrum","dos_8086","windows_95"):
+        from .dragon_native_legacy_expansion import native_legacy_source
+        files=native_legacy_source(target_id,seed)
     elif target_id in ("genesis","game_boy_advance","ps1","xbox_original"):
         from .dragon_native_sdk_emitters import (
             genesis_source,gba_source,ps1_source,xbox_original_source,
