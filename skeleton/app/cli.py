@@ -95,6 +95,9 @@ def _parser() -> argparse.ArgumentParser:
     local_ai.add_argument("--snapshot-workspace", help="conversation SQLite state file")
     local_ai.add_argument("--snapshot-library", help="document knowledge SQLite state file")
     local_ai.add_argument("--snapshot-queue", help="indexing job SQLite state file")
+    local_ai.add_argument("--audit-workspace", help="read-only semantic check of chat SQLite")
+    local_ai.add_argument("--audit-library", help="read-only semantic check of document SQLite")
+    local_ai.add_argument("--audit-queue", help="read-only semantic check of job SQLite")
     sub.add_parser("down", help="stop the assembled application")
     sub.add_parser("ps", help="show assembled service state")
 
@@ -241,6 +244,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
             or args.run_queue or args.queue_status or args.cancel_queue_job
             or args.retry_queue_job or args.snapshot_to
             or args.restore_from or args.verify_snapshot
+            or args.audit_workspace or args.audit_library or args.audit_queue
         ):
             # A single command implementation ensures the GUI's CLI and the
             # frozen console use identical offline document safety policies.
@@ -268,6 +272,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 ("--snapshot-workspace", args.snapshot_workspace),
                 ("--snapshot-library", args.snapshot_library),
                 ("--snapshot-queue", args.snapshot_queue),
+                ("--audit-workspace", args.audit_workspace),
+                ("--audit-library", args.audit_library),
+                ("--audit-queue", args.audit_queue),
             ):
                 if value is not None:
                     local_args.extend((option, str(value)))
