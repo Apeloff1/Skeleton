@@ -22,7 +22,7 @@
       "workflow": ".github/workflows/state-recovery-drill.yml",
       "workflow_name": "State Recovery Drill",
       "verifier_script": "scripts/verify_state_authority_closure.py",
-      "expected_receipt_verifier": "independent-state-authority-v1",
+      "expected_receipt_verifier": "independent-state-authority-v2",
       "expected_script_sha256": "e018cfc27714939bd8c8428c798986e0274944e7c51074ec35acd9984ba24430"
     },
     {
