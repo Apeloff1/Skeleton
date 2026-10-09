@@ -228,7 +228,7 @@ jobs:
             throw "installed offline deterministic capability catalog failed"
           }
           $capabilityCatalog = $capabilityCatalogJson | ConvertFrom-Json
-          if ($capabilityCatalog.operations.Count -ne 24 -or
+          if ($capabilityCatalog.operations.Count -ne 29 -or
               $capabilityCatalog.training_examples_required -ne 0 -or
               $capabilityCatalog.executor_authority_granted) {
             throw "installed capability catalog contract mismatch"
