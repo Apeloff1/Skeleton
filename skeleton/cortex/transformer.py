@@ -589,12 +589,16 @@ class TinyTransformer:
             return self._logits(window)
         if cache.primed_for(window):
             return self._step(window[-1], cache)
-        # Pure rotary positions are shift-equivariant: once the cache reaches
-        # the context limit, only the oldest K/V slot needs eviction. Learned
+        # In a single-layer pure rotary model, K/V are independent of
+        # preceding tokens: once the cache fills, eviction is sufficient. Learned
         # absolute position embeddings are NOT shift-equivariant and retain
         # their conservative re-prime behavior for checkpoint compatibility.
         if (
             self.position_mode == "rope"
+            # In deeper models the previous token's K/V depends on evicted
+            # tokens through earlier layers. Reuse would silently change
+            # the full-window reference result; preserve exact parity.
+            and self.n_layers == 1
             and len(cache.tokens) == self.ctx
             and cache.tokens[1:] == window[:-1]
         ):
