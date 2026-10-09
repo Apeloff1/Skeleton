@@ -69,6 +69,9 @@ def _parser() -> argparse.ArgumentParser:
     local_ai.add_argument("--model", help="native content-addressed checkpoint for headless inference")
     local_ai.add_argument("--inspect-model", action="store_true", help="validate model weights and report offline runtime limits")
     local_ai.add_argument("--train-corpus", help="train a bounded CPU native checkpoint from a local UTF-8 text file")
+    local_ai.add_argument("--improve-model", help="previous native checkpoint for independent held-out improvement")
+    local_ai.add_argument("--eval-corpus", help="separate held-out UTF-8 evaluation text (required for improvement)")
+
     local_ai.add_argument("--output-model", help="new native checkpoint filename for --train-corpus")
     local_ai.add_argument("--epochs", type=int, default=1, help="bounded native CPU training passes (1-4)")
 
@@ -221,10 +224,37 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if command == "local-ai":
         from skeleton.app.local_ai import OfflineAISession, inspect_local_model, load_native_checkpoint, run_offline_ai
 
+        if args.improve_model:
+            if (
+                not args.train_corpus or not args.eval_corpus or not args.output_model
+                or args.model or args.prompt or args.inspect_model
+                or args.load_chat or args.save_chat
+            ):
+                print("local-ai improvement requires --improve-model, --train-corpus, --eval-corpus and --output-model only")
+                return 2
+            from skeleton.app.local_ai_improvement import improve_local_model
+
+            try:
+                receipt = improve_local_model(
+                    args.improve_model, args.train_corpus, args.eval_corpus,
+                    args.output_model, epochs=args.epochs,
+                )
+            except (ValueError, RuntimeError, OSError) as exc:
+                print("local-ai candidate rejected: " + type(exc).__name__ + ": " + str(exc))
+                return 1
+            if args.as_json:
+                print(json.dumps(receipt.to_dict(), ensure_ascii=False, sort_keys=True))
+            else:
+                print("Native candidate checkpoint written: " + str(args.output_model))
+                print("held-out perplexity: "
+                      + f"{receipt.baseline_perplexity:.3f} -> {receipt.accepted_perplexity:.3f}")
+                print("parent weights untouched; not an independent quality certification")
+            return 0
         if args.train_corpus:
             if (
                 not args.output_model or args.model or args.prompt
                 or args.inspect_model or args.load_chat or args.save_chat
+                or args.eval_corpus or args.improve_model
             ):
                 print("local-ai training requires --train-corpus and --output-model without chat/inference options")
                 return 2
@@ -243,8 +273,8 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 print("training steps: " + str(receipt.training_steps))
                 print("quality: not independently certified; not foundation-model weights")
             return 0
-        if args.output_model:
-            print("--output-model requires --train-corpus")
+        if args.output_model or args.eval_corpus:
+            print("--output-model/--eval-corpus require local training or improvement")
             return 2
         if args.inspect_model:
             if not args.model or args.prompt or args.load_chat or args.save_chat:
