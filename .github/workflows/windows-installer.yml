@@ -204,17 +204,26 @@ jobs:
           # No GGUF or llama.cpp binary is shipped. Verify that the installed
           # command fails closed on missing operator-owned artifacts, rather
           # than invoking a downloader or silently falling back to hosted AI.
-          $missingGguf = Start-Process -FilePath $launcher -ArgumentList @(
-            "--offline-command", "local-ai",
-            "--gguf-model", ('"' + (Join-Path $env:TEMP "missing-native-model.gguf") + '"'),
-            "--llama-executable", ('"' + (Join-Path $env:TEMP "missing-llama-cli.exe") + '"'),
-            # Start-Process flattens ArgumentList into a Windows command
-            # line. A multiword prompt without embedded quotes can be parsed
-            # as extra CLI arguments, returning 2 before GGUF admission.
-            "--prompt", "offline", "--json"
-          ) -Wait -PassThru
-          if ($missingGguf.ExitCode -ne 1) {
-            throw "installed Skeleton.exe GGUF missing-artifact smoke: expected runtime refusal (1), got $($missingGguf.ExitCode)"
+          $ggufStdout = Join-Path $env:TEMP ("skeleton-gguf-rejection-" + [guid]::NewGuid().ToString("N") + ".out")
+          $ggufStderr = $ggufStdout + ".err"
+          try {
+            # Start-Process joins the argument array into a Windows command
+            # line; use one token for a genuinely unambiguous refusal probe.
+            $missingGguf = Start-Process -FilePath $launcher -ArgumentList @(
+              "--offline-command", "local-ai",
+              "--gguf-model", ('"' + (Join-Path $env:TEMP "missing-native-model.gguf") + '"'),
+              "--llama-executable", ('"' + (Join-Path $env:TEMP "missing-llama-cli.exe") + '"'),
+              "--prompt", "offline", "--json"
+            ) -Wait -PassThru -RedirectStandardOutput $ggufStdout -RedirectStandardError $ggufStderr
+            $ggufOutput = Get-Content -LiteralPath $ggufStdout -Raw -ErrorAction SilentlyContinue
+            $ggufError = Get-Content -LiteralPath $ggufStderr -Raw -ErrorAction SilentlyContinue
+            if ($missingGguf.ExitCode -ne 1 -or $ggufOutput -notmatch "local GGUF request rejected:") {
+              Write-Host ("GGUF stdout: " + $ggufOutput)
+              Write-Host ("GGUF stderr: " + $ggufError)
+              throw "installed Skeleton.exe GGUF command did not fail closed on missing artifacts: expected authenticated artifact refusal (1), got $($missingGguf.ExitCode)"
+            }
+          } finally {
+            Remove-Item -LiteralPath $ggufStdout, $ggufStderr -Force -ErrorAction SilentlyContinue
           }
 
           $uninstaller = Join-Path $installDir "unins000.exe"
