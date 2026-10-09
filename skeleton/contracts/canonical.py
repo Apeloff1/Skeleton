@@ -145,10 +145,24 @@ class CanonicalEnvelope:
     payload: dict[str, Any]
 
     def canonical_payload(self) -> dict[str, Any]:
-        if self.schema_version not in SUPPORTED_SCHEMA_VERSIONS:
+        # bool and 1.0 compare equal to integer 1 in Python; neither is an
+        # acceptable serialized schema version at an authority boundary.
+        if type(self.schema_version) is not int or self.schema_version not in SUPPORTED_SCHEMA_VERSIONS:
             raise CanonicalContractError("unsupported schema version")
-        if not self.kind:
+        if not isinstance(self.kind, str) or not self.kind or not self.kind.strip():
             raise CanonicalContractError("missing envelope kind")
+        if not isinstance(self.identity, Identity):
+            raise CanonicalContractError("envelope identity must be Identity")
+        if not isinstance(self.evidence, tuple) or any(
+            not isinstance(item, EvidenceRef) for item in self.evidence
+        ):
+            raise CanonicalContractError("envelope evidence must contain EvidenceRef")
+        if not isinstance(self.constraints, tuple) or any(
+            not isinstance(item, str) or not item for item in self.constraints
+        ):
+            raise CanonicalContractError("envelope constraints must be non-empty strings")
+        if not isinstance(self.payload, dict):
+            raise CanonicalContractError("envelope payload must be an object")
         raw = canonical_json_bytes(self.payload)
         if len(raw) > MAX_PAYLOAD_BYTES:
             raise CanonicalContractError("payload exceeds byte budget")
