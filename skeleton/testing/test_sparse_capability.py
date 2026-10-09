@@ -1,6 +1,7 @@
 """Adversarial limits for wide capability coverage using tiny training subsets."""
 from __future__ import annotations
 
+from contextlib import closing
 import json
 from pathlib import Path
 import shutil
@@ -91,7 +92,7 @@ def test_sparse_plan_is_byte_deterministic_across_repeated_requests() -> None:
 
 def test_sparse_registration_has_train_split_only_and_rights_no_promotion() -> None:
     plan = build_sparse_capability_plan(SOURCE)
-    with DatasetRegistry(":memory:") as registry:
+    with closing(DatasetRegistry(":memory:")) as registry:
         identity = register_sparse_capability_plan(SOURCE, plan, registry)
         assert register_sparse_capability_plan(SOURCE, plan, registry) == identity
         ready = registry.require_training_ready(identity)
@@ -115,7 +116,7 @@ def test_forged_sparse_answer_cannot_register_even_with_new_self_hash() -> None:
     assert altered != plan["training_text"]
     bad["training_text"] = altered
     bad["training_text_sha256"] = hashlib.sha256(altered).hexdigest()
-    with DatasetRegistry(":memory:") as registry:
+    with closing(DatasetRegistry(":memory:")) as registry:
         with pytest.raises(SyntheticCurriculumError, match="differs"):
             register_sparse_capability_plan(SOURCE, bad, registry)
         assert not registry._db.execute("SELECT 1 FROM dataset_manifest").fetchone()
@@ -127,7 +128,7 @@ def test_swapped_heldout_training_identity_cannot_register() -> None:
     bad["selected_sample_ids"] = ["ofv1-integer_arithmetic-14-0"] + (
         plan["selected_sample_ids"][1:]
     )
-    with DatasetRegistry(":memory:") as registry:
+    with closing(DatasetRegistry(":memory:")) as registry:
         with pytest.raises(SyntheticCurriculumError, match="differs"):
             register_sparse_capability_plan(SOURCE, bad, registry)
 
