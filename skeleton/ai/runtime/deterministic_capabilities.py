@@ -14,6 +14,8 @@ import json
 import re
 from typing import Any, Callable, Mapping
 
+from .gameplay_capabilities import GAMEPLAY_OPERATIONS
+
 SCHEMA = "skeleton.offline_deterministic_capabilities.v1"
 MAX_INPUT_BYTES = 8192
 MAX_OUTPUT_BYTES = 32768
@@ -340,6 +342,7 @@ OPERATIONS: dict[str, Callable[[dict[str, Any]], Any]] = {
     "policy.local_action": _policy,
     "evidence.lookup": _fact,
     "content.sha256": _hash_text,
+    **GAMEPLAY_OPERATIONS,
 }
 
 
