@@ -1,8 +1,8 @@
 # No-plagiarism game evolution policy: originality, attribution and lawful inspiration
 
-**Policy:** No deceptive claims of authorship, unattributed third-party expression, or unlicensed incorporation of protected game code, art, audio, characters, story, distinctive level designs or audiovisual presentation. Inspired mechanics and hardware facts remain eligible for *independent* game creation.  
-**Review date:** 2026-10-10.  
-**Implementation:** `plagiarism_guard.py`, `plagiarism_cli.py`, `legal_paths.py`, `legal_native_export.py`, `rights.py`.  
+**Policy:** No deceptive claims of authorship, unattributed third-party expression, or unlicensed incorporation of protected game code, art, audio, characters, story, distinctive level designs or audiovisual presentation. Inspired mechanics and hardware facts remain eligible for *independent* game creation.
+**Review date:** 2026-10-10.
+**Implementation:** `plagiarism_guard.py`, `plagiarism_cli.py`, `legal_paths.py`, `legal_native_export.py`, `rights.py`.
 **Historical scope:** all currently curated systems in `platform_catalog.json`, with no claim that the global archive is complete.
 
 ## No universal legal plagiarism percentage exists
