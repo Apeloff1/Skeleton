@@ -14,6 +14,8 @@ import threading
 from typing import Any
 
 from skeleton.ai.runtime.inference.artifact import load_local_model_artifact
+from skeleton.ai.runtime.inference.deployment import LocalModelDeployment
+from skeleton.ai.runtime.inference.llama_cpp import LlamaCppModel
 from skeleton.ai.runtime.inference.local import LocalInferenceRequest, LocalInferenceResult, LocalInferenceEngine
 from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
 
@@ -62,6 +64,11 @@ class OfflineAISession:
 
     def clear(self) -> None:
         self.history = ()
+
+    @property
+    def max_interactive_tokens(self) -> int:
+        runtime = self.backend.runtime
+        return max(1, min(32, runtime.limits.max_new_tokens, runtime.limits.max_context // 4))
 
     @property
     def model_digest(self) -> str:
@@ -121,6 +128,89 @@ class OfflineAISession:
         )
 
 
+
+
+class OfflineGGUFSession:
+    """Desktop/headless chat over the already-governed offline llama.cpp owner.
+
+    A manifest pins both a local executable and the operator-supplied GGUF by
+    SHA-256. Every inference revalidates artifact hashes; no hosted provider,
+    model download, or implicit cloud fallback is constructed. Transcript
+    history is volatile, and only complete model results enter the next turn.
+    """
+
+    def __init__(self, manifest_path: str | Path) -> None:
+        deployment = LocalModelDeployment.load(manifest_path)
+        self.deployment = deployment
+        self.backend = LlamaCppModel(
+            deployment.llama_cpp_config(rehash_artifacts_each_run=True)
+        )
+        self.engine = LocalInferenceEngine(self.backend, cache_size=0)
+        self.history: tuple[tuple[str, str], ...] = ()
+
+    @property
+    def model_digest(self) -> str:
+        return self.backend.model_digest
+
+    @property
+    def max_interactive_tokens(self) -> int:
+        return min(32, max(1, (self.deployment.context_size or 2048) // 4))
+
+    def clear(self) -> None:
+        self.history = ()
+
+    def _request(
+        self, prompt: str, max_output_tokens: int
+    ) -> tuple[LocalInferenceRequest, tuple[tuple[str, str], ...]]:
+        if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > MAX_USER_CHARS:
+            raise OfflineAIError("message must contain 1-4096 characters")
+        context = self.deployment.context_size
+        limit = min(8192, context // 2) if context is not None else 8192
+        if (
+            isinstance(max_output_tokens, bool)
+            or not isinstance(max_output_tokens, int)
+            or not 1 <= max_output_tokens <= limit
+        ):
+            raise OfflineAIError("output-token budget exceeds the local GGUF deployment limit")
+
+        # Bounded history prevents unbounded transcript growth in the desktop
+        # process. The llama.cpp runtime remains the token/context authority.
+        history = self.history
+        while history and (
+            sum(len(text) for _, text in history) + len(prompt) > 16_384
+            or len(history) > MAX_HISTORY_MESSAGES - 2
+        ):
+            history = history[2:]
+        return LocalInferenceRequest(
+            prompt=prompt.strip(),
+            history=history,
+            max_output_tokens=max_output_tokens,
+        ), history
+
+    async def ask(self, prompt: str, *, max_output_tokens: int = 32) -> OfflineAnswer:
+        request, retained = self._request(prompt, max_output_tokens)
+        result = await self.engine.generate(request)
+        if (
+            not isinstance(result.text, str)
+            or not result.text.strip()
+            or result.tool_calls
+            or not result.execution_receipt_digest
+            or result.model_digest != self.model_digest
+            or result.finish_reason not in {"completed", "length"}
+        ):
+            raise OfflineAIError("local GGUF model did not return a bound, text-only answer")
+        self.history = (
+            retained + (("user", request.prompt), ("assistant", result.text))
+        )[-MAX_HISTORY_MESSAGES:]
+        return OfflineAnswer(
+            text=result.text,
+            model_digest=result.model_digest,
+            execution_receipt_digest=result.execution_receipt_digest,
+            input_tokens=result.input_tokens,
+            output_tokens=result.output_tokens,
+        )
+
+
 class OfflineAIWindow:
     """Tk window hosted by the existing Windows desktop launcher."""
 
@@ -135,7 +225,7 @@ class OfflineAIWindow:
         self.window.geometry("850x660")
         self.window.minsize(600, 440)
         self.window.protocol("WM_DELETE_WINDOW", self.close)
-        self.session: OfflineAISession | None = None
+        self.session: OfflineAISession | OfflineGGUFSession | None = None
         self.events: Queue[tuple[str, object]] = Queue()
         self.active = False
         self.closed = False
@@ -148,13 +238,15 @@ class OfflineAIWindow:
         ttk.Label(frame, text="Local AI · no Docker / no hosted provider", font=("Segoe UI", 13, "bold")).pack(anchor="w")
         ttk.Label(
             frame,
-            text="Runs an explicitly selected native checkpoint offline. No trained model is supplied; quality depends on your checkpoint.",
+            text="Select a native checkpoint or a digest-pinned local GGUF deployment. No model is bundled or downloaded; answer quality depends on local weights.",
             wraplength=790,
         ).pack(anchor="w", pady=(4, 10))
         toolbar = ttk.Frame(frame)
         toolbar.pack(fill="x")
         self.load_button = ttk.Button(toolbar, text="Load checkpoint…", command=self.choose_model)
         self.load_button.pack(side="left")
+        self.deployment_button = ttk.Button(toolbar, text="Load GGUF deployment…", command=self.choose_deployment)
+        self.deployment_button.pack(side="left", padx=8)
         self.clear_button = ttk.Button(toolbar, text="New conversation", command=self.clear)
         self.clear_button.pack(side="left", padx=8)
         self.cancel_button = ttk.Button(toolbar, text="Cancel generation", command=self.cancel)
@@ -173,6 +265,7 @@ class OfflineAIWindow:
 
     def _refresh(self) -> None:
         self.load_button.configure(state="disabled" if self.active else "normal")
+        self.deployment_button.configure(state="disabled" if self.active else "normal")
         self.send_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
         self.clear_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
         self.cancel_button.configure(state="normal" if self.active else "disabled")
@@ -206,6 +299,28 @@ class OfflineAIWindow:
 
         threading.Thread(target=work, name="skeleton-local-model-load", daemon=True).start()
 
+    def choose_deployment(self) -> None:
+        if self.active:
+            return
+        selected = self.filedialog.askopenfilename(
+            parent=self.window,
+            title="Select a local GGUF deployment manifest",
+            filetypes=[("JSON deployment manifest", "*.json"), ("All files", "*.*")],
+        )
+        if not selected:
+            return
+        self.active = True
+        self.status.set("Verifying the local executable and GGUF SHA-256 identities…")
+        self._refresh()
+
+        def work() -> None:
+            try:
+                self.events.put(("loaded", OfflineGGUFSession(selected)))
+            except Exception as exc:
+                self.events.put(("error", str(exc)))
+
+        threading.Thread(target=work, name="skeleton-gguf-manifest-load", daemon=True).start()
+
     def clear(self) -> None:
         if self.active or self.session is None:
             return
@@ -230,7 +345,7 @@ class OfflineAIWindow:
 
         def work() -> None:
             async def generate() -> OfflineAnswer:
-                task = asyncio.create_task(session.ask(prompt, max_output_tokens=min(32, session.backend.runtime.limits.max_new_tokens, max(1, session.backend.runtime.limits.max_context // 4))))
+                task = asyncio.create_task(session.ask(prompt, max_output_tokens=session.max_interactive_tokens))
                 with self.worker_lock:
                     self.worker_loop = asyncio.get_running_loop()
                     self.worker_task = task
@@ -267,7 +382,7 @@ class OfflineAIWindow:
                 if kind == "loaded":
                     self.session = value  # type: ignore[assignment]
                     self.clear()
-                    self.status.set("Native model loaded: " + self.session.model_digest[:16] + "…")
+                    self.status.set("Offline model loaded: " + self.session.model_digest[:16] + "…")
                 elif kind == "answer":
                     answer = value
                     self._append("Skeleton · Local", answer.text)  # type: ignore[attr-defined]
