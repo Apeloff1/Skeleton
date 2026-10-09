@@ -590,7 +590,14 @@ class TinyTransformer:
         if self._accel is not None:
             try:
                 return list(self._accel.logits(ids))
-            except Exception:
+            except Exception as exc:
+                if (
+                    self._accel.kv_dtype_name != "fp32"
+                    or self._accel.max_kv_bytes is not None
+                ):
+                    raise RuntimeError(
+                        "explicit Torch KV policy forbids silent CPU fallback"
+                    ) from exc
                 self._sync_accelerator()
                 self._accel = None
                 self.resident = False
@@ -631,7 +638,15 @@ class TinyTransformer:
                 # not a hint to silently allocate an unbudgeted Python cache.
                 cache.reset()
                 raise
-            except Exception:
+            except Exception as exc:
+                if (
+                    self._accel.kv_dtype_name != "fp32"
+                    or self._accel.max_kv_bytes is not None
+                ):
+                    cache.reset()
+                    raise RuntimeError(
+                        "explicit Torch KV policy forbids silent CPU fallback"
+                    ) from exc
                 self._sync_accelerator()
                 self._accel = None
                 self.resident = False
