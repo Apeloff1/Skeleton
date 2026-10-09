@@ -230,6 +230,33 @@ def verify_snapshot(folder: str | Path) -> dict[str, Any]:
     return data
 
 
+def _quarantine_restored_queue(path: Path) -> None:
+    """Never replay source paths or lease authority from another installation.
+
+    A restored queue can contain active jobs with source/library paths that
+    belong to the *old* device or installation. Preserve completed audit
+    history while neutralizing every actionable pre-restore job. Operators
+    must explicitly enqueue fresh work against the new local paths.
+    """
+    try:
+        with sqlite3.connect(str(path), isolation_level=None, timeout=10) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                conn.execute(
+                    "UPDATE offline_index_jobs SET "
+                    "state='cancelled', lease_token=NULL, lease_until=NULL, "
+                    "result_json=NULL, "
+                    "last_error='restored queue: explicitly enqueue work for this device' "
+                    "WHERE state IN ('queued', 'running', 'failed')"
+                )
+                conn.execute("COMMIT")
+            except BaseException:
+                conn.execute("ROLLBACK")
+                raise
+    except sqlite3.Error as exc:
+        raise OfflineSnapshotError("cannot quarantine restored indexing jobs") from exc
+
+
 def restore_snapshot(
     folder: str | Path,
     *,
@@ -271,6 +298,12 @@ def restore_snapshot(
             if _digest(temporary) != manifest["databases"][kind]["sha256"]:
                 raise OfflineSnapshotError("restore copy differs from verified input")
             _verify_database(temporary, kind)
+            if kind == "queue":
+                # The manifest verifies input integrity; the restored copy
+                # intentionally has different bytes because old leases and
+                # path-based pending authority cannot be safely replayed.
+                _quarantine_restored_queue(temporary)
+                _verify_database(temporary, kind)
         # Publish only after *every* domain has passed its own validation.
         # If a later publish fails, delete only files made in this operation.
         for temporary, target, _kind in staged:
