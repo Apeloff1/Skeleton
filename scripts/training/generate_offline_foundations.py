@@ -27,7 +27,13 @@ def _json(value: dict[str, Any]) -> str:
 
 
 def generate_example(family: str, group: int, variant: int) -> tuple[str, str, str]:
-    if family not in FAMILIES or group not in range(20) or variant not in range(3):
+    # Groups 00-19 are the pinned corpus; 20+ are transient capability
+    # challenges with parameter values disjoint from all fixed split groups.
+    if (
+        family not in FAMILIES or type(group) is not int
+        or not 0 <= group <= 10_000 or type(variant) is not int
+        or not 0 <= variant < 3
+    ):
         raise ValueError("unknown synthetic example key")
     t = group + (1100 if group >= 17 else 200 if group >= 14 else 0)
     unit = "unit-" + f"{t:04d}"
