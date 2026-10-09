@@ -178,3 +178,79 @@ def test_restored_running_lease_is_quarantined_even_if_not_expired(tmp_path: Pat
     with OfflineIndexQueue(restored) as store:
         assert store.get(job_id).state == "cancelled"
         assert store.run_one() is None
+
+
+def test_snapshot_publication_never_clobbers_racing_directory(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    import skeleton.app.offline_snapshot as module
+
+    workspace, _, _ = _example(tmp_path)
+    target = tmp_path / "snapshot"
+    actual_publish = module._publish_new_snapshot
+
+    def competitor_arrives(stage, destination):
+        destination.mkdir()
+        (destination / "private.txt").write_text("do not delete", encoding="utf-8")
+        return actual_publish(stage, destination)
+
+    monkeypatch.setattr(module, "_publish_new_snapshot", competitor_arrives)
+    with pytest.raises(FileExistsError):
+        create_snapshot(target, workspace=workspace)
+    assert (target / "private.txt").read_text("utf-8") == "do not delete"
+    assert sorted(item.name for item in target.iterdir()) == ["private.txt"]
+
+
+def test_snapshot_manifest_is_last_and_incomplete_publication_is_rejected(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    import skeleton.app.offline_snapshot as module
+
+    workspace, _, _ = _example(tmp_path)
+    target = tmp_path / "snapshot"
+    original_link = module.os.link
+    examined = []
+
+    def reject_final_link(source, destination, *args, **kwargs):
+        if Path(source).name == "manifest.json":
+            with pytest.raises(OfflineSnapshotError, match="manifest"):
+                verify_snapshot(target)
+            examined.append(True)
+            raise OSError("simulated failure before final manifest")
+        return original_link(source, destination, *args, **kwargs)
+
+    monkeypatch.setattr(module.os, "link", reject_final_link)
+    with pytest.raises(OSError, match="simulated failure"):
+        create_snapshot(target, workspace=workspace)
+    assert examined
+    assert not target.exists()
+
+
+def test_failed_multi_file_restore_never_deletes_competing_replacement(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    import skeleton.app.offline_snapshot as module
+
+    workspace, library, _ = _example(tmp_path)
+    archive = tmp_path / "snapshot"
+    create_snapshot(archive, workspace=workspace, library=library)
+    library_destination = tmp_path / "recovered-docs.sqlite"
+    workspace_destination = tmp_path / "recovered-chat.sqlite"
+    original_link = module.os.link
+
+    def replace_after_first_publish(source, destination, *args, **kwargs):
+        if Path(destination) == workspace_destination:
+            assert library_destination.exists()
+            library_destination.unlink()
+            library_destination.write_bytes(b"new concurrent private data")
+            raise OSError("simulated competing mutation")
+        return original_link(source, destination, *args, **kwargs)
+
+    monkeypatch.setattr(module.os, "link", replace_after_first_publish)
+    with pytest.raises(OSError, match="competing mutation"):
+        restore_snapshot(
+            archive, workspace=workspace_destination,
+            library=library_destination,
+        )
+    assert library_destination.read_bytes() == b"new concurrent private data"
+    assert not workspace_destination.exists()
