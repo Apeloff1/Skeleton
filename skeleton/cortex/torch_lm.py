@@ -450,8 +450,17 @@ class TorchAccel:
         themselves remain correct.
         """
         with self._state_lock:
-            result = self._logits_window_unlocked(ids)
-            return result, tuple(self._cached_ids)
+            try:
+                result = self._logits_window_unlocked(ids)
+                return result, tuple(self._cached_ids)
+            except Exception:
+                # A failed kernel or layer allocation can occur after an
+                # earlier layer has already appended its K/V. In that state
+                # _cached_ids still describes the previous prefix but the
+                # physical cache contains a different graph. Never reuse it:
+                # evict all layers and retry via a clean fused prefill.
+                self._reset_decode_cache_unlocked()
+                raise
 
     def _logits_window_unlocked(self, ids: Sequence[int]) -> List[float]:
         """Prefill once, then decode with on-device per-layer K/V tensors."""
