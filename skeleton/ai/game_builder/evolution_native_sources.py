@@ -22,6 +22,9 @@ from .game_boy_native_export import (
     GameBoySourceError, GameBoySourceProject,
     compile_native_game_boy, export_native_game_boy,
 )
+from .nes_native_export import (
+    NativeNESError, NativeNESSourceProject, compile_native_nes, export_native_nes,
+)
 from .port_planner import HomebrewSource
 
 _DESKTOP = frozenset({"windows_modern", "linux_desktop", "macos_modern"})
@@ -39,7 +42,7 @@ class EvolutionNativeStage:
     source_kind: str | None
     source_digest: str | None
     status: str
-    project: NativeDesktopSourceProject | GameBoySourceProject | None
+    project: NativeDesktopSourceProject | GameBoySourceProject | NativeNESSourceProject | None
 
     def __post_init__(self):
         if self.status not in _STATUSES:
@@ -125,19 +128,26 @@ def compile_evolution_native_sources(
         if stage.native_binary_built or stage.target_adapter_state != "concept_prototype_not_native":
             raise GameEvolutionError("upstream practice has forged hardware build assertion")
         target = stage.intended_platform_id
-        project: NativeDesktopSourceProject | GameBoySourceProject | None = None
+        project: NativeDesktopSourceProject | GameBoySourceProject | NativeNESSourceProject | None = None
         status = "design_only"
         if target in _DESKTOP:
             try:
                 project = compile_native_desktop(stage.game_world, source, target, authorized=True)
             except NativeDesktopExportError as exc:
                 raise GameEvolutionError("desktop native compiler refused practice stage") from exc
-        elif target in _HANDHELD:
+        elif target == "nintendo_game_boy":
             try:
                 project = compile_native_game_boy(stage.game_world, source, authorized=True)
             except GameBoySourceError as exc:
                 if "exceeds DMG" not in str(exc):
                     raise GameEvolutionError("handheld compiler refused practice stage") from exc
+                status = "budget_incompatible"
+        elif target == "nintendo_famicom":
+            try:
+                project = compile_native_nes(stage.game_world, source, authorized=True)
+            except NativeNESError as exc:
+                if "envelope exceeded" not in str(exc):
+                    raise GameEvolutionError("NES compiler refused practice stage") from exc
                 status = "budget_incompatible"
         if project is not None:
             status = "native_source_ready"
@@ -183,6 +193,8 @@ def export_evolution_native_sources(
         folder = root / f"stage-{stage.stage_number:02d}-{stage.target_platform_id}"
         if isinstance(stage.project, GameBoySourceProject):
             export_native_game_boy(stage.project, folder, authorized=True)
+        elif isinstance(stage.project, NativeNESSourceProject):
+            export_native_nes(stage.project, folder, authorized=True)
         else:
             export_native_desktop_source(stage.project, folder, authorized=True)
     with (root / "evolution-native-manifest.json").open("x", encoding="utf-8", newline="\n") as output:
