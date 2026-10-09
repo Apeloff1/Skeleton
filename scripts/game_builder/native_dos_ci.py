@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 from skeleton.ai.game_builder.dos_native_export import compile_native_dos, export_native_dos
+from skeleton.ai.game_builder.dos_memory_replay import export_dos_replay
 from skeleton.ai.game_builder.playable_world import GameBuildIntent, generate_playable_world
 from skeleton.ai.game_builder.port_planner import HomebrewSource
 
@@ -25,6 +26,7 @@ def generate_source(output: Path) -> dict[str, object]:
     )
     project = compile_native_dos(world, original, authorized=True)
     folder = export_native_dos(project, output, authorized=True)
+    export_dos_replay(world, folder / "original-dos-replay.json")
     manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
     if manifest["world_digest"] != world.digest or manifest["executable_built"] is not False:
         raise RuntimeError("world identity or unverified native build assertion")
@@ -40,6 +42,8 @@ def verify_executable(path: Path) -> dict[str, object]:
         raise ValueError("8086 COM image out of DOS 64KiB segment budget")
     if not data.startswith(b"\x0E\x1F\xB8\x03\x00\xCD\x10"):
         raise ValueError("expected real 8086 CS->DS init and BIOS text-mode startup")
+    if data.count(b"SKELDOSSTATE") != 1:
+        raise ValueError("missing or duplicate real-mode state trace symbol table")
     for opcode, meaning in (
         (b"\xB8\x00\xB8\x8E\xC0", "IBM text-mode ES segment setup"),
         (b"\xCD\x16", "BIOS keyboard service"),
