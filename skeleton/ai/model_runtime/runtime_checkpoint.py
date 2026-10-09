@@ -286,7 +286,9 @@ def restore_components(
 
     policy_raw = body["device_policy"]
     required_policy_keys = {"requested", "allow_fallback"}
-    allowed_policy_keys = required_policy_keys | {"kv_dtype", "kv_limit_bytes"}
+    allowed_policy_keys = required_policy_keys | {
+        "kv_dtype", "kv_limit_bytes", "prefill_query_chunk",
+    }
     if (
         not required_policy_keys.issubset(policy_raw)
         or not set(policy_raw).issubset(allowed_policy_keys)
