@@ -15,6 +15,7 @@ _NATIVE_SOURCE_ADAPTERS = {
     "macos_modern": "sdl2_c11_cmake",
     "nintendo_game_boy": "rgbds_dmg_2bpp_rom_source",
     "nintendo_famicom": "ca65_nrom256_2bpp_rom_source",
+    "commodore_64": "cc65_6510_vic_ii_sid_prg_source",
 }
 _NATIVE_SOURCE_TARGETS = frozenset(_NATIVE_SOURCE_ADAPTERS)
 
@@ -132,7 +133,7 @@ def editor_platform_form(*, registry: PlatformRegistry | None = None) -> dict[st
             {"value": PortMode.CROSS_HYBRID.value, "label": "Original, independently cleared two-source hybrid"},
         ],
         "export_status": "no_native_target_verified",
-        "source_export_status": "three_desktop_c11_and_two_original_console_rom_source_projects",
+        "source_export_status": "three_desktop_c11_two_rom_and_one_c64_6510_native_source_projects",
         "native_source_project_destinations": sorted(_NATIVE_SOURCE_TARGETS & set(catalog.profiles)),
         "native_source_export_requires": [
             "generated_original_playable_world",
