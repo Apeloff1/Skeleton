@@ -176,6 +176,14 @@ def train_local_text(
         raise OfflineTrainingError("native training produced non-finite quality diagnostics")
     if steps < 1:
         raise OfflineTrainingError("training produced no gradient steps")
+    # Recheck the concrete source bytes after computation. A user may edit
+    # the selected file while CPU fitting runs; never attribute trained
+    # weights to a filename whose content changed during the operation.
+    observed_after, _ = _read_corpus(source)
+    if observed_after != source_bytes:
+        raise OfflineTrainingError(
+            "training source changed during fitting; checkpoint not published"
+        )
     native = NativeLLMRuntime(model)
     from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
 
