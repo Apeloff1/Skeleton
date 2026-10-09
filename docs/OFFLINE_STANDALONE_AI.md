@@ -256,6 +256,44 @@ system compromise. Other processes and any additional spawned binaries
 must be governed separately. For a truly disconnected acceptance test,
 use an independent OS policy or physically isolated test machine.
 
+## Functional model qualification with real local inference
+
+Artifact readiness and the tiny `--native-smoke` check are not sufficient
+to qualify a device for real offline chat. Use `--qualify-model` with your
+locally installed checkpoint or GGUF deployment, after independently
+verifying its publisher and model license:
+
+```sh
+skeleton-offline --deployment ./deployment.json --qualify-model --max-output-tokens 16 --json
+skeleton-offline --model ./checkpoint.json --qualify-model --max-output-tokens 2 --json
+python -m skeleton app local-ai --deployment ./deployment.json --qualify-model --max-output-tokens 16 --json
+```
+
+The qualification makes **two actual inference calls** using the supplied
+model, closes the first model/session and its SQLite connection, reopens
+the same model and locally stored conversation context, and verifies the
+second committed turn and pinned model/runtime hashes. It reports model
+identity, output hashes, per-turn execution receipts and token counts;
+neither generated answers nor transcript text are written to stdout.
+Temporary user context is deleted at the end. This is **session reopen
+inside one process**, not a subprocess reboot, power-loss recovery, real
+model quality benchmark or OS-enforced airgap.
+
+The report explicitly sets
+`network_isolation_verified=false`,
+`trained_model_quality_verified=false`, and
+`release_signed=false`. A simulated llama.cpp CLI can pass this interface
+contract without containing a useful trained model, so successful
+qualification of a real deployment needs independently trusted weights,
+a genuine executable and target-hardware observation.
+
+The Windows installer workflow creates a temporary **synthetic**
+deterministic native checkpoint during CI and runs the above two-turn check
+using the *installed frozen SkeletonOffline.exe*. It tests executable
+packaging, model inference integration, SQLite recovery and receipt
+generation without requiring system Python for the installed application.
+This is not a claim that production trained weights are bundled.
+
 ## Offline readiness doctor
 
 Use `--doctor` with one preinstalled local artifact before running it:
