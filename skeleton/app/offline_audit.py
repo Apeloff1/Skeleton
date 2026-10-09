@@ -17,8 +17,7 @@ import re
 import sqlite3
 from typing import Any
 
-from .offline_history import _history, _canonical
-from .offline_snapshot import KINDS, MAX_DATABASE_BYTES
+ from .offline_snapshot import KINDS, MAX_DATABASE_BYTES
 
 
 AUDIT_SCHEMA = "skeleton.app.offline_state_audit.v1"
@@ -64,7 +63,7 @@ def _workspace(conn: sqlite3.Connection) -> dict[str, int]:
             if type(revision) is not int or revision < 0:
                 raise OfflineAuditError("workspace revision is invalid")
             messages = _load_snapshot(history_json, digest)
-        except (ValueError, TypeError) as exc:
+        except (ValueError, TypeError, RuntimeError) as exc:
             raise OfflineAuditError("workspace contains malformed conversation") from exc
         turns += len(messages) // 2
     return {"conversations": len(rows), "complete_turns": turns}
