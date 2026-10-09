@@ -413,6 +413,64 @@ class TestEvaluatedOfflineImprovement(unittest.TestCase):
                         improve_local_model(source, train, heldout, dest)
             self.assertFalse(dest.exists())
 
+    def test_training_uses_isolated_clone_and_never_mutates_baseline_runtime(self) -> None:
+        from skeleton.app.local_ai_benchmark import SCHEMA
+        from skeleton.ai.runtime.inference.artifact import (
+            load_local_model_artifact as actual_loader,
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            source, train, heldout, dest = self._fixture(directory)
+            suite = Path(directory) / "guarded.json"
+            suite.write_text(json.dumps({
+                "schema": SCHEMA,
+                "cases": [
+                    {"id": "one", "category": "safety", "text": "alpha beta user"},
+                    {"id": "two", "category": "safety", "text": "beta alpha user"},
+                    {"id": "three", "category": "dialog", "text": "assistant beta alpha"},
+                    {"id": "four", "category": "dialog", "text": "alpha assistant beta"},
+                ],
+            }), encoding="utf-8")
+            retained = []
+            original_fit = TinyTransformer.fit
+
+            def load_with_baseline_tracking(path):
+                loaded = actual_loader(path)
+                if not retained:
+                    retained.append(loaded.model)
+                return loaded
+
+            def assert_model_is_clone(model, texts, **kwargs):
+                self.assertTrue(retained)
+                self.assertIsNot(model, retained[0].runtime.model)
+                retained[0].assert_identity()
+                steps = original_fit(model, texts, **kwargs)
+                retained[0].assert_identity()
+                return steps
+
+            with patch(
+                "skeleton.app.local_ai_improvement.load_local_model_artifact",
+                side_effect=load_with_baseline_tracking,
+            ), patch.object(
+                TinyTransformer, "fit", new=assert_model_is_clone,
+            ), patch(
+                "skeleton.app.local_ai_improvement._token_weighted_perplexity",
+                side_effect=[4.0, 3.0, 3.0],
+            ), patch(
+                "skeleton.app.local_ai_benchmark.compare_benchmark_results",
+                return_value={"passes_local_regression_gate": True},
+            ):
+                receipt = improve_local_model(
+                    source, train, heldout, dest, protected_suite=suite,
+                )
+            self.assertTrue(dest.exists())
+            self.assertTrue(receipt.protected_suite_passed)
+            retained[0].assert_identity()
+            self.assertNotEqual(
+                load_native_checkpoint(dest).model_digest,
+                retained[0].model_digest,
+            )
+
     def test_cli_cannot_skip_independent_evaluation(self) -> None:
         from skeleton.app.cli import run_app_cli
 
