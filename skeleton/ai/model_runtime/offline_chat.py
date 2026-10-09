@@ -457,7 +457,8 @@ class OfflineChatStore:
                output_digest: str, prompt_tokens: int,
                generated_tokens: int) -> OfflineTurnReceipt:
         rid = _identifier("request id", request_id)
-        if not isinstance(transcript, ChatTranscript) or not isinstance(text, str):
+        if (not isinstance(transcript, ChatTranscript) or not isinstance(text, str)
+                or not text.strip()):
             raise RuntimeContractError("invalid completed native chat result")
         transcript.validate_turn_order()
         prior = session.transcript.messages
