@@ -204,6 +204,55 @@ Black-box acceptance:
 The integration test binds a real ephemeral localhost port, executes native inference, checks token/origin/host protections, concurrent exact-once retries, complete-history backups, forks and local token-file permissions.
 
 
+## Local reference library: verified searchable source passages
+
+The authenticated localhost app can ingest operator-supplied text/Markdown files
+into the **same model-specific SQLite authority** as saved conversations.
+The local browser sidebar has **Local reference library** controls for uploading,
+listing, searching and removing references. No web crawler, HTTP fetch, remote
+model, filesystem path execution, remote search or shell command is involved.
+
+The REST workflow is:
+
+- `POST /v1/knowledge/documents`: `{"title":"GPU notes.md","text":"..."}`
+  with at most 65,536 UTF-8 bytes of source content.
+- `GET /v1/knowledge/documents`: model-scoped document catalog with SHA-256.
+- `POST /v1/knowledge/search`: `{"query":"rasterizer edge functions","limit":6}`.
+- `DELETE /v1/knowledge/documents/{document_id}`: remove one local document
+  and its dependent index chunks.
+
+Documents are exact-byte deduplicated within the admitted model/tokenizer
+identity and limited to 256 documents / 4,096 chunks per model. Searches apply
+deterministic Unicode-normalized lexical scoring, not remote embeddings. Every
+returned passage contains the source title, source SHA-256, indexed character
+offsets, source chunk index and a local citation ID.
+
+**Adversarial provenance control:** search and list read a consistent SQLite
+snapshot, check the original full document bytes against the declared SHA-256,
+and recompute every original chunk/offset. Missing chunks, corrupted source
+bytes or falsified citations make the request fail rather than return bogus
+source evidence. The text is treated as untrusted reference content and is not
+given tools or elevated instruction authority.
+
+**Scope:** this implements searchable reference evidence only. It does **not**
+assert that a local language model used those passages in a generated answer.
+Search results are displayed separately from generated chat responses. Full
+retrieval-grounded answer generation will require explicit prompt/citation
+binding, stored evidence manifests, drift-safe replay and answer-attribution
+evaluations. Accordingly, the project's `assistant.retrieval_grounded`
+capability remains partial rather than being promoted to complete.
+
+Release test entry points:
+
+    python -m pytest -q tests/test_app_offline_knowledge.py tests/test_app_offline_http.py
+    Skeleton.exe --local-http-smoke
+
+The frozen Windows HTTP smoke now includes actual localhost reference import,
+search and **fresh SQLite reopen after service teardown**, as well as native
+generation and replay. Real model quality and installer signing remain separate
+release gates.
+
+
 ## Windows desktop product integration
 
 The installed Windows launcher already includes a **Local AI (offline)**
