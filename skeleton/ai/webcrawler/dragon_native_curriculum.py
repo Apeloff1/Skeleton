@@ -121,6 +121,11 @@ class DragonNativeCurriculum:
         successes=Counter(x.target for x in proofs)
         recommendations=[];blocked=[]
         for step in MILESTONES:
+            # The introductory Game Boy source skill is already structurally
+            # demonstrated. Do not farm repeat variants ahead of a newly
+            # unlocked platforming/6502 skill.
+            if step.milestone_id=="gb_input" and "game_boy" in built:
+                continue
             unmet=tuple(x for x in step.requires if x not in built)
             if unmet:
                 blocked.append({

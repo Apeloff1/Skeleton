@@ -25,12 +25,12 @@ def test_matrix_accurately_counts_source_emitters_per_style():
     by_name={entry["style"]:entry for entry in rows}
     assert by_name["arcade_score_attack"]["supported_hardware_count"]==48
     assert "nes" in by_name["arcade_score_attack"]["native_emitters"]
-    assert by_name["fixed_screen_puzzle"]["supported_hardware_count"]==4
-    assert by_name["first_person_shooter"]["supported_hardware_count"]==4
-    assert by_name["rhythm_game"]["supported_hardware_count"]==4
+    assert by_name["fixed_screen_puzzle"]["supported_hardware_count"]==25
+    assert by_name["first_person_shooter"]["supported_hardware_count"]==25
+    assert by_name["rhythm_game"]["supported_hardware_count"]==25
     assert by_name["grand_strategy"]["supported_hardware_count"]==0
-    assert by_name["fixed_screen_puzzle"]["native_emitters"]==(
-        "pc_linux","pc_windows","pc_macos","steam_deck")
+    from skeleton.ai.webcrawler.dragon_desktop_abi import DESKTOP_NATIVE
+    assert set(by_name["fixed_screen_puzzle"]["native_emitters"])==DESKTOP_NATIVE
 
 def test_adaptive_curriculum_teaches_real_new_hardware_and_native_puzzles():
     curr={step.milestone_id:step for step in MILESTONES}

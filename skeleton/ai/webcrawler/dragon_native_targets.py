@@ -50,7 +50,7 @@ TARGETS: tuple[ConsoleTarget,...] = (
        "keyboard / paddle","cc65","bin","native_source",colors=6,width=280,height=192,
        notes="Native ProDOS-loadable cc65 file; disk image packaging is separate"),
     _t("nes","Nintendo","8-bit",1983,"Ricoh 2A03","PPU tiles","APU",
-       "NES controller","cc65 / ca65","nes",colors=54,width=256,height=240),
+       "NES controller","cc65 / ca65","nes","native_source",colors=54,width=256,height=240),
     _t("master_system","Sega","8-bit",1985,"Z80","VDP tiles","SN76489",
        "2-button pad","SDCC / devkitSMS","sms","native_source",colors=64,width=256,height=192),
     _t("game_boy","Nintendo","handheld 8-bit",1989,"SM83","2bpp tiles / OAM","DMG APU",
@@ -160,9 +160,9 @@ def target_catalog(*, family: str | None = None) -> tuple[dict, ...]:
     from .dragon_game_blueprints import GENRES
     from .dragon_desktop_abi import DESKTOP_NATIVE
     desktop=DESKTOP_NATIVE
-    source_ids={"game_boy","game_boy_color","nes","master_system","game_gear","snes","commodore_64","genesis","game_boy_advance","ps1",
-                "xbox_original","dos_vga","nintendo_64","nintendo_ds","psp",
-                "apple_ii","zx_spectrum","dos_8086","windows_95","atari_2600"}|desktop
+    # Single authoritative source-emitter registry prevents catalog drift.
+    from .dragon_native_projects import EMITTERS
+    source_ids=EMITTERS
     rows=[]
     for t in TARGETS:
         if family is not None and t.family!=family:

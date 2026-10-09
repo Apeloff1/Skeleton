@@ -90,8 +90,10 @@ def test_incapable_and_licensed_hardware_remain_fail_closed():
     assert "non-programmable" in entry.next_gate
     assert readiness_for("nintendo_switch_2").status=="licensed_sdk"
     assert readiness_for("ps5_pro").status=="licensed_sdk"
+    # Windows 11 is now a genuine SDL2 source target, so it must no longer
+    # appear in the unsupported hardware test.
     for target in ("magnavox_odyssey","nintendo_switch_2",
-                   "android_arm64","windows_11","ps5"):
+                   "android_arm64","windows_98","ps5"):
         with pytest.raises((ValueError,PermissionError)):
             render_native_project(
                 title="Dragon must not fake code",target_id=target,
