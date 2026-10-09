@@ -1072,3 +1072,123 @@ def test_failed_cache_operation_cannot_replay_stale_cached_logits(monkeypatch):
     assert accel.logits_window((1, 2, 3)) == pytest.approx(
         model._logits((1, 2, 3)), abs=2e-5
     )
+
+
+@pytest.mark.parametrize("chunk,position,kv_dtype", [
+    (1, "rope", "fp32"), (2, "rope", "fp16"),
+    (3, "learned_rope", "fp32"), (5, "rope", "bf16"),
+])
+def test_causal_chunked_prefill_is_numerically_equivalent(
+    chunk, position, kv_dtype
+):
+    pytest.importorskip("torch")
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = TinyTransformer(
+        vocab=("alpha", "beta", "gamma"), dim=16, ctx=16,
+        n_heads=4, n_layers=2, d_ff=24, seed=317,
+        norm="rms", ffn_kind="swiglu", position_mode=position,
+    )
+    reference = model._logits((1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2))
+    full = TorchAccel(model).pin()
+    segmented = TorchAccel(
+        model, prefill_query_chunk=chunk, kv_dtype=kv_dtype
+    ).pin()
+    sequence = (1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2)
+    from_full = full.logits(sequence)
+    from_segmented = segmented.logits(sequence)
+    assert from_full == pytest.approx(reference, rel=2e-5, abs=2e-5)
+    assert from_segmented == pytest.approx(reference, rel=2e-5, abs=2e-5)
+
+    # Also exercise the prefill-with-KV path and subsequent decode.
+    assert segmented.logits_window(sequence) == pytest.approx(
+        reference, rel=2e-5, abs=2e-5
+    )
+    followup = sequence + (3,)
+    assert segmented.logits_window(followup) == pytest.approx(
+        model._logits(followup), rel=4e-3 if kv_dtype != "fp32" else 2e-5,
+        abs=4e-3 if kv_dtype != "fp32" else 2e-5,
+    )
+    assert segmented.cached_tokens == followup
+
+
+def test_chunked_sdpa_mask_uses_absolute_query_positions(monkeypatch):
+    torch = pytest.importorskip("torch")
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = TinyTransformer(
+        vocab=("alpha", "beta", "gamma"), dim=8, ctx=12,
+        n_heads=2, n_layers=1, seed=44, d_ff=0,
+    )
+    accel = TorchAccel(model, prefill_query_chunk=3).pin()
+    observed = []
+    original = torch.nn.functional.scaled_dot_product_attention
+
+    def audit(q, k, v, *, attn_mask=None, dropout_p=0.0, is_causal=False):
+        assert attn_mask is not None
+        assert not is_causal
+        start = k.shape[-2] - q.shape[-2]
+        for i in range(q.shape[-2]):
+            allowed = torch.nonzero(attn_mask[i]).flatten().tolist()
+            assert allowed == list(range(start + i + 1))
+        observed.append((q.shape[-2], k.shape[-2]))
+        return original(
+            q, k, v, attn_mask=attn_mask,
+            dropout_p=dropout_p, is_causal=is_causal,
+        )
+
+    monkeypatch.setattr(torch.nn.functional, "scaled_dot_product_attention", audit)
+    sequence = (1, 2, 3, 1, 2, 3, 1, 2)
+    result = accel.logits(sequence)
+    assert result == pytest.approx(model._logits(sequence), abs=2e-5)
+    assert observed == [(3, 3), (3, 6), (2, 8)]
+
+
+def test_chunked_causal_attention_training_remains_differentiable():
+    pytest.importorskip("torch")
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = TinyTransformer(
+        vocab=("alpha", "beta", "gamma"), dim=8, ctx=12,
+        n_heads=2, n_layers=2, d_ff=12, seed=77,
+        norm="rms", ffn_kind="swiglu",
+    )
+    accel = TorchAccel(model, prefill_query_chunk=2).pin()
+    before = accel.logits((1, 2, 3, 1, 2))
+    loss = accel.sgd((1, 2, 3, 1, 2), target=3, lr=0.03)
+    after = accel.logits((1, 2, 3, 1, 2))
+    assert 0 < loss < 100
+    assert any(abs(a - b) > 1e-8 for a, b in zip(before, after))
+    assert accel._weights_modified
+    accel.sync()
+    assert model._logits((1, 2, 3, 1, 2)) == pytest.approx(
+        after, abs=2e-5, rel=2e-5
+    )
+
+
+def test_chunked_prefill_roundtrips_device_policy_and_checkpoint():
+    pytest.importorskip("torch")
+    model = _model()
+    policy = DevicePolicy(
+        requested="torch", allow_fallback=False,
+        prefill_query_chunk=2,
+    )
+    runtime = NativeLLMRuntime(model, device_policy=policy)
+    assert runtime.device.prefill_query_chunk == 2
+    assert runtime.device.digest != NativeLLMRuntime(
+        TinyTransformer.from_snapshot(model.snapshot()),
+        device_policy=DevicePolicy(requested="torch", allow_fallback=False),
+    ).device.digest
+    assert runtime.model._accel.prefill_query_chunk == 2
+    restored = NativeLLMRuntime.restore(runtime.checkpoint())
+    assert restored.device_policy.prefill_query_chunk == 2
+    assert restored.device.digest == runtime.device.digest
+    assert restored.infer_text("alpha beta").logits == pytest.approx(
+        runtime.infer_text("alpha beta").logits, abs=2e-5,
+    )
+
+
+@pytest.mark.parametrize("bad", [0, -1, True, None if False else "2", 10**8])
+def test_chunked_prefill_admission_rejects_bad_sizes(bad):
+    with pytest.raises(RuntimeContractError, match="prefill query chunk"):
+        DevicePolicy(requested="torch", prefill_query_chunk=bad)
