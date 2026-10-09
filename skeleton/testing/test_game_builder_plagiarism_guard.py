@@ -418,3 +418,24 @@ def test_local_scan_refuses_incomplete_disclosures(tmp_path):
     manifest.write_text(json.dumps(document))
     with pytest.raises(OriginalityError):
         scan_manifest(manifest, root)
+
+
+
+def test_plagiarism_report_cannot_be_mutated_into_fake_clearance():
+    from skeleton.ai.game_builder.plagiarism_guard import OriginalityDisposition
+    flagged = run(references=(external(SYNTHETIC_TEXT),))
+    assert flagged.disposition is OriginalityDisposition.HUMAN_REVIEW_REQUIRED
+    with pytest.raises(OriginalityError):
+        replace(flagged, disposition=OriginalityDisposition.DESIGN_ADMISSIBLE_NOT_LEGAL_CLEARANCE)
+    with pytest.raises(OriginalityError):
+        replace(flagged, legal_originality_certified=True)
+    with pytest.raises(OriginalityError):
+        replace(flagged, release_permitted=True)
+    with pytest.raises(OriginalityError):
+        replace(flagged, independent_human_signoff_complete=True)
+    blocked_asset = list(make_assets())
+    index = MODALITIES.index("story_dialogue")
+    blocked_asset[index] = replace(blocked_asset[index], false_authorship_claim=True)
+    blocked = run(assets=tuple(blocked_asset))
+    with pytest.raises(OriginalityError):
+        replace(blocked, disposition=OriginalityDisposition.HUMAN_REVIEW_REQUIRED)
