@@ -139,6 +139,9 @@ def editor_platform_form(*, registry: PlatformRegistry | None = None) -> dict[st
         "export_status": "no_native_target_verified",
         "source_export_status": "three_desktop_three_rom_one_c64_one_dos_one_atari8_one_apple2_native_sources",
         "native_source_project_destinations": sorted(_NATIVE_SOURCE_TARGETS & set(catalog.profiles)),
+        "atomic_all_native_original_portfolio_supported": True,
+        "portfolio_target_count": len(_NATIVE_SOURCE_TARGETS & set(catalog.profiles)),
+        "portfolio_partial_export_allowed": False,
         "native_source_export_requires": [
             "generated_original_playable_world",
             "matching_cleared_homebrew_source",
