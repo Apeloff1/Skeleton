@@ -76,6 +76,7 @@ def _parser() -> argparse.ArgumentParser:
     local_ai.add_argument("--eval-corpus", help="separate held-out UTF-8 evaluation text (required for improvement)")
     local_ai.add_argument("--benchmark-suite", help="strict offline multi-category native model evaluation JSON")
     local_ai.add_argument("--exclude-train-corpus", help="reject benchmark cases copied from a specified local training text")
+    local_ai.add_argument("--protect-suite", help="require an independent category benchmark pass before publishing trained weights")
 
     local_ai.add_argument("--output-model", help="new native checkpoint filename for --train-corpus")
     local_ai.add_argument("--epochs", type=int, default=1, help="bounded native CPU training passes (1-4)")
@@ -234,7 +235,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 not args.model or args.prompt or args.inspect_model
                 or args.compare_model or args.improve_model or args.train_corpus
                 or args.eval_corpus or args.output_model or args.load_chat
-                or args.save_chat
+                or args.save_chat or args.protect_suite
             ):
                 print("local-ai --benchmark-suite requires --model and optional --candidate-model only")
                 return 2
@@ -265,6 +266,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
 
         if args.exclude_train_corpus:
             print("--exclude-train-corpus requires --benchmark-suite")
+            return 2
+        if args.protect_suite and not args.improve_model:
+            print("--protect-suite requires incremental --improve-model")
             return 2
         if args.compare_model or args.candidate_model:
             if (
@@ -308,6 +312,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 receipt = improve_local_model(
                     args.improve_model, args.train_corpus, args.eval_corpus,
                     args.output_model, epochs=args.epochs,
+                    protected_suite=args.protect_suite,
                 )
             except (ValueError, RuntimeError, OSError) as exc:
                 print("local-ai candidate rejected: " + type(exc).__name__ + ": " + str(exc))
