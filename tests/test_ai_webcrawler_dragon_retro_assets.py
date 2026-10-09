@@ -42,7 +42,7 @@ def test_real_cartridge_assembly_receives_original_tiles_and_animated_dragon():
     asm=gb.files["src/main.asm"]
     assert "AnimFrame: ds 1" in asm and "    inc [hl]" in asm
     assert asm.count("db $")>=16
-    assert "ld [OAM+6], a" in asm
+    assert "ld [DRAGON_OAM+6], a" in asm
     assert "original dragon_blink" in asm
     assert gb.files["dragon-pixel-art.json"].endswith("\n")
     nes=render_native_project(target_id="nes",**args)
@@ -88,5 +88,9 @@ def test_rgbds_reserved_identifiers_are_removed_only_after_asm_sprite_enrichment
             assert "DEF GOAL_X EQU" in asm
             assert "ld hl,DRAGON_VRAM" in asm
         else:
+            assert "ld hl, DRAGON_VRAM" in asm
+            assert "ld hl, DRAGON_OAM" in asm
+            assert "ld hl, VRAM" not in asm
+            assert "ld hl, OAM" not in asm
             assert "AnimFrame: ds 1" in asm
             assert "ld a, 4" in asm

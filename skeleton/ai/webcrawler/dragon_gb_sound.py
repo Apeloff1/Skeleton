@@ -54,11 +54,13 @@ def enrich_native_gb_sound(source:str,*,scrolling:bool)->str:
         # therefore repeated frame-by-frame false rewards are avoided.
         # RGBDS source generators differ in comma spacing; match the
         # exact pair of hardware instructions rather than literal styling.
-        trigger=r"(?m)^    ld a,\s*\$1B\n    ldh \[rOBP0\],\s*a$"
+        trigger=(r"(?m)^[ \t]*ld a,\s*\$1B[ \t]*\n"
+                 r"[ \t]*ldh \[rOBP0\],\s*a(?:[ \t]*;[^\n]*)?$")
         source,count=re.subn(trigger,lambda m:m.group(0)+"\n    call PlayReward",source,count=1)
         if count!=1:raise ValueError("scrolling game reward unavailable")
     else:
-        trigger=r"(?m)^    ld a,\s*\$1B\n    ldh \[rOBP0\],\s*a$"
+        trigger=(r"(?m)^[ \t]*ld a,\s*\$1B[ \t]*\n"
+                 r"[ \t]*ldh \[rOBP0\],\s*a(?:[ \t]*;[^\n]*)?$")
         source,count=re.subn(trigger,lambda m:m.group(0)+"\n    call PlayRewardOnce",source,count=1)
         if count!=1:raise ValueError("cartridge reward unavailable")
     return source

@@ -108,3 +108,20 @@ Hero: ds 1
         enrich_native_gb_sound(
             bare.replace("ldh [rOBP0],a","ldh [rOBP1],a"),
             scrolling=False)
+
+
+def test_scroll_cartridge_reward_accepts_trailing_palette_comment():
+    source='''SECTION "Game", ROM0[$150]
+Start:
+    ld sp,$FFFE
+    ld a,$1B
+    ldh [rOBP0],a ; palette effect, preserve this comment
+SECTION "Variables", WRAM0
+Hero: ds 1
+'''
+    out=enrich_native_gb_sound(source,scrolling=True)
+    assert "ldh [rOBP0],a ; palette effect, preserve this comment" in out
+    assert out.count("    call PlayReward\n")==1
+    assert "    call PlayRewardOnce\n" not in out
+    with pytest.raises(ValueError,match="reward"):
+        enrich_native_gb_sound(source.replace("ld a,$1B","ld a,$1A"),scrolling=True)

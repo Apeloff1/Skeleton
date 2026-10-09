@@ -684,10 +684,17 @@ def render_native_project(*,title:str,target_id:str,style:str,
     # existing semantic instruction matching still targets canonical source.
     if target_id in ("game_boy","game_boy_color"):
         asm=files["src/main.asm"]
-        asm=asm.replace("DEF OAM EQU","DEF DRAGON_OAM EQU")
-        asm=asm.replace("DEF VRAM EQU","DEF DRAGON_VRAM EQU")
-        asm=asm.replace("[OAM","[DRAGON_OAM")
-        asm=asm.replace("ld hl,VRAM","ld hl,DRAGON_VRAM")
+        # Rename full assembler identifiers, including both "ld hl, OAM"
+        # and "ld hl,OAM"; the old substring replacements only covered
+        # bracketed writes and missed source RAM/VRAM pointers.
+        asm=re.sub(r"(?<![A-Za-z0-9_])OAM(?![A-Za-z0-9_])",
+                   "DRAGON_OAM",asm)
+        asm=re.sub(r"(?<![A-Za-z0-9_])VRAM(?![A-Za-z0-9_])",
+                   "DRAGON_VRAM",asm)
+        if "DEF DRAGON_OAM EQU $FE00" not in asm or (
+            "DEF DRAGON_VRAM EQU $8000" not in asm
+        ):
+            raise ValueError("native cartridge memory addresses missing")
         files["src/main.asm"]=asm
     if any(PurePosixPath(p).is_absolute() or ".." in PurePosixPath(p).parts for p in files):
         raise ValueError("unsafe generated path")
