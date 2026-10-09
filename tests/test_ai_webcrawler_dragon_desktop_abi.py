@@ -26,14 +26,14 @@ def test_21_actual_desktop_architectures_have_accurate_source_contracts():
     assert len(ABI_PROFILES)==21
     assert len(DESKTOP_NATIVE)==25
     assert len(BASE_DESKTOP)==4
-    assert len(EMITTERS)==45
+    assert len(EMITTERS)==48
     assert all(p.id==k for k,p in ABI_PROFILES.items())
     assert all(p.arch in ("arm64","x86_64","x86","riscv64")
                for p in ABI_PROFILES.values())
     assert all(p.system in ("Windows","Linux","Darwin","FreeBSD","OpenBSD","NetBSD")
                for p in ABI_PROFILES.values())
     assert len({id for id in DESKTOP_NATIVE})==25
-    assert coverage_report()["native_source_count"]==45
+    assert coverage_report()["native_source_count"]==48
     for id in ABI_PROFILES:
         row=readiness_for(id)
         assert row.source_emitter

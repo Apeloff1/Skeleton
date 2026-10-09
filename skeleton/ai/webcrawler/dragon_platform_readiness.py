@@ -42,6 +42,11 @@ SOURCE_RENDERERS={
 }
 from .dragon_desktop_abi import ABI_PROFILES
 SOURCE_RENDERERS.update({key:"C99/SDL2 "+p.system+" "+p.arch for key,p in ABI_PROFILES.items()})
+SOURCE_RENDERERS.update({
+    "gamecube":"PowerPC libogc GameCube XFB console",
+    "wii":"PowerPC libogc Wii XFB console and WPAD",
+    "nintendo_3ds":"ARM11 libctru/citro2d hardware top display",
+})
 assert set(SOURCE_RENDERERS)==EMITTERS
 
 @dataclass(frozen=True)

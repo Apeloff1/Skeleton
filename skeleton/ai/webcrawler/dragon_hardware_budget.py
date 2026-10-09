@@ -56,6 +56,9 @@ LIMITS={
     "xbox_original":("Microsoft","x86",67108864,16777216,67108864,65536,1024,1024,1048576),
     # Developer-facing source budgets, not physical linker map verification.
     "nintendo_64":("Nintendo","VR4300",4194304,262144,4194304,65536,128,128,8192),
+    "gamecube":("Nintendo","PowerPC Gekko",25165824,8388608,25165824,65536,256,256,4096),
+    "wii":("Nintendo","PowerPC Broadway",67108864,8388608,67108864,65536,256,256,8192),
+    "nintendo_3ds":("Nintendo","ARM11",6291456,1048576,67108864,65536,256,256,8192),
     "atari_2600":("Atari","6507",128,128,128,4096,2,2,8),
     "apple_ii":("Apple","6502",49152,8192,49152,16384,1,1,512),
     "zx_spectrum":("Sinclair","Z80",6912,6144,49152,16384,8,8,768),

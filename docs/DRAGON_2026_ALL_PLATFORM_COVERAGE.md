@@ -6,7 +6,7 @@ The game academy previously mapped **47** major platform targets and implemented
 **19 original native source backends**. This change adds 122 concrete historic,
 consumer, handheld, computer OS/ABI and modern mobile targets, bringing the
 curated inventory to **169 distinct target identities**. It additionally implements
-five independent legacy native backends plus 21 ABI-aware desktop variants, bringing source production to **45/169**.
+five independent legacy native backends plus 21 ABI-aware desktop variants, bringing source production to **48/169**.
 
 This is not every model or board ever manufactured, and 169 catalog entries
 do NOT mean 169 working console games. No compiler/emulator or device test is
@@ -29,7 +29,7 @@ listed system.
 | Gate | Meaning | What this change demonstrates |
 | --- | --- | --- |
 | Hardware identified | CPU/graphics/sound/inputs/SDK/ABI recorded | 169 targets |
-| Original native source | Per-hardware implementation and build recipe exist | 45 targets |
+| Original native source | Per-hardware implementation and build recipe exist | 48 targets |
 | Compiler passed | Exact source built by target-specific toolchain | Not inferred |
 | Emulator passed | Repeated native input, video, audio and state trace | Not inferred |
 | Physical device passed | Hardware-verified timing and controls | Not inferred |
@@ -142,10 +142,47 @@ input/battery/display certification is future work.
 
 ### Revised source coverage
 
-169 cataloged platform identities; **45 native source generators**
+169 cataloged platform identities; **48 native source generators**
 (19 prior + 5 new original legacy SDK backends + 21 PC ABI-targeted
-source builds); **124** without an implemented native source producer.
+source builds); **121** without an implemented native source producer.
 The expanded denominator makes percentage-based readiness
-**45/169 = 26.6% for source generation only**, not a gameplay or overall
+**48/169 = 26.6% for source generation only**, not a gameplay or overall
 application completion estimate. No platform is awarded a compiled or
 hardware-verified status from source generation.
+
+## Open devkitPro GameCube, Wii and Nintendo 3DS production backends
+
+Three additional original native source emitters bring the complete
+source-level catalog to **48/169 = 28.4%** with **121** source-adapter
+gaps. These are distinct hardware programs:
+
+- GameCube: PowerPC Gekko libogc game using VIDEO_Init, framebuffer
+  allocation, XFB console output, PAD D-pad/Start/A input, deterministic
+  3-enemy pursuit, lives, invulnerability, crystal gathering, leveling,
+  and a libogc/devkitPPC Makefile targeting actual DOL format.
+- Wii: PowerPC Broadway/libogc program with its own wii_rules source
+  configuration, Wii Remote WPAD buttons and HOME, optional GameCube
+  PAD controller, XFB video synchronization, and the same original
+  deterministic game rules. The runtime does not substitute HTML/SDL.
+- Nintendo 3DS: ARM11 devkitARM/libctru/citro2d native game that draws
+  directly on the top screen using real GPU C2D rectangle commands.
+  The lower display shows status and receives native stylus input
+  projected to the top game viewport. D-pad motion, four pursuers,
+  score, lives, damage invulnerability and level advancement operate
+  in the original C game loop.
+
+SDK references reviewed against current publicly available
+devkitPro examples. Source/build receipts are only source-level;
+platform toolchains, output `.dol` / `.3dsx` bytes, 3DS emulator
+GPU calls, Wii Remote and GameCube controller behavior on hardware
+are not yet certified. Do not reclassify these as compiled or
+emulator-proven merely because the generator produces project files.
+
+Cross compiler gated tests run automatically only where devkitPPC /
+devkitARM, libogc/libctru/citro2d and the required packaging tools
+are installed. The test suite also checks that arbitrary genres
+(e.g. grand_strategy) fail instead of mapping every genre label to
+the same arcade collector. Detailed future work includes real SDK
+build runners, emulator replay recordings, latency measurements,
+sound playback and art beyond the intentionally simple original
+homebrew visuals.

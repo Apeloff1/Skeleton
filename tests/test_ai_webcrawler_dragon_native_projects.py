@@ -43,7 +43,7 @@ def test_platform_matrix_covers_actual_console_and_computer_history():
 def test_native_emitters_make_platform_specific_source_not_html(target):
     p=make(target)
     assert p.status=="source_generated" and p.output in (
-        "gb","gbc","nes","tap","prg","sms","gg","sfc","z64","nds","pbp","exe","elf","app","bin","gba","xbe")
+        "gb","gbc","nes","tap","prg","dol","3dsx","sms","gg","sfc","z64","nds","pbp","exe","elf","app","bin","gba","xbe")
     assert len(p.files)>=3 and p.target_id==target
     assert p.digest==sha(p.files)
     assert p==make(target)
