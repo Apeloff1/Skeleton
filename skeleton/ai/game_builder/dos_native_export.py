@@ -41,6 +41,7 @@ org 100h
 Start:
     push cs
     pop ds
+    cld                     ; DOS makes no promise about direction flag.
     mov ax, 0003h
     int 10h
     mov ax, 0B800h
