@@ -75,6 +75,49 @@ python -m skeleton app local-ai --model ./my-native.json \
   --prompt "user: hello" --max-output-tokens 8 --json
 ```
 
+### Multi-category benchmark: reject localized regressions
+
+Use **Evaluate…** in the native offline window, or use the headless suite
+runner to test a checkpoint across several independent categories. Unlike a
+single aggregate corpus score, a candidate fails the local regression gate
+if **any** category becomes worse in predicted-token-weighted perplexity
+(or if an optional next-token top-1 objective loses correct predictions),
+even if overall perplexity improves.
+
+Create a bounded `suite.json` using the exact native vocabulary in your
+checkpoint. Cases must have distinct identities and distinct normalized token
+sequences; case text is hashed and is not echoed in the report.
+
+```json
+{
+  "schema": "skeleton.ai.offline.benchmark.v1",
+  "cases": [
+    {"id": "dialog-1", "category": "dialog", "text": "user hello assistant world"},
+    {"id": "dialog-2", "category": "dialog", "text": "hello user world assistant"},
+    {"id": "reason-1", "category": "reason", "text": "world alpha hello"},
+    {"id": "reason-2", "category": "reason", "text": "hello alpha world"}
+  ]
+}
+```
+
+```bash
+# Read-only benchmark for one checkpoint:
+python -m skeleton app local-ai --benchmark-suite ./suite.json \
+  --model ./my-native.json --json
+
+# Protected-category acceptance (exit 0 = local nonregression, 1 = rejected):
+python -m skeleton app local-ai --benchmark-suite ./suite.json \
+  --model ./my-native.json --candidate-model ./my-native-v2.json --json
+```
+
+The suite is limited to 64 cases, 16 categories, 128 KiB and 1024 total
+tokens, with strict duplicate-key / non-finite / symlink rejection. Every case
+is evaluated against the same verified tokenizer identity and its metrics
+carry the suite/content hashes; no release state is modified. Category
+results are diagnostics, **not** independent certification of safety or
+general model performance. The optional `expected_next` case field
+can evaluate top-1 accuracy for a token from the exact checkpoint vocabulary.
+
 ### Continue improving existing weights, with rollback
 
 The **Improve model…** button and CLI can continue local CPU training of
