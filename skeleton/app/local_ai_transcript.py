@@ -102,7 +102,7 @@ def decode_transcript(
         raise LocalTranscriptError("transcript exceeds byte budget")
     try:
         obj = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_pairs, parse_constant=_reject_constant)
-    except (UnicodeError, json.JSONDecodeError) as exc:
+    except (UnicodeError, json.JSONDecodeError, RecursionError) as exc:
         raise LocalTranscriptError("transcript is invalid UTF-8 JSON") from exc
     if not isinstance(obj, dict) or set(obj) != {"schema", "model_digest", "tokenizer_digest", "messages", "digest"}:
         raise LocalTranscriptError("invalid transcript envelope fields")
@@ -158,6 +158,12 @@ def save_transcript(
         # within one directory and never resolves a symlink destination.
         if target.is_symlink() or (target.exists() and not target.is_file()):
             raise LocalTranscriptError("transcript destination must be a regular file")
+        if target.exists():
+            # Never overwrite a checkpoint, unrelated JSON, or another model's
+            # chat merely because the operator selected the wrong filename.
+            load_transcript(
+                target, model_digest=model_digest, tokenizer_digest=tokenizer_digest,
+            )
         with tempfile.NamedTemporaryFile(
             mode="wb", prefix=".skeleton-local-chat-", suffix=".tmp",
             dir=target.parent, delete=False,
