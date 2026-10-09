@@ -191,6 +191,9 @@ def _advance(
     if not _traversable(rows, x + vx, y):
         vx = 0
     x += vx
+    # A goal must register whenever the actor ENTERS it, even if a later
+    # gravity substep moves it out of the goal before the frame boundary.
+    touched_goal = (x, y) == goal
     moved_y = 0
     for _ in range(abs(vy)):
         ny = y + (1 if vy > 0 else -1)
@@ -198,13 +201,14 @@ def _advance(
             vy = 0
             break
         y = ny
+        touched_goal = touched_goal or (x, y) == goal
         moved_y += 1
     grounded_after = not _traversable(rows, x, y + 1)
     # Velocity becomes zero when a wall stopped vertical movement.
     return {
         "avatar": {"x": x, "y": y, "vx": vx, "vy": vy},
         "grounded": grounded_after,
-        "goal_reached": (x, y) == goal,
+        "goal_reached": touched_goal,
         "vertical_cells_traversed": moved_y,
     }
 
