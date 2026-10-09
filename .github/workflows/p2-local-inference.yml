@@ -8,6 +8,7 @@ on:
       - "skeleton/app/offline_chat_cli.py"
       - "skeleton/app/offline_http.py"
       - "skeleton/app/offline_knowledge.py"
+      - "skeleton/app/offline_grounding.py"
       - "skeleton/app/offline_web.py"
       - "skeleton/app/windows_launcher.py"
       - "skeleton/ai/model_runtime/offline_chat.py"
@@ -17,6 +18,7 @@ on:
       - "tests/test_app_offline_chat_cli.py"
       - "tests/test_app_offline_http.py"
       - "tests/test_app_offline_knowledge.py"
+      - "tests/test_app_offline_grounding.py"
       - "tests/test_app_offline_windows_browser.py"
       - "tests/flgb/test_desktop_offline_ai.py"
       - "skeleton/testing/test_local_inference.py"
@@ -39,6 +41,7 @@ on:
       - "skeleton/app/offline_chat_cli.py"
       - "skeleton/app/offline_http.py"
       - "skeleton/app/offline_knowledge.py"
+      - "skeleton/app/offline_grounding.py"
       - "skeleton/app/offline_web.py"
       - "skeleton/app/windows_launcher.py"
       - "skeleton/ai/model_runtime/offline_chat.py"
@@ -48,6 +51,7 @@ on:
       - "tests/test_app_offline_chat_cli.py"
       - "tests/test_app_offline_http.py"
       - "tests/test_app_offline_knowledge.py"
+      - "tests/test_app_offline_grounding.py"
       - "tests/test_app_offline_windows_browser.py"
       - "tests/flgb/test_desktop_offline_ai.py"
       - "skeleton/testing/test_local_inference.py"
@@ -114,4 +118,5 @@ jobs:
           tests/test_app_offline_chat_cli.py
           tests/test_app_offline_http.py
           tests/test_app_offline_knowledge.py
+          tests/test_app_offline_grounding.py
           tests/test_app_offline_windows_browser.py
