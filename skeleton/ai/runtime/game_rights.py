@@ -102,6 +102,17 @@ def _source(item: Mapping[str, Any]) -> dict[str, Any]:
         raise GameRightsError(
             "protected/circumvention-dependent content cannot enter this authoring path"
         )
+    if kind == "original" and item["contains_third_party_content"]:
+        raise GameRightsError(
+            "original classification conflicts with declared third-party content"
+        )
+    if kind in ("commissioned", "licensed", "open_licensed") and not item["contains_third_party_content"]:
+        # This is conservatively rejected rather than silently laundering
+        # third-party rights into a supposedly self-created work.
+        raise GameRightsError(
+            "third-party license/source kind requires third-party content declaration"
+        )
+
     if kind == "interoperability_research" and any(
         x in permissions for x in ("embed", "distribute", "commercial", "train")
     ):
