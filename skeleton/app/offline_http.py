@@ -35,7 +35,7 @@ from skeleton.app.local_ai import (
 from skeleton.app.offline_web import HTML, CSS, JAVASCRIPT
 from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary, MAX_DOCUMENT_BYTES
 from skeleton.app.offline_grounding import (
-    grounded_request_digest, prepare_evidence,
+    audit_answer_citations, grounded_request_digest, prepare_evidence,
 )
 
 
@@ -152,6 +152,10 @@ class OfflineHTTPApplication:
                     "output_tokens": replay.generated_tokens,
                     "replayed": True, "model_digest": self.model_digest,
                     "evidence": previous[replay.revision - 1],
+                    "citation_audit": (
+                        audit_answer_citations(replay.text, previous[replay.revision - 1])
+                        if previous[replay.revision - 1] is not None else None
+                    ),
                 }
             manifest = None
             if grounded:
@@ -191,6 +195,10 @@ class OfflineHTTPApplication:
                 "output_tokens": receipt.generated_tokens,
                 "replayed": False, "model_digest": self.model_digest,
                 "evidence": committed_evidence,
+                "citation_audit": (
+                    audit_answer_citations(receipt.text, committed_evidence)
+                    if committed_evidence is not None else None
+                ),
             }
 
     def dispatch(self, method: str, path: str,
@@ -262,12 +270,23 @@ class OfflineHTTPApplication:
         if tail is None:
             if method == "GET":
                 stored = self._session(sid)
+                evidence = self._store.turn_evidence(
+                    sid, self.model_digest, self.tokenizer_digest,
+                )
+                answers = [
+                    message.content for message in stored.transcript.messages
+                    if message.role == "assistant"
+                ]
+                if len(answers) != len(evidence):
+                    raise RuntimeContractError("conversation evidence count drift")
                 return 200, {
                     "session_id": sid, "revision": stored.revision,
                     "messages": stored.transcript.to_list(),
-                    "evidence": self._store.turn_evidence(
-                        sid, self.model_digest, self.tokenizer_digest,
-                    ),
+                    "evidence": evidence,
+                    "citation_audits": [
+                        audit_answer_citations(answer, item) if item else None
+                        for answer, item in zip(answers, evidence)
+                    ],
                 }
             if method == "DELETE":
                 self._store.delete(sid, self.model_digest,
