@@ -97,9 +97,12 @@ def test_chip8_export_rejects_conflicting_inference_and_state_changes(
     assert offline_console([
         "--chip8-demo-output", out, "--model", "some.gguf",
     ]) == 2
-    assert offline_console([
-        "--chip8-demo-output", out, "--game-preview-check",
-    ]) == 2  # mutually exclusive modes
+    import pytest
+    with pytest.raises(SystemExit) as exited:
+        offline_console([
+            "--chip8-demo-output", out, "--game-preview-check",
+        ])
+    assert exited.value.code == 2  # argparse rejects mutually exclusive modes
     assert offline_console([
         "--chip8-demo-output", out, "--queue-status",
     ]) == 2
