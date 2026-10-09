@@ -507,7 +507,7 @@ class OfflineChatStore:
             parent = self.load(sid, model_digest, tokenizer_digest)
             rows = self._db.execute(
                 "SELECT request_id, request_digest, revision, text, output_digest, "
-                "prompt_tokens, generated_tokens FROM offline_turns "
+                "prompt_tokens, generated_tokens, grounded FROM offline_turns "
                 "WHERE session_id=? ORDER BY revision",
                 (sid,),
             ).fetchall()
@@ -538,7 +538,10 @@ class OfflineChatStore:
                  forked.to_json(), time.time_ns()),
             )
             self._db.executemany(
-                "INSERT INTO offline_turns VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO offline_turns "
+                "(session_id, request_id, request_digest, revision, text, "
+                "output_digest, prompt_tokens, generated_tokens, grounded) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [(new_id, *row) for row in rows[:after_turn]],
             )
             self._db.execute(
@@ -717,8 +720,12 @@ class OfflineChatStore:
                 (new_id, model_digest, tokenizer_digest, rev, serialized, time.time_ns()),
             )
             self._db.executemany(
-                "INSERT INTO offline_turns VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                [(new_id, *row) for row in validated],
+                "INSERT INTO offline_turns "
+                "(session_id, request_id, request_digest, revision, text, "
+                "output_digest, prompt_tokens, generated_tokens, grounded) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [(new_id, *row, int(evidence[index] is not None))
+                 for index, row in enumerate(validated)],
             )
             self._db.executemany(
                 "INSERT INTO offline_turn_evidence VALUES (?, ?, ?, ?)",
@@ -818,9 +825,13 @@ class OfflineChatStore:
             if cursor.rowcount != 1:
                 raise RuntimeContractError("offline conversation revision conflict")
             self._db.execute(
-                "INSERT INTO offline_turns VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO offline_turns "
+                "(session_id, request_id, request_digest, revision, text, "
+                "output_digest, prompt_tokens, generated_tokens, grounded) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (session.session_id, rid, request_digest, session.revision + 1,
-                 text, output_digest, prompt_tokens, generated_tokens),
+                 text, output_digest, prompt_tokens, generated_tokens,
+                 int(stored_evidence is not None)),
             )
             if stored_evidence is not None:
                 self._db.execute(
