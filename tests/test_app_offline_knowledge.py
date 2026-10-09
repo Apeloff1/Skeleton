@@ -113,6 +113,61 @@ class OfflineKnowledgeLibraryTests(unittest.TestCase):
             hits[0]["passage"],
         )
 
+    def test_corrupt_document_digest_fails_closed_for_search_and_list(self):
+        item = self.library.add_text(
+            "Trusted original", "Hardware rasterizer uses tile bins."
+        )
+        with self.store._transaction():
+            self.store._db.execute(
+                "UPDATE offline_documents SET content_text=? WHERE document_id=?",
+                ("Attack-controlled substituted material.", item["document_id"]),
+            )
+        with self.assertRaisesRegex(RuntimeContractError, "hash mismatch"):
+            self.library.search("substituted")
+        with self.assertRaisesRegex(RuntimeContractError, "hash mismatch"):
+            self.library.list_documents()
+
+    def test_altered_passage_and_offsets_cannot_forge_valid_citation(self):
+        item = self.library.add_text(
+            "Source offsets", "The temporal frame interpolation is exact."
+        )
+        with self.store._transaction():
+            self.store._db.execute(
+                "UPDATE offline_document_chunks SET content=? "
+                "WHERE document_id=? AND ordinal=0",
+                ("Fake copied passage", item["document_id"]),
+            )
+        with self.assertRaisesRegex(RuntimeContractError, "provenance mismatch"):
+            self.library.search("temporal interpolation")
+
+    def test_missing_chunk_is_not_silently_hidden_from_search(self):
+        item = self.library.add_text(
+            "Long source", "Software geometry rasterizer. " * 90
+        )
+        self.assertGreater(item["chunk_count"], 1)
+        with self.store._transaction():
+            self.store._db.execute(
+                "DELETE FROM offline_document_chunks "
+                "WHERE document_id=? AND ordinal=1", (item["document_id"],)
+            )
+        with self.assertRaisesRegex(RuntimeContractError, "index is incomplete"):
+            self.library.search("rasterizer")
+
+    def test_corrupted_offline_reference_is_isolated_from_chat_history(self):
+        model_session = self.store.create(self.model, self.tokenizer)
+        source = self.library.add_text(
+            "Reference only", "Rasterization colors follow sRGB gamma."
+        )
+        with self.store._transaction():
+            self.store._db.execute(
+                "UPDATE offline_document_chunks SET char_start=999 "
+                "WHERE document_id=? AND ordinal=0", (source["document_id"],)
+            )
+        with self.assertRaises(RuntimeContractError):
+            self.library.search("gamma")
+        restored_chat = self.store.load(model_session, self.model, self.tokenizer)
+        self.assertEqual(restored_chat.revision, 0)
+
     def test_delete_cascades_chunks_but_cannot_delete_other_model_data(self):
         item = self.library.add_text(
             "Knowledge", "Game console memory bus layout and mapper structure."
