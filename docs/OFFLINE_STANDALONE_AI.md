@@ -15,6 +15,35 @@ are offline-complete.
 - **Desktop:** `python -m skeleton app local-ai`; select either **Load
   checkpoint…** or **Load GGUF deployment…**.
 
+## Portable offline conversation recovery
+
+The desktop now provides **Back up conversation…** and **Restore
+conversation…** after a native checkpoint or GGUF deployment is loaded.
+Backups are explicit user-owned JSON files and are **not** silently synced or
+used as the server-side authoritative conversation database. A restored
+transcript is treated as untrusted local model context, never a verified
+execution receipt. Restoring requires an empty conversation (choose New
+conversation before restoring into an active session).
+
+The headless CLI supports copying local chat context across processes:
+
+```sh
+python -m skeleton app local-ai --deployment ./deployment.json \
+    --prompt "First turn" --backup-out ./my-chat.json --json
+python -m skeleton app local-ai --deployment ./deployment.json \
+    --prompt "Continue the conversation" \
+    --backup-in ./my-chat.json --backup-out ./my-chat.json --json
+```
+
+Backup files contain **plaintext** conversation content. Keep them on an
+access-controlled local volume, encrypt the storage if appropriate, and remove
+the files when no longer needed. The writer atomically replaces the selected
+backup, uses private permissions on POSIX, limits file size and message counts,
+and pins the full backup to a local model SHA-256. A checksum detects accidental
+corruption; it does not provide signing, authentication or protection against
+a malicious actor who can rewrite both the backup and its checksum. No cloud
+account or hosted provider is involved.
+
 GGUF deployment uses the canonical `skeleton.ai.runtime.inference` engine;
 it does not route through remote provider clients. Headless responses contain
 model identity, token usage and the execution receipt digest. Both options
@@ -72,15 +101,15 @@ Use an independently verified, trusted llama.cpp build and disable outbound
 network access using the OS firewall/sandbox for an air-gapped guarantee.
 Do not run unknown binaries just because their digest matches a manifest.
 
-**Data durability:** The desktop session keeps chat turns in memory only.
-Closing the app loses them. There is no implied sync, local persistent
-conversation database, managed model download, auto-update or offline
-system-completion attestation from this feature.
+**Data durability:** Live turns remain in memory unless the user explicitly
+exports a portable backup. The app does not yet provide automatic durable
+history, a local authoritative conversation database, managed model downloads,
+auto-update or offline system-completion attestation.
 
 ## Acceptance
 
 ```sh
-python -m pytest skeleton/testing/test_app_offline_gguf.py -q
+python -m pytest skeleton/testing/test_app_offline_gguf.py skeleton/testing/test_offline_history_backup.py -q
 python -m pytest skeleton/testing/test_local_model_deployment.py -q
 python scripts/check_architecture_map.py
 python scripts/check_ai_app_construction.py
