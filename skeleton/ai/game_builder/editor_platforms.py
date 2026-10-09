@@ -20,6 +20,8 @@ def _option(profile: PlatformProfile, *, as_source: bool) -> dict[str, object]:
         "kind": profile.kind,
         "family": profile.family,
         "lifecycle": profile.lifecycle,
+        "first_year_candidate": profile.first_year_candidate,
+        "archive_disposition": profile.archive_disposition,
         "screen_model": profile.render,
         "audio_model": profile.sound,
         "input_model": profile.input,
@@ -49,7 +51,7 @@ def editor_platform_options(
         raise PlatformRegistryError("search must be <=128 characters")
     if kind is not None and kind not in {
         "console", "handheld", "computer", "arcade", "calculator", "mobile",
-        "educational", "micro", "fantasy",
+        "educational", "micro", "fantasy", "precursor", "electromechanical", "mechanical",
     }:
         raise PlatformRegistryError("unknown platform kind")
     if legacy is not None and type(legacy) is not bool:
