@@ -14,6 +14,8 @@ on:
       - "skeleton/app/offline_cli.py"
       - "skeleton/app/offline_workspace.py"
       - "skeleton/app/offline_readiness.py"
+      - "skeleton/app/offline_qualification.py"
+      - "scripts/windows/create_offline_native_fixture.py"
       - "skeleton/testing/test_offline_readiness.py"
       - "skeleton/app/offline_library.py"
       - "skeleton/testing/test_offline_library.py"
@@ -56,6 +58,8 @@ on:
       - "skeleton/app/offline_cli.py"
       - "skeleton/app/offline_workspace.py"
       - "skeleton/app/offline_readiness.py"
+      - "skeleton/app/offline_qualification.py"
+      - "scripts/windows/create_offline_native_fixture.py"
       - "skeleton/testing/test_offline_readiness.py"
       - "skeleton/app/offline_library.py"
       - "skeleton/testing/test_offline_library.py"
@@ -117,6 +121,7 @@ jobs:
             skeleton/app/offline_audit.py \
             skeleton/app/offline_sqlite_safety.py \
             skeleton/app/offline_readiness.py \
+            skeleton/app/offline_qualification.py \
             skeleton/app/offline_cli.py \
             skeleton/app/local_ai.py \
             skeleton/app/cli.py \
