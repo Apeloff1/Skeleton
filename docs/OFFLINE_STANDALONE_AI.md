@@ -256,6 +256,24 @@ system compromise. Other processes and any additional spawned binaries
 must be governed separately. For a truly disconnected acceptance test,
 use an independent OS policy or physically isolated test machine.
 
+## Original synthetic training set and evaluation
+
+The first fully materialized offline training curriculum now lives at
+\`skeleton/ai/training/datasets/offline_foundations_v1/\` and includes
+720 deterministic instruction/answer examples across 12 game-engine,
+reasoning, local-security and text-processing task families. The train
+split has 504 examples; validation and test each have 108. A dedicated
+\`train_corpus.txt\` exposes **training data only**, and its provenance,
+source rights, SHA-256 digests, and group-disjoint allocation are pinned
+in \`manifest.json\`.
+
+See [Offline Synthetic Training Dataset](OFFLINE_SYNTHETIC_TRAINING_DATASET.md)
+for full schema, independent regeneration, data rights, held-out scoring,
+failure-injection tests, and the experimental local-model training path.
+This set does **not** imply that a trained general-purpose model exists,
+that external game assets may be used for training, or that candidate
+weights are approved for deployment.
+
 ## Functional model qualification with real local inference
 
 Artifact readiness and the tiny `--native-smoke` check are not sufficient
