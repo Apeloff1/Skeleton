@@ -188,6 +188,10 @@ $OfflinePyInstallerArgs = @(
     "--hidden-import", "skeleton.ai.runtime.deterministic_capabilities",
     "--hidden-import", "skeleton.ai.runtime.capability_graph",
     "--hidden-import", "skeleton.ai.runtime.gameplay_capabilities",
+    "--hidden-import", "skeleton.ai.runtime.game_playability",
+    "--hidden-import", "skeleton.ai.runtime.game_project_capsule",
+    "--hidden-import", "skeleton.ai.runtime.game_platform_catalog",
+    "--hidden-import", "skeleton.ai.runtime.game_rights",
     "--hidden-import", "skeleton.app.offline_game_preview",
     "--hidden-import", "skeleton.ai.runtime.inference.local",
     "--hidden-import", "skeleton.ai.runtime.inference.native_runtime",
@@ -228,6 +232,10 @@ $GamePyInstallerArgs = @(
     "--paths", $RepoRoot,
     "--hidden-import", "skeleton.app.offline_game_preview",
     "--hidden-import", "skeleton.ai.runtime.gameplay_capabilities",
+    "--hidden-import", "skeleton.ai.runtime.game_playability",
+    "--hidden-import", "skeleton.ai.runtime.game_project_capsule",
+    "--hidden-import", "skeleton.ai.runtime.game_platform_catalog",
+    "--hidden-import", "skeleton.ai.runtime.game_rights",
     "--hidden-import", "tkinter",
     $GamePreviewEntryPoint
 )
