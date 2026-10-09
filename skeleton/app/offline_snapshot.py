@@ -9,11 +9,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import shutil
 import sqlite3
-import stat
 import tempfile
 import time
 from typing import Any, Mapping
@@ -191,6 +191,7 @@ def verify_snapshot(folder: str | Path) -> dict[str, Any]:
         or not 1 <= len(data["databases"]) <= len(KINDS)
         or not set(data["databases"]).issubset(KINDS)
         or type(data["created_at"]) not in (int, float)
+        or not math.isfinite(data["created_at"])
     ):
         raise OfflineSnapshotError("offline snapshot schema mismatch")
     listed = {"manifest.json"}
