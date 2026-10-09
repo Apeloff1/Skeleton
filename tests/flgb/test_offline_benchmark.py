@@ -234,6 +234,25 @@ class TestOfflineBenchmark(unittest.TestCase):
             self.assertFalse(report["historical_training_disjointness_proven"])
             self.assertFalse(report["candidate_promoted"])
 
+    def test_exclusion_fails_closed_when_training_vocabulary_is_unknown(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent, candidate, suite = self._setup(directory)
+            training = Path(directory) / "training.txt"
+            training.write_text(
+                "hello world neverseen unknownword\n", encoding="utf-8",
+            )
+            baseline_bytes = parent.read_bytes()
+            contender_bytes = candidate.read_bytes()
+            with self.assertRaisesRegex(
+                OfflineBenchmarkError, "out-of-vocabulary",
+            ):
+                benchmark_native_models(
+                    suite, baseline=parent, candidate=candidate,
+                    excluded_training_text=training,
+                )
+            self.assertEqual(parent.read_bytes(), baseline_bytes)
+            self.assertEqual(candidate.read_bytes(), contender_bytes)
+
     def test_excluded_training_substring_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             parent, _, suite = self._setup(directory)
