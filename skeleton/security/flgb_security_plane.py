@@ -20,19 +20,18 @@ MAX_SCORE_PPM = 1_000_000
 MAX_TEXT_CHARS = 2_000_000
 
 _SECRET_PATTERNS = (
-    re.compile(r"(?i)\\b(?:api[_-]?key|access[_-]?token|secret|password)\\b\\s*[:=]\\s*['\"]?([A-Za-z0-9_\\-./+=]{12,})"),
-    re.compile(r"\\bgh[pousr]_[A-Za-z0-9]{20,}\\b"),
+    re.compile(r"(?i)\b(?:api[_-]?key|access[_-]?token|secret|password)\b\s*[:=]\s*['\"]?([A-Za-z0-9_\-./+=]{12,})"),
+    re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}\b"),
 )
 _PII_PATTERNS = (
-    ("email", re.compile(r"\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b", re.I)),
-    ("phone", re.compile(r"(?<!\\d)\\+?\\d(?:[\\s().-]?\\d){7,14}(?!\\d)")),
+    ("email", re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.I)),
+    ("phone", re.compile(r"(?<!\d)\+?\d(?:[\s().-]?\d){7,14}(?!\d)")),
 )
 _PROMPT_INJECTION_PATTERNS = (
-    re.compile(r"(?i)\\bignore (?:all |the )?(?:previous|prior|system) instructions\\b"),
-    re.compile(r"(?i)\\breveal (?:the )?(?:system|developer) prompt\\b"),
-    re.compile(r"(?i)\\bdisable (?:safety|policy|guardrails?)\\b"),
+    re.compile(r"(?i)\bignore (?:all |the )?(?:previous|prior|system) instructions\b"),
+    re.compile(r"(?i)\breveal (?:the )?(?:system|developer) prompt\b"),
+    re.compile(r"(?i)\bdisable (?:safety|policy|guardrails?)\b"),
 )
-
 
 class SecurityPlaneError(ValueError):
     """Fail-closed FLGB-05 contract error."""
