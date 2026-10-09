@@ -286,3 +286,29 @@ def test_native_serving_accounts_for_resident_torch_kv_cache():
     )
     assert generation.usage.kv_peak_bytes >= runtime.estimate_kv_bytes(1)
     assert any(event.cache_tokens > 0 for event in generation.events if event.kind == "token")
+
+
+def test_torch_prefill_is_batched_before_incremental_decode(monkeypatch):
+    pytest.importorskip("torch")
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = _model(norm="rms", ffn_kind="swiglu")
+    accel = TorchAccel(model, device="cpu").pin()
+    original = accel._cached_step
+    calls = []
+
+    def traced(token_id):
+        calls.append(token_id)
+        return original(token_id)
+
+    monkeypatch.setattr(accel, "_cached_step", traced)
+    expected = accel.logits((1, 2, 3))
+    assert accel.logits_window((1, 2, 3)) == pytest.approx(expected, abs=2e-5)
+    assert calls == []  # fused prefill, no per-token launch loop
+    assert accel.cached_tokens == (1, 2, 3)
+    assert len(accel._cached_keys) == model.n_layers
+    assert all(tensor.shape[-2] == 3 for tensor in accel._cached_keys)
+    assert accel.logits_window((1, 2, 3, 1)) == pytest.approx(
+        accel.logits((1, 2, 3, 1)), abs=2e-5
+    )
+    assert calls == [1]  # one resident decoder step
