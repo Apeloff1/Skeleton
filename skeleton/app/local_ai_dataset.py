@@ -363,3 +363,238 @@ def prepare_native_dataset(
         "disjoint_document_split": True,
         "model_quality_certified": False,
     }
+
+
+
+def _read_bounded_regular(path: Path, budget: int) -> bytes:
+    try:
+        identity = path.lstat()
+        if not stat.S_ISREG(identity.st_mode) or not 1 <= identity.st_size <= budget:
+            raise OfflineDatasetError("dataset evidence must be a bounded regular file")
+        fd = os.open(
+            path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_BINARY", 0),
+        )
+        with os.fdopen(fd, "rb") as stream:
+            opened = os.fstat(stream.fileno())
+            if (
+                not stat.S_ISREG(opened.st_mode)
+                or (opened.st_dev, opened.st_ino)
+                != (identity.st_dev, identity.st_ino)
+                or opened.st_size != identity.st_size
+            ):
+                raise OfflineDatasetError("dataset evidence changed during open")
+            data = stream.read(budget + 1)
+            if len(data) != opened.st_size or os.fstat(stream.fileno()).st_size != opened.st_size:
+                raise OfflineDatasetError("dataset evidence changed during read")
+        return data
+    except OSError as exc:
+        raise OfflineDatasetError("could not read selected dataset evidence") from exc
+
+
+def _strict_pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for name, value in pairs:
+        if name in result:
+            raise OfflineDatasetError("duplicate dataset JSON field")
+        result[name] = value
+    return result
+
+
+def _no_nonfinite(value: str) -> None:
+    raise OfflineDatasetError("non-finite dataset JSON value")
+
+
+def _is_sha256(value: object) -> bool:
+    return (
+        isinstance(value, str) and len(value) == 64
+        and all(ch in "0123456789abcdef" for ch in value)
+    )
+
+
+def verify_native_dataset(
+    dataset_directory: str | Path,
+    *,
+    original_sources: str | Path | None = None,
+) -> dict[str, Any]:
+    """Read-only verification of a published deterministic native corpus.
+
+    Dataset files and canonical manifest must agree byte-for-byte.
+    Supplying original_sources additionally checks that each original
+    source still exists unchanged AND that the partition was produced
+    from those originals. Without originals, no provenance claim is made.
+    """
+    directory = Path(dataset_directory)
+    try:
+        folder = directory.lstat()
+        if not stat.S_ISDIR(folder.st_mode):
+            raise OfflineDatasetError("dataset folder must be a real directory")
+        if {item.name for item in directory.iterdir()} != {
+            TRAIN_FILE, VALIDATION_FILE, MANIFEST_FILE,
+        }:
+            raise OfflineDatasetError("dataset folder must contain exactly its three files")
+    except OSError as exc:
+        raise OfflineDatasetError("dataset folder could not be inspected") from exc
+
+    manifest_bytes = _read_bounded_regular(directory / MANIFEST_FILE, 64 * 1024)
+    try:
+        manifest = json.loads(
+            manifest_bytes.decode("utf-8"),
+            object_pairs_hook=_strict_pairs,
+            parse_constant=_no_nonfinite,
+        )
+    except (UnicodeError, json.JSONDecodeError, RecursionError) as exc:
+        raise OfflineDatasetError("invalid dataset manifest JSON") from exc
+    fields = {
+        "schema", "split_seed", "validation_percent", "sources", "training",
+        "validation", "operator_selected", "network_used",
+        "model_quality_certified", "historical_data_disjointness_proven",
+        "dataset_id",
+    }
+    if not isinstance(manifest, dict) or set(manifest) != fields:
+        raise OfflineDatasetError("dataset manifest has unknown or missing fields")
+    if manifest["schema"] != DATASET_SCHEMA:
+        raise OfflineDatasetError("dataset manifest schema is unsupported")
+    if (
+        type(manifest["split_seed"]) is not int
+        or not 0 <= manifest["split_seed"] <= 0xFFFFFFFF
+        or type(manifest["validation_percent"]) is not int
+        or not 10 <= manifest["validation_percent"] <= 50
+    ):
+        raise OfflineDatasetError("invalid recorded dataset split parameters")
+    for name, expected in (
+        ("operator_selected", True),
+        ("network_used", False),
+        ("model_quality_certified", False),
+        ("historical_data_disjointness_proven", False),
+    ):
+        if manifest[name] is not expected:
+            raise OfflineDatasetError("dataset provenance assertion is invalid")
+
+    document_records = manifest["sources"]
+    if not isinstance(document_records, list) or not 2 <= len(document_records) <= MAX_SOURCE_FILES:
+        raise OfflineDatasetError("invalid document inventory")
+    names: set[str] = set()
+    grouped: dict[str, list[dict[str, Any]]] = {"training": [], "validation": []}
+    for record in document_records:
+        if not isinstance(record, dict) or set(record) != {
+            "name", "source_sha256", "normalized_line_count", "token_count", "partition",
+        }:
+            raise OfflineDatasetError("invalid source identity record")
+        name = record["name"]
+        if (
+            not isinstance(name, str) or not name.lower().endswith(".txt")
+            or not name or name in (".", "..")
+            or "/" in name or "\\" in name
+            or name.casefold() in names
+        ):
+            raise OfflineDatasetError("invalid or duplicate source filename")
+        names.add(name.casefold())
+        if not _is_sha256(record["source_sha256"]):
+            raise OfflineDatasetError("source record lacks SHA-256 identity")
+        for field in ("normalized_line_count", "token_count"):
+            if type(record[field]) is not int or not 1 <= record[field] <= MAX_TRAINING_TOKENS:
+                raise OfflineDatasetError("invalid source line or token count")
+        part = record["partition"]
+        if part not in grouped:
+            raise OfflineDatasetError("unknown source partition")
+        grouped[part].append(record)
+    if not grouped["training"] or not grouped["validation"]:
+        raise OfflineDatasetError("dataset split must contain both partitions")
+
+    blobs: dict[str, bytes] = {}
+    parsed: dict[str, tuple[tuple[str, ...], ...]] = {}
+    for field, filename, limit in (
+        ("training", TRAIN_FILE, MAX_TRAINING_TOKENS),
+        ("validation", VALIDATION_FILE, MAX_VALIDATION_TOKENS),
+    ):
+        info = manifest[field]
+        if not isinstance(info, dict) or set(info) != {
+            "filename", "sha256", "token_count", "source_count",
+        } or info["filename"] != filename or not _is_sha256(info["sha256"]):
+            raise OfflineDatasetError("dataset partition has invalid metadata")
+        if type(info["token_count"]) is not int or not 2 <= info["token_count"] <= limit:
+            raise OfflineDatasetError("dataset partition token count violates limits")
+        if field == "validation" and info["token_count"] < 4:
+            raise OfflineDatasetError("held-out partition needs four or more tokens")
+        if type(info["source_count"]) is not int or info["source_count"] != len(grouped[field]):
+            raise OfflineDatasetError("dataset partition source count inconsistent")
+        if info["token_count"] != sum(item["token_count"] for item in grouped[field]):
+            raise OfflineDatasetError("dataset source token count does not reconcile")
+
+        raw = _read_bounded_regular(directory / filename, MAX_CORPUS_BYTES)
+        if _digest(raw) != info["sha256"] or not raw.endswith(b"\n"):
+            raise OfflineDatasetError("prepared dataset content identity mismatch")
+        try:
+            text = raw.decode("utf-8")
+        except UnicodeError as exc:
+            raise OfflineDatasetError("prepared dataset must be UTF-8") from exc
+        lines = text.splitlines()
+        if not lines or any(not line.strip() or line != line.strip() for line in lines):
+            raise OfflineDatasetError("prepared dataset contains empty or mutated lines")
+        normalized = tuple(tuple(tokens(line)) for line in lines)
+        if any(len(words) < 2 for words in normalized):
+            raise OfflineDatasetError("prepared dataset contains single-token lines")
+        if sum(len(words) for words in normalized) != info["token_count"]:
+            raise OfflineDatasetError("prepared dataset token count differs")
+        if len(normalized) != sum(item["normalized_line_count"] for item in grouped[field]):
+            raise OfflineDatasetError("prepared dataset line count differs")
+        if len(set(normalized)) != len(normalized):
+            raise OfflineDatasetError("duplicate normalized lines in published dataset")
+        blobs[field] = raw
+        parsed[field] = normalized
+    def subset(a: tuple[str, ...], b: tuple[str, ...]) -> bool:
+        return len(b) >= 3 and any(
+            a[i:i + len(b)] == b for i in range(len(a) - len(b) + 1)
+        )
+    if any(
+        a == b or subset(a, b) or subset(b, a)
+        for a in parsed["training"] for b in parsed["validation"]
+    ):
+        raise OfflineDatasetError("published split leaks normalized training passages")
+
+    checksum = manifest["dataset_id"]
+    raw_identity = dict(manifest)
+    raw_identity.pop("dataset_id")
+    if not _is_sha256(checksum) or checksum != _digest(_canonical(raw_identity)):
+        raise OfflineDatasetError("dataset manifest identity or provenance was changed")
+    if _canonical(manifest) + b"\n" != manifest_bytes:
+        raise OfflineDatasetError("dataset manifest canonical encoding mismatch")
+
+    source_verified = False
+    if original_sources is not None:
+        root = Path(original_sources)
+        actual_sources = _scan_sources(root)
+        if {s.name for s in actual_sources} != {item["name"] for item in document_records}:
+            raise OfflineDatasetError("original source directory inventory drift")
+        for row in document_records:
+            source = next(s for s in actual_sources if s.name == row["name"])
+            if (
+                source.sha256 != row["source_sha256"]
+                or len(source.lines) != row["normalized_line_count"]
+                or source.token_count != row["token_count"]
+            ):
+                raise OfflineDatasetError("an original dataset source has drifted")
+        for part in ("training", "validation"):
+            expected = ("\n".join(
+                line
+                for row in sorted(grouped[part], key=lambda item: item["name"].casefold())
+                for line in next(s for s in actual_sources if s.name == row["name"]).lines
+            ) + "\n").encode("utf-8")
+            if expected != blobs[part]:
+                raise OfflineDatasetError("published corpus does not match source partition")
+        source_verified = True
+    return {
+        "schema": DATASET_SCHEMA,
+        "dataset_id": checksum,
+        "source_count": len(document_records),
+        "training_sha256": manifest["training"]["sha256"],
+        "validation_sha256": manifest["validation"]["sha256"],
+        "manifest_sha256": _digest(manifest_bytes),
+        "training_tokens": manifest["training"]["token_count"],
+        "validation_tokens": manifest["validation"]["token_count"],
+        "prepared_outputs_verified": True,
+        "original_sources_verified": source_verified,
+        "historical_data_disjointness_proven": False,
+        "model_quality_certified": False,
+    }
