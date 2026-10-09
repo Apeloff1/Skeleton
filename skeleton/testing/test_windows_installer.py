@@ -97,6 +97,8 @@ def test_inno_setup_contract_is_per_user_and_uninstallable():
     assert 'Parameters: "--stop --quiet"' in source
     assert 'Type: files; Name: "{app}\\.env"' in source
     assert "{userdesktop}\\Skeleton" in source
+    assert 'Name: "{group}\\Skeleton Local AI (offline)"' in source
+    assert 'Parameters: "--local-ai"' in source
     assert "{commondesktop}" not in source
 
 
