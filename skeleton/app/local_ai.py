@@ -350,6 +350,20 @@ class OfflineAIWindow:
         )
         if not heldout_path:
             return
+        protected_suite = None
+        if messagebox.askyesno(
+            "Protect model capabilities",
+            "Also require an independent multi-category benchmark suite to "
+            "pass before saving new weights? All suite cases must be separate "
+            "from training and held-out epoch-selection text.",
+            parent=self.window,
+        ):
+            protected_suite = self.filedialog.askopenfilename(
+                parent=self.window, title="Choose independent capability benchmark",
+                filetypes=[("JSON benchmark", "*.json"), ("All files", "*.*")],
+            )
+            if not protected_suite:
+                return
         destination = self.filedialog.asksaveasfilename(
             parent=self.window, title="Save evaluated checkpoint to NEW file",
             defaultextension=".json", filetypes=[("Native checkpoint", "*.json")],
@@ -372,6 +386,7 @@ class OfflineAIWindow:
                     )
                 receipt = improve_local_model(
                     parent_path, training_path, heldout_path, destination,
+                    protected_suite=protected_suite,
                 )
                 improved = OfflineAISession(load_native_checkpoint(destination))
                 self.events.put(("improved", (improved, receipt)))
@@ -412,6 +427,20 @@ class OfflineAIWindow:
             )
             if not candidate:
                 return
+        exclusion = None
+        if messagebox.askyesno(
+            "Check training-data leakage",
+            "Do you want to exclude benchmark cases that overlap an explicit "
+            "local training corpus? This protects against reused examples "
+            "but cannot prove disjointness from all historical training.",
+            parent=self.window,
+        ):
+            exclusion = self.filedialog.askopenfilename(
+                parent=self.window, title="Choose training text for exclusion",
+                filetypes=[("UTF-8 text", "*.txt"), ("All files", "*.*")],
+            )
+            if not exclusion:
+                return
         current_digest = self.session.model_digest
         self.active = True
         self.status.set("Evaluating category-aware offline benchmark…")
@@ -424,7 +453,10 @@ class OfflineAIWindow:
                 parent = load_native_checkpoint(source)
                 if parent.model_digest != current_digest:
                     raise OfflineAIError("benchmark baseline is not the active model")
-                result = benchmark_native_models(suite, baseline=source, candidate=candidate)
+                result = benchmark_native_models(
+                    suite, baseline=source, candidate=candidate,
+                    excluded_training_text=exclusion,
+                )
                 self.events.put(("benchmark", result))
             except Exception as exc:
                 self.events.put(("error", str(exc)))
