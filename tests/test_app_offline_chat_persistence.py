@@ -104,6 +104,29 @@ class OfflineDesktopPersistenceTests(unittest.TestCase):
         ).revision, 0)
         chat.close()
 
+    def test_cancelled_or_expired_text_is_never_saved_as_answer(self):
+        from skeleton.ai.runtime.inference.local import LocalInferenceResult
+        chat = self._session()
+        sid = chat.session_id
+        for terminal in ("cancelled", "deadline"):
+            with self.subTest(terminal=terminal):
+                result = LocalInferenceResult(
+                    text="partial and not safe to display",
+                    model_id=self.backend.model_id,
+                    model_digest=self.backend.model_digest,
+                    input_tokens=2, output_tokens=1,
+                    finish_reason=terminal,
+                    execution_receipt_digest="c" * 64,
+                )
+                with patch.object(chat.engine, "generate", return_value=result):
+                    with self.assertRaisesRegex(OfflineAIError, "completed"):
+                        asyncio.run(chat.ask("hello", max_output_tokens=2))
+                self.assertEqual(chat.history, ())
+                self.assertEqual(chat.store.load(
+                    sid, self.backend.model_digest, chat.tokenizer_digest
+                ).revision, 0)
+        chat.close()
+
     def test_storage_failure_rolls_back_ephemeral_inference(self):
         chat = self._session()
         sid = chat.session_id
