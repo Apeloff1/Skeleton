@@ -42,6 +42,15 @@ _LAZY_EXPORTS = {
     "UsageEntry": (".flgb_runtime", "UsageEntry"),
     "UsageLedger": (".flgb_runtime", "UsageLedger"),
     "parse_structured_output": (".flgb_runtime", "parse_structured_output"),
+    "BatchCompatibilityKey": (".batching", "BatchCompatibilityKey"),
+    "BatchItem": (".batching", "BatchItem"),
+    "BatchPlan": (".batching", "BatchPlan"),
+    "ContinuousBatchScheduler": (".batching", "ContinuousBatchScheduler"),
+    "verify_batch_membership": (".batching", "verify_batch_membership"),
+    "SpeculativeCandidate": (".speculation", "SpeculativeCandidate"),
+    "SpeculationDecision": (".speculation", "SpeculationDecision"),
+    "assess_speculative_candidate": (".speculation", "assess_speculative_candidate"),
+    "require_speculative_equivalence": (".speculation", "require_speculative_equivalence"),
 }
 
 __all__ = list(_LAZY_EXPORTS)

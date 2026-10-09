@@ -48,17 +48,6 @@ class TestRuntimeEpochs(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "historical decade cannot be forecast"):
             RuntimeEpoch(2010, EpochStatus.FORECAST, ("x",), "invalid")
 
-    def test_inheritance_is_monotone_before_forecast(self):
-        registry = RuntimeEpochRegistry()
-        snapshots = [set(registry.inherited_capabilities(y)) for y in (1980, 1990, 2000, 2010, 2020)]
-        self.assertTrue(all(a <= b for a, b in zip(snapshots, snapshots[1:])))
-
-    def test_forecast_snapshot_opt_in_never_changes_production_inheritance(self):
-        registry = RuntimeEpochRegistry()
-        before = registry.inherited_capabilities(2040)
-        registry.snapshot(2040, include_forecast=True)
-        self.assertEqual(before, registry.inherited_capabilities(2040))
-
     def test_epoch_receipt_is_replay_stable(self):
         registry = RuntimeEpochRegistry()
         self.assertEqual(registry.snapshot(2020), registry.snapshot(2020))

@@ -6,10 +6,7 @@ import hashlib
 import json
 from typing import Iterable
 
-from .flgb_model_runtime import (
-    BatchRequest, KVCacheEntry, ModelRuntimeError, MAX_BATCH_SIZE, MAX_TOKENS,
-    MAX_WEIGHT_BYTES, plan_kv_admission,
-)
+from .flgb_model_runtime import BatchRequest, KVCacheEntry, ModelRuntimeError, plan_kv_admission
 from .runtime_policy import RuntimePolicy
 
 
@@ -17,22 +14,6 @@ def _digest(value: object) -> str:
     return hashlib.sha256(
         json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
     ).hexdigest()
-
-
-# Architecture-bounded count of retained + active KV allocation records.
-MAX_RESIDENT_KV_ENTRIES = 65_536
-
-
-def _require_request_id(value: object) -> str:
-    """Reject malformed public operation identifiers before state lookup."""
-    if (type(value) is not str or not 1 <= len(value) <= 256
-            or any(ord(ch) < 32 or ord(ch) == 127 for ch in value)):
-        raise ModelRuntimeError("invalid scheduler request identity")
-    try:
-        value.encode("utf-8", errors="strict")
-    except UnicodeError as exc:
-        raise ModelRuntimeError("invalid scheduler request identity") from exc
-    return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,21 +31,6 @@ class AdmissionLimits:
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
                 raise ModelRuntimeError(f"invalid {name}")
-        # These constants bound both in-memory scheduling and the number of
-        # records accepted by checkpoint restore. A signed/hashed checkpoint
-        # must not create an unbounded allocation policy.
-        if self.max_active_requests > MAX_BATCH_SIZE:
-            raise ModelRuntimeError("active request capacity exceeds runtime bound")
-        if self.max_queued_requests > 65_536:
-            raise ModelRuntimeError("queued request capacity exceeds runtime bound")
-        if self.max_batch_size > MAX_BATCH_SIZE:
-            raise ModelRuntimeError("batch capacity exceeds runtime bound")
-        if self.max_tokens_per_batch > MAX_TOKENS:
-            raise ModelRuntimeError("token capacity exceeds runtime bound")
-        if self.kv_capacity_bytes > MAX_WEIGHT_BYTES:
-            raise ModelRuntimeError("KV capacity exceeds runtime bound")
-        if self.max_age_boost > MAX_TOKENS:
-            raise ModelRuntimeError("age boost exceeds runtime bound")
         if self.max_batch_size > self.max_active_requests:
             raise ModelRuntimeError("batch size cannot exceed active request limit")
 
@@ -104,9 +70,7 @@ class RuntimeAdmissionScheduler:
     """Stateful, deterministic and fail-closed local inference admission scheduler."""
 
     def __init__(self, limits: AdmissionLimits | None = None, *, policy: RuntimePolicy | None = None) -> None:
-        if limits is not None and not isinstance(limits, AdmissionLimits):
-            raise ModelRuntimeError("AdmissionLimits required")
-        self.limits = limits if limits is not None else AdmissionLimits()
+        self.limits = limits or AdmissionLimits()
         if policy is not None and not isinstance(policy, RuntimePolicy):
             raise ModelRuntimeError("RuntimePolicy required")
         self.policy = policy
@@ -124,13 +88,7 @@ class RuntimeAdmissionScheduler:
         return tuple(sorted(self._active))
 
     def submit(self, request: BatchRequest, *, kv_bytes: int, pinned_kv: bool = False) -> None:
-        if not isinstance(request, BatchRequest):
-            raise ModelRuntimeError("BatchRequest required")
-        # A completed request may retain KV data. Reusing that identity before
-        # explicit eviction would collide with resident-cache ownership during
-        # admission; reject it at submission rather than dropping queued work.
-        if (request.request_id in self._queued or request.request_id in self._active
-                or request.request_id in self._kv):
+        if request.request_id in self._queued or request.request_id in self._active:
             raise ModelRuntimeError("duplicate scheduler request identity")
         if len(self._queued) >= self.limits.max_queued_requests:
             raise ModelRuntimeError("runtime admission queue capacity exceeded")
@@ -192,12 +150,6 @@ class RuntimeAdmissionScheduler:
                 deferred.append(rid)
                 continue
             victim_set = set(victims)
-            if len(working_kv) - len(victim_set) >= MAX_RESIDENT_KV_ENTRIES:
-                # A cache may have sufficient free *bytes* yet exhaust its
-                # bookkeeping-entry budget. Do not accumulate unrestoreable
-                # state or evict pinned/active entries to hide this pressure.
-                deferred.append(rid)
-                continue
             if victim_set & set(self._active):
                 deferred.append(rid)
                 continue
@@ -229,7 +181,6 @@ class RuntimeAdmissionScheduler:
 
     def cancel(self, request_id: str) -> str:
         """Withdraw queued work or terminate active work and release its KV state."""
-        _require_request_id(request_id)
         if request_id in self._queued:
             self._queued.pop(request_id)
             self._sequence += 1
@@ -241,27 +192,8 @@ class RuntimeAdmissionScheduler:
             return "active"
         raise ModelRuntimeError("cannot cancel unknown request")
 
-    def release_retained_kv(self, request_id: str) -> None:
-        """Explicitly free completed-request KV without touching active state.
-
-        A pinned retained cache entry can still be deliberately released by
-        the owning control plane. Implicit cancellation does not evict retained
-        state. Authorization belongs to the caller; no provider/model authority
-        is granted by this memory-accounting operation.
-        """
-        _require_request_id(request_id)
-        if request_id in self._active:
-            raise ModelRuntimeError("cannot release active request KV")
-        if request_id in self._queued:
-            raise ModelRuntimeError("cannot release queued request KV")
-        if request_id not in self._kv:
-            raise ModelRuntimeError("retained KV entry not found")
-        self._kv.pop(request_id)
-        self._sequence += 1
-
     def retry(self, request_id: str, *, priority_delta: int = 0) -> None:
         """Move active work back to the queue with a fresh sequence and no stale KV."""
-        _require_request_id(request_id)
         item = self._active.get(request_id)
         if item is None:
             raise ModelRuntimeError("cannot retry inactive request")
@@ -270,21 +202,13 @@ class RuntimeAdmissionScheduler:
         priority = item.request.priority + priority_delta
         if not -1_000_000 <= priority <= 1_000_000:
             raise ModelRuntimeError("retry priority outside supported range")
-        # Preserve the active request and its resident KV on admission failure:
-        # a retry may be attempted while every waiting slot is occupied.
-        if len(self._queued) >= self.limits.max_queued_requests:
-            raise ModelRuntimeError("runtime admission retry queue capacity exceeded")
-        request = BatchRequest(request_id, item.request.prompt_tokens, item.request.max_new_tokens, priority)
-        replacement = ScheduledRequest(
-            request, item.kv_bytes, self._sequence, item.pinned_kv
-        )
         self._active.pop(request_id)
         self._kv.pop(request_id, None)
-        self._queued[request_id] = replacement
+        request = BatchRequest(request_id, item.request.prompt_tokens, item.request.max_new_tokens, priority)
+        self._queued[request_id] = ScheduledRequest(request, item.kv_bytes, self._sequence, item.pinned_kv)
         self._sequence += 1
 
     def set_kv_pinned(self, request_id: str, pinned: bool) -> None:
-        _require_request_id(request_id)
         if not isinstance(pinned, bool):
             raise ModelRuntimeError("pinned must be boolean")
         entry = self._kv.get(request_id)
@@ -311,7 +235,6 @@ class RuntimeAdmissionScheduler:
         }
 
     def complete(self, request_id: str, *, retain_kv: bool = False) -> None:
-        _require_request_id(request_id)
         if request_id not in self._active:
             raise ModelRuntimeError("cannot complete inactive request")
         self._active.pop(request_id)

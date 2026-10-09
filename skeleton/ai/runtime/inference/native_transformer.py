@@ -52,8 +52,10 @@ class NativeTransformerModel:
         return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
     def _assert_identity(self) -> None:
-        self.runtime.assert_model_unchanged()
+        # Report tokenizer-identity violations at the tokenizer contract boundary
+        # before the broader model snapshot catches the same vocabulary mutation.
         self.runtime.tokenizer.assert_unchanged()
+        self.runtime.assert_model_unchanged()
         if self.runtime.model_digest != self._model_digest:
             raise RuntimeContractError("native transformer model identity drift")
         if self.runtime.tokenizer.digest != self._tokenizer_digest:

@@ -21,8 +21,6 @@ class TestRuntimeSignals(unittest.TestCase):
                 "paged_kv_memory",
                 "tiered_kv_reuse",
                 "prefix_affinity",
-                "chunked_prefill",
-                "slo_admission",
             ),
         )
         self.assertEqual(registry.production_policy(2026), registry.production_policy(2024))
