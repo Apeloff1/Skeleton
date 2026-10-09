@@ -274,7 +274,35 @@ class OfflineChatStore:
             raise RuntimeContractError("persisted conversation exceeds byte budget")
         transcript = ChatTranscript.from_json(row[3])
         transcript.validate_turn_order()
-        return StoredChat(sid, row[2], transcript, row[0], row[1])
+        revision = row[2]
+        if type(revision) is not int or not 0 <= revision <= MAX_EXPORTED_TURNS:
+            raise RuntimeContractError("stored conversation revision is invalid")
+        # The revision number is not itself evidence that every saved turn
+        # survived. Verify all receipts against the full authoritative
+        # transcript on *every* read, not only when exporting a backup.
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT request_id, request_digest, revision, text, output_digest, "
+                "prompt_tokens, generated_tokens FROM offline_turns "
+                "WHERE session_id=? ORDER BY revision", (sid,),
+            ).fetchall()
+        if len(rows) != revision:
+            raise RuntimeContractError("stored conversation is missing turn receipts")
+        turns: list[dict[str, Any]] = []
+        for item in rows:
+            _sha256(item[1], "stored request digest")
+            _sha256(item[4], "stored output digest")
+            if (not isinstance(item[3], str)
+                    or any(type(value) is not int or value < 0
+                           for value in (item[5], item[6]))):
+                raise RuntimeContractError("stored conversation receipt is invalid")
+            turns.append(dict(
+                request_id=item[0], request_digest=item[1],
+                revision=item[2], text=item[3], output_digest=item[4],
+                prompt_tokens=item[5], generated_tokens=item[6],
+            ))
+        _validate_complete_history(transcript, turns)
+        return StoredChat(sid, revision, transcript, row[0], row[1])
 
     def list_sessions(self, model_digest: str, tokenizer_digest: str,
                       *, limit: int = 100) -> tuple[tuple[str, int], ...]:
@@ -526,6 +554,8 @@ class OfflineChatStore:
                 or not text.strip()):
             raise RuntimeContractError("invalid completed native chat result")
         transcript.validate_turn_order()
+        if session.revision >= MAX_EXPORTED_TURNS:
+            raise RuntimeContractError("stored conversation has reached turn limit")
         prior = session.transcript.messages
         next_messages = transcript.messages
         if (
