@@ -59,7 +59,9 @@ GameLoop:
     xor ah, ah
     int 16h
     cmp ah, 01h             ; Escape exits without modifying files.
-    je ExitGame
+    jne .process_key
+    jmp ExitGame
+.process_key:
     mov bl, [player_x]
     mov [candidate_x], bl
     mov bl, [player_y]
@@ -218,10 +220,14 @@ LoadLevel:
 TryMove:
     mov al, [candidate_x]
     cmp al, WIDTH
-    jae .blocked
+    jb .x_inside
+    ret
+.x_inside:
     mov al, [candidate_y]
     cmp al, HEIGHT
-    jae .blocked
+    jb .y_inside
+    ret
+.y_inside:
     xor ax, ax
     mov al, [candidate_y]
     mov bx, WIDTH
