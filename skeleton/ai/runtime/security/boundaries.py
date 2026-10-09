@@ -132,6 +132,15 @@ def evaluate_boundary(boundary: SecurityBoundary, crossing: BoundaryCrossing) ->
         return BoundaryDecision(boundary.digest,crossing.digest,False,"boundary_mismatch",())
     if crossing.authenticated_identity is None:
         return BoundaryDecision(boundary.digest,crossing.digest,False,"authentication_missing",())
+    # The execution plane currently supports the workload-identity contract.
+    # Other authentication modes must be verified explicitly before admission.
+    if boundary.required_authn != "workload-identity":
+        return BoundaryDecision(boundary.digest,crossing.digest,False,"authentication_method_unsupported",())
+    # Bind the presented identity to the declared workload. The authenticity
+    # of that identity is still the upstream transport verifier's obligation.
+    expected_identity=f"spiffe://skeleton/{crossing.workload_id}"
+    if crossing.authenticated_identity != expected_identity:
+        return BoundaryDecision(boundary.digest,crossing.digest,False,"authentication_identity_mismatch",())
     required=set(boundary.required_scopes)
     granted=set(crossing.granted_scopes)
     if not required.issubset(granted):
