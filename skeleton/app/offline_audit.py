@@ -12,6 +12,7 @@ import hashlib
 import json
 import math
 import os
+from .offline_sqlite_safety import check_sqlite_companion_paths, UnsafeOfflineSqlitePath
 from pathlib import Path
 import re
 import sqlite3
@@ -35,6 +36,10 @@ def _admit(source: str | Path) -> Path:
     path = Path(os.path.abspath(Path(source).expanduser()))
     if path.is_symlink() or not path.is_file():
         raise OfflineAuditError("audit source must be a real local SQLite database")
+    try:
+        check_sqlite_companion_paths(path)
+    except UnsafeOfflineSqlitePath as exc:
+        raise OfflineAuditError(str(exc)) from exc
     if path.stat().st_size > MAX_DATABASE_BYTES:
         raise OfflineAuditError("audit source exceeds maximum database size")
     return path
