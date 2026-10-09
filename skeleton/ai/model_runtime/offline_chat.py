@@ -11,6 +11,7 @@ import argparse
 from contextlib import contextmanager
 from dataclasses import dataclass
 from hashlib import sha256
+import hmac
 import json
 import os
 from pathlib import Path
@@ -31,6 +32,38 @@ from .runtime_contracts import GenerationConfig, RuntimeContractError
 MAX_ID_BYTES = 128
 MAX_TURN_BYTES = 262_144
 MAX_TRANSCRIPT_BYTES = 2_359_296
+MAX_BUNDLE_BYTES = 16 * 1024 * 1024
+MAX_EXPORTED_TURNS = 8192
+_BUNDLE_SCHEMA = "skeleton.ai.offline-chat-bundle.v1"
+
+
+def _stable_bytes(obj: Any) -> bytes:
+    try:
+        return json.dumps(obj, sort_keys=True, separators=(",", ":"),
+                          ensure_ascii=False, allow_nan=False).encode("utf-8")
+    except (ValueError, TypeError, UnicodeError) as exc:
+        raise RuntimeContractError("invalid offline conversation bundle") from exc
+
+
+def _strict_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    obj: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in obj:
+            raise RuntimeContractError("duplicate key in offline conversation bundle")
+        obj[key] = value
+    return obj
+
+
+def _reject_constant(value: str) -> None:
+    raise RuntimeContractError("nonfinite value in offline conversation bundle")
+
+
+def _sha256(value: object, name: str) -> str:
+    if (not isinstance(value, str) or len(value) != 64
+            or any(ch not in "0123456789abcdef" for ch in value)):
+        raise RuntimeContractError(f"invalid {name}")
+    return value
+
 
 
 def _identifier(name: str, raw: str) -> str:
@@ -226,6 +259,140 @@ class OfflineChatStore:
                 raise RuntimeContractError(
                     "unknown conversation or model/tokenizer identity mismatch"
                 )
+
+    def export_bundle(self, session_id: str, model_digest: str,
+                      tokenizer_digest: str) -> bytes:
+        """Atomic read of a complete conversation and its retry receipts.
+
+        The bundle carries all committed turns, unlike copying a UI transcript.
+        It is integrity-checked but NOT encrypted or signed; operators must
+        protect it as sensitive local conversation data.
+        """
+        sid = _identifier("session id", session_id)
+        _sha256(model_digest, "model digest")
+        _sha256(tokenizer_digest, "tokenizer digest")
+        with self._transaction():
+            stored = self.load(sid, model_digest, tokenizer_digest)
+            rows = self._db.execute(
+                "SELECT request_id, request_digest, revision, text, output_digest, "
+                "prompt_tokens, generated_tokens FROM offline_turns "
+                "WHERE session_id=? ORDER BY revision",
+                (sid,),
+            ).fetchall()
+            if len(rows) > MAX_EXPORTED_TURNS:
+                raise RuntimeContractError("conversation has too many durable turns to export")
+            turns = [
+                dict(request_id=row[0], request_digest=row[1], revision=row[2],
+                     text=row[3], output_digest=row[4], prompt_tokens=row[5],
+                     generated_tokens=row[6])
+                for row in rows
+            ]
+            body = {
+                "schema": _BUNDLE_SCHEMA,
+                "model_digest": stored.model_digest,
+                "tokenizer_digest": stored.tokenizer_digest,
+                "revision": stored.revision,
+                "messages": stored.transcript.to_list(),
+                "turns": turns,
+            }
+            body_bytes = _stable_bytes(body)
+            bundle = _stable_bytes({
+                "body": body,
+                "sha256": sha256(body_bytes).hexdigest(),
+            })
+            if len(bundle) > MAX_BUNDLE_BYTES:
+                raise RuntimeContractError("conversation export exceeds byte budget")
+            return bundle
+
+    def import_bundle(self, payload: bytes, model_digest: str,
+                      tokenizer_digest: str) -> str:
+        """Verify the complete portable record before an atomic new-ID import.
+
+        Never overwrite an existing conversation. Every imported turn receipt
+        preserves idempotency under its original request ID.
+        """
+        _sha256(model_digest, "model digest")
+        _sha256(tokenizer_digest, "tokenizer digest")
+        if not isinstance(payload, bytes) or not 1 <= len(payload) <= MAX_BUNDLE_BYTES:
+            raise RuntimeContractError("offline conversation import exceeds byte budget")
+        try:
+            envelope = json.loads(payload.decode("utf-8", errors="strict"),
+                                  object_pairs_hook=_strict_pairs,
+                                  parse_constant=_reject_constant)
+        except (UnicodeError, ValueError) as exc:
+            raise RuntimeContractError("invalid conversation bundle encoding") from exc
+        if not isinstance(envelope, dict) or set(envelope) != {"body", "sha256"}:
+            raise RuntimeContractError("invalid conversation bundle envelope")
+        body = envelope["body"]
+        if not isinstance(body, dict) or set(body) != {
+            "schema", "model_digest", "tokenizer_digest", "revision", "messages", "turns"
+        } or body["schema"] != _BUNDLE_SCHEMA:
+            raise RuntimeContractError("unsupported conversation bundle schema")
+        if not hmac.compare_digest(
+            _sha256(envelope["sha256"], "bundle digest"),
+            sha256(_stable_bytes(body)).hexdigest(),
+        ):
+            raise RuntimeContractError("conversation bundle digest mismatch")
+        if (body["model_digest"] != model_digest
+                or body["tokenizer_digest"] != tokenizer_digest):
+            raise RuntimeContractError("bundle model/tokenizer identity mismatch")
+        messages = body["messages"]
+        if not isinstance(messages, list):
+            raise RuntimeContractError("conversation bundle messages must be a list")
+        transcript = ChatTranscript.parse(messages)
+        transcript.validate_turn_order()
+        if len(transcript.messages) % 2 or any(
+            m.role != ("user" if i % 2 == 0 else "assistant")
+            or not m.content.strip()
+            for i, m in enumerate(transcript.messages)
+        ):
+            raise RuntimeContractError("bundle contains invalid desktop dialogue")
+        rev = body["revision"]
+        turns = body["turns"]
+        if (type(rev) is not int or rev < 0 or rev > MAX_EXPORTED_TURNS
+                or not isinstance(turns, list) or len(turns) != rev):
+            raise RuntimeContractError("bundle revision or turn count mismatch")
+        validated = []
+        for index, turn in enumerate(turns):
+            if not isinstance(turn, dict) or set(turn) != {
+                "request_id", "request_digest", "revision", "text",
+                "output_digest", "prompt_tokens", "generated_tokens"
+            }:
+                raise RuntimeContractError("invalid exported turn shape")
+            rid = _identifier("request id", turn["request_id"])
+            _sha256(turn["request_digest"], "request digest")
+            _sha256(turn["output_digest"], "output digest")
+            if turn["revision"] != index + 1 or type(turn["revision"]) is not int:
+                raise RuntimeContractError("nonconsecutive exported turn revisions")
+            if (not isinstance(turn["text"], str)
+                    or len(turn["text"].encode("utf-8")) > MAX_TRANSCRIPT_BYTES
+                    or any(type(turn[key]) is not int or turn[key] < 0
+                           for key in ("prompt_tokens", "generated_tokens"))):
+                raise RuntimeContractError("invalid exported turn content")
+            validated.append((
+                rid, turn["request_digest"], turn["revision"], turn["text"],
+                turn["output_digest"], turn["prompt_tokens"],
+                turn["generated_tokens"],
+            ))
+        if rev and (
+            len(transcript.messages) < 2
+            or transcript.messages[-1].content != turns[-1]["text"]
+        ):
+            raise RuntimeContractError("bundle terminal answer does not match transcript")
+        serialized = transcript.to_json()
+        if len(serialized.encode("utf-8")) > MAX_TRANSCRIPT_BYTES:
+            raise RuntimeContractError("restored conversation exceeds byte budget")
+        new_id = secrets.token_urlsafe(24)
+        with self._transaction():
+            self._db.execute(
+                "INSERT INTO offline_sessions VALUES (?, ?, ?, ?, ?, ?)",
+                (new_id, model_digest, tokenizer_digest, rev, serialized, time.time_ns()),
+            )
+            self._db.executemany(
+                "INSERT INTO offline_turns VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                [(new_id, *row) for row in validated],
+            )
+        return new_id
 
     @staticmethod
     def _receipt(row: tuple[Any, ...], session_id: str, request_id: str,
