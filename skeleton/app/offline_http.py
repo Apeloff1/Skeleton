@@ -426,6 +426,99 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
         self._handle("PATCH")
 
 
+def smoke_offline_http_inference() -> bool:
+    """End-to-end acceptance inside the *frozen* Windows executable.
+
+    Binds an ephemeral numeric-loopback socket, authenticates with a new
+    token, performs an actual native transformer turn, retries the identical
+    request, verifies SQLite recovery and tears down all resources.
+    No Tk, browser, Docker, network provider, external model weights or
+    secret from the operator's real installation is required.
+    """
+    from http.client import HTTPConnection
+    from tempfile import TemporaryDirectory
+    from skeleton.cortex.transformer import TinyTransformer
+    from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
+    from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
+
+    runtime = NativeLLMRuntime(TinyTransformer(
+        vocab=("system:", "user:", "assistant:", "hello", "world", "answer"),
+        dim=8, ctx=96, seed=41, n_heads=2, n_layers=2, d_ff=16,
+    ))
+    backend = NativeRuntimeLocalModel(runtime)
+    token = secrets.token_urlsafe(48)
+    with TemporaryDirectory(prefix="skeleton-local-http-accept-") as folder:
+        app = OfflineHTTPApplication(
+            backend, Path(folder) / "acceptance.sqlite3", token=token,
+        )
+        try:
+            with LocalOnlyHTTPServer(app, port=0) as server:
+                port = server.server_port
+                if server.server_address[0] != "127.0.0.1":
+                    return False
+                worker = threading.Thread(
+                    target=server.serve_forever,
+                    kwargs={"poll_interval": 0.05},
+                    name="skeleton-local-acceptance", daemon=True,
+                )
+                worker.start()
+                def request(method: str, route: str, body: dict[str, Any] | None,
+                            *, authenticated: bool = True) -> tuple[int, Any]:
+                    headers: dict[str, str] = {}
+                    if authenticated:
+                        headers["Authorization"] = "Bearer " + token
+                    payload = None
+                    if body is not None:
+                        headers["Content-Type"] = "application/json"
+                        payload = json.dumps(body, separators=(",", ":")).encode("utf-8")
+                    connection = HTTPConnection("127.0.0.1", port, timeout=15)
+                    try:
+                        connection.request(method, route, body=payload, headers=headers)
+                        response = connection.getresponse()
+                        status = response.status
+                        data = json.loads(response.read().decode("utf-8"))
+                        return status, data
+                    finally:
+                        connection.close()
+                try:
+                    denied_status, _ = request(
+                        "GET", "/v1/status", None, authenticated=False
+                    )
+                    status, health = request("GET", "/v1/status", None)
+                    if (denied_status != 401 or status != 200
+                            or health.get("model_digest") != backend.model_digest):
+                        return False
+                    status, created = request("POST", "/v1/sessions", {})
+                    if status != 201 or not created.get("session_id"):
+                        return False
+                    sid = created["session_id"]
+                    route = "/v1/sessions/" + sid + "/turn"
+                    payload = {
+                        "message": "hello", "request_id": "frozen-http-smoke",
+                        "max_output_tokens": 2,
+                    }
+                    status, first = request("POST", route, payload)
+                    again_status, replay = request("POST", route, payload)
+                    read_status, saved = request(
+                        "GET", "/v1/sessions/" + sid, None
+                    )
+                    return bool(
+                        status == again_status == read_status == 200
+                        and first["revision"] == replay["revision"] == saved["revision"] == 1
+                        and first["output_digest"] == replay["output_digest"]
+                        and not first["replayed"] and replay["replayed"]
+                        and len(saved["messages"]) == 2
+                        and len(saved["messages"][-1]["content"].strip()) > 0
+                    )
+                finally:
+                    server.shutdown()
+                    worker.join(timeout=10)
+                    if worker.is_alive():
+                        raise RuntimeError("offline HTTP smoke worker failed to terminate")
+        finally:
+            app.close()
+
+
 def create_token_file(path: str | Path, *, token: str | None = None) -> str:
     """One-time owner-only secret file; a preexisting path is never overwritten."""
     token = secrets.token_urlsafe(48) if token is None else token
@@ -495,5 +588,5 @@ if __name__ == "__main__":
 
 __all__ = [
     "OfflineHTTPApplication", "OfflineHTTPError", "OfflineHTTPHandler",
-    "LocalOnlyHTTPServer", "create_token_file", "main",
+    "LocalOnlyHTTPServer", "create_token_file", "smoke_offline_http_inference", "main",
 ]
