@@ -543,7 +543,7 @@
       "requirements": [
         "Run construct -> attack/improve -> reconcile/promote with alternating rivals.",
         "Opponent attacks missing dependencies, inconsistent subsystems, weak player value and release risk and must produce a better integrated candidate.",
-        "Deterministic release gates—not either rival—authorize promotion."
+        "Deterministic release gates\u2014not either rival\u2014authorize promotion."
       ],
       "adversarial": [
         "dependency orphan",
@@ -1197,7 +1197,7 @@
       "requirements": [
         "Run construct -> attack/improve -> reconcile/promote with alternating rivals.",
         "Opponent attacks missing dependencies, inconsistent subsystems, weak player value and release risk and must produce a better integrated candidate.",
-        "Deterministic release gates—not either rival—authorize promotion."
+        "Deterministic release gates\u2014not either rival\u2014authorize promotion."
       ],
       "adversarial": [
         "integration-only failure",

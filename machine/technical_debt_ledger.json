@@ -6,9 +6,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-115",
     "title": "Technical Debt Ledger",
-    "required_gap_texts": [
-      "independent cleanup-compatibility evaluation remains pending"
-    ]
+    "required_gap_texts": []
   },
   "items": [
     {

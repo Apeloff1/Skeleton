@@ -6,9 +6,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-118",
     "title": "Roadmap Control",
-    "required_gap_texts": [
-      "independent roadmap-control verification remains pending"
-    ]
+    "required_gap_texts": []
   },
   "sources": [
     "machine/ai_master_build_sequence.json",

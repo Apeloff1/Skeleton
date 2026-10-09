@@ -13,17 +13,12 @@
     {
       "volume_ref": "VOL-055",
       "title": "Architecture Linter",
-      "required_gap_texts": [
-        "define rule registry",
-        "add waiver expiry enforcement"
-      ]
+      "required_gap_texts": []
     },
     {
       "volume_ref": "VOL-116",
       "title": "Architecture Fitness Functions",
-      "required_gap_texts": [
-        "independent architecture-rule and waiver verification remains pending"
-      ]
+      "required_gap_texts": []
     }
   ],
   "registry_policy": {

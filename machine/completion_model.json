@@ -6,10 +6,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-119",
     "title": "Completion Model",
-    "required_gap_texts": [
-      "independent stale-signoff evaluation remains pending",
-      "independent critical-blocker evaluation remains pending"
-    ]
+    "required_gap_texts": []
   },
   "sources": [
     "machine/ai_build_accountability.json",

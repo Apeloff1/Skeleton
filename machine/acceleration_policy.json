@@ -16,9 +16,7 @@
       "volume_ref": "VOL-033",
       "title": "Java / JVM Plane",
       "accountability_id": "ACC-VOL-033",
-      "required_gap_texts": [
-        "exact-head VOL-033 gate and independent accountability verification pending"
-      ]
+      "required_gap_texts": []
     }
   ],
   "runtime_authority": {
@@ -36,7 +34,7 @@
     "minimum_profile_runs": 2,
     "minimum_distinct_environment_ids": 1,
     "minimum_speedup": 1.2,
-    "maximum_abs_error": 0.00001,
+    "maximum_abs_error": 1e-05,
     "maximum_crashes": 0,
     "maximum_timeouts": 0,
     "source_identity_required": true,

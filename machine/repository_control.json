@@ -10,9 +10,7 @@
       "volume_ref": "VOL-021",
       "title": "Code Intelligence",
       "accountability_id": "ACC-VOL-021",
-      "required_gap_texts": [
-        "independent cross-language repository-graph, ownership/test impact, and change-planner verification remains pending"
-      ]
+      "required_gap_texts": []
     },
     {
       "volume_ref": "VOL-022",
@@ -30,9 +28,7 @@
       "volume_ref": "VOL-093",
       "title": "Backlog Control",
       "accountability_id": "ACC-VOL-093",
-      "required_gap_texts": [
-        "independent backlog coverage, deduplication, and stale-state verification remains pending"
-      ]
+      "required_gap_texts": []
     },
     {
       "volume_ref": "VOL-094",
@@ -50,17 +46,13 @@
       "volume_ref": "VOL-108",
       "title": "Anti-Patterns",
       "accountability_id": "ACC-VOL-108",
-      "required_gap_texts": [
-        "independent anti-pattern detector and exception-expiry verification remains pending"
-      ]
+      "required_gap_texts": []
     },
     {
       "volume_ref": "VOL-109",
       "title": "Build Order",
       "accountability_id": "ACC-VOL-109",
-      "required_gap_texts": [
-        "independent construction-DAG cycle and blocked-state verification remains pending"
-      ]
+      "required_gap_texts": []
     },
     {
       "volume_ref": "VOL-110",
@@ -72,26 +64,19 @@
       "volume_ref": "VOL-115",
       "title": "Technical Debt Ledger",
       "accountability_id": "ACC-VOL-115",
-      "required_gap_texts": [
-        "independent cleanup-compatibility evaluation remains pending"
-      ]
+      "required_gap_texts": []
     },
     {
       "volume_ref": "VOL-118",
       "title": "Roadmap Control",
       "accountability_id": "ACC-VOL-118",
-      "required_gap_texts": [
-        "independent roadmap-control verification remains pending"
-      ]
+      "required_gap_texts": []
     },
     {
       "volume_ref": "VOL-119",
       "title": "Completion Model",
       "accountability_id": "ACC-VOL-119",
-      "required_gap_texts": [
-        "independent stale-signoff evaluation remains pending",
-        "independent critical-blocker evaluation remains pending"
-      ]
+      "required_gap_texts": []
     }
   ],
   "authorities": [
@@ -174,7 +159,7 @@
     ]
   },
   "invariants": [
-    "No repository mutation bypasses inspect→plan→lease→edit→build→test→review→verify.",
+    "No repository mutation bypasses inspect\u2192plan\u2192lease\u2192edit\u2192build\u2192test\u2192review\u2192verify.",
     "Hard blockers are non-compensable and cannot be outranked by soft priority signals.",
     "Every canonical AIQ task belongs to the build DAG and every work package retains exact engineering/acceptance requirements.",
     "Deletion requires owner, reachability, retention, protected-artifact disposition and rollback/restore evidence.",

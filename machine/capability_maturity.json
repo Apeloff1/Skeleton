@@ -276,10 +276,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-125",
     "title": "Capability Maturity Model",
-    "required_gap_texts": [
-      "bind maturity to evidence digests",
-      "add automatic invalidation triggers"
-    ]
+    "required_gap_texts": []
   },
   "authority_role": "p2_trace_maturity_projection",
   "canonical_source": "machine/maturity_registry.json",

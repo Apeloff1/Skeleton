@@ -11,10 +11,23 @@
     {
       "domain_id": "software-engineering",
       "description": "Repository-grounded software construction and repair requiring code and test evidence.",
-      "required_source_types": ["repository-state", "test-evidence"],
-      "required_tools": ["repository-read", "test-runner"],
-      "allowed_tools": ["repository-read", "repository-write", "test-runner"],
-      "forbidden_assumptions": ["tests-pass-without-evidence", "unread-code-is-correct"],
+      "required_source_types": [
+        "repository-state",
+        "test-evidence"
+      ],
+      "required_tools": [
+        "repository-read",
+        "test-runner"
+      ],
+      "allowed_tools": [
+        "repository-read",
+        "repository-write",
+        "test-runner"
+      ],
+      "forbidden_assumptions": [
+        "tests-pass-without-evidence",
+        "unread-code-is-correct"
+      ],
       "evaluation": {
         "owner_id": "eval-software-quality",
         "suite_id": "software-specialist-v1",
@@ -28,10 +41,22 @@
     {
       "domain_id": "simulation-intelligence",
       "description": "Bounded simulation reasoning with explicit state, model contracts, and simulated-to-real separation.",
-      "required_source_types": ["model-contract", "simulation-state"],
-      "required_tools": ["bounded-rollout", "simulation-read"],
-      "allowed_tools": ["bounded-rollout", "simulation-read"],
-      "forbidden_assumptions": ["simulation-equals-reality", "unbounded-rollout-is-safe"],
+      "required_source_types": [
+        "model-contract",
+        "simulation-state"
+      ],
+      "required_tools": [
+        "bounded-rollout",
+        "simulation-read"
+      ],
+      "allowed_tools": [
+        "bounded-rollout",
+        "simulation-read"
+      ],
+      "forbidden_assumptions": [
+        "simulation-equals-reality",
+        "unbounded-rollout-is-safe"
+      ],
       "evaluation": {
         "owner_id": "eval-simulation-quality",
         "suite_id": "simulation-specialist-v1",
@@ -45,10 +70,21 @@
     {
       "domain_id": "research-synthesis",
       "description": "Evidence-grounded research synthesis with provenance and explicit source-quality constraints.",
-      "required_source_types": ["primary-source", "provenance-record"],
-      "required_tools": ["source-read"],
-      "allowed_tools": ["source-read", "source-search"],
-      "forbidden_assumptions": ["citation-implies-truth", "secondary-source-is-primary"],
+      "required_source_types": [
+        "primary-source",
+        "provenance-record"
+      ],
+      "required_tools": [
+        "source-read"
+      ],
+      "allowed_tools": [
+        "source-read",
+        "source-search"
+      ],
+      "forbidden_assumptions": [
+        "citation-implies-truth",
+        "secondary-source-is-primary"
+      ],
       "evaluation": {
         "owner_id": "eval-research-quality",
         "suite_id": "research-specialist-v1",

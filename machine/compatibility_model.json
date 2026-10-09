@@ -6,10 +6,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-130",
     "title": "Compatibility Model",
-    "required_gap_texts": [
-      "bind schema/API versions to matrix",
-      "define support window policy"
-    ]
+    "required_gap_texts": []
   },
   "sources": {
     "schemas": "machine/schema_registry.json",

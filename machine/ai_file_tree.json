@@ -2922,7 +2922,7 @@
       "destination": "skeleton/ai/research/historical/sheaf",
       "kind": "tree",
       "source_git_object_sha": "d9164c7fee370ad9680b0cabe39253f56e0c3b68",
-      "role": "Sheaf/Čech/gluing primitives are research-grade knowledge/topology candidates and should remain quarantined until a concrete knowledge-system use is measured.",
+      "role": "Sheaf/\u010cech/gluing primitives are research-grade knowledge/topology candidates and should remain quarantined until a concrete knowledge-system use is measured.",
       "work_package_refs": [
         "WP-W09",
         "WP-W26"
@@ -7718,7 +7718,7 @@
       "kind": "tree",
       "ownership_mode": "canonical_native",
       "residual_only": true,
-      "role": "Residual canonical AI-native runtime surfaces—including autonomous engineering, effects, local inference, learning foundation, training, functional AI, provider runtime, and system completion—not claimed by more-specific mappings or native owners.",
+      "role": "Residual canonical AI-native runtime surfaces\u2014including autonomous engineering, effects, local inference, learning foundation, training, functional AI, provider runtime, and system completion\u2014not claimed by more-specific mappings or native owners.",
       "volume_refs": [
         "VOL-006",
         "VOL-007",

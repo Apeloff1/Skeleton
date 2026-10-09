@@ -4110,7 +4110,10 @@
         "planned:cycle/ownership violation suite",
         "planned:legacy-mirror drift evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/masterplan/closure.py",
+        "tests/flgb/test_masterplan_closure.py"
+      ],
       "risks": [
         "competing canonical roots",
         "dependency cycles",
@@ -4161,7 +4164,10 @@
         "planned:dependency-cycle scan",
         "planned:cold-import determinism evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/masterplan/closure.py",
+        "tests/flgb/test_masterplan_closure.py"
+      ],
       "risks": [
         "circular imports",
         "import-time mutation",
@@ -4215,7 +4221,10 @@
         "planned:packaged-vs-source import matrix",
         "planned:module shadowing evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/masterplan/closure.py",
+        "tests/flgb/test_masterplan_closure.py"
+      ],
       "risks": [
         "module shadowing",
         "environment-dependent imports",
@@ -4321,7 +4330,10 @@
         "planned:mutation suite for architecture violations",
         "planned:false-positive regression corpus"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/masterplan/closure.py",
+        "tests/flgb/test_masterplan_closure.py"
+      ],
       "risks": [
         "silent rule gaps",
         "waiver permanence",
@@ -4564,7 +4576,10 @@
         "planned:orphan-decision audit",
         "planned:supersession consistency evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/masterplan/closure.py",
+        "tests/flgb/test_masterplan_closure.py"
+      ],
       "risks": [
         "undocumented architecture change",
         "stale ADR authority",
@@ -6562,7 +6577,10 @@
       "evaluations": [
         "skeleton/testing/test_vol089_090_documentation_engine.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/masterplan/closure.py",
+        "tests/flgb/test_masterplan_closure.py"
+      ],
       "risks": [
         "stale docs",
         "generated overwrite",
@@ -6611,7 +6629,10 @@
       "evaluations": [
         "skeleton/testing/test_vol089_090_documentation_engine.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/masterplan/closure.py",
+        "tests/flgb/test_masterplan_closure.py"
+      ],
       "risks": [
         "generated drift",
         "review noise",
@@ -6731,7 +6752,10 @@
         "skeleton/testing/test_vol092_repository_maintenance.py",
         "scripts/plan_repository_maintenance.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/masterplan/closure.py",
+        "tests/flgb/test_masterplan_closure.py"
+      ],
       "risks": [
         "destructive cleanup",
         "bot churn",
@@ -8365,7 +8389,10 @@
       "evaluations": [
         "planned:requirement ambiguity review"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/masterplan/closure.py",
+        "tests/flgb/test_masterplan_closure.py"
+      ],
       "risks": [
         "untestable requirements",
         "conflicting requirements"
@@ -8414,7 +8441,10 @@
       "evaluations": [
         "planned:NFR workload reproducibility"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/masterplan/closure.py",
+        "tests/flgb/test_masterplan_closure.py"
+      ],
       "risks": [
         "unmeasured targets",
         "conflicting budgets"
@@ -8463,7 +8493,10 @@
       "evaluations": [
         "planned:taxonomy orphan audit"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/masterplan/closure.py",
+        "tests/flgb/test_masterplan_closure.py"
+      ],
       "risks": [
         "duplicate capability concepts",
         "taxonomy treated as runtime truth"
@@ -8512,7 +8545,10 @@
       "evaluations": [
         "planned:stale-evidence downgrade evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/masterplan/closure.py",
+        "tests/flgb/test_masterplan_closure.py"
+      ],
       "risks": [
         "status inflation",
         "irreversible promotion"
@@ -8561,7 +8597,10 @@
       "evaluations": [
         "planned:scenario coverage audit"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/masterplan/closure.py",
+        "tests/flgb/test_masterplan_closure.py"
+      ],
       "risks": [
         "implementation-shaped specs",
         "missing negative behavior"
@@ -8610,7 +8649,10 @@
       "evaluations": [
         "planned:transition mutation testing"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/masterplan/closure.py",
+        "tests/flgb/test_masterplan_closure.py"
+      ],
       "risks": [
         "implicit transitions",
         "terminal resurrection"
@@ -8659,7 +8701,10 @@
       "evaluations": [
         "planned:cross-interface consistency audit"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/masterplan/closure.py",
+        "tests/flgb/test_masterplan_closure.py"
+      ],
       "risks": [
         "leaky abstractions",
         "ambiguous cancellation"
@@ -8705,7 +8750,10 @@
       "evaluations": [
         "planned:schema evolution matrix"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/masterplan/closure.py",
+        "tests/flgb/test_masterplan_closure.py"
+      ],
       "risks": [
         "schema drift",
         "unknown field privilege escalation"
@@ -8751,7 +8799,10 @@
       "evaluations": [
         "planned:mixed-version fleet evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/masterplan/closure.py",
+        "tests/flgb/test_masterplan_closure.py"
+      ],
       "risks": [
         "flag-day upgrade assumption",
         "rollback incompatibility"
@@ -8797,7 +8848,10 @@
       "evaluations": [
         "planned:delay/reorder protocol faults"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/masterplan/closure.py",
+        "tests/flgb/test_masterplan_closure.py"
+      ],
       "risks": [
         "duplicate command execution",
         "deadline loss"
@@ -8843,7 +8897,10 @@
       "evaluations": [
         "planned:partition/staleness evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/masterplan/closure.py",
+        "tests/flgb/test_masterplan_closure.py"
+      ],
       "risks": [
         "hidden eventual consistency",
         "read-your-writes violation"
@@ -8943,7 +9000,10 @@
       "evaluations": [
         "planned:crash-between-state-and-publish drill"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/masterplan/closure.py",
+        "tests/flgb/test_masterplan_closure.py"
+      ],
       "risks": [
         "lost event",
         "duplicate external effect"
@@ -10578,7 +10638,10 @@
       "evaluations": [
         "planned:threat-control coverage audit"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/masterplan/closure.py",
+        "tests/flgb/test_masterplan_closure.py"
+      ],
       "risks": [
         "stale threat model",
         "unowned mitigation"
@@ -10690,7 +10753,10 @@
       "evaluations": [
         "planned:boundary-bypass evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/masterplan/closure.py",
+        "tests/flgb/test_masterplan_closure.py"
+      ],
       "risks": [
         "implicit trust crossing",
         "fallback privilege widening"
@@ -10854,7 +10920,10 @@
       "evaluations": [
         "planned:SSRF/DNS-rebinding campaign"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/masterplan/closure.py",
+        "tests/flgb/test_masterplan_closure.py"
+      ],
       "risks": [
         "SSRF",
         "policy bypass via redirects"
@@ -11006,7 +11075,10 @@
       "evaluations": [
         "planned:cross-tenant red-team campaign"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/masterplan/closure.py",
+        "tests/flgb/test_masterplan_closure.py"
+      ],
       "risks": [
         "tenant bleed",
         "shared cache leak"

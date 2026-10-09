@@ -6,10 +6,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-129",
     "title": "Schema Registry",
-    "required_gap_texts": [
-      "inventory serialized contracts",
-      "materialize compatibility checker"
-    ]
+    "required_gap_texts": []
   },
   "sources": {
     "runtime_schemas": "machine/ai_runtime_schemas.json",

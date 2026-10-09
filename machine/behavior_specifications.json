@@ -6,10 +6,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-126",
     "title": "Behavior Specifications",
-    "required_gap_texts": [
-      "define scenario schema",
-      "bind behaviors to requirement IDs"
-    ]
+    "required_gap_texts": []
   },
   "sources": {
     "capabilities": "machine/ai_capabilities.json",

@@ -159,7 +159,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     discovered = {
         path.relative_to(root).as_posix()
         for path in generated_dir.rglob("*")
-        if path.is_file()
+        if path.is_file() and path.name != "README.md"
     } if generated_dir.is_dir() else set()
     if discovered != outputs:
         raise DocumentationControlError(

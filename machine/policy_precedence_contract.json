@@ -3,7 +3,13 @@
   "gap_id": "G131",
   "title": "invariant/policy conflicts have no single precedence and conflict-resolution contract",
   "authority": "skeleton/security/policy_precedence.py",
-  "precedence_low_to_high": ["tenant", "operator", "developer", "system", "invariant"],
+  "precedence_low_to_high": [
+    "tenant",
+    "operator",
+    "developer",
+    "system",
+    "invariant"
+  ],
   "requirements": [
     "highest authority wins across layers",
     "contradiction at equal highest authority fails closed",

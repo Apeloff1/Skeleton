@@ -3,7 +3,9 @@
   "task_id": "P3T2-TRAINING-01",
   "lane_id": "P3T2-L2",
   "status": "implementation_candidate",
-  "depends_on_task_ids": ["P3T2-DATA-01"],
+  "depends_on_task_ids": [
+    "P3T2-DATA-01"
+  ],
   "dependency_candidate_paths": [
     "machine/ai_p3t2_data_candidate.json"
   ],
@@ -37,13 +39,34 @@
     "skeleton/testing/test_post_training_lab.py"
   ],
   "mirror_pairs": [
-    ["skeleton/training/control_plane.py", "skeleton/ai/training/control_plane.py"],
-    ["skeleton/training/distributed.py", "skeleton/ai/training/distributed.py"],
-    ["skeleton/training/checkpointing.py", "skeleton/ai/training/checkpointing.py"],
-    ["skeleton/training/elastic_recovery.py", "skeleton/ai/training/elastic_recovery.py"],
-    ["skeleton/training/observability.py", "skeleton/ai/training/observability.py"],
-    ["skeleton/training/eval_gates.py", "skeleton/ai/training/eval_gates.py"],
-    ["skeleton/training/post_training.py", "skeleton/ai/training/post_training.py"]
+    [
+      "skeleton/training/control_plane.py",
+      "skeleton/ai/training/control_plane.py"
+    ],
+    [
+      "skeleton/training/distributed.py",
+      "skeleton/ai/training/distributed.py"
+    ],
+    [
+      "skeleton/training/checkpointing.py",
+      "skeleton/ai/training/checkpointing.py"
+    ],
+    [
+      "skeleton/training/elastic_recovery.py",
+      "skeleton/ai/training/elastic_recovery.py"
+    ],
+    [
+      "skeleton/training/observability.py",
+      "skeleton/ai/training/observability.py"
+    ],
+    [
+      "skeleton/training/eval_gates.py",
+      "skeleton/ai/training/eval_gates.py"
+    ],
+    [
+      "skeleton/training/post_training.py",
+      "skeleton/ai/training/post_training.py"
+    ]
   ],
   "cross_plane_regressions": [
     "skeleton/testing/test_p3_training_control.py",
