@@ -535,32 +535,55 @@ class TinyTransformer:
             raise ValueError("prefill_query_chunk must be between 1 and context length")
         from skeleton.cortex.device import resolve
         info = resolve(device)
+        # Synchronization itself is transactional: it must finish before any
+        # device and accelerator ownership state can change.
         self._sync_accelerator()
-        self.requested = str(info.get("requested") or device)
-        self.device = str(info.get("actual") or "cpu")
-        self._accel = None
-        self.resident = False
+        requested = str(info.get("requested") or device)
+        actual = str(info.get("actual") or "cpu")
+        constrained = (
+            kv_dtype != "fp32" or max_kv_bytes is not None
+            or prefill_query_chunk is not None
+        )
         # A Torch projection without Mixture-of-Depths routing would silently
         # execute a different model. Keep the exact Python graph instead.
         if self.use_mod:
-            self.device = "cpu"
+            if constrained:
+                raise RuntimeError(
+                    "Mixture of Depths cannot admit requested Torch execution policy"
+                )
+            self.requested, self.device = requested, "cpu"
+            self._accel, self.resident = None, False
             return self
-        pin = bool(info.get("torch")) and self.requested != "cpu"
+        pin = bool(info.get("torch")) and requested != "cpu"
         if pin:
             try:
                 from skeleton.cortex.torch_lm import TorchAccel
-                self._accel = TorchAccel(
-                    self, device=self.device, kv_dtype=kv_dtype,
+                candidate = TorchAccel(
+                    self, device=actual, kv_dtype=kv_dtype,
                     max_kv_bytes=max_kv_bytes,
                     prefill_query_chunk=prefill_query_chunk,
                 )
-                self._accel.pin()
-                self.device = self._accel.device_name
-                self.resident = True
-            except Exception:
-                self._accel = None
-                self.device = "cpu"
-                self.resident = False
+                candidate.pin()
+            except Exception as exc:
+                if constrained:
+                    raise RuntimeError(
+                        "explicit Torch execution policy cannot be admitted"
+                    ) from exc
+                # Preserve an existing proven resident accelerator rather
+                # than discarding it when a new device upload fails. A
+                # brand-new model remains a CPU reference model.
+                return self
+            self._accel = candidate
+            self.requested = requested
+            self.device = candidate.device_name
+            self.resident = True
+        else:
+            if constrained:
+                raise RuntimeError(
+                    "explicit Torch execution policy unavailable on selected device"
+                )
+            self.requested, self.device = requested, "cpu"
+            self._accel, self.resident = None, False
         return self
 
     def _forward(self, ids: Sequence[int]):
