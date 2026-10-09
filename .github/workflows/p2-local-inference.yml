@@ -21,6 +21,8 @@ on:
       - "skeleton/app/offline_snapshot.py"
       - "skeleton/testing/test_offline_index_queue.py"
       - "skeleton/testing/test_offline_snapshot.py"
+      - "skeleton/app/offline_audit.py"
+      - "skeleton/testing/test_offline_audit.py"
       - "skeleton/testing/test_offline_firewall_policy.py"
       - "scripts/windows/offline_network_policy.ps1"
       - "skeleton/testing/test_offline_workspace.py"
@@ -59,6 +61,8 @@ on:
       - "skeleton/app/offline_snapshot.py"
       - "skeleton/testing/test_offline_index_queue.py"
       - "skeleton/testing/test_offline_snapshot.py"
+      - "skeleton/app/offline_audit.py"
+      - "skeleton/testing/test_offline_audit.py"
       - "skeleton/testing/test_offline_firewall_policy.py"
       - "scripts/windows/offline_network_policy.ps1"
       - "skeleton/testing/test_offline_workspace.py"
@@ -130,5 +134,6 @@ jobs:
           skeleton/testing/test_offline_library.py
           skeleton/testing/test_offline_index_queue.py
           skeleton/testing/test_offline_snapshot.py
+          skeleton/testing/test_offline_audit.py
           skeleton/testing/test_offline_firewall_policy.py
           tests/flgb/test_desktop_offline_ai.py
