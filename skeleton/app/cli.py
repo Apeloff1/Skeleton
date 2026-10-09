@@ -75,6 +75,7 @@ def _parser() -> argparse.ArgumentParser:
 
     local_ai.add_argument("--eval-corpus", help="separate held-out UTF-8 evaluation text (required for improvement)")
     local_ai.add_argument("--benchmark-suite", help="strict offline multi-category native model evaluation JSON")
+    local_ai.add_argument("--exclude-train-corpus", help="reject benchmark cases copied from a specified local training text")
 
     local_ai.add_argument("--output-model", help="new native checkpoint filename for --train-corpus")
     local_ai.add_argument("--epochs", type=int, default=1, help="bounded native CPU training passes (1-4)")
@@ -243,6 +244,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 result = benchmark_native_models(
                     args.benchmark_suite, baseline=args.model,
                     candidate=args.candidate_model,
+                    excluded_training_text=args.exclude_train_corpus,
                 )
             except (ValueError, RuntimeError, OSError) as exc:
                 print("local-ai benchmark rejected: " + type(exc).__name__ + ": " + str(exc))
@@ -261,6 +263,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 print("No general quality certification or automatic model promotion")
             return 0 if result["passes_local_regression_gate"] is not False else 1
 
+        if args.exclude_train_corpus:
+            print("--exclude-train-corpus requires --benchmark-suite")
+            return 2
         if args.compare_model or args.candidate_model:
             if (
                 not args.compare_model or not args.candidate_model or not args.eval_corpus
