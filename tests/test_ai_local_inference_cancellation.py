@@ -64,6 +64,56 @@ class LocalInferenceCancellationDrainTests(unittest.TestCase):
 
         asyncio.run(exercise())
 
+    def test_repeated_cancel_during_worker_cleanup_cannot_detach_worker(self):
+        started = threading.Event()
+        cleanup_started = threading.Event()
+        release_cleanup = threading.Event()
+        done = threading.Event()
+
+        def infer(request, cancellation):
+            started.set()
+            try:
+                while not cancellation.is_set():
+                    time.sleep(0.002)
+                cleanup_started.set()
+                # A second cancel arrives while the OS worker remains alive.
+                release_cleanup.wait(timeout=2.0)
+                return LocalInferenceResult(
+                    text="not committed", model_id="multi-cancel",
+                    model_digest="c" * 64, input_tokens=1, output_tokens=1,
+                )
+            finally:
+                done.set()
+
+        engine = LocalInferenceEngine(
+            CallableLocalModel(
+                model_id="multi-cancel", model_digest="c" * 64,
+                runner=infer,
+            ), cache_size=2,
+        )
+
+        async def exercise():
+            task = asyncio.create_task(engine.generate(
+                LocalInferenceRequest(prompt="hello", max_output_tokens=1)
+            ))
+            self.assertTrue(await asyncio.to_thread(started.wait, 2.0))
+            task.cancel()
+            self.assertTrue(await asyncio.to_thread(cleanup_started.wait, 2.0))
+            task.cancel()
+            await asyncio.sleep(0.02)
+            self.assertFalse(task.done(), "second cancel detached live model worker")
+            self.assertFalse(done.is_set())
+            release_cleanup.set()
+            with self.assertRaises(asyncio.CancelledError):
+                await asyncio.wait_for(task, timeout=2.0)
+            self.assertTrue(done.is_set())
+            self.assertEqual(len(engine._cache), 0)
+
+        try:
+            asyncio.run(exercise())
+        finally:
+            release_cleanup.set()
+
     def test_non_cancelled_generation_still_returns_and_caches(self):
         def infer(request, cancellation):
             self.assertFalse(cancellation.is_set())
