@@ -73,6 +73,22 @@ class TestOfflineNativeTraining(unittest.TestCase):
                     self.assertNotEqual(model.stoi[label], model.unk)
                     self.assertNotIn(label + ":", model.stoi)
 
+    def test_rejects_untrained_single_token_lines_without_silent_skips(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            corpus = Path(directory) / "mixed.txt"
+            checkpoint = Path(directory) / "checkpoint.json"
+            for invalid in ("single", "?!?", "_"):
+                with self.subTest(ignored_line=invalid):
+                    corpus.write_text(
+                        "hello world\n" + invalid + "\nuser assistant world\n",
+                        encoding="utf-8",
+                    )
+                    with self.assertRaisesRegex(
+                        OfflineTrainingError, "each non-empty training line",
+                    ):
+                        train_local_text(corpus, checkpoint)
+                    self.assertFalse(checkpoint.exists())
+
     def test_rejects_missing_corpus_bad_epochs_and_checkpoint_overwrite(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "corpus.txt"
