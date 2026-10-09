@@ -256,6 +256,30 @@ system compromise. Other processes and any additional spawned binaries
 must be governed separately. For a truly disconnected acceptance test,
 use an independent OS policy or physically isolated test machine.
 
+## One-click native offline game
+
+The Windows installer now includes a **third native executable**:
+\`SkeletonGame.exe\`, with a **Skeleton Game Preview** Start Menu shortcut.
+It opens a real small 2D game window with keyboard movement, jumping,
+seed-dependent platforms, solid terrain, a reachable goal, and restart.
+
+\`\`\`powershell
+SkeletonOffline.exe --game-preview --game-seed 42
+SkeletonOffline.exe --game-preview-check --game-seed 42 --json
+\`\`\`
+
+The second command is **headless** and must actually reach the goal in
+two independent matching simulations. Windows Installer CI checks it
+through the installed \`SkeletonOffline.exe\`, in addition to checking
+that the standalone game executable was packaged. Neither command
+downloads game assets or increases the active 36-example training
+curriculum.
+
+See [Native Offline Game Preview](OFFLINE_NATIVE_GAME_PREVIEW.md)
+for launcher, controls, architecture, test coverage and limitations.
+A genuinely interactive Windows desktop acceptance remains required:
+the CI runner's headless check does not prove Tk rendered a window.
+
 ## Deterministic local capabilities and game dataflows
 
 Skeleton now exposes **30 bounded model-free capabilities**, including
