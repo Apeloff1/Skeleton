@@ -22,6 +22,8 @@ import CaptureEditor from './workbench/CaptureEditor';
 import { captureInput } from './workbench/capture';
 import type { CaptureInput } from './workbench/capture';
 import DragonCompanionPanel from './companion/DragonCompanionPanel';
+import DragonDemoPlayer from './companion/DragonDemoPlayer';
+import {useDragonAcademy} from './companion/useDragonAcademy';
 
 const C = { bg: '#0b1220', card: '#111a2e', edge: '#28364e', text: '#e2e8f0', muted: '#94a3b8', purple: '#a78bfa', green: '#86efac', red: '#fca5a5' };
 type Icon = keyof typeof Ionicons.glyphMap;
@@ -123,6 +125,7 @@ function Library({ controller, close }: { controller: WorkspaceController; close
 
 export default function ChatWorkspace() {
   const router = useRouter();
+  const dragonAcademy = useDragonAcademy();
   const { width } = useWindowDimensions();
   const [controller] = useState(() => new WorkspaceController(
     AsyncStorage,
@@ -260,8 +263,10 @@ export default function ChatWorkspace() {
         {snapshot.saveState === 'error' ? <Button icon="refresh-outline" label="Save again" onPress={controller.retrySave} /> : <TouchableOpacity accessibilityLabel="Dismiss notice" onPress={controller.dismissNotice}><Ionicons name="close" size={20} color={C.text} /></TouchableOpacity>}
       </View>}
       <View style={[s.companionDock, width < 760 && s.companionDockCompact]}>
-        <DragonCompanionPanel draft={conversation.draft} lastUserText={[...conversation.messages].reverse().find(message => message.role === 'user')?.text} />
+        <DragonCompanionPanel draft={conversation.draft} lastUserText={[...conversation.messages].reverse().find(message => message.role === 'user')?.text} academy={dragonAcademy.view} telemetry={dragonAcademy.telemetry} />
       </View>
+      <DragonDemoPlayer demo={dragonAcademy.demo} onClose={dragonAcademy.closeDemo} />
+      {!!dragonAcademy.error && <Text accessibilityRole="alert" style={s.small}>{dragonAcademy.error}</Text>}
       <ScrollView ref={scroll} style={s.flex} contentContainerStyle={[s.transcript, width < 760 && s.transcriptCompact]} keyboardShouldPersistTaps="handled" testID="jeeves-transcript">
         {!conversation.messages.length && <View style={s.welcome}>
           <View style={s.crest}><Ionicons name="sparkles-outline" size={34} color={C.purple} /></View>

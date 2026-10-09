@@ -7,7 +7,7 @@ from skeleton.ai.webcrawler.dragon_analysis_execution import LayerDispatch
 from skeleton.ai.webcrawler.dragon_adversarial_review_worker import AdversarialReviewOutput
 from skeleton.ai.webcrawler.dragon_human_review import DragonHumanReviewLedger,ReviewerPrincipal
 from skeleton.ai.webcrawler.dragon_knowledge_normalization_worker import NormalizedKnowledge
-from skeleton.ai.webcrawler.dragon_memory_promotion_worker import execute_memory_promotion
+from skeleton.ai.webcrawler.dragon_memory_promotion_worker import execute_memory_promotion,execute_memory_promotion_from_ledger
 
 
 def principal(reviewer_id):
@@ -130,3 +130,18 @@ def test_promotion_rejects_decision_without_verified_principal_fingerprint():
  with pytest.raises(PermissionError,match="verified reviewer principal"):
   execute_memory_promotion(d,(k,),human_receipt=hr,human_decision=forged,
    surviving_knowledge_ids=(k.knowledge_id,),authorized=True)
+
+
+def test_durable_promotion_reloads_exact_review_from_ledger():
+ k,_,ledger,decision,hr,d=setup()
+ out=execute_memory_promotion_from_ledger(d,(k,),human_receipt=hr,
+  review_ledger=ledger,owner="u",surviving_knowledge_ids=(k.knowledge_id,),authorized=True)
+ assert out.promoted[0].human_review_id==decision.review_id
+
+def test_durable_promotion_rejects_unpersisted_approval_receipt():
+ k,_,ledger,decision,hr,d=setup()
+ forged=replace(hr,output_fingerprint="9"*64)
+ forged_dispatch=replace(d,input_fingerprints=(forged.output_fingerprint,))
+ with pytest.raises(KeyError,match="human review not found"):
+  execute_memory_promotion_from_ledger(forged_dispatch,(k,),human_receipt=forged,
+   review_ledger=ledger,owner="u",surviving_knowledge_ids=(k.knowledge_id,),authorized=True)

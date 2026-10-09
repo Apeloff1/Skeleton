@@ -1593,3 +1593,136 @@ def test_causal_batch_decoder_rejects_type_confusion_and_invalid_source_ids():
             deserialize_causal_training_batch(
                 json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
             )
+
+
+def test_feed_finalize_releases_buffers_on_success_and_encode_failure(native_model, monkeypatch):
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, StreamingTextFeed, TokenizerContractError
+    tokenizer = NativeTokenizer(native_model)
+    feed = StreamingTextFeed()
+    feed.push("alpha")
+    sequence = feed.finalize(tokenizer)
+    assert sequence == tokenizer.encode_sequence("alpha")
+    assert feed.closed and feed._chunks == []
+    with pytest.raises(TokenizerContractError, match="already finalized"):
+        feed.finalize(tokenizer)
+    failing = StreamingTextFeed()
+    failing.push("beta")
+    def reject(_text):
+        raise TokenizerContractError("injected encoder failure")
+    monkeypatch.setattr(tokenizer, "encode_sequence", reject)
+    with pytest.raises(TokenizerContractError, match="injected encoder failure"):
+        failing.finalize(tokenizer)
+    assert failing.closed and failing._chunks == []
+
+
+def test_checkpoint_validates_bpe_unknown_id_and_live_identity(native_model):
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    tokenizer = NativeTokenizer(native_model)
+    checkpoint = tokenizer.checkpoint()
+    tokenizer.assert_checkpoint_matches(checkpoint)
+    with pytest.raises(TokenizerContractError, match="unknown-token"):
+        tokenizer.assert_checkpoint_matches({**checkpoint, "unknown_token_id": True})
+    with pytest.raises(TokenizerContractError, match="BPE"):
+        tokenizer.assert_checkpoint_matches({**checkpoint, "bpe": {"tampered": True}})
+    with pytest.raises(TokenizerContractError, match="mapping"):
+        tokenizer.assert_checkpoint_matches(None)
+    with pytest.raises(TokenizerContractError, match="vocabulary"):
+        tokenizer.assert_checkpoint_matches({**checkpoint, "vocabulary": 123})
+    with pytest.raises(TokenizerContractError, match="vocabulary"):
+        tokenizer.assert_checkpoint_matches({**checkpoint, "vocabulary": [None]})
+    original = native_model.unk
+    try:
+        native_model.unk = original + 1
+        with pytest.raises(TokenizerContractError):
+            tokenizer.checkpoint()
+    finally:
+        native_model.unk = original
+    try:
+        native_model.unk = None
+        with pytest.raises(TokenizerContractError, match="vocabulary changed"):
+            tokenizer.assert_unchanged()
+    finally:
+        native_model.unk = original
+
+
+def test_checkpoint_does_not_expose_mutable_bpe_snapshot(native_model):
+    from types import SimpleNamespace
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    native_model.bpe = SimpleNamespace(snapshot=lambda: {"nested": {"ranks": [1, 2]}})
+    tokenizer = NativeTokenizer(native_model)
+    checkpoint = tokenizer.checkpoint()
+    checkpoint["bpe"]["nested"]["ranks"].append(3)
+    with pytest.raises(TokenizerContractError, match="BPE"):
+        tokenizer.assert_checkpoint_matches(checkpoint)
+    assert tokenizer.checkpoint()["bpe"]["nested"]["ranks"] == [1, 2]
+
+
+def test_canonical_mode_requires_boolean():
+    from skeleton.ai.model_runtime.tokenization import TokenSequence, serialize_token_sequence, deserialize_token_sequence, TokenizerContractError
+    seq = TokenSequence("a" * 64, (1, 2), "a" * 64)
+    payload = serialize_token_sequence(seq)
+    for flag in (0, 1, None, "true", []):
+        with pytest.raises(TokenizerContractError, match="require_canonical must be a boolean"):
+            deserialize_token_sequence(payload, require_canonical=flag)
+    assert deserialize_token_sequence(payload, require_canonical=True) == seq
+
+
+def test_native_tokenizer_rejects_non_string_vocabulary_and_mutation(native_model):
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    original = native_model.itos
+    try:
+        native_model.itos = [None, *original[1:]]
+        with pytest.raises(TokenizerContractError, match="vocabulary"):
+            NativeTokenizer(native_model)
+    finally:
+        native_model.itos = original
+    tokenizer = NativeTokenizer(native_model)
+    try:
+        native_model.itos = [None, *original[1:]]
+        with pytest.raises(TokenizerContractError, match="vocabulary"):
+            tokenizer.encode_ids("a")
+        with pytest.raises(TokenizerContractError, match="vocabulary"):
+            tokenizer.decode_ids([0])
+    finally:
+        native_model.itos = original
+
+
+def test_native_tokenizer_rejects_special_id_type_mutation(native_model):
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    tokenizer = NativeTokenizer(native_model)
+    original = native_model.unk
+    try:
+        native_model.unk = True
+        with pytest.raises(TokenizerContractError, match="vocabulary changed"):
+            tokenizer.encode_ids("a")
+    finally:
+        native_model.unk = original
+    with pytest.raises(TokenizerContractError, match="invalid decode token container"):
+        tokenizer.decode_ids(None)
+
+
+def test_token_window_digest_and_batch_count_reject_type_confusion():
+    from skeleton.ai.model_runtime.tokenization import TokenWindow, TokenBatch, TokenizerContractError
+    with pytest.raises(TokenizerContractError, match="source sequence digest"):
+        TokenWindow(0, 1, (1,), None)
+    with pytest.raises(TokenizerContractError, match="source sequence digest"):
+        TokenWindow(0, 1, (1,), "A" * 64)
+    window = TokenWindow(0, 1, (1,), "a" * 64)
+    with pytest.raises(TokenizerContractError, match="accounting"):
+        TokenBatch((window,), True)
+    with pytest.raises(TokenizerContractError, match="accounting"):
+        TokenBatch((window,), 1.0)
+
+
+def test_native_tokenizer_detects_embedding_size_mutation(native_model):
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+    tokenizer = NativeTokenizer(native_model)
+    original = native_model.E
+    try:
+        native_model.E = original[:-1]
+        with pytest.raises(TokenizerContractError, match="embedding"):
+            tokenizer.encode_ids("test")
+        with pytest.raises(TokenizerContractError, match="embedding"):
+            tokenizer.checkpoint()
+    finally:
+        native_model.E = original

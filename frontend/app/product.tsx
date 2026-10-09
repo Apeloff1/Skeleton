@@ -137,6 +137,20 @@ export default function ProductShellRoute() {
           </View>
         </View>
 
+        <TouchableOpacity
+          testID="product-guided-journeys"
+          accessibilityRole="button"
+          accessibilityLabel="Open guided workflows and resume your work"
+          accessibilityHint="Connect creating, learning, game knowledge and Studio without losing your place"
+          onPress={() => router.push('/journeys' as never)}
+          style={styles.journeysBanner}
+        >
+          <View style={styles.journeysCopy}>
+            <Text style={styles.journeysTitle}>Build with guided workflows →</Text>
+            <Text style={styles.journeysText}>Research → create → refine → release. Choose a goal, select a build and resume across connected tools.</Text>
+          </View>
+        </TouchableOpacity>
+
         <View style={styles.healthPanel}>
           <View style={styles.healthHeader}>
             <View style={styles.healthCopy}>
@@ -323,6 +337,10 @@ const styles = StyleSheet.create({
   metric: { flex: 1, borderRadius: 14, backgroundColor: '#121827', paddingHorizontal: 12, paddingVertical: 12 },
   metricValue: { color: '#F8FAFC', fontSize: 16, fontWeight: '800' },
   metricLabel: { color: '#748096', fontSize: 10, marginTop: 3, textTransform: 'uppercase', letterSpacing: 0.7 },
+  journeysBanner: { borderRadius: 18, backgroundColor: '#24204B', borderColor: '#655CC5', borderWidth: 1, padding: 17, minHeight: 80, justifyContent: 'center' },
+  journeysCopy: { gap: 6 },
+  journeysTitle: { color: '#F8FAFC', fontSize: 17, fontWeight: '800' },
+  journeysText: { color: '#CBD0EE', fontSize: 12, lineHeight: 19 },
   healthPanel: { borderRadius: 18, borderWidth: 1, borderColor: '#202737', backgroundColor: '#0F141F', padding: 16, gap: 12 },
   healthHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   healthCopy: { flex: 1 },

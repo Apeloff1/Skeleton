@@ -10,7 +10,7 @@ import hashlib
 import json
 from typing import Iterable
 
-from .outbound_url import ResolvedDestination, resolve_public_https_url
+from .outbound_url import ResolvedDestination, resolve_public_https_url, validate_public_https_url
 
 
 class EgressControlError(ValueError):
@@ -118,6 +118,14 @@ def evaluate_egress(
     """Resolve under SSRF controls, then compare exact host/purpose policy."""
     if request.purpose.lower() not in policy.allowed_purposes:
         return EgressDecision(policy.digest,request.digest,False,"purpose_denied")
+    # Authenticate the destination against the explicit host allowlist before
+    # any DNS query. Disallowed hosts must not reach the resolver at all.
+    try:
+        _, host = validate_public_https_url(request.url, purpose="egress request")
+    except ValueError:
+        return EgressDecision(policy.digest,request.digest,False,"destination_invalid")
+    if host not in policy.allowed_hosts:
+        return EgressDecision(policy.digest,request.digest,False,"host_denied")
     try:
         destination=resolve_public_https_url(
             request.url,
@@ -126,6 +134,4 @@ def evaluate_egress(
         )
     except ValueError:
         return EgressDecision(policy.digest,request.digest,False,"destination_invalid")
-    if destination.host.lower() not in policy.allowed_hosts:
-        return EgressDecision(policy.digest,request.digest,False,"host_denied")
     return EgressDecision(policy.digest,request.digest,True,"authorized",destination)
