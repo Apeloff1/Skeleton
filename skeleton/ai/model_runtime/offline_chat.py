@@ -24,7 +24,7 @@ import time
 from typing import Any, Iterator
 
 from .chat_engine import NativeChatEngine
-from .chat_protocol import ChatTranscript
+from .chat_protocol import ChatTranscript, MAX_MESSAGES
 from .native_llm_runtime import NativeLLMRuntime
 from .runtime_checkpoint import MAX_CHECKPOINT_BYTES
 from .runtime_contracts import GenerationConfig, RuntimeContractError
@@ -595,6 +595,21 @@ class OfflineChatStore:
             row, session_id, request_id, request_digest, replayed=True
         )
 
+    @staticmethod
+    def ensure_can_append(session: StoredChat) -> None:
+        """Preflight full-history room before spending CPU on a model turn.
+
+        The ChatTranscript capacity includes optional system instructions.
+        Model work must never begin if its result cannot be durably appended.
+        """
+        if not isinstance(session, StoredChat):
+            raise RuntimeContractError("offline session snapshot required")
+        if (session.revision >= MAX_EXPORTED_TURNS
+                or len(session.transcript.messages) + 2 > MAX_MESSAGES):
+            raise RuntimeContractError(
+                "offline conversation has reached its durable turn capacity"
+            )
+
     def commit(self, *, session: StoredChat, request_id: str,
                request_digest: str, transcript: ChatTranscript, text: str,
                output_digest: str, prompt_tokens: int,
@@ -604,8 +619,7 @@ class OfflineChatStore:
                 or not text.strip()):
             raise RuntimeContractError("invalid completed native chat result")
         transcript.validate_turn_order()
-        if session.revision >= MAX_EXPORTED_TURNS:
-            raise RuntimeContractError("stored conversation has reached turn limit")
+        self.ensure_can_append(session)
         prior = session.transcript.messages
         next_messages = transcript.messages
         if (
@@ -702,6 +716,7 @@ class OfflineChatProduct:
         old = self.store.replay(session_id, rid, request_digest)
         if old is not None:
             return old
+        self.store.ensure_can_append(session)
         # The engine owns token budgets, role framing and inference. On an
         # exception the store is never touched.
         result = self.engine.turn(session.transcript, message, config)
