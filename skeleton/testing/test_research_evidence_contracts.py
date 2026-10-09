@@ -108,3 +108,14 @@ class ResearchEvidenceContractTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+    def test_required_evidence_text_rejects_unpaired_unicode_surrogates(self) -> None:
+        for invalid in (chr(0xD800), chr(0xDFFF)):
+            with self.subTest(codepoint=ord(invalid)), self.assertRaises(ResearchError):
+                ResearchQuestion(
+                    question_id=invalid,
+                    question="A valid question",
+                    scope="bounded pilot",
+                    limitations=("known limitation",),
+                )
