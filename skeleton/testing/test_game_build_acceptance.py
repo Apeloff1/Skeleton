@@ -24,7 +24,7 @@ def test_all_implemented_game_outputs_are_executed_not_just_generated():
     assert one["native_preview"]["terminal_won"] is True
     assert one["native_preview"]["frames_verified"] >= 16
     assert one["all_implemented_gameplay_outputs_executed"] is True
-    assert one["full_166_platform_release_completion"] is False
+    assert one["all_platform_releases_completed"] is False
     assert one["full_legal_publication_signoff"] is False
     assert one["training_examples_added"] == 0
     assert one["portable_c89"]["proprietary_sdk_used"] is False
@@ -59,7 +59,7 @@ def test_aggregate_game_acceptance_cli_emits_only_passed_receipts(capsys):
     assert report["portable_c89"]["compiled_and_actually_won"] is True
     assert report["chip8_original_rom"]["win_state_reached"] is True
     assert report["native_preview"]["terminal_won"] is True
-    assert report["full_166_platform_release_completion"] is False
+    assert report["all_platform_releases_completed"] is False
 
 
 def test_acceptance_does_not_load_licenses_roms_or_training_data():
