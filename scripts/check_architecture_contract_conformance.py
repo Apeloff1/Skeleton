@@ -55,15 +55,25 @@ def _strict_json(text: str) -> Any:
     return value
 
 
-def _validate_portable_scalars(value: Any) -> None:
+def _validate_portable_scalars(value: Any, *, _depth: int = 0) -> None:
+    # Independent vector replayers apply the same portable JSON limits
+    # without importing or trusting the canonical serializer.
+    if _depth > 64:
+        raise ValueError("canonical JSON nesting depth exceeded")
     if isinstance(value, dict):
-        for child in value.values():
-            _validate_portable_scalars(child)
+        for key, child in value.items():
+            if any(0xD800 <= ord(char) <= 0xDFFF for char in key):
+                raise ValueError("unpaired Unicode surrogate key")
+            _validate_portable_scalars(child, _depth=_depth + 1)
         return
     if isinstance(value, list):
         for child in value:
-            _validate_portable_scalars(child)
+            _validate_portable_scalars(child, _depth=_depth + 1)
         return
+    if isinstance(value, str) and any(
+        0xD800 <= ord(char) <= 0xDFFF for char in value
+    ):
+        raise ValueError("unpaired Unicode surrogate value")
     if type(value) is int and abs(value) > 9_007_199_254_740_991:
         raise ValueError("integer exceeds portable JSON range")
     if type(value) is float:
