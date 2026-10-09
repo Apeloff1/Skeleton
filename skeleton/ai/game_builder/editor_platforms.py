@@ -8,8 +8,12 @@ from __future__ import annotations
 from .platform_registry import PlatformProfile, PlatformRegistry, PlatformRegistryError, default_registry
 from .port_planner import PortMode
 
+# These adapters generate genuine SDL2/C11 source only, NOT verified executable builds.
+_NATIVE_SOURCE_TARGETS = frozenset({"windows_modern", "linux_desktop", "macos_modern"})
+
 
 def _option(profile: PlatformProfile, *, as_source: bool) -> dict[str, object]:
+    source_ready = profile.id in _NATIVE_SOURCE_TARGETS
     return {
         "id": profile.id,
         "label": profile.name,
@@ -22,7 +26,12 @@ def _option(profile: PlatformProfile, *, as_source: bool) -> dict[str, object]:
         "design_tier": profile.tier,
         "constraints": list(profile.constraints),
         "planned_native_format": profile.artifact,
-        "capability_status": "design_catalogue_only",
+        "capability_status": "native_source_project_only" if source_ready else "design_catalogue_only",
+        "native_source_project_available": source_ready,
+        "native_source_project_kind": "sdl2_c11_cmake" if source_ready else None,
+        "native_binary_built": False,
+        "native_gameplay_run_verified": False,
+        "distribution_licensed": False,
         "verified_native_exporter": False,
         "may_select_for_original_homebrew": True,
         "commercial_game_import_allowed": False,
@@ -81,6 +90,8 @@ def editor_portability_context(
             "transformation": operation,
             "design_reachable": True,
             "native_export_verified": False,
+            "native_source_project_available": target.id in _NATIVE_SOURCE_TARGETS,
+            "native_source_project_kind": "sdl2_c11_cmake" if target.id in _NATIVE_SOURCE_TARGETS else None,
             "source_style_retained_as_requirement": True,
         })
     return {
@@ -89,6 +100,7 @@ def editor_portability_context(
         "source_constraints": list(source.constraints),
         "possible_destination_count": len(targets),
         "native_export_destination_count": 0,
+        "native_source_project_destination_count": len(_NATIVE_SOURCE_TARGETS & set(catalog.profiles)),
         "rights_policy": "original_or_cleared_homebrew_only",
         "modes": [mode.value for mode in PortMode],
         "targets": targets,
@@ -111,6 +123,14 @@ def editor_platform_form(*, registry: PlatformRegistry | None = None) -> dict[st
             {"value": PortMode.CROSS_HYBRID.value, "label": "Original, independently cleared two-source hybrid"},
         ],
         "export_status": "no_native_target_verified",
+        "source_export_status": "three_desktop_c11_source_exporters_unverified_binaries",
+        "native_source_project_destinations": sorted(_NATIVE_SOURCE_TARGETS & set(catalog.profiles)),
+        "native_source_export_requires": [
+            "generated_original_playable_world",
+            "matching_cleared_homebrew_source",
+            "explicit_authorization",
+            "independent_target_specific_compilation_and_gameplay_acceptance",
+        ],
         "mandatory_inputs": [
             "owned_or_licensed_homebrew_project",
             "independently_reviewed_rights_evidence",
