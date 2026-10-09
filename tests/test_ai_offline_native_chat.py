@@ -333,6 +333,44 @@ class OfflineNativeChatTests(unittest.TestCase):
             self.store.load(sid, self.product.model_digest,
                             self.product.tokenizer_digest)
 
+    def test_complete_history_capacity_rejected_before_model_inference(self):
+        # Deterministically construct a valid, fully receipted 1,024-turn
+        # conversation without spending CPU on 1,024 model generations.
+        from skeleton.ai.model_runtime.chat_protocol import ChatMessage, ChatTranscript
+        sid = self.product.create()
+        messages = tuple(
+            message
+            for index in range(1024)
+            for message in (
+                ChatMessage("user", f"question-{index}"),
+                ChatMessage("assistant", f"answer-{index}"),
+            )
+        )
+        transcript = ChatTranscript(messages)
+        with self.store._transaction():
+            self.store._db.execute(
+                "UPDATE offline_sessions SET revision=?, transcript_json=? WHERE session_id=?",
+                (1024, transcript.to_json(), sid),
+            )
+            self.store._db.executemany(
+                "INSERT INTO offline_turns VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                [(sid, f"turn-{i}", "a" * 64, i + 1,
+                  f"answer-{i}", "b" * 64, 3, 1)
+                 for i in range(1024)],
+            )
+        self.assertEqual(self.store.load(
+            sid, self.product.model_digest, self.product.tokenizer_digest
+        ).revision, 1024)
+        with patch.object(self.engine, "turn") as generate:
+            with self.assertRaisesRegex(RuntimeContractError, "turn capacity"):
+                self.product.turn(
+                    sid, "one-more-question", self.config, request_id="excess"
+                )
+            generate.assert_not_called()
+        self.assertEqual(self.store.load(
+            sid, self.product.model_digest, self.product.tokenizer_digest
+        ).revision, 1024)
+
     def test_same_revision_changed_prior_transcript_is_not_silently_overwritten(self):
         sid = self.product.create(system="original-system")
         snapshot = self.store.load(
