@@ -149,6 +149,26 @@ class TestLocalTranscript(unittest.TestCase):
                 )), 4,
             )
 
+    def test_cannot_replace_checkpoint_or_other_model_chat(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "checkpoint.json"
+            path.write_text('{"schema":"native-checkpoint","weights":[]}', encoding="utf-8")
+            before = path.read_bytes()
+            with self.assertRaises(LocalTranscriptError):
+                save_transcript(path, model_digest=MODEL, tokenizer_digest=TOKENIZER, history=HISTORY)
+            self.assertEqual(path.read_bytes(), before)
+            other_path = Path(d) / "other.json"
+            save_transcript(other_path, model_digest="c"*64, tokenizer_digest=TOKENIZER, history=HISTORY)
+            before = other_path.read_bytes()
+            with self.assertRaisesRegex(LocalTranscriptError, "different model"):
+                save_transcript(other_path, model_digest=MODEL, tokenizer_digest=TOKENIZER, history=HISTORY)
+            self.assertEqual(other_path.read_bytes(), before)
+
+    def test_malformed_deep_json_is_rejected_without_recursion_escape(self) -> None:
+        invalid = (b"[" * 1500) + b"0" + (b"]" * 1500)
+        with self.assertRaises(LocalTranscriptError):
+            decode_transcript(invalid, model_digest=MODEL, tokenizer_digest=TOKENIZER)
+
     def test_cli_refuses_unbound_chat_options(self) -> None:
         from skeleton.app.cli import run_app_cli
         for option in ("--load-chat", "--save-chat"):
