@@ -58,6 +58,14 @@ The game being exclusive to one historic hardware system does **not** mean that 
 
 **Legal references:** [Norwegian Copyright Act](https://lovdata.no/lov/2018-06-15-40), [EU Software Directive 2009/24/EC](https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32009L0024), [CJEU Cofemel C-683/17](https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:62017CJ0683), [17 U.S.C. § 102](https://www.govinfo.gov/content/pkg/USCODE-2024-title17/html/USCODE-2024-title17-chap1-sec102.htm), [US Copyright Office — game registration](https://www.copyright.gov/register/tx-games.html). Cite applicable current law and have legal counsel review specific disputes.
 
+## Real author credits and third-party notice artifacts
+
+`asset_credits.compile_game_credits()` now generates deterministic **CREDITS.md**, **THIRD_PARTY_NOTICES.txt**, and **material_inventory.json** from the same project-specific `MaterialRecord` declarations and additional `AttributionEntry` information.
+
+It enforces a one-to-one disclosure for every third-party included component, requires the proposed license name and source rights evidence, flags missing attribution and license text, and prevents unknown or unlicensed protected assets from being buried in a CREDITS file. It includes the author, attributed source title, applicable license declaration, license URL, license-text SHA-256, adapted-use description, destination medium and separate permission evidence. Detected copyleft, share-alike, non-commercial or no-derivative terms require **separate license compatibility/legal review**; no simple pattern match can certify compatibility.
+
+`asset_credits.export_game_credits()` writes the actual files to a new directory without replacing existing notices. Authorship assertions and claimed permission evidence require **independent verification** and cannot grant release authorization. The notes remain part of the game's auditable rights chain and can be attached to the distribution review without copying proprietary art, game executables or ROMs.
+
 ## Remediation and operations
 
 1. Generate an original game and its actual target binary from legitimate homebrew source.
