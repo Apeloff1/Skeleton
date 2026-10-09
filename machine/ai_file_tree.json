@@ -1343,7 +1343,17 @@
         "contracts/quality_delta.schema.json",
         "contracts/rights_fingerprint.schema.json",
         "contracts/rival_challenger.schema.json",
-        "contracts/rival_proposer.schema.json"
+        "contracts/rival_proposer.schema.json",
+        "contracts/rival_verifier.schema.json",
+        "contracts/source_provenance.schema.json",
+        "contracts/stop_policy.schema.json",
+        "flgb_forge_runtime.py",
+        "forge_10000_cycle.py",
+        "forge_1000_cycle.py",
+        "forge_100_cycle.py",
+        "promotion_arbitration.py",
+        "quality_delta.py",
+        "rights_fingerprint.py"
       ]
     },
     {
@@ -5047,17 +5057,25 @@
         "VOL-139"
       ],
       "overlay_children": [
-        "chronicle",
         "admission.py",
         "algorithm_lifecycle.py",
         "archive.py",
         "attestation.py",
+        "chronicle",
         "commitments.py",
         "crypto_backends.py",
         "crypto_inventory.py",
         "execution_receipt.py",
         "horizon_assessment.py",
-        "horizon_signals.py"
+        "horizon_signals.py",
+        "key_lifecycle.py",
+        "portable_bundle.py",
+        "quorum.py",
+        "receipt_migration.py",
+        "runtime_bridge.py",
+        "signature_capabilities.py",
+        "signed_envelope.py",
+        "trust_policy.py"
       ],
       "move_tags": [
         "ai-tree:mapped",
@@ -5423,7 +5441,17 @@
         "contracts/adapter_training.schema.json",
         "contracts/candidate_weights.schema.json",
         "contracts/checkpoint_lineage.schema.json",
-        "contracts/contamination_scan.schema.json"
+        "contracts/contamination_scan.schema.json",
+        "contracts/dataset_lineage.schema.json",
+        "contracts/dataset_rights.schema.json",
+        "contracts/deduplication.schema.json",
+        "contracts/distillation.schema.json",
+        "contracts/mirror_room_evaluation.schema.json",
+        "contracts/post_training.schema.json",
+        "contracts/promotion_gate.schema.json",
+        "contracts/training_manifest.schema.json",
+        "dataset_lineage.py",
+        "dataset_rights.py"
       ]
     },
     {
