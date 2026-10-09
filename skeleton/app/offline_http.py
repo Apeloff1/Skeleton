@@ -312,6 +312,13 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
         self._json(error.status, {"error": str(error)})
 
     def _validate_host(self) -> None:
+        # Duplicate Host, Content-Length, Origin, Authorization or Transfer-
+        # Encoding headers are rejected before routing. No ambiguous message
+        # framing, split bearer credentials or DNS rebinding.
+        for name in ("Host", "Content-Length", "Origin", "Authorization",
+                     "Transfer-Encoding"):
+            if len(self.headers.get_all(name, [])) > 1:
+                raise OfflineHTTPError(400, "duplicate HTTP control header")
         expected = {f"127.0.0.1:{self.server.server_port}",
                     f"localhost:{self.server.server_port}"}
         host = self.headers.get("Host", "")
@@ -392,6 +399,22 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
 
     def do_DELETE(self):  # noqa: N802
         self._handle("DELETE")
+
+    def do_HEAD(self):  # noqa: N802
+        self.close_connection = True
+        self.send_response(405)
+        self.send_header("Content-Length", "0")
+        self.send_header("Connection", "close")
+        self.end_headers()
+
+    def do_OPTIONS(self):  # noqa: N802
+        self._handle("OPTIONS")
+
+    def do_PUT(self):  # noqa: N802
+        self._handle("PUT")
+
+    def do_PATCH(self):  # noqa: N802
+        self._handle("PATCH")
 
 
 def create_token_file(path: str | Path, *, token: str | None = None) -> str:
