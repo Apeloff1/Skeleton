@@ -17,8 +17,8 @@ import sqlite3
 import threading
 from typing import Any, Protocol
 
-from .offline_sqlite_safety import check_sqlite_companion_paths, UnsafeOfflineSqlitePath
 from .offline_history import _history, _canonical, _model_digest, MAX_BACKUP_BYTES
+from .offline_sqlite_safety import check_sqlite_companion_paths, UnsafeOfflineSqlitePath
 
 
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
