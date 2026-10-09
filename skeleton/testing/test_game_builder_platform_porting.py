@@ -251,3 +251,34 @@ def test_native_desktop_export_is_rights_bound_and_platform_specific():
         compile_native_desktop(world, original(), "linux_desktop", authorized=True)
     with pytest.raises(PermissionError):
         compile_native_desktop(world, source, "windows_modern", authorized=False)
+
+
+def test_native_desktop_exports_a_exact_three_level_replay_without_html() -> None:
+    intent = GameBuildIntent(
+        project_id="native-acceptance", title="Original Star Routes",
+        subtitle="Real C replay", seed=71368, width=17, height=15,
+        levels=3, collectibles_per_level=3, hazards_per_level=5,
+        starting_health=4, theme="space",
+    )
+    world = generate_playable_world(intent, authorized=True)
+    source = original("native-acceptance", "bandai_wonderswan")
+    project = compile_native_desktop(world, source, "linux_desktop", authorized=True)
+    c = project.game_c
+    manifest = json.loads(project.manifest_json)
+    assert c.count("static int verify_replay(void)") == 1
+    assert 'strcmp(argv[1], "--verify-replay")' in c
+    assert "SKELETON_NATIVE_REPLAY_OK" in c
+    assert "static const char *const verification_routes[LEVEL_COUNT]" in c
+    assert not any(token in c for token in (
+        "__REPLAY_DATA__", "__REPLAY_STEPS__", "__REPLAY_SCORE__", "__LEVEL_COUNT__",
+    ))
+    assert "SDL_CreateWindow" in c and "<html" not in c
+    expected_steps = sum(len(level.safe_solution) for level in world.levels)
+    assert manifest["native_replay_expected_steps"] == expected_steps
+    assert manifest["native_replay_expected_score"] == 3 * (100 + 10 * 3)
+    assert manifest["native_headless_replay_available"] is True
+    assert manifest["native_headless_replay_executed"] is False
+    assert manifest["executable_built"] is False
+    # Source generation is not gameplay execution, binary verification or release approval.
+    assert not project.binary_verified
+    assert not manifest["releasable"]
