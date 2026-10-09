@@ -242,6 +242,9 @@ __all__ = [
 from importlib import import_module as _game_builder_import_module
 
 _KNOWLEDGE_EXPORTS = {
+    "EvolutionPractice": ".evolution_practice",
+    "EvolutionPracticePack": ".evolution_practice",
+    "practice_evolution_games": ".evolution_practice",
     "MachineArchiveError": ".archive_import",
     "MachineRecord": ".archive_import",
     "MachineSnapshot": ".archive_import",
