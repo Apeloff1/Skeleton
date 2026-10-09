@@ -42,7 +42,7 @@ def test_six_additional_gameplay_capabilities_are_installed_without_model():
         "game.platformer_step", "game.platformer_replay",
         "game.tile_line_of_sight",
     }
-    assert len(OPERATIONS) == 30
+    assert len(OPERATIONS) == 31
     assert set(GAMEPLAY_OPERATIONS).issubset(OPERATIONS)
     for name in GAMEPLAY_OPERATIONS:
         assert callable(OPERATIONS[name])
