@@ -16,6 +16,7 @@ import sqlite3
 import stat
 import threading
 from typing import Callable
+
 from .offline_sqlite_safety import check_sqlite_companion_paths, UnsafeOfflineSqlitePath
 
 
