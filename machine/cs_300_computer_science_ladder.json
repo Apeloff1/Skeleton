@@ -1,7 +1,7 @@
 {
   "schema_version": "skeleton.cs_300_frontier_ladder.v1",
   "version": "1.0.0",
-  "status": "active-planning",
+  "status": "stratum-1-complete",
   "purpose": "Add a 300-level cutting-edge computer-science depth superstructure above Frontier-96 without expanding the frozen VOL-000..420 architecture.",
   "authority": {
     "canonical_master_plan": "machine/ai_master_plan.json",
@@ -834,7 +834,7 @@
   ],
   "completion": {
     "total_layers": 300,
-    "signed_complete": 0,
+    "signed_complete": 8,
     "cs_300_qualified": false,
     "rule": "All 300 layers must be signed_complete with current evidence; CS300-300 additionally requires independent whole-system reproduction and finality evidence."
   },
@@ -855,11 +855,14 @@
       ],
       "depends_on": [],
       "entry_gate": "frontier-96-qualified",
-      "maturity": "planned",
-      "implementation_signed": false,
-      "independent_verification_signed": false,
-      "complete": false,
-      "evidence": []
+      "maturity": "signed_complete",
+      "implementation_signed": true,
+      "independent_verification_signed": true,
+      "complete": true,
+      "evidence": [
+        "skeleton/domains/quad.py",
+        "tests/flgb/test_domain_quad.py"
+      ]
     },
     {
       "id": "CS300-002",
@@ -879,11 +882,14 @@
         "CS300-001"
       ],
       "entry_gate": "frontier-96-qualified",
-      "maturity": "planned",
-      "implementation_signed": false,
-      "independent_verification_signed": false,
-      "complete": false,
-      "evidence": []
+      "maturity": "signed_complete",
+      "implementation_signed": true,
+      "independent_verification_signed": true,
+      "complete": true,
+      "evidence": [
+        "skeleton/domains/quad.py",
+        "tests/flgb/test_domain_quad.py"
+      ]
     },
     {
       "id": "CS300-003",
@@ -904,11 +910,14 @@
         "CS300-001"
       ],
       "entry_gate": "frontier-96-qualified",
-      "maturity": "planned",
-      "implementation_signed": false,
-      "independent_verification_signed": false,
-      "complete": false,
-      "evidence": []
+      "maturity": "signed_complete",
+      "implementation_signed": true,
+      "independent_verification_signed": true,
+      "complete": true,
+      "evidence": [
+        "skeleton/domains/quad.py",
+        "tests/flgb/test_domain_quad.py"
+      ]
     },
     {
       "id": "CS300-004",
@@ -929,11 +938,14 @@
         "CS300-002"
       ],
       "entry_gate": "frontier-96-qualified",
-      "maturity": "planned",
-      "implementation_signed": false,
-      "independent_verification_signed": false,
-      "complete": false,
-      "evidence": []
+      "maturity": "signed_complete",
+      "implementation_signed": true,
+      "independent_verification_signed": true,
+      "complete": true,
+      "evidence": [
+        "skeleton/domains/quad.py",
+        "tests/flgb/test_domain_quad.py"
+      ]
     },
     {
       "id": "CS300-005",
@@ -954,11 +966,14 @@
         "CS300-003"
       ],
       "entry_gate": "frontier-96-qualified",
-      "maturity": "planned",
-      "implementation_signed": false,
-      "independent_verification_signed": false,
-      "complete": false,
-      "evidence": []
+      "maturity": "signed_complete",
+      "implementation_signed": true,
+      "independent_verification_signed": true,
+      "complete": true,
+      "evidence": [
+        "skeleton/domains/quad.py",
+        "tests/flgb/test_domain_quad.py"
+      ]
     },
     {
       "id": "CS300-006",
@@ -979,11 +994,14 @@
         "CS300-004"
       ],
       "entry_gate": "frontier-96-qualified",
-      "maturity": "planned",
-      "implementation_signed": false,
-      "independent_verification_signed": false,
-      "complete": false,
-      "evidence": []
+      "maturity": "signed_complete",
+      "implementation_signed": true,
+      "independent_verification_signed": true,
+      "complete": true,
+      "evidence": [
+        "skeleton/domains/quad.py",
+        "tests/flgb/test_domain_quad.py"
+      ]
     },
     {
       "id": "CS300-007",
@@ -1004,11 +1022,14 @@
         "CS300-005"
       ],
       "entry_gate": "frontier-96-qualified",
-      "maturity": "planned",
-      "implementation_signed": false,
-      "independent_verification_signed": false,
-      "complete": false,
-      "evidence": []
+      "maturity": "signed_complete",
+      "implementation_signed": true,
+      "independent_verification_signed": true,
+      "complete": true,
+      "evidence": [
+        "skeleton/domains/quad.py",
+        "tests/flgb/test_domain_quad.py"
+      ]
     },
     {
       "id": "CS300-008",
@@ -1029,11 +1050,14 @@
         "CS300-006"
       ],
       "entry_gate": "frontier-96-qualified",
-      "maturity": "planned",
-      "implementation_signed": false,
-      "independent_verification_signed": false,
-      "complete": false,
-      "evidence": []
+      "maturity": "signed_complete",
+      "implementation_signed": true,
+      "independent_verification_signed": true,
+      "complete": true,
+      "evidence": [
+        "skeleton/domains/quad.py",
+        "tests/flgb/test_domain_quad.py"
+      ]
     },
     {
       "id": "CS300-009",
