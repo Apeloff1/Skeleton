@@ -1,6 +1,6 @@
 from __future__ import annotations
 import hashlib,pytest
-from skeleton.ai.research import *
+from skeleton.ai.research.contracts import *
 S=lambda x:hashlib.sha256(x.encode()).hexdigest()
 def node(i="EVID.1",out=Outcome.SUPPORTS): return EvidenceNode(i,"SOURCE.1",S("source"),"controlled benchmark",("CLAIM.1",),out)
 def test_question_requires_scope_and_limitations():
