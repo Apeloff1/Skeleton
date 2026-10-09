@@ -219,3 +219,44 @@ This is the executable bridge between the dated game history archive,
 the platform selector, the playable-world engine, the rights-gated
 porting system and actual native-machine game sources. New archive
 entries cannot inflate the count of qualified native backends.
+
+
+## Executable homebrew upgrades: Commodore 64 and emulated Game Boy gameplay
+
+A further native adapter, `c64_native_export.py`, now emits **original
+Commodore 64 6510 programs** rather than NES binaries repackaged for 8-bit
+computers. Its hardware backend directly addresses the VIC-II 40×25 text
+screen, color RAM, CIA joystick port 2, raster register and SID sound
+registers. Every generated maze tile, starting location, item, hazard and
+exit comes from the verified independently authored game world. Levels,
+health, scoring, input-driven movement and original synthesized sound
+are runtime mechanics, not static design annotations.
+
+`Game Builder Native C64 PRG` runs the actual cc65 C64 compiler/linker
+against the source project, checks the $0801 load address, BASIC SYS
+launcher and output hash, and stores the loadable `.prg` as a GitHub
+artifact. As with other targets, a passing compilation is **not**
+a claim that VICE emulation, physical 6510 hardware or distribution
+approval has passed.
+
+For the Game Boy DMG backend, the new
+`game_boy_memory_replay.py` builds a per-input independent reference
+from the original generated maze and winning route. The
+`scripts/game_builder/emulate_game_boy_ci.py` tool is designed
+to run the actual assembled cartridge inside PyBoy, press and release
+each D-pad input, and compare real emulated WRAM bytes for player
+coordinates, current level, health, crystal count, score, win and loss.
+It reads real linker-produced symbols rather than guessing absolute
+WRAM addresses. Any divergent controller response, wrong level
+transition, phantom victory or missing collectible makes the gate fail.
+The underlying authoring manifest cannot mark emulator verification
+passed merely by having supplied a reference trace.
+
+The editor/export selector now distinguishes **six candidate native-source
+destinations** (three desktop SDL2 targets, original Game Boy ROM,
+original NES ROM, and original C64 PRG). Everything else in the
+historical catalogue remains a design/planning target until a
+machine-specific compiler adapter and acceptance process are implemented.
+The existing archive and original-game rights controls apply to
+these additions. Neither platform inspiration nor a binary header
+constitutes a right to redistribute copyrighted commercial games.
