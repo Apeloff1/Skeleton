@@ -213,6 +213,43 @@ jobs:
             throw "expected two bound local generation receipts"
           }
 
+          # Exercise genuine model-free capabilities from the INSTALLED
+          # executable. This must not need a model, Python or external I/O.
+          $capabilityCatalogJson = & $offline --capability-list --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed offline deterministic capability catalog failed"
+          }
+          $capabilityCatalog = $capabilityCatalogJson | ConvertFrom-Json
+          if ($capabilityCatalog.operations.Count -ne 24 -or
+              $capabilityCatalog.training_examples_required -ne 0 -or
+              $capabilityCatalog.executor_authority_granted) {
+            throw "installed capability catalog contract mismatch"
+          }
+          $capabilityTask = Join-Path $env:RUNNER_TEMP "SkeletonOfflineCapability.json"
+          '{"operation":"grid.shortest_path","args":{"start":{"x":0,"y":0},"goal":{"x":3,"y":0},"width":4,"height":4,"blocked":[{"x":1,"y":0},{"x":2,"y":0}]}}' |
+            Set-Content -LiteralPath $capabilityTask -Encoding utf8
+          $capabilityReportJson = & $offline --capability-file $capabilityTask --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed frozen console failed model-free pathfinding"
+          }
+          $capabilityReport = $capabilityReportJson | ConvertFrom-Json
+          if ($capabilityReport.operation -ne "grid.shortest_path" -or
+              -not $capabilityReport.result.reachable -or
+              $capabilityReport.result.steps -ne 5 -or
+              $capabilityReport.result.path.Count -ne 6 -or
+              $capabilityReport.model_inference_used -or
+              $capabilityReport.network_access_used -or
+              $capabilityReport.authority_granted) {
+            throw "model-free installed runtime capability result was not valid"
+          }
+          '{"operation":"math.add","operation":"math.multiply","args":{"a":1,"b":2}}' |
+            Set-Content -LiteralPath $capabilityTask -Encoding utf8
+          $null = & $offline --capability-file $capabilityTask --json 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            throw "installed deterministic capability accepted ambiguous duplicate JSON"
+          }
+
+
 
           # Exercise the installed console's actual local knowledge, durable
           # queue and portable database recovery without external Python.
