@@ -187,6 +187,7 @@ $OfflinePyInstallerArgs = @(
     "--hidden-import", "skeleton.ai.runtime.deterministic_capabilities",
     "--hidden-import", "skeleton.ai.runtime.capability_graph",
     "--hidden-import", "skeleton.ai.runtime.gameplay_capabilities",
+    "--hidden-import", "skeleton.app.offline_game_preview",
     "--hidden-import", "skeleton.ai.runtime.inference.local",
     "--hidden-import", "skeleton.ai.runtime.inference.native_runtime",
     "--hidden-import", "skeleton.ai.runtime.inference.llama_cpp",
