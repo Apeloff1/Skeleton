@@ -58,17 +58,24 @@ def benchmark(args: argparse.Namespace) -> dict[str, object]:
     reference = TinyTransformer.from_snapshot(model.snapshot())
     expected = reference._logits(prompt)
     kv_dtype = getattr(args, "kv_dtype", "fp32")
+    prefill_query_chunk = getattr(args, "prefill_query_chunk", None)
+    if prefill_query_chunk is not None and (
+        prefill_query_chunk < 1 or prefill_query_chunk > args.context
+    ):
+        raise ValueError("prefill_query_chunk must fit selected context")
     kv_limit_mib = getattr(args, "kv_limit_mib", None)
     if kv_limit_mib is not None and kv_limit_mib < 1:
         raise ValueError("kv_limit_mib must be a positive integer")
     if args.device == "cpu" and (
         kv_dtype != "fp32" or kv_limit_mib is not None
+        or prefill_query_chunk is not None
     ):
         raise ValueError("KV precision and allocation caps require a Torch accelerator")
     model.to(
         args.device,
         kv_dtype=kv_dtype,
         max_kv_bytes=kv_limit_mib * (1024 ** 2) if kv_limit_mib else None,
+        prefill_query_chunk=prefill_query_chunk,
     )
     expected_accel = {
         "cuda": "cuda",
@@ -84,7 +91,10 @@ def benchmark(args: argparse.Namespace) -> dict[str, object]:
             f"device {args.device} unavailable; refusing to benchmark fallback as requested hardware"
         )
 
-    if (kv_dtype != "fp32" or kv_limit_mib is not None) and model._accel is None:
+    if (
+        kv_dtype != "fp32" or kv_limit_mib is not None
+        or prefill_query_chunk is not None
+    ) and model._accel is None:
         raise RuntimeError("requested Torch KV precision/budget unavailable on selected device")
 
     prefill_ms: list[float] = []
@@ -134,6 +144,7 @@ def benchmark(args: argparse.Namespace) -> dict[str, object]:
         "resident": model.resident,
         "kv_dtype": kv_dtype,
         "kv_limit_mib": kv_limit_mib,
+        "prefill_query_chunk": prefill_query_chunk,
         "architecture": {
             "dim": model.dim, "heads": model.n_heads,
             "layers": model.n_layers, "context": model.ctx,
@@ -181,6 +192,8 @@ def main() -> None:
                         default="rope")
     parser.add_argument("--kv-dtype", choices=("fp32", "fp16", "bf16"),
                         default="fp32")
+    parser.add_argument("--prefill-query-chunk", type=int, default=None,
+                        help="opt-in bounded SDPA query tiles for long prompts")
     parser.add_argument("--kv-limit-mib", type=int, default=None,
                         help="hard Torch KV allocation ceiling in mebibytes")
     parser.add_argument("--assert-parity", action="store_true")
