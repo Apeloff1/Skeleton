@@ -1,0 +1,75 @@
+name: Game Builder Native DOS 8086 COM
+
+on:
+  pull_request:
+    paths:
+      - 'skeleton/ai/game_builder/**'
+      - 'scripts/game_builder/native_dos_ci.py'
+      - '.github/workflows/game-builder-native-dos.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: game-builder-dos-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  original-8086-game:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /skeleton/__init__.py
+            /skeleton/ai/__init__.py
+            /skeleton/ai/capability_map.py
+            /skeleton/ai/game_builder/
+            /scripts/game_builder/native_dos_ci.py
+            /skeleton/testing/test_game_builder_dos_native.py
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install authentic NASM 8086 binary assembler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends nasm make
+          nasm --version
+      - name: Assemble original multi-level DOS 8086 executable
+        env:
+          PYTHONPATH: .
+        run: |
+          set -euo pipefail
+          python scripts/game_builder/native_dos_ci.py --emit original-dos-src > original-dos-source-receipt.json
+          make -C original-dos-src
+          test -s original-dos-src/build/skeleton-original.com
+          python scripts/game_builder/native_dos_ci.py --verify-com original-dos-src/build/skeleton-original.com > original-dos-binary-receipt.json
+          python - <<'PY'
+          import json
+          data=json.load(open("original-dos-binary-receipt.json", encoding="utf-8"))
+          assert data["real_8086_program_header_verified"] is True
+          assert data["dos_emulator_playthrough_verified"] is False
+          print("ORIGINAL_DOS_8086_COM_COMPILED", data["sha256"])
+          PY
+      - name: Run hardware envelope and authorization regression
+        env:
+          PYTHONPATH: .
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+        run: |
+          python -m pip install --disable-pip-version-check "pytest>=8.4,<9"
+          python -m pytest -q --noconftest skeleton/testing/test_game_builder_dos_native.py
+      - name: Upload native 8086 DOS program and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: skeleton-original-dos-8086-game
+          path: |
+            original-dos-src/build/skeleton-original.com
+            original-dos-src/manifest.json
+            original-dos-source-receipt.json
+            original-dos-binary-receipt.json
+          if-no-files-found: error
+          retention-days: 7
