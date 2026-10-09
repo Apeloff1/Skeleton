@@ -58,6 +58,12 @@ def test_full_local_state_backup_and_restore(tmp_path: Path) -> None:
         assert store.search("physics")[0].relative_path == "physics.md"
     with OfflineIndexQueue(queue2) as store:
         assert len(store.list_jobs()) == 1
+        recovered_job = store.list_jobs()[0]
+        assert recovered_job.state == "cancelled"
+        assert "explicitly enqueue" in recovered_job.last_error
+        assert store.run_one() is None
+        with pytest.raises(Exception, match="terminal failed"):
+            store.retry(recovered_job.job_id)
 
 
 def test_live_sqlite_wal_is_saved_consistently(tmp_path: Path) -> None:
@@ -130,3 +136,45 @@ def test_console_snapshot_and_app_verify_and_restore(tmp_path: Path, capsys) -> 
     ]) == 0
     assert json.loads(capsys.readouterr().out)["action"] == "restored"
     assert (tmp_path / "new-chat.sqlite").is_file()
+
+
+def test_restored_queue_fences_old_device_paths_and_worker_leases(tmp_path: Path) -> None:
+    source = tmp_path / "old-notes"
+    source.mkdir()
+    (source / "old.md").write_text("original local content", encoding="utf-8")
+    library = tmp_path / "old-lib.sqlite"
+    with OfflineDocumentLibrary(library) as store:
+        store.index_directory(source)
+    queuefile = tmp_path / "old-queue.sqlite"
+    with OfflineIndexQueue(queuefile) as store:
+        pending = store.enqueue(source, library)
+        snapshot = tmp_path / "queue-backup"
+        create_snapshot(snapshot, queue=queuefile)
+        # A restored queue must not auto-run a job pointing to this old path.
+    recovered = tmp_path / "new-device-queue.sqlite"
+    restore_snapshot(snapshot, queue=recovered)
+    with OfflineIndexQueue(recovered) as store:
+        record = store.get(pending.job_id)
+        assert record.state == "cancelled"
+        assert store.run_one() is None
+        assert record.source == str(source.resolve())
+        assert record.library == str(library.resolve())
+        assert "restored queue" in record.last_error
+    # The original persisted queue is unchanged by a restore.
+    with OfflineIndexQueue(queuefile) as original:
+        assert original.get(pending.job_id).state == "queued"
+
+
+def test_restored_running_lease_is_quarantined_even_if_not_expired(tmp_path: Path) -> None:
+    _, _, queue = _example(tmp_path)
+    with OfflineIndexQueue(queue) as store:
+        claim = store._claim()
+        assert claim is not None
+        job_id = claim[0].job_id
+    archive = tmp_path / "busy-queue"
+    create_snapshot(archive, queue=queue)
+    restored = tmp_path / "busy-queue-restored.sqlite"
+    restore_snapshot(archive, queue=restored)
+    with OfflineIndexQueue(restored) as store:
+        assert store.get(job_id).state == "cancelled"
+        assert store.run_one() is None
