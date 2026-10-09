@@ -18,9 +18,7 @@
       "title": "Master Appendices",
       "plane": "frontier",
       "handler": "skeleton.ai.runtime.deferred.contracts.CapabilityRegistry",
-      "source_gaps": [
-        "independent reference-integrity evaluation remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "stale appendix overrides canonical source",
         "duplicate definitions"
@@ -43,9 +41,7 @@
       "title": "Tool SDK",
       "plane": "tool_security",
       "handler": "skeleton.ai.runtime.deferred.tooling_security.ToolSDK",
-      "source_gaps": [
-        "independent Tool SDK schema, authority-scope, idempotency, and invocation verification remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "tool self-authorizes",
         "schema drift"
@@ -68,9 +64,7 @@
       "title": "Connector Framework",
       "plane": "tool_security",
       "handler": "skeleton.ai.runtime.deferred.tooling_security.ConnectorContract",
-      "source_gaps": [
-        "independent connector scope/permission and lifecycle verification remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "scope escalation",
         "provider-specific leakage"
@@ -93,9 +87,7 @@
       "title": "Plugin Ecosystem",
       "plane": "tool_security",
       "handler": "skeleton.ai.runtime.deferred.tooling_security.PluginRegistry",
-      "source_gaps": [
-        "independent plugin-lifecycle and capability-integration verification remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "plugin privilege creep",
         "uninstall residue"
@@ -118,9 +110,7 @@
       "title": "Tool Marketplace Security",
       "plane": "tool_security",
       "handler": "skeleton.ai.runtime.deferred.tooling_security.PluginRegistry",
-      "source_gaps": [
-        "independent marketplace attestation, quarantine, and revocation verification remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "supply-chain compromise",
         "confused-deputy permissions"
@@ -143,9 +133,7 @@
       "title": "Policy Simulation",
       "plane": "tool_security",
       "handler": "skeleton.ai.runtime.deferred.tooling_security.PolicySimulator",
-      "source_gaps": [
-        "independent exact-head policy-simulation reconciliation remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "simulation differs from runtime",
         "biased trace corpus"
@@ -168,9 +156,7 @@
       "title": "Network Architecture",
       "plane": "tool_security",
       "handler": "skeleton.ai.runtime.deferred.tooling_security.NetworkPolicy",
-      "source_gaps": [
-        "independent network-topology, identity, and egress-policy verification remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "flat network trust",
         "retry storms"
@@ -193,9 +179,7 @@
       "title": "Secret Security",
       "plane": "tool_security",
       "handler": "skeleton.ai.runtime.deferred.tooling_security.SecretLease",
-      "source_gaps": [
-        "independent exact-head secret-handle/lifecycle verification remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "secret in prompt/log",
         "long-lived credentials"
@@ -218,9 +202,7 @@
       "title": "Key Management",
       "plane": "tool_security",
       "handler": "skeleton.ai.runtime.deferred.tooling_security.KeyRing",
-      "source_gaps": [
-        "independent exact-head key-version/rotation/restore verification remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "lost key",
         "revoked key remains trusted"
@@ -243,9 +225,7 @@
       "title": "Privacy Engine",
       "plane": "tool_security",
       "handler": "skeleton.ai.runtime.deferred.tooling_security.PrivacyLabel",
-      "source_gaps": [
-        "independent exact-head privacy-label propagation and purpose-boundary verification remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "classification loss",
         "secondary-use violation"
@@ -268,9 +248,7 @@
       "title": "Data Deletion",
       "plane": "tool_security",
       "handler": "skeleton.ai.runtime.deferred.tooling_security.DeletionGraph",
-      "source_gaps": [
-        "independent exact-head deletion/restore-resurrection verification remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "tombstone resurrection",
         "orphan derivatives"
@@ -293,9 +271,7 @@
       "title": "Software Bill of Materials",
       "plane": "tool_security",
       "handler": "skeleton.ai.runtime.deferred.tooling_security.SBOM",
-      "source_gaps": [
-        "independent exact-head SBOM artifact-binding and coverage verification remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "missing transitive dependency",
         "stale vulnerability data"
@@ -318,9 +294,7 @@
       "title": "Service Level Objectives",
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.SLOSpec",
-      "source_gaps": [
-        "independent exact-head SLO/SLI and operations-review verification remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "misleading SLI",
         "unowned objective"
@@ -343,9 +317,7 @@
       "title": "Error Budgets",
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.ErrorBudget",
-      "source_gaps": [
-        "independent exact-head error-budget burn/release-boundary verification remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "bad denominator",
         "budget used to excuse critical failure"
@@ -368,9 +340,7 @@
       "title": "Observability Cardinality Control",
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.CardinalityGuard",
-      "source_gaps": [
-        "independent exact-head telemetry-cardinality and sensitive-label verification remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "metrics backend overload",
         "PII in labels"
@@ -393,9 +363,7 @@
       "title": "Trace Model",
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.TraceModel",
-      "source_gaps": [
-        "independent exact-head trace-causality and non-authoritative telemetry verification remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "broken correlation",
         "trace contains secrets"
@@ -418,9 +386,7 @@
       "title": "Performance Profiling",
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.ProfileRecord",
-      "source_gaps": [
-        "independent exact-head profile-identity and regression verification remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "benchmark distortion",
         "profiler overhead misread"
@@ -443,9 +409,7 @@
       "title": "Latency Budgeting",
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.LatencyBudget",
-      "source_gaps": [
-        "independent exact-head percentile/stage latency-budget verification remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "retry hides tail latency",
         "stage budget oversubscription"
@@ -468,9 +432,7 @@
       "title": "Cost Governor",
       "plane": "frontier",
       "handler": "skeleton.ai.runtime.deferred.contracts.BudgetLedger",
-      "source_gaps": [
-        "independent exact-head durable cost reservation/fallback verification remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "double charge",
         "unsafe cheap fallback"
@@ -493,9 +455,7 @@
       "title": "Energy / Compute Efficiency",
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.EfficiencySample",
-      "source_gaps": [
-        "independent exact-head quality-normalized efficiency verification remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "greenwashing metric",
         "quality loss hidden by efficiency"
@@ -518,10 +478,7 @@
       "title": "Chaos Engineering",
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.ChaosCampaign",
-      "source_gaps": [
-        "define fault library",
-        "bind campaigns to runbooks"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "chaos causes real outage",
         "unmeasured recovery"
@@ -544,10 +501,7 @@
       "title": "Recovery Drills",
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.RecoveryDrill",
-      "source_gaps": [
-        "build drill scheduler/harness",
-        "bind findings to risk ledger"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "paper runbook only",
         "unrehearsed dependency"
@@ -570,10 +524,7 @@
       "title": "Release Qualification Matrix",
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.ReleaseQualification",
-      "source_gaps": [
-        "centralize qualification rules",
-        "bind merge readiness"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "wrong gate set",
         "cancelled treated green"
@@ -596,10 +547,7 @@
       "title": "Canary Deployment",
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.CanaryController",
-      "source_gaps": [
-        "define canary controller",
-        "bind error budget/quality vector"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "insufficient sample",
         "slow rollback"
@@ -622,10 +570,7 @@
       "title": "Feature Flags",
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.FeatureFlag",
-      "source_gaps": [
-        "define flag schema",
-        "add expiry/combination checks"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "flag combinatorial explosion",
         "security bypass"
@@ -648,10 +593,7 @@
       "title": "Rollback Architecture",
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.RollbackPlan",
-      "source_gaps": [
-        "classify reversible changes",
-        "bind rollback proof to release"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "old binary cannot read new data",
         "external effects unreverted"
@@ -674,10 +616,7 @@
       "title": "Developer Experience",
       "plane": "operations_experience",
       "handler": "skeleton.ai.runtime.deferred.operations_experience.DeveloperCommand",
-      "source_gaps": [
-        "consolidate dev commands",
-        "generate contract-aware templates"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "slow feedback encourages bypass",
         "tooling drifts from CI"
@@ -700,9 +639,7 @@
       "title": "Local Development",
       "plane": "operations_experience",
       "handler": "skeleton.ai.runtime.deferred.operations_experience.LocalEnvironment",
-      "source_gaps": [
-        "check in canonical uv.lock and bind its digest as the authoritative local dependency graph"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "works-only-on-maintainer machine",
         "production secret reuse"
@@ -748,10 +685,7 @@
       "title": "Simulation Mode",
       "plane": "operations_experience",
       "handler": "skeleton.ai.runtime.deferred.simulation_mode.SimulationRuntime",
-      "source_gaps": [
-        "define adapter switch contract",
-        "bind evidence labels"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "simulation leakage",
         "simulated proof accepted as production"
@@ -774,10 +708,7 @@
       "title": "Contract Fuzzing",
       "plane": "operations_experience",
       "handler": "skeleton.ai.runtime.deferred.contract_fuzzing.ContractFuzzer",
-      "source_gaps": [
-        "select P0 contract targets",
-        "integrate reproducers into regression suite"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "resource-exhausting fuzz run",
         "non-reproducible crash"
@@ -800,10 +731,7 @@
       "title": "Property-Based Invariant Testing",
       "plane": "operations_experience",
       "handler": "skeleton.ai.runtime.deferred.operations_experience.Invariant",
-      "source_gaps": [
-        "define generator library",
-        "bind properties to invariant registry"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "weak property passes bad behavior",
         "flaky randomness"
@@ -826,10 +754,7 @@
       "title": "Formal Verification Candidates",
       "plane": "operations_experience",
       "handler": "skeleton.ai.runtime.deferred.operations_experience.FormalCandidateRanker",
-      "source_gaps": [
-        "materialize the first ranked candidate set from concrete high-consequence runtime targets",
-        "wire proof-to-test handoff validation into exact-head conformance CI"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "formal effort on low-value target",
         "model/code divergence"
@@ -852,10 +777,7 @@
       "title": "Artifact Review Workflow",
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.ArtifactReviewWorkflow",
-      "source_gaps": [
-        "define review state machine",
-        "bind to artifact registry"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "review targets old version",
         "approval bypass"
@@ -878,10 +800,7 @@
       "title": "Research Agent Team",
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.ResearchTeam",
-      "source_gaps": [
-        "define role templates",
-        "bind to VS-003"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "citation laundering",
         "role overlap reduces independence"
@@ -904,10 +823,7 @@
       "title": "Literature Watch System",
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.LiteratureWatch",
-      "source_gaps": [
-        "define source adapters",
-        "bind triage to research backlog"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "paper spam",
         "stale/retracted claim"
@@ -930,10 +846,7 @@
       "title": "Citation Graph Analytics",
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.CitationGraph",
-      "source_gaps": [
-        "build citation schema",
-        "bind to evidence graph"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "citation popularity bias",
         "wrong source version"
@@ -956,10 +869,7 @@
       "title": "Reproduction Packages",
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.ReproductionBundle",
-      "source_gaps": [
-        "define bundle format",
-        "bind to experiment/reproducibility"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "hidden dependency",
         "package cannot reproduce claim"
@@ -982,10 +892,7 @@
       "title": "Experiment Comparison",
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.ExperimentComparator",
-      "source_gaps": [
-        "define comparison eligibility",
-        "bind to statistical analysis"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "apples-to-oranges comparison",
         "selective run choice"
@@ -1008,10 +915,7 @@
       "title": "Statistical Analysis",
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.StatisticalAnalyzer",
-      "source_gaps": [
-        "define approved methods",
-        "bind analyses to benchmark metadata"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "p-hacking",
         "invalid independence assumptions"
@@ -1034,10 +938,7 @@
       "title": "Model Evaluation Harness",
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.EvaluationHarness",
-      "source_gaps": [
-        "unify eval runner",
-        "bind quality vector"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "prompt drift",
         "contamination"
@@ -1060,10 +961,7 @@
       "title": "Agent Evaluation Harness",
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.EvaluationHarness",
-      "source_gaps": [
-        "define scenario format",
-        "bind to performance evidence"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "reward gaming",
         "trajectory hidden behind final answer"
@@ -1086,10 +984,7 @@
       "title": "Long-Horizon Benchmarks",
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.EvaluationHarness",
-      "source_gaps": [
-        "materialize bounded long-horizon suite",
-        "bind to autonomy acceptance"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "short-task proxy misleads",
         "state drift"
@@ -1112,10 +1007,7 @@
       "title": "Contamination Auditor",
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.ContaminationAuditor",
-      "source_gaps": [
-        "define fingerprint methods",
-        "bind audit to SOTA claims"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "false clean claim",
         "hash-only misses paraphrases"
@@ -1138,10 +1030,7 @@
       "title": "Human Evaluation",
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.HumanEvaluation",
-      "source_gaps": [
-        "define rubric schema",
-        "bind human evidence to quality vector"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "rater bias",
         "rubric drift"
@@ -1164,9 +1053,7 @@
       "title": "Model Card System",
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.ComponentCard",
-      "source_gaps": [
-        "independent exact-head model-card MBOM/evaluation generation validation remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "stale marketing claim",
         "missing limitation"
@@ -1189,9 +1076,7 @@
       "title": "Dataset Card System",
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.ComponentCard",
-      "source_gaps": [
-        "independent exact-head dataset-card registry/lineage validation remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "unknown rights hidden",
         "card/version mismatch"
@@ -1214,9 +1099,7 @@
       "title": "Tool Card System",
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.ComponentCard",
-      "source_gaps": [
-        "independent exact-head tool-card definition/security-review validation remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "tool description prompt injection",
         "stale authority claim"
@@ -1239,9 +1122,7 @@
       "title": "Agent Card System",
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.ComponentCard",
-      "source_gaps": [
-        "independent exact-head agent-card registry/performance/control validation remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "card overstates autonomy",
         "grant ambiguity"
@@ -1264,9 +1145,7 @@
       "title": "Component Health Scorecard",
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.HealthScore",
-      "source_gaps": [
-        "independent exact-head component-health evidence-source validation remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "green average hides critical failure",
         "stale health"
@@ -1289,9 +1168,7 @@
       "title": "Dependency Health",
       "plane": "operations_experience",
       "handler": "skeleton.ai.runtime.deferred.operations_experience.DependencyHealth",
-      "source_gaps": [
-        "independent exact-head SBOM/dependency-backlog validation remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "abandoned dependency",
         "upgrade breaks compatibility"
@@ -1314,9 +1191,7 @@
       "title": "Vendor / Provider Risk",
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.ProviderRisk",
-      "source_gaps": [
-        "independent exact-head provider dependency/risk validation remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "vendor lock-in",
         "fallback violates privacy"
@@ -1339,9 +1214,7 @@
       "title": "Provider Failover",
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.ProviderFailover",
-      "source_gaps": [
-        "independent exact-head compatibility-safe provider failover validation remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "double execution",
         "weaker privacy fallback"
@@ -1364,9 +1237,7 @@
       "title": "Offline Mode",
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.DeploymentProfile",
-      "source_gaps": [
-        "independent exact-head offline capability/model/storage validation remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "stale data presented current",
         "sync conflict"
@@ -1389,9 +1260,7 @@
       "title": "Air-Gapped Profile",
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.DeploymentProfile",
-      "source_gaps": [
-        "independent exact-head air-gap package trust/install validation remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "hidden egress dependency",
         "unsigned media import"
@@ -1414,9 +1283,7 @@
       "title": "Edge Deployment",
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.DeploymentProfile",
-      "source_gaps": [
-        "independent exact-head edge resource-tier/router validation remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "resource thrash",
         "stale edge state"
@@ -1439,9 +1306,7 @@
       "title": "Enterprise Deployment",
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.DeploymentProfile",
-      "source_gaps": [
-        "independent exact-head enterprise topology/security acceptance validation remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "admin overprivilege",
         "unsupported topology drift"
@@ -1464,9 +1329,7 @@
       "title": "Identity Federation",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.FederatedIdentity",
-      "source_gaps": [
-        "independent exact-head federated principal/session/revocation validation remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "account takeover via claim mapping",
         "stale group grant"
@@ -1489,9 +1352,7 @@
       "title": "Administration Plane",
       "plane": "operations_experience",
       "handler": "skeleton.ai.runtime.deferred.operations_experience.AdminOperation",
-      "source_gaps": [
-        "independent exact-head admin scope/approval/break-glass validation remains pending"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "admin CSRF/confused deputy",
         "unaudited change"
@@ -1514,10 +1375,7 @@
       "title": "Audit UI",
       "plane": "operations_experience",
       "handler": "skeleton.ai.runtime.deferred.operations_experience.AuditLog",
-      "source_gaps": [
-        "define audit API contract",
-        "bind to provenance/trace"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "audit omission",
         "sensitive log exposure"
@@ -1540,10 +1398,7 @@
       "title": "Operations Dashboard",
       "plane": "operations_experience",
       "handler": "skeleton.ai.runtime.deferred.operations_experience.DashboardProjection",
-      "source_gaps": [
-        "define dashboard data contract",
-        "bind runbooks"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "stale green dashboard",
         "alert overload"
@@ -1566,10 +1421,7 @@
       "title": "Agent Operations Dashboard",
       "plane": "operations_experience",
       "handler": "skeleton.ai.runtime.deferred.operations_experience.DashboardProjection",
-      "source_gaps": [
-        "define agent ops projection",
-        "bind human control receipts"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "UI authority bypass",
         "hidden zombie agent"
@@ -1592,10 +1444,7 @@
       "title": "Research Dashboard",
       "plane": "operations_experience",
       "handler": "skeleton.ai.runtime.deferred.operations_experience.DashboardProjection",
-      "source_gaps": [
-        "define research view model",
-        "bind citation/experiment graphs"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "confidence visualization misleads",
         "stale source"
@@ -1618,10 +1467,7 @@
       "title": "Model Operations",
       "plane": "operations_experience",
       "handler": "skeleton.ai.runtime.deferred.operations_experience.ModelOperations",
-      "source_gaps": [
-        "unify model ops registry",
-        "bind router/release gates"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "untracked model swap",
         "capacity mismatch"
@@ -1644,10 +1490,7 @@
       "title": "Model Rollback",
       "plane": "operations_experience",
       "handler": "skeleton.ai.runtime.deferred.operations_experience.ModelOperations",
-      "source_gaps": [
-        "define model version fencing",
-        "bind rollback to deployment registry"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "mixed model version state",
         "stale KV/cache semantics"
@@ -1670,10 +1513,7 @@
       "title": "Prompt / Instruction Registry",
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.InstructionRegistry",
-      "source_gaps": [
-        "inventory instruction assets",
-        "bind to eval harness"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "prompt drift",
         "instruction text mistaken for authority"
@@ -1696,10 +1536,7 @@
       "title": "Prompt Regression Testing",
       "plane": "research_evaluation",
       "handler": "skeleton.ai.runtime.deferred.research_evaluation.InstructionRegistry",
-      "source_gaps": [
-        "build representative corpus",
-        "bind changes to qualification"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "flaky prompt tests",
         "overfit examples"
@@ -1722,10 +1559,7 @@
       "title": "Routing Policy Registry",
       "plane": "knowledge",
       "handler": "skeleton.ai.runtime.deferred.knowledge.PolicyRegistry",
-      "source_gaps": [
-        "centralize routing policy",
-        "bind decisions to receipts"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "silent policy drift",
         "unsafe fallback"
@@ -1748,10 +1582,7 @@
       "title": "Memory Policy Registry",
       "plane": "knowledge",
       "handler": "skeleton.ai.runtime.deferred.knowledge.PolicyRegistry",
-      "source_gaps": [
-        "bind classes to policies",
-        "materialize deletion tests"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "stale memory retained",
         "untrusted memory promoted"
@@ -1774,10 +1605,7 @@
       "title": "Retrieval Policy Registry",
       "plane": "knowledge",
       "handler": "skeleton.ai.runtime.deferred.knowledge.PolicyRegistry",
-      "source_gaps": [
-        "centralize retrieval policy",
-        "bind to evidence contract"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "post-ranking filter leak",
         "stale source accepted"
@@ -1800,10 +1628,7 @@
       "title": "Knowledge Refresh",
       "plane": "knowledge",
       "handler": "skeleton.ai.runtime.deferred.knowledge.FreshnessRecord",
-      "source_gaps": [
-        "define refresh epochs",
-        "bind to lineage"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "mixed index versions",
         "history loss"
@@ -1826,10 +1651,7 @@
       "title": "Temporal Knowledge",
       "plane": "knowledge",
       "handler": "skeleton.ai.runtime.deferred.knowledge.ClaimScope",
-      "source_gaps": [
-        "define bitemporal schema",
-        "bind retrieval freshness"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "stale fact treated current",
         "correction erases history"
@@ -1852,10 +1674,7 @@
       "title": "Hypothesis Engine",
       "plane": "knowledge",
       "handler": "skeleton.ai.runtime.deferred.knowledge.Hypothesis",
-      "source_gaps": [
-        "define update rules",
-        "bind experiments/search"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "confirmation bias",
         "hypothesis becomes fact"
@@ -1878,10 +1697,7 @@
       "title": "Causal Knowledge",
       "plane": "knowledge",
       "handler": "skeleton.ai.runtime.deferred.knowledge.CausalGraph",
-      "source_gaps": [
-        "define causal evidence types",
-        "bind to statistical analysis"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "correlation presented causal",
         "hidden assumptions"
@@ -1904,10 +1720,7 @@
       "title": "Migration Engine",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.MigrationEngine",
-      "source_gaps": [
-        "define migration registry",
-        "bind updater/release"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "partial migration",
         "irreversible transform"
@@ -1930,10 +1743,7 @@
       "title": "Legacy Compatibility",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.MigrationEngine",
-      "source_gaps": [
-        "inventory adapters",
-        "assign retirement milestones"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "permanent legacy layer",
         "behavior drift"
@@ -1956,10 +1766,7 @@
       "title": "Deprecation Process",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.DeprecationRegistry",
-      "source_gaps": [
-        "define windows",
-        "bind to compatibility registry"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "surprise breakage",
         "deprecated code never removed"
@@ -1982,10 +1789,7 @@
       "title": "Architecture Archaeology",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.CodeProvenance",
-      "source_gaps": [
-        "define archaeology packet",
-        "bind consolidation decisions"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "misread legacy intent",
         "lost provenance"
@@ -2008,10 +1812,7 @@
       "title": "Repository Consolidation Engine",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.DuplicationDetector",
-      "source_gaps": [
-        "evolve AI-tree cutover contract",
-        "bind ownership inversion gates"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "duplicate authority",
         "destructive rename"
@@ -2034,10 +1835,7 @@
       "title": "Code Provenance",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.CodeProvenance",
-      "source_gaps": [
-        "define code provenance manifest",
-        "bind consolidation engine"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "orphan copied code",
         "license loss"
@@ -2060,10 +1858,7 @@
       "title": "Duplication Detector",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.DuplicationDetector",
-      "source_gaps": [
-        "define ignore/intent metadata",
-        "bind to consolidation backlog"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "false positive deletes adapter",
         "semantic duplicates missed"
@@ -2086,10 +1881,7 @@
       "title": "Module Ownership",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.OwnershipMap",
-      "source_gaps": [
-        "complete ownership map",
-        "bind CODEOWNERS"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "multiple owners",
         "ownerless critical code"
@@ -2112,10 +1904,7 @@
       "title": "CODEOWNERS Generation",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.OwnershipMap",
-      "source_gaps": [
-        "define generation rules",
-        "bind to module ownership"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "generated owner too broad",
         "machine/human drift"
@@ -2138,10 +1927,7 @@
       "title": "Documentation as Code",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.CodeProvenance",
-      "source_gaps": [
-        "expand doc CI",
-        "bind generated/manual boundaries"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "stale docs",
         "prose becomes shadow authority"
@@ -2164,10 +1950,7 @@
       "title": "Diagram as Code",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.CodeProvenance",
-      "source_gaps": [
-        "select diagram formats",
-        "generate key architecture views"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "stale diagram",
         "layout noise obscures change"
@@ -2190,10 +1973,7 @@
       "title": "Architecture Snapshots",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.DigitalTwin",
-      "source_gaps": [
-        "define bundle format",
-        "bind release provenance"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "snapshot incomplete",
         "unversioned generated data"
@@ -2216,10 +1996,7 @@
       "title": "Release Reproducibility",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.BinaryProvenance",
-      "source_gaps": [
-        "normalize build inputs",
-        "bind provenance attestation"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "untracked build input",
         "timestamp nondeterminism"
@@ -2242,10 +2019,7 @@
       "title": "Build Hermeticity",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.BuildIdentity",
-      "source_gaps": [
-        "inventory build inputs",
-        "add hermetic release profile"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "hidden dependency",
         "developer machine contamination"
@@ -2268,10 +2042,7 @@
       "title": "Build Cache",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.BuildIdentity",
-      "source_gaps": [
-        "define cache domains",
-        "bind provenance/digests"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "cache poisoning",
         "incorrect key reuse"
@@ -2294,10 +2065,7 @@
       "title": "Binary Provenance",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.BinaryProvenance",
-      "source_gaps": [
-        "select attestation format",
-        "bind installer/updater"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "unsigned binary",
         "attestation detached from artifact"
@@ -2320,10 +2088,7 @@
       "title": "Installer Security",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.InstallerManifest",
-      "source_gaps": [
-        "materialize adversarial installer tests",
-        "bind provenance"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "privilege escalation",
         "arbitrary path overwrite"
@@ -2346,10 +2111,7 @@
       "title": "Update Security",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.UpdateManifest",
-      "source_gaps": [
-        "define metadata trust model",
-        "bind key rotation"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "compromised update channel",
         "freeze attack"
@@ -2372,10 +2134,7 @@
       "title": "Bootstrap Recovery",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.DiagnosticCheck",
-      "source_gaps": [
-        "define minimal trust root",
-        "materialize offline recovery"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "recovery depends on broken component",
         "untrusted repair artifact"
@@ -2398,10 +2157,7 @@
       "title": "Crash Diagnostics",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.DiagnosticCheck",
-      "source_gaps": [
-        "define crash schema",
-        "bind support bundle"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "secret dump",
         "diagnostics missing root cause"
@@ -2424,10 +2180,7 @@
       "title": "Support Bundle",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.SupportBundle",
-      "source_gaps": [
-        "define support manifest",
-        "bind operator workflow"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "PII/secret leakage",
         "incomplete diagnostics"
@@ -2450,10 +2203,7 @@
       "title": "Doctor Command",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.DiagnosticCheck",
-      "source_gaps": [
-        "define check registry",
-        "bind findings to repair plans"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "doctor changes state",
         "false healthy result"
@@ -2476,10 +2226,7 @@
       "title": "Self-Diagnosis",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.DiagnosticCheck",
-      "source_gaps": [
-        "define diagnostic API",
-        "bind independent health checks"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "self-report bias",
         "diagnosis loop"
@@ -2502,10 +2249,7 @@
       "title": "Safe Repair",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.RepairProposal",
-      "source_gaps": [
-        "classify repair actions",
-        "bind doctor findings"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "repair causes more damage",
         "silent reset"
@@ -2528,10 +2272,7 @@
       "title": "System Digital Twin",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.DigitalTwin",
-      "source_gaps": [
-        "define synchronization model",
-        "bind deployment planner"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "stale twin",
         "simulation treated as truth"
@@ -2554,10 +2295,7 @@
       "title": "Deployment Planner",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.DeploymentPlanner",
-      "source_gaps": [
-        "bind digital twin/capacity",
-        "add plan verifier"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "unsafe plan authorized by generation",
         "stale capacity input"
@@ -2580,10 +2318,7 @@
       "title": "Resource Scheduler",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.FairResourceScheduler",
-      "source_gaps": [
-        "define resource model",
-        "bind capacity/backpressure"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "oversubscription",
         "orphan reservation"
@@ -2606,10 +2341,7 @@
       "title": "Fairness / Starvation Control",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.FairResourceScheduler",
-      "source_gaps": [
-        "define fairness policy",
-        "bind scheduler metrics"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "priority starvation",
         "fairness hurts critical incident work"
@@ -2632,10 +2364,7 @@
       "title": "Backpressure",
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.CongestionController",
-      "source_gaps": [
-        "catalog producer/consumer edges",
-        "bind queue/stream limits"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "memory blowup",
         "pressure ignored across boundary"
@@ -2658,10 +2387,7 @@
       "title": "Load Shedding",
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.CongestionController",
-      "source_gaps": [
-        "define workload classes",
-        "bind capacity/SLOs"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "wrong work shed",
         "hidden data loss"
@@ -2684,10 +2410,7 @@
       "title": "Queue Congestion Control",
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.CongestionController",
-      "source_gaps": [
-        "inventory queues",
-        "bind retry/fairness"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "queue collapse",
         "recovery work starved"
@@ -2710,10 +2433,7 @@
       "title": "Retry Budgets",
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.RetryBudget",
-      "source_gaps": [
-        "define budget propagation",
-        "bind protocols/tools"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "retry storm",
         "duplicate side effect"
@@ -2736,10 +2456,7 @@
       "title": "Circuit Breaker Standard",
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.CircuitBreaker",
-      "source_gaps": [
-        "define standard library",
-        "bind provider/connectors"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "global breaker overblocks",
         "half-open stampede"
@@ -2762,10 +2479,7 @@
       "title": "Bulkhead Architecture",
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.Bulkhead",
-      "source_gaps": [
-        "map bulkhead domains",
-        "bind scheduler"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "shared pool collapse",
         "overflow breaks isolation"
@@ -2788,10 +2502,7 @@
       "title": "Dead-Letter Workflow",
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.DeadLetterQueue",
-      "source_gaps": [
-        "define DLQ schema",
-        "bind operator UI/runbook"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "poison message loop",
         "unauthorized replay"
@@ -2814,10 +2525,7 @@
       "title": "Operation Replay",
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.OperationReplayLedger",
-      "source_gaps": [
-        "define replay modes",
-        "bind event retention"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "duplicate real effect",
         "missing historical dependency"
@@ -2840,10 +2548,7 @@
       "title": "Determinism Envelope",
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.DeterminismEnvelope",
-      "source_gaps": [
-        "classify critical paths",
-        "bind replay/tests"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "false deterministic expectation",
         "tolerance hides regression"
@@ -2866,10 +2571,7 @@
       "title": "Time Architecture",
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.LogicalClock",
-      "source_gaps": [
-        "unify time primitives",
-        "inject clocks in tests"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "wall-clock jump",
         "timezone ambiguity"
@@ -2892,10 +2594,7 @@
       "title": "Identifier Standard",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.StableIdentifier",
-      "source_gaps": [
-        "inventory ID formats",
-        "migrate ad-hoc identifiers"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "ID collision",
         "case/Unicode ambiguity"
@@ -2918,10 +2617,7 @@
       "title": "Logical Clocks / Event Ordering",
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.LogicalClock",
-      "source_gaps": [
-        "select clock models",
-        "bind events/leases"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "causality inversion",
         "sequence reset"
@@ -2944,10 +2640,7 @@
       "title": "Final Master Control Plane",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.DecisionEngine",
-      "source_gaps": [
-        "define minimal responsibilities",
-        "bind distributed recovery"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "god-object authority",
         "single point of failure"
@@ -2970,10 +2663,7 @@
       "title": "System Objective Model",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.Objective",
-      "source_gaps": [
-        "define objective schema",
-        "bind planning/workflows"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "objective ambiguity",
         "goal overrides policy"
@@ -2996,10 +2686,7 @@
       "title": "Objective Normalization",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.Objective",
-      "source_gaps": [
-        "define normalization pipeline",
-        "bind human confirmation thresholds"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "intent distortion",
         "lost user constraint"
@@ -3022,10 +2709,7 @@
       "title": "Constraint Engine",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.Constraint",
-      "source_gaps": [
-        "define constraint types",
-        "bind planner/scheduler"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "hard constraint weakened",
         "hidden conflict"
@@ -3048,10 +2732,7 @@
       "title": "Decision Engine",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.DecisionEngine",
-      "source_gaps": [
-        "define decision policy interface",
-        "bind decision graph"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "optimizes forbidden option",
         "opaque criteria"
@@ -3074,10 +2755,7 @@
       "title": "Decision Record Graph",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.DecisionRecord",
-      "source_gaps": [
-        "define graph schema",
-        "bind ADR/runtime decisions"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "rewritten history",
         "missing consequence link"
@@ -3100,10 +2778,7 @@
       "title": "Human Factors",
       "plane": "operations_experience",
       "handler": "skeleton.ai.runtime.deferred.operations_experience.ApprovalPolicy",
-      "source_gaps": [
-        "define critical interaction principles",
-        "bind acceptance studies"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "confusing critical UI",
         "automation bias"
@@ -3126,10 +2801,7 @@
       "title": "Approval Fatigue Control",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.ApprovalFatigueGuard",
-      "source_gaps": [
-        "define reusable approval limits",
-        "bind risk model"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "rubber-stamping",
         "overbroad remembered approval"
@@ -3152,10 +2824,7 @@
       "title": "Trust Calibration",
       "plane": "operations_experience",
       "handler": "skeleton.ai.runtime.deferred.operations_experience.TrustSignal",
-      "source_gaps": [
-        "define trust UI patterns",
-        "bind quality/uncertainty"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "overtrust",
         "warning fatigue"
@@ -3178,10 +2847,7 @@
       "title": "User Intent Continuity",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.IntentStore",
-      "source_gaps": [
-        "define intent store",
-        "bind context compiler/handoffs"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "old instruction persists",
         "summary drops constraint"
@@ -3204,10 +2870,7 @@
       "title": "API Client SDK Generator",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.SDKSurface",
-      "source_gaps": [
-        "define source API schema",
-        "publish SDK artifacts"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "client/server drift",
         "auth semantics omitted"
@@ -3230,10 +2893,7 @@
       "title": "Internal SDK",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.SDKSurface",
-      "source_gaps": [
-        "define export surface",
-        "migrate consumers"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "SDK becomes god API",
         "leaky internals"
@@ -3256,10 +2916,7 @@
       "title": "Provider SDK",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.SDKSurface",
-      "source_gaps": [
-        "formalize adapter hooks",
-        "bind registry/router"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "provider leakage",
         "unequal fallback semantics"
@@ -3282,10 +2939,7 @@
       "title": "Storage SDK",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.SDKSurface",
-      "source_gaps": [
-        "define storage capabilities",
-        "migrate direct clients"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "store-specific leakage",
         "wrong consistency assumption"
@@ -3308,10 +2962,7 @@
       "title": "Event SDK",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.SDKSurface",
-      "source_gaps": [
-        "extract event primitives",
-        "bind schema registry"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "duplicate handling inconsistent",
         "schema drift"
@@ -3334,10 +2985,7 @@
       "title": "Evaluation SDK",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.SDKSurface",
-      "source_gaps": [
-        "define SDK contracts",
-        "migrate eval harnesses"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "metric implementation drift",
         "hidden judge config"
@@ -3360,10 +3008,7 @@
       "title": "Benchmark Plugin System",
       "plane": "platform_control",
       "handler": "skeleton.ai.runtime.deferred.platform_control.SDKSurface",
-      "source_gaps": [
-        "define plugin sandbox",
-        "bind technology radar"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "benchmark plugin executes unsafe code",
         "version ambiguity"
@@ -3386,10 +3031,7 @@
       "title": "Data Contracts",
       "plane": "knowledge",
       "handler": "skeleton.ai.runtime.deferred.knowledge.DataContract",
-      "source_gaps": [
-        "inventory data interfaces",
-        "bind quality/lineage"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "semantic drift without schema change",
         "unit mismatch"
@@ -3412,10 +3054,7 @@
       "title": "Data Service SLOs",
       "plane": "reliability_release",
       "handler": "skeleton.ai.runtime.deferred.reliability_release.SLOSpec",
-      "source_gaps": [
-        "define service objectives",
-        "bind error budgets"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "availability hides stale data",
         "SLI sampled incorrectly"
@@ -3438,10 +3077,7 @@
       "title": "Embedding Lifecycle",
       "plane": "knowledge",
       "handler": "skeleton.ai.runtime.deferred.knowledge.EmbeddingIdentity",
-      "source_gaps": [
-        "define embedding metadata",
-        "bind vector migrations"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "index mixes dimensions/models",
         "stale embeddings"
@@ -3464,10 +3100,7 @@
       "title": "Vector Index Migration",
       "plane": "knowledge",
       "handler": "skeleton.ai.runtime.deferred.knowledge.IndexAlias",
-      "source_gaps": [
-        "define index aliases",
-        "bind rollback"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "partial index",
         "mixed embedding routing"
@@ -3490,10 +3123,7 @@
       "title": "Search Index Lifecycle",
       "plane": "knowledge",
       "handler": "skeleton.ai.runtime.deferred.knowledge.IndexVersion",
-      "source_gaps": [
-        "inventory indexes",
-        "bind lineage/freshness"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "index becomes authoritative",
         "watermark loss"
@@ -3516,10 +3146,7 @@
       "title": "Retrieval Freshness Engine",
       "plane": "knowledge",
       "handler": "skeleton.ai.runtime.deferred.knowledge.FreshnessRecord",
-      "source_gaps": [
-        "define freshness metadata",
-        "bind knowledge refresh"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "stale result presented current",
         "refresh storm"
@@ -3542,10 +3169,7 @@
       "title": "Source Trust Model",
       "plane": "knowledge",
       "handler": "skeleton.ai.runtime.deferred.knowledge.SourceTrust",
-      "source_gaps": [
-        "define trust dimensions",
-        "bind context compiler"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "authority inferred from rank",
         "trust label laundering"
@@ -3568,10 +3192,7 @@
       "title": "Source Diversity Engine",
       "plane": "knowledge",
       "handler": "skeleton.ai.runtime.deferred.knowledge.DiversityEngine",
-      "source_gaps": [
-        "build lineage heuristics",
-        "bind answer quality"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "many copies appear independent",
         "diversity gaming"
@@ -3594,10 +3215,7 @@
       "title": "Claim Deduplication",
       "plane": "knowledge",
       "handler": "skeleton.ai.runtime.deferred.knowledge.ClaimReconciler",
-      "source_gaps": [
-        "define equivalence rules",
-        "bind knowledge graph"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "overmerge contradictory scope",
         "duplicate evidence inflation"
@@ -3620,10 +3238,7 @@
       "title": "Claim Scope",
       "plane": "knowledge",
       "handler": "skeleton.ai.runtime.deferred.knowledge.ClaimScope",
-      "source_gaps": [
-        "define scope schema",
-        "bind citations/answers"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "different populations conflated",
         "scope lost in summary"
@@ -3646,10 +3261,7 @@
       "title": "Claim Expiration",
       "plane": "knowledge",
       "handler": "skeleton.ai.runtime.deferred.knowledge.ClaimScope",
-      "source_gaps": [
-        "define validity policies",
-        "bind knowledge refresh"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "old claim remains active",
         "overaggressive expiration"
@@ -3672,10 +3284,7 @@
       "title": "Knowledge Reconciliation",
       "plane": "knowledge",
       "handler": "skeleton.ai.runtime.deferred.knowledge.ClaimReconciler",
-      "source_gaps": [
-        "define reconciliation policies",
-        "bind human review thresholds"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "false single truth",
         "winner chosen by popularity"
@@ -3698,10 +3307,7 @@
       "title": "Knowledge Snapshots",
       "plane": "knowledge",
       "handler": "skeleton.ai.runtime.deferred.knowledge.KnowledgeSnapshot",
-      "source_gaps": [
-        "define snapshot bundle",
-        "bind research/evaluation reproducibility"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "incomplete snapshot",
         "stale restore overwrite"
@@ -3724,10 +3330,7 @@
       "title": "Memory Versioning",
       "plane": "knowledge",
       "handler": "skeleton.ai.runtime.deferred.knowledge.VersionedMemory",
-      "source_gaps": [
-        "bind immutable revision history into memory API/export and operator rollback workflows",
-        "define governed rollback/supersession behavior without violating tombstones or provenance lineage"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "lost update",
         "rollback resurrects deleted memory"
@@ -3750,10 +3353,7 @@
       "title": "Memory Reconciliation",
       "plane": "knowledge",
       "handler": "skeleton.ai.runtime.deferred.knowledge.VersionedMemory",
-      "source_gaps": [
-        "extend deterministic quality decisions into explicit unresolved conflict sets and supersession/merge receipts",
-        "bind reconciliation decisions to canonical revision history and governed memory write promotion"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "false merge",
         "newer but wrong memory wins"
@@ -3776,10 +3376,7 @@
       "title": "Cognitive Strategy Registry",
       "plane": "knowledge",
       "handler": "skeleton.ai.runtime.deferred.knowledge.StrategyRegistry",
-      "source_gaps": [
-        "inventory current strategies",
-        "bind selection engine"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "strategy sprawl",
         "untested strategy used"
@@ -3802,10 +3399,7 @@
       "title": "Strategy Selection",
       "plane": "knowledge",
       "handler": "skeleton.ai.runtime.deferred.knowledge.StrategyRegistry",
-      "source_gaps": [
-        "define baseline selector",
-        "bind performance evidence"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "wrong strategy cost explosion",
         "selection overfits eval"
@@ -3828,10 +3422,7 @@
       "title": "Reasoning Cost Accounting",
       "plane": "knowledge",
       "handler": "skeleton.ai.runtime.deferred.knowledge.ReasoningCost",
-      "source_gaps": [
-        "define stage IDs",
-        "bind cost governor"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "double counting",
         "cost telemetry leaks content"
@@ -3854,10 +3445,7 @@
       "title": "GPU Memory Manager",
       "plane": "compute",
       "handler": "skeleton.ai.runtime.deferred.compute.GPUMemoryManager",
-      "source_gaps": [
-        "define memory accounting",
-        "bind model/KV caches"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "GPU OOM",
         "reservation leak"
@@ -3880,10 +3468,7 @@
       "title": "Model Eviction",
       "plane": "compute",
       "handler": "skeleton.ai.runtime.deferred.compute.ModelEvictionController",
-      "source_gaps": [
-        "define pin/drain semantics",
-        "bind warming"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "evict in-flight model",
         "thrashing"
@@ -3906,10 +3491,7 @@
       "title": "KV Cache Service",
       "plane": "compute",
       "handler": "skeleton.ai.runtime.deferred.compute.KVCacheKey",
-      "source_gaps": [
-        "formalize key identity",
-        "bind GPU memory manager"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "context leak",
         "wrong model cache reuse"
@@ -3932,10 +3514,7 @@
       "title": "Prefix Cache",
       "plane": "compute",
       "handler": "skeleton.ai.runtime.deferred.compute.PrefixCacheKey",
-      "source_gaps": [
-        "define key composition",
-        "bind instruction registry"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "stale prompt prefix",
         "sensitive prefix leak"
@@ -3958,10 +3537,7 @@
       "title": "Speculative Inference",
       "plane": "compute",
       "handler": "skeleton.ai.runtime.deferred.compute.SpeculativePair",
-      "source_gaps": [
-        "define compatible model pairs",
-        "bind eval/cost gates"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "semantic drift",
         "overhead exceeds gain"
@@ -3984,10 +3560,7 @@
       "title": "NUMA Awareness",
       "plane": "compute",
       "handler": "skeleton.ai.runtime.deferred.compute.NUMAPlanner",
-      "source_gaps": [
-        "implement Linux-aware adapter",
-        "bind hardware topology"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "incorrect pinning hurts throughput",
         "platform incompatibility"
@@ -4010,10 +3583,7 @@
       "title": "GPU Interconnect Awareness",
       "plane": "compute",
       "handler": "skeleton.ai.runtime.deferred.compute.InterconnectGraph",
-      "source_gaps": [
-        "model interconnect graph",
-        "bind distributed inference/training"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "slow link bottleneck",
         "topology mismatch"
@@ -4036,10 +3606,7 @@
       "title": "Storage Tiering",
       "plane": "compute",
       "handler": "skeleton.ai.runtime.deferred.compute.StorageTierPlanner",
-      "source_gaps": [
-        "define tiers",
-        "bind CAS/model/data registries"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "cold tier unexpectedly unavailable",
         "duplicate stale copies"
@@ -4062,10 +3629,7 @@
       "title": "Data Locality",
       "plane": "compute",
       "handler": "skeleton.ai.runtime.deferred.compute.LocalityPlanner",
-      "source_gaps": [
-        "bind lineage/location metadata",
-        "integrate scheduler"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "data copied across forbidden boundary",
         "stale local replica"
@@ -4088,10 +3652,7 @@
       "title": "Build Farm",
       "plane": "compute",
       "handler": "skeleton.ai.runtime.deferred.compute.WorkFarm",
-      "source_gaps": [
-        "bind hermetic build profile",
-        "integrate worker attestation"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "worker contamination",
         "non-hermetic cache leak"
@@ -4114,10 +3675,7 @@
       "title": "Evaluation Farm",
       "plane": "compute",
       "handler": "skeleton.ai.runtime.deferred.compute.WorkFarm",
-      "source_gaps": [
-        "bind Evaluation SDK",
-        "reuse worker attestation"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "worker scorer drift",
         "duplicate evaluation"
@@ -4140,10 +3698,7 @@
       "title": "Research Compute Queue",
       "plane": "compute",
       "handler": "skeleton.ai.runtime.deferred.compute.WorkFarm",
-      "source_gaps": [
-        "define research classes",
-        "bind quotas/fairness"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "research starvation",
         "research overloads production"
@@ -4166,10 +3721,7 @@
       "title": "Research Ethics Review",
       "plane": "compute",
       "handler": "skeleton.ai.runtime.deferred.compute.EthicsReview",
-      "source_gaps": [
-        "define trigger criteria",
-        "bind research proposals"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "unreviewed sensitive study",
         "ethics process becomes checkbox"
@@ -4192,9 +3744,7 @@
       "title": "Experimental Feature Sandbox",
       "plane": "compute",
       "handler": "skeleton.ai.runtime.deferred.compute.SandboxManifest",
-      "source_gaps": [
-        "bind feature flags/technology radar"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "experiment leaks authority",
         "experiment becomes permanent"
@@ -4217,10 +3767,7 @@
       "title": "Research Branching Model",
       "plane": "compute",
       "handler": "skeleton.ai.runtime.deferred.compute.ResearchBranch",
-      "source_gaps": [
-        "define branch naming/retention",
-        "bind evidence packages"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "branch sprawl",
         "unreviewed experiment merged"
@@ -4243,10 +3790,7 @@
       "title": "Technique Retirement",
       "plane": "compute",
       "handler": "skeleton.ai.runtime.deferred.compute.TechniqueRecord",
-      "source_gaps": [
-        "bind technology radar/debt",
-        "define archive policy"
-      ],
+      "source_gaps": [],
       "source_risks": [
         "dead technique remains critical path",
         "history deleted"

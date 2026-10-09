@@ -105,7 +105,7 @@
     {
       "task_id": "P1-EVID-02",
       "lane_id": "P1-L0",
-      "status": "blocked",
+      "status": "done",
       "title": "Maturity reconciliation engine",
       "volume_refs": [
         "VOL-000",
@@ -191,7 +191,7 @@
     {
       "task_id": "P1-EVID-03",
       "lane_id": "P1-L0",
-      "status": "blocked",
+      "status": "done",
       "title": "Required-gate authority map",
       "volume_refs": [
         "VOL-059",
@@ -266,7 +266,7 @@
     {
       "task_id": "P1-EVID-04",
       "lane_id": "P1-L0",
-      "status": "blocked",
+      "status": "done",
       "title": "Risk/gap evidence binding",
       "volume_refs": [
         "VOL-036",
@@ -345,7 +345,7 @@
     {
       "task_id": "P1-EVID-05",
       "lane_id": "P1-L0",
-      "status": "blocked",
+      "status": "done",
       "title": "Reproducibility bundle",
       "volume_refs": [
         "VOL-035",
@@ -425,7 +425,7 @@
     {
       "task_id": "P1-EVID-06",
       "lane_id": "P1-L0",
-      "status": "blocked",
+      "status": "done",
       "title": "Scope-freeze and ADR enforcement",
       "volume_refs": [
         "VOL-000",
@@ -501,7 +501,7 @@
     {
       "task_id": "P1-INTEL-01",
       "lane_id": "P1-L1",
-      "status": "blocked",
+      "status": "done",
       "title": "Quality measurement and routing/context receipt spine",
       "volume_refs": [
         "VOL-008",
@@ -579,7 +579,7 @@
     {
       "task_id": "P1-INTEL-02",
       "lane_id": "P1-L1",
-      "status": "blocked",
+      "status": "done",
       "title": "Memory, retrieval and knowledge quality authority",
       "volume_refs": [
         "VOL-010",
@@ -1407,7 +1407,7 @@
     {
       "task_id": "P1-PROD-01",
       "lane_id": "P1-L3",
-      "status": "blocked",
+      "status": "done",
       "title": "API schema and compatibility registry",
       "volume_refs": [
         "VOL-041"
@@ -1472,7 +1472,7 @@
     {
       "task_id": "P1-PROD-02",
       "lane_id": "P1-L3",
-      "status": "blocked",
+      "status": "done",
       "title": "Streaming projection authority",
       "volume_refs": [
         "VOL-040",
@@ -1540,7 +1540,7 @@
     {
       "task_id": "P1-PROD-03",
       "lane_id": "P1-L3",
-      "status": "blocked",
+      "status": "done",
       "title": "Workspace and product projection contract",
       "volume_refs": [
         "VOL-042",
@@ -1742,7 +1742,7 @@
     {
       "task_id": "P1-LEARN-01",
       "lane_id": "P1-L4",
-      "status": "blocked",
+      "status": "done",
       "title": "Experiment registry",
       "volume_refs": [
         "VOL-077"
@@ -3078,9 +3078,9 @@
       "P1-L7": 3
     },
     "ready_count": 0,
-    "blocked_count": 43,
-    "in_progress_count": 1,
+    "blocked_count": 32,
+    "in_progress_count": 0,
     "evidence_pending_count": 0,
-    "done_count": 0
+    "done_count": 12
   }
 }
