@@ -28,7 +28,7 @@
     },
     {
       "path": "machine/master_traceability.json",
-      "git_blob_sha": "bb6115a18d5acda6b7c1f73310f56cc3e7763906",
+      "git_blob_sha": "7c3e78d9853a268d689892a68f6dea6c54b3bb2d",
       "role": "requirement/capability change-impact authority"
     }
   ],
