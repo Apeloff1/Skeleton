@@ -13,6 +13,10 @@ import pytest
 from skeleton.ai.game_builder.platform_registry import (
     PlatformRegistryError, default_registry, list_platforms, lookup_platform, parse_registry,
 )
+from skeleton.ai.game_builder.desktop_native_export import (
+    NativeDesktopExportError, compile_native_desktop, export_native_desktop_source,
+)
+from skeleton.ai.game_builder.playable_world import GameBuildIntent, generate_playable_world
 from skeleton.ai.game_builder.editor_platforms import (
     editor_platform_form, editor_platform_options, editor_portability_context,
 )
@@ -197,3 +201,53 @@ def test_every_platform_can_be_original_design_basis_and_port_planning_target():
         assert result["native_export_destination_count"] == 0
         assert len({x["target_platform_id"] for x in result["targets"]}) == len(registry.profiles)
         assert all(x["design_reachable"] and not x["native_export_verified"] for x in result["targets"])
+
+
+def test_original_solvable_world_can_export_real_native_desktop_game_source(tmp_path):
+    intent = GameBuildIntent(
+        project_id="native-game", title='Original "Ink" \\ Maze', subtitle="Native SDL2",
+        seed=102, width=11, height=11, levels=1, collectibles_per_level=1,
+        hazards_per_level=1, theme="arcade",
+    )
+    world = generate_playable_world(intent, authorized=True)
+    source = original("native-game", "bandai_wonderswan")
+    first = compile_native_desktop(world, source, "windows_modern", authorized=True)
+    again = compile_native_desktop(world, source, "windows_modern", authorized=True)
+    assert first == again
+    assert first.output_kind == "native_sdl2_source_project"
+    assert not first.binary_verified
+    assert "#include <SDL.h>" in first.game_c
+    assert "SDL_CreateWindow" in first.game_c
+    assert "SDL_GameController" in first.game_c
+    assert "static void walk(int dx, int dy)" in first.game_c
+    assert "add_executable(skeleton_homebrew game.c)" in first.cmake_lists
+    assert "Original" in first.game_c and "Ink" in first.game_c
+    assert "test</script>" not in first.game_c
+    manifest = json.loads(first.manifest_json)
+    assert manifest["world_digest"] == world.digest
+    assert manifest["executable_built"] is False
+    assert manifest["compiler_required"] is True
+    assert manifest["releasable"] is False
+    written = export_native_desktop_source(first, tmp_path / "native", authorized=True)
+    assert {p.name for p in written.iterdir()} == {"game.c", "CMakeLists.txt", "manifest.json"}
+    assert (written / "game.c").read_text() == first.game_c
+    with pytest.raises(FileExistsError):
+        export_native_desktop_source(first, written, authorized=True)
+
+
+def test_native_desktop_export_is_rights_bound_and_platform_specific():
+    world = generate_playable_world(GameBuildIntent(
+        project_id="game-42", title="Safe Game", subtitle="Test", seed=42,
+        width=9, height=9, levels=1, collectibles_per_level=1, hazards_per_level=0,
+    ), authorized=True)
+    source = original("game-42", "msx1")
+    for target in ("linux_desktop", "macos_modern"):
+        project = compile_native_desktop(world, source, target, authorized=True)
+        assert project.target_platform_id == target
+        assert "SDL_Init" in project.game_c
+    with pytest.raises(NativeDesktopExportError):
+        compile_native_desktop(world, source, "nintendo_famicom", authorized=True)
+    with pytest.raises(NativeDesktopExportError):
+        compile_native_desktop(world, original(), "linux_desktop", authorized=True)
+    with pytest.raises(PermissionError):
+        compile_native_desktop(world, source, "windows_modern", authorized=False)
