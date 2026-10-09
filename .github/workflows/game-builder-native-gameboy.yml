@@ -1,0 +1,71 @@
+name: Game Builder Native DMG ROM
+
+on:
+  pull_request:
+    paths:
+      - 'skeleton/ai/game_builder/**'
+      - 'scripts/game_builder/native_game_boy_ci.py'
+      - '.github/workflows/game-builder-native-gameboy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: game-builder-dmg-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  world-derived-cartridge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /skeleton/__init__.py
+            /skeleton/ai/__init__.py
+            /skeleton/ai/capability_map.py
+            /skeleton/ai/game_builder/
+            /scripts/game_builder/native_game_boy_ci.py
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install RGBDS 1.0 native ROM toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential bison flex libpng-dev pkg-config
+          git clone --depth 1 --branch v1.0.0 https://github.com/gbdev/rgbds.git /tmp/skeleton-rgbds
+          make -C /tmp/skeleton-rgbds -j 2
+          sudo make -C /tmp/skeleton-rgbds install
+          rgbasm --version
+          rgblink --version
+      - name: Generate and compile real Game Boy ROM
+        env:
+          PYTHONPATH: .
+        run: |
+          set -euo pipefail
+          python scripts/game_builder/native_game_boy_ci.py --emit gameboy-world-src > gameboy-world-provenance.json
+          make -C gameboy-world-src
+          test -s gameboy-world-src/build/skeleton-original.gb
+          python scripts/game_builder/native_game_boy_ci.py --verify-rom gameboy-world-src/build/skeleton-original.gb > gameboy-rom-verification.json
+          python - <<'PY'
+          import json
+          data=json.load(open("gameboy-rom-verification.json", encoding="utf-8"))
+          assert data["native_dmg_header_verified"] is True
+          assert data["emulator_playthrough_verified"] is False
+          print("Native Game Boy cartridge compiled:", data["sha256"])
+          PY
+      - name: Upload actual ROM and immutable provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: skeleton-world-derived-native-dmg-rom
+          path: |
+            gameboy-world-src/build/skeleton-original.gb
+            gameboy-world-src/manifest.json
+            gameboy-rom-verification.json
+            gameboy-world-provenance.json
+          if-no-files-found: error
+          retention-days: 7
