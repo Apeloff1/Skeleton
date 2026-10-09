@@ -101,7 +101,7 @@ JAVASCRIPT = r"""'use strict';
       get(id).disabled = busy;
     });
   };
-  const showMessages = (messages, evidence = []) => {
+  const showMessages = (messages, evidence = [], audits = []) => {
     const list = get('messages');
     list.replaceChildren();
     get('intro').hidden = messages.length > 0;
@@ -116,10 +116,16 @@ JAVASCRIPT = r"""'use strict';
       content.textContent = message.content;
       card.append(header, content);
       if (message.role === 'assistant') {
-        const supplied = evidence[completedTurn++];
+        const turn = completedTurn++;
+        const supplied = evidence[turn];
+        const audit = audits[turn];
         if (supplied && Array.isArray(supplied.citations)) {
           const label = document.createElement('small');
-          label.textContent = 'Evidence supplied to model; answer accuracy not verified';
+          label.textContent = 'Evidence supplied; factual correctness not verified' +
+            (audit ? ' · Citation identifiers: ' +
+              (audit.status === 'no_identifiers' ? 'none in model output' :
+               audit.status === 'unknown_identifiers' ? 'unknown IDs detected' :
+               'recognized IDs only (not factual support)') : '');
           label.className = 'source-custody-label';
           card.appendChild(label);
           supplied.citations.forEach(item => {
@@ -169,7 +175,8 @@ JAVASCRIPT = r"""'use strict';
     state.session = result.session_id;
     state.revision = result.revision;
     get('revision').textContent = 'Saved turns: ' + result.revision;
-    showMessages(result.messages, result.evidence || []);
+    showMessages(result.messages, result.evidence || [],
+                 result.citation_audits || []);
     await loadSessions();
     status('Loaded session ' + id.slice(0, 18) + '…');
   }
