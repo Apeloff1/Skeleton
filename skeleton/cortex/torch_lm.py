@@ -35,8 +35,15 @@ class TorchAccel:
         *,
         kv_dtype: str = "fp32",
         max_kv_bytes: int | None = None,
+        prefill_query_chunk: int | None = None,
     ) -> None:
         torch = _torch()
+        if prefill_query_chunk is not None and (
+            isinstance(prefill_query_chunk, bool)
+            or not isinstance(prefill_query_chunk, int)
+            or not 1 <= prefill_query_chunk <= lm.ctx
+        ):
+            raise ValueError("prefill_query_chunk must be between 1 and context length")
         if kv_dtype not in {"fp32", "fp16", "bf16"}:
             raise ValueError("kv_dtype must be fp32, fp16 or bf16")
         if max_kv_bytes is not None and (
@@ -60,6 +67,7 @@ class TorchAccel:
             "bf16": torch.bfloat16,
         }[kv_dtype]
         self.max_kv_bytes = max_kv_bytes
+        self.prefill_query_chunk = prefill_query_chunk
         self.resident = False
         self._E = self._P = self._Wout = self._bout = None
         self._layers: List[Dict[str, Any]] = []
@@ -299,9 +307,37 @@ class TorchAccel:
         qh = q.reshape(length, heads, head_dim).transpose(0, 1).unsqueeze(0)
         kh = k.reshape(length, heads, head_dim).transpose(0, 1).unsqueeze(0)
         vh = v.reshape(length, heads, head_dim).transpose(0, 1).unsqueeze(0)
-        if hasattr(functional, "scaled_dot_product_attention"):
-            # Use the backend's native kernel dispatcher; do not force an
-            # unsupported Flash kernel or allocate an explicit T x T mask.
+        chunk = self.prefill_query_chunk
+        if chunk is not None and length > chunk:
+            # Causal chunking must use *absolute query positions*. SDPA's
+            # is_causal=True uses an upper-left-aligned triangular mask when
+            # Q is shorter than K; using it here would silently hide previous
+            # tokens and damage autoregressive training/inference.
+            # Queries [start:stop) need only K/V [:stop], reducing the
+            # largest attention mask from T*T to at most chunk*T.
+            parts = []
+            for start in range(0, length, chunk):
+                stop = min(length, start + chunk)
+                qc = qh[:, :, start:stop, :]
+                kc = kh[:, :, :stop, :]
+                vc = vh[:, :, :stop, :]
+                positions = torch.arange(start, stop, device=q.device)
+                keys = torch.arange(stop, device=q.device)
+                allowed = keys.unsqueeze(0) <= positions.unsqueeze(1)
+                if hasattr(functional, "scaled_dot_product_attention"):
+                    part = functional.scaled_dot_product_attention(
+                        qc, kc, vc, attn_mask=allowed,
+                        dropout_p=0.0, is_causal=False,
+                    )
+                else:
+                    scores = (qc @ kc.transpose(-2, -1)) * (head_dim ** -0.5)
+                    part = torch.softmax(
+                        scores.masked_fill(~allowed, float("-inf")), dim=-1
+                    ) @ vc
+                parts.append(part)
+            output = torch.cat(parts, dim=-2)
+        elif hasattr(functional, "scaled_dot_product_attention"):
+            # The default remains native fused full-prompt SDPA.
             output = functional.scaled_dot_product_attention(
                 qh, kh, vh, dropout_p=0.0, is_causal=True
             )
