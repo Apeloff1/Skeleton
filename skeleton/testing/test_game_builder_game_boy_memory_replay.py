@@ -131,12 +131,16 @@ class _FakeCPU:
 
     @property
     def memory(self):
-        return {address: state[field] for field, label in {
-            "level": "Level", "x": "PlayerX", "y": "PlayerY", "health": "Health",
-            "score": "Score", "gems_remaining": "GemsRemaining",
-            "won": "GameWon", "lost": "GameLost",
-        }.items() for address, name in self.symbol_addresses.items()
-                if name == label for state in (self.states[self.index],)}
+        state = self.states[self.index]
+        return {
+            self.symbol_addresses[label]: state[field]
+            for field, label in {
+                "level": "Level", "x": "PlayerX", "y": "PlayerY",
+                "health": "Health", "score": "Score",
+                "gems_remaining": "GemsRemaining",
+                "won": "GameWon", "lost": "GameLost",
+            }.items()
+        }
 
 
 def test_hardware_driver_does_not_force_states_and_rejects_a_stale_native_engine():
